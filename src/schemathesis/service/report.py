@@ -5,7 +5,6 @@ import os
 import tarfile
 import threading
 import time
-import uuid
 from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from io import BytesIO
@@ -56,7 +55,6 @@ class ReportWriter:
         location: str,
         base_url: str | None,
         started_at: str,
-        correlation_id: uuid.UUID,
         metadata: Metadata,
         ci_environment: ci.Environment | None,
         usage_data: dict[str, Any] | None,
@@ -76,8 +74,6 @@ class ReportWriter:
             "ci": ci_environment.asdict() if ci_environment is not None else None,
             # CLI usage statistic
             "usage": usage_data,
-            # The unique identifier of the test run
-            "correlation_id": str(correlation_id),
             # Report format version
             "version": REPORT_FORMAT_VERSION,
         }
@@ -114,7 +110,6 @@ class ServiceReportHandler(BaseReportHandler):
     base_url: str | None
     started_at: str
     telemetry: bool
-    correlation_id: uuid.UUID
     out_queue: Queue
     in_queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
@@ -129,7 +124,6 @@ class ServiceReportHandler(BaseReportHandler):
                 "location": self.location,
                 "base_url": self.base_url,
                 "started_at": self.started_at,
-                "correlation_id": self.correlation_id,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
                 "usage_data": usage.collect() if self.telemetry else None,
@@ -166,7 +160,6 @@ def write_remote(
     location: str,
     base_url: str | None,
     started_at: str,
-    correlation_id: uuid.UUID,
     in_queue: Queue,
     out_queue: Queue,
     usage_data: dict[str, Any] | None,
@@ -182,7 +175,6 @@ def write_remote(
                 location=location,
                 base_url=base_url,
                 started_at=started_at,
-                correlation_id=correlation_id,
                 metadata=Metadata(),
                 ci_environment=ci_environment,
                 usage_data=usage_data,
@@ -212,7 +204,6 @@ class FileReportHandler(BaseReportHandler):
     base_url: str | None
     started_at: str
     telemetry: bool
-    correlation_id: uuid.UUID
     out_queue: Queue
     in_queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
@@ -226,7 +217,6 @@ class FileReportHandler(BaseReportHandler):
                 "location": self.location,
                 "base_url": self.base_url,
                 "started_at": self.started_at,
-                "correlation_id": self.correlation_id,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
                 "usage_data": usage.collect() if self.telemetry else None,
@@ -241,7 +231,6 @@ def write_file(
     location: str,
     base_url: str | None,
     started_at: str,
-    correlation_id: uuid.UUID,
     in_queue: Queue,
     out_queue: Queue,
     usage_data: dict[str, Any] | None,
@@ -254,7 +243,6 @@ def write_file(
             location=location,
             base_url=base_url,
             started_at=started_at,
-            correlation_id=correlation_id,
             metadata=Metadata(),
             ci_environment=ci_environment,
             usage_data=usage_data,

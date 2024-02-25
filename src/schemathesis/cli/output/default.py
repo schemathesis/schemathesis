@@ -12,6 +12,7 @@ from queue import Queue
 from typing import Any, Generator, cast
 
 import click
+from requests import RequestException
 
 from ... import service
 from ...code_samples import CodeSampleStyle
@@ -25,13 +26,15 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
 )
-from ...exceptions import RuntimeErrorType, prepare_response_payload
+from ...exceptions import RuntimeErrorType, format_exception, prepare_response_payload
 from ...experimental import GLOBAL_EXPERIMENTS
+from ...internal.result import Err, Ok
 from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
+from ...service.models import UnknownExtension
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -360,6 +363,44 @@ def display_application_logs(context: ExecutionContext, event: events.Finished) 
 def display_single_log(result: SerializedTestResult) -> None:
     display_subsection(result, None)
     click.echo("\n\n".join(result.logs))
+
+
+def display_analysis(context: ExecutionContext, event: events.Finished) -> None:
+    """Display schema analysis details."""
+    if context.analysis is None:
+        return
+    display_section_name("SCHEMA ANALYSIS")
+    if isinstance(context.analysis, Ok):
+        analysis = context.analysis.ok()
+        click.echo()
+        # TODO: check for empty extensions
+        click.secho(analysis.message, bold=True)
+        click.echo("\nThe following extensions has been applied:")
+        unknown = []
+        for extension in analysis.extensions:
+            if isinstance(extension, UnknownExtension):
+                unknown.append(extension)
+                continue
+            for entry in extension.details:
+                click.echo(f"  - {entry}")
+        click.echo()
+        if unknown:
+            click.secho("The following extensions are not recognized:")
+            for extension in unknown:
+                click.echo(f"  - {extension.type}")
+            click.echo("Consider updating the CLI for complete schema analysis and improved bug detection.")
+    elif isinstance(context.analysis, Err):
+        exception = context.analysis.err()
+        traceback = format_exception(exception, True)
+        if isinstance(exception, RequestException) and exception.response is not None:
+            response = f"\nResponse: {exception.response.text}\n\n"
+        else:
+            response = ""
+        click.echo()
+        click.echo(
+            f"An error happened during API schema analysis.\n"
+            f"Please, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n{response}{traceback.strip()}\n"
+        )
 
 
 def display_statistic(context: ExecutionContext, event: events.Finished) -> None:
@@ -708,15 +749,29 @@ def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing
 def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) -> None:
     context.probes = event.probes
     status = "SKIP"
-    if event.probes is not None:
-        for probe in event.probes:
-            if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
-                # The probe itself has been executed
-                status = "SUCCESS"
-            elif probe.outcome == ProbeOutcome.ERROR:
-                status = "ERROR"
+    for probe in event.probes:
+        if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
+            # The probe itself has been executed
+            status = "SUCCESS"
+        elif probe.outcome == ProbeOutcome.ERROR:
+            status = "ERROR"
     click.secho(f"API probing: {status}\r", bold=True, nl=False)
     click.echo()
+
+
+def handle_before_analysis(context: ExecutionContext, event: events.BeforeAnalysis) -> None:
+    click.secho("Schema analysis:\r", bold=True, nl=False)
+
+
+def handle_after_analysis(context: ExecutionContext, event: events.AfterAnalysis) -> None:
+    context.analysis = event.analysis
+    if isinstance(event.analysis, Ok):
+        status = "SUCCESS"
+    else:
+        status = "ERROR"
+    click.secho(f"Schema analysis: {status}\r", bold=True, nl=False)
+    click.echo()
+    # TODO: move to the first AfterExecution event
     operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
     if operations_count >= 1:
         click.echo()
@@ -755,6 +810,7 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_errors(context, event)
     display_failures(context, event)
     display_application_logs(context, event)
+    display_analysis(context, event)
     display_statistic(context, event)
     click.echo()
     display_summary(event)
@@ -780,6 +836,10 @@ class DefaultOutputStyleHandler(EventHandler):
             handle_before_probing(context, event)
         if isinstance(event, events.AfterProbing):
             handle_after_probing(context, event)
+        if isinstance(event, events.BeforeAnalysis):
+            handle_before_analysis(context, event)
+        if isinstance(event, events.AfterAnalysis):
+            handle_after_analysis(context, event)
         if isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         if isinstance(event, events.AfterExecution):

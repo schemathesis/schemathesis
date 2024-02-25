@@ -146,6 +146,10 @@ Receive automatic comments in your pull requests and updates on GitHub checks st
 
 ### Software as a Service
 
+Schemathesis CLI, in conjunction with Schemathesis.io, enhances bug detection by dynamically optimizing test case generation for efficiency and realism. 
+It leverages historical test run data and proven bug-triggering samples to adjust test cases specifically to your APIs. 
+Plus, a user-friendly UI simplifies viewing and analyzing test results.
+
 If you prefer an all-in-one solution with quick setup, we have a [free tier](https://schemathesis.io/#pricing) available.
 
 ## How it works

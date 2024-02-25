@@ -1,4 +1,5 @@
 from __future__ import annotations
+import uuid
 
 from random import Random
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
@@ -31,6 +32,7 @@ if TYPE_CHECKING:
     from ..stateful import Stateful
     from . import events
     from .impl import BaseRunner
+    from ..service.client import ServiceClient
 
 
 @deprecated_function(removed_in="4.0", replacement="schemathesis.runner.from_schema")
@@ -78,6 +80,8 @@ def prepare(
     hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None,
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
     probe_config: ProbeConfig | None = None,
+    service_client: ServiceClient | None,
+    correlation_id: uuid.UUID | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     from ..checks import DEFAULT_CHECKS
@@ -132,6 +136,7 @@ def prepare(
         count_operations=count_operations,
         count_links=count_links,
         probe_config=probe_config,
+        service_client=service_client,
     )
 
 
@@ -193,6 +198,8 @@ def execute_from_schema(
     count_operations: bool = True,
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
+    service_client: ServiceClient | None,
+    correlation_id: uuid.UUID | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -243,6 +250,7 @@ def execute_from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            service_client=service_client,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)
@@ -348,6 +356,8 @@ def from_schema(
     count_operations: bool = True,
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
+    service_client: ServiceClient | None,
+    correlation_id: uuid.UUID | None = None,
 ) -> BaseRunner:
     import hypothesis
     from starlette.applications import Starlette
@@ -361,6 +371,8 @@ def from_schema(
         ThreadPoolRunner,
         ThreadPoolWSGIRunner,
     )
+
+    correlation_id = correlation_id or uuid.uuid4()
 
     checks = checks or DEFAULT_CHECKS
     probe_config = probe_config or ProbeConfig()
@@ -402,6 +414,7 @@ def from_schema(
                 count_operations=count_operations,
                 count_links=count_links,
                 probe_config=probe_config,
+                service_client=service_client,
             )
         if isinstance(schema.app, Starlette):
             return ThreadPoolASGIRunner(
@@ -426,6 +439,7 @@ def from_schema(
                 count_operations=count_operations,
                 count_links=count_links,
                 probe_config=probe_config,
+                service_client=service_client,
             )
         return ThreadPoolWSGIRunner(
             schema=schema,
@@ -450,6 +464,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            service_client=service_client,
         )
     if not schema.app:
         return SingleThreadRunner(
@@ -478,6 +493,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            service_client=service_client,
         )
     if isinstance(schema.app, Starlette):
         return SingleThreadASGIRunner(
@@ -502,6 +518,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            service_client=service_client,
         )
     return SingleThreadWSGIRunner(
         schema=schema,
@@ -525,6 +542,7 @@ def from_schema(
         count_operations=count_operations,
         count_links=count_links,
         probe_config=probe_config,
+        service_client=service_client,
     )
 
 

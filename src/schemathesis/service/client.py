@@ -1,10 +1,10 @@
 from __future__ import annotations
+import json
 import hashlib
 import http
 from dataclasses import asdict
 from typing import Any, TYPE_CHECKING
 from urllib.parse import urljoin
-import uuid
 
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -26,7 +26,7 @@ from .models import (
 
 
 if TYPE_CHECKING:
-    from ..cli import probes
+    from ..runner import probes
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:
@@ -105,12 +105,13 @@ class ServiceClient(requests.Session):
             return FailedUploadResponse(detail=data["detail"])
         return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])
 
-    def analyze_schema(
-        self, probes: list[probes.ProbeRun], schema: dict[str, Any], run_id: uuid.UUID
-    ) -> AnalysisResult:
+    def analyze_schema(self, probes: list[probes.ProbeRun], schema: dict[str, Any]) -> AnalysisResult:
         """Analyze the API schema."""
-        response = self.post(
-            "/cli/analysis/",
-            json={"probes": [probe.serialize() for probe in probes], "schema": schema, "run_id": str(run_id)},
+        # Manual serialization reduces the size of the payload a bit
+        content = json.dumps(
+            {"probes": [probe.serialize() for probe in probes], "schema": schema}, separators=(",", ":")
         )
+        # TODO: Handle oversize - `JSON payload (20349999 bytes) is larger than allowed (limit: 10485760 bytes).`
+        #   Maybe make the backend to return proper JSON
+        response = self.post("/cli/analysis/", data=content, headers={"Content-Type": "application/json"}, timeout=None)
         return AnalysisResult.from_dict(response.json())
