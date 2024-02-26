@@ -231,7 +231,7 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
+@hookimpl(wrapper=True)  # type:ignore # pragma: no mutate
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
@@ -261,7 +261,7 @@ def skip_unnecessary_hypothesis_output() -> Generator:
         yield
 
 
-@hookimpl(hookwrapper=True)
+@hookimpl(wrapper=True)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 

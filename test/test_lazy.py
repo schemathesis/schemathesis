@@ -570,7 +570,7 @@ def test_(case):
 from _pytest.config import hookimpl
 
 
-@hookimpl(hookwrapper=True)
+@hookimpl(wrapper=True)
 def pytest_terminal_summary(terminalreporter) -> None:
     reports = [
         report
