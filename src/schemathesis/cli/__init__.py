@@ -1328,7 +1328,7 @@ def load_hook(module_name: str) -> None:
     except Exception as exc:
         click.secho("Unable to load Schemathesis extension hooks", fg="red", bold=True)
         formatted_module_name = bold(f"'{module_name}'")
-        if isinstance(exc, ModuleNotFoundError):
+        if isinstance(exc, ModuleNotFoundError) and exc.name == module_name:
             click.echo(
                 f"\nAn attempt to import the module {formatted_module_name} failed because it could not be found."
             )
