@@ -1,0 +1,13 @@
+Exit code: 1
+---
+Stdout:
+Unable to load Schemathesis extension hooks
+
+An error occurred while importing the module 'hook'. Traceback:
+
+Traceback (most recent call last):
+  File "/tmp/hook.py", line XXX, in <module>
+    import something_else
+ModuleNotFoundError: No module named 'something_else'
+
+For more information on how to work with hooks, visit https://schemathesis.readthedocs.io/en/stable/extending.html

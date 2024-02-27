@@ -119,6 +119,12 @@ def test_hooks_module_not_found(cli, snapshot_cli):
     assert os.getcwd() in sys.path
 
 
+def test_hooks_with_inner_import_error(testdir, cli, snapshot_cli):
+    # When the hook module itself raises an ImportError
+    module = testdir.make_importable_pyfile(hook="import something_else")
+    assert cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename) == snapshot_cli
+
+
 def test_hooks_invalid(testdir, cli):
     # When hooks are passed to the CLI call
     # And its importing causes an exception

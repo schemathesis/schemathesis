@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.4...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Incorrect error message when the code inside the hook module raises ``ImportError``. :issue:`2074`
+
 .. _v3.25.4:
 
 :version:`3.25.4 <v3.25.3...v3.25.4>` - 2024-02-25
