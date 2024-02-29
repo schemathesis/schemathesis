@@ -8,6 +8,7 @@ Changelog
 
 - Not respecting ``allow_x00`` and ``codec`` configs options during filling gaps in explicit examples.
 - Internal error when sending ``multipart/form-data`` requests when the schema defines the ``*/*`` content type.
+- Internal error when YAML payload definition contains nested ``binary`` format.
 
 .. _v3.25.5:
 

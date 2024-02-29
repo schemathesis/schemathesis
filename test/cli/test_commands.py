@@ -1357,6 +1357,32 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
     # NOTE, that the actual API operation is not checked in this test
 
 
+def test_nested_binary_in_yaml(testdir, openapi3_base_url, cli, snapshot_cli, empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/property": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "*/*": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"file": {"type": "string", "format": "binary"}},
+                                "required": ["file"],
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                },
+            }
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=10") == snapshot_cli
+
+
 @pytest.mark.operations("form")
 def test_urlencoded_form(cli, cli_args):
     # When the API operation accepts application/x-www-form-urlencoded

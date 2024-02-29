@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import binascii
 import os
 from dataclasses import dataclass
@@ -10,13 +11,14 @@ from typing import (
     Collection,
     Dict,
     Generator,
-    cast,
     Protocol,
+    cast,
     runtime_checkable,
 )
 
-from .internal.copy import fast_deepcopy
 from ._xml import _to_xml
+from .internal.copy import fast_deepcopy
+from .internal.jsonschema import traverse_schema
 from .transports.content_types import (
     is_json_media_type,
     is_plain_text_media_type,
@@ -150,6 +152,10 @@ class JSONSerializer:
         return _to_json(value)
 
 
+def _replace_binary(value: dict) -> dict:
+    return {key: value.data if isinstance(value, Binary) else value for key, value in value.items()}
+
+
 def _to_yaml(value: Any) -> dict[str, Any]:
     import yaml
 
@@ -162,6 +168,8 @@ def _to_yaml(value: Any) -> dict[str, Any]:
         return {"data": value}
     if isinstance(value, Binary):
         return {"data": value.data}
+    if isinstance(value, (list, dict)):
+        value = traverse_schema(value, _replace_binary)
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
