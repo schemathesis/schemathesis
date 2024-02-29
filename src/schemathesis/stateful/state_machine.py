@@ -1,21 +1,24 @@
 from __future__ import annotations
 
 import time
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
-from hypothesis.stateful import RuleBasedStateMachine
 from hypothesis.errors import InvalidDefinition
+from hypothesis.stateful import RuleBasedStateMachine
 
-from ..constants import NOT_SET, NO_LINKS_ERROR_MESSAGE
+from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
+from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
-from ..models import Case, APIOperation, CheckFunction
+from ..models import APIOperation, Case, CheckFunction
 
 if TYPE_CHECKING:
-    from ..schemas import BaseSchema
     import hypothesis
-    from ..transports.responses import GenericResponse
     from requests.structures import CaseInsensitiveDict
+
+    from ..schemas import BaseSchema
+    from ..transports.responses import GenericResponse
 
 
 @dataclass
@@ -25,6 +28,10 @@ class StepResult:
     response: GenericResponse
     case: Case
     elapsed: float
+
+
+def _operation_name_to_identifier(name: str) -> str:
+    return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
 
 
 class APIStateMachine(RuleBasedStateMachine):
@@ -58,6 +65,12 @@ class APIStateMachine(RuleBasedStateMachine):
             wrapper = _DirectionWrapper(direction)
             return super()._pretty_print((result, wrapper))  # type: ignore
         return super()._pretty_print(value)  # type: ignore
+
+    if HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS:
+
+        def _new_name(self, target: str) -> str:
+            target = _operation_name_to_identifier(target)
+            return super()._new_name(target)  # type: ignore
 
     @classmethod
     def run(cls, *, settings: hypothesis.settings | None = None) -> None:
