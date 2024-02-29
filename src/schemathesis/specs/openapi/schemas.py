@@ -33,6 +33,7 @@ from ...auths import AuthStorage
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import HTTP_METHODS, NOT_SET
 from ...exceptions import (
+    InternalError,
     OperationSchemaError,
     UsageError,
     get_missing_content_type_error,
@@ -1060,8 +1061,14 @@ class OpenApi30(SwaggerV20):
         files = []
         content = operation.definition.resolved["requestBody"]["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
-        # the "multipart/form-data" media type
-        schema = content["multipart/form-data"]["schema"]
+        # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
+        for media_type, entry in content.items():
+            main, sub = parse_content_type(media_type)
+            if main in ("*", "multipart") and sub in ("*", "form-data"):
+                schema = entry["schema"]
+                break
+        else:
+            raise InternalError("No 'multipart/form-data' media type found in the schema")
         for name, property_schema in schema.get("properties", {}).items():
             if name in form_data:
                 if isinstance(form_data[name], list):
