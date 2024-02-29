@@ -12,3 +12,6 @@ PYTEST_VERSION = version.parse(metadata.version("pytest"))
 IS_PYTEST_ABOVE_54 = PYTEST_VERSION >= version.parse("5.4.0")
 IS_PYTEST_ABOVE_7 = PYTEST_VERSION >= version.parse("7.0.0")
 IS_PYTEST_ABOVE_8 = PYTEST_VERSION >= version.parse("8.0.0")
+
+HYPOTHESIS_VERSION = version.parse(metadata.version("hypothesis"))
+HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS = HYPOTHESIS_VERSION >= version.parse("6.98.14")

@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Incorrect error message when the code inside the hook module raises ``ImportError``. :issue:`2074`
+- Compatibility with Hypothesis >6.98.14
 
 .. _v3.25.4:
 
