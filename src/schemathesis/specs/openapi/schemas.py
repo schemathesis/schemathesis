@@ -433,7 +433,7 @@ class BaseOpenAPISchema(BaseSchema):
             auth_storage=auth_storage,
             hooks=hooks,
             generator=data_generation_method,
-            generation_config=generation_config,
+            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 
