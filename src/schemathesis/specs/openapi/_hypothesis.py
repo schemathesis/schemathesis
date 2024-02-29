@@ -134,7 +134,7 @@ def get_case_strategy(
 
     context = HookContext(operation)
 
-    generation_config = generation_config or GenerationConfig()
+    generation_config = generation_config or operation.schema.generation_config
 
     path_parameters_ = generate_parameter(
         "path", path_parameters, operation, draw, context, hooks, generator, generation_config
