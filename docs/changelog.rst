@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.5...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Not respecting ``allow_x00`` and ``codec`` configs options during filling gaps in explicit examples.
+
 .. _v3.25.5:
 
 :version:`3.25.5 <v3.25.4...v3.25.5>` - 2024-02-29

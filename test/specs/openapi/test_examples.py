@@ -1,23 +1,23 @@
 from __future__ import annotations
-
-from unittest.mock import ANY
+from schemathesis.generation import GenerationConfig
 
 from test.utils import assert_requests_call
 from typing import Any
+from unittest.mock import ANY
 
 import jsonschema
 import pytest
 import yaml
 from _pytest.main import ExitCode
-from hypothesis import find
+from hypothesis import find, settings, given, HealthCheck, strategies as st, Phase
 
 import schemathesis
 from schemathesis._hypothesis import get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (
-    extract_inner_examples,
     ParameterExample,
+    extract_inner_examples,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -763,6 +763,54 @@ def test_partial_examples(empty_open_api_3_schema):
     example = get_single_example(strategy)
     parameters_schema = parameters_to_json_schema(operation, operation.path_parameters)
     jsonschema.validate(example.path_parameters, parameters_schema)
+
+
+def test_partial_examples_without_null_bytes_and_formats(empty_open_api_3_schema):
+    schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
+    empty_open_api_3_schema["paths"] = {
+        "/test/": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "q1",
+                        "in": "query",
+                        "required": True,
+                        "schema": {
+                            "type": "object",
+                            "properties": {"foo": {"type": "string"}},
+                            "required": ["foo"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    {
+                        "name": "q2",
+                        "in": "query",
+                        "required": True,
+                        "schema": {
+                            "type": "object",
+                            "properties": {"foo": {"type": "string", "format": "even_4_digits"}},
+                            "required": ["foo"],
+                            "additionalProperties": False,
+                        },
+                    },
+                    {"name": "q3", "in": "query", "required": True, "schema": {"type": "string"}, "example": "test"},
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, generation_config=GenerationConfig(allow_x00=False))
+    operation = schema["/test/"]["POST"]
+    strategy = operation.get_strategies_from_examples()[0]
+
+    @given(case=strategy)
+    @settings(deadline=None, suppress_health_check=list(HealthCheck), phases=[Phase.generate])
+    def test(case):
+        assert "\x00" not in case.query["q1"]["foo"]
+        assert len(case.query["q2"]["foo"]) == 4
+        assert int(case.query["q2"]["foo"]) % 2 == 0
+
+    test()
 
 
 def test_external_value(empty_open_api_3_schema, server):
