@@ -8,6 +8,7 @@ Changelog
 
 - Incorrect error message when the code inside the hook module raises ``ImportError``. :issue:`2074`
 - Compatibility with Hypothesis >6.98.14
+- Not respecting ``allow_x00`` and ``codec`` configs options for data generation in some cases. :issue:`2072`
 
 .. _v3.25.4:
 

@@ -255,7 +255,7 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             data_generation_method=data_generation_method,
-            generation_config=generation_config,
+            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 

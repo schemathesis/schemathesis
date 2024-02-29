@@ -4,22 +4,28 @@ import json
 import pathlib
 from functools import lru_cache
 from json import JSONDecodeError
-from typing import IO, Any, Callable, Dict, cast, TYPE_CHECKING, NoReturn
+from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, cast
 
 from ...code_samples import CodeSampleStyle
-from ...generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, DataGenerationMethodInput
 from ...constants import WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
+from ...generation import (
+    DEFAULT_DATA_GENERATION_METHODS,
+    DataGenerationMethod,
+    DataGenerationMethodInput,
+    GenerationConfig,
+)
 from ...hooks import HookContext, dispatch
+from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
-from ...types import PathLike
 from ...transports.headers import setup_default_headers
-from ...internal.validation import require_relative_url
+from ...types import PathLike
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
     from pyrate_limiter import Limiter
+
     from ...transports.responses import GenericResponse
     from .schemas import GraphQLSchema
 
@@ -45,6 +51,7 @@ def from_path(
     app: Any = None,
     base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     encoding: str = "utf8",
@@ -91,6 +98,7 @@ def from_url(
     base_url: str | None = None,
     port: int | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
@@ -152,6 +160,7 @@ def from_file(
     app: Any = None,
     base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     location: str | None = None,
     rate_limit: str | None = None,
@@ -211,6 +220,7 @@ def from_dict(
     base_url: str | None = None,
     location: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
@@ -253,6 +263,7 @@ def from_wsgi(
     *,
     base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
@@ -266,6 +277,7 @@ def from_wsgi(
     :return: GraphQLSchema
     """
     from werkzeug import Client
+
     from ...transports.responses import WSGIResponse
 
     require_relative_url(schema_path)
@@ -292,6 +304,7 @@ def from_asgi(
     *,
     base_url: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
+    generation_config: GenerationConfig | None = None,
     code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
