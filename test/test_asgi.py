@@ -2,9 +2,11 @@ from contextlib import asynccontextmanager
 
 import pytest
 from fastapi import Cookie, FastAPI
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
+from pydantic import BaseModel
 
 import schemathesis
+from schemathesis.generation import GenerationConfig
 from schemathesis.models import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
@@ -51,6 +53,37 @@ def test_cookies(fastapi_app):
         response = case.call_asgi()
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
+
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_null_byte(fastapi_app):
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    class Payload(BaseModel):
+        name: str
+
+    @fastapi_app.post("/data")
+    def post_create(payload: Payload):
+        payload = payload.model_dump()
+        assert "\x00" not in payload["name"]
+        return {"success": True}
+
+    schema = schemathesis.from_asgi(
+        "/openapi.json", app=fastapi_app, generation_config=GenerationConfig(allow_x00=False)
+    )
+
+    strategy = schema["/data"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(
+        max_examples=50, suppress_health_check=[HealthCheck.filter_too_much], deadline=None, phases=[Phase.generate]
+    )
+    def test(case):
+        response = case.call_asgi()
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
 
     test()
 

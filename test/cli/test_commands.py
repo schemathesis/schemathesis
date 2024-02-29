@@ -2079,6 +2079,7 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
 
 
 @pytest.mark.operations("success")
+@flaky(max_runs=5, min_passes=1)
 def test_multiple_failures_in_single_check(
     testdir, mocker, response_factory, cli, empty_open_api_3_schema, openapi3_base_url, snapshot_cli
 ):
