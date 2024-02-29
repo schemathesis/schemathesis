@@ -1278,7 +1278,8 @@ def test_wsgi_app_path_schema(cli, loadable_flask_app):
     assert "1 passed in" in result.stdout
 
 
-def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_base_url, cli):
+@pytest.mark.parametrize("media_type", ("multipart/form-data", "multipart/*"))
+def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_base_url, cli, media_type):
     cassette_path = tmp_path / "output.yaml"
     # When requestBody has a binary field or an array of binary items
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -1291,7 +1292,7 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
                     "requestBody": {
                         "required": True,
                         "content": {
-                            "multipart/form-data": {
+                            media_type: {
                                 "schema": {
                                     "type": "object",
                                     "properties": {"file": {"type": "string", "format": "binary"}},
@@ -1308,7 +1309,7 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
                     "requestBody": {
                         "required": True,
                         "content": {
-                            "multipart/form-data": {
+                            media_type: {
                                 "schema": {
                                     "type": "object",
                                     "properties": {

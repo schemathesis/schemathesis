@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Not respecting ``allow_x00`` and ``codec`` configs options during filling gaps in explicit examples.
+- Internal error when sending ``multipart/form-data`` requests when the schema defines the ``*/*`` content type.
 
 .. _v3.25.5:
 
