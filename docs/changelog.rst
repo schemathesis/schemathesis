@@ -9,6 +9,7 @@ Changelog
 - Not respecting ``allow_x00`` and ``codec`` configs options during filling gaps in explicit examples.
 - Internal error when sending ``multipart/form-data`` requests when the schema defines the ``*/*`` content type.
 - Internal error when YAML payload definition contains nested ``binary`` format.
+- Internal error when an Open API 2.0 schema contains no ``swagger`` key and the schema version is forced.
 
 **Changed**
 
