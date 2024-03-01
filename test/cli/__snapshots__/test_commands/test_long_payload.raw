@@ -9,6 +9,7 @@ Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
+API probing: SUCCESS
 
 GET /api/long F                                                           [100%]
 

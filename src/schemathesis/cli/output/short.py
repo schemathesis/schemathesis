@@ -26,6 +26,10 @@ class ShortOutputStyleHandler(EventHandler):
         """
         if isinstance(event, events.Initialized):
             default.handle_initialized(context, event)
+        if isinstance(event, events.BeforeProbing):
+            default.handle_before_probing(context, event)
+        if isinstance(event, events.AfterProbing):
+            default.handle_after_probing(context, event)
         if isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         if isinstance(event, events.AfterExecution):

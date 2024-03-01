@@ -63,7 +63,10 @@ def csv_strategy(enum):
 
 
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture], deadline=None)
+@settings(
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
+    deadline=None,
+)
 @given(
     params=st.fixed_dictionaries(
         {},

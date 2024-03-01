@@ -10,6 +10,10 @@ Changelog
 - Internal error when sending ``multipart/form-data`` requests when the schema defines the ``*/*`` content type.
 - Internal error when YAML payload definition contains nested ``binary`` format.
 
+**Changed**
+
+- Indicate API probing results in CLI.
+
 .. _v3.25.5:
 
 :version:`3.25.5 <v3.25.4...v3.25.5>` - 2024-02-29

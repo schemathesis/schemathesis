@@ -9,6 +9,7 @@ Random seed: 42
 Workers: 1
 Collected API operations: 2
 Collected API links: 0
+API probing: ERROR
 
 GET /api/failure E                                                        [ 50%]
 GET /api/success E                                                        [100%]

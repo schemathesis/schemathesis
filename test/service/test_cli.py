@@ -138,10 +138,10 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = get_stdout_lines(result.stdout)
     # And meta information should be displayed
-    assert lines[17] == "Compressed report size: 1 KB"
-    assert lines[18] == f"Uploading reports to {service.base_url} ..."
+    assert lines[19] in ("Compressed report size: 1 KB", "Compressed report size: 2 KB")
+    assert lines[20] == f"Uploading reports to {service.base_url} ..."
     # Then the output indicates timeout
-    assert lines[19] == "Upload: TIMEOUT"
+    assert lines[21] == "Upload: TIMEOUT"
 
 
 def test_wait_for_report_handler():
@@ -390,7 +390,7 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
     # Then the report should be saved to a file
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 6
+        assert len(tar.getmembers()) == 8
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         assert metadata["api_name"] == name
@@ -428,7 +428,7 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         assert f"Report is saved to {report_file}" in result.stdout
         assert not service.server.log
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 6
+        assert len(tar.getmembers()) == 8
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         if telemetry == "true":
@@ -482,9 +482,9 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
     assert result.exit_code == ExitCode.OK, result.stdout
     # And CI information is displayed in stdout
     lines = get_stdout_lines(result.stdout)
-    assert lines[16] == f"{environment.verbose_name} detected:"
+    assert lines[18] == f"{environment.verbose_name} detected:"
     key, value = next(iter(environment.as_env().items()))
-    assert lines[17] == f"  -> {key}: {value}"
+    assert lines[19] == f"  -> {key}: {value}"
     # And missing env vars are not displayed
     key, _ = next(filter(lambda kv: kv[1] is None, iter(environment.as_env().items())))
     assert key not in result.stdout
@@ -540,7 +540,7 @@ def test_too_large_payload(cli, schema_url, service):
 @pytest.fixture
 def report_file(tmp_path, cli, schema_url):
     report_file = tmp_path / "report.tar.gz"
-    result = cli.run(schema_url, f"--report={report_file}")
+    result = cli.run(schema_url, f"--report={report_file}", "--show-trace")
     assert result.exit_code == ExitCode.OK, result.stdout
     return report_file
 

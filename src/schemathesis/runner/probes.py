@@ -21,11 +21,22 @@ from ..transports.auth import get_requests_auth
 if TYPE_CHECKING:
     import requests
 
+    from ..types import RequestCert
     from ..schemas import BaseSchema
-    from . import LoaderConfig
 
 
 HEADER_NAME = "X-Schemathesis-Probe"
+
+
+@dataclass
+class ProbeConfig:
+    base_url: str | None = None
+    request_tls_verify: bool | str = True
+    request_proxy: str | None = None
+    request_cert: RequestCert | None = None
+    auth: tuple[str, str] | None = None
+    auth_type: str | None = None
+    headers: dict[str, str] | None = None
 
 
 @dataclass
@@ -35,15 +46,15 @@ class Probe:
     name: str
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: LoaderConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: ProbeConfig
     ) -> requests.PreparedRequest:
         raise NotImplementedError
 
-    def analyze_response(self, response: requests.Response) -> ProbeResultType:
+    def analyze_response(self, response: requests.Response) -> ProbeOutcome:
         raise NotImplementedError
 
 
-class ProbeResultType(str, enum.Enum):
+class ProbeOutcome(str, enum.Enum):
     # Capability is supported
     SUCCESS = "success"
     # Capability is not supported
@@ -55,18 +66,16 @@ class ProbeResultType(str, enum.Enum):
 
 
 @dataclass
-class ProbeResult:
-    """Result of a probe."""
-
+class ProbeRun:
     probe: Probe
-    type: ProbeResultType
+    outcome: ProbeOutcome
     request: requests.PreparedRequest | None = None
     response: requests.Response | None = None
     error: requests.RequestException | None = None
 
     @property
     def is_failure(self) -> bool:
-        return self.type == ProbeResultType.FAILURE
+        return self.outcome == ProbeOutcome.FAILURE
 
     def serialize(self) -> dict[str, Any]:
         """Serialize probe results so it can be sent over the network."""
@@ -87,7 +96,7 @@ class ProbeResult:
             error = None
         return {
             "name": self.probe.name,
-            "type": self.type.value,
+            "outcome": self.outcome.value,
             "request": request,
             "response": response,
             "error": error,
@@ -101,25 +110,25 @@ class NullByteInHeader(Probe):
     name: str = "NULL_BYTE_IN_HEADER"
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: LoaderConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: ProbeConfig
     ) -> requests.PreparedRequest:
         request.method = "GET"
         request.url = config.base_url or schema.get_base_url()
         request.headers = {"X-Schemathesis-Probe-Null": "\x00"}
         return session.prepare_request(request)
 
-    def analyze_response(self, response: requests.Response) -> ProbeResultType:
+    def analyze_response(self, response: requests.Response) -> ProbeOutcome:
         if response.status_code == 400:
-            return ProbeResultType.FAILURE
-        return ProbeResultType.SUCCESS
+            return ProbeOutcome.FAILURE
+        return ProbeOutcome.SUCCESS
 
 
 PROBES = (NullByteInHeader,)
 
 
-def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: LoaderConfig) -> ProbeResult:
+def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: ProbeConfig) -> ProbeRun:
     """Send the probe to the application."""
-    from requests import Request, RequestException, PreparedRequest
+    from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
@@ -129,23 +138,24 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Lo
         request.headers["User-Agent"] = USER_AGENT
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = session.send(request)
+            response = session.send(request, timeout=2)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
-        return ProbeResult(probe, ProbeResultType.SKIP, None, None, None)
+        return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeResult(probe, ProbeResultType.ERROR, req, None, exc)
+        return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
     result_type = probe.analyze_response(response)
-    return ProbeResult(probe, result_type, request, response)
+    return ProbeRun(probe, result_type, request, response)
 
 
-def run(schema: BaseSchema, config: LoaderConfig) -> list[ProbeResult]:
+def run(schema: BaseSchema, config: ProbeConfig) -> list[ProbeRun]:
     """Run all probes against the given schema."""
     from requests import Session
 
     session = Session()
+    session.headers.update(config.headers or {})
     session.verify = config.request_tls_verify
     if config.request_cert is not None:
         session.cert = config.request_cert

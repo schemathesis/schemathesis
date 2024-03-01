@@ -5,27 +5,24 @@ import pathlib
 import platform
 import sys
 import time
-
-import urllib3.exceptions
-
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
-from test.utils import HERE, SIMPLE_PATH, strip_style_win32
+from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
 
+import hypothesis
 import pytest
 import requests
 import trustme
+import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
-import hypothesis
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis.models import Case
-from schemathesis.generation import DataGenerationMethod, GenerationConfig
-from schemathesis.checks import ALL_CHECKS, not_a_server_error, DEFAULT_CHECKS
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
+from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import (
     DEPRECATED_PRE_RUN_OPTION_WARNING,
     LoaderConfig,
@@ -33,25 +30,25 @@ from schemathesis.cli import (
     get_exit_code,
     reset_checks,
 )
-from schemathesis.cli.constants import Phase, HealthCheck
+from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.code_samples import CodeSampleStyle
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54, IS_PYTEST_ABOVE_7
 from schemathesis.constants import (
+    DEFAULT_DEADLINE,
     DEFAULT_RESPONSE_TIMEOUT,
     FLAKY_FAILURE_MESSAGE,
     REPORT_SUGGESTION_ENV_VAR,
-    DEFAULT_DEADLINE,
 )
 from schemathesis.extra._flask import run_server
-from schemathesis.models import APIOperation
-from schemathesis.runner import from_schema, CaseOverride
+from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.internal.datetime import current_datetime
+from schemathesis.models import APIOperation, Case
+from schemathesis.runner import CaseOverride, from_schema
 from schemathesis.runner.impl import threadpool
+from schemathesis.runner.probes import ProbeConfig
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
-from schemathesis.internal.datetime import current_datetime
-from test.utils import flaky
 
 PHASES = ", ".join(x.name for x in Phase)
 HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)
@@ -302,6 +299,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "seed": None,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
+        "probe_config": ProbeConfig(auth_type="basic", headers={}),
         **expected,
     }
     hypothesis_settings = expected.pop("hypothesis_settings", None)
@@ -473,9 +471,9 @@ def test_cli_run_output_success(cli, cli_args, workers):
     lines = result.stdout.split("\n")
     assert lines[5] == f"Workers: {workers}"
     if workers == 1:
-        assert lines[9].startswith("GET /api/success .")
+        assert lines[10].startswith("GET /api/success .")
     else:
-        assert lines[9] == "."
+        assert lines[10] == "."
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
 
@@ -589,11 +587,11 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[9].startswith("GET /api/slow .")
-        assert lines[10].startswith("GET /api/success .")
+        assert lines[10].startswith("GET /api/slow .")
+        assert lines[11].startswith("GET /api/success .")
     else:
         # It could be in any sequence, because of multiple threads
-        assert lines[9] == ".."
+        assert lines[10] == ".."
 
 
 @pytest.mark.operations("unsatisfiable")
@@ -619,9 +617,9 @@ def test_flaky(cli, cli_args, workers):
     # And this operation should be marked as failed in the progress line
     lines = result.stdout.split("\n")
     if workers == 1:
-        assert lines[8].startswith("GET /api/flaky F")
+        assert lines[9].startswith("GET /api/flaky F")
     else:
-        assert lines[8] == "F"
+        assert lines[9] == "F"
     # And it should be displayed only once in "FAILURES" section
     assert "= FAILURES =" in result.stdout
     assert "_ GET /api/flaky _" in result.stdout
@@ -643,8 +641,8 @@ def test_invalid_operation(cli, cli_args, workers):
     assert "You can add @seed" not in result.stdout
     # And this operation should be marked as errored in the progress line
     lines = result.stdout.split("\n")
-    assert lines[9].startswith("POST /api/invalid E")
-    assert " POST /api/invalid " in lines[12]
+    assert lines[10].startswith("POST /api/invalid E")
+    assert " POST /api/invalid " in lines[13]
     # There shouldn't be a section end immediately after section start - there should be error text
     assert (
         """Invalid definition for element at index 0 in `parameters`
@@ -1016,11 +1014,11 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
     if IS_PYTEST_ABOVE_54:
-        ignored_exception = "Exception ignored in: " in lines[7]
-        assert lines[8] in expected or ignored_exception, lines
+        ignored_exception = "Exception ignored in: " in lines[8]
+        assert lines[9] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert any("!! KeyboardInterrupt !!" in line for line in lines[9:]), lines
-    assert any("=== SUMMARY ===" in line for line in lines[8:])
+        assert any("!! KeyboardInterrupt !!" in line for line in lines[10:]), lines
+    assert any("=== SUMMARY ===" in line for line in lines[9:])
 
 
 @pytest.mark.parametrize("workers", (1, 2))
@@ -1053,11 +1051,11 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
-        assert lines[9].startswith("GET /api/failure .")
-        assert lines[9].endswith("[ 50%]")
-        assert lines[10] == "GET /api/success "
-        assert "!! KeyboardInterrupt !!" in lines[11]
-        assert "== SUMMARY ==" in lines[13]
+        assert lines[10].startswith("GET /api/failure .")
+        assert lines[10].endswith("[ 50%]")
+        assert lines[11] == "GET /api/success "
+        assert "!! KeyboardInterrupt !!" in lines[12]
+        assert "== SUMMARY ==" in lines[14]
     else:
         assert_threaded_executor_interruption(lines, ("", "."))
 
@@ -1243,12 +1241,12 @@ def test_wsgi_app_internal_exception(testdir, cli):
     result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[46], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[48]
+    assert "== APPLICATION LOGS ==" in lines[47], result.stdout.strip()
+    assert "ERROR in app: Exception on /api/success [GET]" in lines[49]
     if sys.version_info >= (3, 11):
-        assert lines[64] == "ZeroDivisionError: division by zero"
+        assert lines[65] == "ZeroDivisionError: division by zero"
     else:
-        assert lines[59] == '    raise ZeroDivisionError("division by zero")'
+        assert lines[60] == '    raise ZeroDivisionError("division by zero")'
 
 
 @pytest.mark.parametrize("args", ((), ("--base-url",)))
@@ -1869,9 +1867,9 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
     # And emitted Before / After event pairs have the same correlation ids
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
-    assert events[1]["correlation_id"] == events[2]["correlation_id"]
+    assert events[3]["correlation_id"] == events[4]["correlation_id"]
     # And they should have the same "verbose_name"
-    assert events[1]["verbose_name"] == events[2]["verbose_name"]
+    assert events[3]["verbose_name"] == events[4]["verbose_name"]
 
 
 @pytest.mark.openapi_version("3.0")

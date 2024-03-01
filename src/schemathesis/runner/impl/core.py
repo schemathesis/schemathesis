@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import logging
 import re
 import threading
@@ -8,7 +9,7 @@ import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import TracebackType
-from typing import Any, Callable, Generator, Iterable, cast, TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, List, Literal, cast
 from warnings import WarningMessage, catch_warnings
 
 import hypothesis
@@ -16,53 +17,56 @@ import requests
 from _pytest.logging import LogCaptureHandler, catching_logs
 from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
-from jsonschema.exceptions import ValidationError, SchemaError as JsonSchemaError
+from jsonschema.exceptions import SchemaError as JsonSchemaError
+from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ..._override import CaseOverride
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import (
-    has_unsatisfied_example_mark,
-    get_non_serializable_mark,
-    get_invalid_regex_mark,
     get_invalid_example_headers_mark,
+    get_invalid_regex_mark,
+    get_non_serializable_mark,
+    has_unsatisfied_example_mark,
 )
+from ..._override import CaseOverride
 from ...auths import unregister as unregister_auth
-from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    USER_AGENT,
     SERIALIZERS_SUGGESTION_MESSAGE,
+    USER_AGENT,
 )
 from ...exceptions import (
     CheckFailed,
     DeadlineExceeded,
+    InvalidHeadersExample,
     InvalidRegularExpression,
     NonCheckError,
     OperationSchemaError,
+    SerializationNotPossible,
     SkipTest,
+    format_exception,
     get_grouped_exception,
     maybe_set_assertion_message,
-    format_exception,
-    SerializationNotPossible,
-    InvalidHeadersExample,
 )
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
+from ...internal.datetime import current_datetime
 from ...internal.result import Ok
 from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
 from ...runner import events
-from ...internal.datetime import current_datetime
 from ...schemas import BaseSchema
+from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
 from ...types import RawAuth, RequestCert
 from ...utils import capture_hypothesis_output
+from .. import probes
 from ..serialization import SerializedTestResult
 
 if TYPE_CHECKING:
-    from ...transports.responses import WSGIResponse, GenericResponse
+    from ...transports.responses import GenericResponse, WSGIResponse
 
 
 def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
@@ -77,6 +81,7 @@ class BaseRunner:
     targets: Iterable[Target]
     hypothesis_settings: hypothesis.settings
     generation_config: GenerationConfig
+    probe_config: probes.ProbeConfig
     override: CaseOverride | None = None
     auth: RawAuth | None = None
     auth_type: str | None = None
@@ -104,25 +109,55 @@ class BaseRunner:
         if self.auth is not None:
             unregister_auth()
         results = TestResultSet(seed=self.seed)
+        initialized = None
+        __probes = None
+        start_time = time.monotonic()
 
-        initialized = events.Initialized.from_schema(
-            schema=self.schema, count_operations=self.count_operations, count_links=self.count_links, seed=self.seed
-        )
+        def _initialize() -> events.Initialized:
+            nonlocal initialized
+            initialized = events.Initialized.from_schema(
+                schema=self.schema,
+                count_operations=self.count_operations,
+                count_links=self.count_links,
+                seed=self.seed,
+                start_time=start_time,
+            )
+            return initialized
 
         def _finish() -> events.Finished:
             if has_all_not_found(results):
                 results.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
-            return events.Finished.from_results(results=results, running_time=time.monotonic() - initialized.start_time)
+            return events.Finished.from_results(results=results, running_time=time.monotonic() - start_time)
+
+        def _before_probes() -> events.BeforeProbing:
+            return events.BeforeProbing()
+
+        def _run_probes() -> None:
+            if not self.dry_run:
+                nonlocal __probes
+
+                __probes = run_probes(self.schema, self.probe_config)
+
+        def _after_probes() -> events.AfterProbing:
+            _probes = cast(List[probes.ProbeRun], __probes)
+            return events.AfterProbing(probes=_probes)
 
         if stop_event.is_set():
             yield _finish()
             return
 
-        yield initialized
-
-        if stop_event.is_set():
-            yield _finish()
-            return
+        for event_factory in (
+            _initialize,
+            _before_probes,
+            _run_probes,
+            _after_probes,
+        ):
+            event = event_factory()
+            if event is not None:
+                yield event
+            if stop_event.is_set():
+                yield _finish()
+                return
 
         try:
             yield from self._execute(results, stop_event)
@@ -226,6 +261,20 @@ class BaseRunner:
                 yield from handle_schema_error(
                     result.err(), results, self.schema.data_generation_methods, recursion_level
                 )
+
+
+def run_probes(schema: BaseSchema, config: probes.ProbeConfig) -> list[probes.ProbeRun]:
+    """Discover capabilities of the tested app."""
+    results = probes.run(schema, config)
+    for result in results:
+        if isinstance(result.probe, probes.NullByteInHeader) and result.is_failure:
+            from ...specs.openapi._hypothesis import HEADER_FORMAT, header_values
+
+            formats.register(
+                HEADER_FORMAT,
+                header_values(blacklist_characters="\n\r\x00").map(str.lstrip),
+            )
+    return results
 
 
 @dataclass

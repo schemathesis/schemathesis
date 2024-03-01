@@ -4,34 +4,22 @@ from unittest.mock import ANY
 
 import pytest
 
-from schemathesis.cli import LoaderConfig, probes
 from schemathesis.constants import USER_AGENT
+from schemathesis.runner import probes
 from schemathesis.runner.impl.core import canonicalize_error_message
 
 
 @pytest.fixture
 def config_factory():
     def inner(base_url, request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
-        return LoaderConfig(
-            schema_or_location="http://127.0.0.1/openapi.json",
-            app=None,
+        return probes.ProbeConfig(
             base_url=base_url,
-            validate_schema=False,
-            skip_deprecated_operations=False,
-            data_generation_methods=(),
-            force_schema_version=None,
             request_proxy=request_proxy,
             request_tls_verify=request_tls_verify,
             request_cert=request_cert,
-            wait_for_schema=None,
-            rate_limit=None,
             auth=auth,
             auth_type=None,
             headers=headers,
-            endpoint=None,
-            method=None,
-            tag=None,
-            operation_id=None,
         )
 
     return inner
@@ -51,7 +39,7 @@ DEFAULT_HEADERS = {
 @pytest.mark.parametrize(
     "kwargs, headers",
     (
-        ({"request_cert": str(HERE / "cert.pem")}, {}),
+        ({"request_cert": str(HERE.parent / "cli" / "cert.pem")}, {}),
         ({"auth": ("test", "test")}, {"Authorization": ["[Filtered]"]}),
     ),
 )
@@ -59,8 +47,8 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
     config = config_factory(base_url=openapi3_base_url, **kwargs)
     results = probes.run(openapi_30, config)
     assert results == [
-        probes.ProbeResult(
-            probe=probes.NullByteInHeader(), type=probes.ProbeResultType.FAILURE, request=ANY, response=ANY, error=None
+        probes.ProbeRun(
+            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.FAILURE, request=ANY, response=ANY, error=None
         )
     ]
     assert results[0].serialize() == {
@@ -78,7 +66,7 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
             "uri": openapi3_base_url,
         },
         "response": None,
-        "type": "failure",
+        "outcome": "failure",
     }
 
 
@@ -116,7 +104,7 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
             "status_code": 200,
             "verify": True,
         },
-        "type": "failure",
+        "outcome": "failure",
     }
 
 
@@ -124,8 +112,8 @@ def test_detect_null_byte_error(openapi_30, config_factory):
     config = config_factory(base_url="http://127.0.0.1:1")
     results = probes.run(openapi_30, config)
     assert results == [
-        probes.ProbeResult(
-            probe=probes.NullByteInHeader(), type=probes.ProbeResultType.ERROR, request=ANY, response=None, error=ANY
+        probes.ProbeRun(
+            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.ERROR, request=ANY, response=None, error=ANY
         )
     ]
     serialized = results[0].serialize()
@@ -155,7 +143,7 @@ def test_detect_null_byte_error(openapi_30, config_factory):
             "uri": "http://127.0.0.1:1/",
         },
         "response": None,
-        "type": "error",
+        "outcome": "error",
     }
 
 
@@ -163,8 +151,8 @@ def test_detect_null_byte_skipped(openapi_30, config_factory):
     config = config_factory(base_url=None)
     results = probes.run(openapi_30, config)
     assert results == [
-        probes.ProbeResult(
-            probe=probes.NullByteInHeader(), type=probes.ProbeResultType.SKIP, request=None, response=None, error=None
+        probes.ProbeRun(
+            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.SKIP, request=None, response=None, error=None
         )
     ]
     assert results[0].serialize() == {
@@ -172,5 +160,5 @@ def test_detect_null_byte_skipped(openapi_30, config_factory):
         "name": "NULL_BYTE_IN_HEADER",
         "request": None,
         "response": None,
-        "type": "skip",
+        "outcome": "skip",
     }
