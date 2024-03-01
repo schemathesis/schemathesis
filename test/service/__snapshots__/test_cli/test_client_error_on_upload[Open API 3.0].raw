@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 2
 Collected API links: 0
 Report to Schemathesis.io: ENABLED
+API probing: SUCCESS
 
 GET /api/failure F                                                        [ 50%]
 GET /api/success .                                                        [100%]

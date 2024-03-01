@@ -19,6 +19,15 @@ def serialize_initialized(event: events.Initialized) -> dict[str, Any] | None:
     }
 
 
+def serialize_before_probing(_: events.BeforeProbing) -> None:
+    return None
+
+
+def serialize_after_probing(event: events.AfterProbing) -> dict[str, Any] | None:
+    probes = event.probes or []
+    return {"probes": [probe.serialize() for probe in probes]}
+
+
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
     return {
         "correlation_id": event.correlation_id,
@@ -116,6 +125,8 @@ def serialize_finished(event: events.Finished) -> dict[str, Any] | None:
 
 SERIALIZER_MAP = {
     events.Initialized: serialize_initialized,
+    events.BeforeProbing: serialize_before_probing,
+    events.AfterProbing: serialize_after_probing,
     events.BeforeExecution: serialize_before_execution,
     events.AfterExecution: serialize_after_execution,
     events.Interrupted: serialize_interrupted,
@@ -128,6 +139,8 @@ def serialize_event(
     event: events.ExecutionEvent,
     *,
     on_initialized: SerializeFunc | None = None,
+    on_before_probing: SerializeFunc | None = None,
+    on_after_probing: SerializeFunc | None = None,
     on_before_execution: SerializeFunc | None = None,
     on_after_execution: SerializeFunc | None = None,
     on_interrupted: SerializeFunc | None = None,
@@ -139,6 +152,8 @@ def serialize_event(
     # Use the explicitly provided serializer for this event and fallback to default one if it is not provided
     serializer = {
         events.Initialized: on_initialized,
+        events.BeforeProbing: on_before_probing,
+        events.AfterProbing: on_after_probing,
         events.BeforeExecution: on_before_execution,
         events.AfterExecution: on_after_execution,
         events.Interrupted: on_interrupted,

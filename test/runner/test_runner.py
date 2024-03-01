@@ -179,7 +179,7 @@ def test_interactions(request, any_app_schema, workers):
 @pytest.mark.operations("root")
 def test_asgi_interactions(fastapi_app):
     schema = oas_loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
-    _, *ev, _ = from_schema(schema, store_interactions=True).execute()
+    _, _, _, *ev, _ = from_schema(schema, store_interactions=True).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
     assert interaction.request.uri == "http://localhost/users"
@@ -361,7 +361,7 @@ def test_headers_override(any_app_schema):
 def test_unknown_response_code(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema,
         checks=(status_code_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -380,7 +380,7 @@ def test_unknown_response_code(any_app_schema):
 def test_unknown_response_code_with_default(any_app_schema):
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema,
         checks=(status_code_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -396,7 +396,7 @@ def test_unknown_response_code_with_default(any_app_schema):
 def test_unknown_content_type(any_app_schema):
     # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema,
         checks=(content_type_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -427,7 +427,7 @@ def test_known_content_type(any_app_schema):
 def test_response_conformance_invalid(any_app_schema):
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -517,7 +517,7 @@ def test_response_conformance_text(any_app_schema):
 def test_response_conformance_malformed_json(any_app_schema):
     # When API operation returns a response that contains a malformed JSON, but has a valid content type header
     # And "response_schema_conformance" is specified
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -582,7 +582,7 @@ def test_internal_exceptions(any_app_schema, mocker):
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
     mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
     # Then the execution result should indicate errors
@@ -666,7 +666,7 @@ def test_invalid_path_parameter(schema_url):
 @pytest.mark.operations("missing_path_parameter")
 def test_missing_path_parameter(any_app_schema):
     # When a path parameter is missing
-    _, *others, finished = from_schema(
+    _, _, _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
     # Then it leads to an error
@@ -1069,7 +1069,7 @@ def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
 
 def test_graphql(graphql_url):
     schema = gql_loaders.from_url(graphql_url)
-    initialized, *other, finished = list(
+    initialized, _, _, *other, finished = list(
         from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     )
     assert initialized.operations_count == 4
@@ -1141,6 +1141,8 @@ def test_stop_event_stream_immediately(event_stream):
 
 def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_worker):
     next(event_stream)
+    next(event_stream)
+    next(event_stream)
     assert isinstance(next(event_stream), events.BeforeExecution)
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
@@ -1169,7 +1171,7 @@ def test_case_mutation(real_app_schema):
         case.headers = {"Foo": "BAZ"}
         raise AssertionError("Baz!")
 
-    _, _, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
+    *_, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
     # Then these mutations should not interfere
     assert event.result.checks[0].example.headers["Foo"] == "BAR"
     assert event.result.checks[1].example.headers["Foo"] == "BAZ"
@@ -1187,7 +1189,7 @@ def test_malformed_path_template(empty_open_api_3_schema, path, expected):
     empty_open_api_3_schema["paths"] = {path: {"get": {"responses": {"200": {"description": "OK"}}}}}
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     # Then it should not cause a fatal error
-    _, _, event, _ = list(from_schema(schema).execute())
+    *_, event, _ = list(from_schema(schema).execute())
     assert event.status == Status.error
     # And should produce the proper error message
     assert (
@@ -1248,7 +1250,7 @@ def test_explicit_header_negative(empty_open_api_3_schema, parameters, expected)
     }
     empty_open_api_3_schema["components"] = {"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}}
     schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
-    _, _, event, finished = list(
+    *_, event, finished = list(
         from_schema(
             schema,
             headers={"Authorization": "TEST"},
@@ -1271,7 +1273,7 @@ def test_skip_non_negated_headers(empty_open_api_3_schema):
         }
     }
     schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
-    _, _, event, finished = list(
+    *_, event, finished = list(
         from_schema(
             schema,
             dry_run=True,

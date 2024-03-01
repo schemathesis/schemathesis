@@ -1,35 +1,37 @@
 from __future__ import annotations
+
 import base64
 import os
 import platform
 import shutil
 import textwrap
 import time
+from importlib import metadata
 from itertools import groupby
 from queue import Queue
 from typing import Any, Generator, cast
 
 import click
-from importlib import metadata
 
 from ... import service
 from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
+    FALSE_VALUES,
     FLAKY_FAILURE_MESSAGE,
+    GITHUB_APP_LINK,
+    ISSUE_TRACKER_URL,
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
-    FALSE_VALUES,
-    ISSUE_TRACKER_URL,
-    GITHUB_APP_LINK,
 )
 from ...exceptions import RuntimeErrorType, prepare_response_payload
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
-from ...runner.serialization import SerializedError, SerializedTestResult, deduplicate_failures, SerializedCheck
+from ...runner.probes import ProbeOutcome
+from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -487,7 +489,7 @@ def display_service_unauthorized(hostname: str) -> None:
 
 def display_service_error(event: service.Error, message_prefix: str = "") -> None:
     """Show information about an error during communication with Schemathesis.io."""
-    from requests import RequestException, HTTPError, Response
+    from requests import HTTPError, RequestException, Response
 
     if isinstance(event.exception, HTTPError):
         response = cast(Response, event.exception.response)
@@ -694,7 +696,26 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.secho(f"Collected API links: {links_count}", bold=True)
     if isinstance(context.report, ServiceReportContext):
         click.secho("Report to Schemathesis.io: ENABLED", bold=True)
-    if context.operations_count >= 1:
+
+
+def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing) -> None:
+    click.secho("API probing: ...\r", bold=True, nl=False)
+
+
+def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) -> None:
+    context.probes = event.probes
+    status = "SKIP"
+    if event.probes is not None:
+        for probe in event.probes:
+            if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
+                # The probe itself has been executed
+                status = "SUCCESS"
+            elif probe.outcome == ProbeOutcome.ERROR:
+                status = "ERROR"
+    click.secho(f"API probing: {status}\r", bold=True, nl=False)
+    click.echo()
+    operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
+    if operations_count >= 1:
         click.echo()
 
 
@@ -752,6 +773,10 @@ class DefaultOutputStyleHandler(EventHandler):
         """Choose and execute a proper handler for the given event."""
         if isinstance(event, events.Initialized):
             handle_initialized(context, event)
+        if isinstance(event, events.BeforeProbing):
+            handle_before_probing(context, event)
+        if isinstance(event, events.AfterProbing):
+            handle_after_probing(context, event)
         if isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         if isinstance(event, events.AfterExecution):

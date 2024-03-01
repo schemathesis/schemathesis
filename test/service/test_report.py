@@ -24,9 +24,11 @@ def test_add_events(openapi3_schema_url, read_report):
     data = payload.getvalue()
     with read_report(data) as tar:
         members = tar.getmembers()
-        assert len(members) == 6
+        assert len(members) == 8
         expected = (
             "Initialized",
+            "BeforeProbing",
+            "AfterProbing",
             "BeforeExecution",
             "AfterExecution",
             "BeforeExecution",
