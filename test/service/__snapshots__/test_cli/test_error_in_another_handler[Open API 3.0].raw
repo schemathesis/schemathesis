@@ -9,7 +9,6 @@ Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
-
 CLI Handler Error
 
 An error occurred within your custom CLI handler `FailingHandler`.

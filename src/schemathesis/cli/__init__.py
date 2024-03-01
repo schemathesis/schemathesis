@@ -41,16 +41,15 @@ from .._override import CaseOverride
 from ..transports.auth import get_requests_auth
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..models import Case, CheckFunction
-from ..runner import events, prepare_hypothesis_settings
+from ..runner import events, prepare_hypothesis_settings, probes
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
-from ..specs.openapi import formats
 from ..stateful import Stateful
 from ..targets import Target
 from ..types import Filter, PathLike, RequestCert
 from ..internal.datetime import current_datetime
 from ..internal.validation import file_exists
-from . import callbacks, cassettes, output, probes
+from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
@@ -1100,10 +1099,9 @@ def into_event_stream(
             tag=tag or None,
             operation_id=operation_id or None,
         )
-        loaded_schema = load_schema(config)
-        run_probes(loaded_schema, config)
+        schema = load_schema(config)
         yield from runner.from_schema(
-            loaded_schema,
+            schema,
             auth=auth,
             auth_type=auth_type,
             override=override,
@@ -1126,24 +1124,20 @@ def into_event_stream(
             stateful_recursion_limit=stateful_recursion_limit,
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
+            probe_config=probes.ProbeConfig(
+                base_url=config.base_url,
+                request_tls_verify=config.request_tls_verify,
+                request_proxy=config.request_proxy,
+                request_cert=config.request_cert,
+                auth=config.auth,
+                auth_type=config.auth_type,
+                headers=config.headers,
+            ),
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
-
-
-def run_probes(schema: BaseSchema, config: LoaderConfig) -> None:
-    """Discover capabilities of the tested app."""
-    probe_results = probes.run(schema, config)
-    for result in probe_results:
-        if isinstance(result.probe, probes.NullByteInHeader) and result.is_failure:
-            from ..specs.openapi._hypothesis import HEADER_FORMAT, header_values
-
-            formats.register(
-                HEADER_FORMAT,
-                header_values(blacklist_characters="\n\r\x00").map(str.lstrip),
-            )
 
 
 def load_schema(config: LoaderConfig) -> BaseSchema:

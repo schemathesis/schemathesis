@@ -14,6 +14,7 @@ from .serialization import SerializedError, SerializedTestResult
 if TYPE_CHECKING:
     from ..models import APIOperation, Status, TestResult, TestResultSet
     from ..schemas import BaseSchema
+    from . import probes
 
 
 @dataclass
@@ -60,6 +61,7 @@ class Initialized(ExecutionEvent):
         schema: BaseSchema,
         count_operations: bool = True,
         count_links: bool = True,
+        start_time: float | None = None,
         started_at: str | None = None,
         seed: int | None,
     ) -> Initialized:
@@ -70,10 +72,25 @@ class Initialized(ExecutionEvent):
             links_count=schema.links_count if count_links else None,
             location=schema.location,
             base_url=schema.get_base_url(),
+            start_time=start_time or time.monotonic(),
             started_at=started_at or current_datetime(),
             specification_name=schema.verbose_name,
             seed=seed,
         )
+
+
+@dataclass
+class BeforeProbing(ExecutionEvent):
+    pass
+
+
+@dataclass
+class AfterProbing(ExecutionEvent):
+    probes: list[probes.ProbeRun] | None
+
+    def asdict(self, **kwargs: Any) -> dict[str, Any]:
+        probes = self.probes or []
+        return {"probes": [probe.serialize() for probe in probes], "events_type": self.__class__.__name__}
 
 
 class CurrentOperationMixin:

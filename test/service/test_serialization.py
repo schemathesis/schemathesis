@@ -13,6 +13,8 @@ def test_serialize_event(schema_url):
     events = from_schema(schema).execute()
     next(events)
     next(events)
+    next(events)
+    next(events)
     event = serialize_event(next(events))
     assert "interactions" not in event["AfterExecution"]["result"]
     assert "logs" not in event["AfterExecution"]["result"]
@@ -25,6 +27,8 @@ def test_serialize_interrupted(mocker, schema_url):
     mocker.patch("schemathesis.runner.impl.solo.SingleThreadRunner._execute_impl", side_effect=KeyboardInterrupt)
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()
+    next(events)
+    next(events)
     next(events)
     assert serialize_event(next(events)) == {"Interrupted": None}
 
@@ -80,6 +84,8 @@ def test_stringify_path_parameters(query, expected):
 def test_explicit_serialization(serializer, expected, schema_url):
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()
+    next(events)
+    next(events)
     next(events)
     event = next(events)
     assert serialize_event(event, on_before_execution=serializer)["BeforeExecution"]["verbose_name"] == expected

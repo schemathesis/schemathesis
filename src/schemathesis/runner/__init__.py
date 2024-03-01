@@ -1,34 +1,36 @@
 from __future__ import annotations
 
 from random import Random
-from typing import Any, Callable, Generator, Iterable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
 from urllib.parse import urlparse
 
 from .._override import CaseOverride
-from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
 from ..constants import (
     DEFAULT_DEADLINE,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
 )
-from ..internal.deprecation import deprecated_function
-from ..internal.datetime import current_datetime
-from ..internal.validation import file_exists
-from ..transports.auth import get_requests_auth
 from ..exceptions import SchemaError
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
+from ..internal.datetime import current_datetime
+from ..internal.deprecation import deprecated_function
+from ..internal.validation import file_exists
 from ..loaders import load_app
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..targets import DEFAULT_TARGETS, Target
+from ..transports.auth import get_requests_auth
 from ..types import Filter, NotSet, RawAuth, RequestCert
+from .probes import ProbeConfig
 
 if TYPE_CHECKING:
-    from . import events
+    import hypothesis
+
     from ..models import CheckFunction
     from ..schemas import BaseSchema
-    from .impl import BaseRunner
     from ..stateful import Stateful
-    import hypothesis
+    from . import events
+    from .impl import BaseRunner
 
 
 @deprecated_function(removed_in="4.0", replacement="schemathesis.runner.from_schema")
@@ -75,6 +77,7 @@ def prepare(
     hypothesis_report_multiple_bugs: bool | None = None,
     hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None,
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
+    probe_config: ProbeConfig | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     from ..checks import DEFAULT_CHECKS
@@ -128,6 +131,7 @@ def prepare(
         stateful_recursion_limit=stateful_recursion_limit,
         count_operations=count_operations,
         count_links=count_links,
+        probe_config=probe_config,
     )
 
 
@@ -188,6 +192,7 @@ def execute_from_schema(
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
     count_links: bool = True,
+    probe_config: ProbeConfig | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -237,6 +242,7 @@ def execute_from_schema(
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
             count_links=count_links,
+            probe_config=probe_config,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)
@@ -341,9 +347,11 @@ def from_schema(
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     count_operations: bool = True,
     count_links: bool = True,
+    probe_config: ProbeConfig | None = None,
 ) -> BaseRunner:
-    from starlette.applications import Starlette
     import hypothesis
+    from starlette.applications import Starlette
+
     from ..checks import DEFAULT_CHECKS
     from .impl import (
         SingleThreadASGIRunner,
@@ -355,6 +363,7 @@ def from_schema(
     )
 
     checks = checks or DEFAULT_CHECKS
+    probe_config = probe_config or ProbeConfig()
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
     generation_config = generation_config or GenerationConfig()
@@ -392,6 +401,7 @@ def from_schema(
                 stateful_recursion_limit=stateful_recursion_limit,
                 count_operations=count_operations,
                 count_links=count_links,
+                probe_config=probe_config,
             )
         if isinstance(schema.app, Starlette):
             return ThreadPoolASGIRunner(
@@ -415,6 +425,7 @@ def from_schema(
                 stateful_recursion_limit=stateful_recursion_limit,
                 count_operations=count_operations,
                 count_links=count_links,
+                probe_config=probe_config,
             )
         return ThreadPoolWSGIRunner(
             schema=schema,
@@ -438,6 +449,7 @@ def from_schema(
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
             count_links=count_links,
+            probe_config=probe_config,
         )
     if not schema.app:
         return SingleThreadRunner(
@@ -465,6 +477,7 @@ def from_schema(
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
             count_links=count_links,
+            probe_config=probe_config,
         )
     if isinstance(schema.app, Starlette):
         return SingleThreadASGIRunner(
@@ -488,6 +501,7 @@ def from_schema(
             stateful_recursion_limit=stateful_recursion_limit,
             count_operations=count_operations,
             count_links=count_links,
+            probe_config=probe_config,
         )
     return SingleThreadWSGIRunner(
         schema=schema,
@@ -510,6 +524,7 @@ def from_schema(
         stateful_recursion_limit=stateful_recursion_limit,
         count_operations=count_operations,
         count_links=count_links,
+        probe_config=probe_config,
     )
 
 
