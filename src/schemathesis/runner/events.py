@@ -205,6 +205,9 @@ class InternalErrorType(str, enum.Enum):
     OTHER = "other"
 
 
+DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
+
+
 @dataclass
 class InternalError(ExecutionEvent):
     """An error that happened inside the runner."""
@@ -243,7 +246,7 @@ class InternalError(ExecutionEvent):
             type_=InternalErrorType.OTHER,
             subtype=None,
             title="Test Execution Error",
-            message="An internal error occurred during the test run",
+            message=DEFAULT_INTERNAL_ERROR_MESSAGE,
             extras=[],
         )
 
