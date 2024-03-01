@@ -809,7 +809,7 @@ class SwaggerV20(BaseOpenAPISchema):
 
     @property
     def spec_version(self) -> str:
-        return self.raw_schema["swagger"]
+        return self.raw_schema.get("swagger", "2.0")
 
     @property
     def verbose_name(self) -> str:

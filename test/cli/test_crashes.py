@@ -10,6 +10,7 @@ from schemathesis import DataGenerationMethod
 from schemathesis.cli import ALL_CHECKS_NAMES, ALL_TARGETS_NAMES
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.fixups import ALL_FIXUPS
+from schemathesis.runner.events import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.stateful import Stateful
 
 
@@ -132,7 +133,7 @@ def csv_strategy(enum):
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params, tmp_path):
     report = tmp_path / "temp.tar.gz"
-    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params, f"--report={report}")
+    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params, f"--report={report}", "--show-trace")
     check_result(result)
 
 
@@ -156,6 +157,7 @@ def test_schema_validity(cli, schema, base_url):
 
 def check_result(result):
     assert not (result.exception and not isinstance(result.exception, SystemExit)), result.stdout
+    assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
 
 
 def test_not_handled_error(mocker, cli, schema_url):
