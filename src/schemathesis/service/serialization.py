@@ -7,6 +7,7 @@ from ..exceptions import format_exception
 from ..internal.result import Err, Ok
 from ..internal.transformation import merge_recursively
 from ..models import Response
+from .models import AnalysisSuccess
 from ..runner import events
 from ..runner.serialization import SerializedCase
 
@@ -37,10 +38,15 @@ def serialize_before_analysis(_: events.BeforeAnalysis) -> None:
 
 def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | None:
     data = {}
-    if isinstance(event.analysis, Ok):
-        data["analysis_id"] = event.analysis.ok().id
-    elif isinstance(event.analysis, Err):
-        data["error"] = format_exception(event.analysis.err())
+    analysis = event.analysis
+    if isinstance(analysis, Ok):
+        result = analysis.ok()
+        if isinstance(result, AnalysisSuccess):
+            data["analysis_id"] = result.id
+        else:
+            data["error"] = result.message
+    elif isinstance(analysis, Err):
+        data["error"] = format_exception(analysis.err())
     return data
 
 

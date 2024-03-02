@@ -1,6 +1,5 @@
 import re
 import tarfile
-import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass
 from io import BytesIO
@@ -170,7 +169,6 @@ def service_report_handler(service_client, hostname, hosts_file, openapi3_schema
         telemetry=False,
         out_queue=Queue(),
         in_queue=Queue(),
-        correlation_id=uuid.uuid4(),
     )
     yield handler
     handler.shutdown()
@@ -188,7 +186,6 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
         telemetry=False,
         in_queue=Queue(),
         out_queue=Queue(),
-        correlation_id=uuid.uuid4(),
     )
     yield handler
     handler.shutdown()

@@ -5,7 +5,6 @@ import pathlib
 import platform
 import sys
 import time
-import uuid
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
@@ -1832,7 +1831,6 @@ def assert_exit_code(event_stream, code):
             report=None,
             telemetry=False,
             sanitize_output=False,
-            correlation_id=uuid.uuid4(),
         )
     assert exc.value.code == code
 
