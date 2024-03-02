@@ -114,8 +114,8 @@ class BaseRunner:
             unregister_auth()
         results = TestResultSet(seed=self.seed)
         initialized = None
-        start_time = time.monotonic()
         __probes = None
+        start_time = time.monotonic()
         __analysis: Result[AnalysisResult, Exception] | None = None
 
         def _initialize() -> events.Initialized:
