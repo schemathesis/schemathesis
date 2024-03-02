@@ -1080,9 +1080,6 @@ def into_event_stream(
     stateful_recursion_limit: int,
     service_client: ServiceClient | None,
 ) -> Generator[events.ExecutionEvent, None, None]:
-    from ..service import extensions
-    from requests import RequestException
-
     try:
         if app is not None:
             app = load_app(app)

@@ -749,12 +749,13 @@ def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing
 def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) -> None:
     context.probes = event.probes
     status = "SKIP"
-    for probe in event.probes:
-        if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
-            # The probe itself has been executed
-            status = "SUCCESS"
-        elif probe.outcome == ProbeOutcome.ERROR:
-            status = "ERROR"
+    if event.probes is not None:
+        for probe in event.probes:
+            if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
+                # The probe itself has been executed
+                status = "SUCCESS"
+            elif probe.outcome == ProbeOutcome.ERROR:
+                status = "ERROR"
     click.secho(f"API probing: {status}\r", bold=True, nl=False)
     click.echo()
 

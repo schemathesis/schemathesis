@@ -51,23 +51,6 @@ class FailedUploadResponse:
 
 
 @dataclass
-class SchemaValidationError:
-    title: str
-    message: str
-    extras: list[str]
-    suggestion: str | None
-
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> SchemaValidationError:
-        return cls(
-            title=data["title"],
-            message=data["message"],
-            extras=data["extras"],
-            suggestion=data["suggestion"],
-        )
-
-
-@dataclass
 class NotApplied:
     """The extension was not applied."""
 
@@ -165,7 +148,6 @@ class AnalysisResult:
     id: str
     message: str
     extensions: list[Extension]
-    validation_errors: list[SchemaValidationError]
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AnalysisResult:
@@ -173,5 +155,4 @@ class AnalysisResult:
             id=data["id"],
             message=data["message"],
             extensions=[extension_from_dict(ext) for ext in data["extensions"]],
-            validation_errors=[SchemaValidationError.from_dict(error) for error in data["validation_errors"]],
         )
