@@ -1,5 +1,4 @@
 from __future__ import annotations
-import uuid
 
 from random import Random
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
@@ -81,7 +80,6 @@ def prepare(
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
     probe_config: ProbeConfig | None = None,
     service_client: ServiceClient | None,
-    correlation_id: uuid.UUID | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     from ..checks import DEFAULT_CHECKS
@@ -199,7 +197,6 @@ def execute_from_schema(
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
     service_client: ServiceClient | None,
-    correlation_id: uuid.UUID | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Execute tests for the given schema.
 
@@ -357,7 +354,6 @@ def from_schema(
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
     service_client: ServiceClient | None,
-    correlation_id: uuid.UUID | None = None,
 ) -> BaseRunner:
     import hypothesis
     from starlette.applications import Starlette
@@ -371,8 +367,6 @@ def from_schema(
         ThreadPoolRunner,
         ThreadPoolWSGIRunner,
     )
-
-    correlation_id = correlation_id or uuid.uuid4()
 
     checks = checks or DEFAULT_CHECKS
     probe_config = probe_config or ProbeConfig()

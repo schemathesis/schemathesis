@@ -6,7 +6,6 @@ import io
 import os
 import sys
 import traceback
-import uuid
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
@@ -682,6 +681,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option(
     "--experimental",
+    "experiments",
     help="Enable experimental support for specific features.",
     type=click.Choice([experimental.OPEN_API_3_1.name, experimental.SCHEMA_ANALYSIS.name]),
     callback=callbacks.convert_experimental,
@@ -738,7 +738,7 @@ def run(
     set_header: dict[str, str],
     set_cookie: dict[str, str],
     set_path: dict[str, str],
-    experimental: list,
+    experiments: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -827,7 +827,7 @@ def run(
         show_trace = show_errors_tracebacks
 
     # Enable selected experiments
-    for experiment in experimental:
+    for experiment in experiments:
         experiment.enable()
 
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
@@ -903,7 +903,10 @@ def run(
 
         # Upload without connecting data to a certain API
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
-    # TODO: Init service client if experimental schema analysis is enabled
+    if experimental.SCHEMA_ANALYSIS.is_enabled and not client:
+        from ..service.client import ServiceClient
+
+        client = ServiceClient(base_url=schemathesis_io_url, token=token)
     # TODO: Consider forward compatibility, as service may start requiring authentication, display such an error
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
 

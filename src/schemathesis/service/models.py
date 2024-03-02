@@ -1,5 +1,4 @@
 from __future__ import annotations
-from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Union
@@ -122,13 +121,9 @@ class StringFormatsExtension(BaseExtension):
 
     @property
     def details(self) -> list[str]:
-        counter: dict[str, int] = Counter()
-        for format_definition in self.formats.values():
-            if "regex" in format_definition:
-                counter["format"] += 1
-            if "samples" in format_definition:
-                counter["example"] += len(format_definition["samples"])
-        return [f"{count} {key}" if count == 1 else f"{count} {key}s" for key, count in counter.items()]
+        count = len(self.formats)
+        noun = "formats" if count > 1 else "format"
+        return [f"{count} Open API {noun}"]
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.
@@ -144,15 +139,23 @@ def extension_from_dict(data: dict[str, Any]) -> Extension:
 
 
 @dataclass
-class AnalysisResult:
+class AnalysisSuccess:
     id: str
     message: str
     extensions: list[Extension]
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> AnalysisResult:
+    def from_dict(cls, data: dict[str, Any]) -> AnalysisSuccess:
         return cls(
             id=data["id"],
             message=data["message"],
             extensions=[extension_from_dict(ext) for ext in data["extensions"]],
         )
+
+
+@dataclass
+class AnalysisError:
+    message: str
+
+
+AnalysisResult = Union[AnalysisSuccess, AnalysisError]

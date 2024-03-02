@@ -102,7 +102,7 @@ class BeforeAnalysis(ExecutionEvent):
 
 @dataclass
 class AfterAnalysis(ExecutionEvent):
-    analysis: Result[AnalysisResult, Exception]
+    analysis: Result[AnalysisResult, Exception] | None
 
 
 class CurrentOperationMixin:

@@ -8,6 +8,7 @@ Changelog
 
 - Support for per-media type data generators. :issue:`962`
 - Support for ``application/yaml`` & ``text/yml`` media types in ``YAMLSerializer``.
+- **EXPERIMENTAL**: Run automatic schema optimization & format inference if CLI is authenticated in Schemathesis.io.
 
 **Fixed**
 
@@ -76,7 +77,6 @@ Changelog
 - Run automatic probes to detect the application capabilities before testing.
   They allow for more accurate data generation, reducing false positive test failures. :issue:`1840`
 - Support running async Python tests with ``trio``. :issue:`1872`
-- Run automatic schema optimization & format inference if CLI is authenticated in Schemathesis.io.
 
 **Fixed**
 

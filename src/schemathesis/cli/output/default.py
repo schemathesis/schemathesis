@@ -34,7 +34,7 @@ from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
-from ...service.models import UnknownExtension
+from ...service.models import AnalysisSuccess, UnknownExtension
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -365,7 +365,7 @@ def display_single_log(result: SerializedTestResult) -> None:
     click.echo("\n\n".join(result.logs))
 
 
-def display_analysis(context: ExecutionContext, event: events.Finished) -> None:
+def display_analysis(context: ExecutionContext) -> None:
     """Display schema analysis details."""
     if context.analysis is None:
         return
@@ -373,22 +373,29 @@ def display_analysis(context: ExecutionContext, event: events.Finished) -> None:
     if isinstance(context.analysis, Ok):
         analysis = context.analysis.ok()
         click.echo()
-        # TODO: check for empty extensions
-        click.secho(analysis.message, bold=True)
-        click.echo("\nThe following extensions has been applied:")
-        unknown = []
-        for extension in analysis.extensions:
-            if isinstance(extension, UnknownExtension):
-                unknown.append(extension)
-                continue
-            for entry in extension.details:
-                click.echo(f"  - {entry}")
+        if isinstance(analysis, AnalysisSuccess):
+            click.secho(analysis.message, bold=True)
+            if analysis.extensions:
+                click.echo("\nThe following extensions has been applied:")
+                click.echo()
+                unknown = []
+                for extension in analysis.extensions:
+                    if isinstance(extension, UnknownExtension):
+                        unknown.append(extension)
+                        continue
+                    for entry in extension.details:
+                        click.echo(f"  - {entry}")
+                if unknown:
+                    click.secho("The following extensions are not recognized:")
+                    for extension in unknown:
+                        click.echo(f"  - {extension.type}")
+                    click.echo("Consider updating the CLI for complete schema analysis and improved bug detection.")
+            else:
+                click.echo("\nNo extensions has been applied.")
+        else:
+            click.echo("An error happened during schema analysis:\n")
+            click.secho(f"  {analysis.message}", bold=True)
         click.echo()
-        if unknown:
-            click.secho("The following extensions are not recognized:")
-            for extension in unknown:
-                click.echo(f"  - {extension.type}")
-            click.echo("Consider updating the CLI for complete schema analysis and improved bug detection.")
     elif isinstance(context.analysis, Err):
         exception = context.analysis.err()
         traceback = format_exception(exception, True)
@@ -761,18 +768,19 @@ def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) 
 
 
 def handle_before_analysis(context: ExecutionContext, event: events.BeforeAnalysis) -> None:
-    click.secho("Schema analysis:\r", bold=True, nl=False)
+    click.secho("Schema analysis: ...\r", bold=True, nl=False)
 
 
 def handle_after_analysis(context: ExecutionContext, event: events.AfterAnalysis) -> None:
     context.analysis = event.analysis
-    if isinstance(event.analysis, Ok):
-        status = "SUCCESS"
-    else:
-        status = "ERROR"
+    status = "SKIP"
+    if event.analysis is not None:
+        if isinstance(event.analysis, Ok) and isinstance(event.analysis.ok(), AnalysisSuccess):
+            status = "SUCCESS"
+        else:
+            status = "ERROR"
     click.secho(f"Schema analysis: {status}\r", bold=True, nl=False)
     click.echo()
-    # TODO: move to the first AfterExecution event
     operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
     if operations_count >= 1:
         click.echo()
@@ -811,7 +819,7 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_errors(context, event)
     display_failures(context, event)
     display_application_logs(context, event)
-    display_analysis(context, event)
+    display_analysis(context)
     display_statistic(context, event)
     click.echo()
     display_summary(event)

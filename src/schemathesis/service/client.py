@@ -14,6 +14,8 @@ from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata
 from .models import (
+    AnalysisSuccess,
+    AnalysisError,
     AnalysisResult,
     ProjectDetails,
     AuthResponse,
@@ -111,7 +113,11 @@ class ServiceClient(requests.Session):
         content = json.dumps(
             {"probes": [probe.serialize() for probe in probes], "schema": schema}, separators=(",", ":")
         )
-        # TODO: Handle oversize - `JSON payload (20349999 bytes) is larger than allowed (limit: 10485760 bytes).`
-        #   Maybe make the backend to return proper JSON
         response = self.post("/cli/analysis/", data=content, headers={"Content-Type": "application/json"}, timeout=None)
-        return AnalysisResult.from_dict(response.json())
+        if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
+            try:
+                message = response.json()["detail"]
+            except json.JSONDecodeError:
+                message = response.text
+            return AnalysisError(message=message)
+        return AnalysisSuccess.from_dict(response.json())

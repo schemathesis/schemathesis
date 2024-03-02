@@ -58,7 +58,7 @@ from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResu
 from ...runner import events
 from ...schemas import BaseSchema
 from ...service import extensions
-from ...service.models import AnalysisResult
+from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
@@ -113,9 +113,9 @@ class BaseRunner:
         if self.auth is not None:
             unregister_auth()
         results = TestResultSet(seed=self.seed)
+        start_time = time.monotonic()
         initialized = None
         __probes = None
-        start_time = time.monotonic()
         __analysis: Result[AnalysisResult, Exception] | None = None
 
         def _initialize() -> events.Initialized:
@@ -157,14 +157,14 @@ class BaseRunner:
                 try:
                     _probes = cast(list[probes.ProbeRun], __probes)
                     result = self.service_client.analyze_schema(_probes, self.schema.raw_schema)
-                    extensions.apply(result.extensions, self.schema)
+                    if isinstance(result, AnalysisSuccess):
+                        extensions.apply(result.extensions, self.schema)
                     __analysis = Ok(result)
                 except Exception as exc:
                     __analysis = Err(exc)
 
         def _after_analysis() -> events.AfterAnalysis:
-            _analysis = cast(Result[AnalysisResult, Exception], __analysis)
-            return events.AfterAnalysis(analysis=_analysis)
+            return events.AfterAnalysis(analysis=__analysis)
 
         if stop_event.is_set():
             yield _finish()
@@ -180,22 +180,6 @@ class BaseRunner:
             _after_analysis,
         ):
             event = event_factory()
-            if event is not None:
-                yield event
-            if stop_event.is_set():
-                yield _finish()
-                return
-
-        for func in (
-            _initialize,
-            _before_probes,
-            _run_probes,
-            _after_probes,
-            _before_analysis,
-            _run_analysis,
-            _after_analysis,
-        ):
-            event = func()
             if event is not None:
                 yield event
             if stop_event.is_set():
