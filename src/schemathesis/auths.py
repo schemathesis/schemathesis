@@ -1,4 +1,5 @@
 """Support for custom API authentication mechanisms."""
+
 from __future__ import annotations
 import inspect
 import threading

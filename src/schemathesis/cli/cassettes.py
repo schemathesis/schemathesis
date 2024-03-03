@@ -254,8 +254,8 @@ def write_double_quoted(stream: IO, text: str) -> None:
             ch = text[end]
         if (
             ch is None
-            or ch in '"\\\x85\u2028\u2029\uFEFF'
-            or not ("\x20" <= ch <= "\x7E" or ("\xA0" <= ch <= "\uD7FF" or "\uE000" <= ch <= "\uFFFD"))
+            or ch in '"\\\x85\u2028\u2029\ufeff'
+            or not ("\x20" <= ch <= "\x7e" or ("\xa0" <= ch <= "\ud7ff" or "\ue000" <= ch <= "\ufffd"))
         ):
             if start < end:
                 stream.write(text[start:end])
@@ -264,9 +264,9 @@ def write_double_quoted(stream: IO, text: str) -> None:
                 # Escape character
                 if ch in Emitter.ESCAPE_REPLACEMENTS:
                     data = "\\" + Emitter.ESCAPE_REPLACEMENTS[ch]
-                elif ch <= "\xFF":
+                elif ch <= "\xff":
                     data = "\\x%02X" % ord(ch)
-                elif ch <= "\uFFFF":
+                elif ch <= "\uffff":
                     data = "\\u%04X" % ord(ch)
                 else:
                     data = "\\U%08X" % ord(ch)

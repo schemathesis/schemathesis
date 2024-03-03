@@ -1,4 +1,5 @@
 """Tests for common schema loading logic shared by all loaders."""
+
 import json
 import platform
 from contextlib import suppress

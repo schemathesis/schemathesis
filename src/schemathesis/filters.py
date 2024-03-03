@@ -1,4 +1,5 @@
 """Filtering system that allows users to filter API operations based on certain criteria."""
+
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field

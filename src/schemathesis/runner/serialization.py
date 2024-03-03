@@ -2,6 +2,7 @@
 
 They all consist of primitive types and don't have references to schemas, app, etc.
 """
+
 from __future__ import annotations
 import logging
 import re

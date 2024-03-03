@@ -1,4 +1,5 @@
 """OpenAPI specific loader behavior."""
+
 import json
 from pathlib import Path
 
