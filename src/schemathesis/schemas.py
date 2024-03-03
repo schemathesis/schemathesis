@@ -6,6 +6,7 @@ Their responsibilities:
 
 They give only static definitions of paths.
 """
+
 from __future__ import annotations
 from collections.abc import Mapping, MutableMapping
 from contextlib import nullcontext

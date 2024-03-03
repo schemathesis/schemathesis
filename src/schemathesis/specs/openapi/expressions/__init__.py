@@ -2,6 +2,7 @@
 
 https://swagger.io/docs/specification/links/#runtime-expressions
 """
+
 from typing import Any
 
 from . import lexer, nodes, parser

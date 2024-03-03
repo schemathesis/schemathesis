@@ -1,4 +1,5 @@
 """GraphQL specific loader behavior."""
+
 from io import StringIO
 import json
 

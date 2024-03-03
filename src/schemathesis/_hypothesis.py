@@ -1,4 +1,5 @@
 """High-level API for creating Hypothesis tests."""
+
 from __future__ import annotations
 
 import asyncio

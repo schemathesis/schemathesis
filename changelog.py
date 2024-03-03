@@ -1,4 +1,5 @@
 """Simple CLI for changelog management."""
+
 from __future__ import annotations
 import argparse
 import datetime

@@ -1,4 +1,5 @@
 """Useful info to collect from CLI usage."""
+
 from __future__ import annotations
 import os
 import platform
