@@ -20,7 +20,7 @@ repos:
       - id: gitlint
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.34.0
+    rev: v1.35.1
     hooks:
       - id: yamllint
 
@@ -38,12 +38,12 @@ repos:
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.1
+    rev: v0.3.0
     hooks:
       - id: ruff-format
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.2.1
+    rev: v0.3.0
     hooks:
       - id: ruff
 
