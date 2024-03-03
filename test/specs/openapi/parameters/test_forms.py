@@ -1,4 +1,5 @@
 """Tests for parsing of parameters related to forms."""
+
 import pytest
 
 from schemathesis.parameters import PayloadAlternatives

@@ -2,6 +2,7 @@
 
 Based on https://swagger.io/docs/specification/links/
 """
+
 from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import get_close_matches

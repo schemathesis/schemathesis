@@ -1,4 +1,5 @@
 """Compatibility flags based on installed dependency versions."""
+
 from packaging import version
 
 from importlib import metadata

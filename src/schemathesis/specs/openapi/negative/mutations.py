@@ -1,4 +1,5 @@
 """Schema mutations."""
+
 from __future__ import annotations
 import enum
 from dataclasses import dataclass

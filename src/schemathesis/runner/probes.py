@@ -5,6 +5,7 @@ the application supports certain inputs. This is done to avoid false positives i
 For example, certail web servers do not support NULL bytes in headers, in such cases, the generated test case
 will not reach the tested application at all.
 """
+
 from __future__ import annotations
 
 import enum

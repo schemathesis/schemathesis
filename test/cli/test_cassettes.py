@@ -439,9 +439,9 @@ def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url, snap
 
 @given(text=st.text())
 @example("Test")
-@example("\uFEFF")
-@example("\uE001")
-@example("\xA1")
+@example("\ufeff")
+@example("\ue001")
+@example("\xa1")
 @example("\x21")
 @example("\x07")
 @example("🎉")

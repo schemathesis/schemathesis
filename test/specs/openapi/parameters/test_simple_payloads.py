@@ -1,4 +1,5 @@
 """Tests for behavior not specific to forms."""
+
 import pytest
 
 import schemathesis
