@@ -12,7 +12,7 @@ from requests.adapters import HTTPAdapter, Retry
 from ..constants import USER_AGENT
 from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
-from .metadata import Metadata
+from .metadata import Metadata, collect_dependency_versions
 from .models import (
     AnalysisSuccess,
     AnalysisError,
@@ -110,8 +110,14 @@ class ServiceClient(requests.Session):
     def analyze_schema(self, probes: list[probes.ProbeRun], schema: dict[str, Any]) -> AnalysisResult:
         """Analyze the API schema."""
         # Manual serialization reduces the size of the payload a bit
+        dependencies = collect_dependency_versions()
         content = json.dumps(
-            {"probes": [probe.serialize() for probe in probes], "schema": schema}, separators=(",", ":")
+            {
+                "probes": [probe.serialize() for probe in probes],
+                "schema": schema,
+                "dependencies": list(map(asdict, dependencies)),
+            },
+            separators=(",", ":"),
         )
         response = self.post("/cli/analysis/", data=content, headers={"Content-Type": "application/json"}, timeout=None)
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
