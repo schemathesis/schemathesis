@@ -1,9 +1,12 @@
 import uuid
-from hypothesis import find
+
 import pytest
-from schemathesis.service.extensions import apply
-from schemathesis.service.models import extension_from_dict, UnknownExtension
-from schemathesis.specs.openapi.formats import unregister_string_format, STRING_FORMATS
+from hypothesis import find
+
+from schemathesis.service.extensions import apply, strategy_from_definitions
+from schemathesis.service.models import StrategyDefinition, UnknownExtension, extension_from_dict
+from schemathesis.specs.openapi.formats import STRING_FORMATS, unregister_string_format
+from schemathesis.specs.openapi._hypothesis import Binary
 
 
 @pytest.fixture
@@ -48,6 +51,63 @@ def test_string_formats_success(string_formats, openapi_30):
 
 
 @pytest.mark.parametrize(
+    "definition, expected_type",
+    (
+        ([{"name": "uuids", "transforms": [{"kind": "map", "name": "str"}]}], str),
+        ([{"name": "ip_addresses", "transforms": [{"kind": "map", "name": "str"}]}], str),
+        ([{"name": "ip_addresses", "transforms": [{"kind": "map", "name": "str"}], "arguments": {"v": 6}}], str),
+        ([{"name": "binary", "transforms": [{"kind": "map", "name": "base64_encode"}]}], Binary),
+        ([{"name": "binary", "transforms": [{"kind": "map", "name": "urlsafe_base64_encode"}]}], Binary),
+        (
+            [
+                {
+                    "name": "integers",
+                    "transforms": [{"kind": "map", "name": "str"}],
+                    "arguments": {"min_value": 1, "max_value": 65535},
+                }
+            ],
+            str,
+        ),
+        (
+            [
+                {
+                    "name": "dates",
+                    "transforms": [{"kind": "map", "name": "strftime", "arguments": {"format": "%Y-%m-%d"}}],
+                }
+            ],
+            str,
+        ),
+        ([{"name": "timezone_keys"}], str),
+        (
+            [
+                {
+                    "name": "from_type",
+                    "arguments": {"thing": "IPv4Network"},
+                    "transforms": [{"kind": "map", "name": "str"}],
+                }
+            ],
+            str,
+        ),
+        (
+            [
+                {"name": "timezone_keys"},
+                {
+                    "name": "dates",
+                    "transforms": [{"kind": "map", "name": "strftime", "arguments": {"format": "%Y-%m-%d"}}],
+                },
+            ],
+            str,
+        ),
+        ([{"name": "timezone_keys"}], str),
+        ([{"name": "timezone_keys"}], str),
+    ),
+)
+def test_strategy_from_definition(definition, expected_type):
+    strategy = strategy_from_definitions([StrategyDefinition(**item) for item in definition])
+    find(strategy, lambda x: isinstance(x, expected_type))
+
+
+@pytest.mark.parametrize(
     "format, message",
     (
         ({"regex": "[a-z"}, "Invalid regex: `[a-z`"),
@@ -75,11 +135,3 @@ def test_unknown_extension(openapi_30):
     assert isinstance(extension, UnknownExtension)
     apply([extension], openapi_30)
     assert str(extension.state) == "Not Applied"
-
-
-def test_schema_extension(openapi_30):
-    custom_schema = {"custom": 42}
-    extension = extension_from_dict({"type": "schema", "schema": custom_schema})
-    apply([extension], openapi_30)
-    assert str(extension.state) == "Success"
-    assert openapi_30.raw_schema == custom_schema

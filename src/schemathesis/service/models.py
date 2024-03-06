@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Union
+from typing import Any, TypedDict, Union, Literal
 
 
 class UploadSource(str, Enum):
@@ -112,12 +112,29 @@ class SchemaOptimizationExtension(BaseExtension):
         return []
 
 
+class TransformFunctionDefinition(TypedDict):
+    kind: Literal["map", "filter"]
+    name: str
+    arguments: dict[str, Any]
+
+
+@dataclass
+class StrategyDefinition:
+    name: str
+    transforms: list[TransformFunctionDefinition] | None = None
+    arguments: dict[str, Any] | None = None
+
+
 @dataclass
 class StringFormatsExtension(BaseExtension):
     """Custom string formats."""
 
-    formats: dict[str, dict[str, Any]]
+    formats: dict[str, list[StrategyDefinition]]
     state: ExtensionState = field(default_factory=NotApplied)
+
+    @classmethod
+    def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> StringFormatsExtension:
+        return cls(formats={name: [StrategyDefinition(**item) for item in value] for name, value in formats.items()})
 
     @property
     def details(self) -> list[str]:
@@ -134,7 +151,7 @@ def extension_from_dict(data: dict[str, Any]) -> Extension:
     if data["type"] == "schema":
         return SchemaOptimizationExtension(schema=data["schema"])
     elif data["type"] == "string_formats":
-        return StringFormatsExtension(formats=data["formats"])
+        return StringFormatsExtension.from_dict(formats=data["formats"])
     return UnknownExtension(type=data["type"])
 
 
