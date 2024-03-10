@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.6...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Improve error message when the minimum possible example is too large.
+
 .. _v3.25.6:
 
 :version:`3.25.6 <v3.25.5...v3.25.6>` - 2024-03-02
