@@ -142,14 +142,14 @@ class StrategyDefinition:
 
 
 @dataclass
-class StringFormatsExtension(BaseExtension):
+class OpenApiStringFormatsExtension(BaseExtension):
     """Custom string formats."""
 
     formats: dict[str, list[StrategyDefinition]]
     state: ExtensionState = field(default_factory=NotApplied)
 
     @classmethod
-    def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> StringFormatsExtension:
+    def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> OpenApiStringFormatsExtension:
         return cls(formats={name: [StrategyDefinition(**item) for item in value] for name, value in formats.items()})
 
     @property
@@ -159,15 +159,33 @@ class StringFormatsExtension(BaseExtension):
         return [f"{count} Open API {noun}"]
 
 
+@dataclass
+class GraphQLScalarsExtension(BaseExtension):
+    """Custom scalars."""
+
+    scalars: dict[str, list[StrategyDefinition]]
+    state: ExtensionState = field(default_factory=NotApplied)
+
+    @classmethod
+    def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> GraphQLScalarsExtension:
+        return cls(scalars={name: [StrategyDefinition(**item) for item in value] for name, value in formats.items()})
+
+    @property
+    def details(self) -> list[str]:
+        count = len(self.scalars)
+        noun = "scalars" if count > 1 else "scalar"
+        return [f"{count} GraphQL {noun}"]
+
+
 # A CLI extension that can be used to adjust the behavior of Schemathesis.
-Extension = Union[SchemaPatchesExtension, StringFormatsExtension, UnknownExtension]
+Extension = Union[SchemaPatchesExtension, OpenApiStringFormatsExtension, GraphQLScalarsExtension, UnknownExtension]
 
 
 def extension_from_dict(data: dict[str, Any]) -> Extension:
     if data["type"] == "schema_patches":
         return SchemaPatchesExtension(patches=data["patches"])
     elif data["type"] == "string_formats":
-        return StringFormatsExtension.from_dict(formats=data["items"])
+        return OpenApiStringFormatsExtension.from_dict(formats=data["items"])
     return UnknownExtension(type=data["type"])
 
 
