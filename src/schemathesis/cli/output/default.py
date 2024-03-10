@@ -181,16 +181,19 @@ def display_generic_errors(context: ExecutionContext, errors: list[SerializedErr
 
 def display_full_traceback_message(error: SerializedError) -> bool:
     # Some errors should not trigger the message that suggests to show full tracebacks to the user
-    return not error.exception.startswith(
-        (
-            "DeadlineExceeded",
-            "OperationSchemaError",
-            "requests.exceptions",
-            "SerializationNotPossible",
-            "hypothesis.errors.FailedHealthCheck",
-            "hypothesis.errors.InvalidArgument: Scalar ",
-            "hypothesis.errors.InvalidArgument: min_size=",
+    return (
+        not error.exception.startswith(
+            (
+                "DeadlineExceeded",
+                "OperationSchemaError",
+                "requests.exceptions",
+                "SerializationNotPossible",
+                "hypothesis.errors.FailedHealthCheck",
+                "hypothesis.errors.InvalidArgument: Scalar ",
+                "hypothesis.errors.InvalidArgument: min_size=",
+            )
         )
+        and "can never generate an example, because min_size is larger than Hypothesis supports." not in error.exception
     )
 
 
