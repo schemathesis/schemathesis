@@ -101,10 +101,26 @@ class UnknownExtension(BaseExtension):
 
 
 @dataclass
-class SchemaOptimizationExtension(BaseExtension):
+class AddPatch(TypedDict):
+    operation: Literal["add"]
+    path: list[str | int]
+    value: Any
+
+
+@dataclass
+class RemovePatch(TypedDict):
+    operation: Literal["remove"]
+    path: list[str | int]
+
+
+Patch = Union[AddPatch, RemovePatch]
+
+
+@dataclass
+class SchemaPatchesExtension(BaseExtension):
     """Update the schema with its optimized version."""
 
-    schema: dict[str, Any]
+    patches: list[Patch]
     state: ExtensionState = field(default_factory=NotApplied)
 
     @property
@@ -144,14 +160,14 @@ class StringFormatsExtension(BaseExtension):
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.
-Extension = Union[SchemaOptimizationExtension, StringFormatsExtension, UnknownExtension]
+Extension = Union[SchemaPatchesExtension, StringFormatsExtension, UnknownExtension]
 
 
 def extension_from_dict(data: dict[str, Any]) -> Extension:
-    if data["type"] == "schema":
-        return SchemaOptimizationExtension(schema=data["schema"])
+    if data["type"] == "schema_patches":
+        return SchemaPatchesExtension(patches=data["patches"])
     elif data["type"] == "string_formats":
-        return StringFormatsExtension.from_dict(formats=data["formats"])
+        return StringFormatsExtension.from_dict(formats=data["items"])
     return UnknownExtension(type=data["type"])
 
 
