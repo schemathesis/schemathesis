@@ -27,3 +27,4 @@ jobs:
           commit-message: 'chore: Update test corpus'
           committer: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
           author: 'CI on behalf of the Schemathesis team <team@schemathesis.io>'
+          branch: "create-pull-request/update-test-corpus"
