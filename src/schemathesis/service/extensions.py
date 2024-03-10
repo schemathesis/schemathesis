@@ -4,12 +4,14 @@ import base64
 from ipaddress import IPv4Network, IPv6Network
 from typing import TYPE_CHECKING, Callable, Optional, Any
 
+from ..graphql import nodes
 from ..internal.result import Result, Ok, Err
 from .models import (
     Extension,
     SchemaPatchesExtension,
     StrategyDefinition,
-    StringFormatsExtension,
+    OpenApiStringFormatsExtension,
+    GraphQLScalarsExtension,
     Success,
     Error,
     TransformFunctionDefinition,
@@ -26,21 +28,35 @@ if TYPE_CHECKING:
 def apply(extensions: list[Extension], schema: BaseSchema) -> None:
     """Apply the given extensions."""
     for extension in extensions:
-        if isinstance(extension, StringFormatsExtension):
+        if isinstance(extension, OpenApiStringFormatsExtension):
             _apply_string_formats_extension(extension)
+        if isinstance(extension, GraphQLScalarsExtension):
+            _apply_scalars_extension(extension)
         elif isinstance(extension, SchemaPatchesExtension):
             _apply_schema_optimization_extension(extension, schema)
 
 
-def _apply_string_formats_extension(extension: StringFormatsExtension) -> None:
+def _apply_string_formats_extension(extension: OpenApiStringFormatsExtension) -> None:
     from ..specs.openapi import formats
 
     for name, value in extension.formats.items():
         strategy = strategy_from_definitions(value)
         if isinstance(strategy, Err):
-            extension.set_state(Error(message=f"Unsupported string format extension: {strategy.err()}"))
+            extension.set_state(Error(message=f"Unsupported Open API string format extension: {strategy.err()}"))
             continue
         formats.register(name, strategy.ok())
+        extension.set_state(Success())
+
+
+def _apply_scalars_extension(extension: GraphQLScalarsExtension) -> None:
+    from ..specs.graphql import scalars
+
+    for name, value in extension.scalars.items():
+        strategy = strategy_from_definitions(value)
+        if isinstance(strategy, Err):
+            extension.set_state(Error(message=f"Unsupported GraphQL scalar extension: {strategy.err()}"))
+            continue
+        scalars.scalar(name, strategy.ok())
         extension.set_state(Success())
 
 
@@ -113,6 +129,10 @@ def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[s
 KNOWN_ARGUMENTS = {
     "IPv4Network": IPv4Network,
     "IPv6Network": IPv6Network,
+    "GraphQLBoolean": nodes.Boolean,
+    "GraphQLFloat": nodes.Float,
+    "GraphQLInt": nodes.Int,
+    "GraphQLString": nodes.String,
 }
 
 
