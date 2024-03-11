@@ -30,6 +30,7 @@ from ...types import NotSet
 from ...serializers import Binary
 from ...utils import compose, skip
 from .constants import LOCATION_TO_CONTAINER
+from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
 from .parameters import OpenAPIBody, parameters_to_json_schema
@@ -212,6 +213,8 @@ def _get_body_strategy(
     operation: APIOperation,
     generation_config: GenerationConfig,
 ) -> st.SearchStrategy:
+    if parameter.media_type in MEDIA_TYPES:
+        return MEDIA_TYPES[parameter.media_type]
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:

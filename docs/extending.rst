@@ -645,6 +645,35 @@ In the example above, when Schemathesis detects a string with the "card_number" 
 
 For more details about creating strategies, refer to the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/data.html>`_.
 
+Generating payloads for unknown media types
+-------------------------------------------
+
+Each request payload in Open API is associated with a media type, which defines the format of the payload content.
+Schemathesis allows you to manage the generation of payloads by registering Hypothesis strategies for specific media types.
+
+Schemathesis generates request payload, it first checks whether there is a custom generation strategy registered for the media type.
+If a strategy is registered, it will be used to generate the payload content; otherwise, it will generate payloads based on the schema.
+
+- **Create a Hypothesis Strategy**: Create a strategy that generates binary payloads compliant with the media type.
+- **Register the Strategy**: Make it known to Schemathesis using ``schemathesis.openapi.media_type``.
+
+.. code-block:: python
+
+    from hypothesis import strategies as st
+    import schemathesis
+
+    # Define your own strategy for generating PDFs
+    # NOTE: This is a simplified example, actual PDF generation is much more complex
+    pdfs = st.sampled_from([b"%PDF-1.5...", b"%PDF-1.6..."])
+
+    # Register the strategy for "application/pdf" media type
+    schemathesis.openapi.media_type("application/pdf", pdfs)
+    # You can also specify one or more additional aliases for the media type
+    schemathesis.openapi.media_type("application/pdf", pdfs, aliases=["application/x-pdf"])
+
+In this example, ``pdfs`` would be a Hypothesis strategy that generates binary data compliant with the PDF format.
+When Schemathesis encounters a request payload with the "application/pdf" media type, it uses the registered strategy to generate the payload content.
+
 Schemathesis test runner
 ------------------------
 
