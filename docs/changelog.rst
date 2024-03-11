@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.25.6...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support for per-media type data generators. :issue:`962`
+
 **Changed**
 
 - Improve error message when the minimum possible example is too large.
