@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import re
 from ipaddress import IPv4Network, IPv6Network
 from typing import TYPE_CHECKING, Callable, Optional, Any
 
@@ -12,8 +13,7 @@ from .models import (
     StrategyDefinition,
     OpenApiStringFormatsExtension,
     GraphQLScalarsExtension,
-    Success,
-    Error,
+    MediaTypesExtension,
     TransformFunctionDefinition,
 )
 
@@ -30,34 +30,49 @@ def apply(extensions: list[Extension], schema: BaseSchema) -> None:
     for extension in extensions:
         if isinstance(extension, OpenApiStringFormatsExtension):
             _apply_string_formats_extension(extension)
-        if isinstance(extension, GraphQLScalarsExtension):
+        elif isinstance(extension, GraphQLScalarsExtension):
             _apply_scalars_extension(extension)
+        elif isinstance(extension, MediaTypesExtension):
+            _apply_media_types_extension(extension)
         elif isinstance(extension, SchemaPatchesExtension):
             _apply_schema_optimization_extension(extension, schema)
+
+
+def _apply_simple_extension(
+    extension: OpenApiStringFormatsExtension | GraphQLScalarsExtension | MediaTypesExtension,
+    collection: dict[str, Any],
+    register_strategy: Callable[[str, st.SearchStrategy], None],
+) -> None:
+    errors = []
+    for name, value in collection.items():
+        strategy = strategy_from_definitions(value)
+        if isinstance(strategy, Err):
+            errors.append(str(strategy.err()))
+        else:
+            register_strategy(name, strategy.ok())
+
+    if errors:
+        extension.set_error(errors=errors)
+    else:
+        extension.set_success()
 
 
 def _apply_string_formats_extension(extension: OpenApiStringFormatsExtension) -> None:
     from ..specs.openapi import formats
 
-    for name, value in extension.formats.items():
-        strategy = strategy_from_definitions(value)
-        if isinstance(strategy, Err):
-            extension.set_state(Error(message=f"Unsupported Open API string format extension: {strategy.err()}"))
-            continue
-        formats.register(name, strategy.ok())
-        extension.set_state(Success())
+    _apply_simple_extension(extension, extension.formats, formats.register)
 
 
 def _apply_scalars_extension(extension: GraphQLScalarsExtension) -> None:
     from ..specs.graphql import scalars
 
-    for name, value in extension.scalars.items():
-        strategy = strategy_from_definitions(value)
-        if isinstance(strategy, Err):
-            extension.set_state(Error(message=f"Unsupported GraphQL scalar extension: {strategy.err()}"))
-            continue
-        scalars.scalar(name, strategy.ok())
-        extension.set_state(Success())
+    _apply_simple_extension(extension, extension.scalars, scalars.scalar)
+
+
+def _apply_media_types_extension(extension: MediaTypesExtension) -> None:
+    from ..specs.openapi import media_types
+
+    _apply_simple_extension(extension, extension.media_types, media_types.register_media_type)
 
 
 def _find_built_in_strategy(name: str) -> Optional[st.SearchStrategy]:
@@ -80,17 +95,17 @@ def _apply_schema_optimization_extension(extension: SchemaPatchesExtension, sche
         for part in path[:-1]:
             if isinstance(current, dict):
                 if not isinstance(part, str):
-                    extension.set_state(Error(message=f"Invalid path: {path}"))
+                    extension.set_error([f"Invalid path: {path}"])
                     return
                 current = current.setdefault(part, {})
             elif isinstance(current, list):
                 if not isinstance(part, int):
-                    extension.set_state(Error(message=f"Invalid path: {path}"))
+                    extension.set_error([f"Invalid path: {path}"])
                     return
                 try:
                     current = current[part]
                 except IndexError:
-                    extension.set_state(Error(message=f"Invalid path: {path}"))
+                    extension.set_error([f"Invalid path: {path}"])
                     return
         if operation == "add":
             # Add or replace the value at the target location.
@@ -105,12 +120,12 @@ def _apply_schema_optimization_extension(extension: SchemaPatchesExtension, sche
                     elif isinstance(current, list) and isinstance(last, int):
                         del current[last]
                     else:
-                        extension.set_state(Error(message=f"Invalid path: {path}"))
+                        extension.set_error([f"Invalid path: {path}"])
                         return
             else:
                 current.clear()
 
-    extension.set_state(Success())
+    extension.set_success()
 
 
 def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[st.SearchStrategy, Exception]:
@@ -136,16 +151,42 @@ KNOWN_ARGUMENTS = {
 }
 
 
+def check_regex(regex: str) -> Result[None, Exception]:
+    try:
+        re.compile(regex)
+    except (re.error, OverflowError, RuntimeError):
+        return Err(ValueError(f"Invalid regex: `{regex}`"))
+    return Ok(None)
+
+
+def check_sampled_from(elements: list) -> Result[None, Exception]:
+    if not elements:
+        return Err(ValueError("Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"))
+    return Ok(None)
+
+
+STRATEGY_ARGUMENT_CHECKS = {
+    "from_regex": check_regex,
+    "sampled_from": check_sampled_from,
+}
+
+
 def _strategy_from_definition(definition: StrategyDefinition) -> Result[st.SearchStrategy, Exception]:
     base = _find_built_in_strategy(definition.name)
     if base is None:
-        return Err(ValueError(f"Unknown built-in strategy: {definition.name}"))
+        return Err(ValueError(f"Unknown built-in strategy: `{definition.name}`"))
     arguments = definition.arguments or {}
     arguments = arguments.copy()
     for key, value in arguments.items():
-        known = KNOWN_ARGUMENTS.get(value)
-        if known is not None:
-            arguments[key] = known
+        if isinstance(value, str):
+            known = KNOWN_ARGUMENTS.get(value)
+            if known is not None:
+                arguments[key] = known
+    check = STRATEGY_ARGUMENT_CHECKS.get(definition.name)
+    if check is not None:
+        check_result = check(**arguments)  # type: ignore
+        if isinstance(check_result, Err):
+            return check_result
     strategy = base(**arguments)
     for transform in definition.transforms or []:
         function = _get_transform_function(transform)

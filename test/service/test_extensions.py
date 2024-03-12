@@ -14,15 +14,17 @@ def string_formats():
     extension = extension_from_dict(
         {
             "type": "string_formats",
-            "formats": {
+            "items": {
                 # Simpler regex for faster search
-                "_payment_card_regex": {"regex": "^[0-9]{2}$"},
-                "_payment_card_regex_with_samples": {
-                    "regex": "^[0-9]{2}$",
-                    "samples": ["1234-5678-1234-5678"],
-                },
-                "_payment_card_samples": {"samples": ["1234-5678-1234-5679"]},
-                "_uuid": {"builtin": "uuids"},
+                "_payment_card_regex": [{"name": "from_regex", "arguments": {"regex": "^[0-9]{2}$"}}],
+                "_payment_card_regex_with_samples": [
+                    {"name": "from_regex", "arguments": {"regex": "^[0-9]{2}$"}},
+                    {"name": "sampled_from", "arguments": {"elements": ["1234-5678-1234-5678"]}},
+                ],
+                "_payment_card_samples": [
+                    {"name": "sampled_from", "arguments": {"elements": ["1234-5678-1234-5679"]}},
+                ],
+                "_uuid": [{"name": "uuids", "transforms": [{"kind": "map", "name": "str"}]}],
             },
         }
     )
@@ -104,29 +106,33 @@ def test_string_formats_success(string_formats, openapi_30):
 )
 def test_strategy_from_definition(definition, expected_type):
     strategy = strategy_from_definitions([StrategyDefinition(**item) for item in definition])
-    find(strategy, lambda x: isinstance(x, expected_type))
+    find(strategy.ok(), lambda x: isinstance(x, expected_type))
 
 
 @pytest.mark.parametrize(
-    "format, message",
+    "strategies, errors",
     (
-        ({"regex": "[a-z"}, "Invalid regex: `[a-z`"),
-        ({"builtin": "wrong"}, "Unknown builtin strategy: `wrong`"),
-        ({"samples": []}, "Cannot sample from a length-zero sequence"),
-        ({"regex": r"\d", "samples": []}, "Cannot sample from a length-zero sequence"),
-        ({"unknown": 42}, "Unsupported string format extension"),
+        ([{"name": "from_regex", "arguments": {"regex": "[a-z"}}], ["Invalid regex: `[a-z`"]),
+        ([{"name": "wrong"}], ["Unknown built-in strategy: `wrong`"]),
+        (
+            [{"name": "sampled_from", "arguments": {"elements": []}}],
+            ["Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"],
+        ),
+        (
+            [
+                {"name": "from_regex", "arguments": {"regex": r"\d"}},
+                {"name": "sampled_from", "arguments": {"elements": []}},
+            ],
+            ["Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"],
+        ),
+        ([{"unknown": 42}], ["Unsupported string format extension"]),
     ),
 )
-def test_invalid_regex(format, message, openapi_30):
-    extension = extension_from_dict(
-        {
-            "type": "string_formats",
-            "formats": {"_invalid": format},
-        }
-    )
+def test_invalid_string_format_extension(strategies, errors, openapi_30):
+    extension = extension_from_dict({"type": "string_formats", "items": {"invalid": strategies}})
     apply([extension], openapi_30)
     assert str(extension.state) == "Error"
-    assert extension.state.message == message
+    assert extension.state.errors == errors
     assert "_invalid" not in STRING_FORMATS
 
 
