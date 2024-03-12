@@ -113,7 +113,7 @@ def report_upload(setup_server, next_url, upload_message, correlation_id):
 def analyze_schema(setup_server):
     return setup_server(
         lambda h: h.respond_with_json(
-            {"message": "Success", "extensions": []},
+            {"id": "42", "message": "Success", "extensions": []},
             status=200,
         ),
         "POST",

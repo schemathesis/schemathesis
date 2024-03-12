@@ -385,7 +385,7 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
     # Then the report should be saved to a file
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 8
+        assert len(tar.getmembers()) == 10
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         assert metadata["api_name"] == name
@@ -423,7 +423,7 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         assert f"Report is saved to {report_file}" in result.stdout
         assert not service.server.log
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 8
+        assert len(tar.getmembers()) == 10
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         if telemetry == "true":
@@ -477,9 +477,9 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
     assert result.exit_code == ExitCode.OK, result.stdout
     # And CI information is displayed in stdout
     lines = get_stdout_lines(result.stdout)
-    assert lines[18] == f"{environment.verbose_name} detected:"
+    assert lines[20] == f"{environment.verbose_name} detected:"
     key, value = next(iter(environment.as_env().items()))
-    assert lines[19] == f"  -> {key}: {value}"
+    assert lines[21] == f"  -> {key}: {value}"
     # And missing env vars are not displayed
     key, _ = next(filter(lambda kv: kv[1] is None, iter(environment.as_env().items())))
     assert key not in result.stdout

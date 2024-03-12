@@ -69,8 +69,8 @@ class Success:
 class Error:
     """An error occurred during the extension application."""
 
-    message: str
-    exception: str | None = None
+    errors: list[str] = field(default_factory=list)
+    exceptions: list[Exception] = field(default_factory=list)
 
     def __str__(self) -> str:
         return "Error"
@@ -83,6 +83,12 @@ ExtensionState = Union[NotApplied, Success, Error]
 class BaseExtension:
     def set_state(self, state: ExtensionState) -> None:
         self.state = state
+
+    def set_success(self) -> None:
+        self.set_state(Success())
+
+    def set_error(self, errors: list[str] | None = None, exceptions: list[Exception] | None = None) -> None:
+        self.set_state(Error(errors=errors or [], exceptions=exceptions or []))
 
 
 @dataclass
@@ -125,7 +131,9 @@ class SchemaPatchesExtension(BaseExtension):
 
     @property
     def details(self) -> list[str]:
-        return []
+        count = len(self.patches)
+        noun = "patches" if count > 1 else "patch"
+        return [f"{count} Schema {noun}"]
 
 
 class TransformFunctionDefinition(TypedDict):
@@ -141,6 +149,10 @@ class StrategyDefinition:
     arguments: dict[str, Any] | None = None
 
 
+def _strategies_from_definition(items: dict[str, list[dict[str, Any]]]) -> dict[str, list[StrategyDefinition]]:
+    return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
+
+
 @dataclass
 class OpenApiStringFormatsExtension(BaseExtension):
     """Custom string formats."""
@@ -150,7 +162,7 @@ class OpenApiStringFormatsExtension(BaseExtension):
 
     @classmethod
     def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> OpenApiStringFormatsExtension:
-        return cls(formats={name: [StrategyDefinition(**item) for item in value] for name, value in formats.items()})
+        return cls(formats=_strategies_from_definition(formats))
 
     @property
     def details(self) -> list[str]:
@@ -167,8 +179,8 @@ class GraphQLScalarsExtension(BaseExtension):
     state: ExtensionState = field(default_factory=NotApplied)
 
     @classmethod
-    def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> GraphQLScalarsExtension:
-        return cls(scalars={name: [StrategyDefinition(**item) for item in value] for name, value in formats.items()})
+    def from_dict(cls, scalars: dict[str, list[dict[str, Any]]]) -> GraphQLScalarsExtension:
+        return cls(scalars=_strategies_from_definition(scalars))
 
     @property
     def details(self) -> list[str]:
@@ -177,8 +189,30 @@ class GraphQLScalarsExtension(BaseExtension):
         return [f"{count} GraphQL {noun}"]
 
 
+@dataclass
+class MediaTypesExtension(BaseExtension):
+    media_types: dict[str, list[StrategyDefinition]]
+    state: ExtensionState = field(default_factory=NotApplied)
+
+    @classmethod
+    def from_dict(cls, media_types: dict[str, list[dict[str, Any]]]) -> MediaTypesExtension:
+        return cls(media_types=_strategies_from_definition(media_types))
+
+    @property
+    def details(self) -> list[str]:
+        count = len(self.media_types)
+        noun = "generators" if count > 1 else "generator"
+        return [f"{count} media type {noun}"]
+
+
 # A CLI extension that can be used to adjust the behavior of Schemathesis.
-Extension = Union[SchemaPatchesExtension, OpenApiStringFormatsExtension, GraphQLScalarsExtension, UnknownExtension]
+Extension = Union[
+    SchemaPatchesExtension,
+    OpenApiStringFormatsExtension,
+    GraphQLScalarsExtension,
+    MediaTypesExtension,
+    UnknownExtension,
+]
 
 
 def extension_from_dict(data: dict[str, Any]) -> Extension:
@@ -186,6 +220,10 @@ def extension_from_dict(data: dict[str, Any]) -> Extension:
         return SchemaPatchesExtension(patches=data["patches"])
     elif data["type"] == "string_formats":
         return OpenApiStringFormatsExtension.from_dict(formats=data["items"])
+    elif data["type"] == "scalars":
+        return GraphQLScalarsExtension.from_dict(scalars=data["items"])
+    elif data["type"] == "media_types":
+        return MediaTypesExtension.from_dict(media_types=data["items"])
     return UnknownExtension(type=data["type"])
 
 

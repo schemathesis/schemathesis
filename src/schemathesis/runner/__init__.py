@@ -79,7 +79,7 @@ def prepare(
     hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None,
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
     probe_config: ProbeConfig | None = None,
-    service_client: ServiceClient | None,
+    service_client: ServiceClient | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """Prepare a generator that will run test cases against the given API definition."""
     from ..checks import DEFAULT_CHECKS
@@ -353,7 +353,7 @@ def from_schema(
     count_operations: bool = True,
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
-    service_client: ServiceClient | None,
+    service_client: ServiceClient | None = None,
 ) -> BaseRunner:
     import hypothesis
     from starlette.applications import Starlette
