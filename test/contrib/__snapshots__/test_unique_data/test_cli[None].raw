@@ -17,9 +17,9 @@ GET /api/data/{path_param}/ F                                             [100%]
 =================================== SUMMARY ====================================
 
 Performed checks:
-    unique_test_cases                    13 / 13 passed          PASSED 
+    unique_test_cases                    N / N passed          PASSED 
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-============================== 1 passed in 1.00s ===============================
+============================== in 1.00s ========================================

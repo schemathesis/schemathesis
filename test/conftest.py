@@ -361,6 +361,8 @@ class CliSnapshotConfig:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
+            if "in 1.00s" in lines[-1]:
+                lines[-1] = lines[-1].ljust(80, "=")
             data = "\n".join(lines) + "\n"
         if self.replace_test_case_id:
             lines = data.splitlines()
