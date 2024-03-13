@@ -139,6 +139,7 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 @pytest.mark.xfail(True, reason="The ``--contrib-unique-data`` feature is deprecated and unstable", strict=False)
+@pytest.mark.snapshot(replace_statistic=True)
 def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
     assert run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
