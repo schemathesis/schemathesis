@@ -1459,7 +1459,8 @@ def test_colon_in_headers(cli, schema_url, app):
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples, snapshot_cli):
+@pytest.mark.snapshot(replace_statistic=True)
+def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
     # When the schema contains Open API links or Swagger 2 extension for links
     # And these links are nested - API operations in these links contain links to another operations
     # Note, it might fail if it uncovers the placed bug, which this version of stateful testing should not uncover
@@ -1472,6 +1473,7 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples, snaps
         cli.run(
             *cli_args,
             f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
@@ -1482,6 +1484,7 @@ def test_openapi_links(cli, cli_args, schema_url, hypothesis_max_examples, snaps
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_statistic=True)
 def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapshot_cli):
     # When the user disabled Open API links usage
     assert (
@@ -1491,6 +1494,7 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
+            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
             "--show-trace",
             "--stateful=none",
         )
@@ -1500,23 +1504,26 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
 
 @pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_openapi_links_multiple_threads(cli, cli_args, schema_url, recursion_limit, hypothesis_max_examples, expected):
+@pytest.mark.snapshot(replace_statistic=True)
+def test_openapi_links_multiple_threads(
+    cli, cli_args, recursion_limit, hypothesis_max_examples, expected, snapshot_cli
+):
     # When the schema contains Open API links or Swagger 2 extension for links
     # And these links are nested - API operations in these links contain links to another operations
-    result = cli.run(
-        *cli_args,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
-        "--hypothesis-derandomize",
-        "--hypothesis-deadline=None",
-        "--hypothesis-suppress-health-check=too_slow,filter_too_much",
-        "--show-trace",
-        f"--stateful-recursion-limit={recursion_limit}",
-        "--workers=2",
+    assert (
+        cli.run(
+            *cli_args,
+            f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+            "--hypothesis-seed=1",
+            "--hypothesis-derandomize",
+            "--hypothesis-deadline=None",
+            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+            "--show-trace",
+            f"--stateful-recursion-limit={recursion_limit}",
+            "--workers=2",
+        )
+        == snapshot_cli
     )
-    lines = result.stdout.splitlines()
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert lines[7] == expected + "." if hypothesis_max_examples else expected
 
 
 def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload, snapshot_cli):

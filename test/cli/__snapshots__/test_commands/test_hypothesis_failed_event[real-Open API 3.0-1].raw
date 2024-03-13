@@ -32,4 +32,4 @@ Performed checks:
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-========================= in 1.00s =========================
+========================= in 1.00s =============================================
