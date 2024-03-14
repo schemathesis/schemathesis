@@ -173,7 +173,7 @@ def _to_yaml(value: Any) -> dict[str, Any]:
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
-@register("text/yaml", aliases=("text/x-yaml", "application/x-yaml", "text/vnd.yaml"))
+@register("text/yaml", aliases=("text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"))
 class YAMLSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         return _to_yaml(value)

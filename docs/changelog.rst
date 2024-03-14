@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for per-media type data generators. :issue:`962`
+- Support for ``application/yaml`` & ``text/yml`` media types in ``YAMLSerializer``.
 
 **Changed**
 
