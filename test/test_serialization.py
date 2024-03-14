@@ -243,6 +243,7 @@ def test_binary_data(empty_open_api_3_schema, media_type):
                 "application/octet-stream",
                 "application/x-www-form-urlencoded",
                 "application/x-yaml",
+                "application/yaml",
                 "application/xml",
             },
         ),
