@@ -308,7 +308,10 @@ class CliSnapshotConfig:
     def serialize(self, data: str) -> str:
         lines = data.splitlines()
         lines = [
-            line for line in lines if not any(marker in line for marker in FLASK_MARKERS) and line != "API probing: ..."
+            line
+            for line in lines
+            if not any(marker in line for marker in FLASK_MARKERS)
+            and line not in ("API probing: ...", "Schema analysis: ...")
         ]
         data = "\n".join(lines)
         if self.replace_service_host:
