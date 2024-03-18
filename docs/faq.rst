@@ -15,6 +15,13 @@ This data consists of all possible data types from the JSON schema specification
 We can't guarantee that the generated data will always be accepted by the application under test since there could be validation rules not covered by the API schema.
 If you found that Schemathesis generated something that doesn't fit the API schema, consider `reporting a bug <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_
 
+How many tests does Schemathesis execute for an API operation?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The total number of tests Schemathesis executes is influenced by the API schema's complexity, user-defined settings like ``--hypothesis-max-examples`` for the maximum tests generated, and the test generation phases (``explicit``, ``generate``, ``reuse``, and ``shrink``). 
+The process is designed to optimize coverage within a reasonable test budget rather than aiming for exhaustive coverage. 
+For detailed insights and customization options, refer to our :ref:`data generation docs <data-generation-overview>`.
+
 What kind errors Schemathesis is capable to find?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
