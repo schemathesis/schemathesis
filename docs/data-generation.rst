@@ -12,6 +12,125 @@ Schemathesis converts Open API schemas to compatible JSON Schemas and passes the
     There are many tradeoffs in this process, and Hypothesis tries to give reasonable defaults for a typical case
     and not be too slow for pathological cases.
 
+.. _data-generation-overview:
+
+Overview
+--------
+
+For each API operation, Schemathesis follows a strict order in its test generation process, which includes several phases: explicit examples usage, rerunning previously failed tests, random test generation, and test case minimization (shrinking).
+Each phase targets distinct testing aspects:
+
+- **Explicit examples** (`explicit`): Uses predefined examples from the schema.
+- **Rerunning known failures** (`reuse`): Reuses previously failed test cases to check whether they are still failing.
+- **Random generation** (`generate`): Generates random test cases based on the schema.
+- **Shrinking** (`shrink`): Minimizes the failing test cases to make them easier to understand and debug.
+
+These phases can be selectively enabled or disabled to configure the testing process:
+
+.. code:: shell
+
+    # To disable the shrinking phase
+    --hypothesis-no-phases=shrink
+
+    # To only include the generate and shrink phases
+    --hypothesis-phases=generate,shrink
+
+Additionally, you can control the upper limit of generated test cases (only for the ``generate`` phase) via the ``--hypothesis-max-examples`` option.
+
+.. code:: shell
+
+    # Raise the upper cap for generated test cases per operation
+    --hypothesis-max-examples=1000
+
+The generation process is inherently randomized and is designed for efficient testing, favoring speed and maintaining reasonable coverage over exhaustive testing. 
+It also means that Schemathesis does not guarantee the full coverage of all possible variants, but will do its best to generate a diverse set of test cases with minimal duplication.
+
+The number of generated tests is affected by the schema's complexity and the distinctness of possible test cases.
+Simple schemas with a clear set of distinct values, like a boolean, naturally limit the total number of unique test cases.
+Conversely, complex schemas with many nested objects and arrays can produce a large number of unique test cases.
+
+When Schemathesis finds a minimal failing test case, it stops the test case generation process and verifies whether the failure could be consistently reproduced by rerunning it one more time.
+It also caches distinct minimized failures for reuse in subsequent runs, aiding in catching regressions.
+
+Explicit examples
+~~~~~~~~~~~~~~~~~
+
+This phase uses examples directly from the API schema, filling missing parts with random data.
+If the schema specifies multiple examples for a parameter, then Schemathesis will use a round-robin strategy to ensure all examples are tested.
+
+.. code:: shell
+
+   # Schema
+  {
+    "type": "object",
+    "properties": {
+      "name": {"type": "string", "example": "John"},
+      "age": {"type": "integer", "examples": [42, 43]},
+      "street": {"type": "string"}
+    }
+  }
+  # Test cases
+  {"name": "John", "age": 42, "street": "<RANDOM STRING>"}
+  {"name": "John", "age": 43, "street": "<ANOTHER RANDOM STRING>"}
+
+Reusing known failures
+~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis stores failed test cases in a cache (the ``.hypothesis`` directory) and reruns them in subsequent runs to detect regressions.
+This phase may reduce the total number of generated test cases as Schemathesis may find failures earlier.
+
+Generating random test cases
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The generation process is governed by the ``--data-generation-method`` CLI option, and creates valid (``positive``) or guaranteed invalid (``negative``) test cases based on the schema. 
+If negative testing is inapplicable (e.g., when any input is accepted), the tests are skipped.
+
+Example:
+
+.. code:: shell
+
+    # Schema
+    {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string"}
+      }
+    }
+
+    # Positive testing
+    {"name": "John"}
+
+    # Negative testing
+    {"name": 42}
+
+The upper limit of generated test cases could be controlled via the ``--hypothesis-max-examples`` option.
+
+Test case minimization
+~~~~~~~~~~~~~~~~~~~~~~
+
+This phase focuses on reducing the complexity of failing test cases to make them easier to understand and debug.
+
+While beneficial for isolating issues in complex schemas, it can be time-consuming.
+Disabling shrinking (``--hypothesis-no-phases=shrink``) may be advantageous when the source of an error is apparent and can be debugged straightforwardly.
+
+.. code:: shell
+
+    # Schema
+    {
+      "type": "object",
+      "properties": {
+        "name": {"type": "string", "minLength": 5}
+      }
+    }
+
+    # Failing test case
+    {"name": "Very long name"}
+
+    # Minimized test case
+    {"name": "aaaaa"}
+
+Shrinking works for arbitrary complex structures allowing to avoid digging through large payloads.
+
 Generating strings
 ------------------
 
