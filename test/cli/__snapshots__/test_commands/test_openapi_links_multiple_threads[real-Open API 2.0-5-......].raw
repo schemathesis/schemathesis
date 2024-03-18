@@ -10,6 +10,7 @@ Workers: 2
 Collected API operations: 3
 Collected API links: 3
 API probing: SUCCESS
+Schema analysis: SKIP
 
 ......
 

@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SKIP
+Schema analysis: SKIP
 
 POST /success E                                                           [100%]
 

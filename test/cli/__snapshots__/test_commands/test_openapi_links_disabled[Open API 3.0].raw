@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 3
 Collected API links: 3
 API probing: SUCCESS
+Schema analysis: SKIP
 
 POST /api/users/ .                                                        [ 33%]
 GET /api/users/{user_id} .                                                [ 66%]
