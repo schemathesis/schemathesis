@@ -2,10 +2,8 @@ import json
 import re
 from queue import Queue
 
-import hypothesis
 import pytest
 from _pytest.main import ExitCode
-from packaging import version
 from requests import Timeout
 
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
@@ -339,10 +337,6 @@ def test_authenticated_with_name(cli, service):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-@pytest.mark.xfail(
-    version.parse(hypothesis.__version__) >= version.parse("6.87.3"),
-    reason="PermissionError due to the usage of `Path.exists`",
-)
 def test_permission_denied_on_hosts_creation(mocker, cli, schema_url, service, hosts_file):
     # When the hosts file can't be created
     mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError)
