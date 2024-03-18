@@ -9,6 +9,10 @@ Changelog
 - Support for per-media type data generators. :issue:`962`
 - Support for ``application/yaml`` & ``text/yml`` media types in ``YAMLSerializer``.
 
+**Fixed**
+
+- Not resolving references in nested security schemes. :issue:`2073`
+
 **Changed**
 
 - Improve error message when the minimum possible example is too large.

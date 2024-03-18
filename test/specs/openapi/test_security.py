@@ -19,6 +19,22 @@ def test_ref_resolving():
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == http_schema
 
 
+def test_ref_resolving_nested():
+    http_schema = {"type": "http", "scheme": "basic"}
+    schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Blank API", "version": "1.0"},
+        "servers": [{"url": "http://localhost/api"}],
+        "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
+        "components": {
+            "securitySchemes": {"basic_auth": {"$ref": "#/components/HTTPSchema"}},
+            "HTTPSchema": http_schema,
+        },
+    }
+    resolver = InliningResolver("", schema)
+    assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == {"basic_auth": http_schema}
+
+
 PARAMETER_NAME = "TestApiKey"
 SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME = {
     "openapi": "3.0.2",
