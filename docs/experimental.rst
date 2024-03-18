@@ -115,9 +115,8 @@ For more details, join the `GitHub Discussion #1822 <https://github.com/schemath
 Schema Analysis
 ~~~~~~~~~~~~~~~
 
-Enables using Schemathesis.io to improve the efficiency and realism of the generated test cases for better bug detection.
-
-By using this feature, you can expect to see higher coverage of edge cases to be avhieved faster, as well as tests reaching deeper into your API implementation.
+Enables integration with Schemathesis.io to optimize test case generation for better bug detection.
+This feature infers appropriate data generation strategies, supports uncommon media types, adjusts schemas for faster data generation, and detects the web server to generate more targeted test data. 
 
 .. _schema-analysis-cli:
 

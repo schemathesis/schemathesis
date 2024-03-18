@@ -7,19 +7,26 @@ Schemathesis as a Service on `Schemathesis.io <https://app.schemathesis.io/auth/
 
     For a step-by-step guide on getting started with Schemathesis.io, visit our `Quick Start Guide <https://docs.schemathesis.io/quick-start/>`_.
 
-API Schema Analysis
--------------------
+Schema Analysis (Experimental)
+------------------------------
 
-Schemathesis CLI uses Schemathesis.io to improve the efficiency and realism of the generated test cases for better bug detection.
-This feature is currently in its experimental phase and by using it, you automatically agree to Schemathesis.io's `Terms of Service <https://schemathesis.io/legal/terms>`_ and `Privacy Policy`_.
+Schemathesis CLI now includes an experimental feature that integrates with Schemathesis.io to improve the efficiency and realism of generated test cases for better bug detection. This feature optimizes test case generation by:
 
-By using this feature, you can expect to see higher coverage of edge cases to be avhieved faster, as well as tests reaching deeper into your API implementation.
+- Inferring "format" keywords for appropriate string data generation
+- Providing data generation strategies for uncommon media types (e.g., application/pdf)
+- Inferring data generation strategies for GraphQL scalars
+- Adjusting schemas for faster data generation in Schemathesis
+- Detecting the web server to generate more targeted test data and avoid rejected inputs
 
-.. note::
-
-    Schema analysis is available free of charge and does not require signup during the experimental phase.
+By enabling this feature, you can potentially benefit from faster achievement of higher edge case coverage and tests that reach deeper into your API implementation.
 
 To enable schema analysis, use the ``--experimental=schema-analysis`` CLI option. It is also automatically enabled when the ``--report`` CLI option is used.
+
+.. note::
+ 
+    During the experimental phase, schema analysis is available free of charge and does not require signup. By using this feature, you automatically agree to Schemathesis.io's `Terms of Service <https://schemathesis.io/legal/terms>`_ and `Privacy Policy`_.
+
+Please note that this feature is still experimental, and its effectiveness may vary depending on the API being tested. We are actively refining the algorithms and techniques used. If you encounter any issues or have suggestions, please open an issue on our GitHub repository or reach out via our support channels.
 
 Uploading Reports to Schemathesis.io
 ------------------------------------
