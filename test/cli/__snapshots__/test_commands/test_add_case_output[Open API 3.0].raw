@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 2
 Collected API links: 0
 API probing: SUCCESS
+Schema analysis: SKIP
 
 GET /api/failure F                                                        [ 50%]
 GET /api/success F                                                        [100%]
