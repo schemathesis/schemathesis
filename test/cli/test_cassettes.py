@@ -176,7 +176,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     )
     assert result.ret == ExitCode.OK
     expected = f"Network log: {cassette_path}"
-    assert result.outlines[18] == expected or result.outlines[19]
+    assert result.outlines[20] == expected or result.outlines[21]
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
