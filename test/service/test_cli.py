@@ -340,7 +340,7 @@ def test_authenticated_with_name(cli, service):
 @pytest.mark.operations("success")
 def test_permission_denied_on_hosts_creation(mocker, cli, schema_url, service, hosts_file):
     # When the hosts file can't be created
-    mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError)
+    mocker.patch("pathlib.Path.mkdir", side_effect=PermissionError("Permission Denied"))
     # Then it should not make the run fail
     result = cli.run(schema_url, f"--hosts-file={hosts_file}")
     assert result.exit_code == ExitCode.OK, result.stdout
