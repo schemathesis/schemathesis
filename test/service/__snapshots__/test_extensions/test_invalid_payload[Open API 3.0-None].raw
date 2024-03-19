@@ -11,7 +11,7 @@ Collected API operations: 2
 Collected API links: 0
 Report to Schemathesis.io: ENABLED
 API probing: SUCCESS
-Schema analysis: SUCCESS
+Schema analysis: ERROR
 
 GET /api/failure F                                                        [ 50%]
 GET /api/success .                                                        [100%]
@@ -31,10 +31,18 @@ Reproduce with:
     curl -X GET http://127.0.0.1/api/failure
 
 =============================== SCHEMA ANALYSIS ================================
+Error
 
-Success
+We apologize for the inconvenience. This appears to be an internal issue.
+Please, consider reporting the following details to our issue tracker:
 
-No extensions has been applied.
+  https://github.com/schemathesis/schemathesis/issues/new?labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D
+
+Response: 'Json deserialize error: invalid type: integer `42`, expected a sequence at line 1 column 13'
+Status: 400
+Headers: {'X-Foo': 'Bar'}
+
+Tip: Please update your CLI to the latest version and try again.
 
 =================================== SUMMARY ====================================
 
@@ -47,17 +55,10 @@ Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
 Compressed report size: 2 KB
 Uploading reports to http://127.0.0.1 ...
-Upload: ERROR
+Upload: COMPLETED
 
-We apologize for the inconvenience. This appears to be an internal issue.
-Please, consider reporting the following details to our issue tracker:
+Hi!
 
-  https://github.com/schemathesis/schemathesis/issues/new?labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D
-
-Response: '"Content-Type error"'
-Status: 400
-Headers: {'X-Foo': 'Bar'}
-
-Tip: Please update your CLI to the latest version and try again.
+http://127.0.0.1/r/next/
 
 ========================= 1 passed, 1 failed in 1.00s ==========================

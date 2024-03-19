@@ -12,7 +12,7 @@ from queue import Queue
 from typing import Any, Generator, cast
 
 import click
-from requests import RequestException
+import requests
 
 from ... import service
 from ...code_samples import CodeSampleStyle
@@ -26,7 +26,12 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
 )
-from ...exceptions import RuntimeErrorType, format_exception, prepare_response_payload
+from ...exceptions import (
+    RuntimeErrorType,
+    format_exception,
+    prepare_response_payload,
+    extract_requests_exception_details,
+)
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...internal.result import Err, Ok
 from ...models import Status
@@ -387,6 +392,7 @@ def display_analysis(context: ExecutionContext) -> None:
                         click.echo(f"  - {entry}")
                 if unknown:
                     click.secho("The following extensions are not recognized:")
+                    # TODO: More clear message
                     for extension in unknown:
                         click.echo(f"  - {extension.type}")
                     click.echo("Consider updating the CLI for complete schema analysis and improved bug detection.")
@@ -398,16 +404,28 @@ def display_analysis(context: ExecutionContext) -> None:
         click.echo()
     elif isinstance(context.analysis, Err):
         exception = context.analysis.err()
-        traceback = format_exception(exception, True)
-        if isinstance(exception, RequestException) and exception.response is not None:
-            response = f"\nResponse: {exception.response.text}\n\n"
+        suggestion = None
+        if isinstance(exception, requests.exceptions.HTTPError):
+            response = exception.response
+            click.secho("Error\n", fg="red", bold=True)
+            _display_service_network_error(response)
+            click.echo()
+            return None
+        elif isinstance(exception, requests.RequestException):
+            message, extras = extract_requests_exception_details(exception)
+            suggestion = "Please check your network connection and try again."
+            title = "Network Error"
         else:
-            response = ""
+            traceback = format_exception(exception, True)
+            extras = _split_traceback(traceback)
+            title = "Internal Error"
+            message = f"We apologize for the inconvenience. This appears to be an internal issue.\nPlease, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
+            suggestion = "Please update your CLI to the latest version and try again."
+        click.secho(f"{title}\n", fg="red", bold=True)
+        click.echo(message)
+        _display_extras(extras)
+        _maybe_display_tip(suggestion)
         click.echo()
-        click.echo(
-            f"An error happened during API schema analysis.\n"
-            f"Please, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n{response}{traceback.strip()}\n"
-        )
 
 
 def display_statistic(context: ExecutionContext, event: events.Finished) -> None:
@@ -544,37 +562,43 @@ def display_service_error(event: service.Error, message_prefix: str = "") -> Non
 
     if isinstance(event.exception, HTTPError):
         response = cast(Response, event.exception.response)
-        status_code = response.status_code
-        if 500 <= status_code <= 599:
-            click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
-            # Server error, should be resolved soon
-            click.secho(
-                "\nIt is likely that we are already notified about the issue and working on a fix\n"
-                "Please, try again in 30 minutes",
-                fg="red",
-            )
-        elif status_code == 401:
-            # Likely an invalid token
-            click.echo("Your CLI is not authenticated.")
-            display_service_unauthorized("schemathesis.io")
-        else:
-            try:
-                data = response.json()
-                detail = data["detail"]
-                click.secho(f"{message_prefix}{detail}", fg="red")
-            except Exception:
-                # Other client-side errors are likely caused by a bug on the CLI side
-                click.secho(
-                    "We apologize for the inconvenience. This appears to be an internal issue.\n"
-                    "Please, consider reporting the following details to our issue "
-                    f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
-                    f"Headers: {response.headers!r}",
-                    fg="red",
-                )
+        _display_service_network_error(response, message_prefix)
     elif isinstance(event.exception, RequestException):
         ask_to_report(event, report_to_issues=False)
     else:
         ask_to_report(event)
+
+
+def _display_service_network_error(response: requests.Response, message_prefix: str = "") -> None:
+    status_code = response.status_code
+    if 500 <= status_code <= 599:
+        click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
+        # Server error, should be resolved soon
+        click.secho(
+            "\nIt is likely that we are already notified about the issue and working on a fix\n"
+            "Please, try again in 30 minutes",
+            fg="red",
+        )
+    elif status_code == 401:
+        # Likely an invalid token
+        click.echo("Your CLI is not authenticated.")
+        display_service_unauthorized("schemathesis.io")
+    else:
+        try:
+            data = response.json()
+            detail = data["detail"]
+            click.secho(f"{message_prefix}{detail}", fg="red")
+        except Exception:
+            # Other client-side errors are likely caused by a bug on the CLI side
+            click.secho(
+                "We apologize for the inconvenience. This appears to be an internal issue.\n"
+                "Please, consider reporting the following details to our issue "
+                f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
+                f"Status: {response.status_code}\n"
+                f"Headers: {response.headers!r}",
+                fg="red",
+            )
+            _maybe_display_tip("Please update your CLI to the latest version and try again.")
 
 
 SERVICE_ERROR_MESSAGE = "An error happened during uploading reports to Schemathesis.io"
