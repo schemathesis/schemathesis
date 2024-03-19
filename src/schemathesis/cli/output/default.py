@@ -9,10 +9,9 @@ import time
 from importlib import metadata
 from itertools import groupby
 from queue import Queue
-from typing import Any, Generator, cast
+from typing import Any, Generator, cast, TYPE_CHECKING
 
 import click
-import requests
 
 from ... import service
 from ...code_samples import CodeSampleStyle
@@ -42,6 +41,9 @@ from ...runner.serialization import SerializedCheck, SerializedError, Serialized
 from ...service.models import AnalysisSuccess, UnknownExtension
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
+
+if TYPE_CHECKING:
+    import requests
 
 SPINNER_REPETITION_NUMBER = 10
 
