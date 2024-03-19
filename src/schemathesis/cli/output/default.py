@@ -374,6 +374,8 @@ def display_single_log(result: SerializedTestResult) -> None:
 
 def display_analysis(context: ExecutionContext) -> None:
     """Display schema analysis details."""
+    import requests.exceptions
+
     if context.analysis is None:
         return
     display_section_name("SCHEMA ANALYSIS")

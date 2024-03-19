@@ -106,14 +106,12 @@ class UnknownExtension(BaseExtension):
         return [self.type]
 
 
-@dataclass
 class AddPatch(TypedDict):
     operation: Literal["add"]
     path: list[str | int]
     value: Any
 
 
-@dataclass
 class RemovePatch(TypedDict):
     operation: Literal["remove"]
     path: list[str | int]
