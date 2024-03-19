@@ -276,6 +276,7 @@ def keep_cwd():
 
 FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
 PACKAGE_ROOT = Path(schemathesis.__file__).parent
+SITE_PACKAGES = requests.__file__.split("requests")[0]
 
 
 @dataclass()
@@ -335,6 +336,7 @@ class CliSnapshotConfig:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
         data = data.replace(str(PACKAGE_ROOT), "/package-root")
+        data = data.replace(str(SITE_PACKAGES), "/site-packages/")
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         if self.replace_multi_worker_progress:
             lines = data.splitlines()

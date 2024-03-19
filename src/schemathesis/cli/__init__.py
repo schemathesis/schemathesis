@@ -907,7 +907,6 @@ def run(
         from ..service.client import ServiceClient
 
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
-    # TODO: Consider forward compatibility, as service may start requiring authentication, display such an error
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
 
     if "all" in checks:

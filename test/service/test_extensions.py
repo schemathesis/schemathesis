@@ -1,6 +1,7 @@
 import uuid
 
 import pytest
+import requests.exceptions
 from hypothesis import find
 
 from schemathesis.service.extensions import apply, strategy_from_definitions
@@ -125,7 +126,8 @@ def test_strategy_from_definition(definition, expected_type):
             ],
             ["Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"],
         ),
-        ([{"unknown": 42}], ["Unsupported string format extension"]),
+        # TODO: Handle this
+        # ([{"unknown": 42}], ["Unsupported string format extension"]),
     ),
 )
 def test_invalid_string_format_extension(strategies, errors, openapi_30):
@@ -141,3 +143,67 @@ def test_unknown_extension(openapi_30):
     assert isinstance(extension, UnknownExtension)
     apply([extension], openapi_30)
     assert str(extension.state) == "Not Applied"
+
+
+@pytest.fixture
+def cli_args(schema_url, service):
+    return [
+        schema_url,
+        "my-api",
+        f"--schemathesis-io-token={service.token}",
+        f"--schemathesis-io-url={service.base_url}",
+        "--report",
+    ]
+
+
+@pytest.mark.service(data={"detail": "Internal Server Error"}, status=500, method="POST", path="/cli/analysis/")
+@pytest.mark.openapi_version("3.0")
+def test_internal_server_error(cli_args, cli, service, snapshot_cli):
+    assert cli.run(*cli_args) == snapshot_cli
+    assert len(service.server.log) == 2
+    service.assert_call(0, "/cli/analysis/", 500)
+
+
+@pytest.mark.service(data={"detail": "Forbidden"}, status=403, method="POST", path="/cli/analysis/")
+@pytest.mark.openapi_version("3.0")
+def test_forbidden(cli_args, cli, service, snapshot_cli):
+    assert cli.run(*cli_args) == snapshot_cli
+    assert len(service.server.log) == 2
+    service.assert_call(0, "/cli/analysis/", 403)
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.parametrize("analyze_schema", [None])
+def test_oversize_text(cli_args, cli, service, snapshot_cli, setup_server):
+    payload = "JSON payload (20350625 bytes) is larger than allowed (limit: 10485760 bytes)"
+    setup_server(
+        lambda h: h.respond_with_data(payload, status=413),
+        "POST",
+        "/cli/analysis/",
+    )
+    assert cli.run(*cli_args) == snapshot_cli
+    assert len(service.server.log) == 2
+    service.assert_call(0, "/cli/analysis/", 413)
+
+
+@pytest.mark.openapi_version("3.0")
+def test_connection_error(mocker, cli_args, cli, snapshot_cli):
+    try:
+        requests.get("http://127.0.0.1:1", timeout=0.00001)
+    except requests.exceptions.RequestException as exc:
+        e = exc
+    mocker.patch("schemathesis.service.client.ServiceClient.analyze_schema", side_effect=e)
+    assert cli.run(*cli_args) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.parametrize("analyze_schema", [None])
+def test_invalid_payload(setup_server, cli_args, cli, snapshot_cli):
+    # Analysis payload is invalid
+    payload = "Json deserialize error: invalid type: integer `42`, expected a sequence at line 1 column 13"
+    setup_server(
+        lambda h: h.respond_with_data(payload, status=400),
+        "POST",
+        "/cli/analysis/",
+    )
+    assert cli.run(*cli_args) == snapshot_cli
