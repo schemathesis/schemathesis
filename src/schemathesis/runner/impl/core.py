@@ -155,7 +155,7 @@ class BaseRunner:
 
             if self.service_client is not None:
                 try:
-                    _probes = cast(list[probes.ProbeRun], __probes)
+                    _probes = cast(List[probes.ProbeRun], __probes)
                     result = self.service_client.analyze_schema(_probes, self.schema.raw_schema)
                     if isinstance(result, AnalysisSuccess):
                         extensions.apply(result.extensions, self.schema)
