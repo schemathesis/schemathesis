@@ -543,11 +543,11 @@ def extract_requests_exception_details(exc: RequestException) -> tuple[str, list
     elif isinstance(exc, ConnectionError):
         message = "Connection failed"
         inner = exc.args[0]
-        if isinstance(inner, MaxRetryError) and inner.reason is not None and isinstance(inner.reason.args[0], str):
-            if ":" not in inner.reason.args[0]:
-                reason = inner.reason.args[0]
+        if isinstance(inner, MaxRetryError) and inner.reason is not None:
+            if ":" not in str(inner.reason.args[0]):
+                reason = str(inner.reason.args[0])
             else:
-                _, reason = inner.reason.args[0].split(":", maxsplit=1)
+                _, reason = str(inner.reason.args[0]).split(":", maxsplit=1)
             extra = [reason.strip()]
         else:
             extra = [" ".join(map(str, inner.args))]
