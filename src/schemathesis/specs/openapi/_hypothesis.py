@@ -176,6 +176,11 @@ def get_case_strategy(
         else:
             body_ = ValueContainer(value=body, location="body", generator=None)
     else:
+        # This explicit body payload comes for a media type that has a custom strategy registered
+        # Such strategies only support binary payloads, otherwise they can't be serialized
+        if not isinstance(body, bytes) and media_type in MEDIA_TYPES:
+            all_media_types = operation.get_request_payload_content_types()
+            raise SerializationNotPossible.from_media_types(*all_media_types)
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
