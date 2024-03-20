@@ -385,7 +385,7 @@ def display_analysis(context: ExecutionContext) -> None:
         if isinstance(analysis, AnalysisSuccess):
             click.secho(analysis.message, bold=True)
             if analysis.extensions:
-                click.echo("\nThe following extensions has been applied:")
+                click.echo("\nThe following extensions have been applied:")
                 click.echo()
                 unknown = []
                 for extension in analysis.extensions:

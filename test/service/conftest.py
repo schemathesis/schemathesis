@@ -110,10 +110,12 @@ def report_upload(setup_server, next_url, upload_message, correlation_id):
 
 
 @pytest.fixture
-def analyze_schema(setup_server):
+def analyze_schema(request, setup_server):
+    marker = request.node.get_closest_marker("extensions")
+    extensions = marker.args if marker else []
     return setup_server(
         lambda h: h.respond_with_json(
-            {"id": "42", "message": "Success", "extensions": []},
+            {"id": "42", "message": "Success", "extensions": extensions},
             status=200,
         ),
         "POST",

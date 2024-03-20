@@ -209,3 +209,68 @@ def test_invalid_payload(setup_server, cli_args, cli, snapshot_cli):
         "/cli/analysis/",
     )
     assert cli.run(*cli_args) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.extensions(
+    {
+        "type": "string_formats",
+        "items": {
+            "port": [
+                {
+                    "name": "integers",
+                    "transforms": [{"kind": "map", "name": "str"}],
+                    "arguments": {"min_value": 1, "max_value": 65535},
+                }
+            ],
+        },
+    }
+)
+def test_custom_format(cli, snapshot_cli, service, openapi3_base_url, empty_open_api_3_schema, testdir):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"port": {"type": "string", "format": "port"}},
+                                "required": ["port"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+@schemathesis.check
+def port_check(response, case):
+    assert isinstance(case.body, dict), "Not a dict"
+    assert "port" in case.body, "Missing key"
+    assert 1 <= int(case.body["port"]) <= 65535, "Invalid port"
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "-c",
+            "port_check",
+            f"--base-url={openapi3_base_url}",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--hypothesis-max-examples=10",
+            "--experimental=schema-analysis",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
