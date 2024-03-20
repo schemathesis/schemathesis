@@ -51,3 +51,28 @@ def test_pdf_generation(empty_open_api_3_schema):
         assert case.as_werkzeug_kwargs()["data"] == SAMPLE_PDF
 
     test()
+
+
+def test_explicit_example_with_custom_media_type(
+    empty_open_api_3_schema, testdir, cli, snapshot_cli, openapi3_base_url
+):
+    empty_open_api_3_schema["paths"] = {
+        "/csv": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "text/csv": {
+                            "schema": {"type": "string", "format": "binary"},
+                            "example": [{"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 4, "c": 5}],
+                        },
+                    },
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}},
+            }
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
+
+    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}") == snapshot_cli
