@@ -32,7 +32,7 @@ from ...exceptions import (
     extract_requests_exception_details,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
-from ...internal.result import Err, Ok
+from ...internal.result import Ok
 from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
@@ -385,28 +385,32 @@ def display_analysis(context: ExecutionContext) -> None:
         if isinstance(analysis, AnalysisSuccess):
             click.secho(analysis.message, bold=True)
             if analysis.extensions:
-                click.echo("\nThe following extensions have been applied:")
-                click.echo()
-                unknown = []
+                known = []
+                unknown = 0
                 for extension in analysis.extensions:
                     if isinstance(extension, UnknownExtension):
-                        unknown.append(extension)
-                        continue
-                    for entry in extension.details:
-                        click.echo(f"  - {entry}")
+                        unknown += 1
+                    else:
+                        known.append(extension)
+                if known:
+                    click.echo("\nThe following extensions have been applied:\n")
+                    click.echo()
+                    for extension in known:
+                        for entry in extension.details:
+                            click.echo(f"  - {entry}")
                 if unknown:
-                    click.secho("The following extensions are not recognized:")
-                    # TODO: More clear message
-                    for extension in unknown:
-                        click.echo(f"  - {extension.type}")
-                    click.echo("Consider updating the CLI for complete schema analysis and improved bug detection.")
+                    noun = "extension" if unknown == 1 else "extensions"
+                    specific_noun = "this extension" if unknown == 1 else "these extensions"
+                    click.secho(
+                        f"\n{unknown} {noun} not recognized.\nConsider updating the CLI to add support for {specific_noun}."
+                    )
             else:
                 click.echo("\nNo extensions has been applied.")
         else:
             click.echo("An error happened during schema analysis:\n")
             click.secho(f"  {analysis.message}", bold=True)
         click.echo()
-    elif isinstance(context.analysis, Err):
+    else:
         exception = context.analysis.err()
         suggestion = None
         if isinstance(exception, requests.exceptions.HTTPError):

@@ -1,0 +1,57 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 2
+Collected API links: 0
+Report to Schemathesis.io: ENABLED
+API probing: SUCCESS
+Schema analysis: SUCCESS
+
+GET /api/failure F                                                        [ 50%]
+GET /api/success .                                                        [100%]
+
+=================================== FAILURES ===================================
+_______________________________ GET /api/failure _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with: 
+
+    curl -X GET http://127.0.0.1/api/failure
+
+=============================== SCHEMA ANALYSIS ================================
+
+Success
+
+1 extension not recognized.
+Consider updating the CLI to add support for this extension.
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    1 / 3 passed          FAILED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+
+Compressed report size: 2 KB
+Uploading reports to http://127.0.0.1 ...
+Upload: COMPLETED
+
+Hi!
+
+http://127.0.0.1/r/next/
+
+========================= 1 passed, 1 failed in 1.00s ==========================

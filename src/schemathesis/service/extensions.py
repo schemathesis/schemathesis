@@ -35,7 +35,7 @@ def apply(extensions: list[Extension], schema: BaseSchema) -> None:
         elif isinstance(extension, MediaTypesExtension):
             _apply_media_types_extension(extension)
         elif isinstance(extension, SchemaPatchesExtension):
-            _apply_schema_optimization_extension(extension, schema)
+            _apply_schema_patches_extension(extension, schema)
 
 
 def _apply_simple_extension(
@@ -86,7 +86,7 @@ def _find_built_in_strategy(name: str) -> Optional[st.SearchStrategy]:
     return None
 
 
-def _apply_schema_optimization_extension(extension: SchemaPatchesExtension, schema: BaseSchema) -> None:
+def _apply_schema_patches_extension(extension: SchemaPatchesExtension, schema: BaseSchema) -> None:
     """Apply a set of patches to the schema."""
     for patch in extension.patches:
         current: dict[str, Any] | list = schema.raw_schema

@@ -211,7 +211,6 @@ def test_invalid_payload(setup_server, cli_args, cli, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
 @pytest.mark.extensions(
     {
         "type": "string_formats",
@@ -274,3 +273,9 @@ def port_check(response, case):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.extensions({"type": "unknown"})
+def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
+    assert cli.run(*cli_args) == snapshot_cli
