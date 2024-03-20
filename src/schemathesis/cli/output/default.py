@@ -394,7 +394,6 @@ def display_analysis(context: ExecutionContext) -> None:
                         known.append(extension)
                 if known:
                     click.echo("\nThe following extensions have been applied:\n")
-                    click.echo()
                     for extension in known:
                         for entry in extension.details:
                             click.echo(f"  - {entry}")
