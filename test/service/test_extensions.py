@@ -127,8 +127,6 @@ def test_strategy_from_definition(definition, expected_type):
             ],
             ["Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"],
         ),
-        # TODO: Handle this
-        # ([{"unknown": 42}], ["Unsupported string format extension"]),
     ),
 )
 def test_invalid_string_format_extension(strategies, errors, openapi_30):
@@ -278,4 +276,10 @@ def port_check(response, case):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.extensions({"type": "unknown"})
 def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
+    assert cli.run(*cli_args) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.extensions({"type": "string_formats", "items": {"format": 42}})
+def test_invalid_extension(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
