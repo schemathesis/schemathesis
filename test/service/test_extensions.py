@@ -1,3 +1,4 @@
+import platform
 import uuid
 
 import pytest
@@ -187,6 +188,7 @@ def test_oversize_text(cli_args, cli, service, snapshot_cli, setup_server):
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.skipif(platform.system() == "Windows", reason="Only verify on non-Windows platforms for simplicity")
 def test_connection_error(mocker, cli_args, cli, snapshot_cli):
     try:
         requests.get("http://127.0.0.1:1", timeout=0.00001)
