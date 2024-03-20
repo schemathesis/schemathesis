@@ -791,7 +791,7 @@ def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) 
                 status = "SUCCESS"
             elif probe.outcome == ProbeOutcome.ERROR:
                 status = "ERROR"
-    click.secho(f"API probing: {status}\r", bold=True, nl=False)
+    click.secho(f"API probing: {status}", bold=True, nl=False)
     click.echo()
 
 
@@ -807,7 +807,7 @@ def handle_after_analysis(context: ExecutionContext, event: events.AfterAnalysis
             status = "SUCCESS"
         else:
             status = "ERROR"
-    click.secho(f"Schema analysis: {status}\r", bold=True, nl=False)
+    click.secho(f"Schema analysis: {status}", bold=True, nl=False)
     click.echo()
     operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
     if operations_count >= 1:
