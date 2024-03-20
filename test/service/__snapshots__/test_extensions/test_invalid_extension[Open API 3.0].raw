@@ -41,28 +41,20 @@ Please, consider reporting the following details to our issue tracker:
     Traceback (most recent call last):
       File "/package-root/runner/impl/core.py", line XXX, in _run_analysis
         result = self.service_client.analyze_schema(_probes, self.schema.raw_schema)
-                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/client.py", line XXX, in analyze_schema
         return AnalysisSuccess.from_dict(response.json())
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in from_dict
         extensions=[extension_from_dict(ext) for ext in data["extensions"]],
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in <listcomp>
         extensions=[extension_from_dict(ext) for ext in data["extensions"]],
-                    ^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in extension_from_dict
         return OpenApiStringFormatsExtension.from_dict(formats=data["items"])
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in from_dict
         return cls(formats=_strategies_from_definition(formats))
-                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in _strategies_from_definition
         return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
-               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/service/models.py", line XXX, in <dictcomp>
         return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
-                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     TypeError: 'int' object is not iterable
 
 Tip: Please update your CLI to the latest version and try again.

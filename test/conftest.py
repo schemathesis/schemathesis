@@ -339,6 +339,9 @@ class CliSnapshotConfig:
         data = data.replace(str(PACKAGE_ROOT), "/package-root")
         data = data.replace(str(SITE_PACKAGES), "/site-packages/")
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
+        if "Traceback (most recent call last):" in data:
+            lines = [line for line in data.splitlines() if set(line) != {" ", "^"}]
+            data = "\n".join(lines)
         if self.replace_multi_worker_progress:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
