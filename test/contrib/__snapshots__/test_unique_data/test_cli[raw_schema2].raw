@@ -20,6 +20,8 @@ GET /api/data/{path_param}/ .                                             [100%]
 Performed checks:
     unique_test_cases                    N / N passed          PASSED 
 
+WARNING: All API responses have a 404 status code. Did you specify the proper API location?
+
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
