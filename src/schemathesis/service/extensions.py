@@ -144,10 +144,6 @@ def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[s
 KNOWN_ARGUMENTS = {
     "IPv4Network": IPv4Network,
     "IPv6Network": IPv6Network,
-    "GraphQLBoolean": nodes.Boolean,
-    "GraphQLFloat": nodes.Float,
-    "GraphQLInt": nodes.Int,
-    "GraphQLString": nodes.String,
 }
 
 
@@ -213,6 +209,10 @@ def _get_transform_function(definition: TransformFunctionDefinition) -> Callable
         "base64_encode": lambda: lambda x: Binary(base64.b64encode(x)),
         "urlsafe_base64_encode": lambda: lambda x: Binary(base64.urlsafe_b64encode(x)),
         "strftime": make_strftime,
+        "GraphQLBoolean": lambda: nodes.Boolean,
+        "GraphQLFloat": lambda: nodes.Float,
+        "GraphQLInt": lambda: nodes.Int,
+        "GraphQLString": lambda: nodes.String,
     }
     factory = TRANSFORM_FACTORIES.get(definition["name"])
     if factory is None:

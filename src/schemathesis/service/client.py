@@ -107,13 +107,17 @@ class ServiceClient(requests.Session):
             return FailedUploadResponse(detail=data["detail"])
         return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])
 
-    def analyze_schema(self, probes: list[probes.ProbeRun], schema: dict[str, Any]) -> AnalysisResult:
+    def analyze_schema(self, probes: list[probes.ProbeRun] | None, schema: dict[str, Any]) -> AnalysisResult:
         """Analyze the API schema."""
         # Manual serialization reduces the size of the payload a bit
         dependencies = collect_dependency_versions()
+        if probes is not None:
+            _probes = [probe.serialize() for probe in probes]
+        else:
+            _probes = []
         content = json.dumps(
             {
-                "probes": [probe.serialize() for probe in probes],
+                "probes": _probes,
                 "schema": schema,
                 "dependencies": list(map(asdict, dependencies)),
             },

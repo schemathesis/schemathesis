@@ -281,6 +281,11 @@ def test_invalid_extension(cli, cli_args, snapshot_cli):
 
 
 @pytest.mark.openapi_version("3.0")
+def test_dry_run(cli, cli_args, snapshot_cli):
+    assert cli.run(*cli_args, "--dry-run") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": [{"name": "binary"}]}}])
 def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir):
     empty_open_api_3_schema["paths"] = {
@@ -382,6 +387,60 @@ def schema_check(response, case):
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
             "--show-trace",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.analyze_schema(
+    extensions=[
+        {
+            "type": "scalars",
+            "items": {
+                "FooBar": [
+                    {
+                        "name": "integers",
+                        "transforms": [{"kind": "map", "name": "GraphQLInt"}],
+                        "arguments": {"min_value": 1, "max_value": 65535},
+                    }
+                ],
+            },
+        }
+    ]
+)
+def test_graphql_scalars(testdir, cli, snapshot_cli, service, openapi3_base_url):
+    schema_file = testdir.make_graphql_schema_file(
+        """
+scalar FooBar
+
+type Query {
+  getByDate(value: FooBar!): Int!
+}
+    """,
+    )
+    module = testdir.make_importable_pyfile(
+        hook=r"""
+import re
+import schemathesis
+
+@schemathesis.check
+def port_check(response, case):
+    value = re.findall("getByDate\(value: (\d+)\)", case.body)[0]
+    assert 1 <= int(value) <= 65535, "Invalid port"
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "-c",
+            "port_check",
+            f"--base-url={openapi3_base_url}",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--hypothesis-max-examples=10",
+            "--experimental=schema-analysis",
             hooks=module.purebasename,
         )
         == snapshot_cli
