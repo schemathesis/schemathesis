@@ -114,14 +114,13 @@ def _apply_schema_patches_extension(extension: SchemaPatchesExtension, schema: B
             # Remove the item at the target location if it exists.
             if path:
                 last = path[-1]
-                if last in current:
-                    if isinstance(current, dict) and isinstance(last, str):
-                        del current[last]
-                    elif isinstance(current, list) and isinstance(last, int):
-                        del current[last]
-                    else:
-                        extension.set_error([f"Invalid path: {path}"])
-                        return
+                if isinstance(current, dict) and isinstance(last, str):
+                    del current[last]
+                elif isinstance(current, list) and isinstance(last, int):
+                    del current[last]
+                else:
+                    extension.set_error([f"Invalid path: {path}"])
+                    return
             else:
                 current.clear()
 

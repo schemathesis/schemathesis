@@ -331,6 +331,13 @@ def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, emp
             },
             {},
         ),
+        (
+            {
+                "operation": "remove",
+                "path": ["paths", "/success", "post", "parameters", 0],
+            },
+            [],
+        ),
     ),
 )
 @pytest.mark.analyze_schema(autouse=False)
