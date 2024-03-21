@@ -1,7 +1,7 @@
 from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, TypedDict, Union, Literal
+from typing import Any, Iterable, TypedDict, Union, Literal
 
 
 class UploadSource(str, Enum):
@@ -130,8 +130,8 @@ class SchemaPatchesExtension(BaseExtension):
     @property
     def summary(self) -> str:
         count = len(self.patches)
-        noun = "patches" if count > 1 else "patch"
-        return f"{count} schema {noun}"
+        plural = "es" if count > 1 else ""
+        return f"{count} schema patch{plural}"
 
 
 class TransformFunctionDefinition(TypedDict):
@@ -151,6 +151,10 @@ def _strategies_from_definition(items: dict[str, list[dict[str, Any]]]) -> dict[
     return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
 
 
+def _format_items(items: Iterable[str]) -> str:
+    return ", ".join([f"`{item}`" for item in items])
+
+
 @dataclass
 class OpenApiStringFormatsExtension(BaseExtension):
     """Custom string formats."""
@@ -165,8 +169,9 @@ class OpenApiStringFormatsExtension(BaseExtension):
     @property
     def summary(self) -> str:
         count = len(self.formats)
-        noun = "formats" if count > 1 else "format"
-        return f"{count} Open API {noun}"
+        plural = "s" if count > 1 else ""
+        formats = _format_items(self.formats)
+        return f"Data generator{plural} for {formats} Open API format{plural}"
 
 
 @dataclass
@@ -183,8 +188,9 @@ class GraphQLScalarsExtension(BaseExtension):
     @property
     def summary(self) -> str:
         count = len(self.scalars)
-        noun = "scalars" if count > 1 else "scalar"
-        return f"{count} GraphQL {noun}"
+        plural = "s" if count > 1 else ""
+        scalars = _format_items(self.scalars)
+        return f"Data generator{plural} for {scalars} GraphQL scalar{plural}"
 
 
 @dataclass
@@ -199,10 +205,9 @@ class MediaTypesExtension(BaseExtension):
     @property
     def summary(self) -> str:
         count = len(self.media_types)
-        noun_1 = "generators" if count > 1 else "generator"
-        noun_2 = "types" if count > 1 else "type"
-        media_types = ", ".join([f"`{media_type}`" for media_type in self.media_types])
-        return f"Data {noun_1} for {media_types} media {noun_2}"
+        plural = "s" if count > 1 else ""
+        media_types = _format_items(self.media_types)
+        return f"Data generator{plural} for {media_types} media type{plural}"
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.

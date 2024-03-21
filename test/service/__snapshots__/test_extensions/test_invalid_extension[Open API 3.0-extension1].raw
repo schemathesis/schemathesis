@@ -38,7 +38,7 @@ Analysis took: 1.42ms
 
 The following extensions errored:
 
-  - 1 Open API format
+  - Data generator for `format` Open API format
 
 Tip: Please, consider reporting this to our issue tracker:
 

@@ -23,7 +23,7 @@ Analysis took: 1.42ms
 
 The following extensions have been applied:
 
-  - 1 GraphQL scalar
+  - Data generator for `FooBar` GraphQL scalar
 
 =================================== SUMMARY ====================================
 
