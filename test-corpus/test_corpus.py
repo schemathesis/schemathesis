@@ -19,7 +19,7 @@ from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.constants import URL_ENV_VAR, TOKEN_ENV_VAR
-from schemathesis.service.models import Success, AnalysisError
+from schemathesis.service.models import SuccessState, AnalysisError
 from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -196,7 +196,7 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
             analysis = event.analysis.ok()
             assert not isinstance(analysis, AnalysisError)
             for extension in analysis.extensions:
-                assert isinstance(extension.state, Success), extension
+                assert isinstance(extension.state, SuccessState), extension
 
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
