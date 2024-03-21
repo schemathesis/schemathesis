@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
+Schema analysis: SKIP
 
 GET /api/success E                                                        [100%]
 
@@ -22,12 +23,10 @@ division by zero
     Traceback (most recent call last):
       File "/package-root/runner/impl/core.py", line XXX, in network_test
         response = _network_test(case, *args)
-                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/package-root/runner/impl/core.py", line XXX, in _network_test
         run_checks(
       File "/package-root/runner/impl/core.py", line XXX, in run_checks
         skip_check = check(response, copied_case)
-                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
       File "/tmp/hook.py", line XXX, in with_error
         1 / 0
         ~~^~~

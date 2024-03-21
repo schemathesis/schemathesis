@@ -110,7 +110,35 @@ To enable OpenAPI 3.1 support via environment variables, you can set:
 
     export SCHEMATHESIS_EXPERIMENTAL_OPENAPI_3_1=true
 
-For more details, join the `GitHub Discussion <https://github.com/schemathesis/schemathesis/discussions/1822>`_.
+For more details, join the `GitHub Discussion #1822 <https://github.com/schemathesis/schemathesis/discussions/1822>`_.
+
+Schema Analysis
+~~~~~~~~~~~~~~~
+
+Enables integration with Schemathesis.io to optimize test case generation for better bug detection.
+This feature infers appropriate data generation strategies, supports uncommon media types, adjusts schemas for faster data generation, and detects the web server to generate more targeted test data. 
+
+.. _schema-analysis-cli:
+
+In CLI
+~~~~~~
+
+.. code-block:: bash
+
+  st run https://example.schemathesis.io/openapi.json --experimental=schema-analysis
+
+.. _schema-analysis-env-vars:
+
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To enable schema analysis support via environment variables, you can set:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_SCHEMA_ANALYSIS=true
+
+For more details, join the `GitHub Discussion #2056 <https://github.com/schemathesis/schemathesis/discussions/2056>`_.
 
 Stabilization of Experimental Features
 --------------------------------------

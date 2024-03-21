@@ -1,6 +1,7 @@
 import pathlib
 from typing import NoReturn
 
+import os
 import hypothesis
 import pytest
 from flask import Flask
@@ -10,16 +11,23 @@ from hypothesis import HealthCheck, Phase, Verbosity
 import schemathesis
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.extra._flask import run_server
-from schemathesis.exceptions import SchemaError, CheckFailed, UsageError
+from schemathesis.exceptions import SchemaError, CheckFailed, UsageError, format_exception
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.models import Status
+from schemathesis.internal.result import Err
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
+from schemathesis.service.client import ServiceClient
+from schemathesis.service.constants import URL_ENV_VAR, TOKEN_ENV_VAR
+from schemathesis.service.models import SuccessState, AnalysisError
 from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CATALOG_DIR = CURRENT_DIR / "openapi-directory/APIs/"
 schemathesis.experimental.OPEN_API_3_1.enable()
+VERIFY_SCHEMA_ANALYSIS = os.getenv("VERIFY_SCHEMA_ANALYSIS", "false").lower() in ("true", "1")
+SCHEMATHESIS_IO_URL = os.getenv(URL_ENV_VAR)
+SCHEMATHESIS_IO_TOKEN = os.getenv(TOKEN_ENV_VAR)
 
 
 app = Flask("test_app")
@@ -130,6 +138,12 @@ def test_corpus(schema_path, app_port):
         schema.as_state_machine()()
     except (RefResolutionError, UsageError, SchemaError):
         pass
+
+    service_client = None
+    if VERIFY_SCHEMA_ANALYSIS:
+        assert SCHEMATHESIS_IO_URL, "SCHEMATHESIS_IO_URL is not set"
+        assert SCHEMATHESIS_IO_TOKEN, "SCHEMATHESIS_IO_TOKEN is not set"
+        service_client = ServiceClient(base_url=SCHEMATHESIS_IO_URL, token=SCHEMATHESIS_IO_TOKEN)
     runner = from_schema(
         schema,
         checks=(combined_check,),
@@ -143,6 +157,7 @@ def test_corpus(schema_path, app_port):
             phases=[Phase.explicit, Phase.generate],
             verbosity=Verbosity.quiet,
         ),
+        service_client=service_client,
     )
     for event in runner.execute():
         if isinstance(event, events.Interrupted):
@@ -172,6 +187,16 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
         assert event.status in (Status.success, Status.skip, Status.error)
     if isinstance(event, events.InternalError):
         raise AssertionError(f"Internal Error: {event.exception_with_traceback}")
+    if VERIFY_SCHEMA_ANALYSIS and isinstance(event, events.AfterAnalysis):
+        assert event.analysis is not None
+        if isinstance(event.analysis, Err):
+            traceback = format_exception(event.analysis.err(), True)
+            raise AssertionError(f"Analysis failed: {traceback}")
+        else:
+            analysis = event.analysis.ok()
+            assert not isinstance(analysis, AnalysisError)
+            for extension in analysis.extensions:
+                assert isinstance(extension.state, SuccessState), extension
 
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 import os
 import platform
+from importlib import metadata
 from dataclasses import dataclass, field
 
 from ..constants import SCHEMATHESIS_VERSION
@@ -33,6 +34,27 @@ class CliMetadata:
     version: str = SCHEMATHESIS_VERSION
 
 
+DEPDENDENCY_NAMES = ["hypothesis", "hypothesis-jsonschema", "hypothesis-graphql"]
+
+
+@dataclass
+class Dependency:
+    """A single dependency."""
+
+    # Name of the package.
+    name: str
+    # Version of the package.
+    version: str
+
+    @classmethod
+    def from_name(cls, name: str) -> Dependency:
+        return cls(name=name, version=metadata.version(name))
+
+
+def collect_dependency_versions() -> list[Dependency]:
+    return [Dependency.from_name(name) for name in DEPDENDENCY_NAMES]
+
+
 @dataclass
 class Metadata:
     """CLI environment metadata."""
@@ -45,3 +67,4 @@ class Metadata:
     cli: CliMetadata = field(default_factory=CliMetadata)
     # Used Docker image if any
     docker_image: str | None = field(default_factory=lambda: os.getenv(DOCKER_IMAGE_ENV_VAR))
+    depdenencies: list[Dependency] = field(default_factory=collect_dependency_versions)

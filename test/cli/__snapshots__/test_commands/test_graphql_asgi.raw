@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 4
 Collected API links: 0
 API probing: SKIP
+Schema analysis: SKIP
 
 Query.getBooks .                                                          [ 25%]
 Query.getAuthors .                                                        [ 50%]

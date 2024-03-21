@@ -146,7 +146,9 @@ Receive automatic comments in your pull requests and updates on GitHub checks st
 
 ### Software as a Service
 
-If you prefer an all-in-one solution with quick setup, we have a [free tier](https://schemathesis.io/#pricing) available.
+Schemathesis CLI integrates with Schemathesis.io to enhance bug detection by optimizing test case generation for efficiency and realism. It leverages various techniques to infer appropriate data generation strategies, provide support for uncommon media types, and adjust schemas for faster data generation. The integration also detects the web server being used to generate more targeted test data. 
+
+Schemathesis.io offers a user-friendly UI that simplifies viewing and analyzing test results. If you prefer an all-in-one solution with quick setup, we have a [free tier](https://schemathesis.io/#pricing) available.
 
 ## How it works
 

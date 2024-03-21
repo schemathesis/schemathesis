@@ -1,5 +1,6 @@
 from __future__ import annotations
 import io
+import platform
 import json
 import os
 import re
@@ -34,6 +35,7 @@ from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
+from schemathesis.specs.openapi import media_types
 from schemathesis.transports.responses import WSGIResponse
 
 from .apps import _graphql as graphql
@@ -64,11 +66,13 @@ def reset_hooks():
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()
+    media_types.unregister_all()
     yield
     GLOBAL_EXPERIMENTS.disable_all()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()
+    media_types.unregister_all()
 
 
 @pytest.fixture(scope="session")
@@ -111,6 +115,7 @@ def pytest_generate_tests(metafunc):
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
     config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
+    config.addinivalue_line("markers", "analyze_schema(autouse=True, extensions=()): Configure schema analysis.")
     config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
     config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
     config.addinivalue_line(
@@ -276,6 +281,7 @@ def keep_cwd():
 
 FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
 PACKAGE_ROOT = Path(schemathesis.__file__).parent
+SITE_PACKAGES = requests.__file__.split("requests")[0]
 
 
 @dataclass()
@@ -308,7 +314,10 @@ class CliSnapshotConfig:
     def serialize(self, data: str) -> str:
         lines = data.splitlines()
         lines = [
-            line for line in lines if not any(marker in line for marker in FLASK_MARKERS) and line != "API probing: ..."
+            line
+            for line in lines
+            if not any(marker in line for marker in FLASK_MARKERS)
+            and line not in ("API probing: ...", "Schema analysis: ...")
         ]
         data = "\n".join(lines)
         if self.replace_service_host:
@@ -331,8 +340,23 @@ class CliSnapshotConfig:
         if self.replace_tmp_dir:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
-        data = data.replace(str(PACKAGE_ROOT), "/package-root")
+        package_root = "/package-root"
+        site_packages = "/site-packages/"
+        data = data.replace(str(PACKAGE_ROOT), package_root)
+        data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
+        if "Traceback (most recent call last):" in data:
+            lines = [line for line in data.splitlines() if set(line) != {" ", "^"}]
+            comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
+            # Drop frames that are related to comprehensions
+            for idx in comprehension_ids[::-1]:
+                lines.pop(idx)
+                lines.pop(idx)
+            if platform.system() == "Windows":
+                for idx, line in enumerate(lines):
+                    if line.strip().startswith("File") and "line" in line:
+                        lines[idx] = line.replace("\\", "/")
+            data = "\n".join(lines)
         if self.replace_multi_worker_progress:
             lines = data.splitlines()
             for idx, line in enumerate(lines):

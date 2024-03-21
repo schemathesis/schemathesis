@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SKIP
+Schema analysis: SKIP
 
 GET /api/cp866 F                                                          [100%]
 

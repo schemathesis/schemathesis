@@ -11,6 +11,7 @@ Collected API operations: 2
 Collected API links: 0
 Report to Schemathesis.io: ENABLED
 API probing: SUCCESS
+Schema analysis: SUCCESS
 
 GET /api/failure F                                                        [ 50%]
 GET /api/success .                                                        [100%]
@@ -28,6 +29,14 @@ _______________________________ GET /api/failure _______________________________
 Reproduce with: 
 
     curl -X GET http://127.0.0.1/api/failure
+
+=============================== SCHEMA ANALYSIS ================================
+
+Success
+
+Analysis took: 1.42ms
+
+No extensions have been applied.
 
 =================================== SUMMARY ====================================
 
@@ -48,6 +57,9 @@ Please, consider reporting the following details to our issue tracker:
   https://github.com/schemathesis/schemathesis/issues/new?labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D
 
 Response: '"Content-Type error"'
+Status: 400
 Headers: {'X-Foo': 'Bar'}
+
+Tip: Please update your CLI to the latest version and try again.
 
 ========================= 1 passed, 1 failed in 1.00s ==========================

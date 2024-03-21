@@ -11,6 +11,7 @@ Collected API operations: 2
 Collected API links: 0
 Report to Schemathesis.io: ENABLED
 API probing: SUCCESS
+Schema analysis: SUCCESS
 
 GET /api/failure F                                                        [ 50%]
 GET /api/success .                                                        [100%]
@@ -28,6 +29,14 @@ _______________________________ GET /api/failure _______________________________
 Reproduce with: 
 
     curl -X GET http://127.0.0.1/api/failure
+
+=============================== SCHEMA ANALYSIS ================================
+
+Success
+
+Analysis took: 1.42ms
+
+No extensions have been applied.
 
 =================================== SUMMARY ====================================
 

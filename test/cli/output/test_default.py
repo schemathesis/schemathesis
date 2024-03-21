@@ -120,7 +120,7 @@ def test_handle_initialized(capsys, mocker, execution_context, results_set, swag
     # And number of collected operations
     assert strip_style_win32(click.style("Collected API operations: 1", bold=True)) in lines
     # And the output has an empty line in the end
-    assert out.endswith("\n\n")
+    assert out.endswith("\n")
 
 
 def test_display_statistic(capsys, swagger_20, execution_context, operation, response):

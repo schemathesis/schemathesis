@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 
 from ..code_samples import CodeSampleStyle
 from ..internal.deprecation import deprecated_property
-from ..runner.serialization import SerializedTestResult
+from ..internal.result import Result
 from ..runner.probes import ProbeRun
+from ..runner.serialization import SerializedTestResult
+from ..service.models import AnalysisResult
 
 if TYPE_CHECKING:
     import hypothesis
@@ -52,6 +54,7 @@ class ExecutionContext:
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
+    analysis: Result[AnalysisResult, Exception] | None = None
 
     @deprecated_property(removed_in="4.0", replacement="show_trace")
     def show_errors_tracebacks(self) -> bool:
