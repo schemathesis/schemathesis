@@ -45,15 +45,11 @@ Please, consider reporting the following details to our issue tracker:
         return AnalysisSuccess.from_dict(response.json())
       File "/package-root/service/models.py", line XXX, in from_dict
         extensions=[extension_from_dict(ext) for ext in data["extensions"]],
-      File "/package-root/service/models.py", line XXX, in <listcomp>
-        extensions=[extension_from_dict(ext) for ext in data["extensions"]],
       File "/package-root/service/models.py", line XXX, in extension_from_dict
         return OpenApiStringFormatsExtension.from_dict(formats=data["items"])
       File "/package-root/service/models.py", line XXX, in from_dict
         return cls(formats=_strategies_from_definition(formats))
       File "/package-root/service/models.py", line XXX, in _strategies_from_definition
-        return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
-      File "/package-root/service/models.py", line XXX, in <dictcomp>
         return {name: [StrategyDefinition(**item) for item in value] for name, value in items.items()}
     TypeError: 'int' object is not iterable
 

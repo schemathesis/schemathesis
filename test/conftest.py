@@ -1,5 +1,6 @@
 from __future__ import annotations
 import io
+import platform
 import json
 import os
 import re
@@ -339,11 +340,22 @@ class CliSnapshotConfig:
         if self.replace_tmp_dir:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
-        data = data.replace(str(PACKAGE_ROOT), "/package-root")
-        data = data.replace(str(SITE_PACKAGES), "/site-packages/")
+        package_root = "/package-root"
+        site_packages = "/site-packages/"
+        data = data.replace(str(PACKAGE_ROOT), package_root)
+        data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) != {" ", "^"}]
+            comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
+            # Drop frames that are related to comprehensions
+            for idx in comprehension_ids[::-1]:
+                lines.pop(idx)
+                lines.pop(idx)
+            if platform.system() == "Windows":
+                for idx, line in enumerate(lines):
+                    if package_root in line or site_packages in line:
+                        lines[idx] = line.replace("/", "\\")
             data = "\n".join(lines)
         if self.replace_multi_worker_progress:
             lines = data.splitlines()
