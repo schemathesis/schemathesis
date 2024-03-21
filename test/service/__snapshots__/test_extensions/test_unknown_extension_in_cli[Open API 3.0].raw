@@ -36,8 +36,11 @@ Success
 
 Analysis took: 1.42ms
 
-Compatibility Notice: 1 extension not recognized.
-Consider updating the CLI to add support for this extension.
+Compatibility Notice: 1 extension not recognized:
+
+  - `unknown`
+
+Tip: Consider updating the CLI to add support for this extension.
 
 =================================== SUMMARY ====================================
 

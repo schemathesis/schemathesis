@@ -102,8 +102,8 @@ class UnknownExtension(BaseExtension):
     state: ExtensionState = field(default_factory=NotApplied)
 
     @property
-    def details(self) -> list[str]:
-        return [self.type]
+    def summary(self) -> str:
+        return f"`{self.type}`"
 
 
 class AddPatch(TypedDict):
@@ -128,10 +128,10 @@ class SchemaPatchesExtension(BaseExtension):
     state: ExtensionState = field(default_factory=NotApplied)
 
     @property
-    def details(self) -> list[str]:
+    def summary(self) -> str:
         count = len(self.patches)
         noun = "patches" if count > 1 else "patch"
-        return [f"{count} schema {noun}"]
+        return f"{count} schema {noun}"
 
 
 class TransformFunctionDefinition(TypedDict):
@@ -163,10 +163,10 @@ class OpenApiStringFormatsExtension(BaseExtension):
         return cls(formats=_strategies_from_definition(formats))
 
     @property
-    def details(self) -> list[str]:
+    def summary(self) -> str:
         count = len(self.formats)
         noun = "formats" if count > 1 else "format"
-        return [f"{count} Open API {noun}"]
+        return f"{count} Open API {noun}"
 
 
 @dataclass
@@ -181,10 +181,10 @@ class GraphQLScalarsExtension(BaseExtension):
         return cls(scalars=_strategies_from_definition(scalars))
 
     @property
-    def details(self) -> list[str]:
+    def summary(self) -> str:
         count = len(self.scalars)
         noun = "scalars" if count > 1 else "scalar"
-        return [f"{count} GraphQL {noun}"]
+        return f"{count} GraphQL {noun}"
 
 
 @dataclass
@@ -197,10 +197,10 @@ class MediaTypesExtension(BaseExtension):
         return cls(media_types=_strategies_from_definition(media_types))
 
     @property
-    def details(self) -> list[str]:
+    def summary(self) -> str:
         count = len(self.media_types)
         noun = "generators" if count > 1 else "generator"
-        return [f"{count} media type {noun}"]
+        return f"{count} media type {noun}"
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.

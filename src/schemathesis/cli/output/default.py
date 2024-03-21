@@ -387,24 +387,25 @@ def display_analysis(context: ExecutionContext) -> None:
             click.echo("\nAnalysis took: {:.2f}ms".format(analysis.elapsed))
             if analysis.extensions:
                 known = []
-                unknown = 0
+                unknown = []
                 for extension in analysis.extensions:
                     if isinstance(extension, UnknownExtension):
-                        unknown += 1
+                        unknown.append(extension)
                     else:
                         known.append(extension)
                 if known:
                     click.echo("\nThe following extensions have been applied:\n")
                     for extension in known:
-                        for entry in extension.details:
-                            click.echo(f"  - {entry}")
+                        click.echo(f"  - {extension.summary}")
                 if unknown:
-                    noun = "extension" if unknown == 1 else "extensions"
-                    specific_noun = "this extension" if unknown == 1 else "these extensions"
+                    noun = "extension" if len(unknown) == 1 else "extensions"
+                    specific_noun = "this extension" if len(unknown) == 1 else "these extensions"
                     title = click.style("Compatibility Notice", bold=True)
-                    click.secho(
-                        f"\n{title}: {unknown} {noun} not recognized.\nConsider updating the CLI to add support for {specific_noun}."
-                    )
+                    click.secho(f"\n{title}: {len(unknown)} {noun} not recognized:\n")
+                    for extension in unknown:
+                        click.echo(f"  - {extension.summary}")
+                    suggestion = f"Consider updating the CLI to add support for {specific_noun}."
+                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
             else:
                 click.echo("\nNo extensions have been applied.")
         else:
