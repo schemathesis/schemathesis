@@ -111,16 +111,31 @@ def report_upload(setup_server, next_url, upload_message, correlation_id):
 
 @pytest.fixture
 def analyze_schema(request, setup_server):
-    marker = request.node.get_closest_marker("extensions")
-    extensions = marker.args if marker else []
-    return setup_server(
-        lambda h: h.respond_with_json(
-            {"id": "42", "message": "Success", "extensions": extensions},
-            status=200,
-        ),
-        "POST",
-        "/cli/analysis/",
-    )
+    marker = request.node.get_closest_marker("analyze_schema")
+    _extensions = None
+    _payload = None
+    _status = None
+    if marker:
+        _extensions = marker.kwargs.get("extensions")
+        _payload = marker.kwargs.get("payload")
+        _status = marker.kwargs.get("status", 200)
+
+    def _analyze_schema(payload=None, status=None, extensions=None):
+        payload = payload or _payload
+        status = status or _status or 200
+        if payload is not None:
+            return setup_server(lambda h: h.respond_with_data(payload, status=status), "POST", "/cli/analysis/")
+        extensions = extensions or _extensions or []
+        return setup_server(
+            lambda h: h.respond_with_json(
+                {"id": "42", "message": "Success", "elapsed": 1.42, "extensions": extensions},
+                status=status,
+            ),
+            "POST",
+            "/cli/analysis/",
+        )
+
+    return _analyze_schema
 
 
 @dataclass
@@ -145,7 +160,13 @@ def hostname(httpserver):
 
 
 @pytest.fixture
-def service(httpserver, hostname, service_setup, get_project_details, report_upload, analyze_schema, service_token):
+def service(
+    request, httpserver, hostname, service_setup, get_project_details, report_upload, analyze_schema, service_token
+):
+    marker = request.node.get_closest_marker("analyze_schema")
+    enabled = marker.kwargs.get("autouse", True) if marker else True
+    if enabled:
+        analyze_schema()
     return Service(server=httpserver, hostname=hostname, token=service_token)
 
 

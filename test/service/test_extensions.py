@@ -172,14 +172,10 @@ def test_forbidden(cli_args, cli, service, snapshot_cli):
 
 
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.parametrize("analyze_schema", [None])
-def test_oversize_text(cli_args, cli, service, snapshot_cli, setup_server):
-    payload = "JSON payload (20350625 bytes) is larger than allowed (limit: 10485760 bytes)"
-    setup_server(
-        lambda h: h.respond_with_data(payload, status=413),
-        "POST",
-        "/cli/analysis/",
-    )
+@pytest.mark.analyze_schema(
+    payload="JSON payload (20350625 bytes) is larger than allowed (limit: 10485760 bytes)", status=413
+)
+def test_oversize_text(cli_args, cli, service, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
     assert len(service.server.log) == 2
     service.assert_call(0, "/cli/analysis/", 413)
@@ -197,31 +193,30 @@ def test_connection_error(mocker, cli_args, cli, snapshot_cli):
 
 
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.parametrize("analyze_schema", [None])
-def test_invalid_payload(setup_server, cli_args, cli, snapshot_cli):
+@pytest.mark.analyze_schema(
+    payload="Json deserialize error: invalid type: integer `42`, expected a sequence at line 1 column 13",
+    status=400,
+)
+def test_invalid_payload(cli_args, cli, snapshot_cli):
     # Analysis payload is invalid
-    payload = "Json deserialize error: invalid type: integer `42`, expected a sequence at line 1 column 13"
-    setup_server(
-        lambda h: h.respond_with_data(payload, status=400),
-        "POST",
-        "/cli/analysis/",
-    )
     assert cli.run(*cli_args) == snapshot_cli
 
 
-@pytest.mark.extensions(
-    {
-        "type": "string_formats",
-        "items": {
-            "port": [
-                {
-                    "name": "integers",
-                    "transforms": [{"kind": "map", "name": "str"}],
-                    "arguments": {"min_value": 1, "max_value": 65535},
-                }
-            ],
-        },
-    }
+@pytest.mark.analyze_schema(
+    extensions=[
+        {
+            "type": "string_formats",
+            "items": {
+                "port": [
+                    {
+                        "name": "integers",
+                        "transforms": [{"kind": "map", "name": "str"}],
+                        "arguments": {"min_value": 1, "max_value": 65535},
+                    }
+                ],
+            },
+        }
+    ]
 )
 def test_custom_format(cli, snapshot_cli, service, openapi3_base_url, empty_open_api_3_schema, testdir):
     empty_open_api_3_schema["paths"] = {
@@ -274,19 +269,19 @@ def port_check(response, case):
 
 
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.extensions({"type": "unknown"})
+@pytest.mark.analyze_schema(extensions=[{"type": "unknown"}])
 def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.extensions({"type": "string_formats", "items": {"format": 42}})
+@pytest.mark.analyze_schema(extensions=[{"type": "string_formats", "items": {"format": 42}}])
 def test_invalid_extension(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.extensions({"type": "media_types", "items": {"application/pdf": [{"name": "binary"}]}})
+@pytest.mark.analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": [{"name": "binary"}]}}])
 def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir):
     empty_open_api_3_schema["paths"] = {
         "/success": {
@@ -333,12 +328,13 @@ def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, emp
         ),
     ),
 )
+@pytest.mark.analyze_schema(autouse=False)
 def test_schema_patches(
     cli,
     empty_open_api_3_schema,
     patch,
     expected,
-    setup_server,
+    analyze_schema,
     testdir,
     service,
     openapi3_base_url,
@@ -358,14 +354,7 @@ def test_schema_patches(
         if h.matcher.uri == "/cli/analysis/":
             httpserver.handlers.pop(idx)
             break
-    setup_server(
-        lambda h: h.respond_with_json(
-            {"id": "42", "message": "Success", "extensions": [{"type": "schema_patches", "patches": [patch]}]},
-            status=200,
-        ),
-        "POST",
-        "/cli/analysis/",
-    )
+    analyze_schema(extensions=[{"type": "schema_patches", "patches": [patch]}])
     module = testdir.make_importable_pyfile(
         hook=f"""
 import schemathesis
