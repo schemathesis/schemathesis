@@ -114,9 +114,9 @@ def _apply_schema_patches_extension(extension: SchemaPatchesExtension, schema: B
             # Remove the item at the target location if it exists.
             if path:
                 last = path[-1]
-                if isinstance(current, dict) and isinstance(last, str):
+                if isinstance(current, dict) and isinstance(last, str) and last in current:
                     del current[last]
-                elif isinstance(current, list) and isinstance(last, int):
+                elif isinstance(current, list) and isinstance(last, int) and len(current) > last:
                     del current[last]
                 else:
                     extension.set_error([f"Invalid path: {path}"])
@@ -135,7 +135,7 @@ def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[s
         strategy = _strategy_from_definition(definition)
         if isinstance(strategy, Ok):
             strategies.append(strategy.ok())
-        elif isinstance(strategy, Err):
+        else:
             return strategy
     return Ok(combine_strategies(strategies))
 

@@ -5,8 +5,14 @@ import pytest
 import requests.exceptions
 from hypothesis import find
 
-from schemathesis.service.extensions import apply, strategy_from_definitions
-from schemathesis.service.models import StrategyDefinition, UnknownExtension, extension_from_dict
+import schemathesis
+from schemathesis.service.extensions import apply, strategy_from_definitions, _apply_schema_patches_extension
+from schemathesis.service.models import (
+    StrategyDefinition,
+    UnknownExtension,
+    extension_from_dict,
+    SchemaPatchesExtension,
+)
 from schemathesis.specs.openapi.formats import STRING_FORMATS, unregister_string_format
 from schemathesis.specs.openapi._hypothesis import Binary
 
@@ -398,6 +404,30 @@ def schema_check(response, case):
         )
         == snapshot_cli
     )
+
+
+def test_schema_patches_remove_all(empty_open_api_3_schema):
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    _apply_schema_patches_extension(SchemaPatchesExtension(patches=[{"operation": "remove", "path": []}]), schema)
+    assert schema.raw_schema == {}
+
+
+@pytest.mark.parametrize(
+    "path, expected",
+    (
+        (["unknown"], "Invalid path: ['unknown']"),
+        ([0], "Invalid path: [0]"),
+        (
+            ["paths", "/success", "post", "parameters", "invalid"],
+            "Invalid path: ['paths', '/success', 'post', 'parameters', 'invalid']",
+        ),
+    ),
+)
+def test_invalid_schema_patches(path, expected, empty_open_api_3_schema):
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    extension = SchemaPatchesExtension(patches=[{"operation": "remove", "path": path}])
+    _apply_schema_patches_extension(extension, schema)
+    assert extension.state.errors == [expected]
 
 
 @pytest.mark.analyze_schema(
