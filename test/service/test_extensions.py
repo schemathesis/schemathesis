@@ -311,3 +311,89 @@ def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, emp
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize(
+    "patch, expected",
+    (
+        (
+            {
+                "operation": "add",
+                "path": ["paths", "/success", "post", "parameters", 0, "schema", "format"],
+                "value": "date-time",
+            },
+            {"type": "string", "format": "date-time"},
+        ),
+        (
+            {
+                "operation": "remove",
+                "path": ["paths", "/success", "post", "parameters", 0, "schema", "type"],
+            },
+            {},
+        ),
+    ),
+)
+def test_schema_patches(
+    cli,
+    empty_open_api_3_schema,
+    patch,
+    expected,
+    setup_server,
+    testdir,
+    service,
+    openapi3_base_url,
+    snapshot_cli,
+    httpserver,
+):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    for idx, h in enumerate(httpserver.handlers):
+        if h.matcher.uri == "/cli/analysis/":
+            httpserver.handlers.pop(idx)
+            break
+    setup_server(
+        lambda h: h.respond_with_json(
+            {"id": "42", "message": "Success", "extensions": [{"type": "schema_patches", "patches": [patch]}]},
+            status=200,
+        ),
+        "POST",
+        "/cli/analysis/",
+    )
+    module = testdir.make_importable_pyfile(
+        hook=f"""
+import schemathesis
+
+PATH = {patch["path"]}
+EXPECTED = {expected}
+
+@schemathesis.check
+def schema_check(response, case):
+    schema = case.operation.schema.raw_schema
+    for segment in PATH[:-1]:
+        schema = schema[segment]
+    assert schema == EXPECTED, f"Invalid schema: {{schema}}"
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "-c",
+            "schema_check",
+            f"--base-url={openapi3_base_url}",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--hypothesis-max-examples=10",
+            "--experimental=schema-analysis",
+            "--show-trace",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
