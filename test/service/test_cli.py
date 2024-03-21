@@ -137,10 +137,10 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = get_stdout_lines(result.stdout)
     # And meta information should be displayed
-    assert lines[27] in ("Compressed report size: 1 KB", "Compressed report size: 2 KB")
-    assert lines[28] == f"Uploading reports to {service.base_url} ..."
+    assert lines[29] in ("Compressed report size: 1 KB", "Compressed report size: 2 KB")
+    assert lines[30] == f"Uploading reports to {service.base_url} ..."
     # Then the output indicates timeout
-    assert lines[29] == "Upload: TIMEOUT"
+    assert lines[31] == "Upload: TIMEOUT"
 
 
 def test_wait_for_report_handler():

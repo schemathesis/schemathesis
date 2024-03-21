@@ -19,6 +19,8 @@ POST /api/success .                                                       [100%]
 
 Success
 
+Analysis took: 1.42ms
+
 The following extensions have been applied:
 
   - 1 media type generator

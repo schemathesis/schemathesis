@@ -20,7 +20,9 @@ GET /api/success .                                                        [100%]
 
 Success
 
-No extensions has been applied.
+Analysis took: 1.42ms
+
+No extensions have been applied.
 
 =================================== SUMMARY ====================================
 

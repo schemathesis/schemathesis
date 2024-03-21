@@ -416,6 +416,15 @@ def test_schema_patches_remove_all(empty_open_api_3_schema):
     "path, expected",
     (
         (["unknown"], "Invalid path: ['unknown']"),
+        (["paths", 0, "foo"], "Invalid path: ['paths', 0, 'foo']"),
+        (
+            ["paths", "/success", "post", "parameters", "invalid", "more"],
+            "Invalid path: ['paths', '/success', 'post', 'parameters', 'invalid', 'more']",
+        ),
+        (
+            ["paths", "/success", "post", "parameters", 6, "more"],
+            "Invalid path: ['paths', '/success', 'post', 'parameters', 6, 'more']",
+        ),
         ([0], "Invalid path: [0]"),
         (
             ["paths", "/success", "post", "parameters", "invalid"],
@@ -424,6 +433,13 @@ def test_schema_patches_remove_all(empty_open_api_3_schema):
     ),
 )
 def test_invalid_schema_patches(path, expected, empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
+            },
+        },
+    }
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     extension = SchemaPatchesExtension(patches=[{"operation": "remove", "path": path}])
     _apply_schema_patches_extension(extension, schema)

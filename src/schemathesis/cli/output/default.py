@@ -384,6 +384,7 @@ def display_analysis(context: ExecutionContext) -> None:
         click.echo()
         if isinstance(analysis, AnalysisSuccess):
             click.secho(analysis.message, bold=True)
+            click.echo("\nAnalysis took: {:.2f}ms".format(analysis.elapsed))
             if analysis.extensions:
                 known = []
                 unknown = 0
@@ -400,11 +401,12 @@ def display_analysis(context: ExecutionContext) -> None:
                 if unknown:
                     noun = "extension" if unknown == 1 else "extensions"
                     specific_noun = "this extension" if unknown == 1 else "these extensions"
+                    title = click.style("Compatibility Notice", bold=True)
                     click.secho(
-                        f"\n{unknown} {noun} not recognized.\nConsider updating the CLI to add support for {specific_noun}."
+                        f"\n{title}: {unknown} {noun} not recognized.\nConsider updating the CLI to add support for {specific_noun}."
                     )
             else:
-                click.echo("\nNo extensions has been applied.")
+                click.echo("\nNo extensions have been applied.")
         else:
             click.echo("An error happened during schema analysis:\n")
             click.secho(f"  {analysis.message}", bold=True)

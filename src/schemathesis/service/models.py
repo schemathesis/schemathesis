@@ -131,7 +131,7 @@ class SchemaPatchesExtension(BaseExtension):
     def details(self) -> list[str]:
         count = len(self.patches)
         noun = "patches" if count > 1 else "patch"
-        return [f"{count} Schema {noun}"]
+        return [f"{count} schema {noun}"]
 
 
 class TransformFunctionDefinition(TypedDict):
@@ -228,6 +228,7 @@ def extension_from_dict(data: dict[str, Any]) -> Extension:
 @dataclass
 class AnalysisSuccess:
     id: str
+    elapsed: float
     message: str
     extensions: list[Extension]
 
@@ -235,6 +236,7 @@ class AnalysisSuccess:
     def from_dict(cls, data: dict[str, Any]) -> AnalysisSuccess:
         return cls(
             id=data["id"],
+            elapsed=data["elapsed"],
             message=data["message"],
             extensions=[extension_from_dict(ext) for ext in data["extensions"]],
         )
