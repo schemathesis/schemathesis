@@ -1,5 +1,6 @@
 from __future__ import annotations
 import io
+import platform
 import json
 import os
 import re
@@ -351,10 +352,10 @@ class CliSnapshotConfig:
             for idx in comprehension_ids[::-1]:
                 lines.pop(idx)
                 lines.pop(idx)
-            #  if platform.system() == "Windows":
-            #      for idx, line in enumerate(lines):
-            #          if line.strip().startswith("File") and "line" in line:
-            #              lines[idx] = line.replace("/", "\\")
+            if platform.system() == "Windows":
+                for idx, line in enumerate(lines):
+                    if line.strip().startswith("File") and "line" in line:
+                        lines[idx] = line.replace("\\", "/")
             data = "\n".join(lines)
         if self.replace_multi_worker_progress:
             lines = data.splitlines()
