@@ -38,7 +38,7 @@ from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
-from ...service.models import AnalysisSuccess, UnknownExtension
+from ...service.models import AnalysisSuccess, UnknownExtension, ErrorState
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 
@@ -387,16 +387,25 @@ def display_analysis(context: ExecutionContext) -> None:
             click.echo("\nAnalysis took: {:.2f}ms".format(analysis.elapsed))
             if analysis.extensions:
                 known = []
+                failed = []
                 unknown = []
                 for extension in analysis.extensions:
                     if isinstance(extension, UnknownExtension):
                         unknown.append(extension)
+                    elif isinstance(extension.state, ErrorState):
+                        failed.append(extension)
                     else:
                         known.append(extension)
                 if known:
                     click.echo("\nThe following extensions have been applied:\n")
                     for extension in known:
                         click.echo(f"  - {extension.summary}")
+                if failed:
+                    click.echo("\nThe following extensions errored:\n")
+                    for extension in failed:
+                        click.echo(f"  - {extension.summary}")
+                    suggestion = f"Please, consider reporting this to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
+                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
                 if unknown:
                     noun = "extension" if len(unknown) == 1 else "extensions"
                     specific_noun = "this extension" if len(unknown) == 1 else "these extensions"

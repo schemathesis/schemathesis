@@ -50,7 +50,7 @@ class FailedUploadResponse:
 
 
 @dataclass
-class NotApplied:
+class NotAppliedState:
     """The extension was not applied."""
 
     def __str__(self) -> str:
@@ -58,7 +58,7 @@ class NotApplied:
 
 
 @dataclass
-class Success:
+class SuccessState:
     """The extension was applied successfully."""
 
     def __str__(self) -> str:
@@ -66,7 +66,7 @@ class Success:
 
 
 @dataclass
-class Error:
+class ErrorState:
     """An error occurred during the extension application."""
 
     errors: list[str] = field(default_factory=list)
@@ -76,7 +76,7 @@ class Error:
         return "Error"
 
 
-ExtensionState = Union[NotApplied, Success, Error]
+ExtensionState = Union[NotAppliedState, SuccessState, ErrorState]
 
 
 @dataclass
@@ -85,10 +85,10 @@ class BaseExtension:
         self.state = state
 
     def set_success(self) -> None:
-        self.set_state(Success())
+        self.set_state(SuccessState())
 
     def set_error(self, errors: list[str] | None = None, exceptions: list[Exception] | None = None) -> None:
-        self.set_state(Error(errors=errors or [], exceptions=exceptions or []))
+        self.set_state(ErrorState(errors=errors or [], exceptions=exceptions or []))
 
 
 @dataclass
@@ -99,7 +99,7 @@ class UnknownExtension(BaseExtension):
     """
 
     type: str
-    state: ExtensionState = field(default_factory=NotApplied)
+    state: ExtensionState = field(default_factory=NotAppliedState)
 
     @property
     def summary(self) -> str:
@@ -125,7 +125,7 @@ class SchemaPatchesExtension(BaseExtension):
     """Update the schema with its optimized version."""
 
     patches: list[Patch]
-    state: ExtensionState = field(default_factory=NotApplied)
+    state: ExtensionState = field(default_factory=NotAppliedState)
 
     @property
     def summary(self) -> str:
@@ -156,7 +156,7 @@ class OpenApiStringFormatsExtension(BaseExtension):
     """Custom string formats."""
 
     formats: dict[str, list[StrategyDefinition]]
-    state: ExtensionState = field(default_factory=NotApplied)
+    state: ExtensionState = field(default_factory=NotAppliedState)
 
     @classmethod
     def from_dict(cls, formats: dict[str, list[dict[str, Any]]]) -> OpenApiStringFormatsExtension:
@@ -174,7 +174,7 @@ class GraphQLScalarsExtension(BaseExtension):
     """Custom scalars."""
 
     scalars: dict[str, list[StrategyDefinition]]
-    state: ExtensionState = field(default_factory=NotApplied)
+    state: ExtensionState = field(default_factory=NotAppliedState)
 
     @classmethod
     def from_dict(cls, scalars: dict[str, list[dict[str, Any]]]) -> GraphQLScalarsExtension:
@@ -190,7 +190,7 @@ class GraphQLScalarsExtension(BaseExtension):
 @dataclass
 class MediaTypesExtension(BaseExtension):
     media_types: dict[str, list[StrategyDefinition]]
-    state: ExtensionState = field(default_factory=NotApplied)
+    state: ExtensionState = field(default_factory=NotAppliedState)
 
     @classmethod
     def from_dict(cls, media_types: dict[str, list[dict[str, Any]]]) -> MediaTypesExtension:
@@ -199,8 +199,10 @@ class MediaTypesExtension(BaseExtension):
     @property
     def summary(self) -> str:
         count = len(self.media_types)
-        noun = "generators" if count > 1 else "generator"
-        return f"{count} media type {noun}"
+        noun_1 = "generators" if count > 1 else "generator"
+        noun_2 = "types" if count > 1 else "type"
+        media_types = ", ".join([f"`{media_type}`" for media_type in self.media_types])
+        return f"Data {noun_1} for {media_types} media {noun_2}"
 
 
 # A CLI extension that can be used to adjust the behavior of Schemathesis.

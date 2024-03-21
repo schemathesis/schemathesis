@@ -209,6 +209,7 @@ def _get_map_function(definition: TransformFunctionDefinition) -> Result[Callabl
     TRANSFORM_FACTORIES: dict[str, Callable] = {
         "str": lambda: str,
         "base64_encode": lambda: lambda x: Binary(base64.b64encode(x)),
+        "base64_decode": lambda: lambda x: Binary(base64.b64decode(x)),
         "urlsafe_base64_encode": lambda: lambda x: Binary(base64.urlsafe_b64encode(x)),
         "strftime": make_strftime,
         "GraphQLBoolean": lambda: nodes.Boolean,

@@ -285,9 +285,24 @@ def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "extension",
+    (
+        42,
+        [
+            {"name": "binary"},
+            {
+                "name": "sampled_from",
+                "arguments": {"elements": ["JVBERi0xLjUuLi4=", "JVBERi0xLjYuLi4="]},
+                "transforms": [{"kind": "map", "name": "unknown"}],
+            },
+        ],
+    ),
+)
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.analyze_schema(extensions=[{"type": "string_formats", "items": {"format": 42}}])
-def test_invalid_extension(cli, cli_args, snapshot_cli):
+@pytest.mark.analyze_schema(autouse=False)
+def test_invalid_extension(cli, cli_args, snapshot_cli, analyze_schema, extension):
+    analyze_schema(extensions=[{"type": "string_formats", "items": {"format": extension}}])
     assert cli.run(*cli_args) == snapshot_cli
 
 
@@ -296,9 +311,26 @@ def test_dry_run(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args, "--dry-run") == snapshot_cli
 
 
+@pytest.mark.parametrize(
+    "strategy",
+    (
+        [{"name": "binary"}],
+        [
+            {"name": "binary"},
+            {
+                "name": "sampled_from",
+                "arguments": {"elements": ["JVBERi0xLjUuLi4=", "JVBERi0xLjYuLi4="]},
+                "transforms": [{"kind": "map", "name": "base64_decode"}],
+            },
+        ],
+    ),
+)
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": [{"name": "binary"}]}}])
-def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir):
+@pytest.mark.analyze_schema(autouse=False)
+def test_media_type_extension(
+    cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir, analyze_schema, strategy
+):
+    analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": strategy}}])
     empty_open_api_3_schema["paths"] = {
         "/success": {
             "post": {
