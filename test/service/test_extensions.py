@@ -283,3 +283,31 @@ def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
 @pytest.mark.extensions({"type": "string_formats", "items": {"format": 42}})
 def test_invalid_extension(cli, cli_args, snapshot_cli):
     assert cli.run(*cli_args) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.extensions({"type": "media_types", "items": {"application/pdf": [{"name": "binary"}]}})
+def test_media_type_extension(cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={openapi3_base_url}",
+            f"--schemathesis-io-token={service.token}",
+            f"--schemathesis-io-url={service.base_url}",
+            "--hypothesis-max-examples=10",
+            "--experimental=schema-analysis",
+        )
+        == snapshot_cli
+    )
