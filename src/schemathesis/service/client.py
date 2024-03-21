@@ -1,8 +1,9 @@
 from __future__ import annotations
+import json
 import hashlib
 import http
 from dataclasses import asdict
-from typing import Any
+from typing import Any, TYPE_CHECKING
 from urllib.parse import urljoin
 
 import requests
@@ -11,8 +12,11 @@ from requests.adapters import HTTPAdapter, Retry
 from ..constants import USER_AGENT
 from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
-from .metadata import Metadata
+from .metadata import Metadata, collect_dependency_versions
 from .models import (
+    AnalysisSuccess,
+    AnalysisError,
+    AnalysisResult,
     ProjectDetails,
     AuthResponse,
     FailedUploadResponse,
@@ -21,6 +25,10 @@ from .models import (
     ProjectEnvironment,
     Specification,
 )
+
+
+if TYPE_CHECKING:
+    from ..runner import probes
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:
@@ -98,3 +106,28 @@ class ServiceClient(requests.Session):
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
             return FailedUploadResponse(detail=data["detail"])
         return UploadResponse(message=data["message"], next_url=data["next"], correlation_id=data["correlation_id"])
+
+    def analyze_schema(self, probes: list[probes.ProbeRun] | None, schema: dict[str, Any]) -> AnalysisResult:
+        """Analyze the API schema."""
+        # Manual serialization reduces the size of the payload a bit
+        dependencies = collect_dependency_versions()
+        if probes is not None:
+            _probes = [probe.serialize() for probe in probes]
+        else:
+            _probes = []
+        content = json.dumps(
+            {
+                "probes": _probes,
+                "schema": schema,
+                "dependencies": list(map(asdict, dependencies)),
+            },
+            separators=(",", ":"),
+        )
+        response = self.post("/cli/analysis/", data=content, headers={"Content-Type": "application/json"}, timeout=None)
+        if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:
+            try:
+                message = response.json()["detail"]
+            except json.JSONDecodeError:
+                message = response.text
+            return AnalysisError(message=message)
+        return AnalysisSuccess.from_dict(response.json())

@@ -11,8 +11,9 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
+Schema analysis: SKIP
 
-GET /api/data/{path_param}/ F                                             [100%]
+GET /api/data/{path_param}/ .                                             [100%]
 
 =================================== SUMMARY ====================================
 

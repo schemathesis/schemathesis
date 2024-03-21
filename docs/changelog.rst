@@ -8,6 +8,7 @@ Changelog
 
 - Support for per-media type data generators. :issue:`962`
 - Support for ``application/yaml`` & ``text/yml`` media types in ``YAMLSerializer``.
+- **EXPERIMENTAL**: Run automatic schema optimization & format inference if CLI is authenticated in Schemathesis.io.
 
 **Fixed**
 

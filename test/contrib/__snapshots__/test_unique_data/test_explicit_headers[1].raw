@@ -11,13 +11,14 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
+Schema analysis: SKIP
 
 GET /api/success F                                                        [100%]
 
 =================================== SUMMARY ====================================
 
 Performed checks:
-    unique_test_cases                    22 / 22 passed          PASSED 
+    unique_test_cases                    23 / 23 passed          PASSED 
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.

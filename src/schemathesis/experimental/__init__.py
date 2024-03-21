@@ -72,3 +72,10 @@ OPEN_API_3_1 = GLOBAL_EXPERIMENTS.create_experiment(
     description="Support for response validation",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/1822",
 )
+SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
+    name="schema-analysis",
+    verbose_name="Schema Analysis",
+    env_var="SCHEMA_ANALYSIS",
+    description="Analyzing API schemas via Schemathesis.io",
+    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2056",
+)

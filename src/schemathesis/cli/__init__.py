@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import base64
 import enum
 import io
@@ -10,47 +11,45 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import Any, Callable, Generator, Iterable, NoReturn, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, NoReturn, cast
 from urllib.parse import urlparse
 
 import click
 
 from .. import checks as checks_module
-from .. import contrib, experimental, generation
+from .. import contrib, experimental, generation, runner, service
 from .. import fixups as _fixups
-from .. import runner, service
 from .. import targets as targets_module
+from .._override import CaseOverride
 from ..code_samples import CodeSampleStyle
-from .constants import HealthCheck, Phase, Verbosity
-from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
     DEFAULT_RESPONSE_TIMEOUT,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
+    EXTENSIONS_DOCUMENTATION_URL,
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    WAIT_FOR_SCHEMA_ENV_VAR,
-    EXTENSIONS_DOCUMENTATION_URL,
     ISSUE_TRACKER_URL,
+    WAIT_FOR_SCHEMA_ENV_VAR,
 )
-from ..exceptions import SchemaError, extract_nth_traceback, SchemaErrorType
+from ..exceptions import SchemaError, SchemaErrorType, extract_nth_traceback
 from ..fixups import ALL_FIXUPS
-from ..loaders import load_app, load_yaml
-from .._override import CaseOverride
-from ..transports.auth import get_requests_auth
+from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
+from ..internal.datetime import current_datetime
+from ..internal.validation import file_exists
+from ..loaders import load_app, load_yaml
 from ..models import Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings, probes
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
+from ..transports.auth import get_requests_auth
 from ..types import Filter, PathLike, RequestCert
-from ..internal.datetime import current_datetime
-from ..internal.validation import file_exists
 from . import callbacks, cassettes, output
-from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
+from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .junitxml import JunitXMLHandler
@@ -60,8 +59,9 @@ from .sanitization import SanitizationHandler
 if TYPE_CHECKING:
     import hypothesis
     import requests
-    from ..service.client import ServiceClient
+
     from ..schemas import BaseSchema
+    from ..service.client import ServiceClient
     from ..specs.graphql.schemas import GraphQLSchema
     from .handlers import EventHandler
 
@@ -681,8 +681,9 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 @click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.option(
     "--experimental",
+    "experiments",
     help="Enable experimental support for specific features.",
-    type=click.Choice([experimental.OPEN_API_3_1.name]),
+    type=click.Choice([experimental.OPEN_API_3_1.name, experimental.SCHEMA_ANALYSIS.name]),
     callback=callbacks.convert_experimental,
     multiple=True,
 )
@@ -737,7 +738,7 @@ def run(
     set_header: dict[str, str],
     set_cookie: dict[str, str],
     set_path: dict[str, str],
-    experimental: list,
+    experiments: list,
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -826,7 +827,7 @@ def run(
         show_trace = show_errors_tracebacks
 
     # Enable selected experiments
-    for experiment in experimental:
+    for experiment in experiments:
         experiment.enable()
 
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
@@ -902,6 +903,10 @@ def run(
 
         # Upload without connecting data to a certain API
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
+    if experimental.SCHEMA_ANALYSIS.is_enabled and not client:
+        from ..service.client import ServiceClient
+
+        client = ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
 
     if "all" in checks:
@@ -970,6 +975,7 @@ def run(
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
+        service_client=client,
     )
     execute(
         event_stream,
@@ -1074,6 +1080,7 @@ def into_event_stream(
     store_interactions: bool,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
+    service_client: ServiceClient | None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     try:
         if app is not None:
@@ -1133,6 +1140,7 @@ def into_event_stream(
                 auth_type=config.auth_type,
                 headers=config.headers,
             ),
+            service_client=service_client,
         ).execute()
     except SchemaError as error:
         yield events.InternalError.from_schema_error(error)

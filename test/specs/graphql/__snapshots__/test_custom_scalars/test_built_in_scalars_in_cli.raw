@@ -10,6 +10,7 @@ Workers: 1
 Collected API operations: 9
 Collected API links: 0
 API probing: SKIP
+Schema analysis: SKIP
 
 Query.getByDate .                                                         [ 11%]
 Query.getByTime .                                                         [ 22%]

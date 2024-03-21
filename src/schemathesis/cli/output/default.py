@@ -9,7 +9,7 @@ import time
 from importlib import metadata
 from itertools import groupby
 from queue import Queue
-from typing import Any, Generator, cast
+from typing import Any, Generator, cast, TYPE_CHECKING
 
 import click
 
@@ -25,15 +25,25 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
 )
-from ...exceptions import RuntimeErrorType, prepare_response_payload
+from ...exceptions import (
+    RuntimeErrorType,
+    format_exception,
+    prepare_response_payload,
+    extract_requests_exception_details,
+)
 from ...experimental import GLOBAL_EXPERIMENTS
+from ...internal.result import Ok
 from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
+from ...service.models import AnalysisSuccess, UnknownExtension, ErrorState
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
+
+if TYPE_CHECKING:
+    import requests
 
 SPINNER_REPETITION_NUMBER = 10
 
@@ -362,6 +372,81 @@ def display_single_log(result: SerializedTestResult) -> None:
     click.echo("\n\n".join(result.logs))
 
 
+def display_analysis(context: ExecutionContext) -> None:
+    """Display schema analysis details."""
+    import requests.exceptions
+
+    if context.analysis is None:
+        return
+    display_section_name("SCHEMA ANALYSIS")
+    if isinstance(context.analysis, Ok):
+        analysis = context.analysis.ok()
+        click.echo()
+        if isinstance(analysis, AnalysisSuccess):
+            click.secho(analysis.message, bold=True)
+            click.echo("\nAnalysis took: {:.2f}ms".format(analysis.elapsed))
+            if analysis.extensions:
+                known = []
+                failed = []
+                unknown = []
+                for extension in analysis.extensions:
+                    if isinstance(extension, UnknownExtension):
+                        unknown.append(extension)
+                    elif isinstance(extension.state, ErrorState):
+                        failed.append(extension)
+                    else:
+                        known.append(extension)
+                if known:
+                    click.echo("\nThe following extensions have been applied:\n")
+                    for extension in known:
+                        click.echo(f"  - {extension.summary}")
+                if failed:
+                    click.echo("\nThe following extensions errored:\n")
+                    for extension in failed:
+                        click.echo(f"  - {extension.summary}")
+                    suggestion = f"Please, consider reporting this to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
+                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+                if unknown:
+                    noun = "extension" if len(unknown) == 1 else "extensions"
+                    specific_noun = "this extension" if len(unknown) == 1 else "these extensions"
+                    title = click.style("Compatibility Notice", bold=True)
+                    click.secho(f"\n{title}: {len(unknown)} {noun} not recognized:\n")
+                    for extension in unknown:
+                        click.echo(f"  - {extension.summary}")
+                    suggestion = f"Consider updating the CLI to add support for {specific_noun}."
+                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+            else:
+                click.echo("\nNo extensions have been applied.")
+        else:
+            click.echo("An error happened during schema analysis:\n")
+            click.secho(f"  {analysis.message}", bold=True)
+        click.echo()
+    else:
+        exception = context.analysis.err()
+        suggestion = None
+        if isinstance(exception, requests.exceptions.HTTPError):
+            response = exception.response
+            click.secho("Error\n", fg="red", bold=True)
+            _display_service_network_error(response)
+            click.echo()
+            return None
+        elif isinstance(exception, requests.RequestException):
+            message, extras = extract_requests_exception_details(exception)
+            suggestion = "Please check your network connection and try again."
+            title = "Network Error"
+        else:
+            traceback = format_exception(exception, True)
+            extras = _split_traceback(traceback)
+            title = "Internal Error"
+            message = f"We apologize for the inconvenience. This appears to be an internal issue.\nPlease, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
+            suggestion = "Please update your CLI to the latest version and try again."
+        click.secho(f"{title}\n", fg="red", bold=True)
+        click.echo(message)
+        _display_extras(extras)
+        _maybe_display_tip(suggestion)
+        click.echo()
+
+
 def display_statistic(context: ExecutionContext, event: events.Finished) -> None:
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
@@ -496,37 +581,43 @@ def display_service_error(event: service.Error, message_prefix: str = "") -> Non
 
     if isinstance(event.exception, HTTPError):
         response = cast(Response, event.exception.response)
-        status_code = response.status_code
-        if 500 <= status_code <= 599:
-            click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
-            # Server error, should be resolved soon
-            click.secho(
-                "\nIt is likely that we are already notified about the issue and working on a fix\n"
-                "Please, try again in 30 minutes",
-                fg="red",
-            )
-        elif status_code == 401:
-            # Likely an invalid token
-            click.echo("Your CLI is not authenticated.")
-            display_service_unauthorized("schemathesis.io")
-        else:
-            try:
-                data = response.json()
-                detail = data["detail"]
-                click.secho(f"{message_prefix}{detail}", fg="red")
-            except Exception:
-                # Other client-side errors are likely caused by a bug on the CLI side
-                click.secho(
-                    "We apologize for the inconvenience. This appears to be an internal issue.\n"
-                    "Please, consider reporting the following details to our issue "
-                    f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
-                    f"Headers: {response.headers!r}",
-                    fg="red",
-                )
+        _display_service_network_error(response, message_prefix)
     elif isinstance(event.exception, RequestException):
         ask_to_report(event, report_to_issues=False)
     else:
         ask_to_report(event)
+
+
+def _display_service_network_error(response: requests.Response, message_prefix: str = "") -> None:
+    status_code = response.status_code
+    if 500 <= status_code <= 599:
+        click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
+        # Server error, should be resolved soon
+        click.secho(
+            "\nIt is likely that we are already notified about the issue and working on a fix\n"
+            "Please, try again in 30 minutes",
+            fg="red",
+        )
+    elif status_code == 401:
+        # Likely an invalid token
+        click.echo("Your CLI is not authenticated.")
+        display_service_unauthorized("schemathesis.io")
+    else:
+        try:
+            data = response.json()
+            detail = data["detail"]
+            click.secho(f"{message_prefix}{detail}", fg="red")
+        except Exception:
+            # Other client-side errors are likely caused by a bug on the CLI side
+            click.secho(
+                "We apologize for the inconvenience. This appears to be an internal issue.\n"
+                "Please, consider reporting the following details to our issue "
+                f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
+                f"Status: {response.status_code}\n"
+                f"Headers: {response.headers!r}",
+                fg="red",
+            )
+            _maybe_display_tip("Please update your CLI to the latest version and try again.")
 
 
 SERVICE_ERROR_MESSAGE = "An error happened during uploading reports to Schemathesis.io"
@@ -715,7 +806,23 @@ def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) 
                 status = "SUCCESS"
             elif probe.outcome == ProbeOutcome.ERROR:
                 status = "ERROR"
-    click.secho(f"API probing: {status}\r", bold=True, nl=False)
+    click.secho(f"API probing: {status}", bold=True, nl=False)
+    click.echo()
+
+
+def handle_before_analysis(context: ExecutionContext, event: events.BeforeAnalysis) -> None:
+    click.secho("Schema analysis: ...\r", bold=True, nl=False)
+
+
+def handle_after_analysis(context: ExecutionContext, event: events.AfterAnalysis) -> None:
+    context.analysis = event.analysis
+    status = "SKIP"
+    if event.analysis is not None:
+        if isinstance(event.analysis, Ok) and isinstance(event.analysis.ok(), AnalysisSuccess):
+            status = "SUCCESS"
+        else:
+            status = "ERROR"
+    click.secho(f"Schema analysis: {status}", bold=True, nl=False)
     click.echo()
     operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
     if operations_count >= 1:
@@ -755,6 +862,7 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_errors(context, event)
     display_failures(context, event)
     display_application_logs(context, event)
+    display_analysis(context)
     display_statistic(context, event)
     click.echo()
     display_summary(event)
@@ -780,6 +888,10 @@ class DefaultOutputStyleHandler(EventHandler):
             handle_before_probing(context, event)
         if isinstance(event, events.AfterProbing):
             handle_after_probing(context, event)
+        if isinstance(event, events.BeforeAnalysis):
+            handle_before_analysis(context, event)
+        if isinstance(event, events.AfterAnalysis):
+            handle_after_analysis(context, event)
         if isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         if isinstance(event, events.AfterExecution):
