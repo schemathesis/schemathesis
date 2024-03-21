@@ -120,6 +120,11 @@ def test_strategy_from_definition(definition, expected_type):
 @pytest.mark.parametrize(
     "strategies, errors",
     (
+        ([{"name": "uuids", "transforms": [{"kind": "map", "name": "unknown"}]}], ["Unknown transform: unknown"]),
+        (
+            [{"name": "uuids", "transforms": [{"kind": "unknown", "name": "unknown-func"}]}],
+            ["Unknown transform kind: unknown"],
+        ),
         ([{"name": "from_regex", "arguments": {"regex": "[a-z"}}], ["Invalid regex: `[a-z`"]),
         ([{"name": "wrong"}], ["Unknown built-in strategy: `wrong`"]),
         (

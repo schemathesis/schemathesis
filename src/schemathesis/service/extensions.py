@@ -184,11 +184,14 @@ def _strategy_from_definition(definition: StrategyDefinition) -> Result[st.Searc
             return check_result
     strategy = base(**arguments)
     for transform in definition.transforms or []:
-        function = _get_transform_function(transform)
         if transform["kind"] == "map":
-            strategy = strategy.map(function)
-        elif transform["kind"] == "filter":
-            strategy = strategy.filter(function)
+            function = _get_map_function(transform)
+            if isinstance(function, Ok):
+                strategy = strategy.map(function.ok())
+            else:
+                return function
+        else:
+            return Err(ValueError(f"Unknown transform kind: {transform['kind']}"))
 
     return Ok(strategy)
 
@@ -200,7 +203,7 @@ def make_strftime(format: str) -> Callable:
     return strftime
 
 
-def _get_transform_function(definition: TransformFunctionDefinition) -> Callable | None:
+def _get_map_function(definition: TransformFunctionDefinition) -> Result[Callable | None, Exception]:
     from ..specs.openapi._hypothesis import Binary
 
     TRANSFORM_FACTORIES: dict[str, Callable] = {
@@ -215,6 +218,6 @@ def _get_transform_function(definition: TransformFunctionDefinition) -> Callable
     }
     factory = TRANSFORM_FACTORIES.get(definition["name"])
     if factory is None:
-        raise ValueError(f"Unknown transform: {definition['name']}")
+        return Err(ValueError(f"Unknown transform: {definition['name']}"))
     arguments = definition.get("arguments", {})
-    return factory(**arguments)
+    return Ok(factory(**arguments))
