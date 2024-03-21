@@ -354,7 +354,7 @@ class CliSnapshotConfig:
                 lines.pop(idx)
             if platform.system() == "Windows":
                 for idx, line in enumerate(lines):
-                    if package_root in line or site_packages in line:
+                    if line.strip().startswith("File") and "line" in line:
                         lines[idx] = line.replace("/", "\\")
             data = "\n".join(lines)
         if self.replace_multi_worker_progress:
