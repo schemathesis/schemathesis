@@ -1,5 +1,6 @@
 import datetime
 from base64 import b64decode
+from unittest.mock import ANY
 
 import pytest
 from hypothesis import HealthCheck, assume, find, given, settings
@@ -71,7 +72,11 @@ def test_get_examples(location, swagger_20):
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert strategies[0].example() == Case(
-        operation, data_generation_method=DataGenerationMethod.positive, media_type=media_type, **{container: expected}
+        operation,
+        generation_time=ANY,
+        data_generation_method=DataGenerationMethod.positive,
+        media_type=media_type,
+        **{container: expected},
     )
 
 

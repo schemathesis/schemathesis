@@ -1165,7 +1165,7 @@ def response_factory():
 def case_factory(swagger_20):
     def factory(**kwargs):
         kwargs.setdefault("operation", swagger_20["/users"]["get"])
-        return Case(**kwargs)
+        return Case(generation_time=0.0, **kwargs)
 
     return factory
 

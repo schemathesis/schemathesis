@@ -953,6 +953,7 @@ class SwaggerV20(BaseOpenAPISchema):
             query=query,
             body=body,
             media_type=media_type,
+            generation_time=0.0,
         )
 
     def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:

@@ -1029,9 +1029,9 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
         operation.app = flask_app
-        original = Case(operation).call_wsgi
+        original = Case(operation, generation_time=0.0).call_wsgi
     else:
-        original = Case(operation).call
+        original = Case(operation, generation_time=0.0).call
     counter = 0
 
     def mocked(*args, **kwargs):
