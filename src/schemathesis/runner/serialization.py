@@ -9,7 +9,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING, cast
 
-from ..transports import serialize_payload
+from ..transports import serialize_payload, Response, Request
 from ..code_samples import get_excluded_headers
 from ..exceptions import (
     FailureContext,
@@ -25,7 +25,7 @@ from ..exceptions import (
     SerializationError,
     UnboundPrefixError,
 )
-from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
+from ..models import Case, Check, Interaction, Status, TestResult
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -107,42 +107,32 @@ class SerializedCheck:
 
     @classmethod
     def from_check(cls, check: Check) -> SerializedCheck:
-        import requests
-        from ..transports.responses import WSGIResponse
-
         if check.response is not None:
-            request = Request.from_prepared_request(check.response.request)
+            request = check.response.request
         elif check.request is not None:
             # Response is not available, but it is not an error (only time-out behaves this way at the moment)
             request = Request.from_prepared_request(check.request)
         else:
             raise InternalError("Can not find request data")
 
-        response: Response | None
-        if isinstance(check.response, requests.Response):
-            response = Response.from_requests(check.response)
-        elif isinstance(check.response, WSGIResponse):
-            response = Response.from_wsgi(check.response, check.elapsed)
-        else:
-            response = None
         headers = _get_headers(request.headers)
         history = get_serialized_history(check.example)
         return cls(
             name=check.name,
             value=check.value,
             example=SerializedCase.from_case(
-                check.example, headers, verify=response.verify if response is not None else True
+                check.example, headers, verify=check.response.verify if check.response is not None else True
             ),
             message=check.message,
             request=request,
-            response=response,
+            response=check.response,
             context=check.context,
             history=history,
         )
 
 
 def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str]:
-    return {key: value[0] for key, value in headers.items() if key not in get_excluded_headers()}
+    return {key: value for key, value in headers.items() if key not in get_excluded_headers()}
 
 
 @dataclass
@@ -152,20 +142,13 @@ class SerializedHistoryEntry:
 
 
 def get_serialized_history(case: Case) -> list[SerializedHistoryEntry]:
-    import requests
-
     history = []
     while case.source is not None:
         history_request = case.source.response.request
         headers = _get_headers(history_request.headers)
-        if isinstance(case.source.response, requests.Response):
-            history_response = Response.from_requests(case.source.response)
-            verify = history_response.verify
-        else:
-            history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
-            verify = True
         entry = SerializedHistoryEntry(
-            case=SerializedCase.from_case(case.source.case, headers, verify=verify), response=history_response
+            case=SerializedCase.from_case(case.source.case, headers, verify=case.source.response.verify),
+            response=case.source.response,
         )
         history.append(entry)
         case = case.source.case

@@ -19,7 +19,7 @@ from ...transports.auth import get_requests_auth
 from ...types import RawAuth, RequestCert
 from ...utils import capture_hypothesis_output
 from .. import events
-from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
+from .core import BaseRunner, get_session, handle_schema_error, network_test, run_test
 
 
 def _run_task(
@@ -145,74 +145,6 @@ def thread_task(
         )
 
 
-def wsgi_thread_task(
-    tasks_queue: Queue,
-    events_queue: Queue,
-    generator_done: threading.Event,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    data_generation_methods: Iterable[DataGenerationMethod],
-    settings: hypothesis.settings,
-    generation_config: GenerationConfig,
-    seed: int | None,
-    results: TestResultSet,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
-    kwargs: Any,
-) -> None:
-    _run_task(
-        wsgi_test,
-        tasks_queue,
-        events_queue,
-        generator_done,
-        checks,
-        targets,
-        data_generation_methods,
-        settings,
-        generation_config,
-        seed,
-        results,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
-        **kwargs,
-    )
-
-
-def asgi_thread_task(
-    tasks_queue: Queue,
-    events_queue: Queue,
-    generator_done: threading.Event,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    data_generation_methods: Iterable[DataGenerationMethod],
-    settings: hypothesis.settings,
-    generation_config: GenerationConfig,
-    headers: dict[str, Any] | None,
-    seed: int | None,
-    results: TestResultSet,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
-    kwargs: Any,
-) -> None:
-    _run_task(
-        asgi_test,
-        tasks_queue,
-        events_queue,
-        generator_done,
-        checks,
-        targets,
-        data_generation_methods,
-        settings,
-        generation_config,
-        seed,
-        results,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
-        headers=headers,
-        **kwargs,
-    )
-
-
 def stop_worker(thread_id: int) -> None:
     """Raise an error in a thread, so it is possible to asynchronously stop thread execution."""
     ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
@@ -320,6 +252,7 @@ class ThreadPoolRunner(BaseRunner):
             "targets": self.targets,
             "settings": self.hypothesis_settings,
             "generation_config": self.generation_config,
+            # todo:handle in transport (+ wsgi is using it in kwargs)
             "auth": self.auth,
             "auth_type": self.auth_type,
             "headers": self.headers,
@@ -329,70 +262,11 @@ class ThreadPoolRunner(BaseRunner):
             "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
+                # TODO: Handle in transports
                 "request_timeout": self.request_timeout,
                 "request_tls_verify": self.request_tls_verify,
                 "request_proxy": self.request_proxy,
                 "request_cert": self.request_cert,
-                "store_interactions": self.store_interactions,
-                "max_response_time": self.max_response_time,
-                "dry_run": self.dry_run,
-            },
-        }
-
-
-class ThreadPoolWSGIRunner(ThreadPoolRunner):
-    def _get_task(self) -> Callable:
-        return wsgi_thread_task
-
-    def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> dict[str, Any]:
-        return {
-            "tasks_queue": tasks_queue,
-            "events_queue": events_queue,
-            "generator_done": generator_done,
-            "checks": self.checks,
-            "targets": self.targets,
-            "settings": self.hypothesis_settings,
-            "generation_config": self.generation_config,
-            "seed": self.seed,
-            "results": results,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
-            "data_generation_methods": self.schema.data_generation_methods,
-            "kwargs": {
-                "auth": self.auth,
-                "auth_type": self.auth_type,
-                "headers": self.headers,
-                "store_interactions": self.store_interactions,
-                "max_response_time": self.max_response_time,
-                "dry_run": self.dry_run,
-            },
-        }
-
-
-class ThreadPoolASGIRunner(ThreadPoolRunner):
-    def _get_task(self) -> Callable:
-        return asgi_thread_task
-
-    def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
-    ) -> dict[str, Any]:
-        return {
-            "tasks_queue": tasks_queue,
-            "events_queue": events_queue,
-            "generator_done": generator_done,
-            "checks": self.checks,
-            "targets": self.targets,
-            "settings": self.hypothesis_settings,
-            "generation_config": self.generation_config,
-            "headers": self.headers,
-            "seed": self.seed,
-            "results": results,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
-            "data_generation_methods": self.schema.data_generation_methods,
-            "kwargs": {
                 "store_interactions": self.store_interactions,
                 "max_response_time": self.max_response_time,
                 "dry_run": self.dry_run,

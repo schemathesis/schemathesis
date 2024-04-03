@@ -1029,9 +1029,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     if len(cli_args) == 2:
         operation.app = flask_app
-        original = Case(operation, generation_time=0.0).call_wsgi
-    else:
-        original = Case(operation, generation_time=0.0).call
+    original = Case(operation, generation_time=0.0).call
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -1042,10 +1040,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    if len(cli_args) == 2:
-        mocker.patch("schemathesis.Case.call_wsgi", wraps=mocked)
-    else:
-        mocker.patch("schemathesis.Case.call", wraps=mocked)
+    mocker.patch("schemathesis.Case.call", wraps=mocked)
     result = cli.run(*cli_args, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then execution stops, and a message about interruption is displayed

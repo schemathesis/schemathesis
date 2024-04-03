@@ -22,7 +22,7 @@ from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
 
 
 if TYPE_CHECKING:
-    from ...transports.responses import GenericResponse
+    from ...transports import Response
 
 
 @dataclass(repr=False)
@@ -58,7 +58,7 @@ class Link(StatefulTest):
             request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
         )
 
-    def parse(self, case: Case, response: GenericResponse) -> ParsedData:
+    def parse(self, case: Case, response: Response) -> ParsedData:
         """Parse data into a structure expected by links definition."""
         context = expressions.ExpressionContext(case=case, response=response)
         parameters = {
@@ -151,7 +151,7 @@ class Link(StatefulTest):
         )
 
 
-def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
+def get_links(response: Response, operation: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
     responses = operation.definition.resolved["responses"]
     if str(response.status_code) in responses:

@@ -356,17 +356,9 @@ def from_schema(
     service_client: ServiceClient | None = None,
 ) -> BaseRunner:
     import hypothesis
-    from starlette.applications import Starlette
 
     from ..checks import DEFAULT_CHECKS
-    from .impl import (
-        SingleThreadASGIRunner,
-        SingleThreadRunner,
-        SingleThreadWSGIRunner,
-        ThreadPoolASGIRunner,
-        ThreadPoolRunner,
-        ThreadPoolWSGIRunner,
-    )
+    from .impl import SingleThreadRunner, ThreadPoolRunner
 
     checks = checks or DEFAULT_CHECKS
     probe_config = probe_config or ProbeConfig()
@@ -379,63 +371,9 @@ def from_schema(
         seed = Random().getrandbits(128)
 
     started_at = started_at or current_datetime()
+    # todo - maybe join classes and decide in runtime? ie, delegate to "dispatcher", use composition
     if workers_num > 1:
-        if not schema.app:
-            return ThreadPoolRunner(
-                schema=schema,
-                checks=checks,
-                max_response_time=max_response_time,
-                targets=targets,
-                hypothesis_settings=hypothesis_settings,
-                generation_config=generation_config,
-                auth=auth,
-                auth_type=auth_type,
-                override=override,
-                headers=headers,
-                seed=seed,
-                workers_num=workers_num,
-                request_timeout=request_timeout,
-                request_tls_verify=request_tls_verify,
-                request_proxy=request_proxy,
-                request_cert=request_cert,
-                exit_first=exit_first,
-                max_failures=max_failures,
-                started_at=started_at,
-                dry_run=dry_run,
-                store_interactions=store_interactions,
-                stateful=stateful,
-                stateful_recursion_limit=stateful_recursion_limit,
-                count_operations=count_operations,
-                count_links=count_links,
-                probe_config=probe_config,
-                service_client=service_client,
-            )
-        if isinstance(schema.app, Starlette):
-            return ThreadPoolASGIRunner(
-                schema=schema,
-                checks=checks,
-                max_response_time=max_response_time,
-                targets=targets,
-                hypothesis_settings=hypothesis_settings,
-                generation_config=generation_config,
-                auth=auth,
-                auth_type=auth_type,
-                override=override,
-                headers=headers,
-                seed=seed,
-                exit_first=exit_first,
-                max_failures=max_failures,
-                started_at=started_at,
-                dry_run=dry_run,
-                store_interactions=store_interactions,
-                stateful=stateful,
-                stateful_recursion_limit=stateful_recursion_limit,
-                count_operations=count_operations,
-                count_links=count_links,
-                probe_config=probe_config,
-                service_client=service_client,
-            )
-        return ThreadPoolWSGIRunner(
+        return ThreadPoolRunner(
             schema=schema,
             checks=checks,
             max_response_time=max_response_time,
@@ -448,31 +386,6 @@ def from_schema(
             headers=headers,
             seed=seed,
             workers_num=workers_num,
-            exit_first=exit_first,
-            max_failures=max_failures,
-            started_at=started_at,
-            dry_run=dry_run,
-            store_interactions=store_interactions,
-            stateful=stateful,
-            stateful_recursion_limit=stateful_recursion_limit,
-            count_operations=count_operations,
-            count_links=count_links,
-            probe_config=probe_config,
-            service_client=service_client,
-        )
-    if not schema.app:
-        return SingleThreadRunner(
-            schema=schema,
-            checks=checks,
-            max_response_time=max_response_time,
-            targets=targets,
-            hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
-            auth=auth,
-            auth_type=auth_type,
-            override=override,
-            headers=headers,
-            seed=seed,
             request_timeout=request_timeout,
             request_tls_verify=request_tls_verify,
             request_proxy=request_proxy,
@@ -489,32 +402,7 @@ def from_schema(
             probe_config=probe_config,
             service_client=service_client,
         )
-    if isinstance(schema.app, Starlette):
-        return SingleThreadASGIRunner(
-            schema=schema,
-            checks=checks,
-            max_response_time=max_response_time,
-            targets=targets,
-            hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
-            auth=auth,
-            auth_type=auth_type,
-            override=override,
-            headers=headers,
-            seed=seed,
-            exit_first=exit_first,
-            max_failures=max_failures,
-            started_at=started_at,
-            dry_run=dry_run,
-            store_interactions=store_interactions,
-            stateful=stateful,
-            stateful_recursion_limit=stateful_recursion_limit,
-            count_operations=count_operations,
-            count_links=count_links,
-            probe_config=probe_config,
-            service_client=service_client,
-        )
-    return SingleThreadWSGIRunner(
+    return SingleThreadRunner(
         schema=schema,
         checks=checks,
         max_response_time=max_response_time,
@@ -526,6 +414,10 @@ def from_schema(
         override=override,
         headers=headers,
         seed=seed,
+        request_timeout=request_timeout,
+        request_tls_verify=request_tls_verify,
+        request_proxy=request_proxy,
+        request_cert=request_cert,
         exit_first=exit_first,
         max_failures=max_failures,
         started_at=started_at,

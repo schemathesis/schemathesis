@@ -15,8 +15,8 @@ from typing import TYPE_CHECKING, Any
 
 from ..constants import USER_AGENT
 from ..exceptions import format_exception
-from ..models import Request, Response
 from ..sanitization import sanitize_request, sanitize_response
+from ..transports import Response, Request
 from ..transports.auth import get_requests_auth
 
 if TYPE_CHECKING:
@@ -72,6 +72,7 @@ class ProbeRun:
     outcome: ProbeOutcome
     request: requests.PreparedRequest | None = None
     response: requests.Response | None = None
+    verify: bool = True
     error: requests.RequestException | None = None
 
     @property
@@ -88,7 +89,8 @@ class ProbeRun:
             request = None
         if self.response:
             sanitize_response(self.response)
-            response = asdict(Response.from_requests(self.response))
+            response = asdict(Response.from_requests(self.response, self.verify))
+            del response["request"]
         else:
             response = None
         if self.error:
@@ -133,6 +135,7 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Pr
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
+    verify = bool(session.verify)
     try:
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
@@ -143,12 +146,12 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Pr
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
-        return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
+        return ProbeRun(probe=probe, outcome=ProbeOutcome.SKIP, verify=verify)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
-    result_type = probe.analyze_response(response)
-    return ProbeRun(probe, result_type, request, response)
+        return ProbeRun(probe=probe, outcome=ProbeOutcome.ERROR, request=req, verify=verify, error=exc)
+    outcome = probe.analyze_response(response)
+    return ProbeRun(probe=probe, outcome=outcome, request=request, response=response, verify=verify)
 
 
 def run(schema: BaseSchema, config: ProbeConfig) -> list[ProbeRun]:

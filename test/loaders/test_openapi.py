@@ -14,20 +14,20 @@ from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SC
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
 
-def test_openapi_asgi_loader(fastapi_app, run_asgi_test):
+def test_openapi_asgi_loader(fastapi_app, run_test):
     # When an ASGI app is loaded via `from_asgi`
     schema = loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
     strategy = schema["/users"]["GET"].as_strategy()
-    # Then it should successfully make calls via `call_asgi`
-    run_asgi_test(strategy)
+    # Then it should successfully make calls via `call`
+    run_test(strategy)
 
 
-def test_openapi_wsgi_loader(flask_app, run_wsgi_test):
+def test_openapi_wsgi_loader(flask_app, run_test):
     # When a WSGI app is loaded via `from_wsgi`
     schema = loaders.from_wsgi("/schema.yaml", flask_app)
     strategy = schema["/success"]["GET"].as_strategy()
-    # Then it should successfully make calls via `call_wsgi`
-    run_wsgi_test(strategy)
+    # Then it should successfully make calls via `call`
+    run_test(strategy)
 
 
 @pytest.mark.parametrize(

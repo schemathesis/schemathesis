@@ -502,7 +502,7 @@ def test_graphql_body(graphql_schema):
     @settings(max_examples=3, phases=[Phase.generate], suppress_health_check=list(HealthCheck), deadline=None)
     def test(case):
         # Not necessarily valid GraphQL, but it is simpler to check the hook this way
-        assert case.body == "mutation {\n  addedViaHook\n}"
+        assert case.body == {"query": "mutation {\n  addedViaHook\n}"}
 
     test()
 
@@ -548,7 +548,12 @@ def test_graphql_query(graphql_schema, graphql_server_host):
         assert case.cookies == cookies
         assert case.as_requests_kwargs() == {
             "cookies": {"c": "4"},
-            "headers": {"User-Agent": USER_AGENT, "X-Schemathesis-TestCaseId": ANY, "h": "3"},
+            "headers": {
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/json",
+                "X-Schemathesis-TestCaseId": ANY,
+                "h": "3",
+            },
             "json": {"query": ANY},
             "method": "POST",
             "params": {"q": 1},

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
     from .models import APIOperation, Case
     from .schemas import BaseSchema
-    from .transports.responses import GenericResponse
+    from .transports import Response
 
 
 @unique
@@ -325,7 +325,7 @@ def before_init_operation(context: HookContext, operation: APIOperation) -> None
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def add_case(context: HookContext, case: Case, response: GenericResponse) -> Case | None:
+def add_case(context: HookContext, case: Case, response: Response) -> Case | None:
     """Creates an additional test per API operation. If this hook returns None, no additional test created.
 
     Called with a copy of the original case object and the server's response to the original case.
@@ -343,7 +343,7 @@ def before_call(context: HookContext, case: Case) -> None:
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_call(context: HookContext, case: Case, response: GenericResponse) -> None:
+def after_call(context: HookContext, case: Case, response: Response) -> None:
     """Called after every network call in CLI tests.
 
     Note that you need to modify the response in-place.

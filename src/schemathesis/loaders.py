@@ -18,6 +18,7 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
 
     try:
         response = loader()
+        # TODO: Non-requests-based loaders could raise their own errors
     except requests.RequestException as exc:
         url = exc.request.url if exc.request is not None else None
         if isinstance(exc, requests.exceptions.SSLError):

@@ -259,22 +259,20 @@ TestStateful = schema.as_state_machine().TestCase
     assert " in step" not in result.stdout.str()
 
 
-@pytest.mark.parametrize("method", ("requests", "werkzeug"))
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_history(testdir, app_schema, base_url, response_factory, method):
+def test_history(app_schema, response_factory):
     # When cases are serialized
     schema = schemathesis.from_dict(app_schema)
     first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
-    factory = getattr(response_factory, method)
-    first_response = factory(status_code=201)
+    first_response = response_factory.default(status_code=201)
     second = schema["/users/{user_id}"]["PATCH"].make_case(
         path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
     )
-    second_response = factory(status_code=200)
+    second_response = response_factory.default(status_code=200)
     second.source = CaseSource(case=first, response=first_response, elapsed=10)
     third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
-    third_response = factory(status_code=200)
+    third_response = response_factory.default(status_code=200)
     third.source = CaseSource(case=second, response=second_response, elapsed=10)
     check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
     serialized = SerializedCheck.from_check(check)

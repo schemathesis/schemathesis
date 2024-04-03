@@ -7,7 +7,6 @@ from pydantic import BaseModel
 
 import schemathesis
 from schemathesis.generation import GenerationConfig
-from schemathesis.models import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
 
@@ -50,7 +49,7 @@ def test_cookies(fastapi_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_asgi()
+        response = case.call()
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -81,22 +80,11 @@ def test_null_byte(fastapi_app):
         max_examples=50, suppress_health_check=[HealthCheck.filter_too_much], deadline=None, phases=[Phase.generate]
     )
     def test(case):
-        response = case.call_asgi()
+        response = case.call()
         assert response.status_code == 200
         assert response.json() == {"success": True}
 
     test()
-
-
-def test_not_app_with_asgi(schema):
-    case = Case(schema["/users"]["GET"], generation_time=0.0)
-    case.operation.app = None
-    with pytest.raises(
-        RuntimeError,
-        match="ASGI application instance is required. "
-        "Please, set `app` argument in the schema constructor or pass it to `call_asgi`",
-    ):
-        case.call_asgi()
 
 
 def test_base_url():
@@ -116,13 +104,13 @@ def test_base_url():
     def read_root():
         return {"Hello": "World"}
 
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.from_dict(raw_schema, app=app)
     strategy = schema["/foo"]["GET"].as_strategy()
 
     @given(case=strategy)
     @settings(max_examples=1, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_asgi(app)
+        response = case.call()
         # Then the base path should be respected and calls should not lead to 404
         assert response.status_code == 200
 
@@ -212,7 +200,7 @@ def test_events(setup):
     @given(case=schema["/health"]["GET"].as_strategy())
     @settings(max_examples=3, deadline=None)
     def test(case):
-        response = case.call_asgi()
+        response = case.call()
         assert response.status_code == 200
         assert response.json() == {"status": "OK"}
 

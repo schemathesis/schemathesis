@@ -11,7 +11,7 @@ from schemathesis.runner.impl.core import canonicalize_error_message
 
 @pytest.fixture
 def config_factory():
-    def inner(base_url, request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
+    def inner(base_url, request_proxy=None, request_tls_verify=True, request_cert=None, auth=None, headers=None):
         return probes.ProbeConfig(
             base_url=base_url,
             request_proxy=request_proxy,
@@ -29,10 +29,10 @@ HERE = Path(__file__).absolute().parent
 
 
 DEFAULT_HEADERS = {
-    "User-Agent": [USER_AGENT],
-    "Accept": ["*/*"],
-    "Accept-Encoding": ["gzip, deflate"],
-    "Connection": ["keep-alive"],
+    "User-Agent": USER_AGENT,
+    "Accept": "*/*",
+    "Accept-Encoding": "gzip, deflate",
+    "Connection": "keep-alive",
 }
 
 
@@ -40,7 +40,7 @@ DEFAULT_HEADERS = {
     "kwargs, headers",
     (
         ({"request_cert": str(HERE.parent / "cli" / "cert.pem")}, {}),
-        ({"auth": ("test", "test")}, {"Authorization": ["[Filtered]"]}),
+        ({"auth": ("test", "test")}, {"Authorization": "[Filtered]"}),
     ),
 )
 def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url, kwargs, headers):
@@ -57,13 +57,13 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
         "request": {
             "body": None,
             "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
+                "X-Schemathesis-Probe": "NULL_BYTE_IN_HEADER",
+                "X-Schemathesis-Probe-Null": "\x00",
                 **DEFAULT_HEADERS,
                 **headers,
             },
             "method": "GET",
-            "uri": openapi3_base_url,
+            "url": openapi3_base_url,
         },
         "response": None,
         "outcome": "failure",
@@ -80,24 +80,20 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
         "request": {
             "body": None,
             "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
+                "X-Schemathesis-Probe": "NULL_BYTE_IN_HEADER",
+                "X-Schemathesis-Probe-Null": "\x00",
                 **DEFAULT_HEADERS,
             },
             "method": "GET",
-            "uri": openapi3_base_url,
+            "url": openapi3_base_url,
         },
         "response": {
-            "body": "eyJzdWNjZXNzIjogdHJ1ZX0=",
+            "body": b'{"success": true}',
             "elapsed": 0.0,
             "encoding": None,
             "headers": {
-                "Content-Length": [
-                    "17",
-                ],
-                "Content-Type": [
-                    "application/json",
-                ],
+                "Content-Length": "17",
+                "Content-Type": "application/json",
             },
             "http_version": "1.1",
             "message": None,
@@ -135,12 +131,12 @@ def test_detect_null_byte_error(openapi_30, config_factory):
         "request": {
             "body": None,
             "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
+                "X-Schemathesis-Probe": "NULL_BYTE_IN_HEADER",
+                "X-Schemathesis-Probe-Null": "\x00",
                 **DEFAULT_HEADERS,
             },
             "method": "GET",
-            "uri": "http://127.0.0.1:1/",
+            "url": "http://127.0.0.1:1/",
         },
         "response": None,
         "outcome": "error",

@@ -61,7 +61,7 @@ from .types import (
 from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy, combine_strategies
 
 if TYPE_CHECKING:
-    from .transports.responses import GenericResponse
+    from .transports import Transport, Response
 
 
 C = TypeVar("C", bound=Case)
@@ -75,6 +75,7 @@ def get_full_path(base_path: str, path: str) -> str:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
+    transport: Transport
     location: str | None = None
     base_url: str | None = None
     method: Filter | None = None
@@ -186,7 +187,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
+        self, response: Response, operation: APIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
@@ -346,6 +347,7 @@ class BaseSchema(Mapping):
             code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
             sanitize_output=sanitize_output,  # type: ignore
+            transport=self.transport,
         )
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
@@ -414,7 +416,7 @@ class BaseSchema(Mapping):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
+    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:

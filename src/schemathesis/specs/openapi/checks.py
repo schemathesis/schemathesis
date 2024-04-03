@@ -13,11 +13,11 @@ from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ...transports.responses import GenericResponse
+    from ...transports import Response
     from ...models import Case
 
 
-def status_code_conformance(response: GenericResponse, case: Case) -> bool | None:
+def status_code_conformance(response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -48,7 +48,7 @@ def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, N
         yield from expand_status_code(code)
 
 
-def content_type_conformance(response: GenericResponse, case: Case) -> bool | None:
+def content_type_conformance(response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -96,7 +96,7 @@ def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, d
     ) from exc
 
 
-def response_headers_conformance(response: GenericResponse, case: Case) -> bool | None:
+def response_headers_conformance(response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -121,7 +121,7 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
     )
 
 
-def response_schema_conformance(response: GenericResponse, case: Case) -> bool | None:
+def response_schema_conformance(response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):

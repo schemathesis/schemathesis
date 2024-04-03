@@ -1,5 +1,4 @@
 from __future__ import annotations
-import base64
 import json
 import platform
 from dataclasses import asdict
@@ -127,27 +126,27 @@ def test_interactions(request, any_app_schema, workers):
     assert len(interactions) == 2
     failure = interactions[0]
     assert asdict(failure.request) == {
-        "uri": f"{base_url}/failure",
+        "url": f"{base_url}/failure",
         "method": "GET",
         "body": None,
         "headers": {
-            "Accept": ["*/*"],
-            "Accept-Encoding": ["gzip, deflate"],
-            "Connection": ["keep-alive"],
-            "User-Agent": [USER_AGENT],
-            SCHEMATHESIS_TEST_CASE_HEADER: [ANY],
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "User-Agent": USER_AGENT,
+            SCHEMATHESIS_TEST_CASE_HEADER: ANY,
         },
     }
     assert failure.response.status_code == 500
     assert failure.response.message == "Internal Server Error"
     if isinstance(any_app_schema.app, Flask):
         assert failure.response.headers == {
-            "Content-Type": ["text/html; charset=utf-8"],
-            "Content-Length": ["265"],
+            "Content-Type": "text/html; charset=utf-8",
+            "Content-Length": "265",
         }
     else:
-        assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
-        assert failure.response.headers["Content-Length"] == ["26"]
+        assert failure.response.headers["Content-Type"] == "text/plain; charset=utf-8"
+        assert failure.response.headers["Content-Length"] == "26"
     # success
     interactions = [
         event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.success
@@ -155,25 +154,25 @@ def test_interactions(request, any_app_schema, workers):
     assert len(interactions) == 1
     success = interactions[0]
     assert asdict(success.request) == {
-        "uri": f"{base_url}/success",
+        "url": f"{base_url}/success",
         "method": "GET",
         "body": None,
         "headers": {
-            "Accept": ["*/*"],
-            "Accept-Encoding": ["gzip, deflate"],
-            "Connection": ["keep-alive"],
-            "User-Agent": [USER_AGENT],
-            SCHEMATHESIS_TEST_CASE_HEADER: [ANY],
+            "Accept": "*/*",
+            "Accept-Encoding": "gzip, deflate",
+            "Connection": "keep-alive",
+            "User-Agent": USER_AGENT,
+            SCHEMATHESIS_TEST_CASE_HEADER: ANY,
         },
     }
     assert success.response.status_code == 200
     assert success.response.message == "OK"
-    assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
+    assert json.loads(success.response.body) == {"success": True}
     assert success.response.encoding == "utf-8"
     if isinstance(any_app_schema.app, Flask):
-        assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
+        assert success.response.headers == {"Content-Type": "application/json", "Content-Length": "17"}
     else:
-        assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
+        assert success.response.headers["Content-Type"] == "application/json; charset=utf-8"
 
 
 @pytest.mark.operations("root")
@@ -207,7 +206,7 @@ def test_empty_string_response_interaction(any_app_schema):
     interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
-        assert interaction.response.body == ""
+        assert interaction.response.body == b""
         assert interaction.response.encoding == "utf-8"
 
 
@@ -581,7 +580,6 @@ def test_internal_exceptions(any_app_schema, mocker):
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
-    mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
     _, _, _, _, _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
@@ -639,11 +637,7 @@ def test_plain_text_body(any_app, any_app_schema):
     # When the expected payload is text/plain
     # Then the payload is not encoded as JSON
     def check_content(response, case):
-        if isinstance(any_app, Flask):
-            data = response.get_data()
-        else:
-            data = response.content
-        assert case.body.encode("utf8") == data
+        assert case.body.encode("utf8") == response.body
 
     result = execute(
         any_app_schema, checks=(check_content,), hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)

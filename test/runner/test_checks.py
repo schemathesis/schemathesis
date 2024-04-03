@@ -494,7 +494,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
     def test(case):
-        response = response_factory.requests(content=json.dumps({"foo": 1}).encode())
+        response = response_factory.default(content=json.dumps({"foo": 1}).encode())
         with pytest.raises(AssertionError):
             case.validate_response(response)
         assert not case.operation.is_response_valid(response)
@@ -510,7 +510,7 @@ def test_response_schema_conformance_references_valid(complex_schema, value, res
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
     def test(case):
-        response = response_factory.requests(content=json.dumps({"key": value, "referenced": value}).encode())
+        response = response_factory.default(content=json.dumps({"key": value, "referenced": value}).encode())
         case.validate_response(response)
 
     test()

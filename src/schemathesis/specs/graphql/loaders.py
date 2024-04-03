@@ -234,6 +234,7 @@ def from_dict(
     :return: GraphQLSchema
     """
     from .schemas import GraphQLSchema
+    from ...transports import get_transport
 
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
@@ -252,6 +253,7 @@ def from_dict(
         code_sample_style=_code_sample_style,
         rate_limiter=rate_limiter,
         sanitize_output=sanitize_output,
+        transport=get_transport(app),
     )  # type: ignore
     dispatch("after_load_schema", hook_context, instance)
     return instance

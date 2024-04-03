@@ -36,6 +36,7 @@ from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.specs.openapi import media_types
+from schemathesis.transports import Response, Request
 from schemathesis.transports.responses import WSGIResponse
 
 from .apps import _graphql as graphql
@@ -1154,10 +1155,33 @@ def response_factory():
         )
         return response
 
+    def default_factory(
+        *,
+        content: bytes = b"{}",
+        content_type: str | None = "application/json",
+        status_code: int = 200,
+        headers: dict[str, Any] | None = None,
+    ) -> Response:
+        headers = headers or {}
+        if content_type:
+            headers.setdefault("Content-Type", content_type)
+        return Response(
+            status_code=status_code,
+            message="Ok",
+            headers=headers,
+            body=content,
+            encoding="utf-8",
+            http_version="1.1",
+            elapsed=0.1,
+            verify=True,
+            request=Request(method="GET", url="http://127.0.0.1/", body=None, headers={}),
+        )
+
     return SimpleNamespace(
         httpx=httpx_factory,
         requests=requests_factory,
         werkzeug=werkzeug_factory,
+        default=default_factory,
     )
 
 

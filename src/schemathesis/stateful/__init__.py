@@ -12,7 +12,7 @@ from ..internal.result import Ok, Result
 
 if TYPE_CHECKING:
     import hypothesis
-    from ..transports.responses import GenericResponse
+    from ..transports import Response
     from .state_machine import APIStateMachine
 
 
@@ -51,7 +51,7 @@ class StatefulTest:
 
     name: str
 
-    def parse(self, case: Case, response: GenericResponse) -> ParsedData:
+    def parse(self, case: Case, response: Response) -> ParsedData:
         raise NotImplementedError
 
     def make_operation(self, collected: list[ParsedData]) -> APIOperation:
@@ -68,7 +68,7 @@ class StatefulData:
     def make_operation(self) -> APIOperation:
         return self.stateful_test.make_operation(self.container)
 
-    def store(self, case: Case, response: GenericResponse) -> None:
+    def store(self, case: Case, response: Response) -> None:
         """Parse and store data for a stateful test."""
         parsed = self.stateful_test.parse(case, response)
         self.container.append(parsed)
@@ -85,7 +85,7 @@ class Feedback:
     operation: APIOperation = field(repr=False)
     stateful_tests: dict[str, StatefulData] = field(default_factory=dict, repr=False)
 
-    def add_test_case(self, case: Case, response: GenericResponse) -> None:
+    def add_test_case(self, case: Case, response: Response) -> None:
         """Store test data to reuse it in the future additional tests."""
         for stateful_test in case.operation.get_stateful_tests(response, self.stateful):
             data = self.stateful_tests.setdefault(stateful_test.name, StatefulData(stateful_test))

@@ -15,14 +15,19 @@ from schemathesis.specs.openapi.references import resolve_pointer, UNRESOLVABLE
 DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4, "i\\j": 5, 'k"l': 6, " ": 7, "m~n": 8}
 
 
-@pytest.fixture(scope="module")
-def operation():
+@pytest.fixture
+def operation(openapi_30):
     return APIOperation(
-        "/users/{user_id}", "GET", None, None, verbose_name="GET /users/{user_id}", base_url="http://127.0.0.1:8080/api"
+        "/users/{user_id}",
+        "GET",
+        None,
+        openapi_30,
+        verbose_name="GET /users/{user_id}",
+        base_url="http://127.0.0.1:8080/api",
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def case(operation):
     return Case(
         operation,
@@ -44,7 +49,7 @@ def response():
     return response
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def context(case, response):
     return expressions.ExpressionContext(response=response, case=case)
 

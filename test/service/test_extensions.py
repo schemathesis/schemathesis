@@ -516,7 +516,7 @@ import schemathesis
 
 @schemathesis.check
 def port_check(response, case):
-    value = re.findall("getByDate\(value: (\d+)\)", case.body)[0]
+    value = re.findall("getByDate\(value: (\d+)\)", case.body["query"])[0]
     assert 1 <= int(value) <= 65535, "Invalid port"
 """
     )
@@ -531,6 +531,7 @@ def port_check(response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
+            "--show-trace",
             hooks=module.purebasename,
         )
         == snapshot_cli

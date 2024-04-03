@@ -304,6 +304,7 @@ def from_dict(
     :param dict raw_schema: A schema to load.
     """
     from .schemas import OpenApi30, SwaggerV20
+    from ...transports import get_transport
 
     if not isinstance(raw_schema, dict):
         raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
@@ -338,6 +339,7 @@ def from_dict(
             location=location,
             rate_limiter=rate_limiter,
             sanitize_output=sanitize_output,
+            transport=get_transport(app),
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance
@@ -379,6 +381,7 @@ def from_dict(
             location=location,
             rate_limiter=rate_limiter,
             sanitize_output=sanitize_output,
+            transport=get_transport(app),
         )
         dispatch("after_load_schema", hook_context, instance)
         return instance

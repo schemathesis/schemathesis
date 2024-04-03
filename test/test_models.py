@@ -11,8 +11,9 @@ from schemathesis._compat import MultipleFailures
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
+from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
+from schemathesis.transports import Response, _merge_dict_to, Request
 
 
 @pytest.fixture
@@ -408,7 +409,7 @@ def test_from_case(swagger_20, base_url, expected):
     case = Case(operation, generation_time=0.0, path_parameters={"name": "test"})
     session = requests.Session()
     request = Request.from_case(case, session)
-    assert request.uri == "http://127.0.0.1/api/v3/users/test"
+    assert request.url == "http://127.0.0.1/api/v3/users/test"
 
 
 @pytest.mark.parametrize(
@@ -583,26 +584,6 @@ def test_merge_dict_to():
     data = {"params": {"A": 1}}
     _merge_dict_to(data, "params", {"B": 2})
     assert data == {"params": {"A": 1, "B": 2}}
-
-
-@pytest.mark.parametrize("arg", ("headers", "query_string"))
-def test_call_wsgi_overrides(mocker, arg, openapi_30):
-    spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
-    original = {"A": "X", "B": "X"}
-    case = Case(
-        openapi_30["/users"]["GET"],
-        generation_time=0.0,
-        headers=original,
-        query=original,
-    )
-    # NOTE: Werkzeug does not accept cookies, so no override
-    # When user passes header / query explicitly
-    overridden = {"B": "Y"}
-    try:
-        case.call_wsgi(**{arg: overridden}, base_url="http://127.0.0.1", app=42)
-    except ValueError:
-        pass
-    _assert_override(spy, arg, original, overridden)
 
 
 def test_operation_definition_as_dict():

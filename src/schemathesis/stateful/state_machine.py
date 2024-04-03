@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -18,14 +18,14 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from ..schemas import BaseSchema
-    from ..transports.responses import GenericResponse
+    from ..transports import Response
 
 
 @dataclass
 class StepResult:
     """Output from a single transition of a state machine."""
 
-    response: GenericResponse
+    response: Response
     case: Case
     elapsed: float
 
@@ -148,7 +148,7 @@ class APIStateMachine(RuleBasedStateMachine):
                         case.body["is_fake"] = True
         """
 
-    def after_call(self, response: GenericResponse, case: Case) -> None:
+    def after_call(self, response: Response, case: Case) -> None:
         """Hook method for additional actions with case or response instances.
 
         :param response: Response from the application under test.
@@ -181,7 +181,7 @@ class APIStateMachine(RuleBasedStateMachine):
             # PATCH /users/{user_id} -> 500
         """
 
-    def call(self, case: Case, **kwargs: Any) -> GenericResponse:
+    def call(self, case: Case, **kwargs: Any) -> Response:
         """Make a request to the API.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
@@ -189,13 +189,12 @@ class APIStateMachine(RuleBasedStateMachine):
         :return: Response from the application under test.
 
         Note that WSGI/ASGI applications are detected automatically in this method. Depending on the result of this
-        detection the state machine will call ``call``, ``call_wsgi`` or ``call_asgi`` methods.
+        detection the state machine will call ``call`` methods.
 
         Usually, you don't need to override this method unless you are building a different state machine on top of this
         one and want to customize the transport layer itself.
         """
-        method = self._get_call_method(case)
-        return method(**kwargs)
+        return case.call(**kwargs)
 
     def get_call_kwargs(self, case: Case) -> dict[str, Any]:
         """Create custom keyword arguments that will be passed to the :meth:`Case.call` method.
@@ -214,17 +213,8 @@ class APIStateMachine(RuleBasedStateMachine):
         """
         return {}
 
-    def _get_call_method(self, case: Case) -> Callable:
-        if case.app is not None:
-            from starlette.applications import Starlette
-
-            if isinstance(case.app, Starlette):
-                return case.call_asgi
-            return case.call_wsgi
-        return case.call
-
     def validate_response(
-        self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
+        self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
     ) -> None:
         """Validate an API response.
 
@@ -258,7 +248,7 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks)
 
-    def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
+    def store_result(self, response: Response, case: Case, elapsed: float) -> StepResult:
         return StepResult(response, case, elapsed)
 
 

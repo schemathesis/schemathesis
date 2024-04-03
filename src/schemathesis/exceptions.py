@@ -15,9 +15,8 @@ from .failures import FailureContext
 if TYPE_CHECKING:
     import hypothesis.errors
     from jsonschema import RefResolutionError, ValidationError, SchemaError as JsonSchemaError
-    from .transports.responses import GenericResponse
+    import requests
     from graphql.error import GraphQLFormattedError
-    from requests import RequestException
 
 
 class CheckFailed(AssertionError):
@@ -411,7 +410,7 @@ class SchemaError(RuntimeError):
     type: SchemaErrorType
     message: str
     url: str | None = None
-    response: GenericResponse | None = None
+    response: requests.Response | None = None
     extras: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -532,7 +531,7 @@ def remove_ssl_line_number(text: str) -> str:
     return re.sub(r"\(_ssl\.c:\d+\)", "", text)
 
 
-def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
+def extract_requests_exception_details(exc: requests.RequestException) -> tuple[str, list[str]]:
     from requests.exceptions import SSLError, ConnectionError, ChunkedEncodingError
     from urllib3.exceptions import MaxRetryError
 

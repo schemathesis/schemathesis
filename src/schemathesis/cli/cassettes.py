@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from queue import Queue
 from typing import IO, Any, Generator, Iterator, cast, TYPE_CHECKING
 
+from requests.utils import CaseInsensitiveDict
+
 from ..constants import SCHEMATHESIS_VERSION
 from ..runner import events
 from ..types import RequestCert
@@ -123,11 +125,11 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
     current_id = 1
     stream = file_handle.open()
 
-    def format_header_values(values: list[str]) -> str:
-        return "\n".join(f"      - {json.dumps(v)}" for v in values)
+    def format_header_value(value: str) -> str:
+        return f"      - {json.dumps(value)}"
 
-    def format_headers(headers: dict[str, list[str]]) -> str:
-        return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
+    def format_headers(headers: CaseInsensitiveDict) -> str:
+        return "\n".join(f'      "{name}":\n{format_header_value(value)}' for name, value in headers.items())
 
     def format_check_message(message: str | None) -> str:
         return "~" if message is None else f"{repr(message)}"
@@ -142,26 +144,28 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.body is not None:
+                body = base64.b64encode(request.body).decode()
                 output.write(
                     f"""
     body:
       encoding: 'utf-8'
-      base64_string: '{request.body}'"""
+      base64_string: '{body}'"""
                 )
 
         def format_response_body(output: IO, response: Response) -> None:
             if response.body is not None:
+                body = base64.b64encode(response.body).decode()
                 output.write(
                     f"""    body:
       encoding: '{response.encoding}'
-      base64_string: '{response.body}'"""
+      base64_string: '{body}'"""
                 )
 
     else:
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.body is not None:
-                string = _safe_decode(request.body, "utf8")
+                string = request.body.decode("utf8", "replace")
                 output.write(
                     """
     body:
@@ -173,7 +177,7 @@ def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, q
         def format_response_body(output: IO, response: Response) -> None:
             if response.body is not None:
                 encoding = response.encoding or "utf8"
-                string = _safe_decode(response.body, encoding)
+                string = response.body.decode(encoding, "replace")
                 output.write(
                     f"""    body:
       encoding: '{encoding}'
@@ -205,7 +209,7 @@ http_interactions:"""
   checks:
 {format_checks(interaction.checks)}
   request:
-    uri: '{interaction.request.uri}'
+    uri: '{interaction.request.url}'
     method: '{interaction.request.method}'
     headers:
 {format_headers(interaction.request.headers)}"""
@@ -230,11 +234,6 @@ http_interactions:"""
         else:
             break
     file_handle.close()
-
-
-def _safe_decode(value: str, encoding: str) -> str:
-    """Decode base64-encoded body bytes as a string."""
-    return base64.b64decode(value).decode(encoding, "replace")
 
 
 def write_double_quoted(stream: IO, text: str) -> None:

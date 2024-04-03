@@ -20,7 +20,7 @@ from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .hosts import HostData
 from .metadata import Metadata
 from .models import UploadResponse
-from .serialization import serialize_event
+from .serialization import serialize_event, json_encoder
 
 
 if TYPE_CHECKING:
@@ -41,7 +41,7 @@ class ReportWriter:
 
     def add_json_file(self, name: str, data: Any) -> None:
         buffer = BytesIO()
-        buffer.write(json.dumps(data, separators=(",", ":")).encode())
+        buffer.write(json.dumps(data, separators=(",", ":"), default=json_encoder).encode())
         buffer.seek(0)
         info = tarfile.TarInfo(name=name)
         info.size = len(buffer.getbuffer())

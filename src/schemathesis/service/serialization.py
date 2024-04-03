@@ -1,18 +1,27 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import asdict
 from typing import Any, Callable, Dict, Optional, TypeVar, cast
+
+from requests.utils import CaseInsensitiveDict
 
 from ..exceptions import format_exception
 from ..internal.result import Err, Ok
 from ..internal.transformation import merge_recursively
-from ..models import Response
 from .models import AnalysisSuccess
 from ..runner import events
 from ..runner.serialization import SerializedCase
+from ..transports import Response
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
+
+
+def json_encoder(o: Any) -> Any:
+    if isinstance(o, CaseInsensitiveDict):
+        return dict(o)
+    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
 
 
 def serialize_initialized(event: events.Initialized) -> dict[str, Any] | None:
@@ -74,8 +83,8 @@ def _serialize_case(case: SerializedCase) -> dict[str, Any]:
 def _serialize_response(response: Response) -> dict[str, Any]:
     return {
         "status_code": response.status_code,
-        "headers": response.headers,
-        "body": response.body,
+        "headers": dict(response.headers),
+        "body": base64.b64encode(response.body).decode("utf-8") if response.body is not None else None,
         "encoding": response.encoding,
         "elapsed": response.elapsed,
     }
@@ -95,9 +104,11 @@ def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | 
                     "value": check.value,
                     "request": {
                         "method": check.request.method,
-                        "uri": check.request.uri,
-                        "body": check.request.body,
-                        "headers": check.request.headers,
+                        "uri": check.request.url,
+                        "body": base64.b64encode(check.request.body).decode("utf-8")
+                        if check.request.body is not None
+                        else None,
+                        "headers": dict(check.request.headers),
                     },
                     "response": _serialize_response(check.response) if check.response is not None else None,
                     "example": _serialize_case(check.example),

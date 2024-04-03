@@ -28,32 +28,32 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
 from ..._compat import MultipleFailures
-from ..._override import CaseOverride, set_override_mark, check_no_override_mark
+from ..._override import CaseOverride, check_no_override_mark, set_override_mark
 from ...auths import AuthStorage
-from ...generation import DataGenerationMethod, GenerationConfig
 from ...constants import HTTP_METHODS, NOT_SET
 from ...exceptions import (
     InternalError,
+    OperationNotFound,
     OperationSchemaError,
+    SchemaError,
+    SchemaErrorType,
     UsageError,
     get_missing_content_type_error,
     get_response_parsing_error,
     get_schema_validation_error,
-    SchemaError,
-    SchemaErrorType,
-    OperationNotFound,
 )
+from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
-from ...schemas import BaseSchema, APIOperationMap
+from ...schemas import APIOperationMap, BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type, parse_content_type
-from ...transports.responses import get_json
-from ...types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query, GenericTest
+from ...transports import Response
+from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
 from . import links, serialization
 from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
@@ -74,12 +74,12 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver, resolve_pointer, UNRESOLVABLE
+from .references import RECURSION_DEPTH_LIMIT, UNRESOLVABLE, ConvertingResolver, InliningResolver, resolve_pointer
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
 if TYPE_CHECKING:
-    from ...transports.responses import GenericResponse
+    from ...transports import Response
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
@@ -104,7 +104,7 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
+        self, response: Response, operation: APIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         if stateful == Stateful.links:
             return links.get_links(response, operation, field=self.links_field)
@@ -358,7 +358,7 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
         raise NotImplementedError
 
@@ -453,7 +453,7 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> dict[str, Any] | None:
+    def _get_response_definitions(self, operation: APIOperation, response: Response) -> dict[str, Any] | None:
         try:
             responses = operation.definition.resolved["responses"]
         except KeyError as exc:
@@ -468,7 +468,7 @@ class BaseOpenAPISchema(BaseSchema):
             return responses["default"]
         return None
 
-    def get_headers(self, operation: APIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
+    def get_headers(self, operation: APIOperation, response: Response) -> dict[str, dict[str, Any]] | None:
         definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return None
@@ -568,7 +568,7 @@ class BaseOpenAPISchema(BaseSchema):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.resolved.get("tags")
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
+    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
@@ -599,7 +599,7 @@ class BaseOpenAPISchema(BaseSchema):
             _maybe_raise_one_or_more(errors)
             return None
         try:
-            data = get_json(response)
+            data = response.json()
         except JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)
             context = failures.JSONDecodeErrorContext.from_exception(exc)
@@ -872,7 +872,7 @@ class SwaggerV20(BaseOpenAPISchema):
         # because it is not converted
         return scopes, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
         if produces:
             return produces
@@ -1038,7 +1038,7 @@ class OpenApi30(SwaggerV20):
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return []

@@ -1769,6 +1769,6 @@ def after_init_cli_run_handlers(
 def process_call_kwargs(context: HookContext, case: Case, kwargs: dict[str, Any]) -> None:
     """Called before every network call in CLI tests.
 
-    Aims to modify the argument passed to `case.call` / `case.call_wsgi` / `case.call_asgi`.
+    Aims to modify the argument passed to `case.call`.
     Note that you need to modify `kwargs` in-place.
     """

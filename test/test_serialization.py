@@ -6,7 +6,7 @@ from test.utils import assert_requests_call
 from xml.etree import ElementTree
 
 import pytest
-from hypothesis import HealthCheck, given, settings, Phase
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -18,6 +18,7 @@ from schemathesis.exceptions import (
     UnboundPrefixError,
 )
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.transports import RequestsTransport, WerkzeugTransport
 
 
 def to_csv(data):
@@ -69,18 +70,11 @@ def test_text_csv(api_schema):
     @given(case=api_schema["/csv"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)
     def test(case):
-        if case.app is not None:
-            response = case.call_wsgi()
-        else:
-            response = case.call()
+        response = case.call()
         # Then this serializer should be used
         case.validate_response(response)
         # And data should be successfully sent to the API as CSV
-        if case.app is not None:
-            data = response.json
-        else:
-            data = response.json()
-        assert data == case.body
+        assert response.json() == case.body
 
     test()
 
@@ -121,17 +115,18 @@ def test_in_cli(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url) == snapshot_cli
 
 
-@pytest.mark.parametrize("method", ("as_requests_kwargs", "as_werkzeug_kwargs"))
-def test_serialize_yaml(open_api_3_schema_with_yaml_payload, method):
+@pytest.mark.parametrize("transport", (RequestsTransport(), WerkzeugTransport(app=None)))
+def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
     # See GH-1010
     # When API expects `text/yaml`
     schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
+    schema.transport = transport
 
     @given(case=schema["/yaml"]["POST"].as_strategy())
     @settings(max_examples=1)
     def test(case):
         # Then Schemathesis should generate valid YAML, not JSON with `application/json` media type
-        kwargs = getattr(case, method)()
+        kwargs = case.as_transport_kwargs()
         assert kwargs["headers"]["Content-Type"] == "text/yaml"
         assert kwargs["data"] == "- 42\n"
 
@@ -219,15 +214,16 @@ def test_binary_data(empty_open_api_3_schema, media_type):
     body = b"\x92\x42"
     case = operation.make_case(body=body, media_type=media_type)
     # Then it should be used as is
-    requests_kwargs = case.as_requests_kwargs()
-    assert requests_kwargs["data"] == body
-    werkzeug_kwargs = case.as_werkzeug_kwargs()
-    assert werkzeug_kwargs["data"] == body
-    if media_type != "multipart/form-data":
-        # Don't know the proper header for raw multipart content
-        assert requests_kwargs["headers"]["Content-Type"] == media_type
-        assert werkzeug_kwargs["headers"]["Content-Type"] == media_type
+    original_transport = case.operation.schema.transport
+    for transport in (RequestsTransport(), WerkzeugTransport(app=None)):
+        case.operation.schema.transport = transport
+        kwargs = case.as_transport_kwargs()
+        assert kwargs["data"] == body
+        if media_type != "multipart/form-data":
+            # Don't know the proper header for raw multipart content
+            assert kwargs["headers"]["Content-Type"] == media_type
     # And it is OK to send it over the network
+    case.operation.schema.transport = original_transport
     assert_requests_call(case)
 
 
@@ -337,8 +333,9 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
     @settings(max_examples=1)
     def test(case):
         # Then it should be correctly serialized
-        for method in (case.as_requests_kwargs, case.as_werkzeug_kwargs):
-            data = method()["data"]
+        for transport in (RequestsTransport(), WerkzeugTransport(app=None)):
+            schema.transport = transport
+            data = case.as_transport_kwargs()["data"]
             assert data == expected
             # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
             # it can be parsed.
@@ -452,8 +449,9 @@ def test_serialize_xml_hypothesis(data, schema_object, media_type):
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
     with suppress(SerializationError, UnboundPrefixError):
-        for method in (case.as_requests_kwargs, case.as_werkzeug_kwargs):
-            serialized_data = method()["data"].decode("utf8")
+        for transport in (RequestsTransport(), WerkzeugTransport(app=None)):
+            schema.transport = transport
+            serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
 
 

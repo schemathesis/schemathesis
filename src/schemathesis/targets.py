@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from .models import Case
-    from .transports.responses import GenericResponse
+    from .transports import Response
 
 
 @dataclass
@@ -17,7 +17,8 @@ class TargetContext:
     """
 
     case: Case
-    response: GenericResponse
+    response: Response
+    # TODO: Deprecate - available via `response.elapsed`
     response_time: float
 
 

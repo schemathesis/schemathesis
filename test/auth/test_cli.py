@@ -31,14 +31,14 @@ def test_custom_auth(testdir, cli, schema_url, app, snapshot_cli):
 def after_call(context, case, response):
     assert case.headers["Authorization"] ==  f"Bearer {TOKEN}", case.headers["Authorization"]
     request_authorization = response.request.headers["Authorization"]
-    assert request_authorization == f"Bearer {TOKEN}", request_authorization
+    assert request_authorization == [f"Bearer {TOKEN}"], request_authorization
     note()
     note(request_authorization)
 """
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, "--show-trace", hooks=module.purebasename) == snapshot_cli
 
 
 @pytest.mark.parametrize(

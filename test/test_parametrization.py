@@ -649,7 +649,7 @@ schema = schemathesis.from_uri("{openapi3_schema_url}")
 
 @schema.parametrize()
 def test_(request, case):
-    assert case._get_base_url(None) == "{openapi3_base_url}"
+    assert case.build_base_url(None) == "{openapi3_base_url}"
     case.call()
 """
     )

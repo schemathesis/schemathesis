@@ -1,5 +1,6 @@
 import platform
 
+from schemathesis.transports import WerkzeugTransport
 import strawberry
 
 from test.apps._graphql.schema import Author
@@ -41,14 +42,15 @@ def test_operation_strategy(graphql_strategy):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_as_werkzeug_kwargs(graphql_strategy):
+def test_as_transport_kwargs_werkzeug(graphql_strategy):
     case = graphql_strategy.example()
-    assert case.as_werkzeug_kwargs() == {
+    case.operation.schema.transport = WerkzeugTransport(app=None)
+    assert case.as_transport_kwargs() == {
         "method": "POST",
         "path": "/graphql",
         "query_string": None,
-        "json": {"query": case.body},
-        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
+        "json": case.body,
+        "headers": {"Content-Type": "application/json", "User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
     }
 
 
@@ -104,7 +106,7 @@ def test_response_validation(graphql_schema, response_factory, kwargs, expected)
 
 
 def test_client_error(graphql_schema):
-    case = graphql_schema["Query"]["getBooks"].make_case(body="invalid query")
+    case = graphql_schema["Query"]["getBooks"].make_case(body={"query": "invalid query"})
     with pytest.raises(CheckFailed, match="Syntax Error: Unexpected Name 'invalid'"):
         case.call_and_validate()
 
@@ -280,7 +282,7 @@ def test_type_as_strategy(graphql_schema, type_name):
     strategy = operations.as_strategy()
     for operation in operations.values():
         # All fields should be possible to generate
-        find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+        find(strategy, lambda x, op=operation: op.definition.field_name in x.body["query"])
 
 
 def test_schema_as_strategy(graphql_schema):
@@ -288,4 +290,4 @@ def test_schema_as_strategy(graphql_schema):
     for operations in graphql_schema.values():
         for operation in operations.values():
             # All fields should be possible to generate
-            find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+            find(strategy, lambda x, op=operation: op.definition.field_name in x.body["query"])

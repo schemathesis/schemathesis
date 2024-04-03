@@ -7,7 +7,7 @@ from ...models import TestResultSet
 from ...types import RequestCert
 from ...transports.auth import get_requests_auth
 from .. import events
-from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
+from .core import BaseRunner, get_session, network_test
 
 
 @dataclass
@@ -48,43 +48,3 @@ class SingleThreadRunner(BaseRunner):
                 store_interactions=self.store_interactions,
                 dry_run=self.dry_run,
             )
-
-
-@dataclass
-class SingleThreadWSGIRunner(SingleThreadRunner):
-    def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
-        yield from self._run_tests(
-            maker=self.schema.get_all_tests,
-            template=wsgi_test,
-            settings=self.hypothesis_settings,
-            generation_config=self.generation_config,
-            seed=self.seed,
-            checks=self.checks,
-            max_response_time=self.max_response_time,
-            targets=self.targets,
-            results=results,
-            auth=self.auth,
-            auth_type=self.auth_type,
-            headers=self.headers,
-            store_interactions=self.store_interactions,
-            dry_run=self.dry_run,
-        )
-
-
-@dataclass
-class SingleThreadASGIRunner(SingleThreadRunner):
-    def _execute_impl(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
-        yield from self._run_tests(
-            maker=self.schema.get_all_tests,
-            template=asgi_test,
-            settings=self.hypothesis_settings,
-            generation_config=self.generation_config,
-            seed=self.seed,
-            checks=self.checks,
-            max_response_time=self.max_response_time,
-            targets=self.targets,
-            results=results,
-            headers=self.headers,
-            store_interactions=self.store_interactions,
-            dry_run=self.dry_run,
-        )

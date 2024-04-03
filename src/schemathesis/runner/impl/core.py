@@ -62,6 +62,7 @@ from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
+from ...transports import Response
 from ...types import RawAuth, RequestCert
 from ...utils import capture_hypothesis_output
 from .. import probes
@@ -69,7 +70,6 @@ from ..serialization import SerializedTestResult
 
 if TYPE_CHECKING:
     from ...service.client import ServiceClient
-    from ...transports.responses import GenericResponse, WSGIResponse
 
 
 def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
@@ -668,7 +668,7 @@ def run_checks(
     checks: Iterable[CheckFunction],
     check_results: list[Check],
     result: TestResult,
-    response: GenericResponse,
+    response: Response,
     elapsed_time: float,
     max_response_time: int | None = None,
 ) -> None:
@@ -687,6 +687,7 @@ def run_checks(
         check_name = check.__name__
         copied_case = case.partial_deepcopy()
         try:
+            # todo: add some compat wrapper to avoid breaking checks
             skip_check = check(response, copied_case)
             if not skip_check:
                 check_result = result.add_success(check_name, copied_case, response, elapsed_time)
@@ -722,7 +723,7 @@ def run_targets(targets: Iterable[Callable], context: TargetContext) -> None:
         hypothesis.target(value, label=target.__name__)
 
 
-def add_cases(case: Case, response: GenericResponse, test: Callable, *args: Any) -> None:
+def add_cases(case: Case, response: Response, test: Callable, *args: Any) -> None:
     context = HookContext(case.operation)
     for case_hook in get_all_by_name("add_case"):
         _case = case_hook(context, case.partial_deepcopy(), response)
@@ -832,21 +833,25 @@ def _network_test(
     request_proxy: str | None,
     request_cert: RequestCert | None,
     max_response_time: int | None,
-) -> requests.Response:
+) -> Response:
     check_results: list[Check] = []
     try:
         hook_context = HookContext(operation=case.operation)
-        kwargs: dict[str, Any] = {
-            "session": session,
-            "headers": headers,
-            "timeout": timeout,
-            "verify": request_tls_verify,
-            "cert": request_cert,
-        }
-        if request_proxy is not None:
-            kwargs["proxies"] = {"all": request_proxy}
+        kwargs: dict[str, Any] = case.operation.schema.transport.filter_kwargs(
+            session=session,
+            headers=headers,
+            timeout=timeout,
+            verify=request_tls_verify,
+            cert=request_cert,
+            proxies={"all": request_proxy} if request_proxy is not None else None,
+        )
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-        response = case.call(**kwargs)
+        if case.operation.schema.app is not None:
+            with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
+                response = case.call(**kwargs)
+            result.logs.extend(recorded.records)
+        else:
+            response = case.call(**kwargs)
     except CheckFailed as exc:
         check_name = "request_timeout"
         requests_kwargs = case.as_requests_kwargs(base_url=case.get_full_base_url(), headers=headers)
@@ -857,7 +862,7 @@ def _network_test(
         )
         check_results.append(check_result)
         raise exc
-    context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
+    context = TargetContext(case=case, response=response, response_time=response.elapsed)
     run_targets(targets, context)
     status = Status.success
     try:
@@ -876,7 +881,7 @@ def _network_test(
     finally:
         feedback.add_test_case(case, response)
         if store_interactions:
-            result.store_requests_response(case, response, status, check_results)
+            result.store_response(case, response, status, check_results)
     return response
 
 
@@ -896,84 +901,10 @@ def prepare_timeout(timeout: int | None) -> float | None:
     return output
 
 
-def wsgi_test(
-    case: Case,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    result: TestResult,
-    auth: RawAuth | None,
-    auth_type: str | None,
-    headers: dict[str, Any] | None,
-    store_interactions: bool,
-    feedback: Feedback,
-    max_response_time: int | None,
-    data_generation_methods: list[DataGenerationMethod],
-    dry_run: bool,
-    errors: list[Exception],
-) -> None:
-    with ErrorCollector(errors):
-        _force_data_generation_method(data_generation_methods, case)
-        result.mark_executed()
-        headers = _prepare_wsgi_headers(headers, auth, auth_type)
-        if not dry_run:
-            args = (
-                checks,
-                targets,
-                result,
-                headers,
-                store_interactions,
-                feedback,
-                max_response_time,
-            )
-            response = _wsgi_test(case, *args)
-            add_cases(case, response, _wsgi_test, *args)
-
-
-def _wsgi_test(
-    case: Case,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    result: TestResult,
-    headers: dict[str, Any],
-    store_interactions: bool,
-    feedback: Feedback,
-    max_response_time: int | None,
-) -> WSGIResponse:
-    with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
-        start = time.monotonic()
-        hook_context = HookContext(operation=case.operation)
-        kwargs = {"headers": headers}
-        hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-        response = case.call_wsgi(**kwargs)
-        elapsed = time.monotonic() - start
-    context = TargetContext(case=case, response=response, response_time=elapsed)
-    run_targets(targets, context)
-    result.logs.extend(recorded.records)
-    status = Status.success
-    check_results: list[Check] = []
-    try:
-        run_checks(
-            case=case,
-            checks=checks,
-            check_results=check_results,
-            result=result,
-            response=response,
-            elapsed_time=context.response_time * 1000,
-            max_response_time=max_response_time,
-        )
-    except CheckFailed:
-        status = Status.failure
-        raise
-    finally:
-        feedback.add_test_case(case, response)
-        if store_interactions:
-            result.store_wsgi_response(case, response, headers, elapsed, status, check_results)
-    return response
-
-
 def _prepare_wsgi_headers(
     headers: dict[str, Any] | None, auth: RawAuth | None, auth_type: str | None
 ) -> dict[str, Any]:
+    # todo - should be in transport
     headers = headers or {}
     if "user-agent" not in {header.lower() for header in headers}:
         headers["User-Agent"] = USER_AGENT
@@ -989,74 +920,3 @@ def get_wsgi_auth(auth: RawAuth | None, auth_type: str | None) -> str | None:
             raise ValueError("Digest auth is not supported for WSGI apps")
         return _basic_auth_str(*auth)
     return None
-
-
-def asgi_test(
-    case: Case,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    result: TestResult,
-    store_interactions: bool,
-    headers: dict[str, Any] | None,
-    feedback: Feedback,
-    max_response_time: int | None,
-    data_generation_methods: list[DataGenerationMethod],
-    dry_run: bool,
-    errors: list[Exception],
-) -> None:
-    """A single test body will be executed against the target."""
-    with ErrorCollector(errors):
-        _force_data_generation_method(data_generation_methods, case)
-        result.mark_executed()
-        headers = headers or {}
-
-        if not dry_run:
-            args = (
-                checks,
-                targets,
-                result,
-                store_interactions,
-                headers,
-                feedback,
-                max_response_time,
-            )
-            response = _asgi_test(case, *args)
-            add_cases(case, response, _asgi_test, *args)
-
-
-def _asgi_test(
-    case: Case,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    result: TestResult,
-    store_interactions: bool,
-    headers: dict[str, Any] | None,
-    feedback: Feedback,
-    max_response_time: int | None,
-) -> requests.Response:
-    hook_context = HookContext(operation=case.operation)
-    kwargs: dict[str, Any] = {"headers": headers}
-    hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-    response = case.call_asgi(**kwargs)
-    context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
-    run_targets(targets, context)
-    status = Status.success
-    check_results: list[Check] = []
-    try:
-        run_checks(
-            case=case,
-            checks=checks,
-            check_results=check_results,
-            result=result,
-            response=response,
-            elapsed_time=context.response_time * 1000,
-            max_response_time=max_response_time,
-        )
-    except CheckFailed:
-        status = Status.failure
-        raise
-    finally:
-        feedback.add_test_case(case, response)
-        if store_interactions:
-            result.store_requests_response(case, response, status, check_results)
-    return response

@@ -3,7 +3,6 @@ from flask import jsonify, request
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.models import Case
 
 
 @pytest.fixture()
@@ -45,9 +44,9 @@ def test_cookies(flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = case.call()
         assert response.status_code == 200
-        assert response.json == {"token": "test"}
+        assert response.json() == {"token": "test"}
 
     test()
 
@@ -60,25 +59,12 @@ def test_form_data(schema):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = case.call()
         assert response.status_code == 200
         # converted to string in the app
-        assert response.json == {key: str(value) for key, value in case.body.items()}
+        assert response.json() == {key: str(value) for key, value in case.body.items()}
 
     test()
-
-
-def test_not_wsgi(schema):
-    # When a schema is created without a WSGI app (e.g. from a URL)
-    case = Case(schema["/success"]["GET"], generation_time=0.0)
-    case.operation.app = None
-    # Then an error should be raised if the user tries to use `call_wsgi`
-    with pytest.raises(
-        RuntimeError,
-        match="WSGI application instance is required. "
-        "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`",
-    ):
-        case.call_wsgi()
 
 
 @pytest.mark.hypothesis_nested
@@ -106,9 +92,9 @@ def test_binary_body(mocker, flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = case.call()
         assert response.status_code == 200
-        assert response.json == {"size": mocker.ANY}
+        assert response.json() == {"size": mocker.ANY}
 
     # Then it should be sent correctly
     test()

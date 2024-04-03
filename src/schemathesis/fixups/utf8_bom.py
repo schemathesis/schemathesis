@@ -1,3 +1,4 @@
+from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..constants import BOM_MARK
@@ -7,7 +8,7 @@ from ..hooks import register, unregister
 
 if TYPE_CHECKING:
     from ..models import Case
-    from ..transports.responses import GenericResponse
+    from ..transports import Response
 
 
 def install() -> None:
@@ -22,7 +23,7 @@ def is_installed() -> bool:
     return global_is_installed("after_call", after_call)
 
 
-def after_call(context: HookContext, case: "Case", response: "GenericResponse") -> None:
+def after_call(context: HookContext, case: "Case", response: Response) -> None:
     from requests import Response
 
     if isinstance(response, Response) and response.encoding == "utf-8" and response.text[0:1] == BOM_MARK:

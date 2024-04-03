@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from requests import PreparedRequest
     from .models import Case, CaseSource, Request
     from .runner.serialization import SerializedCase, SerializedCheck, SerializedInteraction
-    from .transports.responses import GenericResponse
+    from .transports import Response
 
 # Exact keys to sanitize
 DEFAULT_KEYS_TO_SANITIZE = frozenset(
@@ -175,7 +175,7 @@ def sanitize_history(source: CaseSource, *, config: Config | None = None) -> Non
         current = current.case.source
 
 
-def sanitize_response(response: GenericResponse, *, config: Config | None = None) -> None:
+def sanitize_response(response: Response, *, config: Config | None = None) -> None:
     # Sanitize headers
     sanitize_value(response.headers, config=config)
 
@@ -187,12 +187,12 @@ def sanitize_request(request: PreparedRequest | Request, *, config: Config | Non
         request.url = sanitize_url(request.url, config=config)
     else:
         request = cast("Request", request)
-        request.uri = sanitize_url(request.uri, config=config)
+        request.url = sanitize_url(request.url, config=config)
     # Sanitize headers
     sanitize_value(request.headers, config=config)
 
 
-def sanitize_output(case: Case, response: GenericResponse | None = None, *, config: Config | None = None) -> None:
+def sanitize_output(case: Case, response: Response | None = None, *, config: Config | None = None) -> None:
     sanitize_case(case, config=config)
     if response is not None:
         sanitize_response(response, config=config)

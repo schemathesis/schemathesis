@@ -23,7 +23,7 @@ from schemathesis.cli.cassettes import (
 )
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.constants import USER_AGENT
-from schemathesis.models import Request
+from schemathesis.transports import Request
 
 
 @pytest.fixture
@@ -358,7 +358,7 @@ def test_multiple_cookies(base_url):
     response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers, timeout=1)
     request = Request.from_prepared_request(response.request)
     serialized = {
-        "uri": request.uri,
+        "uri": request.url,
         "method": request.method,
         "headers": request.headers,
         "body": {"encoding": "utf-8", "base64_string": request.body},

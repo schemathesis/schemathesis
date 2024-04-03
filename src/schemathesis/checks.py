@@ -12,15 +12,14 @@ from .specs.openapi.checks import (
 )
 
 if TYPE_CHECKING:
-    from .transports.responses import GenericResponse
+    from .transports import Response
     from .models import Case, CheckFunction
 
 
-def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
+def not_a_server_error(response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
     from .specs.graphql.schemas import GraphQLCase
     from .specs.graphql.validation import validate_graphql_response
-    from .transports.responses import get_json
 
     status_code = response.status_code
     if status_code >= 500:
@@ -28,7 +27,7 @@ def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
         raise exc_class(failures.ServerError.title, context=failures.ServerError(status_code=status_code))
     if isinstance(case, GraphQLCase):
         try:
-            data = get_json(response)
+            data = response.json()
             validate_graphql_response(data)
         except json.JSONDecodeError as exc:
             exc_class = get_response_parsing_error(exc)

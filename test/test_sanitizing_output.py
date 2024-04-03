@@ -5,8 +5,8 @@ import requests
 from requests import Request, Response
 
 from schemathesis.models import CaseSource, Check
-from schemathesis.models import Request as SerializedRequest
-from schemathesis.models import Response as SerializedResponse
+from schemathesis.transports import Request as SerializedRequest
+from schemathesis.transports import Response as SerializedResponse
 from schemathesis.models import Status
 from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
 from schemathesis.sanitization import (
@@ -145,9 +145,9 @@ def test_sanitize_request_url(request_factory):
 
 
 def test_sanitize_serialized_request():
-    request = SerializedRequest(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={})
+    request = SerializedRequest(method="POST", url="http://user:pass@127.0.0.1/path", body=None, headers={})
     sanitize_request(request)
-    assert request.uri == "http://[Filtered]@127.0.0.1/path"
+    assert request.url == "http://[Filtered]@127.0.0.1/path"
 
 
 def test_sanitize_output(case_factory, request_factory):
@@ -226,7 +226,7 @@ def serialized_check(case_factory, response_factory):
     root_case = case_factory()
     value = "secret"
     root_case.source = CaseSource(
-        case=case_factory(), response=response_factory.requests(headers={"X-Token": value}), elapsed=1.0
+        case=case_factory(), response=response_factory.default(headers={"X-Token": value}), elapsed=1.0
     )
     check = Check(
         name="test",
@@ -246,7 +246,7 @@ def test_sanitize_serialized_check(serialized_check):
 
 def test_sanitize_serialized_interaction(serialized_check):
     request = SerializedRequest(
-        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={"X-Token": "Secret"}
+        method="POST", url="http://user:pass@127.0.0.1/path", body=None, headers={"X-Token": "Secret"}
     )
     response = SerializedResponse(
         status_code=500,
@@ -265,7 +265,7 @@ def test_sanitize_serialized_interaction(serialized_check):
 
     assert interaction.checks[0].example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.checks[0].history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
-    assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
+    assert interaction.request.url == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
     assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
 

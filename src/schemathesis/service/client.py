@@ -13,6 +13,7 @@ from ..constants import USER_AGENT
 from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata, collect_dependency_versions
+from .serialization import json_encoder
 from .models import (
     AnalysisSuccess,
     AnalysisError,
@@ -122,6 +123,7 @@ class ServiceClient(requests.Session):
                 "dependencies": list(map(asdict, dependencies)),
             },
             separators=(",", ":"),
+            default=json_encoder,
         )
         response = self.post("/cli/analysis/", data=content, headers={"Content-Type": "application/json"}, timeout=None)
         if response.status_code == http.HTTPStatus.REQUEST_ENTITY_TOO_LARGE:

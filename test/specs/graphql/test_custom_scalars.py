@@ -30,7 +30,7 @@ type Query {
     @given(schema["Query"]["getByDate"].as_strategy())
     def test(case):
         # Then scalars should be properly generated
-        assert f'getByDate(value: "{expected}")' in case.body
+        assert f'getByDate(value: "{expected}")' in case.body["query"]
 
     test()
 

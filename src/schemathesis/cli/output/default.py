@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import platform
 import shutil
@@ -324,7 +323,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                         else:
                             encoding = check.response.encoding or "utf8"
                             try:
-                                payload = base64.b64decode(response_body).decode(encoding)
+                                payload = response_body.decode(encoding)
                                 payload = prepare_response_payload(payload)
                                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
                                 click.echo(payload)
@@ -345,7 +344,7 @@ def group_by_case(
 
 
 def _by_unique_code_sample(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> str:
-    request_body = base64.b64decode(check.example.body).decode() if check.example.body is not None else None
+    request_body = check.example.body.encode() if check.example.body is not None else None
     return code_sample_style.generate(
         method=check.example.method,
         url=check.example.url,

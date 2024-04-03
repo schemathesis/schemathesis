@@ -20,7 +20,6 @@ from typing import (
 from urllib.parse import urlsplit, urlunsplit
 
 import graphql
-import requests
 from graphql import GraphQLNamedType
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
@@ -49,7 +48,7 @@ from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
-    from ...transports.responses import GenericResponse
+    from ...transports import Response
 
 
 @unique
@@ -60,43 +59,16 @@ class RootType(enum.Enum):
 
 @dataclass(repr=False)
 class GraphQLCase(Case):
-    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        final_headers = self._get_headers(headers)
-        base_url = self._get_base_url(base_url)
+    def get_url(self, base_url: str | None) -> str:
+        base_url = self.build_base_url(base_url)
         # Replace the path, in case if the user provided any path parameters via hooks
         parts = list(urlsplit(base_url))
         parts[2] = self.formatted_path
-        kwargs: dict[str, Any] = {
-            "method": self.method,
-            "url": urlunsplit(parts),
-            "headers": final_headers,
-            "cookies": self.cookies,
-            "params": self.query,
-        }
-        # There is no direct way to have bytes here, but it is a useful pattern to support.
-        # It also unifies GraphQLCase with its Open API counterpart where bytes may come from external examples
-        if isinstance(self.body, bytes):
-            kwargs["data"] = self.body
-            # Assume that the payload is JSON, not raw GraphQL queries
-            kwargs["headers"].setdefault("Content-Type", "application/json")
-        else:
-            kwargs["json"] = {"query": self.body}
-        return kwargs
-
-    def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        final_headers = self._get_headers(headers)
-        return {
-            "method": self.method,
-            "path": self.operation.schema.get_full_path(self.formatted_path),
-            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
-            "headers": dict(final_headers),
-            "query_string": self.query,
-            "json": {"query": self.body},
-        }
+        return urlunsplit(parts)
 
     def validate_response(
         self,
-        response: GenericResponse,
+        response: Response,
         checks: tuple[CheckFunction, ...] = (),
         additional_checks: tuple[CheckFunction, ...] = (),
         excluded_checks: tuple[CheckFunction, ...] = (),
@@ -106,15 +78,6 @@ class GraphQLCase(Case):
         checks += additional_checks
         checks = tuple(check for check in checks if check not in excluded_checks)
         return super().validate_response(response, checks, code_sample_style=code_sample_style)
-
-    def call_asgi(
-        self,
-        app: Any = None,
-        base_url: str | None = None,
-        headers: dict[str, str] | None = None,
-        **kwargs: Any,
-    ) -> requests.Response:
-        return super().call_asgi(app=app, base_url=base_url, headers=headers, **kwargs)
 
 
 C = TypeVar("C", bound=Case)
@@ -264,7 +227,7 @@ class GraphQLSchema(BaseSchema):
         return []
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
+        self, response: Response, operation: APIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         return []
 
@@ -287,7 +250,7 @@ class GraphQLSchema(BaseSchema):
             cookies=cookies,
             query=query,
             body=body,
-            media_type=media_type,
+            media_type=media_type or "application/json",
             generation_time=0.0,
         )
 
@@ -369,10 +332,11 @@ def get_case_strategy(
         headers=headers_,
         cookies=cookies_,
         query=query_,
-        body=body,
+        body={"query": body},
         operation=operation,
         data_generation_method=data_generation_method,
         generation_time=time.monotonic() - start,
+        media_type="application/json",
     )  # type: ignore
     context = auths.AuthContext(
         operation=operation,
