@@ -26,6 +26,7 @@ def operation():
 def case(operation):
     return Case(
         operation,
+        generation_time=0.0,
         path_parameters={"user_id": 5},
         query={"username": "foo"},
         headers={"X-Token": "secret"},

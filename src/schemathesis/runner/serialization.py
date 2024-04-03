@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 class SerializedCase:
     # Case data
     id: str
+    generation_time: float
     path_parameters: dict[str, Any] | None
     headers: dict[str, Any] | None
     cookies: dict[str, Any] | None
@@ -60,6 +61,7 @@ class SerializedCase:
         serialized_body = _serialize_body(request_data.body)
         return cls(
             id=case.id,
+            generation_time=case.generation_time,
             path_parameters=case.path_parameters,
             headers=dict(case.headers) if case.headers is not None else None,
             cookies=case.cookies,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import time
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from enum import unique
@@ -287,6 +288,7 @@ class GraphQLSchema(BaseSchema):
             query=query,
             body=body,
             media_type=media_type,
+            generation_time=0.0,
         )
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
@@ -337,6 +339,7 @@ def get_case_strategy(
     generation_config: GenerationConfig | None = None,
     **kwargs: Any,
 ) -> Any:
+    start = time.monotonic()
     definition = cast(GraphQLOperationDefinition, operation.definition)
     strategy_factory = {
         RootType.QUERY: gql_st.queries,
@@ -369,6 +372,7 @@ def get_case_strategy(
         body=body,
         operation=operation,
         data_generation_method=data_generation_method,
+        generation_time=time.monotonic() - start,
     )  # type: ignore
     context = auths.AuthContext(
         operation=operation,

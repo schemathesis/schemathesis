@@ -125,6 +125,8 @@ class Case:
     """A single test case parameters."""
 
     operation: APIOperation
+    # Time spent on generation of this test case
+    generation_time: float
     # Unique test case identifier
     id: str = field(default_factory=generate_random_case_id, compare=False)
     path_parameters: PathParameters | None = None
@@ -579,6 +581,7 @@ class Case:
             cookies=fast_deepcopy(self.cookies),
             query=fast_deepcopy(self.query),
             body=fast_deepcopy(self.body),
+            generation_time=self.generation_time,
         )
 
 

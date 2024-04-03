@@ -125,8 +125,12 @@ def test_handle_initialized(capsys, mocker, execution_context, results_set, swag
 
 def test_display_statistic(capsys, swagger_20, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation))
-    failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation))
+    success = models.Check(
+        "not_a_server_error", models.Status.success, response, 0, models.Case(operation, generation_time=0.0)
+    )
+    failure = models.Check(
+        "not_a_server_error", models.Status.failure, response, 0, models.Case(operation, generation_time=0.0)
+    )
     single_test_statistic = models.TestResult(
         method=operation.method,
         path=operation.full_path,
@@ -138,7 +142,9 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
             success,
             failure,
             failure,
-            models.Check("different_check", models.Status.success, response, 0, models.Case(operation)),
+            models.Check(
+                "different_check", models.Status.success, response, 0, models.Case(operation, generation_time=0.0)
+            ),
         ],
     )
     results = models.TestResultSet(seed=42, results=[single_test_statistic])
@@ -232,8 +238,12 @@ def test_display_hypothesis_output(capsys):
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, NOT_SET))
 def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
-    success = models.Check("not_a_server_error", models.Status.success, response, 0, models.Case(operation, body=body))
-    failure = models.Check("not_a_server_error", models.Status.failure, response, 0, models.Case(operation, body=body))
+    success = models.Check(
+        "not_a_server_error", models.Status.success, response, 0, models.Case(operation, generation_time=0.0, body=body)
+    )
+    failure = models.Check(
+        "not_a_server_error", models.Status.failure, response, 0, models.Case(operation, generation_time=0.0, body=body)
+    )
     test_statistic = models.TestResult(
         method=operation.method,
         path=operation.full_path,
@@ -245,7 +255,13 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
             success,
             failure,
             failure,
-            models.Check("different_check", models.Status.success, response, 0, models.Case(operation, body=body)),
+            models.Check(
+                "different_check",
+                models.Status.success,
+                response,
+                0,
+                models.Case(operation, generation_time=0.0, body=body),
+            ),
         ],
     )
     # When this failure is displayed

@@ -27,7 +27,7 @@ def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
     operation = models.APIOperation(
         "/path", "GET", definition=OperationDefinition(definition, definition, None, []), schema=schema
     )
-    return models.Case(operation)
+    return models.Case(operation, generation_time=0.0)
 
 
 @pytest.fixture()
@@ -187,7 +187,7 @@ def test_content_type_conformance_another_status_code(response_factory):
 def assert_content_type_conformance(response_factory, raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
     operation = schema["/users"]["get"]
-    case = models.Case(operation)
+    case = models.Case(operation, generation_time=0.0)
     response = response_factory.requests(content_type=content_type)
     if not is_error:
         assert content_type_conformance(response, case) is None
@@ -250,7 +250,7 @@ def test_invalid_schema_on_content_type_check(response_factory):
         validate_schema=False,
     )
     operation = schema["/users"]["get"]
-    case = models.Case(operation)
+    case = models.Case(operation, generation_time=0.0)
     response = response_factory.requests(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(OperationSchemaError):

@@ -60,6 +60,8 @@ def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] 
 
 def _serialize_case(case: SerializedCase) -> dict[str, Any]:
     return {
+        "id": case.id,
+        "generation_time": case.generation_time,
         "verbose_name": case.verbose_name,
         "path_template": case.path_template,
         "path_parameters": stringify_path_parameters(case.path_parameters),

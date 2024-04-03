@@ -223,6 +223,7 @@ def test_case_partial_deepcopy(swagger_20):
     media_type = "application/json"
     original_case = Case(
         operation=operation,
+        generation_time=0.0,
         media_type=media_type,
         path_parameters={"test": "test"},
         headers={"Content-Type": "application/json"},
@@ -252,6 +253,7 @@ def test_case_partial_deepcopy_same_generated_code(swagger_20):
     operation = APIOperation("/example/path", "GET", {}, swagger_20)
     original_case = Case(
         operation=operation,
+        generation_time=0.0,
         media_type="application/json",
         path_parameters={"test": "test"},
         headers={"Content-Type": "application/json"},
@@ -267,11 +269,11 @@ def test_case_partial_deepcopy_same_generated_code(swagger_20):
 
 def test_case_partial_deepcopy_source(swagger_20):
     operation = APIOperation("/example/path", "GET", {}, swagger_20)
-    original_case = Case(operation=operation)
+    original_case = Case(operation=operation, generation_time=0.0)
     response = requests.Response()
     response.status_code = 500
     original_case.source = CaseSource(
-        case=Case(operation=operation, query={"first": 1}), response=response, elapsed=1.0
+        case=Case(operation=operation, generation_time=0.0, query={"first": 1}), response=response, elapsed=1.0
     )
     copied_case = original_case.partial_deepcopy()
     assert copied_case.source.case.query == original_case.source.case.query
@@ -403,7 +405,7 @@ def test_response_from_requests(base_url):
 )
 def test_from_case(swagger_20, base_url, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(operation, path_parameters={"name": "test"})
+    case = Case(operation, generation_time=0.0, path_parameters={"name": "test"})
     session = requests.Session()
     request = Request.from_case(case, session)
     assert request.uri == "http://127.0.0.1/api/v3/users/test"
@@ -428,7 +430,7 @@ def test_method_suggestion(swagger_20):
 
 def test_deprecated_attribute(swagger_20):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(operation)
+    case = Case(operation, generation_time=0.0)
     with pytest.warns(Warning) as records:
         assert case.endpoint == case.operation == operation
     assert str(records[0].message) == (
@@ -563,6 +565,7 @@ def test_call_overrides(mocker, arg, openapi_30):
     original = {"A": "X", "B": "X"}
     case = Case(
         openapi_30["/users"]["GET"],
+        generation_time=0.0,
         headers=original,
         cookies=original,
         query=original,
@@ -588,6 +591,7 @@ def test_call_wsgi_overrides(mocker, arg, openapi_30):
     original = {"A": "X", "B": "X"}
     case = Case(
         openapi_30["/users"]["GET"],
+        generation_time=0.0,
         headers=original,
         query=original,
     )

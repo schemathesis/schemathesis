@@ -1,5 +1,6 @@
 from __future__ import annotations
 import string
+import time
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
@@ -131,6 +132,7 @@ def get_case_strategy(
     The primary purpose of this behavior is to prevent sending incomplete explicit examples by generating missing parts
     as it works with `body`.
     """
+    start = time.monotonic()
     strategy_factory = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
 
     context = HookContext(operation)
@@ -193,6 +195,7 @@ def get_case_strategy(
             reject()
     instance = Case(
         operation=operation,
+        generation_time=time.monotonic() - start,
         media_type=media_type,
         path_parameters=path_parameters_.value,
         headers=CaseInsensitiveDict(headers_.value) if headers_.value is not None else headers_.value,

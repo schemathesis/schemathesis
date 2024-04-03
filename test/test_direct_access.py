@@ -1,3 +1,5 @@
+from unittest.mock import ANY
+
 import pytest
 from hypothesis import strategies as st
 
@@ -46,7 +48,9 @@ def test_as_strategy(swagger_20):
     operation = swagger_20["/users"]["GET"]
     strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(operation, data_generation_method=DataGenerationMethod.positive)
+    assert strategy.example() == Case(
+        operation, generation_time=ANY, data_generation_method=DataGenerationMethod.positive
+    )
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

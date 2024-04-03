@@ -40,7 +40,7 @@ LINK = Link(
 
 @pytest.fixture(scope="module")
 def case():
-    return Case(API_OPERATION)
+    return Case(API_OPERATION, generation_time=0.0)
 
 
 @pytest.fixture(scope="module")

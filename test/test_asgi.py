@@ -89,7 +89,7 @@ def test_null_byte(fastapi_app):
 
 
 def test_not_app_with_asgi(schema):
-    case = Case(schema["/users"]["GET"])
+    case = Case(schema["/users"]["GET"], generation_time=0.0)
     case.operation.app = None
     with pytest.raises(
         RuntimeError,

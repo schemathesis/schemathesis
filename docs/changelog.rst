@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.26.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Store time needed to generate each test case.
+
 **Fixed**
 
 - ``InvalidArgument`` when using ``from_pytest_fixture`` with parametrized pytest fixtures and Hypothesis settings. :issue:`2115`
