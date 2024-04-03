@@ -21,7 +21,9 @@ def test_as_curl_command(case: Case, headers, curl):
 
 
 def test_non_utf_8_body(curl):
-    case = Case(operation=schema["/users"]["GET"], body=b"42\xff", media_type="application/octet-stream")
+    case = Case(
+        operation=schema["/users"]["GET"], generation_time=0.0, body=b"42\xff", media_type="application/octet-stream"
+    )
     command = case.as_curl_command()
     assert command == "curl -X GET -H 'Content-Type: application/octet-stream' -d '42�' http://localhost/users"
     curl.assert_valid(command)
@@ -30,7 +32,9 @@ def test_non_utf_8_body(curl):
 def test_json_payload(curl):
     new_app = create_app(operations=["create_user"])
     schema = schemathesis.from_dict(new_app.openapi(), force_schema_version="30")
-    case = Case(operation=schema["/users/"]["POST"], body={"foo": 42}, media_type="application/json")
+    case = Case(
+        operation=schema["/users/"]["POST"], generation_time=0.0, body={"foo": 42}, media_type="application/json"
+    )
     command = case.as_curl_command()
     assert command == "curl -X POST -H 'Content-Type: application/json' -d '{\"foo\": 42}' http://localhost/users/"
     curl.assert_valid(command)
@@ -40,7 +44,7 @@ def test_explicit_headers(curl):
     # When the generated case contains a header from the list of headers that are ignored by default
     name = "Accept"
     value = "application/json"
-    case = Case(operation=schema["/users"]["GET"], headers={name: value})
+    case = Case(operation=schema["/users"]["GET"], generation_time=0.0, headers={name: value})
     command = case.as_curl_command()
     assert command == f"curl -X GET -H '{name}: {value}' http://localhost/users"
     curl.assert_valid(command)

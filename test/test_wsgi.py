@@ -70,7 +70,7 @@ def test_form_data(schema):
 
 def test_not_wsgi(schema):
     # When a schema is created without a WSGI app (e.g. from a URL)
-    case = Case(schema["/success"]["GET"])
+    case = Case(schema["/success"]["GET"], generation_time=0.0)
     case.operation.app = None
     # Then an error should be raised if the user tries to use `call_wsgi`
     with pytest.raises(
