@@ -73,16 +73,16 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     if is_older_subtests:
         expected = [
-            r"test_invalid_operation.py::test_[GET /v1/valid] PASSED                   [ 25%]",
-            r"test_invalid_operation.py::test_[GET /v1/invalid] FAILED                 [ 50%]",
-            r"test_invalid_operation.py::test_[GET /v1/users] PASSED                   [ 75%]",
+            r"test_invalid_operation.py::test_\[GET /v1/valid\] PASSED *\[ 25%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/invalid\] FAILED *\[ 50%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/users\] PASSED *\[ 75%\]",
             r".*1 passed",
         ]
     else:
         expected = [
-            r"test_invalid_operation.py::test_[GET /v1/valid] SUBPASS                  [ 25%]",
-            r"test_invalid_operation.py::test_[GET /v1/invalid] SUBFAIL                [ 50%]",
-            r"test_invalid_operation.py::test_[GET /v1/users] SUBPASS                  [ 75%]",
+            r"test_invalid_operation.py::test_\[GET /v1/valid\] SUBPASS +\[ 25%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/invalid\] SUBFAIL +\[ 50%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/users\] SUBPASS +\[ 75%\]",
             r".*1 passed",
         ]
     result.stdout.re_match_lines(expected)
