@@ -508,7 +508,8 @@ def test_b(case):
     result.assert_outcomes(passed=2)
 
 
-def test_parametrized_fixture(testdir, openapi3_base_url, is_older_subtests):
+@pytest.mark.parametrize("settings", ("", "@settings(deadline=None)"))
+def test_parametrized_fixture(testdir, openapi3_base_url, is_older_subtests, settings):
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
@@ -521,6 +522,7 @@ def parametrized_lazy_schema(request):
 lazy_schema = schemathesis.from_pytest_fixture("parametrized_lazy_schema")
 
 @lazy_schema.parametrize()
+{settings}
 def test_(case):
     case.call()
 """,

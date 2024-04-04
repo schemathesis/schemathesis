@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.26.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- ``InvalidArgument`` when using ``from_pytest_fixture`` with parametrized pytest fixtures and Hypothesis settings. :issue:`2115`
+
 .. _v3.26.0:
 
 :version:`3.26.0 <v3.25.6...v3.26.0>` - 2024-03-21

@@ -77,7 +77,16 @@ def create_test(
             wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
     setup_default_deadline(wrapped_test)
     if settings is not None:
-        wrapped_test = settings(wrapped_test)
+        existing_settings = _get_hypothesis_settings(wrapped_test)
+        if existing_settings is not None:
+            # Merge the user-provided settings with the current ones
+            default = hypothesis.settings.default
+            wrapped_test._hypothesis_internal_use_settings = hypothesis.settings(
+                wrapped_test._hypothesis_internal_use_settings,
+                **{item: value for item, value in settings.__dict__.items() if value != getattr(default, item)},
+            )
+        else:
+            wrapped_test = settings(wrapped_test)
     existing_settings = _get_hypothesis_settings(wrapped_test)
     if existing_settings is not None:
         existing_settings = remove_explain_phase(existing_settings)
