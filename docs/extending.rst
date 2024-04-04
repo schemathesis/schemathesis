@@ -24,7 +24,13 @@ They can be used to limit the test input to certain criteria, modify the generat
         return query["key"] != "42"
 
 Hooks are identified and applied based on their function name, utilized through a decorator, like ``@schemathesis.hook``. 
-The function name, such as ``filter_query``, indicates it's a hook to filter query parameters. 
+The function name, such as ``filter_query``, indicates it's a hook to filter query parameters.
+
+.. note::
+
+    The second argument could be ``None`` if there are no parameters of such a kind or if it is optional.
+    Keep it in mind when acessing the keys of the dictionary.
+
 When dealing with multiple hooks that serve similar purposes, especially across different schemas within the same file, custom names can be assigned as the first argument in the decorator to avoid conflicts and maintain clarity.
 
 .. code:: python
