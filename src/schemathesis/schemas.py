@@ -423,7 +423,7 @@ class BaseSchema(Mapping):
         """Limit the rate of sending generated requests."""
         label = urlparse(self.base_url).netloc
         if self.rate_limiter is not None:
-            return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
+            return self.rate_limiter.ratelimit.try_acquire(label)
         return nullcontext()
 
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:

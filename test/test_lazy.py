@@ -909,9 +909,8 @@ lazy_schema = schemathesis.from_pytest_fixture("api_schema", rate_limit="1/s")
 @lazy_schema.parametrize()
 def test_(case):
     limiter = case.operation.schema.rate_limiter
-    rate = limiter._rates[0]
-    assert rate.interval == 1
-    assert rate.limit == 1
+    assert limiter.bucket_factory.bucket.rates[0].limit == 1
+    assert limiter.bucket_factory.bucket.rates[0].interval == 1000
 """,
     )
     result = testdir.runpytest()

@@ -1,7 +1,7 @@
 import threading
 
 import pytest
-from pyrate_limiter import BucketFullException, RequestRate
+from pyrate_limiter import BucketFullException, Rate, RateItem
 
 import schemathesis.graphql
 
@@ -16,9 +16,11 @@ import schemathesis.graphql
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_maximum_requests(request, loader, fixture, mocker):
+    
+    rate_item = RateItem("test_item", timestamp=None)
     mocker.patch(
         "pyrate_limiter.limit_context_decorator.LimitContextDecorator.delay_or_reraise",
-        side_effect=BucketFullException("41", RequestRate(5, 3600), 0.0),
+        side_effect=BucketFullException(rate_item, Rate(5, 3600)),
     )
     url = request.getfixturevalue(fixture)
     schema = loader(url, rate_limit="5/h")
