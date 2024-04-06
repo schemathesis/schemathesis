@@ -43,7 +43,9 @@ StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationC
 
 
 def header_values(blacklist_characters: str = "\n\r") -> st.SearchStrategy[str]:
-    return st.text(alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters="\n\r"))
+    return st.text(
+        alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters=blacklist_characters)
+    )
 
 
 @lru_cache
