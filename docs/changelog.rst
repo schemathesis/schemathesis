@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.26.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Excluding ``\x00`` bytes as a result of probes.
+
 .. _v3.26.1:
 
 :version:`3.26.1 <v3.26.0...v3.26.1>` - 2024-04-04
