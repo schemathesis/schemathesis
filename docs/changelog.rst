@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.26.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support for ``pyrate-limiter>=3.0``.
+
 **Fixed**
 
 - Excluding ``\x00`` bytes as a result of probes.

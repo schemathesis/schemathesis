@@ -34,8 +34,8 @@ def invalid_rate(value: str) -> UsageError:
 
 
 def build_limiter(rate: str) -> Limiter:
-    from pyrate_limiter import Limiter, RequestRate
+    from ._rate_limiter import Limiter, Rate
 
     limit, interval = parse_units(rate)
-    rate = RequestRate(limit, interval)
+    rate = Rate(limit, interval)
     return Limiter(rate)
