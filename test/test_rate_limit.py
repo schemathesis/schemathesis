@@ -1,9 +1,11 @@
 import threading
 
 import pytest
-from pyrate_limiter import BucketFullException, Rate, RateItem
+from pyrate_limiter import BucketFullException
 
 import schemathesis.graphql
+from schemathesis._rate_limiter import Rate
+from schemathesis._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
 
 
 @pytest.mark.parametrize(
@@ -16,12 +18,16 @@ import schemathesis.graphql
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_maximum_requests(request, loader, fixture, mocker):
-    
-    rate_item = RateItem("test_item", timestamp=None)
-    mocker.patch(
-        "pyrate_limiter.limit_context_decorator.LimitContextDecorator.delay_or_reraise",
-        side_effect=BucketFullException(rate_item, Rate(5, 3600)),
-    )
+    if IS_PYRATE_LIMITER_ABOVE_3:
+        from pyrate_limiter import RateItem
+
+        target = "pyrate_limiter.limiter.Limiter.delay_or_raise"
+        rate_item = RateItem("test_item", timestamp=None)
+        side_effect = BucketFullException(rate_item, Rate(5, 3600))
+    else:
+        target = "pyrate_limiter.limit_context_decorator.LimitContextDecorator.delay_or_reraise"
+        side_effect = BucketFullException("41", Rate(5, 3600), 0.0)
+    mocker.patch(target, side_effect=side_effect)
     url = request.getfixturevalue(fixture)
     schema = loader(url, rate_limit="5/h")
     counter = 0

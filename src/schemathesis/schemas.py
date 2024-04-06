@@ -40,6 +40,7 @@ from .generation import (
     DataGenerationMethodInput,
     GenerationConfig,
 )
+from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
 from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .internal.result import Result, Ok
@@ -423,7 +424,10 @@ class BaseSchema(Mapping):
         """Limit the rate of sending generated requests."""
         label = urlparse(self.base_url).netloc
         if self.rate_limiter is not None:
-            return self.rate_limiter.ratelimit.try_acquire(label)
+            if IS_PYRATE_LIMITER_ABOVE_3:
+                self.rate_limiter.try_acquire(label)
+            else:
+                return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
         return nullcontext()
 
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:

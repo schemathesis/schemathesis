@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
+
 
 def test_default(testdir):
     # When LazySchema is used
@@ -898,6 +900,17 @@ def test_(case):
 
 @pytest.mark.operations("success")
 def test_rate_limit(testdir, openapi3_schema_url):
+    if IS_PYRATE_LIMITER_ABOVE_3:
+        assertion = """
+    assert limiter.bucket_factory.bucket.rates[0].limit == 1
+    assert limiter.bucket_factory.bucket.rates[0].interval == 1000
+"""
+    else:
+        assertion = """
+    rate = limiter._rates[0]
+    assert rate.interval == 1
+    assert rate.limit == 1
+        """
     testdir.make_test(
         f"""
 @pytest.fixture
@@ -909,8 +922,7 @@ lazy_schema = schemathesis.from_pytest_fixture("api_schema", rate_limit="1/s")
 @lazy_schema.parametrize()
 def test_(case):
     limiter = case.operation.schema.rate_limiter
-    assert limiter.bucket_factory.bucket.rates[0].limit == 1
-    assert limiter.bucket_factory.bucket.rates[0].interval == 1000
+    {assertion}
 """,
     )
     result = testdir.runpytest()
