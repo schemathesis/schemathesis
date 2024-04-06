@@ -16,3 +16,6 @@ IS_PYTEST_ABOVE_8 = PYTEST_VERSION >= version.parse("8.0.0")
 
 HYPOTHESIS_VERSION = version.parse(metadata.version("hypothesis"))
 HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS = HYPOTHESIS_VERSION >= version.parse("6.98.14")
+
+PYRATE_LIMITER_VERSION = version.parse(metadata.version("pyrate-limiter"))
+IS_PYRATE_LIMITER_ABOVE_3 = PYRATE_LIMITER_VERSION >= version.parse("3.0")

@@ -42,7 +42,7 @@ dependencies = [
     "hypothesis_jsonschema>=0.23.1,<0.24",
     "jsonschema>=4.18.0,<5.0",
     "junit-xml>=1.9,<2.0",
-    "pyrate-limiter>=2.10,<3.0",
+    "pyrate-limiter>=2.10,<4.0",
     "pytest-subtests>=0.2.1,<0.8.0",
     "pytest>=4.6.4,<9",
     "PyYAML>=5.1,<7.0",
@@ -160,6 +160,7 @@ known-third-party = ["_pytest", "aiohttp", "click", "fastapi", "flask", "graphen
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
 "_compat.py" = ["F401"]
+"_rate_limiter.py" = ["F401"]
 
 [tool.ruff.format]
 skip-magic-trailing-comma = false
