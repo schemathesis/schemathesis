@@ -55,7 +55,8 @@ class Transport(Protocol[S, R]):
         headers: dict[str, Any] | None = None,
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
-    ) -> dict[str, Any]: ...
+    ) -> dict[str, Any]:
+        raise NotImplementedError
 
     def send(
         self,
@@ -67,7 +68,8 @@ class Transport(Protocol[S, R]):
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> R: ...
+    ) -> R:
+        raise NotImplementedError
 
 
 class RequestsTransport:
