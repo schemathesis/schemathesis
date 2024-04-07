@@ -20,7 +20,6 @@ from typing import (
 from urllib.parse import urlsplit, urlunsplit
 
 import graphql
-import requests
 from graphql import GraphQLNamedType
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
@@ -112,15 +111,6 @@ class GraphQLCase(Case):
         checks += additional_checks
         checks = tuple(check for check in checks if check not in excluded_checks)
         return super().validate_response(response, checks, code_sample_style=code_sample_style)
-
-    def call_asgi(
-        self,
-        app: Any = None,
-        base_url: str | None = None,
-        headers: dict[str, str] | None = None,
-        **kwargs: Any,
-    ) -> requests.Response:
-        return super().call_asgi(app=app, base_url=base_url, headers=headers, **kwargs)
 
 
 C = TypeVar("C", bound=Case)

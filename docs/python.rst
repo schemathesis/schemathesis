@@ -398,7 +398,7 @@ In the following example we test a hypothetical ``/api/auth/password/reset/`` op
             case.body["token"] = data.draw(
                 (st.emails() | st.just(user.email)).map(create_reset_password_token)
             )
-        response = case.call_asgi(app=app)
+        response = case.call()
         case.validate_response(response)
 
 Here we use the special `data strategy <https://hypothesis.readthedocs.io/en/latest/data.html#drawing-interactively-in-tests>`_ to change the ``case`` data in ~50% cases.
