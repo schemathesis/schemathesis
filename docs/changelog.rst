@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.26.2...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- ``Case.as_transport_kwargs`` method to simplify the creation of transport-specific keyword arguments for sending requests.
+
 **Changed**
 
 - Make ``Case.call`` work with ``ASGI`` & ``WSGI`` applications.
@@ -11,6 +15,7 @@ Changelog
 **Deprecated**
 
 - ``Case.call_wsgi`` & ``Case.call_asgi`` in favor of ``Case.call``.
+- ``Case.as_requests_kwargs`` & ``Case.as_werkzeug_kwargs`` in favor of ``Case.as_transport_kwargs``.
 
 .. _v3.26.2:
 
