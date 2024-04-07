@@ -41,7 +41,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
     assert case.operation.definition.field_name in case.body
-    response = case.call_wsgi()
+    response = case.call()
     assert response.status_code == 200
     case.validate_response(response)
 """,

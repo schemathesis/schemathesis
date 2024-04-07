@@ -48,7 +48,7 @@ def test_as_werkzeug_kwargs(graphql_strategy):
         "path": "/graphql",
         "query_string": None,
         "json": {"query": case.body},
-        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
+        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY, "Content-Type": "application/json"},
     }
 
 

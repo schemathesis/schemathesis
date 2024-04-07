@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -189,13 +189,12 @@ class APIStateMachine(RuleBasedStateMachine):
         :return: Response from the application under test.
 
         Note that WSGI/ASGI applications are detected automatically in this method. Depending on the result of this
-        detection the state machine will call ``call``, ``call_wsgi`` or ``call_asgi`` methods.
+        detection the state machine will call the ``call`` method.
 
         Usually, you don't need to override this method unless you are building a different state machine on top of this
         one and want to customize the transport layer itself.
         """
-        method = self._get_call_method(case)
-        return method(**kwargs)
+        return case.call(**kwargs)
 
     def get_call_kwargs(self, case: Case) -> dict[str, Any]:
         """Create custom keyword arguments that will be passed to the :meth:`Case.call` method.
@@ -213,15 +212,6 @@ class APIStateMachine(RuleBasedStateMachine):
         The above example disables the server's TLS certificate verification.
         """
         return {}
-
-    def _get_call_method(self, case: Case) -> Callable:
-        if case.app is not None:
-            from starlette.applications import Starlette
-
-            if isinstance(case.app, Starlette):
-                return case.call_asgi
-            return case.call_wsgi
-        return case.call
 
     def validate_response(
         self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()

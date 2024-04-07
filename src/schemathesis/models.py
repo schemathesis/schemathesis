@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import datetime
 import inspect
 import textwrap
@@ -6,7 +7,7 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import partial, lru_cache
+from functools import lru_cache, partial
 from itertools import chain
 from logging import LogRecord
 from typing import (
@@ -25,51 +26,48 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-from urllib3.exceptions import ReadTimeoutError
-
-from . import failures, serializers
+from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
-from .generation import DataGenerationMethod, GenerationConfig
 from .constants import (
-    DEFAULT_RESPONSE_TIMEOUT,
+    NOT_SET,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
-    NOT_SET,
 )
 from .exceptions import (
-    maybe_set_assertion_message,
     CheckFailed,
     FailureContext,
     OperationSchemaError,
     SerializationNotPossible,
+    SkipTest,
     deduplicate_failed_checks,
     get_grouped_exception,
-    get_timeout_error,
+    maybe_set_assertion_message,
     prepare_response_payload,
-    SkipTest,
 )
-from .internal.deprecation import deprecated_property
-from .internal.copy import fast_deepcopy
+from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
+from .internal.copy import fast_deepcopy
+from .internal.deprecation import deprecated_property, deprecated_function
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
-from .serializers import Serializer, SerializerContext
-from .transports import serialize_payload
+from .serializers import Serializer
+from .transports import ASGITransport, RequestsTransport, WSGITransport, serialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .generation import generate_random_case_id
 
 if TYPE_CHECKING:
-    import werkzeug
     import unittest
-    from requests.structures import CaseInsensitiveDict
-    from hypothesis import strategies as st
+
     import requests.auth
-    from .transports.responses import GenericResponse, WSGIResponse
+    import werkzeug
+    from hypothesis import strategies as st
+    from requests.structures import CaseInsensitiveDict
+
     from .schemas import BaseSchema
     from .stateful import Stateful, StatefulTest
+    from .transports.responses import GenericResponse, WSGIResponse
 
 
 @dataclass
@@ -86,7 +84,7 @@ class CaseSource:
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     """Reject the current example if we don't know how to send this data to the application."""
-    from hypothesis import note, event, reject
+    from hypothesis import event, note, reject
 
     event_text = f"Can't serialize data to `{media_type}`."
     note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
@@ -210,7 +208,7 @@ class Case:
 
     def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
         base_url = self.get_full_base_url()
-        kwargs = self.as_requests_kwargs(base_url, headers=headers)
+        kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
         return prepare_request_data(kwargs)
 
     def get_code_to_reproduce(
@@ -286,40 +284,12 @@ class Case:
             return cls()
         return None
 
+    def _get_body(self) -> Body | NotSet:
+        return self.body
+
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
-        final_headers = self._get_headers(headers)
-        if self.media_type and self.media_type != "multipart/form-data" and not isinstance(self.body, NotSet):
-            # `requests` will handle multipart form headers with the proper `boundary` value.
-            if "content-type" not in {header.lower() for header in final_headers}:
-                final_headers["Content-Type"] = self.media_type
-        base_url = self._get_base_url(base_url)
-        formatted_path = self.formatted_path.lstrip("/")
-        if not base_url.endswith("/"):
-            base_url += "/"
-        url = unquote(urljoin(base_url, quote(formatted_path)))
-        extra: dict[str, Any]
-        serializer = self._get_serializer()
-        if serializer is not None and not isinstance(self.body, NotSet):
-            context = SerializerContext(case=self)
-            extra = serializer.as_requests(context, self.body)
-        else:
-            extra = {}
-        if self._auth is not None:
-            extra["auth"] = self._auth
-        additional_headers = extra.pop("headers", None)
-        if additional_headers:
-            # Additional headers, needed for the serializer
-            for key, value in additional_headers.items():
-                final_headers.setdefault(key, value)
-        return {
-            "method": self.method,
-            "url": url,
-            "cookies": self.cookies,
-            "headers": final_headers,
-            "params": self.query,
-            **extra,
-        }
+        return RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
 
     def call(
         self,
@@ -329,83 +299,20 @@ class Case:
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> requests.Response:
-        import requests
-
-        """Make a network call with `requests`."""
+    ) -> GenericResponse:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
-        data = self.as_requests_kwargs(base_url, headers)
-        data.update(kwargs)
-        if params is not None:
-            _merge_dict_to(data, "params", params)
-        if cookies is not None:
-            _merge_dict_to(data, "cookies", cookies)
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
-        if session is None:
-            validate_vanilla_requests_kwargs(data)
-            session = requests.Session()
-            close_session = True
-        else:
-            close_session = False
-        verify = data.get("verify", True)
-        try:
-            with self.operation.schema.ratelimit():
-                response = session.request(**data)  # type: ignore
-        except (requests.Timeout, requests.ConnectionError) as exc:
-            if isinstance(exc, requests.ConnectionError):
-                if not isinstance(exc.args[0], ReadTimeoutError):
-                    raise
-                req = requests.Request(
-                    method=data["method"].upper(),
-                    url=data["url"],
-                    headers=data["headers"],
-                    files=data.get("files"),
-                    data=data.get("data") or {},
-                    json=data.get("json"),
-                    params=data.get("params") or {},
-                    auth=data.get("auth"),
-                    cookies=data["cookies"],
-                    hooks=data.get("hooks"),
-                )
-                request = session.prepare_request(req)
-            else:
-                request = cast(requests.PreparedRequest, exc.request)
-            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
-            message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
-            raise get_timeout_error(timeout)(
-                f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_message}",
-                context=failures.RequestTimeout(message=message, timeout=timeout),
-            ) from None
-        response.verify = verify  # type: ignore[attr-defined]
+        response = self.operation.schema.transport.send(
+            self, session=session, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
+        )
         dispatch("after_call", hook_context, self, response)
-        if close_session:
-            session.close()
         return response
 
     def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
-        final_headers = self._get_headers(headers)
-        if self.media_type and not isinstance(self.body, NotSet):
-            # If we need to send a payload, then the Content-Type header should be set
-            final_headers["Content-Type"] = self.media_type
-        extra: dict[str, Any]
-        serializer = self._get_serializer()
-        if serializer is not None and not isinstance(self.body, NotSet):
-            context = SerializerContext(case=self)
-            extra = serializer.as_werkzeug(context, self.body)
-        else:
-            extra = {}
-        return {
-            "method": self.method,
-            "path": self.operation.schema.get_full_path(self.formatted_path),
-            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
-            "headers": dict(final_headers),
-            "query_string": self.query,
-            **extra,
-        }
+        return WSGITransport(self.app).serialize_case(self, headers=headers)
 
+    @deprecated_function(removed_in="4.0", replacement="Case.call")
     def call_wsgi(
         self,
         app: Any = None,
@@ -413,10 +320,6 @@ class Case:
         query_string: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> WSGIResponse:
-        from .transports.responses import WSGIResponse
-        import werkzeug
-        import requests
-
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -425,17 +328,11 @@ class Case:
             )
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
-        data = self.as_werkzeug_kwargs(headers)
-        if query_string is not None:
-            _merge_dict_to(data, "query_string", query_string)
-        client = werkzeug.Client(application, WSGIResponse)
-        with cookie_handler(client, self.cookies), self.operation.schema.ratelimit():
-            response = client.open(**data, **kwargs)
-        requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
-        response.request = requests.Request(**requests_kwargs).prepare()
+        response = WSGITransport(application).send(self, headers=headers, params=query_string, **kwargs)
         dispatch("after_call", hook_context, self, response)
         return response
 
+    @deprecated_function(removed_in="4.0", replacement="Case.call")
     def call_asgi(
         self,
         app: Any = None,
@@ -443,19 +340,17 @@ class Case:
         headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> requests.Response:
-        from starlette_testclient import TestClient as ASGIClient
-
         application = app or self.app
         if application is None:
             raise RuntimeError(
                 "ASGI application instance is required. "
                 "Please, set `app` argument in the schema constructor or pass it to `call_asgi`"
             )
-        if base_url is None:
-            base_url = self.get_full_base_url()
-
-        with ASGIClient(application) as client:
-            return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
+        hook_context = HookContext(operation=self.operation)
+        dispatch("before_call", hook_context, self)
+        response = ASGITransport(application).send(self, base_url=base_url, headers=headers, **kwargs)
+        dispatch("after_call", hook_context, self, response)
+        return response
 
     def validate_response(
         self,
@@ -559,6 +454,13 @@ class Case:
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(response, checks, code_sample_style=code_sample_style)
         return response
+
+    def _get_url(self, base_url: str | None) -> str:
+        base_url = self._get_base_url(base_url)
+        formatted_path = self.formatted_path.lstrip("/")
+        if not base_url.endswith("/"):
+            base_url += "/"
+        return unquote(urljoin(base_url, quote(formatted_path)))
 
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""

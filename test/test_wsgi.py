@@ -11,8 +11,9 @@ def schema(flask_app):
     return schemathesis.from_wsgi("/schema.yaml", flask_app)
 
 
+@pytest.mark.parametrize("method", ("call", "call_wsgi"))
 @pytest.mark.hypothesis_nested
-def test_cookies(flask_app):
+def test_cookies(flask_app, method):
     @flask_app.route("/cookies", methods=["GET"])
     def cookies():
         return jsonify(request.cookies)
@@ -45,7 +46,7 @@ def test_cookies(flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = getattr(case, method)()
         assert response.status_code == 200
         assert response.json == {"token": "test"}
 
@@ -60,7 +61,7 @@ def test_form_data(schema):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = case.call()
         assert response.status_code == 200
         # converted to string in the app
         assert response.json == {key: str(value) for key, value in case.body.items()}
@@ -106,7 +107,7 @@ def test_binary_body(mocker, flask_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call_wsgi()
+        response = case.call()
         assert response.status_code == 200
         assert response.json == {"size": mocker.ANY}
 

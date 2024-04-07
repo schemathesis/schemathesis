@@ -548,7 +548,12 @@ def test_graphql_query(graphql_schema, graphql_server_host):
         assert case.cookies == cookies
         assert case.as_requests_kwargs() == {
             "cookies": {"c": "4"},
-            "headers": {"User-Agent": USER_AGENT, "X-Schemathesis-TestCaseId": ANY, "h": "3"},
+            "headers": {
+                "User-Agent": USER_AGENT,
+                "X-Schemathesis-TestCaseId": ANY,
+                "Content-Type": "application/json",
+                "h": "3",
+            },
             "json": {"query": ANY},
             "method": "POST",
             "params": {"q": 1},
