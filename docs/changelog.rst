@@ -4,6 +4,14 @@ Changelog
 :version:`Unreleased <v3.26.2...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Make ``Case.call`` work with ``ASGI`` & ``WSGI`` applications.
+
+**Deprecated**
+
+- ``Case.call_wsgi`` & ``Case.call_asgi`` in favor of ``Case.call``.
+
 .. _v3.26.2:
 
 :version:`3.26.2 <v3.26.1...v3.26.2>` - 2024-04-06

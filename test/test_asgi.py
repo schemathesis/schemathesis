@@ -16,8 +16,9 @@ def schema(fastapi_app):
     return from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
 
 
+@pytest.mark.parametrize("method", ("call", "call_asgi"))
 @pytest.mark.hypothesis_nested
-def test_cookies(fastapi_app):
+def test_cookies(fastapi_app, method):
     @fastapi_app.get("/cookies")
     def cookies(token: str = Cookie(None)):
         return {"token": token}
@@ -50,7 +51,7 @@ def test_cookies(fastapi_app):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = case.call()
+        response = getattr(case, method)()
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import datetime
 import inspect
 import textwrap
@@ -6,7 +7,7 @@ from collections import Counter
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import partial, lru_cache
+from functools import lru_cache, partial
 from itertools import chain
 from logging import LogRecord
 from typing import (
@@ -29,43 +30,44 @@ from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
-from .generation import DataGenerationMethod, GenerationConfig
 from .constants import (
+    NOT_SET,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
-    NOT_SET,
 )
 from .exceptions import (
-    maybe_set_assertion_message,
     CheckFailed,
     FailureContext,
     OperationSchemaError,
     SerializationNotPossible,
+    SkipTest,
     deduplicate_failed_checks,
     get_grouped_exception,
+    maybe_set_assertion_message,
     prepare_response_payload,
-    SkipTest,
 )
-from .internal.deprecation import deprecated_property
-from .internal.copy import fast_deepcopy
+from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
+from .internal.copy import fast_deepcopy
+from .internal.deprecation import deprecated_property, deprecated_function
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer
-from .transports import serialize_payload, RequestsTransport, ASGITransport, WSGITransport
+from .transports import ASGITransport, RequestsTransport, WSGITransport, serialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
-from .generation import generate_random_case_id
 
 if TYPE_CHECKING:
-    import werkzeug
     import unittest
-    from requests.structures import CaseInsensitiveDict
-    from hypothesis import strategies as st
+
     import requests.auth
-    from .transports.responses import GenericResponse, WSGIResponse
+    import werkzeug
+    from hypothesis import strategies as st
+    from requests.structures import CaseInsensitiveDict
+
     from .schemas import BaseSchema
     from .stateful import Stateful, StatefulTest
+    from .transports.responses import GenericResponse, WSGIResponse
 
 
 @dataclass
@@ -82,7 +84,7 @@ class CaseSource:
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     """Reject the current example if we don't know how to send this data to the application."""
-    from hypothesis import note, event, reject
+    from hypothesis import event, note, reject
 
     event_text = f"Can't serialize data to `{media_type}`."
     note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
@@ -310,6 +312,7 @@ class Case:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         return WSGITransport(self.app).serialize_case(self, headers=headers)
 
+    @deprecated_function(removed_in="4.0", replacement="Case.call")
     def call_wsgi(
         self,
         app: Any = None,
@@ -329,6 +332,7 @@ class Case:
         dispatch("after_call", hook_context, self, response)
         return response
 
+    @deprecated_function(removed_in="4.0", replacement="Case.call")
     def call_asgi(
         self,
         app: Any = None,
