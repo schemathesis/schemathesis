@@ -37,8 +37,6 @@ def get(app: Any) -> Transport:
         return RequestsTransport()
     if isinstance(app, Starlette):
         return ASGITransport(app=app)
-    if app.__class__.__module__.startswith("aiohttp."):
-        return RequestsTransport()
     return WSGITransport(app=app)
 
 
