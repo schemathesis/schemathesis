@@ -196,10 +196,10 @@ def test_default_strategies_binary(swagger_20):
     operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
     operation.definition.parameters = [body]
     swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
-    result = get_case_strategy(operation).example()
-    assert isinstance(result.body["upfile"], Binary)
-    kwargs = result.as_requests_kwargs(base_url="http://127.0.0.1")
-    assert kwargs["files"] == [("upfile", result.body["upfile"].data)]
+    case = get_case_strategy(operation).example()
+    assert isinstance(case.body["upfile"], Binary)
+    kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
+    assert kwargs["files"] == [("upfile", case.body["upfile"].data)]
 
 
 @pytest.mark.parametrize("media_type", ("application/json", "text/yaml"))
@@ -223,7 +223,7 @@ def test_binary_is_serializable(empty_open_api_3_schema, media_type):
     @settings(max_examples=1)
     def test(case):
         assert_requests_call(case)
-        assert case.as_requests_kwargs()["data"] == case.body.data
+        assert case.as_transport_kwargs()["data"] == case.body.data
 
     test()
 

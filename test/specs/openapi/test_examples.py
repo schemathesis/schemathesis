@@ -1,6 +1,7 @@
 from __future__ import annotations
 from schemathesis.generation import GenerationConfig
 
+from schemathesis.transports import WSGITransport
 from test.utils import assert_requests_call
 from typing import Any
 from unittest.mock import ANY
@@ -838,7 +839,7 @@ def test_external_value(empty_open_api_3_schema, server):
     assert example.body == b"42"
     # And this data should be OK to send
     assert_requests_call(example)
-    assert example.as_werkzeug_kwargs()["data"] == b"42"
+    assert WSGITransport(None).serialize_case(example)["data"] == b"42"
 
 
 def test_external_value_network_error(empty_open_api_3_schema):

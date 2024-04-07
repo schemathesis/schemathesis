@@ -225,7 +225,7 @@ schema.auth.set_from_requests(auth).apply_to(method="GET", path="/success")
 @schema.parametrize()
 @settings(max_examples=2)
 def test(case):
-    case_auth = case.as_requests_kwargs().get("auth")
+    case_auth = case.as_transport_kwargs().get("auth")
     if case.operation.path == "/success":
         assert case_auth is auth
     if case.operation.path == "/text":
@@ -234,7 +234,7 @@ def test(case):
         schema=app_schema,
     )
     result = testdir.runpytest("-s")
-    # Then auth should be present in `as_requests_kwargs` output
+    # Then auth should be present in `as_transport_kwargs` output
     result.assert_outcomes(passed=2)
 
 

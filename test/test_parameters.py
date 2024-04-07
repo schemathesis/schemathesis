@@ -434,7 +434,7 @@ def test_json_media_type(testdir):
 @settings(max_examples=10, deadline=None)
 @schema.parametrize()
 def test_(case):
-    kwargs = case.as_requests_kwargs()
+    kwargs = case.as_transport_kwargs()
     assert kwargs["headers"]["Content-Type"] == "application/problem+json"
     assert "key" in kwargs["json"]
     assert_requests_call(case)

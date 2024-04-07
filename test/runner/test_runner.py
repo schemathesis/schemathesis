@@ -249,6 +249,7 @@ def test_root_url():
         return {}
 
     def check(response, case):
+        assert case.as_transport_kwargs()["url"] == "/"
         assert case.as_requests_kwargs()["url"] == "/"
         assert response.status_code == 200
 

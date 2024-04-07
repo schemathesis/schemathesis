@@ -316,7 +316,7 @@ def test_optional_query_param_negation(empty_open_api_3_schema):
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         request = requests.PreparedRequest()
-        request.prepare(**case.as_requests_kwargs(base_url="http://127.0.0.1"))
+        request.prepare(**case.as_transport_kwargs(base_url="http://127.0.0.1"))
         # Then negative schema should not generate empty queries
         assert urlparse(request.url).query != ""
 
