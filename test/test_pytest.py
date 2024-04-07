@@ -299,8 +299,7 @@ schema.base_url = "{openapi3_base_url}"
 
 @schema.parametrize(endpoint="failure")
 def test(case):
-    response = case.call()
-    case.validate_response(response, code_sample_style="{style}")
+    case.call_and_validate(code_sample_style="{style}")
     """,
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
     )
@@ -666,8 +665,7 @@ schema.base_url = "{openapi3_base_url}"
 
 @schema.parametrize(endpoint="failure")
 def test(case):
-    response = case.call(headers={{'Authorization': '{auth}'}})
-    case.validate_response(response)
+    case.call_and_validate(headers={{'Authorization': '{auth}'}})
 """,
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
         sanitize_output=value,
@@ -685,13 +683,12 @@ def test(case):
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
-
 schema.base_url = "{openapi3_base_url}"
 
 @schema.parametrize(endpoint="success")
 @settings(phases=[Phase.explicit])
 def test(case):
-    case.validate_response(response)
+    pass
 """,
         paths={
             "/success": {
@@ -839,7 +836,7 @@ schema.base_url = "{openapi3_base_url}"
 @schema.parametrize(endpoint="success")
 @settings(phases=[Phase.explicit])
 def test(case):
-    case.validate_response(response)
+    pass
 """,
         paths={
             "/success": {

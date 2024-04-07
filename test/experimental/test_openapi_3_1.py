@@ -58,9 +58,8 @@ def test_works_with_fastapi(fastapi_app, with_fixup):
     @given(case=schema["/address/"]["GET"].as_strategy())
     @settings(phases=[Phase.generate], deadline=None)
     def test(case):
-        response = case.call()
         with pytest.raises(CheckFailed) as exc:
-            case.validate_response(response)
+            case.call_and_validate()
         assert "Unevaluated properties are not allowed ('department' was unexpected)" in str(exc.value)
 
     test()

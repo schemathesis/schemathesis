@@ -113,8 +113,11 @@ Loaders
 .. autofunction:: schemathesis.from_pytest_fixture
 .. autofunction:: schemathesis.from_uri
 .. autofunction:: schemathesis.from_wsgi
+.. autofunction:: schemathesis.graphql.from_path
 .. autofunction:: schemathesis.graphql.from_dict
+.. autofunction:: schemathesis.graphql.from_file
 .. autofunction:: schemathesis.graphql.from_url
+.. autofunction:: schemathesis.graphql.from_asgi
 .. autofunction:: schemathesis.graphql.from_wsgi
 
 Sanitizing Output

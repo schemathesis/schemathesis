@@ -552,8 +552,7 @@ def test_null_body(api_schema):
     def test(case):
         assume(case.body is None)
         # Then it should be possible to send `null`
-        response = case.call()
-        case.validate_response(response)
+        response = case.call_and_validate()
         if case.app is None:
             data = response.content
         else:
@@ -573,9 +572,8 @@ def test_read_only(schema_url):
     @settings(max_examples=1, deadline=None)
     def test(case):
         # Then `writeOnly` should not affect the response schema
-        response = case.call()
+        response = case.call_and_validate()
         assert "write" not in response.json()
-        case.validate_response(response)
 
     test()
 
@@ -592,9 +590,8 @@ def test_write_only(schema_url):
         assert "write" in case.body
         assert "read" not in case.body
         # And `readOnly` should only occur in responses
-        response = case.call()
+        response = case.call_and_validate()
         assert "write" not in response.json()
-        case.validate_response(response)
 
     test()
 
