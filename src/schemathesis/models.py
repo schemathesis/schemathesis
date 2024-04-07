@@ -57,7 +57,7 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
-from .transports import serialize_payload
+from .transports import serialize_payload, RequestsTransport
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .generation import generate_random_case_id
 
@@ -210,7 +210,7 @@ class Case:
 
     def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
         base_url = self.get_full_base_url()
-        kwargs = self.as_requests_kwargs(base_url, headers=headers)
+        kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
         return prepare_request_data(kwargs)
 
     def get_code_to_reproduce(
@@ -285,6 +285,9 @@ class Case:
             cls = cast(Type[serializers.Serializer], serializers.get(media_type))
             return cls()
         return None
+
+    def _get_body(self) -> Body | NotSet:
+        return self.body
 
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""

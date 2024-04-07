@@ -67,6 +67,9 @@ class GraphQLCase(Case):
         parts[2] = self.formatted_path
         return urlunsplit(parts)
 
+    def _get_body(self) -> Body | NotSet:
+        return self.body if isinstance(self.body, NotSet) else {"query": self.body}
+
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         kwargs: dict[str, Any] = {
@@ -290,7 +293,7 @@ class GraphQLSchema(BaseSchema):
             cookies=cookies,
             query=query,
             body=body,
-            media_type=media_type,
+            media_type=media_type or "application/json",
             generation_time=0.0,
         )
 
@@ -376,6 +379,7 @@ def get_case_strategy(
         operation=operation,
         data_generation_method=data_generation_method,
         generation_time=time.monotonic() - start,
+        media_type="application/json",
     )  # type: ignore
     context = auths.AuthContext(
         operation=operation,

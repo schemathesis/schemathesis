@@ -89,7 +89,7 @@ class RequestsTransport:
         serializer = case._get_serializer()
         if serializer is not None and not isinstance(case.body, NotSet):
             context = SerializerContext(case=case)
-            extra = serializer.as_requests(context, case.body)
+            extra = serializer.as_requests(context, case._get_body())
         else:
             extra = {}
         if case._auth is not None:
@@ -240,7 +240,7 @@ class WerkzeugTransport:
         serializer = case._get_serializer()
         if serializer is not None and not isinstance(case.body, NotSet):
             context = SerializerContext(case=case)
-            extra = serializer.as_werkzeug(context, case.body)
+            extra = serializer.as_werkzeug(context, case._get_body())
         else:
             extra = {}
         data = {
