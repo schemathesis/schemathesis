@@ -52,7 +52,7 @@ from .internal.copy import fast_deepcopy
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
-from .serializers import Serializer, SerializerContext
+from .serializers import Serializer
 from .transports import serialize_payload, RequestsTransport, ASGITransport, WSGITransport
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .generation import generate_random_case_id
@@ -287,38 +287,7 @@ class Case:
 
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
-        final_headers = self._get_headers(headers)
-        if self.media_type and self.media_type != "multipart/form-data" and not isinstance(self.body, NotSet):
-            # `requests` will handle multipart form headers with the proper `boundary` value.
-            if "content-type" not in {header.lower() for header in final_headers}:
-                final_headers["Content-Type"] = self.media_type
-        base_url = self._get_base_url(base_url)
-        formatted_path = self.formatted_path.lstrip("/")
-        if not base_url.endswith("/"):
-            base_url += "/"
-        url = unquote(urljoin(base_url, quote(formatted_path)))
-        extra: dict[str, Any]
-        serializer = self._get_serializer()
-        if serializer is not None and not isinstance(self.body, NotSet):
-            context = SerializerContext(case=self)
-            extra = serializer.as_requests(context, self.body)
-        else:
-            extra = {}
-        if self._auth is not None:
-            extra["auth"] = self._auth
-        additional_headers = extra.pop("headers", None)
-        if additional_headers:
-            # Additional headers, needed for the serializer
-            for key, value in additional_headers.items():
-                final_headers.setdefault(key, value)
-        return {
-            "method": self.method,
-            "url": url,
-            "cookies": self.cookies,
-            "headers": final_headers,
-            "params": self.query,
-            **extra,
-        }
+        return RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
 
     def call(
         self,
