@@ -207,7 +207,7 @@ def test_call_and_validate(openapi3_schema_url):
 
 
 @pytest.mark.operations("success")
-def test_call_asgi_and_validate(fastapi_app):
+def test_call_and_validate_for_asgi(fastapi_app):
     api_schema = schemathesis.from_dict(fastapi_app.openapi(), force_schema_version="30")
 
     @given(case=api_schema["/users"]["GET"].as_strategy())
@@ -587,7 +587,7 @@ def test_merge_dict_to():
 
 
 @pytest.mark.parametrize("call_arg, client_arg", (("headers", "headers"), ("params", "query_string")))
-def test_call_wsgi_overrides(mocker, call_arg, client_arg, openapi_30):
+def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
     openapi_30.transport = WSGITransport(42)

@@ -939,11 +939,13 @@ def _wsgi_test(
     feedback: Feedback,
     max_response_time: int | None,
 ) -> WSGIResponse:
+    from ...transports.responses import WSGIResponse
+
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
         hook_context = HookContext(operation=case.operation)
-        kwargs = {"headers": headers}
+        kwargs: dict[str, Any] = {"headers": headers}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-        response = case.call(**kwargs)
+        response = cast(WSGIResponse, case.call(**kwargs))
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     result.logs.extend(recorded.records)

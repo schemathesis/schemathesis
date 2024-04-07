@@ -189,7 +189,7 @@ class APIStateMachine(RuleBasedStateMachine):
         :return: Response from the application under test.
 
         Note that WSGI/ASGI applications are detected automatically in this method. Depending on the result of this
-        detection the state machine will call ``call``, ``call_wsgi`` or ``call_asgi`` methods.
+        detection the state machine will call the ``call`` method.
 
         Usually, you don't need to override this method unless you are building a different state machine on top of this
         one and want to customize the transport layer itself.
