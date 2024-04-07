@@ -8,11 +8,13 @@ They give only static definitions of paths.
 """
 
 from __future__ import annotations
+
 from collections.abc import Mapping, MutableMapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     ContextManager,
@@ -22,7 +24,6 @@ from typing import (
     NoReturn,
     Sequence,
     TypeVar,
-    TYPE_CHECKING,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
@@ -30,23 +31,23 @@ import hypothesis
 from hypothesis.strategies import SearchStrategy
 from pyrate_limiter import Limiter
 
-from .constants import NOT_SET
+from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
 from ._hypothesis import create_test
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
+from .constants import NOT_SET
+from .exceptions import OperationSchemaError, UsageError
 from .generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
     DataGenerationMethodInput,
     GenerationConfig,
 )
-from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
-from .exceptions import OperationSchemaError, UsageError
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
-from .internal.result import Result, Ok
+from .internal.result import Ok, Result
 from .models import APIOperation, Case
-from .stateful.state_machine import APIStateMachine
 from .stateful import Stateful, StatefulTest
+from .stateful.state_machine import APIStateMachine
 from .types import (
     Body,
     Cookies,
@@ -58,9 +59,10 @@ from .types import (
     PathParameters,
     Query,
 )
-from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy, combine_strategies
+from .utils import PARAMETRIZE_MARKER, GivenInput, combine_strategies, given_proxy
 
 if TYPE_CHECKING:
+    from .transports import Transport
     from .transports.responses import GenericResponse
 
 
@@ -75,6 +77,7 @@ def get_full_path(base_path: str, path: str) -> str:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
+    transport: Transport
     location: str | None = None
     base_url: str | None = None
     method: Filter | None = None
@@ -346,6 +349,7 @@ class BaseSchema(Mapping):
             code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
             sanitize_output=sanitize_output,  # type: ignore
+            transport=self.transport,
         )
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
