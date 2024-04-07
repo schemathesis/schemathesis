@@ -581,7 +581,6 @@ def test_internal_exceptions(any_app_schema, mocker):
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
-    mocker.patch("schemathesis.Case.call_wsgi", side_effect=ValueError)
     _, _, _, _, _, *others, finished = from_schema(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()

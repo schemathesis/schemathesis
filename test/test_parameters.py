@@ -552,10 +552,7 @@ def test_null_body(api_schema):
     def test(case):
         assume(case.body is None)
         # Then it should be possible to send `null`
-        if case.app is not None:
-            response = case.call_wsgi()
-        else:
-            response = case.call()
+        response = case.call()
         case.validate_response(response)
         if case.app is None:
             data = response.content

@@ -69,10 +69,7 @@ def test_text_csv(api_schema):
     @given(case=api_schema["/csv"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)
     def test(case):
-        if case.app is not None:
-            response = case.call_wsgi()
-        else:
-            response = case.call()
+        response = case.call()
         # Then this serializer should be used
         case.validate_response(response)
         # And data should be successfully sent to the API as CSV

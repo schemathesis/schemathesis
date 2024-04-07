@@ -939,14 +939,14 @@ def _wsgi_test(
     feedback: Feedback,
     max_response_time: int | None,
 ) -> WSGIResponse:
+    from ...transports.responses import WSGIResponse
+
     with catching_logs(LogCaptureHandler(), level=logging.DEBUG) as recorded:
-        start = time.monotonic()
         hook_context = HookContext(operation=case.operation)
-        kwargs = {"headers": headers}
+        kwargs: dict[str, Any] = {"headers": headers}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-        response = case.call_wsgi(**kwargs)
-        elapsed = time.monotonic() - start
-    context = TargetContext(case=case, response=response, response_time=elapsed)
+        response = cast(WSGIResponse, case.call(**kwargs))
+    context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     result.logs.extend(recorded.records)
     status = Status.success
@@ -967,7 +967,7 @@ def _wsgi_test(
     finally:
         feedback.add_test_case(case, response)
         if store_interactions:
-            result.store_wsgi_response(case, response, headers, elapsed, status, check_results)
+            result.store_wsgi_response(case, response, headers, response.elapsed.total_seconds(), status, check_results)
     return response
 
 
@@ -1037,7 +1037,7 @@ def _asgi_test(
     hook_context = HookContext(operation=case.operation)
     kwargs: dict[str, Any] = {"headers": headers}
     hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-    response = case.call_asgi(**kwargs)
+    response = case.call(**kwargs)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
