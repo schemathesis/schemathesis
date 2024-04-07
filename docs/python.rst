@@ -478,7 +478,7 @@ in this case, the test execution will go much faster.
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call_wsgi()
+        response = case.call()
         case.validate_response(response)
 
 If you don't supply the ``app`` argument to the loader, make sure you pass your test client when running tests:

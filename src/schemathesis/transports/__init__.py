@@ -271,13 +271,14 @@ class WSGITransport:
 
         from .responses import WSGIResponse
 
-        data = self.serialize_case(case, headers=headers, params=params)
         application = kwargs.pop("app", self.app) or self.app
+        data = self.serialize_case(case, headers=headers, params=params)
+        data.update(kwargs)
         client = werkzeug.Client(application, WSGIResponse)
         cookies = {**(case.cookies or {}), **(cookies or {})}
         with cookie_handler(client, cookies), case.operation.schema.ratelimit():
             start = time.monotonic()
-            response = client.open(**data, **kwargs)
+            response = client.open(**data)
             elapsed = time.monotonic() - start
         requests_kwargs = RequestsTransport().serialize_case(
             case,

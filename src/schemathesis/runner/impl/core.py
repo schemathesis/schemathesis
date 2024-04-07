@@ -943,7 +943,7 @@ def _wsgi_test(
         hook_context = HookContext(operation=case.operation)
         kwargs = {"headers": headers}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
-        response = case.call_wsgi(**kwargs)
+        response = case.call(**kwargs)
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     result.logs.extend(recorded.records)

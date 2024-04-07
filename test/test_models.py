@@ -13,6 +13,7 @@ from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
+from schemathesis.transports import WSGITransport
 
 
 @pytest.fixture
@@ -585,10 +586,11 @@ def test_merge_dict_to():
     assert data == {"params": {"A": 1, "B": 2}}
 
 
-@pytest.mark.parametrize("arg", ("headers", "query_string"))
-def test_call_wsgi_overrides(mocker, arg, openapi_30):
+@pytest.mark.parametrize("call_arg, client_arg", (("headers", "headers"), ("params", "query_string")))
+def test_call_wsgi_overrides(mocker, call_arg, client_arg, openapi_30):
     spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
+    openapi_30.transport = WSGITransport(42)
     case = Case(
         openapi_30["/users"]["GET"],
         generation_time=0.0,
@@ -599,10 +601,10 @@ def test_call_wsgi_overrides(mocker, arg, openapi_30):
     # When user passes header / query explicitly
     overridden = {"B": "Y"}
     try:
-        case.call_wsgi(**{arg: overridden}, base_url="http://127.0.0.1", app=42)
+        case.call(**{call_arg: overridden}, base_url="http://127.0.0.1", app=42)
     except ValueError:
         pass
-    _assert_override(spy, arg, original, overridden)
+    _assert_override(spy, client_arg, original, overridden)
 
 
 def test_operation_definition_as_dict():
