@@ -226,7 +226,7 @@ If you maintain your API schema in Python code or your web framework (for exampl
 Web applications
 ~~~~~~~~~~~~~~~~
 
-Schemathesis natively supports testing of ASGI and WSGI compatible apps (e.g., Flask or FastAPI),
+Schemathesis natively supports testing of ASGI and WSGI compatible apps (e.g., FastAPI or Flask),
 which is significantly faster since it doesn't involve the network.
 
 .. code:: python
@@ -272,7 +272,7 @@ This approach requires an initialized application instance to generate the API s
             yield
             await db.disconnect()
 
-        return schemathesis.from_dict(app.openapi())
+        return schemathesis.from_dict(app.openapi(), app)
 
 
     schema = schemathesis.from_pytest_fixture("web_app")
@@ -300,7 +300,7 @@ When the received response is validated, Schemathesis runs the following checks:
 - ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
 
-Validation happens in the ``case.validate_response`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
+Validation happens in the ``case.call_and_validate`` function, but you can add your code to verify the response conformance as you do in regular Python tests.
 By default, all available checks will be applied, but you can customize it by passing a tuple of checks explicitly:
 
 .. code-block:: python
@@ -312,8 +312,7 @@ By default, all available checks will be applied, but you can customize it by pa
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response, checks=(not_a_server_error,))
+        case.call_and_validate(checks=(not_a_server_error,))
 
 The code above will run only the ``not_a_server_error`` check. Or a tuple of additional checks will be executed after ones from the ``checks`` argument:
 
@@ -328,8 +327,7 @@ The code above will run only the ``not_a_server_error`` check. Or a tuple of add
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response, additional_checks=(my_check,))
+        case.call_and_validate(additional_checks=(my_check,))
 
 .. note::
 
@@ -346,8 +344,7 @@ You can also use the ``excluded_checks`` argument to exclude chhecks from runnin
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response, excluded_checks=(not_a_server_error,))
+        case.call_and_validate(excluded_checks=(not_a_server_error,))
 
 The code above will run the default checks, and any additional checks, excluding the ``not_a_server_error`` check.
 
@@ -398,8 +395,7 @@ In the following example we test a hypothetical ``/api/auth/password/reset/`` op
             case.body["token"] = data.draw(
                 (st.emails() | st.just(user.email)).map(create_reset_password_token)
             )
-        response = case.call()
-        case.validate_response(response)
+        case.call_and_validate()
 
 Here we use the special `data strategy <https://hypothesis.readthedocs.io/en/latest/data.html#drawing-interactively-in-tests>`_ to change the ``case`` data in ~50% cases.
 The additional strategy in the conditional branch creates a valid password reset token from the given email.
@@ -449,11 +445,13 @@ This approach ensures that both types of tests can be executed, albeit in separa
     def test_explicit_examples(data, case, user):
         ...
 
-ASGI / WSGI support
+ASGI & WSGI support
 -------------------
 
-Schemathesis supports making calls to ASGI and WSGI-compliant applications instead of real network calls;
-in this case, the test execution will go much faster.
+Schemathesis supports making calls to `ASGI <https://asgi.readthedocs.io/en/latest/>`_ and `WSGI-compliant <https://docs.python.org/3/library/wsgiref.html>`_ applications instead of through real network calls,
+significantly speeding up test execution.
+
+Using Schemathesis with a Flask application (WSGI):
 
 .. code:: python
 
@@ -470,34 +468,50 @@ in this case, the test execution will go much faster.
 
     @app.route("/v1/users", methods=["GET"])
     def users():
-        return jsonify([{"name": "Robin"}])
+        return [{"name": "Robin"}]
 
 
+    # Load the schema from the WSGI app
     schema = schemathesis.from_wsgi("/schema.json", app)
 
 
     @schema.parametrize()
     def test_api(case):
-        response = case.call()
-        case.validate_response(response)
+        # The test case will make a call to the application and validate the response
+        # against the defined schema automatically.
+        case.call_and_validate()
 
-If you don't supply the ``app`` argument to the loader, make sure you pass your test client when running tests:
+Running the example above with ``pytest`` will execute property-based tests against the Flask application.
 
-.. code-block:: python
+Using Schemathesis with a FastAPI application (ASGI):
 
-    @pytest.fixture()
-    def app_schema(client):
-        openapi = client.app.openapi()
-        return schemathesis.from_dict(openapi)
+.. code:: python
+
+    from fastapi import FastAPI
+    import schemathesis
+
+    # Enable the experimental Open API 3.1 support
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    app = FastAPI()
 
 
-    schema = schemathesis.from_pytest_fixture("app_schema")
+    @app.get("/v1/users")
+    async def users():
+        return [{"name": "Robin"}]
+
+
+    # Load the schema from the ASGI app
+    schema = schemathesis.from_asgi("/openapi.json", app)
 
 
     @schema.parametrize()
-    def test_api(case, client):
-        # The `session` argument must be supplied.
-        case.call_and_validate(session=client)
+    def test_api(case):
+        # The test case will make a call to the application and validate the response
+        # against the defined schema automatically.
+        case.call_and_validate()
+
+Note that Schemathesis currently tests ASGI applications synchronously.
 
 Async support
 -------------

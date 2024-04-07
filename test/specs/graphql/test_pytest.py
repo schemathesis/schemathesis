@@ -41,9 +41,8 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "{graphql_path}"
     assert case.operation.definition.field_name in case.body
-    response = case.call()
+    response = case.call_and_validate()
     assert response.status_code == 200
-    case.validate_response(response)
 """,
     )
     result = testdir.runpytest("-v", "-s")
