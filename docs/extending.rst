@@ -558,7 +558,7 @@ For the WSGI case, it will be ``schemathesis.utils.WSGIResponse``.
 ``process_call_kwargs``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-If you want to modify what keyword arguments will be given to ``case.call`` / ``case.call_wsgi`` / ``case.call_asgi`` in CLI, then you can use this hook:
+If you want to modify what keyword arguments will be given to ``case.call`` in CLI, then you can use this hook:
 
 .. code:: python
 
