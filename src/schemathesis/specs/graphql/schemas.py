@@ -69,17 +69,6 @@ class GraphQLCase(Case):
     def _get_body(self) -> Body | NotSet:
         return self.body if isinstance(self.body, (NotSet, bytes)) else {"query": self.body}
 
-    def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        final_headers = self._get_headers(headers)
-        return {
-            "method": self.method,
-            "path": self.operation.schema.get_full_path(self.formatted_path),
-            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
-            "headers": dict(final_headers),
-            "query_string": self.query,
-            "json": {"query": self.body},
-        }
-
     def validate_response(
         self,
         response: GenericResponse,
