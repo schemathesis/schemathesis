@@ -274,8 +274,8 @@ class WSGITransport:
         data = self.serialize_case(case, headers=headers, params=params)
         application = kwargs.pop("app", self.app) or self.app
         client = werkzeug.Client(application, WSGIResponse)
-        # TODO: merge cookies
-        with cookie_handler(client, case.cookies), case.operation.schema.ratelimit():
+        cookies = {**(case.cookies or {}), **(cookies or {})}
+        with cookie_handler(client, cookies), case.operation.schema.ratelimit():
             start = time.monotonic()
             response = client.open(**data, **kwargs)
             elapsed = time.monotonic() - start

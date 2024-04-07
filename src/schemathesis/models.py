@@ -53,7 +53,7 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
-from .transports import serialize_payload, RequestsTransport, ASGITransport
+from .transports import serialize_payload, RequestsTransport, ASGITransport, WSGITransport
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .generation import generate_random_case_id
 
@@ -366,10 +366,6 @@ class Case:
         query_string: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> WSGIResponse:
-        from .transports.responses import WSGIResponse
-        import werkzeug
-        import requests
-
         application = app or self.app
         if application is None:
             raise RuntimeError(
@@ -378,14 +374,7 @@ class Case:
             )
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
-        data = self.as_werkzeug_kwargs(headers)
-        if query_string is not None:
-            _merge_dict_to(data, "query_string", query_string)
-        client = werkzeug.Client(application, WSGIResponse)
-        with cookie_handler(client, self.cookies), self.operation.schema.ratelimit():
-            response = client.open(**data, **kwargs)
-        requests_kwargs = self.as_requests_kwargs(base_url=self.get_full_base_url(), headers=headers)
-        response.request = requests.Request(**requests_kwargs).prepare()
+        response = WSGITransport(application).send(self, headers=headers, params=query_string, **kwargs)
         dispatch("after_call", hook_context, self, response)
         return response
 
