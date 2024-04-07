@@ -69,25 +69,6 @@ class GraphQLCase(Case):
     def _get_body(self) -> Body | NotSet:
         return self.body if isinstance(self.body, (NotSet, bytes)) else {"query": self.body}
 
-    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        final_headers = self._get_headers(headers)
-        kwargs: dict[str, Any] = {
-            "method": self.method,
-            "url": self._get_url(base_url),
-            "headers": final_headers,
-            "cookies": self.cookies,
-            "params": self.query,
-        }
-        # There is no direct way to have bytes here, but it is a useful pattern to support.
-        # It also unifies GraphQLCase with its Open API counterpart where bytes may come from external examples
-        if isinstance(self.body, bytes):
-            kwargs["data"] = self.body
-            # Assume that the payload is JSON, not raw GraphQL queries
-            kwargs["headers"].setdefault("Content-Type", "application/json")
-        else:
-            kwargs["json"] = {"query": self.body}
-        return kwargs
-
     def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)
         return {
