@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import json
+from datetime import timedelta
 from typing import Union, TYPE_CHECKING, NoReturn, Any
 from .._compat import JSONMixin
 from werkzeug.wrappers import Response as BaseResponse
@@ -15,6 +16,7 @@ if TYPE_CHECKING:
 class WSGIResponse(BaseResponse, JSONMixin):
     # We store "requests" request to build a reproduction code
     request: PreparedRequest
+    elapsed: timedelta
 
     def on_json_loading_failed(self, e: json.JSONDecodeError) -> NoReturn:
         # We don't need a werkzeug-specific exception when JSON parsing error happens

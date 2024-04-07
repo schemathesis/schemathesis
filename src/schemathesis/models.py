@@ -560,6 +560,13 @@ class Case:
         self.validate_response(response, checks, code_sample_style=code_sample_style)
         return response
 
+    def _get_url(self, base_url: str | None) -> str:
+        base_url = self._get_base_url(base_url)
+        formatted_path = self.formatted_path.lstrip("/")
+        if not base_url.endswith("/"):
+            base_url += "/"
+        return unquote(urljoin(base_url, quote(formatted_path)))
+
     def get_full_url(self) -> str:
         """Make a full URL to the current API operation, including query parameters."""
         import requests

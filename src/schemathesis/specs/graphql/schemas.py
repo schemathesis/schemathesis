@@ -60,15 +60,18 @@ class RootType(enum.Enum):
 
 @dataclass(repr=False)
 class GraphQLCase(Case):
-    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        final_headers = self._get_headers(headers)
+    def _get_url(self, base_url: str | None) -> str:
         base_url = self._get_base_url(base_url)
         # Replace the path, in case if the user provided any path parameters via hooks
         parts = list(urlsplit(base_url))
         parts[2] = self.formatted_path
+        return urlunsplit(parts)
+
+    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
+        final_headers = self._get_headers(headers)
         kwargs: dict[str, Any] = {
             "method": self.method,
-            "url": urlunsplit(parts),
+            "url": self._get_url(base_url),
             "headers": final_headers,
             "cookies": self.cookies,
             "params": self.query,
