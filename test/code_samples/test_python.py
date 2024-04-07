@@ -68,15 +68,15 @@ def test_code_sample_from_request(openapi_case, verify):
 def test_get_code_sample_code_validity(mocker, loose_schema):
     # See GH-1030
     # When the input schema is too loose
-    original = Case.as_requests_kwargs
+    original = Case.as_transport_kwargs
 
-    def as_requests_kwargs(*args, **kwargs):
+    def as_transport_kwargs(*args, **kwargs):
         kwargs = original(*args, **kwargs)
         # Add timeout in order to ensure fast execution on Windows
         kwargs["timeout"] = 0.001
         return kwargs
 
-    mocker.patch.object(Case, "as_requests_kwargs", as_requests_kwargs)
+    mocker.patch.object(Case, "as_transport_kwargs", as_transport_kwargs)
 
     @given(case=loose_schema["/test/{key}"]["POST"].as_strategy())
     @settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], deadline=None)
@@ -107,7 +107,7 @@ def test_escape_single_quotes(value, expected):
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     case = graphql_strategy.example()
-    kwargs = case.as_requests_kwargs()
+    kwargs = case.as_transport_kwargs()
     request = requests.Request(**kwargs).prepare()
     assert (
         case.get_code_to_reproduce()

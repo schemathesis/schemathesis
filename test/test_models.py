@@ -95,15 +95,15 @@ def test_case_repr(swagger_20, kwargs, expected):
 
 @pytest.mark.parametrize("override", (False, True))
 @pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
-def test_as_requests_kwargs(override, server, base_url, swagger_20, converter):
+def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
     operation = APIOperation("/success", "GET", {}, swagger_20)
     case = operation.make_case(cookies={"TOKEN": "secret"})
     if override:
-        data = case.as_requests_kwargs(base_url)
+        data = case.as_transport_kwargs(base_url)
     else:
         operation.base_url = base_url
-        data = case.as_requests_kwargs()
+        data = case.as_transport_kwargs()
     assert data == {
         "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
         "method": "GET",
@@ -122,7 +122,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
     operation = APIOperation("/foo:bar", "GET", {}, swagger_20)
     case = operation.make_case()
     # Then it should not be truncated during API call
-    assert case.as_requests_kwargs("/")["url"] == "/foo:bar"
+    assert case.as_transport_kwargs("/")["url"] == "/foo:bar"
 
 
 @pytest.mark.parametrize(
@@ -134,11 +134,11 @@ def test_reserved_characters_in_operation_name(swagger_20):
         ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
     ),
 )
-def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
+def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
     original_headers = headers.copy() if headers is not None else headers
     case = operation.make_case(headers=headers)
-    data = case.as_requests_kwargs(headers={"X-Key": "foo"})
+    data = case.as_transport_kwargs(headers={"X-Key": "foo"})
     expected[SCHEMATHESIS_TEST_CASE_HEADER] = ANY
     assert data == {
         "headers": expected,
@@ -154,7 +154,7 @@ def test_as_requests_kwargs_override_user_agent(server, openapi2_base_url, swagg
 
 
 @pytest.mark.parametrize("header", ("content-Type", "Content-Type"))
-def test_as_requests_kwargs_override_content_type(empty_open_api_3_schema, header):
+def test_as_transport_kwargs_override_content_type(empty_open_api_3_schema, header):
     empty_open_api_3_schema["paths"] = {
         "/data": {
             "post": {
@@ -169,7 +169,7 @@ def test_as_requests_kwargs_override_content_type(empty_open_api_3_schema, heade
     schema = schemathesis.from_dict(empty_open_api_3_schema)
     case = schema["/data"]["post"].make_case(body="<html></html>", media_type="text/plain")
     # When the `Content-Type` header is explicitly passed
-    data = case.as_requests_kwargs(headers={header: "text/html"})
+    data = case.as_transport_kwargs(headers={header: "text/html"})
     # Then it should be used in network requests
     assert data == {
         "method": "POST",

@@ -1,5 +1,6 @@
 import platform
 
+from schemathesis.transports import WSGITransport
 import strawberry
 
 from test.apps._graphql.schema import Author
@@ -41,15 +42,17 @@ def test_operation_strategy(graphql_strategy):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_as_werkzeug_kwargs(graphql_strategy):
+def test_as_wsgi_kwargs(graphql_strategy):
     case = graphql_strategy.example()
-    assert case.as_werkzeug_kwargs() == {
+    expected = {
         "method": "POST",
         "path": "/graphql",
         "query_string": None,
         "json": {"query": case.body},
         "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY, "Content-Type": "application/json"},
     }
+    assert WSGITransport(None).serialize_case(case) == expected
+    assert case.as_werkzeug_kwargs() == expected
 
 
 @pytest.mark.parametrize(
@@ -79,7 +82,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
         strategy = schema["Query"]["getBooks"].as_strategy()
         case = strategy.example()
         # And all requests should go to the specified URL
-        assert case.as_requests_kwargs()["url"] == expected
+        assert case.as_transport_kwargs()["url"] == expected
 
 
 @pytest.mark.parametrize("kwargs", ({"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}))

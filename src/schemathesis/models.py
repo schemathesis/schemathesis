@@ -287,9 +287,14 @@ class Case:
     def _get_body(self) -> Body | NotSet:
         return self.body
 
+    @deprecated_function(removed_in="4.0", replacement="Case.as_transport_kwargs")
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by requests."""
         return RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
+
+    def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
+        """Convert the test case into a dictionary acceptable by the underlying transport call."""
+        return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
 
     def call(
         self,
@@ -308,6 +313,7 @@ class Case:
         dispatch("after_call", hook_context, self, response)
         return response
 
+    @deprecated_function(removed_in="4.0", replacement="Case.as_transport_kwargs")
     def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the case into a dictionary acceptable by werkzeug.Client."""
         return WSGITransport(self.app).serialize_case(self, headers=headers)
@@ -467,7 +473,7 @@ class Case:
         import requests
 
         base_url = self.base_url or "http://127.0.0.1"
-        kwargs = self.as_requests_kwargs(base_url)
+        kwargs = RequestsTransport().serialize_case(self, base_url=base_url)
         request = requests.Request(**kwargs)
         prepared = requests.Session().prepare_request(request)  # type: ignore
         return cast(str, prepared.url)
@@ -824,7 +830,7 @@ class Request:
         import requests
 
         base_url = case.get_full_base_url()
-        kwargs = case.as_requests_kwargs(base_url)
+        kwargs = RequestsTransport().serialize_case(case, base_url=base_url)
         request = requests.Request(**kwargs)
         prepared = session.prepare_request(request)  # type: ignore
         return cls.from_prepared_request(prepared)

@@ -5,6 +5,7 @@ from hypothesis import strategies as st, given
 
 import schemathesis
 import pytest
+from schemathesis.transports import WSGITransport, RequestsTransport
 
 HERE = Path(__file__).absolute().parent
 
@@ -47,8 +48,8 @@ def test_pdf_generation(empty_open_api_3_schema):
     def test(case):
         assert case.body == SAMPLE_PDF
         assert case.media_type in (MEDIA_TYPE, ALIAS)
-        assert case.as_requests_kwargs()["data"] == SAMPLE_PDF
-        assert case.as_werkzeug_kwargs()["data"] == SAMPLE_PDF
+        for transport in (RequestsTransport(), WSGITransport(app=None)):
+            assert transport.serialize_case(case)["data"] == SAMPLE_PDF
 
     test()
 

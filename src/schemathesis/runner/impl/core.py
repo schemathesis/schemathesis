@@ -21,6 +21,8 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
+from schemathesis.transports import RequestsTransport
+
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import (
@@ -849,7 +851,7 @@ def _network_test(
         response = case.call(**kwargs)
     except CheckFailed as exc:
         check_name = "request_timeout"
-        requests_kwargs = case.as_requests_kwargs(base_url=case.get_full_base_url(), headers=headers)
+        requests_kwargs = RequestsTransport().serialize_case(case, base_url=case.get_full_base_url(), headers=headers)
         request = requests.Request(**requests_kwargs).prepare()
         elapsed = cast(float, timeout)  # It is defined and not empty, since the exception happened
         check_result = result.add_failure(

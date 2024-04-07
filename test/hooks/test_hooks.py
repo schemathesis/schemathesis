@@ -546,7 +546,7 @@ def test_graphql_query(graphql_schema, graphql_server_host):
         assert case.path_parameters == path_parameters
         assert case.headers == headers
         assert case.cookies == cookies
-        assert case.as_requests_kwargs() == {
+        assert case.as_transport_kwargs() == {
             "cookies": {"c": "4"},
             "headers": {
                 "User-Agent": USER_AGENT,
