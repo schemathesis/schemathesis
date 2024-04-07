@@ -25,15 +25,12 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-from urllib3.exceptions import ReadTimeoutError
-
-from . import failures, serializers
+from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .generation import DataGenerationMethod, GenerationConfig
 from .constants import (
-    DEFAULT_RESPONSE_TIMEOUT,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
@@ -47,7 +44,6 @@ from .exceptions import (
     SerializationNotPossible,
     deduplicate_failed_checks,
     get_grouped_exception,
-    get_timeout_error,
     prepare_response_payload,
     SkipTest,
 )
@@ -57,7 +53,7 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer, SerializerContext
-from .transports import serialize_payload, RequestsTransport
+from .transports import serialize_payload, RequestsTransport, ASGITransport
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 from .generation import generate_random_case_id
 
@@ -332,59 +328,13 @@ class Case:
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> requests.Response:
-        import requests
-
-        """Make a network call with `requests`."""
+    ) -> GenericResponse:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self)
-        data = self.as_requests_kwargs(base_url, headers)
-        data.update(kwargs)
-        if params is not None:
-            _merge_dict_to(data, "params", params)
-        if cookies is not None:
-            _merge_dict_to(data, "cookies", cookies)
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
-        if session is None:
-            validate_vanilla_requests_kwargs(data)
-            session = requests.Session()
-            close_session = True
-        else:
-            close_session = False
-        verify = data.get("verify", True)
-        try:
-            with self.operation.schema.ratelimit():
-                response = session.request(**data)  # type: ignore
-        except (requests.Timeout, requests.ConnectionError) as exc:
-            if isinstance(exc, requests.ConnectionError):
-                if not isinstance(exc.args[0], ReadTimeoutError):
-                    raise
-                req = requests.Request(
-                    method=data["method"].upper(),
-                    url=data["url"],
-                    headers=data["headers"],
-                    files=data.get("files"),
-                    data=data.get("data") or {},
-                    json=data.get("json"),
-                    params=data.get("params") or {},
-                    auth=data.get("auth"),
-                    cookies=data["cookies"],
-                    hooks=data.get("hooks"),
-                )
-                request = session.prepare_request(req)
-            else:
-                request = cast(requests.PreparedRequest, exc.request)
-            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            code_message = self._get_code_message(self.operation.schema.code_sample_style, request, verify=verify)
-            message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
-            raise get_timeout_error(timeout)(
-                f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_message}",
-                context=failures.RequestTimeout(message=message, timeout=timeout),
-            ) from None
-        response.verify = verify  # type: ignore[attr-defined]
+        response = self.operation.schema.transport.send(
+            self, session=session, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
+        )
         dispatch("after_call", hook_context, self, response)
-        if close_session:
-            session.close()
         return response
 
     def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
@@ -446,19 +396,17 @@ class Case:
         headers: dict[str, str] | None = None,
         **kwargs: Any,
     ) -> requests.Response:
-        from starlette_testclient import TestClient as ASGIClient
-
         application = app or self.app
         if application is None:
             raise RuntimeError(
                 "ASGI application instance is required. "
                 "Please, set `app` argument in the schema constructor or pass it to `call_asgi`"
             )
-        if base_url is None:
-            base_url = self.get_full_base_url()
-
-        with ASGIClient(application) as client:
-            return self.call(base_url=base_url, session=client, headers=headers, **kwargs)
+        hook_context = HookContext(operation=self.operation)
+        dispatch("before_call", hook_context, self)
+        response = ASGITransport(application).send(self, base_url=base_url, headers=headers, **kwargs)
+        dispatch("after_call", hook_context, self, response)
+        return response
 
     def validate_response(
         self,

@@ -68,7 +68,7 @@ class GraphQLCase(Case):
         return urlunsplit(parts)
 
     def _get_body(self) -> Body | NotSet:
-        return self.body if isinstance(self.body, NotSet) else {"query": self.body}
+        return self.body if isinstance(self.body, (NotSet, bytes)) else {"query": self.body}
 
     def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         final_headers = self._get_headers(headers)

@@ -36,10 +36,10 @@ def get(app: Any) -> Transport:
     if app is None:
         return RequestsTransport()
     if isinstance(app, Starlette):
-        return StarletteTransport(app=app)
+        return ASGITransport(app=app)
     if app.__class__.__module__.startswith("aiohttp."):
         return RequestsTransport()
-    return WerkzeugTransport(app=app)
+    return WSGITransport(app=app)
 
 
 S = TypeVar("S", contravariant=True)
@@ -166,6 +166,7 @@ class RequestsTransport:
                 f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_message}",
                 context=failures.RequestTimeout(message=message, timeout=timeout),
             ) from None
+        response.verify = verify  # type: ignore[attr-defined]
         if close_session:
             session.close()
         return response
@@ -194,7 +195,7 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
 
 
 @dataclass
-class StarletteTransport(RequestsTransport):
+class ASGITransport(RequestsTransport):
     app: ASGI2App | ASGI3App
 
     def send(
@@ -212,15 +213,14 @@ class StarletteTransport(RequestsTransport):
 
         if base_url is None:
             base_url = case.get_full_base_url()
-        application = kwargs.pop("app", self.app)
-        with ASGIClient(application) as client:
+        with ASGIClient(self.app) as client:
             return super().send(
                 case, session=client, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
             )
 
 
 @dataclass
-class WerkzeugTransport:
+class WSGITransport:
     app: WSGIApplication
 
     def serialize_case(
@@ -272,7 +272,7 @@ class WerkzeugTransport:
         from .responses import WSGIResponse
 
         data = self.serialize_case(case, headers=headers, params=params)
-        application = kwargs.pop("app", self.app)
+        application = kwargs.pop("app", self.app) or self.app
         client = werkzeug.Client(application, WSGIResponse)
         # TODO: merge cookies
         with cookie_handler(client, case.cookies), case.operation.schema.ratelimit():
