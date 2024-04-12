@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - Make ``Case.call`` work with ``ASGI`` & ``WSGI`` applications.
+- Extend the JUnit XML report format to match CLI output including skipped tests, code samples, and more.
 
 **Deprecated**
 
