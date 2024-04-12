@@ -4,28 +4,30 @@ They all consist of primitive types and don't have references to schemas, app, e
 """
 
 from __future__ import annotations
+
 import logging
 import re
+import textwrap
 from dataclasses import dataclass, field
-from typing import Any, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from ..transports import serialize_payload
 from ..code_samples import get_excluded_headers
 from ..exceptions import (
+    BodyInGetRequestError,
+    DeadlineExceeded,
     FailureContext,
     InternalError,
-    make_unique_by_key,
-    format_exception,
-    extract_requests_exception_details,
-    RuntimeErrorType,
-    DeadlineExceeded,
-    OperationSchemaError,
-    BodyInGetRequestError,
     InvalidRegularExpression,
+    OperationSchemaError,
+    RuntimeErrorType,
     SerializationError,
     UnboundPrefixError,
+    extract_requests_exception_details,
+    format_exception,
+    make_unique_by_key,
 )
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
+from ..transports import serialize_payload
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -108,6 +110,7 @@ class SerializedCheck:
     @classmethod
     def from_check(cls, check: Check) -> SerializedCheck:
         import requests
+
         from ..transports.responses import WSGIResponse
 
         if check.response is not None:
@@ -139,6 +142,25 @@ class SerializedCheck:
             context=check.context,
             history=history,
         )
+
+    @property
+    def title(self) -> str:
+        if self.context is not None:
+            return self.context.title
+        return f"Custom check failed: `{self.name}`"
+
+    @property
+    def formatted_message(self) -> str | None:
+        if self.context is not None:
+            if self.context.message:
+                message = self.context.message
+            else:
+                message = None
+        else:
+            message = self.message
+        if message is not None:
+            message = textwrap.indent(message, prefix="    ")
+        return message
 
 
 def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str]:
@@ -203,8 +225,8 @@ class SerializedError:
 
     @classmethod
     def from_exception(cls, exception: Exception) -> SerializedError:
-        import requests
         import hypothesis.errors
+        import requests
         from hypothesis import HealthCheck
 
         title = "Runtime Error"

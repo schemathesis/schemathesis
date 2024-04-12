@@ -7,14 +7,12 @@ import shutil
 import textwrap
 import time
 from importlib import metadata
-from itertools import groupby
 from queue import Queue
 from typing import Any, Generator, cast, TYPE_CHECKING
 
 import click
 
 from ... import service
-from ...code_samples import CodeSampleStyle
 from ...constants import (
     DISCORD_LINK,
     FALSE_VALUES,
@@ -37,10 +35,11 @@ from ...models import Status
 from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
-from ...runner.serialization import SerializedCheck, SerializedError, SerializedTestResult, deduplicate_failures
+from ...runner.serialization import SerializedError, SerializedTestResult
 from ...service.models import AnalysisSuccess, UnknownExtension, ErrorState
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
+from ..reporting import group_by_case, TEST_CASE_ID_TITLE, split_traceback, get_runtime_error_suggestion
 
 if TYPE_CHECKING:
     import requests
@@ -256,11 +255,11 @@ def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
     if error.extras:
         extras = error.extras
     elif context.show_trace and error.type.has_useful_traceback:
-        extras = _split_traceback(error.exception_with_traceback)
+        extras = split_traceback(error.exception_with_traceback)
     else:
         extras = []
     _display_extras(extras)
-    suggestion = RUNTIME_ERROR_SUGGESTIONS.get(error.type)
+    suggestion = get_runtime_error_suggestion(error.type)
     _maybe_display_tip(suggestion)
     return display_full_traceback_message(error)
 
@@ -279,9 +278,6 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
         display_failures_for_single_test(context, result)
 
 
-TEST_CASE_ID_TITLE = "Test Case ID"
-
-
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
     from ...transports.responses import get_reason
@@ -297,18 +293,9 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         for check_idx, check in enumerate(checks):
             if check_idx == 0:
                 click.secho(f"{idx}. {TEST_CASE_ID_TITLE}: {check.example.id}", bold=True)
-            if check.context is not None:
-                title = check.context.title
-                if check.context.message:
-                    message = check.context.message
-                else:
-                    message = None
-            else:
-                title = f"Custom check failed: `{check.name}`"
-                message = check.message
-            click.secho(f"\n- {title}", fg="red", bold=True)
+            click.secho(f"\n- {check.title}", fg="red", bold=True)
+            message = check.formatted_message
             if message:
-                message = textwrap.indent(message, prefix="    ")
                 click.secho(f"\n{message}", fg="red")
             if check_idx + 1 == len(checks):
                 if check.response is not None:
@@ -316,9 +303,8 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                     reason = get_reason(status_code)
                     response = bold(f"[{check.response.status_code}] {reason}")
                     click.echo(f"\n{response}:")
-
                     response_body = check.response.body
-                    if check.response is not None and response_body is not None:
+                    if response_body is not None:
                         if not response_body:
                             click.echo("\n    <EMPTY>")
                         else:
@@ -334,26 +320,6 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
         click.echo(
             f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
         )
-
-
-def group_by_case(
-    checks: list[SerializedCheck], code_sample_style: CodeSampleStyle
-) -> Generator[tuple[str, Generator[SerializedCheck, None, None]], None, None]:
-    checks = deduplicate_failures(checks)
-    checks = sorted(checks, key=lambda c: _by_unique_code_sample(c, code_sample_style))
-    yield from groupby(checks, lambda c: _by_unique_code_sample(c, code_sample_style))
-
-
-def _by_unique_code_sample(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> str:
-    request_body = base64.b64decode(check.example.body).decode() if check.example.body is not None else None
-    return code_sample_style.generate(
-        method=check.example.method,
-        url=check.example.url,
-        body=request_body,
-        headers=check.example.headers,
-        verify=check.example.verify,
-        extra_headers=check.example.extra_headers,
-    )
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
@@ -436,7 +402,7 @@ def display_analysis(context: ExecutionContext) -> None:
             title = "Network Error"
         else:
             traceback = format_exception(exception, True)
-            extras = _split_traceback(traceback)
+            extras = split_traceback(traceback)
             title = "Internal Error"
             message = f"We apologize for the inconvenience. This appears to be an internal issue.\nPlease, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
             suggestion = "Please update your CLI to the latest version and try again."
@@ -719,10 +685,6 @@ def should_skip_suggestion(context: ExecutionContext, event: events.InternalErro
     return event.subtype == SchemaErrorType.CONNECTION_OTHER and context.wait_for_schema is not None
 
 
-def _split_traceback(traceback: str) -> list[str]:
-    return [entry for entry in traceback.splitlines() if entry]
-
-
 def _display_extras(extras: list[str]) -> None:
     if extras:
         click.echo()
@@ -743,7 +705,7 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
     if event.type == InternalErrorType.SCHEMA:
         extras = event.extras
     elif context.show_trace:
-        extras = _split_traceback(event.exception_with_traceback)
+        extras = split_traceback(event.exception_with_traceback)
     else:
         extras = [event.exception]
     _display_extras(extras)
