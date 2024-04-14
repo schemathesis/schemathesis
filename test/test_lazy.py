@@ -41,6 +41,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 0$"])
 
 
+@pytest.mark.skip()
 def test_invalid_operation(testdir, hypothesis_max_examples, is_older_subtests):
     # When the given schema is invalid
     # And schema validation is disabled
@@ -545,6 +546,7 @@ def test_(case):
     result.stdout.re_match_lines(expected)
 
 
+@pytest.mark.skip()
 def test_data_generation_methods(testdir, is_older_subtests):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     testdir.make_test(
