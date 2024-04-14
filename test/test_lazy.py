@@ -539,8 +539,8 @@ def test_(case):
         ]
     else:
         expected = [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] SUBPASS",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] SUBPASS",
+            r"test_parametrized_fixture.py::test_[a][GET /api/users] (verbose_name='GET /api/users') SUBPASS [ 33%]",
+            r"test_parametrized_fixture.py::test_[b][GET /api/users] (verbose_name='GET /api/users') SUBPASS [ 75%]",
         ]
     result.stdout.re_match_lines(expected)
 
@@ -628,7 +628,7 @@ def test_(case):
     if is_older_subtests:
         expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] PASSED *\[ 50%\]"
     else:
-        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] SUBPASS *\[ 50%\]"
+        expected = r"test_data_generation_methods_override.py::test_[GET /v1/users] (verbose_name='GET /v1/users') SUBPASS [ 50%]"
     result.stdout.re_match_lines([expected])
 
 
