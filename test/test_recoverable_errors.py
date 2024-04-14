@@ -63,11 +63,11 @@ def test_(case):
     else:
         expected = [
             # Path-level error. no method is displayed
-            r".*test_\[/foo\] SUBFAIL",
+            r"test_in_pytest_subtests.py::test_[/foo] (path='/foo') SUBFAIL",
             # Valid operation
-            r".*test_\[GET /bar\] SUBPASS",
+            r"test_in_pytest_subtests.py::test_[GET /bar] (verbose_name='GET /bar') SUBPASS",
             # Operation-level error
-            r".*test_\[POST /bar\] SUBFAIL",
+            r"test_in_pytest_subtests.py::test_[POST /bar] (method='POST', path='/bar') SUBFAIL",
             # The error in both failing cases
             ".*Unresolvable JSON pointer in the schema.*",
         ]
