@@ -10,7 +10,7 @@ jobs:
     name: Update pre-commit
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4.1.2
+      - uses: actions/checkout@v4.1.3
         with:
           fetch-depth: 1
           submodules: true
