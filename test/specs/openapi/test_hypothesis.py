@@ -5,7 +5,7 @@ from hypothesis import assume, given, settings, Phase
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
+from schemathesis.generation import GenerationConfig, HeaderConfig
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
@@ -152,6 +152,31 @@ def test_valid_headers(keywords):
     def test(headers):
         # Then headers are always valid
         assert is_valid_header(headers)
+
+    test()
+
+
+def test_configure_headers():
+    strategy = make_positive_strategy(
+        {
+            "type": "object",
+            "properties": {"X-Foo": {"type": "string"}},
+            "required": ["X-Foo"],
+            "additionalProperties": False,
+        },
+        "GET /users/",
+        "header",
+        None,
+        GenerationConfig(
+            headers=HeaderConfig(strategy=st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=67)))
+        ),
+    )
+
+    @given(strategy)
+    def test(headers):
+        # Then headers are always valid
+        assert is_valid_header(headers)
+        assert set(headers["X-Foo"]) - {"A", "B", "C"} == set()
 
     test()
 

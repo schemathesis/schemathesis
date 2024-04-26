@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.27.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- ``GenerationConfig.headers.strategy`` attribute for customizing header generation. :issue:`2137`
+
 .. _v3.27.0:
 
 :version:`3.27.0 <v3.26.2...v3.27.0>` - 2024-04-14
