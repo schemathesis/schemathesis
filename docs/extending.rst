@@ -651,6 +651,51 @@ In the example above, when Schemathesis detects a string with the "card_number" 
 
 For more details about creating strategies, refer to the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/data.html>`_.
 
+Adjusting header generation
+---------------------------
+
+By default, Schemathesis generates headers based on the schema definition falling back to the set of characters defined in `RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_, but you can adjust this behavior to suit your needs.
+
+To customize header generation, you can extend the ``GenerationConfig`` class and modify its ``headers`` attribute. 
+The ``headers`` attribute accepts a ``HeaderConfig`` object, which allows you to specify a custom Hypothesis strategy for generating header values.
+
+Here's an example of how you can adjust header generation:
+
+.. code-block:: python
+
+    import schemathesis
+    from schemathesis import GenerationConfig, HeaderConfig
+    from hypothesis import strategies as st
+
+    schema = schemathesis.from_uri(
+        "https://example.schemathesis.io/openapi.json",
+        generation_config=GenerationConfig(
+            headers=HeaderConfig(
+                strategy=st.text(
+                    alphabet=st.characters(
+                        min_codepoint=1, 
+                        max_codepoint=127,
+                    ).map(str.strip)
+                )
+            )
+        ),
+    )
+
+In the code above, we use the ``st.text`` strategy from Hypothesis to restrict the characters used in the generated headers to codepoints 1 to 127.
+
+Alternatively, you can customize header generation using the ``after_load_schema`` hook:
+
+.. code-block:: python
+
+    import schemathesis
+    from hypothesis import strategies as st
+
+    @schemathesis.hook
+    def after_load_schema(context, schema) -> None:
+        schema.generation_config.headers.strategy = st.text(
+            alphabet=st.characters(min_codepoint=1, max_codepoint=127)
+        )
+
 Generating payloads for unknown media types
 -------------------------------------------
 

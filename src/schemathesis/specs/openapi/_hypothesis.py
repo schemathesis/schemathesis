@@ -45,7 +45,8 @@ StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationC
 def header_values(blacklist_characters: str = "\n\r") -> st.SearchStrategy[str]:
     return st.text(
         alphabet=st.characters(min_codepoint=0, max_codepoint=255, blacklist_characters=blacklist_characters)
-    )
+        # Header values with leading non-visible chars can't be sent with `requests`
+    ).map(str.lstrip)
 
 
 @lru_cache
@@ -67,8 +68,7 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
         "_header_name": st.text(
             min_size=1, alphabet=st.sampled_from("!#$%&'*+-.^_`|~" + string.digits + string.ascii_letters)
         ),
-        # Header values with leading non-visible chars can't be sent with `requests`
-        HEADER_FORMAT: header_value.map(str.lstrip),
+        HEADER_FORMAT: header_value,
         "_basic_auth": st.tuples(latin1_text, latin1_text).map(make_basic_auth_str),
         "_bearer_auth": header_value.map("Bearer {}".format),
     }
@@ -425,6 +425,15 @@ def jsonify_python_specific_types(value: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def _build_custom_formats(
+    custom_formats: dict[str, st.SearchStrategy] | None, generation_config: GenerationConfig
+) -> dict[str, st.SearchStrategy]:
+    custom_formats = {**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
+    if generation_config.headers.strategy is not None:
+        custom_formats[HEADER_FORMAT] = generation_config.headers.strategy
+    return custom_formats
+
+
 def make_positive_strategy(
     schema: dict[str, Any],
     operation_name: str,
@@ -441,9 +450,10 @@ def make_positive_strategy(
         for sub_schema in schema.get("properties", {}).values():
             if list(sub_schema) == ["type"] and sub_schema["type"] == "string":
                 sub_schema.setdefault("format", HEADER_FORMAT)
+    custom_formats = _build_custom_formats(custom_formats, generation_config)
     return from_schema(
         schema,
-        custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})},
+        custom_formats=custom_formats,
         allow_x00=generation_config.allow_x00,
         codec=generation_config.codec,
     )
@@ -462,12 +472,13 @@ def make_negative_strategy(
     generation_config: GenerationConfig,
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
+    custom_formats = _build_custom_formats(custom_formats, generation_config)
     return negative_schema(
         schema,
         operation_name=operation_name,
         location=location,
         media_type=media_type,
-        custom_formats={**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})},
+        custom_formats=custom_formats,
         generation_config=generation_config,
     )
 
