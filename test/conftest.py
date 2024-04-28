@@ -1,12 +1,15 @@
 from __future__ import annotations
+
 import io
-import platform
 import json
+import logging
 import os
+import platform
 import re
 import shlex
 from contextlib import contextmanager
 from dataclasses import dataclass, field
+from importlib import metadata
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
@@ -22,17 +25,16 @@ from hypothesis import settings
 from packaging import version
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from syrupy.types import PropertyFilter, PropertyMatcher
-from importlib import metadata
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
-from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
-from schemathesis.models import Case
 from schemathesis.cli import reset_checks
+from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
 from schemathesis.extra._flask import run_server as run_flask_server
+from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.specs.openapi import media_types
@@ -45,6 +47,7 @@ from .utils import get_schema_path, make_schema
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
+logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
