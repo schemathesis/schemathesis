@@ -65,6 +65,12 @@ def test_run_subprocess(testdir):
     assert result.ret == ExitCode.OK
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+def test_run_as_module(testdir):
+    result = testdir.run("python", "-m", "schemathesis.cli")
+    assert result.ret == ExitCode.OK
+
+
 @pytest.mark.parametrize(
     "args",
     (
