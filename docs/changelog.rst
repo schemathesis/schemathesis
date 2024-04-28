@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - ``GenerationConfig.headers.strategy`` attribute for customizing header generation. :issue:`2137`
+- Support for ``python -m schemathesis.cli``. :issue:`2142`
 
 .. _v3.27.0:
 
