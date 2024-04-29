@@ -13,6 +13,7 @@ Changelog
 **Fixed**
 
 - Supporting non-Starlette ASGI apps. :issue:`2136`
+- Missing version metadata in ASGI client causing errors with ASGI3-only apps. :issue:`2136`
 
 .. _v3.27.0:
 
