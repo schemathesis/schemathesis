@@ -10,6 +10,10 @@ Changelog
 - Support for ``python -m schemathesis.cli``. :issue:`2142`
 - Support for ``anyio>=4.0``. :issue:`2081`
 
+**Fixed**
+
+- Supporting non-Starlette ASGI apps. :issue:`2136`
+
 .. _v3.27.0:
 
 :version:`3.27.0 <v3.26.2...v3.27.0>` - 2024-04-14

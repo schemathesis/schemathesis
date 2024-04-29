@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import time
+from inspect import iscoroutinefunction
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
@@ -31,11 +32,11 @@ def serialize_payload(payload: bytes) -> str:
 
 def get(app: Any) -> Transport:
     """Get transport to send the data to the application."""
-    from starlette.applications import Starlette
-
     if app is None:
         return RequestsTransport()
-    if isinstance(app, Starlette):
+    if iscoroutinefunction(app) or (
+        hasattr(app, "__call__") and iscoroutinefunction(app.__call__)  # noqa: B004
+    ):
         return ASGITransport(app=app)
     return WSGITransport(app=app)
 
