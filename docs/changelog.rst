@@ -8,6 +8,7 @@ Changelog
 
 - ``GenerationConfig.headers.strategy`` attribute for customizing header generation. :issue:`2137`
 - Support for ``python -m schemathesis.cli``. :issue:`2142`
+- Support for ``anyio>=4.0``. :issue:`2081`
 
 .. _v3.27.0:
 
