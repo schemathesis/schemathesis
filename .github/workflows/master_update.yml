@@ -20,7 +20,7 @@ jobs:
             tag: "latest-bookworm"
 
     steps:
-      - uses: actions/checkout@v4.1.3
+      - uses: actions/checkout@v4.1.4
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
