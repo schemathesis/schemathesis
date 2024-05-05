@@ -531,24 +531,28 @@ Extending CLI
 -------------
 
 To fit Schemathesis to your workflows, you might want to extend it with your custom checks or setup environment before the test run.
-Schemathesis can load your Python code via the ``SCHEMATHESIS_HOOKS`` environment variable:
+
+Extensions should be placed in a separate Python module. 
+Then, Schemathesis should be informed about this module via the ``SCHEMATHESIS_HOOKS`` environment variable:
 
 .. code:: bash
 
-    $ SCHEMATHESIS_HOOKS=test.setup
-    $ st run https://example.com/api/swagger.json
-
-**NOTE**. This option should be passed before the ``run`` subcommand.
+    export SCHEMATHESIS_HOOKS=myproject.tests.hooks
+    st run http://127.0.0.1/openapi.yaml
 
 Also, depending on your setup, you might need to run this command with a custom ``PYTHONPATH`` environment variable like this:
 
 .. code:: bash
 
-    $ PYTHONPATH=$(pwd)
-    $ SCHEMATHESIS_HOOKS=test.setup
-    $ st run https://example.com/api/swagger.json
+    export PYTHONPATH=$(pwd)
+    export SCHEMATHESIS_HOOKS=myproject.tests.hooks
+    st run https://example.com/api/swagger.json
 
 The passed value will be treated as an importable Python path and imported before the test run.
+
+.. note::
+
+    You can find more details on how to extend Schemathesis in the :ref:`Extending Schemathesis <enabling-extensions>` section.
 
 Registering custom checks
 ~~~~~~~~~~~~~~~~~~~~~~~~~
