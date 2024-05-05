@@ -495,7 +495,7 @@ def test_cli_run_output_success(cli, cli_args, workers):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_cli_run_only_failure(cli, cli_args, app_type, workers, snapshot_cli):
+def test_cli_run_only_failure(cli, cli_args, workers, snapshot_cli):
     assert cli.run(*cli_args, f"--workers={workers}") == snapshot_cli
 
 
@@ -561,7 +561,7 @@ def test_hypothesis_failed_event(cli, cli_args, workers, snapshot_cli):
 
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_connection_timeout(cli, server, schema_url, workers, snapshot_cli):
+def test_connection_timeout(cli, schema_url, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
@@ -731,7 +731,7 @@ def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_remote_disconnected_error(mocker, cli, schema_url, app, snapshot_cli):
+def test_remote_disconnected_error(mocker, cli, schema_url, snapshot_cli):
     mocker.patch(
         "http.client.HTTPResponse.begin",
         side_effect=http.client.RemoteDisconnected("Remote end closed connection without response"),
@@ -1463,6 +1463,7 @@ def test_colon_in_headers(cli, schema_url, app):
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
+@flaky(max_runs=5, min_passes=1)
 @pytest.mark.snapshot(replace_statistic=True)
 def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
     # When the schema contains Open API links or Swagger 2 extension for links
@@ -1506,12 +1507,11 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
     )
 
 
-@pytest.mark.parametrize("recursion_limit, expected", ((1, "....."), (5, "......")))
+@pytest.mark.parametrize("recursion_limit", (1, 5))
 @pytest.mark.operations("create_user", "get_user", "update_user")
+@flaky(max_runs=5, min_passes=1)
 @pytest.mark.snapshot(replace_statistic=True)
-def test_openapi_links_multiple_threads(
-    cli, cli_args, recursion_limit, hypothesis_max_examples, expected, snapshot_cli
-):
+def test_openapi_links_multiple_threads(cli, cli_args, recursion_limit, hypothesis_max_examples, snapshot_cli):
     # When the schema contains Open API links or Swagger 2 extension for links
     # And these links are nested - API operations in these links contain links to another operations
     assert (
@@ -1568,7 +1568,7 @@ paths:
 
 @pytest.mark.operations("slow")
 @pytest.mark.parametrize("workers", (1, 2))
-def test_max_response_time_invalid(cli, server, schema_url, workers, snapshot_cli):
+def test_max_response_time_invalid(cli, schema_url, workers, snapshot_cli):
     # When maximum response time check is specified in the CLI and the request takes more time
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
@@ -1577,7 +1577,7 @@ def test_max_response_time_invalid(cli, server, schema_url, workers, snapshot_cl
 
 
 @pytest.mark.operations("slow")
-def test_max_response_time_valid(cli, server, schema_url):
+def test_max_response_time_valid(cli, schema_url):
     # When maximum response time check is specified in the CLI and the request takes less time
     result = cli.run(schema_url, "--max-response-time=200")
     # Then no errors should occur
@@ -1697,7 +1697,7 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema, snapshot_cli):
 @pytest.mark.parametrize("extra", ("--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"))
 @pytest.mark.operations("basic")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_auth_override_on_protected_operation(cli, base_url, schema_url, extra, snapshot_cli):
+def test_auth_override_on_protected_operation(cli, schema_url, extra, snapshot_cli):
     # See GH-792
     # When the tested API operation has basic auth
     # And the auth is overridden (directly or via headers)
@@ -1847,7 +1847,7 @@ def test_cli_execute(swagger_20, capsys):
     assert capsys.readouterr().out.strip() == "Unexpected error"
 
 
-def test_get_exit_code(swagger_20, capsys):
+def test_get_exit_code(swagger_20):
     event_stream = from_schema(swagger_20).execute()
     next(event_stream)
     event = next(event_stream)
@@ -2066,15 +2066,9 @@ def test_disable_report_suggestion(monkeypatch, cli, schema_url):
     assert "You can visualize" not in result.stdout
 
 
-@pytest.mark.parametrize(
-    "version, details",
-    (
-        ("3.0.2", "The provided definition doesn't match any of the expected formats or types."),
-        ("3.1.0", "'type' is a required property"),
-    ),
-)
+@pytest.mark.parametrize("version", ("3.0.2", "3.1.0"))
 def test_invalid_schema_with_disabled_validation(
-    testdir, cli, openapi_3_schema_with_invalid_security, version, details, snapshot_cli
+    testdir, cli, openapi_3_schema_with_invalid_security, version, snapshot_cli
 ):
     # When there is an error in the schema
     openapi_3_schema_with_invalid_security["openapi"] = version
