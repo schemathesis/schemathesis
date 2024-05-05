@@ -139,16 +139,18 @@ To use your custom authentication mechanism in the Schemathesis CLI, you need to
         # Here goes your implementation
         ...
 
-Put the code above to the ``hooks.py`` file and extend your command via the ``SCHEMATHESIS_HOOKS`` environment variable:
+Then put your code into a Python file (for example, ``my_file.py``) and set the ``SCHEMATHESIS_HOOKS`` environment variable to point to it:
 
 .. code:: bash
 
-    $ SCHEMATHESIS_HOOKS=hooks
-    $ st run ...
+    SCHEMATHESIS_HOOKS=my_file
+    st run http://127.0.0.1/openapi.yaml
+
+That is it! Now Schemathesis will use your custom authentication mechanism for all tests.
 
 .. note::
 
-    You can take a look at how to extend CLI :ref:`here <extend-cli>`
+    The registration process is the same as for any other extension, and you can find more details on how to extend Schemathesis in the :ref:`Extending Schemathesis <enabling-extensions>` section.
 
 Using in Python tests
 ~~~~~~~~~~~~~~~~~~~~~
