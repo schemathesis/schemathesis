@@ -97,18 +97,35 @@ They execute in the order they are defined, with globally defined hooks executin
     Be mindful of the sequence in which hooks are applied. The order can significantly impact the generated test data and subsequent API calls during testing. 
     Always validate the test data and requests to ensure that hooks are applied in the intended order and manner.
 
-Enabling and Organizing Hooks
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. _enabling-extensions:
 
-For Schemathesis to utilize your custom hooks, they need to be properly organized and enabled.
+Enabling Extensions
+~~~~~~~~~~~~~~~~~~~
 
-For **CLI** usage, hooks should be placed in a separate module. 
-Schemathesis should be directed to this module through the ``SCHEMATHESIS_HOOKS`` environment variable:
+For Schemathesis to utilize your custom hooks or other extensions, they need to be properly enabled.
+
+For **CLI** usage, extensions should be placed in a separate Python module. 
+Then, Schemathesis should be informed about this module via the ``SCHEMATHESIS_HOOKS`` environment variable:
 
 .. code:: bash
 
-    SCHEMATHESIS_HOOKS=myproject.tests.hooks
+    export SCHEMATHESIS_HOOKS=myproject.tests.hooks
     st run http://127.0.0.1/openapi.yaml
+
+Also, depending on your setup, you might need to run this command with a custom ``PYTHONPATH`` environment variable like this:
+
+.. code:: bash
+
+    export PYTHONPATH=$(pwd)
+    export SCHEMATHESIS_HOOKS=myproject.tests.hooks
+    st run https://example.com/api/swagger.json
+
+In the example above, the module is located at ``myproject/tests/hooks.py`` and the environment variable contains 
+a path that could be used as an import in Python.
+
+.. note::
+
+    The name of the module is arbitrary but make sure it is a valid Python module name. Usually it is sufficient to put all your extensions in the ``hooks.py`` file in the current directory.
 
 If you're using Schemathesis in Python tests, ensure to define your hooks in the test setup code.
 
