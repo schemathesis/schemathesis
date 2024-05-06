@@ -114,7 +114,7 @@ typing-extensions==4.8.0
     # via schemathesis
 urllib3==2.1.0
     # via requests
-werkzeug==3.0.1
+werkzeug==3.0.3
     # via schemathesis
 yarl==1.9.3
     # via schemathesis
