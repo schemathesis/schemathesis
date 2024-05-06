@@ -28,5 +28,5 @@ sqlalchemy==1.4.50
     # via
     #   -r requirements-app.in
     #   flask-sqlalchemy
-werkzeug==3.0.1
+werkzeug==3.0.3
     # via flask
