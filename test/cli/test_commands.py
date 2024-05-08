@@ -2386,3 +2386,13 @@ def test_recursive_reference_error_message(
 ):
     schema_file = testdir.make_openapi_schema_file(schema_with_recursive_references)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--show-trace") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("payload")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_unknown_schema_error(mocker, schema_url, cli, snapshot_cli):
+    # Some AssertionError may be caused by internal error in dependencies and can not be associated with a specific
+    # schema issue
+    mocker.patch("hypothesis_jsonschema._from_schema.canonicalish", side_effect=AssertionError("Something bad happen"))
+    assert cli.run(schema_url) == snapshot_cli
