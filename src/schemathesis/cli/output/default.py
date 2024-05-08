@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import platform
 import shutil
@@ -304,14 +303,15 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                     reason = get_reason(status_code)
                     response = bold(f"[{check.response.status_code}] {reason}")
                     click.echo(f"\n{response}:")
-                    response_body = check.response.body
-                    if response_body is not None:
-                        if not response_body:
+                    if check.response.body is not None:
+                        if not check.response.body:
                             click.echo("\n    <EMPTY>")
                         else:
                             encoding = check.response.encoding or "utf8"
                             try:
-                                payload = base64.b64decode(response_body).decode(encoding)
+                                # Checked that is not None
+                                body = cast(bytes, check.response.deserialize_body())
+                                payload = body.decode(encoding)
                                 payload = prepare_response_payload(payload)
                                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
                                 click.echo(payload)

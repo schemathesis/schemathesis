@@ -28,7 +28,7 @@ from ..exceptions import (
     make_unique_by_key,
 )
 from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
-from ..transports import serialize_payload
+from ..transports import serialize_payload, deserialize_payload
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -81,6 +81,14 @@ class SerializedCase:
             verify=verify,
             extra_headers=request_data.headers,
         )
+
+    def deserialize_body(self) -> bytes | None:
+        """Deserialize the test case body.
+
+        `SerializedCase` should be serializable to JSON, therefore body is encoded as base64 string
+        to support arbitrary binary data.
+        """
+        return deserialize_payload(self.body)
 
 
 def _serialize_body(body: str | bytes | None) -> str | None:

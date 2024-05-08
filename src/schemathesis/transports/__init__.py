@@ -30,6 +30,12 @@ def serialize_payload(payload: bytes) -> str:
     return base64.b64encode(payload).decode()
 
 
+def deserialize_payload(data: str | None) -> bytes | None:
+    if data is None:
+        return None
+    return base64.b64decode(data)
+
+
 def get(app: Any) -> Transport:
     """Get transport to send the data to the application."""
     if app is None:

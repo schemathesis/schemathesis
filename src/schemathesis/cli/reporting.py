@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from itertools import groupby
 from typing import Callable, Generator
 
@@ -22,11 +21,10 @@ def group_by_case(
 
 
 def _by_unique_code_sample(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> str:
-    request_body = base64.b64decode(check.example.body).decode() if check.example.body is not None else None
     return code_sample_style.generate(
         method=check.example.method,
         url=check.example.url,
-        body=request_body,
+        body=check.example.deserialize_body(),
         headers=check.example.headers,
         verify=check.example.verify,
         extra_headers=check.example.extra_headers,
