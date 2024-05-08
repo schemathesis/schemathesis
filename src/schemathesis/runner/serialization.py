@@ -278,6 +278,7 @@ class SerializedError:
             message = f"{exception}. Possible reasons:"
             extras = [
                 "- Contradictory schema constraints, such as a minimum value exceeding the maximum.",
+                "- Invalid schema definitions for headers or cookies, for example allowing for non-ASCII characters.",
                 "- Excessive schema complexity, which hinders parameter generation.",
             ]
             title = "Schema Error"
