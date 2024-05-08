@@ -12,6 +12,7 @@ Changelog
 
 - Do not show suggestion to show a traceback on Hypothesis' ``Unsatisfiable`` error.
 - Clarify error message on unsupported recursive references.
+- Report more details on some internal errors instead of "Unknown Schema Error".
 
 .. _v3.27.1:
 
