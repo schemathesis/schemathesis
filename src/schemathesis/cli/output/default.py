@@ -318,9 +318,23 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                             except UnicodeDecodeError:
                                 click.echo("\n    <BINARY>")
 
-        click.echo(
-            f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
-        )
+        try:
+            click.echo(
+                f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
+            )
+        except UnicodeEncodeError:
+            # On Windows it may fail when redirecting the output to a file
+            # because it uses a different encoding than the console encoding and the default
+            # is cp1252, which doesn't support some Unicode characters.
+            # In this case, display a stub message and set a flag to display a warning at the end
+            if platform.system() != "Windows":
+                raise
+            click.echo(
+                f"\n{bold('Reproduce with')}: \n\n"
+                "    CAN NOT DISPLAY THIS CODE SAMPLE DUE TO TERMINAL LIMITATIONS.\n"
+                "    SEE DETAILS AT THE END OF THE OUTPUT\n",
+            )
+            context.encountered_windows_encoding_issue = True
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
@@ -465,6 +479,17 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         if context.seed is not None:
             seed_option = f"`--hypothesis-seed={context.seed}`"
             click.secho(f"\n{bold('Note')}: To replicate these test failures, rerun with {bold(seed_option)}")
+
+    if context.encountered_windows_encoding_issue:
+        click.echo()
+        title = click.style("WARNING:", bold=True, fg="yellow")
+        name = click.style("PYTHONIOENCODING", bold=True)
+        value = click.style("utf8", bold=True)
+        warning = (
+            "Some code samples could not be displayed due to terminal limitations on Windows.\n"
+            f"To resolve this set the '{name}' environment variable to '{value}' and rerun your command."
+        )
+        click.secho(f"{title} {warning}")
 
     if context.report is not None and not context.is_interrupted:
         if isinstance(context.report, FileReportContext):
