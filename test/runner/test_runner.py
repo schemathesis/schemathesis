@@ -24,7 +24,7 @@ from schemathesis.transports.auth import get_requests_auth
 from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, reraise, deduplicate_errors
+from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, deduplicate_errors
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 
@@ -706,14 +706,6 @@ def test_workers_num_regression(mocker, real_app_schema):
     spy = mocker.patch("schemathesis.runner.impl.ThreadPoolRunner", wraps=threadpool.ThreadPoolRunner)
     execute(real_app_schema, workers_num=5)
     assert spy.call_args[1]["workers_num"] == 5
-
-
-def test_reraise(swagger_20):
-    try:
-        raise AssertionError("Foo")
-    except AssertionError:
-        error = reraise(swagger_20["/users"]["GET"])
-        assert error.args[0] == "Unknown schema error"
 
 
 @pytest.mark.parametrize("schema_path", ("petstore_v2.yaml", "petstore_v3.yaml"))

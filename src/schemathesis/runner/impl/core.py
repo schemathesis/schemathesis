@@ -42,6 +42,7 @@ from ...constants import (
 from ...exceptions import (
     CheckFailed,
     DeadlineExceeded,
+    InternalError,
     InvalidHeadersExample,
     InvalidRegularExpression,
     NonCheckError,
@@ -475,9 +476,21 @@ def run_test(
     except SkipTest as exc:
         status = Status.skip
         result.mark_skipped(exc)
-    except AssertionError:  # comes from `hypothesis-jsonschema`
-        error = reraise(operation)
+    except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
         status = Status.error
+        try:
+            operation.schema.validate()
+            try:
+                raise InternalError(f"Unexpected error during testing of this API operation: {exc}") from exc
+            except InternalError as exc:
+                error = exc
+        except ValidationError as exc:
+            error = OperationSchemaError.from_jsonschema_error(
+                exc,
+                path=operation.path,
+                method=operation.method,
+                full_path=operation.schema.get_full_path(operation.path),
+            )
         result.add_error(error)
     except HypothesisRefResolutionError:
         status = Status.error
@@ -613,16 +626,6 @@ def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> st
         if "is not valid syntax for a Python regular expression" in message:
             return message
     return None
-
-
-def reraise(operation: APIOperation) -> OperationSchemaError:
-    try:
-        operation.schema.validate()
-    except ValidationError as exc:
-        return OperationSchemaError.from_jsonschema_error(
-            exc, path=operation.path, method=operation.method, full_path=operation.schema.get_full_path(operation.path)
-        )
-    return OperationSchemaError("Unknown schema error")
 
 
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
