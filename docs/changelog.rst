@@ -14,6 +14,10 @@ Changelog
 - Clarify error message on unsupported recursive references.
 - Report more details on some internal errors instead of "Unknown Schema Error".
 
+**Fixed**
+
+- Internal error on Windows when the CLI output is redirected to a file and code samples contain non CP1252 characters.
+
 .. _v3.27.1:
 
 :version:`3.27.1 <v3.27.0...v3.27.1>` - 2024-04-29
