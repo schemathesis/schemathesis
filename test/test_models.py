@@ -8,7 +8,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis._compat import MultipleFailures
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
@@ -391,24 +391,26 @@ def test_validate_response_schema_path(
 def test_response_from_requests(base_url):
     response = requests.get(f"{base_url}/cookies", timeout=1)
     serialized = Response.from_requests(response)
+    assert serialized.deserialize_body() == b""
     assert serialized.status_code == 200
     assert serialized.http_version == "1.1"
     assert serialized.message == "OK"
     assert serialized.headers["Set-Cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
 
 
-@pytest.mark.parametrize(
-    "base_url, expected",
-    (
-        (None, "http://127.0.0.1/api/v3/users/test"),
-        ("http://127.0.0.1/api/v3", "http://127.0.0.1/api/v3/users/test"),
-    ),
-)
-def test_from_case(swagger_20, base_url, expected):
+@pytest.mark.parametrize("body, expected", ((NOT_SET, None), (b"example", b"example")))
+def test_from_case(swagger_20, body, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(operation, generation_time=0.0, path_parameters={"name": "test"})
+    case = Case(
+        operation,
+        generation_time=0.0,
+        path_parameters={"name": "test"},
+        body=body,
+        media_type="application/octet-stream",
+    )
     session = requests.Session()
     request = Request.from_case(case, session)
+    assert request.deserialize_body() == expected
     assert request.uri == "http://127.0.0.1/api/v3/users/test"
 
 

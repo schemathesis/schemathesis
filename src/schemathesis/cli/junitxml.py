@@ -1,19 +1,18 @@
 from __future__ import annotations
 
-import base64
 import platform
 import textwrap
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
+from ..exceptions import RuntimeErrorType, prepare_response_payload
 from ..models import Status
 from ..runner import events
 from ..runner.serialization import SerializedCheck, SerializedError
-from ..exceptions import prepare_response_payload, RuntimeErrorType
 from .handlers import EventHandler
-from .reporting import group_by_case, TEST_CASE_ID_TITLE, split_traceback, get_runtime_error_suggestion
+from .reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
 
 if TYPE_CHECKING:
     from click.utils import LazyFile
@@ -65,14 +64,15 @@ def build_failure_message(idx: int, code_sample: str, checks: list[SerializedChe
                 status_code = check.response.status_code
                 reason = get_reason(status_code)
                 message += f"\n[{check.response.status_code}] {reason}:\n"
-                response_body = check.response.body
-                if response_body is not None:
-                    if not response_body:
+                if check.response.body is not None:
+                    if not check.response.body:
                         message += "\n    <EMPTY>\n"
                     else:
                         encoding = check.response.encoding or "utf8"
                         try:
-                            payload = base64.b64decode(response_body).decode(encoding)
+                            # Checked that is not None
+                            body = cast(bytes, check.response.deserialize_body())
+                            payload = body.decode(encoding)
                             payload = prepare_response_payload(payload)
                             payload = textwrap.indent(f"\n`{payload}`\n", prefix="    ")
                             message += payload

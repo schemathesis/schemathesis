@@ -50,11 +50,11 @@ from .exceptions import (
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.copy import fast_deepcopy
-from .internal.deprecation import deprecated_property, deprecated_function
+from .internal.deprecation import deprecated_function, deprecated_property
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer
-from .transports import ASGITransport, RequestsTransport, WSGITransport, serialize_payload
+from .transports import ASGITransport, RequestsTransport, WSGITransport, serialize_payload, deserialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 
 if TYPE_CHECKING:
@@ -854,6 +854,14 @@ class Request:
             body=serialize_payload(body) if body is not None else body,
         )
 
+    def deserialize_body(self) -> bytes | None:
+        """Deserialize the request body.
+
+        `Request` should be serializable to JSON, therefore body is encoded as base64 string
+        to support arbitrary binary data.
+        """
+        return deserialize_payload(self.body)
+
 
 @dataclass(repr=False)
 class Response:
@@ -922,6 +930,14 @@ class Response:
             elapsed=elapsed,
             verify=True,
         )
+
+    def deserialize_body(self) -> bytes | None:
+        """Deserialize the response body.
+
+        `Response` should be serializable to JSON, therefore body is encoded as base64 string
+        to support arbitrary binary data.
+        """
+        return deserialize_payload(self.body)
 
 
 @dataclass

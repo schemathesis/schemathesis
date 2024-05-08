@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.27.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- ``Request.deserialize_body`` and ``Response.deserialize_body`` helper methods to deserialize payloads to bytes from Base 64.
+
 **Changed**
 
 - Do not show suggestion to show a traceback on Hypothesis' ``Unsatisfiable`` error.
