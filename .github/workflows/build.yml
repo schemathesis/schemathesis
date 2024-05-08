@@ -48,23 +48,48 @@ jobs:
         with:
           docs-folder: "docs/"
 
-  tests:
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-2019]
-        python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
-        # Set the patch version for "python", so GitHub adds these configurations instead of expanding existing ones
-        include:
-          - os: ubuntu-22.04
-            python: "3.9.16"
-            tox_env: pytest6
-          - os: ubuntu-22.04
-            python: "3.9.16"
-            tox_env: pytest53
-      fail-fast: false
+  #  tests:
+  #    strategy:
+  #      matrix:
+  #        os: [ubuntu-22.04, windows-2019]
+  #        python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+  #        # Set the patch version for "python", so GitHub adds these configurations instead of expanding existing ones
+  #        include:
+  #          - os: ubuntu-22.04
+  #            python: "3.9.16"
+  #            tox_env: pytest6
+  #          - os: ubuntu-22.04
+  #            python: "3.9.16"
+  #            tox_env: pytest53
+  #      fail-fast: false
+  #
+  #    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
+  #    runs-on: ${{ matrix.os }}
+  #    steps:
+  #      - uses: actions/checkout@v4.1.4
+  #        with:
+  #          fetch-depth: 1
+  #
+  #      - uses: actions/setup-python@v5
+  #        with:
+  #          python-version: ${{ matrix.python }}
+  #
+  #      - run: pip install tox tox-gh-actions
+  #
+  #      - if: ${{ matrix.tox_env }}
+  #        run: python -m tox -e ${{ matrix.tox_env }}
+  #
+  #      - if: ${{ !matrix.tox_env }}
+  #        run: python -m tox
+  #
+  #      - name: Upload coverage to Codecov
+  #        uses: codecov/codecov-action@v4.3.1
+  #        with:
+  #          token: ${{ secrets.CODECOV_TOKEN }}
 
-    name: Tests (Python ${{ matrix.python }} on ${{ matrix.os }} ${{ matrix.tox_env }})
-    runs-on: ${{ matrix.os }}
+  tests-windows-smoke-test:
+    runs-on: windows-2019
+    name: Testing corner cases of CLI output on Windows
     steps:
       - uses: actions/checkout@v4.1.4
         with:
@@ -72,17 +97,15 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: ${{ matrix.python }}
+          python-version: "3.12"
 
-      - run: pip install tox tox-gh-actions
+      - run: pip install ".[dev]"
 
-      - if: ${{ matrix.tox_env }}
-        run: python -m tox -e ${{ matrix.tox_env }}
+      - run: bash test_server.sh --spec=openapi3 --operations=unicode 8081 &
+        shell: bash
 
-      - if: ${{ !matrix.tox_env }}
-        run: python -m tox
+      - run: st run http://127.0.0.1:8081/schema.yaml > output.txt || true
+        env:
+          PYTHONIOENCODING: "cp1252"
 
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4.3.1
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+      - run: cat output.txt

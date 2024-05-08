@@ -41,6 +41,8 @@ class Operation(Enum):
     read_only = ("GET", "/api/read_only")
     write_only = ("POST", "/api/write_only")
 
+    unicode = ("POST", "/api/unicode")
+
     create_user = ("POST", "/api/users/")
     get_user = ("GET", "/api/users/{user_id}")
     update_user = ("PATCH", "/api/users/{user_id}")
@@ -197,6 +199,11 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
         elif name == "invalid":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "type": "int"}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif name == "unicode":
+            schema = {
+                "parameters": [{"name": "value", "in": "body", "required": True, "schema": {"enum": ["└"]}}],
                 "responses": {"200": {"description": "OK"}},
             }
         elif name == "upload_file":
@@ -548,6 +555,11 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
         elif name == "invalid":
             schema = {
                 "parameters": [{"name": "id", "in": "query", "required": True, "schema": {"type": "int"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        elif name == "unicode":
+            schema = {
+                "requestBody": {"content": {"application/json": {"schema": {"enum": ["└"]}}}, "required": True},
                 "responses": {"200": {"description": "OK"}},
             }
         elif name == "upload_file":

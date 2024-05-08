@@ -291,3 +291,4 @@ reserved = success
 invalid = success
 invalid_path_parameter = success
 missing_path_parameter = success
+unicode = failure

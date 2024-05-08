@@ -114,6 +114,10 @@ def create_app(
     def failure():
         raise InternalServerError
 
+    @app.route("/api/unicode", methods=["POST"])
+    def unicode():
+        raise InternalServerError
+
     @app.route("/api/multiple_failures", methods=["GET"])
     def multiple_failures():
         try:
