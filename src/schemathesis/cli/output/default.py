@@ -200,6 +200,7 @@ def display_full_traceback_message(error: SerializedError) -> bool:
                 "hypothesis.errors.FailedHealthCheck",
                 "hypothesis.errors.InvalidArgument: Scalar ",
                 "hypothesis.errors.InvalidArgument: min_size=",
+                "hypothesis.errors.Unsatisfiable",
             )
         )
         and "can never generate an example, because min_size is larger than Hypothesis supports." not in error.exception
