@@ -336,6 +336,12 @@ class DeadlineExceeded(Exception):
         )
 
 
+class RecursiveReferenceError(Exception):
+    """Recursive reference is impossible to resolve due to current limitations."""
+
+    __module__ = "builtins"
+
+
 @enum.unique
 class RuntimeErrorType(str, enum.Enum):
     # Connection related issues
@@ -354,6 +360,7 @@ class RuntimeErrorType(str, enum.Enum):
 
     SCHEMA_BODY_IN_GET_REQUEST = "schema_body_in_get_request"
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
+    SCHEMA_UNSUPPORTED = "schema_unsupported"
     SCHEMA_GENERIC = "schema_generic"
 
     SERIALIZATION_NOT_POSSIBLE = "serialization_not_possible"
@@ -367,6 +374,7 @@ class RuntimeErrorType(str, enum.Enum):
         return self not in (
             RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST,
             RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorType.SCHEMA_UNSUPPORTED,
             RuntimeErrorType.SCHEMA_GENERIC,
             RuntimeErrorType.SERIALIZATION_NOT_POSSIBLE,
         )
