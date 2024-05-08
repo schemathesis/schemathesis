@@ -70,7 +70,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     assert testcases[3][0].attrib["type"] == "error"
     assert (
         testcases[3][0].attrib["message"]
-        == "Schema Error  Failed to generate test cases for this API operation. Possible reasons:      - Contradictory schema constraints, such as a minimum value exceeding the maximum.     - Excessive schema complexity, which hinders parameter generation.  Tip: Examine the schema for inconsistencies and consider simplifying it."
+        == "Schema Error  Failed to generate test cases for this API operation. Possible reasons:      - Contradictory schema constraints, such as a minimum value exceeding the maximum.     - Invalid schema definitions for headers or cookies, for example allowing for non-ASCII characters.     - Excessive schema complexity, which hinders parameter generation.  Tip: Examine the schema for inconsistencies and consider simplifying it."
     )
 
 
