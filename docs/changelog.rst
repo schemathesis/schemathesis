@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.27.1...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Do not show suggestion to show a traceback on Hypothesis' ``Unsatisfiable`` error.
+
 .. _v3.27.1:
 
 :version:`3.27.1 <v3.27.0...v3.27.1>` - 2024-04-29
