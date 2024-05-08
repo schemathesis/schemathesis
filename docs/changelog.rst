@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Do not show suggestion to show a traceback on Hypothesis' ``Unsatisfiable`` error.
+- Clarify error message on unsupported recursive references.
 
 .. _v3.27.1:
 

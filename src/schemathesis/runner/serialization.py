@@ -19,6 +19,7 @@ from ..exceptions import (
     InternalError,
     InvalidRegularExpression,
     OperationSchemaError,
+    RecursiveReferenceError,
     RuntimeErrorType,
     SerializationError,
     UnboundPrefixError,
@@ -244,6 +245,11 @@ class SerializedError:
             type_ = RuntimeErrorType.HYPOTHESIS_DEADLINE_EXCEEDED
             message = str(exception).strip()
             extras = []
+        elif isinstance(exception, RecursiveReferenceError):
+            type_ = RuntimeErrorType.SCHEMA_UNSUPPORTED
+            message = str(exception).strip()
+            extras = []
+            title = "Unsupported Schema"
         elif isinstance(exception, hypothesis.errors.InvalidArgument) and str(exception).startswith("Scalar "):
             # Comes from `hypothesis-graphql`
             scalar_name = _scalar_name_from_error(exception)

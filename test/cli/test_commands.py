@@ -2378,3 +2378,11 @@ def test_null_byte_in_header_probe(testdir, cli, empty_open_api_3_schema, snapsh
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
+def test_recursive_reference_error_message(
+    cli, testdir, schema_with_recursive_references, openapi3_base_url, snapshot_cli
+):
+    schema_file = testdir.make_openapi_schema_file(schema_with_recursive_references)
+    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--show-trace") == snapshot_cli

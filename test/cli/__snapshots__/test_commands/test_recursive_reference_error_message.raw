@@ -1,0 +1,32 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.0
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+POST /api/foo E                                                           [100%]
+
+==================================== ERRORS ====================================
+________________________________ POST /api/foo _________________________________
+Unsupported Schema
+
+Currently, Schemathesis can't generate data for this operation due to recursive references in the operation definition. See more information in this issue - https://github.com/schemathesis/schemathesis/issues/947
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 errored in 1.00s ==============================

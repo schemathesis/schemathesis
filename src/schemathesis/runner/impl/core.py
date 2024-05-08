@@ -46,6 +46,7 @@ from ...exceptions import (
     InvalidRegularExpression,
     NonCheckError,
     OperationSchemaError,
+    RecursiveReferenceError,
     SerializationNotPossible,
     SkipTest,
     format_exception,
@@ -480,7 +481,7 @@ def run_test(
         result.add_error(error)
     except HypothesisRefResolutionError:
         status = Status.error
-        result.add_error(hypothesis.errors.Unsatisfiable(RECURSIVE_REFERENCE_ERROR_MESSAGE))
+        result.add_error(RecursiveReferenceError(RECURSIVE_REFERENCE_ERROR_MESSAGE))
     except InvalidArgument as error:
         status = Status.error
         message = get_invalid_regular_expression_message(warnings)
