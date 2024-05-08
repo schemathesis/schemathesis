@@ -55,6 +55,8 @@ class ExecutionContext:
     report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
     analysis: Result[AnalysisResult, Exception] | None = None
+    # Special flag to display a warning about Windows-specific encoding issue
+    encountered_windows_encoding_issue: bool = False
 
     @deprecated_property(removed_in="4.0", replacement="show_trace")
     def show_errors_tracebacks(self) -> bool:
