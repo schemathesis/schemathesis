@@ -241,7 +241,7 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
     return body.getvalue()
 
 
-@register("multipart/form-data")
+@register("multipart/form-data", aliases=("multipart/mixed",))
 class MultipartSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
         if isinstance(value, bytes):

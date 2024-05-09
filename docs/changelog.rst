@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - ``Request.deserialize_body`` and ``Response.deserialize_body`` helper methods to deserialize payloads to bytes from Base 64.
+- Support for ``multipart/mixed`` media type.
 
 **Changed**
 
