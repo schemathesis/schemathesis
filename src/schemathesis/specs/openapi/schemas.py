@@ -1065,7 +1065,7 @@ class OpenApi30(SwaggerV20):
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
         for media_type, entry in content.items():
             main, sub = parse_content_type(media_type)
-            if main in ("*", "multipart") and sub in ("*", "form-data"):
+            if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
                 schema = entry["schema"]
                 break
         else:
