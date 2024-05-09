@@ -1,5 +1,5 @@
 <p align="center">
-    <em>Schemathesis: catch crashes, validate specs, and save time</em>
+    <em>Schemathesis: Supercharge your API testing, catch bugs, and ensure compliance</em>
 </p>
 
 <p align="center">
@@ -31,29 +31,34 @@
 
 ---
 
-## Why Schemathesis?
+## What is Schemathesis?
 
-Schemathesis is a tool that automates your API testing to catch crashes and spec violations. Built on top of the widely-used <a href="https://hypothesis.works/" target="_blank">Hypothesis</a> framework for property-based testing, it offers the following advantages:
+Schemathesis is a tool that levels-up your API testing by automating the process of finding crashes, uncovering bugs, and validating spec compliance. With Schemathesis, you can:
 
-🕒 **Time-Saving**
+🎯 **Catch Hard-to-Find Bugs**
 
-Automatically generates test cases, freeing you from manual test writing.
+- Uncover hidden crashes and edge cases that manual testing might miss
+- Identify spec violations and ensure your API adheres to its defined contract
 
-🔍 **Comprehensive**
+⚡ **Accelerate Testing Cycles**
 
-Utilizes fuzzing techniques to probe both common and edge-case scenarios, including those you might overlook.
+- Automatically generate a wide range of test cases based on your API schema
+- Save time and effort by eliminating the need for manual test case creation
 
-🛠️ **Flexible**
+🧩 **Integrate Seamlessly**
 
-Supports OpenAPI, GraphQL, and can work even with partially complete schemas. Only the parts describing data generation or responses are required.
+- Works with popular API formats such as OpenAPI, GraphQL.
+- Easily integrate into your existing testing pipeline and CI/CD workflows
 
-🎛️ **Customizable**
+🔧 **Customize and Extend**
 
-Customize the framework by writing Python extensions to modify almost any aspect of the testing process.
+- Tune the testing process to your specific requirements using Python extensions
+- Modify and enhance various aspects of the testing flow to suit your needs with rich configuration options
 
-🔄 **Reproducible**
+📊 **Gain Valuable Insights**
 
-Generates code samples to help you quickly replicate and investigate any failing test cases.
+- Get detailed reports and actionable insights to help you identify and fix issues quickly
+- Reproduce failing test cases effortlessly with generated code samples and cURL commands
 
 ## Quick Demo
 
@@ -230,6 +235,24 @@ This includes:
 - Direct consultation to work closely with your API specification, optimizing the Schemathesis setup for your specific needs.
 
 To discuss a custom support arrangement that best suits your organization, please contact our support team at <a href="mailto:support@schemathesis.io">support@schemathesis.io</a>.
+
+## Acknowledgements
+
+Schemathesis is built on top of <a href="https://hypothesis.works/" target="_blank">Hypothesis</a>, a powerful property-based testing library for Python.
+
+## Who's Using Schemathesis?
+
+Schemathesis is used by a number of project and companies, including direct usage or integration into other tools:
+
+- Abstract Machines ([Magistrala](https://github.com/absmach/magistrala))
+- Bundesstelle für Open Data ([smard-api](https://github.com/bundesAPI/smard-api))
+- [CheckMK](https://github.com/Checkmk/checkmk)
+- HXSecurity ([DongTai](https://github.com/HXSecurity/DongTai))
+- Netflix ([Dispatch](https://github.com/Netflix/dispatch))
+- [Pixie](https://github.com/pixie-io/pixie)
+- [Qdrant](https://github.com/qdrant/qdrant)
+- Spotify ([Backstage](https://github.com/backstage/backstage))
+- WordPress ([OpenVerse](https://github.com/WordPress/openverse))
 
 ## Additional content
 
