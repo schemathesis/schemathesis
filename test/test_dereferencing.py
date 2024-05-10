@@ -217,6 +217,67 @@ def test_non_removable_recursive_references(empty_open_api_3_schema, definition)
         test()
 
 
+def test_nested_recursive_references(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"]["/folders"] = {
+        "post": {
+            "description": "Test",
+            "summary": "Test",
+            "requestBody": {
+                "content": {
+                    "application/json": {
+                        "schema": {
+                            "$ref": "#/components/schemas/editFolder",
+                        }
+                    }
+                },
+                "required": True,
+            },
+            "responses": {"200": {"description": "Test"}},
+        }
+    }
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "editFolder": {
+                "type": "object",
+                "properties": {
+                    "parent": {"$ref": "#/components/schemas/Folder"},
+                },
+                "additionalProperties": False,
+            },
+            "Folder": {
+                "type": "object",
+                "properties": {
+                    "folders": {"$ref": "#/components/schemas/Folders"},
+                },
+                "additionalProperties": False,
+            },
+            "Folders": {
+                "type": "object",
+                "properties": {
+                    "folder": {
+                        "allOf": [
+                            {
+                                "minItems": 1,
+                                "type": "array",
+                                "items": {"$ref": "#/components/schemas/Folder"},
+                            }
+                        ]
+                    },
+                },
+                "additionalProperties": False,
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+
+    @given(case=schema["/folders"]["POST"].as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    test()
+
+
 def test_simple_dereference(testdir):
     # When a given parameter contains a JSON reference
     testdir.make_test(
