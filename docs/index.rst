@@ -1,18 +1,40 @@
 Welcome to Schemathesis!
 ========================
 
-Schemathesis is a tool that automates API testing by leveraging API specs as a blueprints for generating test cases.
+Schemathesis is a tool that levels-up your API testing by leveraging API specs as a blueprints for generating test cases.
 It focuses on testing for general properties — such as ensuring no input leads to server errors and all responses adhere to the API spec — rather than just checking specific input-output combinations.
 
 This approach broadens your testing suite's capability to detect a wide range of potential issues, from trivial bugs to critical vulnerabilities.
 
-Built on top of the widely-used `Hypothesis <http://hypothesis.works/>`_ framework for property-based testing, it offers the following advantages:
+With Schemathesis, you can:
 
-- 🕒 **Time-Saving**: Automatically generates test cases, freeing you from manual test writing.
-- 🔍 **Comprehensive**: Utilizes fuzzing techniques for both common and edge-case scenarios.
-- 🛠️ **Flexible**: Supports OpenAPI and GraphQL. Operates even with partially complete schemas.
-- 🎛️ **Customizable**: Extend almost any aspect of the testing process through Python.
-- 🔄 **Reproducible**: Generates code samples for quick replication of any failing test cases.
+🎯 **Catch Hard-to-Find Bugs**
+
+- Uncover hidden crashes and edge cases that manual testing might miss
+- Identify spec violations and ensure your API adheres to its defined contract
+
+⚡ **Accelerate Testing Cycles**
+
+- Automatically generate a wide range of test cases based on your API schema
+- Save time and effort by eliminating the need for manual test case creation
+
+🧩 **Integrate Seamlessly**
+
+- Works with popular API formats such as OpenAPI, GraphQL.
+- Easily integrate into your existing testing pipeline and CI/CD workflows
+
+🔧 **Customize and Extend**
+
+- Tune the testing process to your specific requirements using Python extensions
+- Modify and enhance various aspects of the testing flow to suit your needs with rich configuration options
+
+📊 **Gain Valuable Insights**
+
+- Get detailed reports and actionable insights to help you identify and fix issues quickly
+- Reproduce failing test cases effortlessly with generated code samples and cURL commands
+
+How it works?
+-------------
 
 Here’s a simplified overview of how Schemathesis works:
 
