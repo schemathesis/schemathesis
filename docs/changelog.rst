@@ -19,6 +19,7 @@ Changelog
 **Fixed**
 
 - Internal error on Windows when the CLI output is redirected to a file and code samples contain non CP1252 characters.
+- Properly check for nested recursive references inside combinators. This makes Schemathesis work with more schemas with recursive references.
 
 .. _v3.27.1:
 

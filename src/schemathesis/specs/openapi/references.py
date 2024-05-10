@@ -186,7 +186,7 @@ def remove_optional_references(schema: dict[str, Any]) -> None:
             v = s.get(keyword)
             if v is not None:
                 elided = [sub for sub in v if not can_elide(sub)]
-                if len(elided) == 1 and "$ref" in elided[0]:
+                if len(elided) == 1 and contains_ref(elided[0]):
                     found.append(keyword)
         return found
 
