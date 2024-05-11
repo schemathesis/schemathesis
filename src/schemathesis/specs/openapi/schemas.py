@@ -524,7 +524,7 @@ class BaseOpenAPISchema(BaseSchema):
             if operation == source.path:
                 # Methods should be completely resolved now, otherwise they might miss a resolving scope when
                 # they will be fully resolved later
-                methods = self.resolver.resolve_all(methods)
+                methods = self.resolver.resolve_all(methods, RECURSION_DEPTH_LIMIT - 8)
                 found = False
                 for method, definition in methods.items():
                     if method.upper() == source.method.upper():

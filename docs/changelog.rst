@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.28.0...HEAD>` - TBD
 --------------------------------------------
 
+**Performance**
+
+- Improve performance of ``add_link`` by avoiding unnecessary reference resolving.
+
 .. _v3.28.0:
 
 :version:`3.28.0 <v3.27.1...v3.28.0>` - 2024-05-10
