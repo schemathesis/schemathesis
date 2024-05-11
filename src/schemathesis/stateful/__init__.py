@@ -16,6 +16,10 @@ if TYPE_CHECKING:
     from .state_machine import APIStateMachine
 
 
+class UnresolvableLink(Exception):
+    """Raised when a link cannot be resolved."""
+
+
 @enum.unique
 class Stateful(enum.Enum):
     none = 1
@@ -70,8 +74,12 @@ class StatefulData:
 
     def store(self, case: Case, response: GenericResponse) -> None:
         """Parse and store data for a stateful test."""
-        parsed = self.stateful_test.parse(case, response)
-        self.container.append(parsed)
+        try:
+            parsed = self.stateful_test.parse(case, response)
+            self.container.append(parsed)
+        except UnresolvableLink:
+            # For now, ignore if a link cannot be resolved
+            pass
 
 
 @dataclass
