@@ -1,0 +1,27 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.0
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+POST /api/property .                                                      [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    1 / 1 passed          PASSED 
+
+WARNING: All API responses have a 404 status code. Did you specify the proper API location?
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 passed in 1.00s ===============================

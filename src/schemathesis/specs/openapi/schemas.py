@@ -1066,11 +1066,11 @@ class OpenApi30(SwaggerV20):
         for media_type, entry in content.items():
             main, sub = parse_content_type(media_type)
             if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
-                schema = entry["schema"]
+                schema = entry.get("schema")
                 break
         else:
             raise InternalError("No 'multipart/form-data' media type found in the schema")
-        for name, property_schema in schema.get("properties", {}).items():
+        for name, property_schema in (schema or {}).get("properties", {}).items():
             if name in form_data:
                 if isinstance(form_data[name], list):
                     files.extend([(name, item) for item in form_data[name]])
