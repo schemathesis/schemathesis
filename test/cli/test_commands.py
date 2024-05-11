@@ -1507,6 +1507,91 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
     )
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user")
+def test_unresolvable_links(cli, empty_open_api_3_schema, testdir, snapshot_cli, base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/users/": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "first_name": {"type": "string", "minLength": 3},
+                                    "last_name": {"type": "string", "minLength": 3},
+                                },
+                                "required": ["first_name", "last_name"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "OK",
+                        "links": {
+                            "next": {
+                                "operationId": "get_user",
+                                "parameters": {"user_id": "$response.body#/invalid_value"},
+                            },
+                            "update": {
+                                "operationId": "update_user",
+                                "parameters": {"user_id": "$response.body#/id"},
+                                "requestBody": {"first_name": "foo", "last_name": "bar"},
+                            },
+                        },
+                    }
+                },
+            },
+        },
+        "/users/{user_id}": {
+            "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}],
+            "get": {
+                "operationId": "get_user",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                    }
+                },
+            },
+            "patch": {
+                "operationId": "update_user",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "first_name": {"type": "string", "minLength": 3},
+                                    "last_name": {"type": "string", "minLength": 3},
+                                },
+                                "required": ["first_name", "last_name"],
+                                "additionalProperties": False,
+                            }
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={base_url}",
+            "--hypothesis-max-examples=1",
+            "--show-trace",
+            "--validate-schema=true",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize("recursion_limit", (1, 5))
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @flaky(max_runs=5, min_passes=1)

@@ -262,7 +262,7 @@ TestStateful = schema.as_state_machine().TestCase
 @pytest.mark.parametrize("method", ("requests", "werkzeug"))
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-def test_history(testdir, app_schema, base_url, response_factory, method):
+def test_history(app_schema, response_factory, method):
     # When cases are serialized
     schema = schemathesis.from_dict(app_schema)
     first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
