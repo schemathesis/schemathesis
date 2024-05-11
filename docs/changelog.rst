@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error on unresolvable Open API links during stateful testing.
+- Internal error when media type definition has only ``example`` or ``examples`` keys.
 
 **Performance**
 

@@ -1359,6 +1359,36 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
     # NOTE, that the actual API operation is not checked in this test
 
 
+@pytest.mark.openapi_version("3.0")
+def test_no_schema_in_media_type(testdir, cli, base_url, snapshot_cli):
+    schema = {
+        "openapi": "3.0.0",
+        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
+        "paths": {
+            "/property": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"multipart/form-data": {}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(schema)
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={base_url}",
+            "--hypothesis-max-examples=1",
+            "--show-trace",
+            "--validate-schema=true",
+        )
+        == snapshot_cli
+    )
+
+
 def test_nested_binary_in_yaml(testdir, openapi3_base_url, cli, snapshot_cli, empty_open_api_3_schema):
     empty_open_api_3_schema["paths"] = {
         "/property": {
