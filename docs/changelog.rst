@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.28.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error on unresolvable Open API links during stateful testing.
+
 **Performance**
 
 - Improve performance of ``add_link`` by avoiding unnecessary reference resolving.

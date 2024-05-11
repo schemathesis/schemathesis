@@ -10,8 +10,7 @@ from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from ....utils import combine_strategies
 from .. import expressions
-from . import links
-from .links import APIOperationConnections, Connection, _convert_strategy, apply, make_response_filter
+from .links import APIOperationConnections, Connection, apply
 
 if TYPE_CHECKING:
     from ....models import APIOperation, Case

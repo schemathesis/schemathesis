@@ -4,22 +4,22 @@ Based on https://swagger.io/docs/specification/links/
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from typing import Any, Generator, NoReturn, Sequence, Union, TYPE_CHECKING
-
-from ...models import APIOperation, Case
-from ...parameters import ParameterSet
-from ...stateful import ParsedData, StatefulTest
-from ...stateful.state_machine import Direction
-from ...types import NotSet
+from typing import TYPE_CHECKING, Any, Generator, NoReturn, Sequence, Union
 
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
+from ...models import APIOperation, Case
+from ...parameters import ParameterSet
+from ...stateful import ParsedData, StatefulTest, UnresolvableLink
+from ...stateful.state_machine import Direction
+from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-
+from .references import Unresolvable
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
@@ -61,16 +61,17 @@ class Link(StatefulTest):
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         """Parse data into a structure expected by links definition."""
         context = expressions.ExpressionContext(case=case, response=response)
-        parameters = {
-            parameter: expressions.evaluate(expression, context) for parameter, expression in self.parameters.items()
-        }
-        return ParsedData(
-            parameters=parameters,
-            # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#link-object
-            # > A literal value or {expression} to use as a request body when calling the target operation.
-            # In this case all literals will be passed as is, and expressions will be evaluated
-            body=expressions.evaluate(self.request_body, context),
-        )
+        parameters = {}
+        for parameter, expression in self.parameters.items():
+            evaluated = expressions.evaluate(expression, context)
+            if isinstance(evaluated, Unresolvable):
+                raise UnresolvableLink(f"Unresolvable reference in the link: {expression}")
+            parameters[parameter] = evaluated
+        # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#link-object
+        # > A literal value or {expression} to use as a request body when calling the target operation.
+        # In this case all literals will be passed as is, and expressions will be evaluated
+        body = expressions.evaluate(self.request_body, context)
+        return ParsedData(parameters=parameters, body=body)
 
     def make_operation(self, collected: list[ParsedData]) -> APIOperation:
         """Create a modified version of the original API operation with additional data merged in."""
