@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Callable, Dict, Union, overload
@@ -77,9 +78,15 @@ class InliningResolver(jsonschema.RefResolver):
                         remove_optional_references(copied)
                         return copied
                     return self.resolve_all(resolved, next_recursion_level)
-            return {key: self.resolve_all(sub_item, recursion_level) for key, sub_item in item.items()}
+            return {
+                key: self.resolve_all(sub_item, recursion_level) if isinstance(sub_item, (list, dict)) else sub_item
+                for key, sub_item in item.items()
+            }
         if isinstance(item, list):
-            return [self.resolve_all(sub_item, recursion_level) for sub_item in item]
+            return [
+                self.resolve_all(sub_item, recursion_level) if isinstance(sub_item, (list, dict)) else sub_item
+                for sub_item in item
+            ]
         return item
 
     def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
