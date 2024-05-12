@@ -261,7 +261,7 @@ def get_parameters_value(
     strategy = apply_hooks(operation, context, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
-        copied = fast_deepcopy(value)
+        copied = value
         copied.update(new)
         return copied
     return value

@@ -320,11 +320,12 @@ def from_dict(
     rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
+    from rpds import HashTrieMap
 
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         instance = SwaggerV20(
-            raw_schema,
+            HashTrieMap(raw_schema),
             app=app,
             base_url=base_url,
             method=method,
@@ -366,7 +367,7 @@ def from_dict(
             validator = definitions.OPENAPI_30_VALIDATOR
         _maybe_validate_schema(raw_schema, validator, validate_schema)
         instance = OpenApi30(
-            raw_schema,
+            HashTrieMap(raw_schema),
             app=app,
             base_url=base_url,
             method=method,

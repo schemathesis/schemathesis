@@ -73,7 +73,7 @@ class InliningResolver(jsonschema.RefResolver):
                     # In other cases, this method create new objects for mutable types (dict & list)
                     next_recursion_level = recursion_level + 1
                     if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        copied = fast_deepcopy(resolved)
+                        copied = resolved
                         remove_optional_references(copied)
                         return copied
                     return self.resolve_all(resolved, next_recursion_level)
@@ -89,7 +89,7 @@ class InliningResolver(jsonschema.RefResolver):
         if "$ref" in definition:
             self.push_scope(scope)
             try:
-                new_scope, definition = fast_deepcopy(self.resolve(definition["$ref"]))
+                new_scope, definition = self.resolve(definition["$ref"])
             finally:
                 self.pop_scope()
             scopes.append(new_scope)

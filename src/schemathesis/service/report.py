@@ -146,7 +146,7 @@ def consume_events(writer: ReportWriter, in_queue: Queue) -> ConsumeResult:
             return ConsumeResult.INTERRUPT
         # Add every event to the report
         if isinstance(event, Initialized):
-            writer.add_json_file("schema.json", event.schema)
+            writer.add_json_file("schema.json", dict(event.schema))
         writer.add_event(event)
         if event.is_terminal:
             break

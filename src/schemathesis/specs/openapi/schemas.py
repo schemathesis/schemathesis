@@ -44,7 +44,6 @@ from ...exceptions import (
     OperationNotFound,
 )
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
-from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
@@ -325,8 +324,8 @@ class BaseOpenAPISchema(BaseSchema):
         # It will allow us to provide a proper reference resolving in `response_schema_conformance` and avoid
         # recursion errors
         if "$ref" in methods:
-            return fast_deepcopy(self.resolver.resolve(methods["$ref"]))
-        return self.resolver.resolution_scope, fast_deepcopy(methods)
+            return self.resolver.resolve(methods["$ref"])
+        return self.resolver.resolution_scope, methods
 
     def make_operation(
         self,
@@ -648,7 +647,7 @@ class BaseOpenAPISchema(BaseSchema):
                     else:
                         break
                 else:
-                    target.update(traverse_schema(fast_deepcopy(schema), callback, self.nullable_name))
+                    target.update(traverse_schema(schema, callback, self.nullable_name))
             if self._inline_reference_cache:
                 components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
             self._rewritten_components = components
@@ -659,7 +658,6 @@ class BaseOpenAPISchema(BaseSchema):
 
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
-        schema = fast_deepcopy(schema)
         schema = traverse_schema(schema, self._rewrite_references, self.resolver)
         # Only add definitions that are reachable from the schema via references
         stack = [schema]
@@ -864,7 +862,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return get_strategies_from_examples(operation, self.examples_field)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(fast_deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
         schema = definition.get("schema")
         if not schema:
             return scopes, None
@@ -1024,7 +1022,7 @@ class OpenApi30(SwaggerV20):
         return collected
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(fast_deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object

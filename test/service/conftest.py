@@ -68,7 +68,7 @@ def get_project_details(setup_server, openapi3_base_url, openapi3_schema):
         lambda h: h.respond_with_json(
             {
                 "specification": {
-                    "schema": openapi3_schema.raw_schema,
+                    "schema": dict(openapi3_schema.raw_schema),
                     "type": "openapi",
                     "version": openapi3_schema.spec_version,
                     "operations_count": openapi3_schema.operations_count,

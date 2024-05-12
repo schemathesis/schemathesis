@@ -9,6 +9,8 @@ from json import JSONDecodeError
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
 
+from rpds import HashTrieMap
+
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
 
@@ -289,10 +291,16 @@ class InvalidHeadersExample(OperationSchemaError):
         return cls(message)
 
 
+def default(o):
+    if isinstance(o, HashTrieMap):
+        return dict(o)
+    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+
 def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
     # Convert JSON to string with indentation
     indent = 4
-    serialized = json.dumps(data, indent=indent)
+    serialized = json.dumps(data, indent=indent, default=default)
 
     # Split string by lines
 

@@ -118,7 +118,7 @@ class ServiceClient(requests.Session):
         content = json.dumps(
             {
                 "probes": _probes,
-                "schema": schema,
+                "schema": dict(schema),
                 "dependencies": list(map(asdict, dependencies)),
             },
             separators=(",", ":"),
