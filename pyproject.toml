@@ -74,7 +74,7 @@ cov = [
     "coverage[toml]>=5.3",
 ]
 bench = [
-    "pytest-codspeed==2.2.0",
+    "pytest-codspeed==2.2.1",
 ]
 docs = [
     "sphinx",
