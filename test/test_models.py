@@ -610,7 +610,7 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
 
 
 def test_operation_definition_as_dict():
-    definition = OperationDefinition({"A": 1, "B": 2}, {"A": 1, "B": 2, "C": 3}, "", [])
+    definition = OperationDefinition({"A": 1, "B": 2}, {"A": 1, "B": 2, "C": 3}, "")
     assert definition["C"] == 3
     assert definition.get("C") == 3
     assert definition.get("D") is None

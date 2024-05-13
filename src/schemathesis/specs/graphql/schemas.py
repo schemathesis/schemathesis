@@ -191,7 +191,6 @@ class GraphQLSchema(BaseSchema):
                         raw=definition,
                         resolved=definition,
                         scope="",
-                        parameters=[],
                         type_=operation_type,
                         field_name=field_name,
                         root_type=root_type,

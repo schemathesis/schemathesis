@@ -661,10 +661,9 @@ def test_complex_dereference(testdir, complex_schema):
         "tags": ["ancillaries"],
     }
     assert operation.definition.scope == f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath"
-    assert len(operation.definition.parameters) == 1
-    assert operation.definition.parameters[0].required
-    assert operation.definition.parameters[0].media_type == "application/json"
-    assert operation.definition.parameters[0].definition == body_definition
+    assert operation.body[0].required
+    assert operation.body[0].media_type == "application/json"
+    assert operation.body[0].definition == body_definition
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):

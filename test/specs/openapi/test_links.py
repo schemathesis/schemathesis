@@ -311,13 +311,15 @@ def test_get_container_invalid_location(swagger_20):
             raw={},
             resolved={},
             scope="",
-            parameters=[
-                OpenAPI30Parameter({"in": "query", "name": "code", "type": "integer"}),
-                OpenAPI30Parameter({"in": "query", "name": "user_id", "type": "integer"}),
-                OpenAPI30Parameter({"in": "query", "name": "common", "type": "integer"}),
-            ],
         ),
     )
+    parameters = [
+        OpenAPI30Parameter({"in": "query", "name": "code", "type": "integer"}),
+        OpenAPI30Parameter({"in": "query", "name": "user_id", "type": "integer"}),
+        OpenAPI30Parameter({"in": "query", "name": "common", "type": "integer"}),
+    ]
+    for parameter in parameters:
+        operation.add_parameter(parameter)
     case = operation.make_case()
     with pytest.raises(ValueError, match="Parameter `unknown` is not defined in API operation `GET /users/{user_id}`"):
         get_container(case, None, "unknown")
