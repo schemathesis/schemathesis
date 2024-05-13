@@ -258,9 +258,7 @@ class BaseOpenAPISchema(BaseSchema):
                         )
                         # To prevent recursion errors we need to pass not resolved schema as well
                         # It could be used for response validation
-                        raw_definition = OperationDefinition(
-                            raw_methods[method], resolved_definition, scope, parameters
-                        )
+                        raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope)
                         operation = self.make_operation(path, method, parameters, raw_definition)
                         context = HookContext(operation=operation)
                         if (
@@ -399,7 +397,7 @@ class BaseOpenAPISchema(BaseSchema):
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
-                raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope, parameters)
+                raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope)
                 yield resolved_definition["operationId"], self.make_operation(path, method, parameters, raw_definition)
 
     def get_operation_by_reference(self, reference: str) -> APIOperation:
@@ -417,7 +415,7 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = self.collect_parameters(
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )
-        raw_definition = OperationDefinition(data, resolved_definition, scope, parameters)
+        raw_definition = OperationDefinition(data, resolved_definition, scope)
         return self.make_operation(path, method, parameters, raw_definition)
 
     def get_case_strategy(
@@ -903,7 +901,7 @@ class SwaggerV20(BaseOpenAPISchema):
             else:
                 files.append((name, file_value))
 
-        for parameter in operation.definition.parameters:
+        for parameter in operation.body:
             if isinstance(parameter, OpenAPI20CompositeBody):
                 for form_parameter in parameter.definition:
                     name = form_parameter.name

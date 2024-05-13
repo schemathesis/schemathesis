@@ -539,7 +539,7 @@ D = TypeVar("D", bound=dict)
 
 
 @dataclass
-class OperationDefinition(Generic[P, D]):
+class OperationDefinition(Generic[D]):
     """A wrapper to store not resolved API operation definitions.
 
     To prevent recursion errors we need to store definitions without resolving references. But operation definitions
@@ -550,7 +550,6 @@ class OperationDefinition(Generic[P, D]):
     raw: D
     resolved: D
     scope: str
-    parameters: Sequence[P]
 
     def __contains__(self, item: str | int) -> bool:
         return item in self.resolved

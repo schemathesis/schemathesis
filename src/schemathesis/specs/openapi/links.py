@@ -201,7 +201,7 @@ class OpenAPILink(Direction):
             # Therefore the container is empty, otherwise it will be at least an empty object
             if container is None:
                 message = f"No such parameter in `{case.operation.method.upper()} {case.operation.path}`: `{name}`."
-                possibilities = [param.name for param in case.operation.definition.parameters]
+                possibilities = [param.name for param in case.operation.iter_parameters()]
                 matches = get_close_matches(name, possibilities)
                 if matches:
                     message += f" Did you mean `{matches[0]}`?"
@@ -223,7 +223,7 @@ def get_container(case: Case, location: str | None, name: str) -> dict[str, Any]
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
     else:
-        for param in case.operation.definition.parameters:
+        for param in case.operation.iter_parameters():
             if param.name == name:
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
