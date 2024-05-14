@@ -383,6 +383,32 @@ def test_missing_header_filter(empty_open_api_3_schema, mocker):
     mocked.assert_called()
 
 
+def test_serializing_shared_header_parameters():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"version": "1.0.0", "title": "Example API"},
+        "paths": {
+            "/data": {
+                "get": {
+                    "responses": {"default": {"description": "Ok"}},
+                },
+                "parameters": [
+                    {"name": "key", "type": "boolean", "in": "header"},
+                ],
+            },
+        },
+    }
+
+    schema = schemathesis.from_dict(raw_schema)
+
+    @given(schema["/data"]["GET"].as_strategy())
+    def test(case):
+        print(case)
+        assert is_valid_header(case.headers)
+
+    test()
+
+
 def test_filter_urlencoded(empty_open_api_3_schema):
     # When API schema allows for inputs that can't be serialized to `application/x-www-form-urlencoded`
     # Then such examples should be filtered out during generation

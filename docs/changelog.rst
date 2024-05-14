@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.28.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Not serializing shared parameters for an API operation.
+
 .. _v3.28.1:
 
 :version:`3.28.1 <v3.28.0...v3.28.1>` - 2024-05-11
