@@ -437,7 +437,7 @@ class BaseOpenAPISchema(BaseSchema):
         )
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
-        definitions = [item for item in operation.definition.resolved.get("parameters", []) if item["in"] == location]
+        definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, operation, self.resolver, location
         )
