@@ -39,29 +39,48 @@ def test_get_all_operations(raw_schema):
         pass
 
 
+# Schemas with pre-populated cache
+BBCI_OPERATION_ID = "Get_Categories_"
+BBCI_OPERATION_KEY = ("/categories", "get")
+BBCI_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(BBCI)
+BBCI_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(BBCI_OPERATION_ID)
+_ = BBCI_SCHEMA_WITH_OPERATIONS_CACHE.operations
+VMWARE_OPERATION_ID = "listProblemEvents"
+VMWARE_OPERATION_KEY = ("/entities/problems", "get")
+VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(VMWARE)
+VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(VMWARE_OPERATION_ID)
+_ = VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.operations
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "raw_schema, key",
     [
-        (BBCI, ("/categories", "get")),
-        (VMWARE, ("/entities/problems", "get")),
+        (BBCI, BBCI_OPERATION_KEY),
+        (VMWARE, VMWARE_OPERATION_KEY),
     ],
     ids=("bbci", "vmware"),
 )
-def test_get_operation(raw_schema, key):
+def test_get_operation_single(raw_schema, key):
     schema = schemathesis.from_dict(raw_schema)
     current = schema
     for segment in key:
         current = current[segment]
 
 
-# Schemas with pre-populated cache
-BBCI_OPERATION_ID = "Get_Categories_"
-BBCI_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(BBCI)
-BBCI_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(BBCI_OPERATION_ID)
-VMWARE_OPERATION_ID = "listProblemEvents"
-VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(VMWARE)
-VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(VMWARE_OPERATION_ID)
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "schema, key",
+    [
+        (BBCI_SCHEMA_WITH_OPERATIONS_CACHE, BBCI_OPERATION_KEY),
+        (VMWARE_SCHEMA_WITH_OPERATIONS_CACHE, VMWARE_OPERATION_KEY),
+    ],
+    ids=("bbci", "vmware"),
+)
+def test_get_operation_repeatedly(schema, key):
+    current = schema
+    for segment in key:
+        current = current[segment]
 
 
 @pytest.mark.benchmark
