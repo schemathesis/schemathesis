@@ -179,17 +179,18 @@ SCHEMA = {
 
 
 @pytest.mark.parametrize(
-    "operation_id, path, method",
+    "operation_id, reference, path, method",
     (
-        ("getFoo", "/foo", "GET"),
-        ("postBar", "/bar", "POST"),
+        ("getFoo", "#/paths/~1foo/get", "/foo", "GET"),
+        ("postBar", "#/paths/~1bar/post", "/bar", "POST"),
     ),
 )
-def test_get_operation_by_id(operation_id, path, method):
+def test_get_operation(operation_id, reference, path, method):
     schema = schemathesis.from_dict(SCHEMA)
-    operation = schema.get_operation_by_id(operation_id)
-    assert operation.path == path
-    assert operation.method.upper() == method
+    for getter, key in ((schema.get_operation_by_id, operation_id), (schema.get_operation_by_reference, reference)):
+        operation = getter(key)
+        assert operation.path == path
+        assert operation.method.upper() == method
 
 
 def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
