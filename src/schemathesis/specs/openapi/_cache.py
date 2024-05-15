@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Tuple
 
 if TYPE_CHECKING:
     from ...models import APIOperation
@@ -20,7 +20,10 @@ class OperationCacheEntry:
     __slots__ = ("path", "method", "scope", "shared_parameters", "operation")
 
 
+# During traversal, we need to keep track of the scope, path, and method
+TraversalKey = Tuple[str, str, str]
 OperationId = str
+Reference = str
 
 
 @dataclass
@@ -28,27 +31,31 @@ class OperationCache:
     """Cache for Open API operations.
 
     This cache contains multiple levels to avoid unnecessary parsing of the schema.
-
-    The first level cache contains operation IDs and their metadata. The second level cache contains
-    initialized operation instances.
-
-    The first level is populated eagerly because it is cheap. It is mostly a dict traversal and
-    a bit of reference resolving. The entries there does not own the data, they are just references to the schema.
-
-    The second level is populated lazily because it is more expensive. It requires parsing the schema, its parameters
-    and some more elaborate reference resolution.
     """
 
-    _ids_to_definitions: dict[OperationId, OperationCacheEntry] = field(default_factory=dict)
-    _ids_to_operations: dict[OperationId, APIOperation] = field(default_factory=dict)
+    # Cache to avoid schema traversal on every access
+    _id_to_definition: dict[OperationId, OperationCacheEntry] = field(default_factory=dict)
+    # Map map between 1st & 2nd level cache keys
+    # Even though 1st level keys could be directly mapped to Python objects in memory, we need to keep them separate
+    # to ensure a single owner of the operation instance.
+    _id_to_operation: dict[OperationId, int] = field(default_factory=dict)
+    _traversal_key_to_operation: dict[TraversalKey, int] = field(default_factory=dict)
+    _reference_to_operation: dict[Reference, int] = field(default_factory=dict)
+    # The actual operations
+    _operations: list[APIOperation] = field(default_factory=list)
 
     @property
     def known_operation_ids(self) -> list[str]:
-        return list(self._ids_to_definitions)
+        return list(self._id_to_definition)
 
     @property
     def has_ids_to_definitions(self) -> bool:
-        return bool(self._ids_to_definitions)
+        return bool(self._id_to_definition)
+
+    def _append_operation(self, operation: APIOperation) -> int:
+        idx = len(self._operations)
+        self._operations.append(operation)
+        return idx
 
     def insert_definition_by_id(
         self,
@@ -60,19 +67,44 @@ class OperationCache:
         operation: dict[str, Any],
     ) -> None:
         """Insert a new operation definition into cache."""
-        self._ids_to_definitions[operation_id] = OperationCacheEntry(
+        self._id_to_definition[operation_id] = OperationCacheEntry(
             path=path, method=method, scope=scope, shared_parameters=shared_parameters, operation=operation
         )
 
     def get_definition_by_id(self, operation_id: str) -> OperationCacheEntry:
         """Get an operation definition by its ID."""
         # TODO: Avoid KeyError in the future
-        return self._ids_to_definitions[operation_id]
+        return self._id_to_definition[operation_id]
 
     def insert_operation_by_id(self, operation_id: str, operation: APIOperation) -> None:
-        """Insert a new operation into cache."""
-        self._ids_to_operations[operation_id] = operation
+        """Insert a new operation into cache by ID."""
+        self._id_to_operation[operation_id] = self._append_operation(operation)
+
+    def insert_operation_by_reference(self, reference: str, operation: APIOperation) -> None:
+        """Insert a new operation into cache by reference."""
+        self._reference_to_operation[reference] = self._append_operation(operation)
+
+    def insert_operation_by_traversal_key(self, scope: str, path: str, method: str, operation: APIOperation) -> None:
+        """Insert a new operation into cache by traversal key."""
+        self._traversal_key_to_operation[(scope, path, method)] = self._append_operation(operation)
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation | None:
         """Get an operation by its ID."""
-        return self._ids_to_operations.get(operation_id)
+        idx = self._id_to_operation.get(operation_id)
+        if idx is not None:
+            return self._operations[idx]
+        return None
+
+    def get_operation_by_reference(self, reference: str) -> APIOperation | None:
+        """Get an operation by its reference."""
+        idx = self._reference_to_operation.get(reference)
+        if idx is not None:
+            return self._operations[idx]
+        return None
+
+    def get_operation_by_traversal_key(self, scope: str, path: str, method: str) -> APIOperation | None:
+        """Get an operation by its traverse key."""
+        idx = self._traversal_key_to_operation.get((scope, path, method))
+        if idx is not None:
+            return self._operations[idx]
+        return None
