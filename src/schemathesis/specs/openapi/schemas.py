@@ -383,7 +383,7 @@ class BaseOpenAPISchema(BaseSchema):
             self._on_missing_operation(operation_id, exc, matches)
 
     def _group_operations_by_id(self) -> Generator[tuple[str, APIOperation], None, None]:
-        for path, methods in self.raw_schema["paths"].items():
+        for path, methods in self.raw_schema.get("paths", {}).items():
             scope, methods = self._resolve_methods(methods)
             common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
             for method, definition in methods.items():
