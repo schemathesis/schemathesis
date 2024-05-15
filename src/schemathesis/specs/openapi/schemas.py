@@ -384,9 +384,9 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _group_operations_by_id(self) -> Generator[tuple[str, APIOperation], None, None]:
         for path, methods in self.raw_schema["paths"].items():
-            scope, raw_methods = self._resolve_methods(methods)
+            scope, methods = self._resolve_methods(methods)
             common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-            for method, definition in raw_methods.items():
+            for method, definition in methods.items():
                 if method not in HTTP_METHODS or "operationId" not in definition:
                     continue
                 self.resolver.push_scope(scope)
@@ -397,7 +397,7 @@ class BaseOpenAPISchema(BaseSchema):
                 parameters = self.collect_parameters(
                     itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
                 )
-                raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope)
+                raw_definition = OperationDefinition(methods[method], resolved_definition, scope)
                 yield resolved_definition["operationId"], self.make_operation(path, method, parameters, raw_definition)
 
     def get_operation_by_reference(self, reference: str) -> APIOperation:
