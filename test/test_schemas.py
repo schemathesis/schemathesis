@@ -1,11 +1,11 @@
 import pytest
 
 import schemathesis
-from schemathesis.exceptions import OperationSchemaError, SchemaError
+from schemathesis.exceptions import OperationNotFound, OperationSchemaError, SchemaError
 from schemathesis.experimental import OPEN_API_3_1
+from schemathesis.internal.result import Err, Ok
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
-from schemathesis.internal.result import Err, Ok
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -227,6 +227,17 @@ def test_get_operation_by_id_in_referenced_path_shared_parameters(empty_open_api
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
     assert operation.query.get("foo").definition == parameter
+
+
+def test_get_operation_by_id_no_paths_on_openapi_3_1():
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "version": "0.1.0"},
+    }
+    OPEN_API_3_1.enable()
+    schema = schemathesis.from_dict(raw_schema)
+    with pytest.raises(OperationNotFound):
+        schema.get_operation_by_id("getFoo")
 
 
 @pytest.mark.parametrize(
