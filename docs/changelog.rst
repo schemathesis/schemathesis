@@ -8,6 +8,7 @@ Changelog
 
 - Not serializing shared parameters for an API operation.
 - ``OperationNotFound`` raised in ``schema.get_operation_by_id`` if the relevant path item is behind a reference.
+- Missing parameters shared under the same path in stateful testing if the path is behind a reference.
 
 .. _v3.28.1:
 
