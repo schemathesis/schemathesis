@@ -14,6 +14,7 @@ Changelog
 **Performance**
 
 - Optimize `get_operation_by_id` method performance and reduce memory usage.
+- Optimize `get_operation_by_reference` method performance.
 
 .. _v3.28.1:
 

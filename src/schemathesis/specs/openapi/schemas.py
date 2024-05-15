@@ -387,6 +387,10 @@ class BaseOpenAPISchema(BaseSchema):
         except KeyError as exc:
             matches = get_close_matches(operation_id, cache.known_operation_ids)
             self._on_missing_operation(operation_id, exc, matches)
+        # It could'be been already accessed in a different place
+        instance = cache.get_operation_by_traversal_key(entry.scope, entry.path, entry.method)
+        if instance is not None:
+            return instance
         shared_parameters = self.resolver.resolve_all(entry.shared_parameters, RECURSION_DEPTH_LIMIT - 8)
         self.resolver.push_scope(entry.scope)
         try:
@@ -397,6 +401,7 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = self.collect_parameters(raw_parameters, resolved)
         definition = OperationDefinition(entry.operation, resolved, entry.scope)
         initialized = self.make_operation(entry.path, entry.method, parameters, definition)
+        cache.insert_operation_by_traversal_key(entry.scope, entry.path, entry.method, initialized)
         cache.insert_operation_by_id(operation_id, initialized)
         return initialized
 
@@ -427,9 +432,18 @@ class BaseOpenAPISchema(BaseSchema):
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
+        cache = self._operation_cache
+        operation = cache.get_operation_by_reference(reference)
+        if operation is not None:
+            return operation
         scope, data = self.resolver.resolve(reference)
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
+        # Check the traversal cache as it could've been populated in other places
+        traversal_key = (self.resolver.resolution_scope, path, method)
+        operation = cache.get_operation_by_traversal_key(*traversal_key)
+        if operation is not None:
+            return operation
         resolved_definition = self.resolver.resolve_all(data)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, methods = self.resolver.resolve(parent_ref)
@@ -438,7 +452,10 @@ class BaseOpenAPISchema(BaseSchema):
             itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
         )
         raw_definition = OperationDefinition(data, resolved_definition, scope)
-        return self.make_operation(path, method, parameters, raw_definition)
+        initialized = self.make_operation(path, method, parameters, raw_definition)
+        cache.insert_operation_by_reference(reference, initialized)
+        cache.insert_operation_by_traversal_key(*traversal_key, initialized)
+        return initialized
 
     def get_case_strategy(
         self,
