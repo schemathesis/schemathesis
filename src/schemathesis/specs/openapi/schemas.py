@@ -386,7 +386,7 @@ class BaseOpenAPISchema(BaseSchema):
         for path, methods in self.raw_schema["paths"].items():
             scope, raw_methods = self._resolve_methods(methods)
             common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-            for method, definition in methods.items():
+            for method, definition in raw_methods.items():
                 if method not in HTTP_METHODS or "operationId" not in definition:
                     continue
                 self.resolver.push_scope(scope)

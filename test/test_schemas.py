@@ -192,6 +192,21 @@ def test_get_operation_by_id(operation_id, path, method):
     assert operation.method.upper() == method
 
 
+def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
+    # When a path enty is behind a reference
+    # it should be resolved correctly
+    empty_open_api_3_schema["paths"]["/foo"] = {"$ref": "#/components/x-paths/Path"}
+    empty_open_api_3_schema["components"] = {
+        "x-paths": {
+            "Path": {"get": {"operationId": "getFoo", **RESPONSES}},
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema.get_operation_by_id("getFoo")
+    assert operation.path == "/foo"
+    assert operation.method.upper() == "GET"
+
+
 @pytest.mark.parametrize(
     "fixture, path",
     (
