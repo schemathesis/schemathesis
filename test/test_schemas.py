@@ -207,6 +207,28 @@ def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
     assert operation.method.upper() == "GET"
 
 
+def test_get_operation_by_id_in_referenced_path_shared_parameters(empty_open_api_3_schema):
+    # When a path enty is behind a reference
+    # and it shares parameters with the parent path
+    # it should be resolved correctly
+    # and the parameters should be merged
+    parameter = {"name": "foo", "in": "query", "schema": {"type": "string"}}
+    empty_open_api_3_schema["paths"]["/foo"] = {"$ref": "#/components/x-paths/Path"}
+    empty_open_api_3_schema["components"] = {
+        "x-paths": {
+            "Path": {
+                "get": {"operationId": "getFoo", **RESPONSES},
+                "parameters": [parameter],
+            }
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema.get_operation_by_id("getFoo")
+    assert operation.path == "/foo"
+    assert operation.method.upper() == "GET"
+    assert operation.query.get("foo").definition == parameter
+
+
 @pytest.mark.parametrize(
     "fixture, path",
     (
