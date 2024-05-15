@@ -40,6 +40,50 @@ def test_get_all_operations(raw_schema):
 
 
 @pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "raw_schema, key",
+    [
+        (BBCI, ("/categories", "get")),
+        (VMWARE, ("/entities/problems", "get")),
+    ],
+    ids=("bbci", "vmware"),
+)
+def test_get_operation(raw_schema, key):
+    schema = schemathesis.from_dict(raw_schema)
+    current = schema
+    for segment in key:
+        current = current[segment]
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "raw_schema, key",
+    [
+        (BBCI, "Get_Categories_"),
+        (VMWARE, "listProblemEvents"),
+    ],
+    ids=("bbci", "vmware"),
+)
+def test_get_operation_by_id(raw_schema, key):
+    schema = schemathesis.from_dict(raw_schema)
+    _ = schema.get_operation_by_id(key)
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "raw_schema, key",
+    [
+        (BBCI, "#/paths/~1categories/get"),
+        (VMWARE, "#/paths/~1entities~1problems/get"),
+    ],
+    ids=("bbci", "vmware"),
+)
+def test_get_operation_by_reference(raw_schema, key):
+    schema = schemathesis.from_dict(raw_schema)
+    _ = schema.get_operation_by_reference(key)
+
+
+@pytest.mark.benchmark
 @pytest.mark.parametrize("operations", [BBCI_OPERATIONS, VMWARE_OPERATIONS], ids=("bbci", "vmware"))
 def test_as_json_schema(operations):
     for operation in operations:
