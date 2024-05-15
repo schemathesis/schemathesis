@@ -11,6 +11,10 @@ Changelog
 - Missing parameters shared under the same path in stateful testing if the path is behind a reference.
 - ``KeyError`` instead of ``OperationNotFound`` when the operation ID is not found in Open API 3.1 without path entries.
 
+**Performance**
+
+- Optimize `get_operation_by_id` method performance and reduce memory usage.
+
 .. _v3.28.1:
 
 :version:`3.28.1 <v3.28.0...v3.28.1>` - 2024-05-11
