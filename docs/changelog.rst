@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Not serializing shared parameters for an API operation.
+- ``OperationNotFound`` raised in ``schema.get_operation_by_id`` if the relevant path item is behind a reference.
 
 .. _v3.28.1:
 
