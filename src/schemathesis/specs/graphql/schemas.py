@@ -143,26 +143,6 @@ class GraphQLSchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
-    def _store_operations(
-        self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
-    ) -> dict[str, APIOperationMap]:
-        output: dict[str, APIOperationMap] = {}
-        for result in operations:
-            if isinstance(result, Ok):
-                operation = result.ok()
-                definition = cast(GraphQLOperationDefinition, operation.definition)
-                type_name = (
-                    definition.type_.name if isinstance(definition.type_, graphql.GraphQLNamedType) else "Unknown"
-                )
-                if type_name not in output:
-                    map = APIOperationMap(self, {})
-                    map._data = FieldMap(map, definition.root_type, definition.type_)
-                    output[type_name] = map
-                else:
-                    map = output[type_name]
-                map[definition.field_name] = operation
-        return output
-
     def get_full_path(self, path: str) -> str:
         return self.base_path
 
