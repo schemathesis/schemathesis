@@ -20,7 +20,6 @@ from typing import (
 from urllib.parse import urlsplit, urlunsplit
 
 import graphql
-from graphql import GraphQLNamedType
 from hypothesis import strategies as st
 from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
@@ -45,6 +44,7 @@ from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import BaseSchema, APIOperationMap
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
+from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
@@ -103,8 +103,36 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    _operation_cache: OperationCache = field(default_factory=OperationCache)
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
+
+    def __iter__(self) -> Iterator[str]:
+        schema = self.client_schema
+        for operation_type in (
+            schema.query_type,
+            schema.mutation_type,
+        ):
+            if operation_type is not None:
+                yield operation_type.name
+
+    def _get_operation_map(self, key: str) -> APIOperationMap:
+        cache = self._operation_cache
+        map = cache.get_map(key)
+        if map is not None:
+            return map
+        schema = self.client_schema
+        for root_type, operation_type in (
+            (RootType.QUERY, schema.query_type),
+            (RootType.MUTATION, schema.mutation_type),
+        ):
+            if operation_type and operation_type.name == key:
+                map = APIOperationMap(self, {})
+                map._data = FieldMap(map, root_type, operation_type)
+                cache.insert_map(key, map)
+                return map
+        raise KeyError(key)
 
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raw_schema = self.raw_schema["__schema"]
@@ -123,9 +151,16 @@ class GraphQLSchema(BaseSchema):
             if isinstance(result, Ok):
                 operation = result.ok()
                 definition = cast(GraphQLOperationDefinition, operation.definition)
-                type_name = definition.type_.name if isinstance(definition.type_, GraphQLNamedType) else "Unknown"
-                for_type = output.setdefault(type_name, APIOperationMap(FieldMap()))
-                for_type[definition.field_name] = operation
+                type_name = (
+                    definition.type_.name if isinstance(definition.type_, graphql.GraphQLNamedType) else "Unknown"
+                )
+                if type_name not in output:
+                    map = APIOperationMap(self, {})
+                    map._data = FieldMap(map, definition.root_type, definition.type_)
+                    output[type_name] = map
+                else:
+                    map = output[type_name]
+                map[definition.field_name] = operation
         return output
 
     def get_full_path(self, path: str) -> str:
@@ -178,25 +213,8 @@ class GraphQLSchema(BaseSchema):
         ):
             if operation_type is None:
                 continue
-            for field_name, definition in operation_type.fields.items():
-                operation: APIOperation = APIOperation(
-                    base_url=self.get_base_url(),
-                    path=self.base_path,
-                    verbose_name=f"{operation_type.name}.{field_name}",
-                    method="POST",
-                    app=self.app,
-                    schema=self,
-                    # Parameters are not yet supported
-                    definition=GraphQLOperationDefinition(
-                        raw=definition,
-                        resolved=definition,
-                        scope="",
-                        type_=operation_type,
-                        field_name=field_name,
-                        root_type=root_type,
-                    ),
-                    case_cls=GraphQLCase,
-                )
+            for field_name, field_ in operation_type.fields.items():
+                operation = self._build_operation(root_type, operation_type, field_name, field_)
                 context = HookContext(operation=operation)
                 if (
                     should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -205,6 +223,32 @@ class GraphQLSchema(BaseSchema):
                 ):
                     continue
                 yield Ok(operation)
+
+    def _build_operation(
+        self,
+        root_type: RootType,
+        operation_type: graphql.GraphQLObjectType,
+        field_name: str,
+        field: graphql.GraphQlField,
+    ) -> APIOperation:
+        return APIOperation(
+            base_url=self.get_base_url(),
+            path=self.base_path,
+            verbose_name=f"{operation_type.name}.{field_name}",
+            method="POST",
+            app=self.app,
+            schema=self,
+            # Parameters are not yet supported
+            definition=GraphQLOperationDefinition(
+                raw=field,
+                resolved=field,
+                scope="",
+                type_=operation_type,
+                field_name=field_name,
+                root_type=root_type,
+            ),
+            case_cls=GraphQLCase,
+        )
 
     def get_case_strategy(
         self,
@@ -267,25 +311,40 @@ class FieldMap(MutableMapping):
     Provides a more specific error message if API operation is not found.
     """
 
-    data: dict[str, APIOperation] = field(default_factory=dict)
+    _parent: APIOperationMap
+    _root_type: RootType
+    _operation_type: graphql.GraphQLObjectType
 
     def __setitem__(self, key: str, value: APIOperation) -> None:
-        self.data[key] = value
+        schema = cast(GraphQLSchema, self._parent._schema)
+        schema._operation_cache.insert_operation(key, value)
 
     def __delitem__(self, key: str) -> None:
-        del self.data[key]
+        del self._operation_type.fields[key]
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self._operation_type.fields)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.data)
+        return iter(self._operation_type.fields)
+
+    def _init_operation(self, field_name: str) -> APIOperation:
+        schema = cast(GraphQLSchema, self._parent._schema)
+        cache = schema._operation_cache
+        operation = cache.get_operation(field_name)
+        if operation is not None:
+            return operation
+        operation_type = self._operation_type
+        field_ = operation_type.fields[field_name]
+        operation = schema._build_operation(self._root_type, operation_type, field_name, field_)
+        cache.insert_operation(field_name, operation)
+        return operation
 
     def __getitem__(self, item: str) -> APIOperation:
         try:
-            return self.data[item]
+            return self._init_operation(item)
         except KeyError as exc:
-            field_names = [operation.definition.field_name for operation in self.data.values()]  # type: ignore[attr-defined]
+            field_names = list(self._operation_type.fields)
             matches = get_close_matches(item, field_names)
             message = f"`{item}` field not found"
             if matches:
