@@ -39,6 +39,13 @@ def test_get_all_operations(raw_schema):
         pass
 
 
+@pytest.mark.benchmark
+@pytest.mark.parametrize("raw_schema", [BBCI, VMWARE], ids=("bbci", "vmware"))
+def test_length(raw_schema):
+    schema = schemathesis.from_dict(raw_schema)
+    _ = len(schema)
+
+
 # Schemas with pre-populated cache
 BBCI_OPERATION_ID = "Get_Categories_"
 BBCI_OPERATION_KEY = ("/categories", "get")
