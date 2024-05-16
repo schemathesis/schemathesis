@@ -112,7 +112,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def __len__(self) -> int:
-        return len(self.operations)
+        return self.operations_count
 
     def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
@@ -446,7 +446,7 @@ class BaseSchema(Mapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all defined API operations."""
-        assert len(self.operations) > 0, "No API operations found"
+        assert len(self) > 0, "No API operations found"
         strategies = [
             operation.as_strategy(
                 hooks=hooks,
