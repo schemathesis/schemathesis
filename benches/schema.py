@@ -12,37 +12,56 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 CATALOG_DIR = CURRENT_DIR / "data"
 
 
-def read_from_catalog(path: str):
+def read_json_from_catalog(path: str):
     with (CATALOG_DIR / path).open() as fd:
         return json.load(fd)
 
 
 # Small size (~2k lines in YAML)
-BBCI = read_from_catalog("bbci.json")
+BBCI = read_json_from_catalog("bbci.json")
 BBCI_SCHEMA = schemathesis.from_dict(BBCI)
 BBCI_OPERATIONS = list(BBCI_SCHEMA.get_all_operations())
 # Medium size (~8k lines in YAML)
-VMWARE = read_from_catalog("vmware.json")
+VMWARE = read_json_from_catalog("vmware.json")
 VMWARE_SCHEMA = schemathesis.from_dict(VMWARE)
 VMWARE_OPERATIONS = list(VMWARE_SCHEMA.get_all_operations())
 # Large size (~92k lines in YAML)
-STRIPE = read_from_catalog("stripe.json")
+STRIPE = read_json_from_catalog("stripe.json")
 STRIPE_SCHEMA = schemathesis.from_dict(STRIPE)
+# Medium GraphQL schema (~6k lines)
+UNIVERSE = read_json_from_catalog("universe.json")
+UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("raw_schema", [BBCI, VMWARE], ids=("bbci", "vmware"))
-def test_get_all_operations(raw_schema):
-    schema = schemathesis.from_dict(raw_schema)
+@pytest.mark.parametrize(
+    "raw_schema, loader",
+    [
+        (BBCI, schemathesis.from_dict),
+        (VMWARE, schemathesis.from_dict),
+        (UNIVERSE, schemathesis.graphql.from_dict),
+    ],
+    ids=("bbci", "vmware", "gitlab"),
+)
+def test_get_all_operations(raw_schema, loader):
+    schema = loader(raw_schema)
 
     for _ in schema.get_all_operations():
         pass
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("raw_schema", [BBCI, VMWARE], ids=("bbci", "vmware"))
-def test_length(raw_schema):
-    schema = schemathesis.from_dict(raw_schema)
+@pytest.mark.parametrize(
+    "raw_schema, loader",
+    [
+        (BBCI, schemathesis.from_dict),
+        (VMWARE, schemathesis.from_dict),
+        (UNIVERSE, schemathesis.graphql.from_dict),
+    ],
+    ids=("bbci", "vmware", "gitlab"),
+)
+def test_length(raw_schema, loader):
+    schema = loader(raw_schema)
     _ = len(schema)
 
 
@@ -57,19 +76,23 @@ VMWARE_OPERATION_KEY = ("/entities/problems", "get")
 VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(VMWARE)
 VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(VMWARE_OPERATION_ID)
 _ = VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.operations
+UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.graphql.from_dict(UNIVERSE)
+_ = UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE.operations
+UNIVERSE_OPERATION_KEY = ("Query", "manageTickets")
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
-    "raw_schema, key",
+    "raw_schema, key, loader",
     [
-        (BBCI, BBCI_OPERATION_KEY),
-        (VMWARE, VMWARE_OPERATION_KEY),
+        (BBCI, BBCI_OPERATION_KEY, schemathesis.from_dict),
+        (VMWARE, VMWARE_OPERATION_KEY, schemathesis.from_dict),
+        (UNIVERSE, UNIVERSE_OPERATION_KEY, schemathesis.graphql.from_dict),
     ],
-    ids=("bbci", "vmware"),
+    ids=("bbci", "vmware", "gitlab"),
 )
-def test_get_operation_single(raw_schema, key):
-    schema = schemathesis.from_dict(raw_schema)
+def test_get_operation_single(raw_schema, key, loader):
+    schema = loader(raw_schema)
     current = schema
     for segment in key:
         current = current[segment]
