@@ -56,9 +56,10 @@ def test_get_all_operations(raw_schema, loader):
     [
         (BBCI, schemathesis.from_dict),
         (VMWARE, schemathesis.from_dict),
+        (STRIPE, schemathesis.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
     ],
-    ids=("bbci", "vmware", "universe"),
+    ids=("bbci", "vmware", "stripe", "universe"),
 )
 def test_length(raw_schema, loader):
     schema = loader(raw_schema)
