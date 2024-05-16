@@ -41,7 +41,7 @@ UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
         (VMWARE, schemathesis.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
     ],
-    ids=("bbci", "vmware", "gitlab"),
+    ids=("bbci", "vmware", "universe"),
 )
 def test_get_all_operations(raw_schema, loader):
     schema = loader(raw_schema)
@@ -58,7 +58,7 @@ def test_get_all_operations(raw_schema, loader):
         (VMWARE, schemathesis.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
     ],
-    ids=("bbci", "vmware", "gitlab"),
+    ids=("bbci", "vmware", "universe"),
 )
 def test_length(raw_schema, loader):
     schema = loader(raw_schema)
@@ -89,7 +89,7 @@ UNIVERSE_OPERATION_KEY = ("Query", "manageTickets")
         (VMWARE, VMWARE_OPERATION_KEY, schemathesis.from_dict),
         (UNIVERSE, UNIVERSE_OPERATION_KEY, schemathesis.graphql.from_dict),
     ],
-    ids=("bbci", "vmware", "gitlab"),
+    ids=("bbci", "vmware", "universe"),
 )
 def test_get_operation_single(raw_schema, key, loader):
     schema = loader(raw_schema)
@@ -104,8 +104,9 @@ def test_get_operation_single(raw_schema, key, loader):
     [
         (BBCI_SCHEMA_WITH_OPERATIONS_CACHE, BBCI_OPERATION_KEY),
         (VMWARE_SCHEMA_WITH_OPERATIONS_CACHE, VMWARE_OPERATION_KEY),
+        (UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE, UNIVERSE_OPERATION_KEY),
     ],
-    ids=("bbci", "vmware"),
+    ids=("bbci", "vmware", "universe"),
 )
 def test_get_operation_repeatedly(schema, key):
     current = schema
