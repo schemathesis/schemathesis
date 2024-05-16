@@ -217,6 +217,19 @@ class BaseOpenAPISchema(BaseSchema):
 
         return _add_override
 
+    def _resolve_shared_parameters(self, path_item: Mapping[str, Any]) -> list[dict[str, Any]]:
+        return self.resolver.resolve_all(path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
+
+    def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
+        return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
+
+    def _collect_operation_parameters(
+        self, path_item: Mapping[str, Any], operation: dict[str, Any]
+    ) -> list[OpenAPIParameter]:
+        shared_parameters = self._resolve_shared_parameters(path_item)
+        parameters = operation.get("parameters", ())
+        return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
+
     def get_all_operations(
         self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
@@ -254,29 +267,17 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 self.dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = self._resolve_path_item(path_item)
-                shared_parameters = self.resolver.resolve_all(
-                    path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8
-                )
-                for method, definition in path_item.items():
+                shared_parameters = self._resolve_shared_parameters(path_item)
+                for method, entry in path_item.items():
+                    if method not in HTTP_METHODS:
+                        continue
                     try:
-                        # Setting a low recursion limit doesn't solve the problem with recursive references & inlining
-                        # too much but decreases the number of cases when Schemathesis stuck on this step.
-                        self.resolver.push_scope(scope)
-                        try:
-                            resolved_definition = self.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)
-                        finally:
-                            self.resolver.pop_scope()
-                        # Only method definitions are parsed
-                        if self._should_skip(method, resolved_definition):
+                        resolved = self._resolve_operation(entry)
+                        if self._should_skip(method, resolved):
                             continue
-                        parameters = self.collect_parameters(
-                            itertools.chain(resolved_definition.get("parameters", ()), shared_parameters),
-                            resolved_definition,
-                        )
-                        # To prevent recursion errors we need to pass not resolved schema as well
-                        # It could be used for response validation
-                        raw_definition = OperationDefinition(path_item[method], resolved_definition, scope)
-                        operation = self.make_operation(path, method, parameters, raw_definition)
+                        parameters = resolved.get("parameters", ())
+                        parameters = self.collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
+                        operation = self.make_operation(path, method, parameters, entry, resolved, scope)
                         context = HookContext(operation=operation)
                         if (
                             should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -348,7 +349,9 @@ class BaseOpenAPISchema(BaseSchema):
         path: str,
         method: str,
         parameters: list[OpenAPIParameter],
-        raw_definition: OperationDefinition,
+        raw: dict[str, Any],
+        resolved: dict[str, Any],
+        scope: str,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -356,7 +359,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
             path=path,
             method=method,
-            definition=raw_definition,
+            definition=OperationDefinition(raw, resolved, scope),
             base_url=base_url,
             app=self.app,
             schema=self,
@@ -407,16 +410,9 @@ class BaseOpenAPISchema(BaseSchema):
         instance = cache.get_operation_by_traversal_key(entry.scope, entry.path, entry.method)
         if instance is not None:
             return instance
-        shared_parameters = self.resolver.resolve_all(entry.shared_parameters, RECURSION_DEPTH_LIMIT - 8)
-        self.resolver.push_scope(entry.scope)
-        try:
-            resolved = self.resolver.resolve_all(entry.operation, RECURSION_DEPTH_LIMIT - 8)
-        finally:
-            self.resolver.pop_scope()
-        raw_parameters = itertools.chain(resolved.get("parameters", ()), shared_parameters)
-        parameters = self.collect_parameters(raw_parameters, resolved)
-        definition = OperationDefinition(entry.operation, resolved, entry.scope)
-        initialized = self.make_operation(entry.path, entry.method, parameters, definition)
+        resolved = self._resolve_operation(entry.operation)
+        parameters = self._collect_operation_parameters(entry.path_item, resolved)
+        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, resolved, entry.scope)
         cache.insert_operation_by_traversal_key(entry.scope, entry.path, entry.method, initialized)
         cache.insert_operation_by_id(operation_id, initialized)
         return initialized
@@ -439,7 +435,7 @@ class BaseOpenAPISchema(BaseSchema):
                         path=path,
                         method=key,
                         scope=scope,
-                        shared_parameters=path_item.get("parameters", []),
+                        path_item=path_item,
                         operation=entry,
                     )
 
@@ -449,28 +445,24 @@ class BaseOpenAPISchema(BaseSchema):
         Reference example: #/paths/~1users~1{user_id}/patch
         """
         cache = self._operation_cache
-        operation = cache.get_operation_by_reference(reference)
-        if operation is not None:
-            return operation
-        scope, data = self.resolver.resolve(reference)
+        cached = cache.get_operation_by_reference(reference)
+        if cached is not None:
+            return cached
+        scope, operation = self.resolver.resolve(reference)
         path, method = scope.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
         # Check the traversal cache as it could've been populated in other places
         traversal_key = (self.resolver.resolution_scope, path, method)
-        operation = cache.get_operation_by_traversal_key(*traversal_key)
-        if operation is not None:
-            return operation
-        resolved_definition = self.resolver.resolve_all(data)
+        cached = cache.get_operation_by_traversal_key(*traversal_key)
+        if cached is not None:
+            return cached
+        resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, methods = self.resolver.resolve(parent_ref)
-        common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-        parameters = self.collect_parameters(
-            itertools.chain(resolved_definition.get("parameters", ()), common_parameters), resolved_definition
-        )
-        raw_definition = OperationDefinition(data, resolved_definition, scope)
-        initialized = self.make_operation(path, method, parameters, raw_definition)
-        cache.insert_operation_by_reference(reference, initialized)
+        _, path_item = self.resolver.resolve(parent_ref)
+        parameters = self._collect_operation_parameters(path_item, resolved)
+        initialized = self.make_operation(path, method, parameters, operation, resolved, scope)
         cache.insert_operation_by_traversal_key(*traversal_key, initialized)
+        cache.insert_operation_by_reference(reference, initialized)
         return initialized
 
     def get_case_strategy(
@@ -814,6 +806,8 @@ class MethodMap(Mapping):
     # Storage for definitions
     _path_item: CaseInsensitiveDict
 
+    __slots__ = ("_parent", "_scope", "_path", "_path_item")
+
     def __len__(self) -> int:
         return len(self._path_item)
 
@@ -822,7 +816,6 @@ class MethodMap(Mapping):
 
     def _init_operation(self, method: str) -> APIOperation:
         method = method.lower()
-        # TODO: Prevent accessing something that is not a method
         operation = self._path_item[method]
         schema = cast(BaseOpenAPISchema, self._parent._schema)
         cache = schema._operation_cache
@@ -831,17 +824,13 @@ class MethodMap(Mapping):
         instance = cache.get_operation_by_traversal_key(scope, path, method)
         if instance is not None:
             return instance
-        shared_parameters = self._path_item.get("parameters", [])
-        shared_parameters = schema.resolver.resolve_all(shared_parameters, RECURSION_DEPTH_LIMIT - 8)
         schema.resolver.push_scope(scope)
         try:
-            resolved = schema.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
+            resolved = schema._resolve_operation(operation)
         finally:
             schema.resolver.pop_scope()
-        raw_parameters = itertools.chain(resolved.get("parameters", ()), shared_parameters)
-        parameters = schema.collect_parameters(raw_parameters, resolved)
-        definition = OperationDefinition(operation, resolved, scope)
-        initialized = schema.make_operation(path, method, parameters, definition)
+        parameters = schema._collect_operation_parameters(self._path_item, resolved)
+        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope)
         cache.insert_operation_by_traversal_key(scope, path, method, initialized)
         return initialized
 

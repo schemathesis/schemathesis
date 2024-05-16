@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.28.1...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**:
+
+- **INTERNAL**: Remove the ability to mutate components used in ``schema["/path"]["METHOD"]`` access patterns.
+
 **Fixed**
 
 - Not serializing shared parameters for an API operation.
@@ -13,7 +17,7 @@ Changelog
 
 **Performance**
 
-- Optimize ``schema["/path"]["methods"]`` access patterns and reduce memory usage.
+- Optimize ``schema["/path"]["METHOD"]`` access patterns and reduce memory usage.
 - Optimize ``get_operation_by_id`` method performance and reduce memory usage.
 - Optimize ``get_operation_by_reference`` method performance.
 - Less copying during schema traversal.

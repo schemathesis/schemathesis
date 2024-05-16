@@ -551,6 +551,8 @@ class OperationDefinition(Generic[D]):
     resolved: D
     scope: str
 
+    __slots__ = ("raw", "resolved", "scope")
+
     def __contains__(self, item: str | int) -> bool:
         return item in self.resolved
 
