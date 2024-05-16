@@ -104,9 +104,12 @@ class BaseSchema(Mapping):
     def __getitem__(self, item: str) -> APIOperationMap:
         __tracebackhide__ = True
         try:
-            return self.operations[item]
+            return self._get_operation_map(item)
         except KeyError as exc:
             self.on_missing_operation(item, exc)
+
+    def _get_operation_map(self, key: str) -> APIOperationMap:
+        raise NotImplementedError
 
     def on_missing_operation(self, item: str, exc: KeyError) -> NoReturn:
         raise NotImplementedError
@@ -463,22 +466,23 @@ class BaseSchema(Mapping):
 
 @dataclass
 class APIOperationMap(MutableMapping):
-    data: MutableMapping
+    _schema: BaseSchema
+    _data: MutableMapping
 
     def __setitem__(self, key: str, value: APIOperation) -> None:
-        self.data[key] = value
+        self._data[key] = value
 
     def __getitem__(self, item: str) -> APIOperation:
-        return self.data[item]
+        return self._data[item]
 
     def __delitem__(self, key: str) -> None:
-        del self.data[key]
+        del self._data[key]
 
     def __len__(self) -> int:
-        return len(self.data)
+        return len(self._data)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.data)
+        return iter(self._data)
 
     def as_strategy(
         self,
@@ -489,7 +493,7 @@ class APIOperationMap(MutableMapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all API operations defined in this subset."""
-        assert len(self.data) > 0, "No API operations found"
+        assert len(self._data) > 0, "No API operations found"
         strategies = [
             operation.as_strategy(
                 hooks=hooks,
@@ -498,6 +502,6 @@ class APIOperationMap(MutableMapping):
                 generation_config=generation_config,
                 **kwargs,
             )
-            for operation in self.data.values()
+            for operation in self._data.values()
         ]
         return combine_strategies(strategies)

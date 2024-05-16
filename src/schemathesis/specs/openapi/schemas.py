@@ -115,6 +115,9 @@ class BaseOpenAPISchema(BaseSchema):
         info = self.raw_schema["info"]
         return f"<{self.__class__.__name__} for {info['title']} {info['version']}>"
 
+    def _get_operation_map(self, key: str) -> APIOperationMap:
+        return self.operations[key]
+
     def _store_operations(
         self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
     ) -> dict[str, APIOperationMap]:
@@ -812,7 +815,7 @@ def operations_to_dict(
     for result in operations:
         if isinstance(result, Ok):
             operation = result.ok()
-            output.setdefault(operation.path, APIOperationMap(MethodMap()))
+            output.setdefault(operation.path, APIOperationMap(operation.schema, MethodMap()))
             output[operation.path][operation.method] = operation
     return output
 
