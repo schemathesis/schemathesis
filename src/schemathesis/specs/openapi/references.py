@@ -65,10 +65,13 @@ class InliningResolver(jsonschema.RefResolver):
 
     def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
         """Recursively resolve all references in the given object."""
+        resolve = self.resolve_all
         if isinstance(item, dict):
             ref = item.get("$ref")
-            if ref is not None and isinstance(ref, str):
-                with self.resolving(ref) as resolved:
+            if isinstance(ref, str):
+                url, resolved = self.resolve(ref)
+                self.push_scope(url)
+                try:
                     # If the next level of recursion exceeds the limit, then we need to copy it explicitly
                     # In other cases, this method create new objects for mutable types (dict & list)
                     next_recursion_level = recursion_level + 1
@@ -76,10 +79,18 @@ class InliningResolver(jsonschema.RefResolver):
                         copied = fast_deepcopy(resolved)
                         remove_optional_references(copied)
                         return copied
-                    return self.resolve_all(resolved, next_recursion_level)
-            return {key: self.resolve_all(sub_item, recursion_level) for key, sub_item in item.items()}
+                    return resolve(resolved, next_recursion_level)
+                finally:
+                    self.pop_scope()
+            return {
+                key: resolve(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
+                for key, sub_item in item.items()
+            }
         if isinstance(item, list):
-            return [self.resolve_all(sub_item, recursion_level) for sub_item in item]
+            return [
+                self.resolve_all(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
+                for sub_item in item
+            ]
         return item
 
     def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
