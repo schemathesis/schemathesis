@@ -240,7 +240,7 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 self.dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = self._resolve_path_item(path_item)
-                common_parameters = self.resolver.resolve_all(
+                shared_parameters = self.resolver.resolve_all(
                     path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8
                 )
                 for method, definition in path_item.items():
@@ -256,7 +256,7 @@ class BaseOpenAPISchema(BaseSchema):
                         if self._should_skip(method, resolved_definition):
                             continue
                         parameters = self.collect_parameters(
-                            itertools.chain(resolved_definition.get("parameters", ()), common_parameters),
+                            itertools.chain(resolved_definition.get("parameters", ()), shared_parameters),
                             resolved_definition,
                         )
                         # To prevent recursion errors we need to pass not resolved schema as well
