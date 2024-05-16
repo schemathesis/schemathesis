@@ -109,7 +109,7 @@ def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers
 
 def test_direct_access(schema):
     # Then valid operations should be accessible via the mapping interface
-    assert len(schema) == 1
+    assert len(schema) == 2
     assert schema["/bar"]["GET"]
 
 
