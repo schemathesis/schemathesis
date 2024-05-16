@@ -15,6 +15,7 @@ Changelog
 
 - Optimize `get_operation_by_id` method performance and reduce memory usage.
 - Optimize `get_operation_by_reference` method performance.
+- Less copying during schema traversal.
 
 .. _v3.28.1:
 
