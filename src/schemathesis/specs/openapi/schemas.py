@@ -232,16 +232,18 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc)
 
         context = HookContext()
-        for path, methods in paths.items():
+        for path, path_item in paths.items():
             method = None
             try:
                 full_path = self.get_full_path(path)  # Should be available for later use
                 if should_skip_endpoint(full_path, self.endpoint):
                     continue
-                self.dispatch_hook("before_process_path", context, path, methods)
-                scope, raw_methods = self._resolve_methods(methods)
-                common_parameters = self.resolver.resolve_all(methods.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-                for method, definition in raw_methods.items():
+                self.dispatch_hook("before_process_path", context, path, path_item)
+                scope, path_item = self._resolve_path_item(path_item)
+                common_parameters = self.resolver.resolve_all(
+                    path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8
+                )
+                for method, definition in path_item.items():
                     try:
                         # Setting a low recursion limit doesn't solve the problem with recursive references & inlining
                         # too much but decreases the number of cases when Schemathesis stuck on this step.
@@ -259,7 +261,7 @@ class BaseOpenAPISchema(BaseSchema):
                         )
                         # To prevent recursion errors we need to pass not resolved schema as well
                         # It could be used for response validation
-                        raw_definition = OperationDefinition(raw_methods[method], resolved_definition, scope)
+                        raw_definition = OperationDefinition(path_item[method], resolved_definition, scope)
                         operation = self.make_operation(path, method, parameters, raw_definition)
                         context = HookContext(operation=operation)
                         if (
@@ -319,13 +321,13 @@ class BaseOpenAPISchema(BaseSchema):
         """
         raise NotImplementedError
 
-    def _resolve_methods(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        # We need to know a proper scope in what methods are.
-        # It will allow us to provide a proper reference resolving in `response_schema_conformance` and avoid
-        # recursion errors
+    def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+        # The path item could be behind a reference
+        # In this case, we need to resolve it to get the proper scope for reference inside the item.
+        # It is mostly for validating responses.
         if "$ref" in methods:
-            return fast_deepcopy(self.resolver.resolve(methods["$ref"]))
-        return self.resolver.resolution_scope, fast_deepcopy(methods)
+            return self.resolver.resolve(methods["$ref"])
+        return self.resolver.resolution_scope, methods
 
     def make_operation(
         self,
