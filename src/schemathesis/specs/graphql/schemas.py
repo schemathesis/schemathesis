@@ -14,7 +14,7 @@ from typing import (
     cast,
     TYPE_CHECKING,
     NoReturn,
-    MutableMapping,
+    Mapping,
     Iterator,
 )
 from urllib.parse import urlsplit, urlunsplit
@@ -285,7 +285,7 @@ class GraphQLSchema(BaseSchema):
 
 
 @dataclass
-class FieldMap(MutableMapping):
+class FieldMap(Mapping):
     """Container for accessing API operations.
 
     Provides a more specific error message if API operation is not found.
@@ -295,12 +295,7 @@ class FieldMap(MutableMapping):
     _root_type: RootType
     _operation_type: graphql.GraphQLObjectType
 
-    def __setitem__(self, key: str, value: APIOperation) -> None:
-        schema = cast(GraphQLSchema, self._parent._schema)
-        schema._operation_cache.insert_operation(key, value)
-
-    def __delitem__(self, key: str) -> None:
-        del self._operation_type.fields[key]
+    __slots__ = ("_parent", "_root_type", "_operation_type")
 
     def __len__(self) -> int:
         return len(self._operation_type.fields)

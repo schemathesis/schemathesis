@@ -14,11 +14,11 @@ class OperationCacheEntry:
     method: str
     # The resolution scope of the operation
     scope: str
-    # Parameters shared among all operations in the path
-    shared_parameters: list[dict[str, Any]]
+    # Parent path item
+    path_item: dict[str, Any]
     # Unresolved operation definition
     operation: dict[str, Any]
-    __slots__ = ("path", "method", "scope", "shared_parameters", "operation")
+    __slots__ = ("path", "method", "scope", "path_item", "operation")
 
 
 # During traversal, we need to keep track of the scope, path, and method
@@ -66,12 +66,12 @@ class OperationCache:
         path: str,
         method: str,
         scope: str,
-        shared_parameters: list[dict[str, Any]],
+        path_item: dict[str, Any],
         operation: dict[str, Any],
     ) -> None:
         """Insert a new operation definition into cache."""
         self._id_to_definition[operation_id] = OperationCacheEntry(
-            path=path, method=method, scope=scope, shared_parameters=shared_parameters, operation=operation
+            path=path, method=method, scope=scope, path_item=path_item, operation=operation
         )
 
     def get_definition_by_id(self, operation_id: str) -> OperationCacheEntry:
