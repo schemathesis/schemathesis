@@ -269,8 +269,6 @@ def test_unknown_field_name(graphql_schema, name, expected):
 def test_field_map_operations(graphql_schema):
     assert len(graphql_schema["Query"]) == 2
     assert list(iter(graphql_schema["Query"])) == ["getBooks", "getAuthors"]
-    del graphql_schema["Query"]["getBooks"]
-    assert len(graphql_schema["Query"]) == 1
 
 
 def test_repr(graphql_schema):

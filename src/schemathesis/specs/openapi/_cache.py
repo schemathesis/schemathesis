@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any, Tuple
 
 if TYPE_CHECKING:
     from ...models import APIOperation
+    from ...schemas import APIOperationMap
 
 
 @dataclass
@@ -43,6 +44,8 @@ class OperationCache:
     _reference_to_operation: dict[Reference, int] = field(default_factory=dict)
     # The actual operations
     _operations: list[APIOperation] = field(default_factory=list)
+    # Cache for operation maps
+    _maps: dict[str, APIOperationMap] = field(default_factory=dict)
 
     @property
     def known_operation_ids(self) -> list[str]:
@@ -108,3 +111,9 @@ class OperationCache:
         if idx is not None:
             return self._operations[idx]
         return None
+
+    def get_map(self, key: str) -> APIOperationMap | None:
+        return self._maps.get(key)
+
+    def insert_map(self, key: str, value: APIOperationMap) -> None:
+        self._maps[key] = value

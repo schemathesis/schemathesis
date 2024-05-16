@@ -49,8 +49,6 @@ def test_add_link_no_operations_cache(schema_url, status_code):
     # When we add a link to the target API operation
     source = schema["/users/"]["POST"]
     target = schema["/users/{user_id}"]["GET"]
-    # And the operations are not cached
-    delattr(schema, "_operations")
     schema.add_link(
         source=source,
         target=target,
@@ -58,7 +56,6 @@ def test_add_link_no_operations_cache(schema_url, status_code):
         parameters={"userId": "$response.body#/id"},
     )
     # Then it should be added without errors
-    # And the cache cleanup should be no-op
     links = schema["/users/"]["POST"].definition["responses"]["201"]["links"]
     assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
@@ -141,29 +138,24 @@ def test_add_link_nothing_is_provided(schema_url):
     "change, message",
     (
         (
-            lambda s, e: setattr(e, "method", "GET"),
-            "No such API operation: `GET /users/`. Did you mean `POST /users/`?",
+            lambda e: setattr(e, "method", "GET"),
+            "Method `GET` not found. Available methods: POST",
         ),
         (
-            lambda s, e: setattr(e, "path", "/userz/"),
-            "No such API operation: `POST /userz/`. Did you mean `POST /users/`?",
+            lambda e: setattr(e, "path", "/userz/"),
+            "`/userz/` not found. Did you mean `/users/`?",
         ),
-        (lambda s, e: setattr(e, "path", "/what?/"), "No such API operation: `POST /what?/`."),
-        (
-            lambda s, e: s.raw_schema["paths"].__setitem__("/users/", {}),
-            "No such API operation: `POST /users/`.",
-        ),
+        (lambda e: setattr(e, "path", "/what?/"), "`/what?/` not found"),
     ),
+    ids=("method-change", "path-with-suggestion", "path-without-suggestion"),
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_unknown_operation(schema_url, change, message):
     schema = schemathesis.from_uri(schema_url)
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
-    change(schema, source)
-    with pytest.raises(
-        ValueError, match=re.escape(f"{message} Check if the requested API operation passes the filters in the schema.")
-    ):
+    change(source)
+    with pytest.raises(KeyError, match=re.escape(message)):
         # Then there should be an error about it.
         schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
 
