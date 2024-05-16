@@ -9,7 +9,7 @@ They give only static definitions of paths.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -99,7 +99,7 @@ class BaseSchema(Mapping):
     sanitize_output: bool = True
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.operations)
+        raise NotImplementedError
 
     def __getitem__(self, item: str) -> APIOperationMap:
         __tracebackhide__ = True
@@ -156,18 +156,6 @@ class BaseSchema(Mapping):
         return self._build_base_url()
 
     def validate(self) -> None:
-        raise NotImplementedError
-
-    @property
-    def operations(self) -> dict[str, APIOperationMap]:
-        if not hasattr(self, "_operations"):
-            operations = self.get_all_operations()
-            self._operations = self._store_operations(operations)
-        return self._operations
-
-    def _store_operations(
-        self, operations: Generator[Result[APIOperation, OperationSchemaError], None, None]
-    ) -> dict[str, APIOperationMap]:
         raise NotImplementedError
 
     @property
@@ -451,32 +439,26 @@ class BaseSchema(Mapping):
         """Build a strategy for generating test cases for all defined API operations."""
         assert len(self) > 0, "No API operations found"
         strategies = [
-            operation.as_strategy(
+            operation.ok().as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
                 data_generation_method=data_generation_method,
                 generation_config=generation_config,
                 **kwargs,
             )
-            for operations in self.operations.values()
-            for operation in operations.values()
+            for operation in self.get_all_operations(hooks=hooks)
+            if isinstance(operation, Ok)
         ]
         return combine_strategies(strategies)
 
 
 @dataclass
-class APIOperationMap(MutableMapping):
+class APIOperationMap(Mapping):
     _schema: BaseSchema
-    _data: MutableMapping
-
-    def __setitem__(self, key: str, value: APIOperation) -> None:
-        self._data[key] = value
+    _data: Mapping
 
     def __getitem__(self, item: str) -> APIOperation:
         return self._data[item]
-
-    def __delitem__(self, key: str) -> None:
-        del self._data[key]
 
     def __len__(self) -> int:
         return len(self._data)
