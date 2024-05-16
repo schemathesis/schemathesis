@@ -395,9 +395,9 @@ class BaseOpenAPISchema(BaseSchema):
     def get_operation_by_id(self, operation_id: str) -> APIOperation:
         """Get an `APIOperation` instance by its `operationId`."""
         cache = self._operation_cache
-        operation = cache.get_operation_by_id(operation_id)
-        if operation is not None:
-            return operation
+        cached = cache.get_operation_by_id(operation_id)
+        if cached is not None:
+            return cached
         # Operation has not been accessed yet, need to populate the cache
         if not cache.has_ids_to_definitions:
             self._populate_operation_id_cache(cache)
@@ -821,9 +821,9 @@ class MethodMap(Mapping):
         cache = schema._operation_cache
         path = self._path
         scope = self._scope
-        instance = cache.get_operation_by_traversal_key(scope, path, method)
-        if instance is not None:
-            return instance
+        cached = cache.get_operation_by_traversal_key(scope, path, method)
+        if cached is not None:
+            return cached
         schema.resolver.push_scope(scope)
         try:
             resolved = schema._resolve_operation(operation)
