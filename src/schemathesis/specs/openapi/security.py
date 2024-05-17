@@ -125,12 +125,10 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
         """In Open API 3 security definitions are located in ``components`` and may have references inside."""
         components = schema.get("components", {})
         security_schemes = components.get("securitySchemes", {})
+        resolve = resolver.resolve
         if "$ref" in security_schemes:
-            return resolver.resolve(security_schemes["$ref"])[1]
-        return {
-            key: resolver.resolve(value["$ref"])[1] if "$ref" in value else value
-            for key, value in security_schemes.items()
-        }
+            return resolve(security_schemes["$ref"])[1]
+        return {key: resolve(value["$ref"])[1] if "$ref" in value else value for key, value in security_schemes.items()}
 
     def _make_http_auth_parameter(self, definition: dict[str, Any]) -> dict[str, Any]:
         schema = make_auth_header_schema(definition)
