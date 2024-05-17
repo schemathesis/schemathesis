@@ -929,7 +929,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return get_strategies_from_examples(operation, self.examples_field)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(fast_deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
         schema = definition.get("schema")
         if not schema:
             return scopes, None
@@ -1089,7 +1089,7 @@ class OpenApi30(SwaggerV20):
         return collected
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(fast_deepcopy(definition), scope)
+        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object
