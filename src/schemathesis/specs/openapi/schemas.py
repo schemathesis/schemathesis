@@ -591,7 +591,7 @@ class BaseOpenAPISchema(BaseSchema):
         return result
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
-        return operation.definition.resolved.get("tags")
+        return operation.definition.raw.get("tags")
 
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
@@ -1100,7 +1100,10 @@ class OpenApi30(SwaggerV20):
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return list(operation.definition.resolved["requestBody"]["content"].keys())
+        request_body = operation.definition.raw["requestBody"]
+        while "$ref" in request_body:
+            _, request_body = self.resolver.resolve(request_body["$ref"])
+        return list(request_body["content"].keys())
 
     def prepare_multipart(
         self, form_data: FormData, operation: APIOperation

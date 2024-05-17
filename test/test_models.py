@@ -27,25 +27,44 @@ def schema_with_payload(empty_open_api_3_schema):
                 },
                 "responses": {"200": {"description": "OK"}},
             },
+            "put": {
+                "requestBody": {"$ref": "#/components/requestBodies/Sample"},
+                "responses": {"200": {"description": "OK"}},
+            },
+            "patch": {
+                "requestBody": {"$ref": "#/components/requestBodies/Ref"},
+                "responses": {"200": {"description": "OK"}},
+            },
         },
     }
-    return schemathesis.from_dict(empty_open_api_3_schema)
+    empty_open_api_3_schema["components"] = {
+        "requestBodies": {
+            "Sample": {
+                "required": True,
+                "content": {"text/plain": {"schema": {"type": "object"}}},
+            },
+            "Ref": {"$ref": "#/components/requestBodies/Sample"},
+        }
+    }
+    return schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
 
 
 def test_make_case_explicit_media_type(schema_with_payload):
     # When there is only one possible media type
     # And the `media_type` argument is passed to `make_case` explicitly
-    case = schema_with_payload["/data"]["POST"].make_case(body="<foo></foo>", media_type="text/xml")
-    # Then this explicit media type should be in `case`
-    assert case.media_type == "text/xml"
+    for method in ("POST", "PUT", "PATCH"):
+        case = schema_with_payload["/data"][method].make_case(body="<foo></foo>", media_type="text/xml")
+        # Then this explicit media type should be in `case`
+        assert case.media_type == "text/xml"
 
 
 def test_make_case_automatic_media_type(schema_with_payload):
     # When there is only one possible media type
     # And the `media_type` argument is not passed to `make_case`
-    case = schema_with_payload["/data"]["POST"].make_case(body="foo")
-    # Then it should be chosen automatically
-    assert case.media_type == "text/plain"
+    for method in ("POST", "PUT", "PATCH"):
+        case = schema_with_payload["/data"][method].make_case(body="foo")
+        # Then it should be chosen automatically
+        assert case.media_type == "text/plain"
 
 
 def test_make_case_missing_media_type(empty_open_api_3_schema):
