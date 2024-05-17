@@ -29,7 +29,7 @@ from test.utils import assert_requests_call
 
 
 def make_operation(schema, **kwargs) -> APIOperation:
-    return APIOperation("/users", "POST", definition=OperationDefinition({}, {}, "foo"), schema=schema, **kwargs)
+    return APIOperation("/users", "POST", definition=OperationDefinition({}, ""), schema=schema, **kwargs)
 
 
 @pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
@@ -85,7 +85,7 @@ def test_no_body_in_get(swagger_20):
     operation = APIOperation(
         path="/api/success",
         method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, ""),
         schema=swagger_20,
         query=ParameterSet(
             [
@@ -112,7 +112,7 @@ def test_invalid_body_in_get(swagger_20):
     operation = APIOperation(
         path="/foo",
         method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, ""),
         schema=swagger_20,
         body=PayloadAlternatives(
             [
@@ -138,7 +138,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
     operation = APIOperation(
         path="/foo",
         method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, ""),
         schema=schema,
         body=PayloadAlternatives(
             [
@@ -266,7 +266,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     operation = APIOperation(
         "/api/success",
         "GET",
-        definition=OperationDefinition({}, {}, "foo"),
+        definition=OperationDefinition({}, ""),
         schema=swagger_20,
         base_url=openapi2_base_url,
         headers=ParameterSet([OpenAPI20Parameter(definition)]),

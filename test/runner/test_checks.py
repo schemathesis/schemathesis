@@ -24,9 +24,7 @@ from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
-    operation = models.APIOperation(
-        "/path", "GET", definition=OperationDefinition(definition, definition, None), schema=schema
-    )
+    operation = models.APIOperation("/path", "GET", definition=OperationDefinition(definition, ""), schema=schema)
     return models.Case(operation, generation_time=0.0)
 
 

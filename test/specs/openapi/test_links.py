@@ -307,11 +307,7 @@ def test_get_container_invalid_location(swagger_20):
         method="get",
         schema=swagger_20,
         verbose_name="GET /users/{user_id}",
-        definition=OperationDefinition(
-            raw={},
-            resolved={},
-            scope="",
-        ),
+        definition=OperationDefinition(raw={}, scope=""),
     )
     parameters = [
         OpenAPI30Parameter({"in": "query", "name": "code", "type": "integer"}),

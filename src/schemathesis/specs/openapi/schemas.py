@@ -235,7 +235,7 @@ class BaseOpenAPISchema(BaseSchema):
         self, path_item: Mapping[str, Any], operation: dict[str, Any]
     ) -> list[OpenAPIParameter]:
         shared_parameters = self._resolve_shared_parameters(path_item)
-        parameters = operation.get("parameters", ())
+        parameters = self.resolver.resolve_all(operation.get("parameters", ()), RECURSION_DEPTH_LIMIT - 8)
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(
@@ -273,7 +273,7 @@ class BaseOpenAPISchema(BaseSchema):
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
         resolve_shared_parameters = self._resolve_shared_parameters
-        resolve_operation = self._resolve_operation
+        resolve_all = self.resolver.resolve_all
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
         make_operation = self.make_operation
@@ -291,12 +291,12 @@ class BaseOpenAPISchema(BaseSchema):
                     if method not in HTTP_METHODS:
                         continue
                     try:
-                        resolved = resolve_operation(entry)
-                        if should_skip(method, resolved):
+                        # TODO: some resolving might be needed
+                        if should_skip(method, entry):
                             continue
-                        parameters = resolved.get("parameters", ())
-                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                        operation = make_operation(path, method, parameters, entry, resolved, scope)
+                        parameters = resolve_all(entry.get("parameters", ()), RECURSION_DEPTH_LIMIT - 8)
+                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
+                        operation = make_operation(path, method, parameters, entry, scope)
                         context = HookContext(operation=operation)
                         if (
                             should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -369,7 +369,6 @@ class BaseOpenAPISchema(BaseSchema):
         method: str,
         parameters: list[OpenAPIParameter],
         raw: dict[str, Any],
-        resolved: dict[str, Any],
         scope: str,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
@@ -378,7 +377,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
             path=path,
             method=method,
-            definition=OperationDefinition(raw, resolved, scope),
+            definition=OperationDefinition(raw, scope),
             base_url=base_url,
             app=self.app,
             schema=self,
@@ -429,9 +428,8 @@ class BaseOpenAPISchema(BaseSchema):
         instance = cache.get_operation_by_traversal_key(entry.scope, entry.path, entry.method)
         if instance is not None:
             return instance
-        resolved = self._resolve_operation(entry.operation)
-        parameters = self._collect_operation_parameters(entry.path_item, resolved)
-        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, resolved, entry.scope)
+        parameters = self._collect_operation_parameters(entry.path_item, entry.operation)
+        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, entry.scope)
         cache.insert_operation_by_traversal_key(entry.scope, entry.path, entry.method, initialized)
         cache.insert_operation_by_id(operation_id, initialized)
         return initialized
@@ -477,11 +475,10 @@ class BaseOpenAPISchema(BaseSchema):
         cached = cache.get_operation_by_traversal_key(*traversal_key)
         if cached is not None:
             return cached
-        resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
-        parameters = self._collect_operation_parameters(path_item, resolved)
-        initialized = self.make_operation(path, method, parameters, operation, resolved, scope)
+        parameters = self._collect_operation_parameters(path_item, operation)
+        initialized = self.make_operation(path, method, parameters, operation, scope)
         cache.insert_operation_by_traversal_key(*traversal_key, initialized)
         cache.insert_operation_by_reference(reference, initialized)
         return initialized
@@ -837,13 +834,8 @@ class MethodMap(Mapping):
         cached = cache.get_operation_by_traversal_key(scope, path, method)
         if cached is not None:
             return cached
-        schema.resolver.push_scope(scope)
-        try:
-            resolved = schema._resolve_operation(operation)
-        finally:
-            schema.resolver.pop_scope()
-        parameters = schema._collect_operation_parameters(self._path_item, resolved)
-        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope)
+        parameters = schema._collect_operation_parameters(self._path_item, operation)
+        initialized = schema.make_operation(path, method, parameters, operation, scope)
         cache.insert_operation_by_traversal_key(scope, path, method, initialized)
         return initialized
 
@@ -1080,9 +1072,12 @@ class OpenApi30(SwaggerV20):
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
         collected: list[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
         if "requestBody" in definition:
-            required = definition["requestBody"].get("required", False)
-            description = definition["requestBody"].get("description")
-            for media_type, content in definition["requestBody"]["content"].items():
+            body = definition["requestBody"]
+            while "$ref" in body:
+                body = self.resolver.resolve_all(body, RECURSION_DEPTH_LIMIT)
+            required = body.get("required", False)
+            description = body.get("description")
+            for media_type, content in body["content"].items():
                 collected.append(
                     OpenAPI30Body(content, description=description, media_type=media_type, required=required)
                 )

@@ -1,11 +1,11 @@
 import json
 import pathlib
 
+import hypothesis
 import pytest
+from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
-import hypothesis
-from hypothesis import HealthCheck, Phase, Verbosity
 from schemathesis.runner import from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
