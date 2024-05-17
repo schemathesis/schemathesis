@@ -521,7 +521,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> dict[str, Any] | None:
         try:
-            responses = operation.definition.resolved["responses"]
+            responses = operation.definition.raw["responses"]
         except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
             path = operation.path
@@ -529,9 +529,11 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
-            return responses[status_code]
+            _, response = self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
+            return response
         if "default" in responses:
-            return responses["default"]
+            _, response = self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
+            return response
         return None
 
     def get_headers(self, operation: APIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
@@ -584,19 +586,9 @@ class BaseOpenAPISchema(BaseSchema):
         """
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
-        # TODO: Avoid adding it twice
-        definition = self[source.path][source.method].definition
         links.add_link(
-            responses=definition.resolved["responses"],
-            links_field=self.links_field,
-            parameters=parameters,
-            request_body=request_body,
-            status_code=status_code,
-            target=target,
-            name=name,
-        )
-        links.add_link(
-            responses=definition.raw["responses"],
+            resolver=self.resolver,
+            responses=self[source.path][source.method].definition.raw["responses"],
             links_field=self.links_field,
             parameters=parameters,
             request_body=request_body,
@@ -991,7 +983,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return files or None, data or None
 
     def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return self._get_consumes_for_operation(operation.definition.resolved)
+        return self._get_consumes_for_operation(operation.definition.raw)
 
     def make_case(
         self,
@@ -1134,7 +1126,12 @@ class OpenApi30(SwaggerV20):
         :return: `files` and `data` values for `requests.request`.
         """
         files = []
-        content = operation.definition.resolved["requestBody"]["content"]
+        definition = operation.definition.raw
+        if "$ref" in definition["requestBody"]:
+            body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+        else:
+            body = definition["requestBody"]
+        content = body["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
         for media_type, entry in content.items():

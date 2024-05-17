@@ -100,7 +100,7 @@ class InliningResolver(jsonschema.RefResolver):
         if "$ref" in definition:
             self.push_scope(scope)
             try:
-                new_scope, definition = fast_deepcopy(self.resolve(definition["$ref"]))
+                new_scope, definition = self.resolve(definition["$ref"])
             finally:
                 self.pop_scope()
             scopes.append(new_scope)
