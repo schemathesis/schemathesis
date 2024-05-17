@@ -1,6 +1,6 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable, Dict, List
+from typing import TYPE_CHECKING, Callable, Dict, List, Iterator
 
 import hypothesis.strategies as st
 from requests.structures import CaseInsensitiveDict
@@ -30,7 +30,7 @@ def apply(
     connections: APIOperationConnections,
 ) -> None:
     """Gather all connections based on Open API links definitions."""
-    all_status_codes = list(operation.definition.resolved["responses"])
+    all_status_codes = operation.definition.raw["responses"].keys()
     for status_code, link in get_all_links(operation):
         target_operation = link.get_target_operation()
         strategy = bundles[operation.path][operation.method.upper()].filter(
@@ -47,7 +47,7 @@ def _convert_strategy(
     return strategy.map(lambda out: (out, link))
 
 
-def make_response_filter(status_code: str, all_status_codes: list[str]) -> FilterFunction:
+def make_response_filter(status_code: str, all_status_codes: Iterator[str]) -> FilterFunction:
     """Create a filter for stored responses.
 
     This filter will decide whether some response is suitable to use as a source for requesting some API operation.
@@ -76,11 +76,11 @@ def match_status_code(status_code: str) -> FilterFunction:
     return compare
 
 
-def default_status_code(status_codes: list[str]) -> FilterFunction:
+def default_status_code(status_codes: Iterator[str]) -> FilterFunction:
     """Create a filter that matches all "default" responses.
 
     In Open API, the "default" response is the one that is used if no other options were matched.
-    Therefore we need to match only responses that were not matched by other listed status codes.
+    Therefore, we need to match only responses that were not matched by other listed status codes.
     """
     expanded_status_codes = {
         status_code for value in status_codes if value != "default" for status_code in expand_status_code(value)
