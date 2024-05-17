@@ -1,11 +1,11 @@
 import pytest
-from hypothesis import HealthCheck, assume, given, settings
+from hypothesis import HealthCheck, Phase, assume, given, settings
 from packaging import version
 
 import schemathesis
 from schemathesis.parameters import PayloadAlternatives
 
-from .utils import integer
+from .utils import assert_requests_call, integer
 
 
 def test_parametrization(testdir):
@@ -701,6 +701,47 @@ def test_loose_multipart_definition():
         assert isinstance(case.body, dict)
 
     # And the resulting values should be valid
+    test()
+
+
+@pytest.mark.hypothesis_nested
+def test_multipart_behind_a_reference():
+    # When the schema of "multipart/form-data" is behind a reference
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/body": {
+                "post": {
+                    "requestBody": {
+                        "$ref": "#/components/requestBodies/MultipartBody",
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        },
+        "components": {
+            "requestBodies": {
+                "MultipartBody": {
+                    "content": {"multipart/form-data": {"schema": {"properties": {"foo": {"type": "string"}}}}},
+                    "required": True,
+                }
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    # Then it should be correctly resolved
+
+    @given(case=schema["/body"]["POST"].as_strategy())
+    @settings(
+        max_examples=5,
+        deadline=None,
+        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
+        phases=[Phase.generate],
+    )
+    def test(case):
+        assert_requests_call(case)
+
     test()
 
 
