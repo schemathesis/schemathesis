@@ -11,7 +11,7 @@ from schemathesis._compat import MultipleFailures
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import APIOperation, Case, CaseSource, OperationDefinition, Request, Response, _merge_dict_to
+from schemathesis.models import APIOperation, Case, CaseSource, Request, Response, _merge_dict_to
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import WSGITransport
 
@@ -626,14 +626,6 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     except ValueError:
         pass
     _assert_override(spy, client_arg, original, overridden)
-
-
-def test_operation_definition_as_dict():
-    definition = OperationDefinition({"A": 1, "B": 2}, {"A": 1, "B": 2, "C": 3}, "")
-    assert definition["C"] == 3
-    assert definition.get("C") == 3
-    assert definition.get("D") is None
-    assert "C" in definition
 
 
 @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ import requests
 import urllib3
 
 import schemathesis
+from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.internal.transformation import merge_recursively
 from schemathesis.loaders import load_yaml
 from schemathesis.models import Case
@@ -33,7 +34,7 @@ def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseS
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:
-    schema = load_schema(schema_name)
+    schema = fast_deepcopy(load_schema(schema_name))
     return merge_recursively(kwargs, schema)
 
 

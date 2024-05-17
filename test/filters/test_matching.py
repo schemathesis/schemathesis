@@ -124,7 +124,7 @@ def case_id(case):
         (
             [
                 ("include", {"path": "/users/"}),
-                ("exclude", {"func": lambda ctx: ctx.operation.definition.get("deprecated") is True}),
+                ("exclude", {"func": lambda ctx: ctx.operation.definition.raw.get("deprecated") is True}),
             ],
             [USERS_GET],
         ),

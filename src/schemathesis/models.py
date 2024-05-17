@@ -553,15 +553,6 @@ class OperationDefinition(Generic[D]):
 
     __slots__ = ("raw", "resolved", "scope")
 
-    def __contains__(self, item: str | int) -> bool:
-        return item in self.resolved
-
-    def __getitem__(self, item: str | int) -> None | bool | float | str | list | dict[str, Any]:
-        return self.resolved[item]
-
-    def get(self, item: str | int, default: Any = None) -> None | bool | float | str | list | dict[str, Any]:
-        return self.resolved.get(item, default)
-
 
 C = TypeVar("C", bound=Case)
 
