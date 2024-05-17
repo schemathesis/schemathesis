@@ -1,3 +1,4 @@
+from functools import lru_cache
 from typing import Tuple, Generator
 
 
@@ -30,6 +31,7 @@ def parse_header(line: str) -> Tuple[str, dict]:
     return key, pdict
 
 
+@lru_cache()
 def parse_content_type(content_type: str) -> Tuple[str, str]:
     """Parse Content Type and return main type and subtype."""
     try:
