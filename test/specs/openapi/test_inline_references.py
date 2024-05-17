@@ -1,0 +1,354 @@
+import json
+from unittest.mock import ANY
+
+import pytest
+from hypothesis import HealthCheck, Phase, Verbosity, given, settings
+from hypothesis_jsonschema import from_schema
+from pytest_httpserver.pytest_plugin import PluginHTTPServer
+
+from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.specs.openapi.references import inline_references
+
+REMOTE_PLACEHOLDER = "http://example.com"
+DEFAULT_URI = "urn:schemathesis:schema"
+FILE_URI = object()
+REMOTE_URI = object()
+TARGET = {"type": "integer"}
+TARGET_LOCAL_REF = {"$ref": "#/components/schemas/Example"}
+TARGET_LOCAL_NESTED_LOCAL_REF = {"$ref": "#/components/schemas/Nested"}
+TARGET_LOCAL_NESTED_FILE_REF = {"$ref": "#/components/schemas/Nested-File"}
+TARGET_LOCAL_NESTED_REMOTE_REF = {"$ref": "#/components/schemas/Nested-Remote"}
+TARGET_FILE_REF = {"$ref": "root-components.json#/RootItem"}
+TARGET_FILE_WITH_SCHEME_REF = {"$ref": "file://root-components.json#/RootItem"}
+TARGET_FILE_ROOT_SCHEMA = {"RootItem": TARGET}
+TARGET_REMOTE_REF = {"$ref": f"{REMOTE_PLACEHOLDER}/schema.json#/RootItem"}
+TARGET_REMOTE_ROOT_SCHEMA = {"RootItem": TARGET}
+INTEGER = 1
+COMPONENTS = {
+    "components": {
+        "schemas": {
+            "Example": TARGET,
+            # Not really valid, but used to test the traversal
+            # Validation error will be raised later on
+            "Integer": INTEGER,
+            "Nested": TARGET_LOCAL_REF,
+            "Nested-File": TARGET_FILE_REF,
+            "Nested-Remote": TARGET_REMOTE_REF,
+        },
+    },
+}
+# Local references
+LOCAL_REF_NO_NESTING = TARGET_LOCAL_REF
+LOCAL_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_LOCAL_REF}}
+LOCAL_NESTED_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_LOCAL_NESTED_LOCAL_REF}}
+LOCAL_REF_NESTED_IN_OBJECT_MULTIPLE = {
+    "properties": {"example-1": TARGET_LOCAL_REF, "example-2": TARGET_LOCAL_REF},
+}
+LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE = {
+    "properties": {"example-1": TARGET_LOCAL_NESTED_LOCAL_REF, "example-2": TARGET_LOCAL_NESTED_LOCAL_REF},
+}
+LOCAL_REF_NESTED_IN_ARRAY = {"allOf": [TARGET_LOCAL_REF]}
+LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE = {"allOf": [TARGET_LOCAL_REF, TARGET_LOCAL_REF]}
+# TODO: How scoped resolution should look like? i.e. reference + scope
+# TODO: Write a separate test for this case
+# Test cases with nested file refs
+LOCAL_REF_NON_SCHEMA = {"$ref": "#/components/schemas/Integer"}
+# File references
+FILE_REF_NO_NESTING = TARGET_FILE_REF
+FILE_REF_WITH_SCHEME_NO_NESTING = TARGET_FILE_WITH_SCHEME_REF
+FILE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_FILE_REF}}
+FILE_NESTED_FILE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_LOCAL_NESTED_FILE_REF}}
+FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE = {
+    "properties": {"example-1": TARGET_LOCAL_NESTED_FILE_REF, "example-2": TARGET_LOCAL_NESTED_FILE_REF},
+}
+# Remote references
+REMOTE_REF_NO_NESTING = TARGET_REMOTE_REF
+REMOTE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_REMOTE_REF}}
+REMOTE_REF_NESTED_IN_OBJECT_MULTIPLE = {
+    "properties": {"example-1": TARGET_REMOTE_REF, "example-2": TARGET_REMOTE_REF},
+}
+# Inner references
+INNER_REF = {
+    "properties": {
+        "example": {
+            "$ref": "#/definitions/Example",
+        },
+    },
+    "definitions": {
+        "Example": TARGET,
+    },
+}
+INNER_REF_WITH_NESTED_FILE_REF = {
+    "properties": {
+        "example": {
+            "$ref": "#/definitions/Example",
+        }
+    },
+    "definitions": {
+        "Example": TARGET_FILE_REF,
+    },
+}
+
+
+@pytest.fixture(scope="module")
+def httpserver():
+    server = PluginHTTPServer(host="127.0.0.1", port=0)
+    server.start()
+    yield server
+    if server.is_running():
+        server.stop()
+
+
+def setup_schema(request, uri, schema):
+    if uri is FILE_URI:
+        testdir = request.getfixturevalue("testdir")
+        root = testdir.mkdir("root")
+        (root / "root-components.json").write_text(json.dumps(TARGET_FILE_ROOT_SCHEMA), "utf8")
+        uri = str(root / "schema.json")
+    elif uri is REMOTE_URI:
+        server = request.getfixturevalue("httpserver")
+        server.expect_request("/schema.json").respond_with_json(TARGET_REMOTE_ROOT_SCHEMA)
+        uri = f"http://{server.host}:{server.port}"
+        prepared = json.dumps(schema).replace(REMOTE_PLACEHOLDER, uri)
+        schema = json.loads(prepared)
+    return uri, schema
+
+
+@pytest.mark.parametrize(
+    (
+        # Schema URI
+        "uri",
+        # Parameter schema intended for data generation
+        "schema",
+        # Components shared between different operations
+        "components",
+        "expected",
+    ),
+    (
+        (
+            DEFAULT_URI,
+            {},
+            {},
+            {},
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_REF_NO_NESTING,
+            COMPONENTS,
+            {
+                "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
+                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_REF_NESTED_IN_OBJECT,
+            COMPONENTS,
+            {
+                "properties": {"example": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
+                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_NESTED_REF_NESTED_IN_OBJECT,
+            COMPONENTS,
+            {
+                "properties": {"example": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"}},
+                "x-inlined-reference": {
+                    "58d4bb06ad165cda74c28d601b154ace1019890c": {
+                        "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                    },
+                    "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
+                },
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_REF_NESTED_IN_OBJECT_MULTIPLE,
+            COMPONENTS,
+            {
+                "properties": {
+                    "example-1": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    "example-2": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                },
+                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE,
+            COMPONENTS,
+            {
+                "properties": {
+                    "example-1": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                    "example-2": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                },
+                "x-inlined-reference": {
+                    "58d4bb06ad165cda74c28d601b154ace1019890c": {
+                        "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                    },
+                    "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
+                },
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_REF_NESTED_IN_ARRAY,
+            COMPONENTS,
+            {
+                "allOf": [{"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
+                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+            },
+        ),
+        (
+            DEFAULT_URI,
+            LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE,
+            COMPONENTS,
+            {
+                "allOf": [
+                    {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                ],
+                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+            },
+        ),
+        (
+            FILE_URI,
+            FILE_REF_NO_NESTING,
+            COMPONENTS,
+            {
+                "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
+                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+            },
+        ),
+        (
+            FILE_URI,
+            FILE_REF_WITH_SCHEME_NO_NESTING,
+            COMPONENTS,
+            {
+                "$ref": "#/x-inlined-reference/c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6",
+                "x-inlined-reference": {"c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6": {"type": "integer"}},
+            },
+        ),
+        (
+            FILE_URI,
+            FILE_REF_NESTED_IN_OBJECT,
+            COMPONENTS,
+            {
+                "properties": {"example": {"$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+            },
+        ),
+        (
+            FILE_URI,
+            FILE_NESTED_FILE_REF_NESTED_IN_OBJECT,
+            COMPONENTS,
+            {
+                "properties": {"example": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"}},
+                "x-inlined-reference": {
+                    "685e4330057cf6ab44313ea387bdf57a2416782a": {
+                        "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                    },
+                    "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
+                },
+            },
+        ),
+        (
+            FILE_URI,
+            FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE,
+            COMPONENTS,
+            {
+                "properties": {
+                    "example-1": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                    "example-2": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                },
+                "x-inlined-reference": {
+                    "685e4330057cf6ab44313ea387bdf57a2416782a": {
+                        "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                    },
+                    "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
+                },
+            },
+        ),
+        (
+            REMOTE_URI,
+            REMOTE_REF_NO_NESTING,
+            COMPONENTS,
+            ANY,
+        ),
+        (
+            REMOTE_URI,
+            REMOTE_REF_NESTED_IN_OBJECT,
+            COMPONENTS,
+            ANY,
+        ),
+        (
+            REMOTE_URI,
+            REMOTE_REF_NESTED_IN_OBJECT_MULTIPLE,
+            COMPONENTS,
+            ANY,
+        ),
+        (
+            DEFAULT_URI,
+            INNER_REF,
+            {},
+            {
+                "properties": {"example": {"$ref": "#/definitions/Example"}},
+                "definitions": {"Example": TARGET},
+            },
+        ),
+        (
+            FILE_URI,
+            INNER_REF_WITH_NESTED_FILE_REF,
+            {},
+            {
+                "properties": {"example": {"$ref": "#/definitions/Example"}},
+                "definitions": {"Example": {"$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+            },
+        ),
+    ),
+    ids=(
+        "empty",
+        "local-ref-no-nesting",
+        "local-ref-nested-in-object",
+        "local-nested-local-ref-nested-in-object",
+        "local-ref-nested-in-object-multiple",
+        "local-nested-ref-nested-in-object-multiple",
+        "local-ref-nested-in-array",
+        "local-ref-nested-in-array-multiple",
+        "file-ref-no-nesting",
+        "file-ref-with-scheme-no-nesting",
+        "file-ref-nested-in-object",
+        "file-nested-file-ref-nested-in-object",
+        "file-nested-file-ref-nested-in-object-multiple",
+        "remote-ref-no-nesting",
+        "remote-ref-nested-in-object",
+        "remote-ref-nested-in-object-multiple",
+        "inner-ref",
+        "inner-ref-with-nested-file-ref",
+    ),
+)
+def test_inline_references_valid(request, uri, schema, components, expected):
+    schema = fast_deepcopy(schema)
+    uri, schema = setup_schema(request, uri, schema)
+    inline_references(uri, schema, components)
+
+    assert schema == expected
+
+    # Hypothesis-jsonschema should be able to generate data for the inlined schema
+
+    @given(from_schema(schema))
+    @settings(
+        deadline=None,
+        database=None,
+        max_examples=1,
+        suppress_health_check=list(HealthCheck),
+        phases=[Phase.explicit, Phase.generate],
+        verbosity=Verbosity.quiet,
+    )
+    def generate(_):
+        pass
+
+    generate()

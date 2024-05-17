@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+from hashlib import sha1
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Callable, Dict, Union, overload
+from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
 
 import jsonschema
+import referencing.retrieval
 import requests
+from referencing import Registry, Resource
+from referencing.exceptions import PointerToNowhere, Unretrievable
+from referencing.jsonschema import DRAFT4
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
@@ -37,6 +43,7 @@ def load_file_uri(location: str) -> dict[str, Any]:
     return load_file_impl(location, urlopen)
 
 
+@lru_cache
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
     response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
@@ -254,3 +261,84 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
         else:
             return UNRESOLVABLE
     return target
+
+
+INLINED_REFERENCE_ROOT_KEY = "x-inlined-reference"
+
+
+def inline_references(uri, schema, components):
+    """Inline all non-local and recursive references in the given schema."""
+
+    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)
+    def cached_retrieve(target: str):
+        parsed = urlsplit(target)
+        if parsed.scheme == "":
+            url = urljoin(uri, target).rstrip("/")
+            return load_file_impl(url, open)
+        if parsed.scheme == "file":
+            url = urljoin(uri, parsed.netloc).rstrip("/")
+            return load_file_impl(url, open)
+        if parsed.scheme in ("http", "https"):
+            return load_remote_uri(target)
+        raise Unretrievable(target)
+
+    # TODO:
+    #  - use different drafts depending on the open API spec
+    #  - use caching for input schemas
+    #  - avoid mutating the original + don't create a copy unless necessary
+    #  - How to add scope to the registry? there is "with_root" or something like that
+    #  - Raise custom error when the referenced value is invalid
+    #  - Handle circular references
+    #  - is it possible to avoid purely "$ref" -> "$ref" jumps?
+
+    self_urn = "urn:self"
+    registry = Registry(retrieve=cached_retrieve).with_resources(
+        [
+            ("", Resource(contents=components, specification=DRAFT4)),
+            (self_urn, Resource(contents=schema, specification=DRAFT4)),
+        ]
+    )
+
+    collected = {}
+    schema[INLINED_REFERENCE_ROOT_KEY] = collected
+    stack = [(schema, registry.resolver())]
+    while stack:
+        item, resolver = stack.pop()
+        if isinstance(item, dict):
+            ref = item.get("$ref")
+            if isinstance(ref, str):
+                try:
+                    resolved = resolver.lookup(ref)
+                    contents = fast_deepcopy(resolved.contents)
+                    key = _make_reference_key(ref)
+                    collected[key] = contents
+                    item["$ref"] = f"#/{INLINED_REFERENCE_ROOT_KEY}/{key}"
+                except PointerToNowhere as exc:
+                    try:
+                        # Do not replace local references
+                        resolved = resolver.lookup(f"{self_urn}{ref}")
+                        contents = fast_deepcopy(resolved.contents)
+                    except PointerToNowhere:
+                        raise exc from None
+                stack.append((contents, resolver))
+            else:
+                # The current object has no references, but its children might
+                for value in item.values():
+                    if isinstance(value, (dict, list)):
+                        stack.append((value, resolver))
+        elif isinstance(item, list):
+            # All potentially nested items are added to the stack
+            for sub_item in item:
+                if isinstance(sub_item, (dict, list)):
+                    stack.append((sub_item, resolver))
+    if not collected:
+        del schema[INLINED_REFERENCE_ROOT_KEY]
+    return schema
+
+
+def _make_reference_key(reference: str) -> str:
+    # TODO: use traversal path to make the key
+    # TODO: or maybe don't use hash at all and have readable keys
+    digest = sha1()
+    digest.update(reference.encode("utf-8"))
+    return digest.hexdigest()

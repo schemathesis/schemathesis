@@ -78,7 +78,14 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, UNRESOLVABLE, ConvertingResolver, InliningResolver, resolve_pointer
+from .references import (
+    RECURSION_DEPTH_LIMIT,
+    UNRESOLVABLE,
+    ConvertingResolver,
+    InliningResolver,
+    inline_references,
+    resolve_pointer,
+)
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -355,13 +362,13 @@ class BaseOpenAPISchema(BaseSchema):
         """
         raise NotImplementedError
 
-    def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    def _resolve_path_item(self, path_item: dict[str, Any]) -> tuple[str, dict[str, Any]]:
         # The path item could be behind a reference
         # In this case, we need to resolve it to get the proper scope for reference inside the item.
         # It is mostly for validating responses.
-        if "$ref" in methods:
-            return self.resolver.resolve(methods["$ref"])
-        return self.resolver.resolution_scope, methods
+        if "$ref" in path_item:
+            return self.resolver.resolve(path_item["$ref"])
+        return self.resolver.resolution_scope, path_item
 
     def make_operation(
         self,
@@ -663,94 +670,19 @@ class BaseOpenAPISchema(BaseSchema):
         _maybe_raise_one_or_more(errors)
         return None  # explicitly return None for mypy
 
-    @property
-    def rewritten_components(self) -> dict[str, Any]:
-        if not hasattr(self, "_rewritten_components"):
+    def prepare_schema(self, operation: APIOperation, schema: Any) -> Any:
+        """Adjust references in the schema to make them suitable for data generation.
 
-            def callback(_schema: dict[str, Any], nullable_name: str) -> dict[str, Any]:
-                _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
-                return self._rewrite_references(_schema, self.resolver)
-
-            # Different spec versions allow different keywords to store possible reference targets
-            components: dict[str, Any] = {}
-            for path in self.component_locations:
-                schema = self.raw_schema
-                target = components
-                for chunk in path:
-                    if chunk in schema:
-                        schema = schema[chunk]
-                        target = target.setdefault(chunk, {})
-                    else:
-                        break
-                else:
-                    target.update(traverse_schema(fast_deepcopy(schema), callback, self.nullable_name))
-            if self._inline_reference_cache:
-                components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
-            self._rewritten_components = components
-        return self._rewritten_components
-
-    def prepare_schema(self, schema: Any) -> Any:
-        """Inline Open API definitions.
-
-        Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
+        Hypothesis-jsonschema does not support remote or recursive references.
+        Therefore, we have to move such referenced data to the root of the schema as components and replace
+        references with local ones.
         """
         schema = fast_deepcopy(schema)
-        schema = traverse_schema(schema, self._rewrite_references, self.resolver)
-        # Only add definitions that are reachable from the schema via references
-        stack = [schema]
-        seen = set()
-        while stack:
-            item = stack.pop()
-            if isinstance(item, dict):
-                if "$ref" in item:
-                    reference = item["$ref"]
-                    if isinstance(reference, str) and reference.startswith("#/") and reference not in seen:
-                        seen.add(reference)
-                        # Resolve the component and add it to the proper place in the schema
-                        pointer = reference[1:]
-                        resolved = resolve_pointer(self.rewritten_components, pointer)
-                        if resolved is UNRESOLVABLE:
-                            raise SchemaError(
-                                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
-                                message=f"Unresolvable JSON pointer in the schema: {pointer}",
-                            )
-                        if isinstance(resolved, dict):
-                            container = schema
-                            for key in pointer.split("/")[1:]:
-                                container = container.setdefault(key, {})
-                            container.update(resolved)
-                        # Explore the resolved value too
-                        stack.append(resolved)
-                # Still explore other values as they may have nested references in other keys
-                for value in item.values():
-                    if isinstance(value, (dict, list)):
-                        stack.append(value)
-            elif isinstance(item, list):
-                for sub_item in item:
-                    if isinstance(sub_item, (dict, list)):
-                        stack.append(sub_item)
-        return schema
-
-    def _rewrite_references(self, schema: dict[str, Any], resolver: InliningResolver) -> dict[str, Any]:
-        """Rewrite references present in the schema.
-
-        The idea is to resolve references, cache the result and replace these references with new ones
-        that point to a local path which is populated from this cache later on.
-        """
-        reference = schema.get("$ref")
-        # If `$ref` is not a property name and should be processed
-        if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
-            key = _make_reference_key(resolver._scopes_stack, reference)
-            with self._inline_reference_cache_lock:
-                if key not in self._inline_reference_cache:
-                    with resolver.resolving(reference) as resolved:
-                        # Resolved object also may have references
-                        self._inline_reference_cache[key] = traverse_schema(
-                            resolved, lambda s: self._rewrite_references(s, resolver)
-                        )
-            # Rewrite the reference with the new location
-            schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
-        return schema
+        components = {}
+        for path in self.component_locations:
+            if path in self.raw_schema:
+                components[path] = fast_deepcopy(self.raw_schema[path])
+        return inline_references(self.location or "", schema, components)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
@@ -760,22 +692,6 @@ def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
         raise errors[0]
     else:
         raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
-
-
-def _make_reference_key(scopes: list[str], reference: str) -> str:
-    """A name under which the resolved reference data will be stored."""
-    # Using a hexdigest is the simplest way to associate practically unique keys with each reference
-    digest = sha1()
-    for scope in scopes:
-        digest.update(scope.encode("utf-8"))
-        # Separator to avoid collisions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
-        # will be the same for both cases
-        digest.update(b"#")
-    digest.update(reference.encode("utf-8"))
-    return digest.hexdigest()
-
-
-INLINED_REFERENCES_KEY = "x-inlined"
 
 
 @contextmanager

@@ -230,7 +230,7 @@ def _get_body_strategy(
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
-    schema = operation.schema.prepare_schema(schema)
+    schema = operation.schema.prepare_schema(operation, schema)
     strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
@@ -365,7 +365,7 @@ def get_parameters_strategy(
             # contains errors.
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
-        schema = operation.schema.prepare_schema(schema)
+        schema = operation.schema.prepare_schema(operation, schema)
         for name in exclude:
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
             # that may be invalid

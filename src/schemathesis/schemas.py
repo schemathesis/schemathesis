@@ -412,7 +412,7 @@ class BaseSchema(Mapping):
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         raise NotImplementedError
 
-    def prepare_schema(self, schema: Any) -> Any:
+    def prepare_schema(self, operation: APIOperation, schema: Any) -> Any:
         raise NotImplementedError
 
     def ratelimit(self) -> ContextManager:
