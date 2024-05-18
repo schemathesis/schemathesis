@@ -774,9 +774,6 @@ class APIOperation(Generic[P, C]):
     def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
         return self.schema._get_payload_schema(self.definition.raw, media_type)
 
-    def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.resolved, media_type)
-
 
 # backward-compatibility
 Endpoint = APIOperation

@@ -19,8 +19,10 @@ TARGET_LOCAL_NESTED_LOCAL_REF = {"$ref": "#/components/schemas/Nested"}
 TARGET_LOCAL_NESTED_FILE_REF = {"$ref": "#/components/schemas/Nested-File"}
 TARGET_LOCAL_NESTED_REMOTE_REF = {"$ref": "#/components/schemas/Nested-Remote"}
 TARGET_FILE_REF = {"$ref": "root-components.json#/RootItem"}
+TARGET_RELATIVE_FILE_REF = {"$ref": "../relative-components.json#/RelativeItem"}
 TARGET_FILE_WITH_SCHEME_REF = {"$ref": "file://root-components.json#/RootItem"}
 TARGET_FILE_ROOT_SCHEMA = {"RootItem": TARGET}
+TARGET_FILE_RELATIVE_SCHEMA = {"RelativeItem": TARGET}
 TARGET_REMOTE_REF = {"$ref": f"{REMOTE_PLACEHOLDER}/schema.json#/RootItem"}
 TARGET_REMOTE_ROOT_SCHEMA = {"RootItem": TARGET}
 INTEGER = 1
@@ -61,6 +63,7 @@ FILE_NESTED_FILE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_LOCAL_
 FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE = {
     "properties": {"example-1": TARGET_LOCAL_NESTED_FILE_REF, "example-2": TARGET_LOCAL_NESTED_FILE_REF},
 }
+FILE_RELATIVE_REF = TARGET_RELATIVE_FILE_REF
 # Remote references
 REMOTE_REF_NO_NESTING = TARGET_REMOTE_REF
 REMOTE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_REMOTE_REF}}
@@ -104,6 +107,7 @@ def setup_schema(request, uri, schema):
         testdir = request.getfixturevalue("testdir")
         root = testdir.mkdir("root")
         (root / "root-components.json").write_text(json.dumps(TARGET_FILE_ROOT_SCHEMA), "utf8")
+        testdir.makefile(".json", **{"relative-components": json.dumps(TARGET_FILE_RELATIVE_SCHEMA)})
         uri = str(root / "schema.json")
     elif uri is REMOTE_URI:
         server = request.getfixturevalue("httpserver")
@@ -272,6 +276,15 @@ def setup_schema(request, uri, schema):
             },
         ),
         (
+            FILE_URI,
+            FILE_RELATIVE_REF,
+            COMPONENTS,
+            {
+                "$ref": "#/x-inlined-reference/4f2e7403753928e6b218cb8e72afb242f55ca267",
+                "x-inlined-reference": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
+            },
+        ),
+        (
             REMOTE_URI,
             REMOTE_REF_NO_NESTING,
             COMPONENTS,
@@ -323,6 +336,7 @@ def setup_schema(request, uri, schema):
         "file-ref-nested-in-object",
         "file-nested-file-ref-nested-in-object",
         "file-nested-file-ref-nested-in-object-multiple",
+        "file-relative-ref",
         "remote-ref-no-nesting",
         "remote-ref-nested-in-object",
         "remote-ref-nested-in-object-multiple",

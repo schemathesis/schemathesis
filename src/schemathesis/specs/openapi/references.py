@@ -3,6 +3,7 @@ from __future__ import annotations
 from hashlib import sha1
 from dataclasses import dataclass
 from functools import lru_cache
+import logging
 from typing import Any, Callable, Dict, Union, overload
 from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
@@ -263,23 +264,41 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     return target
 
 
+logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+logger = logging.getLogger(__name__)
+# logger.propagate = False
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-reference"
 
 
-def inline_references(uri, schema, components):
+def retrieve_from_file(url: str) -> Any:
+    url = url.rstrip("/")
+    retrieved = load_file_impl(url, open)
+    logger.debug("Retrieved %s", url)
+    return retrieved
+
+
+def inline_references(uri: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
     """Inline all non-local and recursive references in the given schema."""
 
-    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)
-    def cached_retrieve(target: str):
+    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)  # type: ignore[misc]
+    def cached_retrieve(target: str) -> Any:
+        logger.debug("Retrieving %s", target)
         parsed = urlsplit(target)
-        if parsed.scheme == "":
-            url = urljoin(uri, target).rstrip("/")
-            return load_file_impl(url, open)
-        if parsed.scheme == "file":
-            url = urljoin(uri, parsed.netloc).rstrip("/")
-            return load_file_impl(url, open)
-        if parsed.scheme in ("http", "https"):
-            return load_remote_uri(target)
+        try:
+            if parsed.scheme == "":
+                url = urljoin(uri, target)
+                return retrieve_from_file(url)
+            if parsed.scheme == "file":
+                url = urljoin(uri, parsed.netloc)
+                return retrieve_from_file(url)
+            if parsed.scheme in ("http", "https"):
+                retrieved = load_remote_uri(target)
+                logger.debug("Retrieved %s", target)
+                return retrieved
+        except Exception as exc:
+            logger.debug("Failed to retrieve %s: %s", target, exc)
+            raise
+        logger.debug("Unretrievable %s", target)
         raise Unretrievable(target)
 
     # TODO:
@@ -291,6 +310,8 @@ def inline_references(uri, schema, components):
     #  - Handle circular references
     #  - is it possible to avoid purely "$ref" -> "$ref" jumps?
 
+    logger.debug("Inlining references in %s", schema)
+
     self_urn = "urn:self"
     registry = Registry(retrieve=cached_retrieve).with_resources(
         [
@@ -299,27 +320,34 @@ def inline_references(uri, schema, components):
         ]
     )
 
-    collected = {}
+    collected: dict[str, dict[str, Any]] = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = collected
-    stack = [(schema, registry.resolver())]
+    stack: list[tuple[Any, Any]] = [(schema, registry.resolver())]
     while stack:
         item, resolver = stack.pop()
+        logger.debug("Processing %r", item)
         if isinstance(item, dict):
             ref = item.get("$ref")
             if isinstance(ref, str):
+                logger.debug("Resolving %s", ref)
                 try:
                     resolved = resolver.lookup(ref)
                     contents = fast_deepcopy(resolved.contents)
                     key = _make_reference_key(ref)
                     collected[key] = contents
-                    item["$ref"] = f"#/{INLINED_REFERENCE_ROOT_KEY}/{key}"
+                    new_ref = f"#/{INLINED_REFERENCE_ROOT_KEY}/{key}"
+                    item["$ref"] = new_ref
+                    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
                 except PointerToNowhere as exc:
                     try:
                         # Do not replace local references
                         resolved = resolver.lookup(f"{self_urn}{ref}")
                         contents = fast_deepcopy(resolved.contents)
+                        logger.debug("Keep local reference: %s", ref)
                     except PointerToNowhere:
+                        logger.debug("Failed to resolve %s: %s", ref, exc)
                         raise exc from None
+                logger.debug("Resolved %s -> %s", ref, contents)
                 stack.append((contents, resolver))
             else:
                 # The current object has no references, but its children might
@@ -332,6 +360,7 @@ def inline_references(uri, schema, components):
                 if isinstance(sub_item, (dict, list)):
                     stack.append((sub_item, resolver))
     if not collected:
+        logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
     return schema
 

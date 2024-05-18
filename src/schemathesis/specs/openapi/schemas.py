@@ -5,7 +5,6 @@ from collections import defaultdict
 from contextlib import ExitStack, contextmanager, suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from hashlib import sha1
 from json import JSONDecodeError
 from threading import RLock
 from typing import (
@@ -48,7 +47,6 @@ from ...exceptions import (
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.copy import fast_deepcopy
-from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -60,7 +58,7 @@ from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, Path
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
-from .converter import to_json_schema, to_json_schema_recursive
+from .converter import to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .filters import (
@@ -80,11 +78,9 @@ from .parameters import (
 )
 from .references import (
     RECURSION_DEPTH_LIMIT,
-    UNRESOLVABLE,
     ConvertingResolver,
     InliningResolver,
     inline_references,
-    resolve_pointer,
 )
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -108,7 +104,7 @@ class BaseOpenAPISchema(BaseSchema):
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
     _override: CaseOverride | None = field(default=None)
-    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
+    component_locations: ClassVar[tuple[str, ...]] = ()
 
     @property
     def spec_version(self) -> str:
@@ -777,7 +773,7 @@ class SwaggerV20(BaseOpenAPISchema):
     examples_field = "x-examples"
     header_required_field = "x-required"
     security = SwaggerSecurityProcessor()
-    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = (("definitions",),)
+    component_locations: ClassVar[tuple[str, ...]] = ("definitions",)
     links_field = "x-links"
 
     @property
@@ -955,7 +951,7 @@ class OpenApi30(SwaggerV20):
     examples_field = "examples"
     header_required_field = "required"
     security = OpenAPISecurityProcessor()
-    component_locations = (("components", "schemas"),)
+    component_locations = ("components", "schemas")
     links_field = "links"
 
     @property

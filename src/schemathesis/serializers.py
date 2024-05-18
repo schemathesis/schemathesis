@@ -67,10 +67,6 @@ class SerializerContext:
         schema = self.case.operation.get_raw_payload_schema(self.media_type)
         return cast(Dict[str, Any], schema)
 
-    def get_resolved_payload_schema(self) -> dict[str, Any]:
-        schema = self.case.operation.get_resolved_payload_schema(self.media_type)
-        return cast(Dict[str, Any], schema)
-
 
 @runtime_checkable
 class Serializer(Protocol):
@@ -185,10 +181,10 @@ class YAMLSerializer:
 @register("application/xml", aliases=("text/xml",))
 class XMLSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-        return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
+        return _to_xml(value, context.get_raw_payload_schema())
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-        return _to_xml(value, context.get_raw_payload_schema(), context.get_resolved_payload_schema())
+        return _to_xml(value, context.get_raw_payload_schema())
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:

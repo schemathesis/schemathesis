@@ -14,7 +14,7 @@ DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 
 
-def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None) -> dict[str, Any]:
+def _to_xml(value: Any, raw_schema: dict[str, Any] | None) -> dict[str, Any]:
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.
@@ -23,6 +23,8 @@ def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict
     :param raw_schema: The payload definition with not resolved references.
     :param resolved_schema: The payload definition with all references resolved.
     """
+    # TODO: use the right schema
+    resolved_schema: dict[str, Any] = {}
     if isinstance(value, (bytes, str)):
         return {"data": value}
     tag = _get_xml_tag(raw_schema, resolved_schema)
