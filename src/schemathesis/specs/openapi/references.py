@@ -308,18 +308,19 @@ def inline_references(
     """
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
-    def cached_retrieve(target: str) -> Any:
-        logger.debug("Retrieving %s", target)
+    def cached_retrieve(reference: str) -> Any:
+        """Resolve non-local reference."""
+        logger.debug("Retrieving %s", reference)
 
         if scope:
             base = scope
         else:
             base = uri
 
-        parsed = urlsplit(target)
+        parsed = urlsplit(reference)
         try:
             if parsed.scheme == "":
-                url = urljoin(base, target)
+                url = urljoin(base, reference)
                 parsed = urlsplit(url)
                 if parsed.scheme == "file":
                     url = parsed.path
@@ -328,14 +329,14 @@ def inline_references(
                 url = urljoin(base, parsed.netloc)
                 return retrieve_from_file(url)
             if parsed.scheme in ("http", "https"):
-                retrieved = load_remote_uri(target)
-                logger.debug("Retrieved %s", target)
+                retrieved = load_remote_uri(reference)
+                logger.debug("Retrieved %s", reference)
                 return retrieved
         except Exception as exc:
-            logger.debug("Failed to retrieve %s: %s", target, exc)
+            logger.debug("Failed to retrieve %s: %s", reference, exc)
             raise
-        logger.debug("Unretrievable %s", target)
-        raise Unretrievable(target)
+        logger.debug("Unretrievable %s", reference)
+        raise Unretrievable(reference)
 
     def process_item(item: Any, resolver: Any) -> None:
         if isinstance(item, dict):
@@ -413,6 +414,7 @@ def inline_references(
     #  - Handle circular references
     #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
     #  - consider recursion without explicit stack
+    #  - Traverse only components that may have references (before passing here)
 
     registry = Registry(retrieve=cached_retrieve).with_resources(
         [
@@ -457,11 +459,13 @@ def _find_recursive_references(
     references: set[str],
     path: tuple[str, ...] = (),
 ) -> None:
+    logger.debug("Traversing %r at %r", item, path)
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
             if ref in path:
                 # The reference was already seen in the current traversl path, it means that it's recursive
+                logger.debug("Found recursive reference: %s at %r", ref, path)
                 references.add(ref)
             else:
                 # Otherwise explore the referenced item
