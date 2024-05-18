@@ -276,7 +276,6 @@ class BaseOpenAPISchema(BaseSchema):
         endpoint = self.endpoint
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
-        resolve_shared_parameters = self._resolve_shared_parameters
         resolve_all = self.resolver.resolve_all
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
@@ -290,7 +289,7 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
-                shared_parameters = resolve_shared_parameters(path_item)
+                shared_parameters = path_item.get("parameters", ())
                 for method, entry in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
