@@ -271,7 +271,7 @@ INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
 SELF_URN = "urn:self"
 MAX_RECURSION_DEPTH = 5
 
-SchemaStorage = Dict[str, Dict[str, Any]]
+ReferencedSchemas = Dict[str, Dict[str, Any]]
 
 # TODO:
 #  - use caching for input schemas
@@ -293,7 +293,7 @@ def inline_references(
 ) -> dict[str, Any]:
     """Inline all non-local and recursive references in the given schema.
 
-    This function performs 3 passes:
+    This function performs three passes:
 
     1. Inline all non-local references. Each external reference is resolved and the referenced data is stored
        in the root of the schema under a special key. The reference itself is modified so it points to the locally
@@ -355,13 +355,13 @@ def inline_references(
     )
 
     logger.debug("Inlining non-local references: %s", schema)
-    schema_storage = handle_remote_references(schema, registry.resolver())
+    referenced_schemas = collect_referenced_schemas(schema, registry.resolver())
 
-    if schema_storage:
+    if referenced_schemas:
         # Check for recursive references
-        references = find_recursive_references(schema_storage)
+        references = find_recursive_references(referenced_schemas)
         logger.debug("Found %s recursive references", len(references))
-        inline_recursive_references(schema_storage, schema_storage, references)
+        inline_recursive_references(referenced_schemas, referenced_schemas, references)
         logger.debug("Inlined schema: %s", schema)
     else:
         # Trivial case - no extra processing needed, just remove the key
@@ -370,40 +370,47 @@ def inline_references(
     return schema
 
 
-def handle_remote_references(schema: dict[str, Any], resolver: Any) -> SchemaStorage:
-    schema_storage: SchemaStorage = {}
-    schema[INLINED_REFERENCE_ROOT_KEY] = schema_storage
-    _handle_remote_references(schema, schema_storage, resolver)
-    return schema_storage
+def collect_referenced_schemas(schema: dict[str, Any], resolver: Any) -> ReferencedSchemas:
+    referenced_schemas: ReferencedSchemas = {}
+    schema[INLINED_REFERENCE_ROOT_KEY] = referenced_schemas
+    _collect_referenced_schemas(schema, referenced_schemas, resolver)
+    return referenced_schemas
 
 
-def _handle_remote_references(item: dict[str, Any] | list, schema_storage: SchemaStorage, resolver: Any) -> None:
+def _collect_referenced_schemas(
+    item: dict[str, Any] | list, referenced_schemas: ReferencedSchemas, resolver: Any
+) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
-            process_reference(item, ref, schema_storage, resolver)
+            resolved = move_referenced_data(item, ref, referenced_schemas, resolver)
+            if resolved is not None:
+                item, resolver = resolved
+                _collect_referenced_schemas(item, referenced_schemas, resolver)
         else:
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
-                    _handle_remote_references(sub_item, schema_storage, resolver)
+                    _collect_referenced_schemas(sub_item, referenced_schemas, resolver)
     elif isinstance(item, list):
         for sub_item in item:
             if sub_item and isinstance(sub_item, (dict, list)):
-                _handle_remote_references(sub_item, schema_storage, resolver)
+                _collect_referenced_schemas(sub_item, referenced_schemas, resolver)
 
 
-def process_reference(item: dict[str, Any], ref: str, schema_storage: SchemaStorage, resolver: Any) -> None:
+def move_referenced_data(
+    item: dict[str, Any], ref: str, referenced_schemas: ReferencedSchemas, resolver: Any
+) -> tuple[dict[str, Any], Any] | None:
     if ref.startswith(INLINED_REFERENCE_PREFIX):
         logger.debug("Already inlined %s", ref)
-        return
+        return None
     logger.debug("Resolving %s", ref)
     try:
         resolved = resolver.lookup(ref)
         # Copy the data as it might be mutated
         contents = fast_deepcopy(resolved.contents)
         key = _make_reference_key(ref)
-        schema_storage[key] = contents
+        referenced_schemas[key] = contents
         new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
         item["$ref"] = new_ref
         logger.debug("Inlined reference: %s -> %s", ref, new_ref)
@@ -412,7 +419,7 @@ def process_reference(item: dict[str, Any], ref: str, schema_storage: SchemaStor
             resolved = resolver.lookup(f"{SELF_URN}{ref}")
             contents = resolved.contents
             key = _make_reference_key(ref)
-            schema_storage[key] = contents
+            referenced_schemas[key] = contents
             new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
             item["$ref"] = new_ref
             logger.debug("Keep local reference: %s", ref)
@@ -420,10 +427,10 @@ def process_reference(item: dict[str, Any], ref: str, schema_storage: SchemaStor
             logger.debug("Failed to resolve %s: %s", ref, exc)
             raise exc from None
     logger.debug("Resolved %s -> %s", ref, contents)
-    _handle_remote_references(contents, schema_storage, resolved.resolver)
+    return contents, resolved.resolver
 
 
-def find_recursive_references(schema_storage: SchemaStorage) -> set[str]:
+def find_recursive_references(schema_storage: ReferencedSchemas) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
     for item in schema_storage.values():
@@ -433,7 +440,7 @@ def find_recursive_references(schema_storage: SchemaStorage) -> set[str]:
 
 def _find_recursive_references(
     item: dict[str, Any] | list,
-    schema_storage: SchemaStorage,
+    referenced_schemas: ReferencedSchemas,
     references: set[str],
     path: tuple[str, ...] = (),
 ) -> None:
@@ -447,22 +454,22 @@ def _find_recursive_references(
                 references.add(ref)
             else:
                 # Otherwise explore the referenced item
-                referenced_item = schema_storage[ref.split("/")[-1]]
+                referenced_item = referenced_schemas[ref.split("/")[-1]]
                 subtree_path = path + (ref,)
-                _find_recursive_references(referenced_item, schema_storage, references, subtree_path)
+                _find_recursive_references(referenced_item, referenced_schemas, references, subtree_path)
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
-                    _find_recursive_references(value, schema_storage, references, path)
+                    _find_recursive_references(value, referenced_schemas, references, path)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                _find_recursive_references(item, schema_storage, references, path)
+                _find_recursive_references(item, referenced_schemas, references, path)
 
 
 def inline_recursive_references(
     item: dict[str, Any] | list,
-    schema_storage: SchemaStorage,
+    referenced_schemas: ReferencedSchemas,
     references: set[str],
     path: tuple[str, ...] = (),
 ) -> None:
@@ -471,25 +478,25 @@ def inline_recursive_references(
         ref = item.get("$ref")
         if isinstance(ref, str):
             subtree_path = path + (ref,)
-            referenced_item = schema_storage[ref.split("/")[-1]]
+            referenced_item = referenced_schemas[ref.split("/")[-1]]
             if ref in references:
                 if path.count(ref) < MAX_RECURSION_DEPTH:
                     logger.debug("Inlining recursive reference: %s", ref)
                     item.clear()
                     item.update(fast_deepcopy(referenced_item))
-                    inline_recursive_references(item, schema_storage, references, subtree_path)
+                    inline_recursive_references(item, referenced_schemas, references, subtree_path)
                 else:
                     logger.debug("Max recursion depth reached for %s at %s", ref, path)
             else:
-                inline_recursive_references(referenced_item, schema_storage, references, subtree_path)
+                inline_recursive_references(referenced_item, referenced_schemas, references, subtree_path)
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
-                    inline_recursive_references(value, schema_storage, references, path)
+                    inline_recursive_references(value, referenced_schemas, references, path)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                inline_recursive_references(sub_item, schema_storage, references, path)
+                inline_recursive_references(sub_item, referenced_schemas, references, path)
 
 
 def _make_reference_key(reference: str) -> str:

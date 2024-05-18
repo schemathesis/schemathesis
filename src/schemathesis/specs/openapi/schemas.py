@@ -26,8 +26,7 @@ from urllib.parse import urlsplit
 import jsonschema
 from hypothesis.strategies import SearchStrategy
 from packaging import version
-from referencing import DRAFT202012
-from referencing.jsonschema import DRAFT4
+from referencing.jsonschema import DRAFT4, DRAFT202012
 from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
