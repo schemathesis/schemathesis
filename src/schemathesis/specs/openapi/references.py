@@ -11,7 +11,7 @@ from urllib.request import urlopen
 import jsonschema
 import referencing.retrieval
 import requests
-from referencing import Registry, Resource
+from referencing import Registry, Resource, Specification
 from referencing.exceptions import PointerToNowhere, Unretrievable
 from referencing.jsonschema import DRAFT4
 
@@ -268,6 +268,8 @@ logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
+SELF_URN = "urn:self"
+MAX_RECURSION_DEPTH = 5
 
 
 def retrieve_from_file(url: str) -> Any:
@@ -277,18 +279,38 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-MAX_RECURSION_DEPTH = 5
-
-
-def inline_references(uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
+def inline_references(
+    uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any], draft: Specification
+) -> dict[str, Any]:
     """Inline all non-local and recursive references in the given schema.
 
-    Recursive references are inlined up to 3 levels because `hypothesis-jsonschema` does not support them natively yet.
+    This function performs 3 passes:
+
+    1. Inline all non-local references. Each external reference is resolved and the referenced data is stored
+       in the root of the schema under a special key. The reference itself is modified so it points to the locally
+       stored data. The stored data may contain its own references, therefore this routine is repeated until there
+       are no more references to process.
+
+    2. Find all recursive references. At this point, schema is self-contained, meaning it has no external references.
+       This step traverses the schema and finds all references whose resolution would lead to themselves immediately,
+       or through a chain of references.
+
+    3. Limited inlining of recursive references. The input schema is a tree and this step traverses it and if it finds
+       a recursive reference (as detected in the previous step), it merges the referenced data into the place of the
+       reference. To avoid infinite recursion, this process is limited by `MAX_RECURSION_DEPTH` iterations.
+       At the last iteration, the reference is not inlined, but instead it is removed from the parent schema in a way
+       so the parent schema remains valid. It includes removing optional parts of the schema that contain
+       this reference. The only exception is when the schema describes infinitely recursive data, in which case an
+       error is raised.
+
+    NOTE: Recursive references are inlined up to `MAX_RECURSION_DEPTH` levels because `hypothesis-jsonschema` does not yet
+    support generating recursive data.
     """
 
-    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)  # type: ignore[misc]
+    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
     def cached_retrieve(target: str) -> Any:
         logger.debug("Retrieving %s", target)
+
         if scope:
             base = scope
         else:
@@ -345,7 +367,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
             logger.debug("Inlined reference: %s -> %s", ref, new_ref)
         except PointerToNowhere as exc:
             try:
-                resolved = resolver.lookup(f"{self_urn}{ref}")
+                resolved = resolver.lookup(f"{SELF_URN}{ref}")
                 contents = resolved.contents
                 key = _make_reference_key(ref)
                 collected[key] = contents
@@ -357,25 +379,6 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
                 raise exc from None
         stack.append((contents, resolved.resolver))
         logger.debug("Resolved %s -> %s", ref, contents)
-
-    def find_recursive_references(data: dict[str, Any] | list, path: tuple[str, ...] = ()) -> set[str]:
-        recursive_refs = set()
-        if isinstance(data, dict):
-            ref = data.get("$ref")
-            if isinstance(ref, str):
-                if ref in path:
-                    recursive_refs.add(ref)
-                else:
-                    recursive_refs.update(find_recursive_references(collected[ref.split("/")[-1]], path + (ref,)))
-            else:
-                for value in data.values():
-                    if isinstance(value, (dict, list)):
-                        recursive_refs.update(find_recursive_references(value, path))
-        else:
-            for item in data:
-                if isinstance(item, (dict, list)):
-                    recursive_refs.update(find_recursive_references(item, path))
-        return recursive_refs
 
     def inline_recursive_references(
         data: dict[str, Any] | list, recursive_refs: set[str], path: tuple[str, ...] = ()
@@ -404,7 +407,6 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
                     inline_recursive_references(item, recursive_refs, path)
 
     # TODO:
-    #  - use different drafts depending on the open API spec
     #  - use caching for input schemas
     #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
     #  - Raise custom error when the referenced value is invalid
@@ -412,16 +414,14 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
     #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
     #  - consider recursion without explicit stack
 
-    logger.debug("Inlining references in %s", schema)
-
-    self_urn = "urn:self"
     registry = Registry(retrieve=cached_retrieve).with_resources(
         [
             ("", Resource(contents=components, specification=DRAFT4)),
-            (self_urn, Resource(contents=schema, specification=DRAFT4)),
+            (SELF_URN, Resource(contents=schema, specification=DRAFT4)),
         ]
     )
 
+    logger.debug("Inlining non-local references: %s", schema)
     collected: dict[str, dict[str, Any]] = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = collected
     stack: list[tuple[Any, Any]] = [(schema, registry.resolver())]
@@ -430,15 +430,52 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         logger.debug("Processing %r", item)
         process_item(item, resolver)
 
-    if not collected:
-        logger.debug("No references were inlined")
-        del schema[INLINED_REFERENCE_ROOT_KEY]
-    else:
+    if collected:
+        # Check for recursive references
         recursive_references = find_recursive_references(collected)
         logger.debug("Found %s recursive references", len(recursive_references))
         inline_recursive_references(collected, recursive_references)
         logger.debug("Inlined schema: %s", schema)
+    else:
+        # Trivial case - no extra processing needed, just remove the key
+        logger.debug("No references inlined")
+        del schema[INLINED_REFERENCE_ROOT_KEY]
     return schema
+
+
+def find_recursive_references(schema_storage: dict[str, dict[str, Any]]) -> set[str]:
+    """Find all recursive references in the given schema storage."""
+    references: set[str] = set()
+    for item in schema_storage.values():
+        _find_recursive_references(item, schema_storage, references)
+    return references
+
+
+def _find_recursive_references(
+    item: dict[str, Any] | list,
+    schema_storage: dict[str, dict[str, Any]],
+    references: set[str],
+    path: tuple[str, ...] = (),
+) -> None:
+    if isinstance(item, dict):
+        ref = item.get("$ref")
+        if isinstance(ref, str):
+            if ref in path:
+                # The reference was already seen in the current traversl path, it means that it's recursive
+                references.add(ref)
+            else:
+                # Otherwise explore the referenced item
+                referenced_item = schema_storage[ref.split("/")[-1]]
+                subtree_path = path + (ref,)
+                _find_recursive_references(referenced_item, schema_storage, references, subtree_path)
+        else:
+            for value in item.values():
+                if isinstance(value, (dict, list)):
+                    _find_recursive_references(value, schema_storage, references, path)
+    else:
+        for sub_item in item:
+            if isinstance(sub_item, (dict, list)):
+                _find_recursive_references(item, schema_storage, references, path)
 
 
 def _make_reference_key(reference: str) -> str:

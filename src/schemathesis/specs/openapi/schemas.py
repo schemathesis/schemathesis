@@ -26,6 +26,8 @@ from urllib.parse import urlsplit
 import jsonschema
 from hypothesis.strategies import SearchStrategy
 from packaging import version
+from referencing import DRAFT202012
+from referencing.jsonschema import DRAFT4
 from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
@@ -678,7 +680,12 @@ class BaseOpenAPISchema(BaseSchema):
         for path in self.component_locations:
             if path in self.raw_schema:
                 components[path] = fast_deepcopy(self.raw_schema[path])
-        return inline_references(self.location or "", operation.definition.scope, schema, components)
+
+        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+            draft = DRAFT202012
+        else:
+            draft = DRAFT4
+        return inline_references(self.location or "", operation.definition.scope, schema, components, draft)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

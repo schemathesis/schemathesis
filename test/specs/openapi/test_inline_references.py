@@ -5,6 +5,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, Verbosity, given, settings
 from hypothesis_jsonschema import from_schema
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
+from referencing.jsonschema import DRAFT4
 
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi.references import inline_references
@@ -429,7 +430,7 @@ def setup_schema(request, uri, scope, schema):
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
     uri, scope, schema = setup_schema(request, uri, scope, schema)
-    schema = inline_references(uri, scope, schema, components)
+    schema = inline_references(uri, scope, schema, components, DRAFT4)
 
     # assert schema == expected
 
