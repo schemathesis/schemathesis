@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from hashlib import sha1
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
-import logging
+from hashlib import sha1
 from typing import Any, Callable, Dict, Union, overload
 from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
@@ -264,12 +264,21 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     return target
 
 
-logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
+# logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
 SELF_URN = "urn:self"
 MAX_RECURSION_DEPTH = 5
+
+SchemaStorage = Dict[str, Dict[str, Any]]
+
+# TODO:
+#  - use caching for input schemas
+#  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
+#  - Raise custom error when the referenced value is invalid
+#  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
+#  - Traverse only components that may have references (before passing here)
 
 
 def retrieve_from_file(url: str) -> Any:
@@ -308,19 +317,19 @@ def inline_references(
     """
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
-    def cached_retrieve(reference: str) -> Any:
+    def cached_retrieve(ref: str) -> Any:
         """Resolve non-local reference."""
-        logger.debug("Retrieving %s", reference)
+        logger.debug("Retrieving %s", ref)
 
         if scope:
             base = scope
         else:
             base = uri
 
-        parsed = urlsplit(reference)
+        parsed = urlsplit(ref)
         try:
             if parsed.scheme == "":
-                url = urljoin(base, reference)
+                url = urljoin(base, ref)
                 parsed = urlsplit(url)
                 if parsed.scheme == "file":
                     url = parsed.path
@@ -329,92 +338,14 @@ def inline_references(
                 url = urljoin(base, parsed.netloc)
                 return retrieve_from_file(url)
             if parsed.scheme in ("http", "https"):
-                retrieved = load_remote_uri(reference)
-                logger.debug("Retrieved %s", reference)
+                retrieved = load_remote_uri(ref)
+                logger.debug("Retrieved %s", ref)
                 return retrieved
         except Exception as exc:
-            logger.debug("Failed to retrieve %s: %s", reference, exc)
+            logger.debug("Failed to retrieve %s: %s", ref, exc)
             raise
-        logger.debug("Unretrievable %s", reference)
-        raise Unretrievable(reference)
-
-    def process_item(item: Any, resolver: Any) -> None:
-        if isinstance(item, dict):
-            ref = item.get("$ref")
-            if isinstance(ref, str):
-                process_reference(item, ref)
-            else:
-                for sub_item in item.values():
-                    if sub_item and isinstance(sub_item, (dict, list)):
-                        stack.append((sub_item, resolver))
-        elif isinstance(item, list):
-            for sub_item in item:
-                if sub_item and isinstance(sub_item, (dict, list)):
-                    stack.append((sub_item, resolver))
-
-    def process_reference(item: dict[str, Any], ref: str) -> None:
-        if ref.startswith(INLINED_REFERENCE_PREFIX):
-            logger.debug("Already inlined %s", ref)
-            return
-        logger.debug("Resolving %s", ref)
-        try:
-            resolved = resolver.lookup(ref)
-            # Copy the data as it might be mutated
-            contents = fast_deepcopy(resolved.contents)
-            key = _make_reference_key(ref)
-            collected[key] = contents
-            new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-            item["$ref"] = new_ref
-            logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-        except PointerToNowhere as exc:
-            try:
-                resolved = resolver.lookup(f"{SELF_URN}{ref}")
-                contents = resolved.contents
-                key = _make_reference_key(ref)
-                collected[key] = contents
-                new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-                item["$ref"] = new_ref
-                logger.debug("Keep local reference: %s", ref)
-            except PointerToNowhere:
-                logger.debug("Failed to resolve %s: %s", ref, exc)
-                raise exc from None
-        stack.append((contents, resolved.resolver))
-        logger.debug("Resolved %s -> %s", ref, contents)
-
-    def inline_recursive_references(
-        data: dict[str, Any] | list, recursive_refs: set[str], path: tuple[str, ...] = ()
-    ) -> None:
-        if isinstance(data, dict):
-            ref = data.get("$ref")
-            if isinstance(ref, str):
-                if ref in recursive_refs:
-                    if path.count(ref) < MAX_RECURSION_DEPTH:
-                        logger.debug("Inlining recursive reference: %s", ref)
-                        key = ref.split("/")[-1]
-                        data.clear()
-                        data.update(fast_deepcopy(collected[key]))
-                        inline_recursive_references(data, recursive_refs, path + (ref,))
-                    else:
-                        logger.debug("Max recursion depth reached for %s at %s", ref, path)
-                else:
-                    inline_recursive_references(collected[ref.split("/")[-1]], recursive_refs, path + (ref,))
-            else:
-                for value in data.values():
-                    if isinstance(value, (dict, list)):
-                        inline_recursive_references(value, recursive_refs, path)
-        else:
-            for item in data:
-                if isinstance(item, (dict, list)):
-                    inline_recursive_references(item, recursive_refs, path)
-
-    # TODO:
-    #  - use caching for input schemas
-    #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
-    #  - Raise custom error when the referenced value is invalid
-    #  - Handle circular references
-    #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
-    #  - consider recursion without explicit stack
-    #  - Traverse only components that may have references (before passing here)
+        logger.debug("Unretrievable %s", ref)
+        raise Unretrievable(ref)
 
     registry = Registry(retrieve=cached_retrieve).with_resources(
         [
@@ -424,19 +355,13 @@ def inline_references(
     )
 
     logger.debug("Inlining non-local references: %s", schema)
-    collected: dict[str, dict[str, Any]] = {}
-    schema[INLINED_REFERENCE_ROOT_KEY] = collected
-    stack: list[tuple[Any, Any]] = [(schema, registry.resolver())]
-    while stack:
-        item, resolver = stack.pop()
-        logger.debug("Processing %r", item)
-        process_item(item, resolver)
+    schema_storage = handle_remote_references(schema, registry.resolver())
 
-    if collected:
+    if schema_storage:
         # Check for recursive references
-        recursive_references = find_recursive_references(collected)
-        logger.debug("Found %s recursive references", len(recursive_references))
-        inline_recursive_references(collected, recursive_references)
+        references = find_recursive_references(schema_storage)
+        logger.debug("Found %s recursive references", len(references))
+        inline_recursive_references(schema_storage, schema_storage, references)
         logger.debug("Inlined schema: %s", schema)
     else:
         # Trivial case - no extra processing needed, just remove the key
@@ -445,7 +370,60 @@ def inline_references(
     return schema
 
 
-def find_recursive_references(schema_storage: dict[str, dict[str, Any]]) -> set[str]:
+def handle_remote_references(schema: dict[str, Any], resolver: Any) -> SchemaStorage:
+    schema_storage: SchemaStorage = {}
+    schema[INLINED_REFERENCE_ROOT_KEY] = schema_storage
+    _handle_remote_references(schema, schema_storage, resolver)
+    return schema_storage
+
+
+def _handle_remote_references(item: dict[str, Any] | list, schema_storage: SchemaStorage, resolver: Any) -> None:
+    logger.debug("Processing %r", item)
+    if isinstance(item, dict):
+        ref = item.get("$ref")
+        if isinstance(ref, str):
+            process_reference(item, ref, schema_storage, resolver)
+        else:
+            for sub_item in item.values():
+                if sub_item and isinstance(sub_item, (dict, list)):
+                    _handle_remote_references(sub_item, schema_storage, resolver)
+    elif isinstance(item, list):
+        for sub_item in item:
+            if sub_item and isinstance(sub_item, (dict, list)):
+                _handle_remote_references(sub_item, schema_storage, resolver)
+
+
+def process_reference(item: dict[str, Any], ref: str, schema_storage: SchemaStorage, resolver: Any) -> None:
+    if ref.startswith(INLINED_REFERENCE_PREFIX):
+        logger.debug("Already inlined %s", ref)
+        return
+    logger.debug("Resolving %s", ref)
+    try:
+        resolved = resolver.lookup(ref)
+        # Copy the data as it might be mutated
+        contents = fast_deepcopy(resolved.contents)
+        key = _make_reference_key(ref)
+        schema_storage[key] = contents
+        new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+        item["$ref"] = new_ref
+        logger.debug("Inlined reference: %s -> %s", ref, new_ref)
+    except PointerToNowhere as exc:
+        try:
+            resolved = resolver.lookup(f"{SELF_URN}{ref}")
+            contents = resolved.contents
+            key = _make_reference_key(ref)
+            schema_storage[key] = contents
+            new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+            item["$ref"] = new_ref
+            logger.debug("Keep local reference: %s", ref)
+        except PointerToNowhere:
+            logger.debug("Failed to resolve %s: %s", ref, exc)
+            raise exc from None
+    logger.debug("Resolved %s -> %s", ref, contents)
+    _handle_remote_references(contents, schema_storage, resolved.resolver)
+
+
+def find_recursive_references(schema_storage: SchemaStorage) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
     for item in schema_storage.values():
@@ -455,7 +433,7 @@ def find_recursive_references(schema_storage: dict[str, dict[str, Any]]) -> set[
 
 def _find_recursive_references(
     item: dict[str, Any] | list,
-    schema_storage: dict[str, dict[str, Any]],
+    schema_storage: SchemaStorage,
     references: set[str],
     path: tuple[str, ...] = (),
 ) -> None:
@@ -480,6 +458,38 @@ def _find_recursive_references(
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
                 _find_recursive_references(item, schema_storage, references, path)
+
+
+def inline_recursive_references(
+    item: dict[str, Any] | list,
+    schema_storage: SchemaStorage,
+    references: set[str],
+    path: tuple[str, ...] = (),
+) -> None:
+    """Inline all recursive references in the given item."""
+    if isinstance(item, dict):
+        ref = item.get("$ref")
+        if isinstance(ref, str):
+            subtree_path = path + (ref,)
+            referenced_item = schema_storage[ref.split("/")[-1]]
+            if ref in references:
+                if path.count(ref) < MAX_RECURSION_DEPTH:
+                    logger.debug("Inlining recursive reference: %s", ref)
+                    item.clear()
+                    item.update(fast_deepcopy(referenced_item))
+                    inline_recursive_references(item, schema_storage, references, subtree_path)
+                else:
+                    logger.debug("Max recursion depth reached for %s at %s", ref, path)
+            else:
+                inline_recursive_references(referenced_item, schema_storage, references, subtree_path)
+        else:
+            for value in item.values():
+                if isinstance(value, (dict, list)):
+                    inline_recursive_references(value, schema_storage, references, path)
+    else:
+        for sub_item in item:
+            if isinstance(sub_item, (dict, list)):
+                inline_recursive_references(sub_item, schema_storage, references, path)
 
 
 def _make_reference_key(reference: str) -> str:
