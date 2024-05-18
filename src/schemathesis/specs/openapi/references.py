@@ -277,7 +277,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-MAX_RECURSION_DEPTH = 3
+MAX_RECURSION_DEPTH = 5
 
 
 def inline_references(uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
@@ -343,31 +343,65 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
             new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
             item["$ref"] = new_ref
             logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-            stack.append((contents, resolved.resolver))
         except PointerToNowhere as exc:
             try:
                 resolved = resolver.lookup(f"{self_urn}{ref}")
                 contents = resolved.contents
+                key = _make_reference_key(ref)
+                collected[key] = contents
+                new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+                item["$ref"] = new_ref
                 logger.debug("Keep local reference: %s", ref)
             except PointerToNowhere:
                 logger.debug("Failed to resolve %s: %s", ref, exc)
                 raise exc from None
+        stack.append((contents, resolved.resolver))
         logger.debug("Resolved %s -> %s", ref, contents)
 
-    def inline_recursive_references(data: dict[str, Any] | list, path: tuple[str, ...] = ()) -> None:
+    def find_recursive_references(data: dict[str, Any] | list, path: tuple[str, ...] = ()) -> set[str]:
+        recursive_refs = set()
         if isinstance(data, dict):
             ref = data.get("$ref")
             if isinstance(ref, str):
-                # TODO: handle recursion
-                pass
+                if ref in path:
+                    recursive_refs.add(ref)
+                else:
+                    recursive_refs.update(find_recursive_references(collected[ref.split("/")[-1]], path + (ref,)))
             else:
                 for value in data.values():
                     if isinstance(value, (dict, list)):
-                        inline_recursive_references(value, path)
+                        recursive_refs.update(find_recursive_references(value, path))
         else:
             for item in data:
                 if isinstance(item, (dict, list)):
-                    inline_recursive_references(item, path)
+                    recursive_refs.update(find_recursive_references(item, path))
+        return recursive_refs
+
+    def inline_recursive_references(
+        data: dict[str, Any] | list, recursive_refs: set[str], path: tuple[str, ...] = ()
+    ) -> None:
+        if isinstance(data, dict):
+            ref = data.get("$ref")
+            if isinstance(ref, str):
+                if ref in recursive_refs:
+                    if path.count(ref) < MAX_RECURSION_DEPTH:
+                        logger.debug("Inlining recursive reference: %s", ref)
+                        key = ref.split("/")[-1]
+                        data.clear()
+                        data.update(fast_deepcopy(collected[key]))
+                        inline_recursive_references(data, recursive_refs, path + (ref,))
+                    else:
+                        logger.debug("Max recursion depth reached for %s at %s", ref, path)
+                else:
+                    inline_recursive_references(collected[ref.split("/")[-1]], recursive_refs, path + (ref,))
+            else:
+                for value in data.values():
+                    if isinstance(value, (dict, list)):
+                        inline_recursive_references(value, recursive_refs, path)
+        else:
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    inline_recursive_references(item, recursive_refs, path)
 
     # TODO:
     #  - use different drafts depending on the open API spec
@@ -400,10 +434,9 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
     else:
-        stack_ = [collected]
-        while stack_:
-            item = stack_.pop()
-            inline_recursive_references(item)
+        recursive_references = find_recursive_references(collected)
+        logger.debug("Found %s recursive references", len(recursive_references))
+        inline_recursive_references(collected, recursive_references)
         logger.debug("Inlined schema: %s", schema)
     return schema
 
