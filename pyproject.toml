@@ -102,7 +102,6 @@ schemathesis = "schemathesis.extra.pytest_plugin"
 addopts = ["-ra", "--strict-markers", "--strict-config"]
 xfail_strict = true
 testpaths = "tests"
-log_cli = true
 norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 
 [tool.coverage.run]

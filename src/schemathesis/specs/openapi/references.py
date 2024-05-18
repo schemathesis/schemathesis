@@ -266,8 +266,8 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-# logger.propagate = False
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-reference"
+INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
 
 
 def retrieve_from_file(url: str) -> Any:
@@ -283,13 +283,21 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)  # type: ignore[misc]
     def cached_retrieve(target: str) -> Any:
         logger.debug("Retrieving %s", target)
+        if scope:
+            base = scope
+        else:
+            base = uri
+
         parsed = urlsplit(target)
         try:
             if parsed.scheme == "":
-                url = urljoin(uri, target)
+                url = urljoin(base, target)
+                parsed = urlsplit(url)
+                if parsed.scheme == "file":
+                    url = parsed.path
                 return retrieve_from_file(url)
             if parsed.scheme == "file":
-                url = urljoin(uri, parsed.netloc)
+                url = urljoin(base, parsed.netloc)
                 return retrieve_from_file(url)
             if parsed.scheme in ("http", "https"):
                 retrieved = load_remote_uri(target)
@@ -304,11 +312,11 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
     # TODO:
     #  - use different drafts depending on the open API spec
     #  - use caching for input schemas
-    #  - avoid mutating the original + don't create a copy unless necessary
-    #  - How to add scope to the registry? there is "with_root" or something like that
+    #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
     #  - Raise custom error when the referenced value is invalid
     #  - Handle circular references
     #  - is it possible to avoid purely "$ref" -> "$ref" jumps?
+    #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
 
     logger.debug("Inlining references in %s", schema)
 
@@ -329,13 +337,18 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         if isinstance(item, dict):
             ref = item.get("$ref")
             if isinstance(ref, str):
+                if ref.startswith(INLINED_REFERENCE_PREFIX):
+                    # May happen if the same schema is referenced multiple times, so it is added to
+                    # the stack from different places
+                    logger.debug("Already inlined %s", ref)
+                    continue
                 logger.debug("Resolving %s", ref)
                 try:
                     resolved = resolver.lookup(ref)
                     contents = fast_deepcopy(resolved.contents)
                     key = _make_reference_key(ref)
                     collected[key] = contents
-                    new_ref = f"#/{INLINED_REFERENCE_ROOT_KEY}/{key}"
+                    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
                     item["$ref"] = new_ref
                     logger.debug("Inlined reference: %s -> %s", ref, new_ref)
                 except PointerToNowhere as exc:
@@ -348,20 +361,22 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
                         logger.debug("Failed to resolve %s: %s", ref, exc)
                         raise exc from None
                 logger.debug("Resolved %s -> %s", ref, contents)
-                stack.append((contents, resolver))
+                stack.append((contents, resolved.resolver))
             else:
                 # The current object has no references, but its children might
-                for value in item.values():
-                    if isinstance(value, (dict, list)):
-                        stack.append((value, resolver))
+                for sub_item in item.values():
+                    if sub_item and isinstance(sub_item, (dict, list)):
+                        stack.append((sub_item, resolver))
         elif isinstance(item, list):
             # All potentially nested items are added to the stack
             for sub_item in item:
-                if isinstance(sub_item, (dict, list)):
+                if sub_item and isinstance(sub_item, (dict, list)):
                     stack.append((sub_item, resolver))
     if not collected:
         logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
+    else:
+        logger.debug("Inlined schema: %s", schema)
     return schema
 
 

@@ -21,8 +21,22 @@ TARGET_LOCAL_NESTED_REMOTE_REF = {"$ref": "#/components/schemas/Nested-Remote"}
 TARGET_FILE_REF = {"$ref": "root-components.json#/RootItem"}
 TARGET_RELATIVE_FILE_REF = {"$ref": "../relative-components.json#/RelativeItem"}
 TARGET_FILE_WITH_SCHEME_REF = {"$ref": "file://root-components.json#/RootItem"}
+# Directory structure for scoped references looks like this:
+# /
+# ├── root.json
+# ├── nested-2
+# │   └── components.json
+# └── nested-1
+#     └── components.json     # The test example starts here
+#
+# The schema in nested-1/components.json references the schema in nested-2/components.json
+# via a relative reference. It requires a proper scope because the root schema is in the parent directory,
+# and without the notion of scope it would be pointing to the parent of the root directory of the test.
+NESTED_SCOPE = object()
+TARGET_FILE_WITH_SCOPED_FILE_REF = {"$ref": "../nested-2/components.json#/Nested-2"}
 TARGET_FILE_ROOT_SCHEMA = {"RootItem": TARGET}
 TARGET_FILE_RELATIVE_SCHEMA = {"RelativeItem": TARGET}
+TARGET_FILE_NESTED_2_SCHEMA = {"Nested-2": TARGET}
 TARGET_REMOTE_REF = {"$ref": f"{REMOTE_PLACEHOLDER}/schema.json#/RootItem"}
 TARGET_REMOTE_ROOT_SCHEMA = {"RootItem": TARGET}
 INTEGER = 1
@@ -51,7 +65,6 @@ LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE = {
 }
 LOCAL_REF_NESTED_IN_ARRAY = {"allOf": [TARGET_LOCAL_REF]}
 LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE = {"allOf": [TARGET_LOCAL_REF, TARGET_LOCAL_REF]}
-# TODO: How scoped resolution should look like? i.e. reference + scope
 # TODO: Write a separate test for this case
 # Test cases with nested file refs
 LOCAL_REF_NON_SCHEMA = {"$ref": "#/components/schemas/Integer"}
@@ -64,6 +77,7 @@ FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE = {
     "properties": {"example-1": TARGET_LOCAL_NESTED_FILE_REF, "example-2": TARGET_LOCAL_NESTED_FILE_REF},
 }
 FILE_RELATIVE_REF = TARGET_RELATIVE_FILE_REF
+FILE_SCOPED_REF = {"properties": {"nested-2": TARGET_FILE_WITH_SCOPED_FILE_REF}}
 # Remote references
 REMOTE_REF_NO_NESTING = TARGET_REMOTE_REF
 REMOTE_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_REMOTE_REF}}
@@ -102,21 +116,34 @@ def httpserver():
         server.stop()
 
 
-def setup_schema(request, uri, schema):
+def makefile(directory, name, schema):
+    target = directory
+    for entry in name.split("/")[:-1]:
+        target = target / entry
+        target.ensure_dir()
+    filename = name.split("/")[-1]
+    (target / filename).write_text(json.dumps(schema), "utf8")
+
+
+def setup_schema(request, uri, scope, schema):
     schema = fast_deepcopy(schema)
     if uri is FILE_URI:
         testdir = request.getfixturevalue("testdir")
         root = testdir.mkdir("root")
-        (root / "root-components.json").write_text(json.dumps(TARGET_FILE_ROOT_SCHEMA), "utf8")
+        makefile(root, "root-components.json", TARGET_FILE_ROOT_SCHEMA)
+        makefile(root, "/nested-2/components.json", TARGET_FILE_NESTED_2_SCHEMA)
         testdir.makefile(".json", **{"relative-components": json.dumps(TARGET_FILE_RELATIVE_SCHEMA)})
         uri = str(root / "schema.json")
+        if scope is NESTED_SCOPE:
+            # It is not necessary for this file to exist, we assume that the schema is already loaded from there
+            scope = str(root / "nested-1/components.json")
     elif uri is REMOTE_URI:
         server = request.getfixturevalue("httpserver")
         server.expect_request("/schema.json").respond_with_json(TARGET_REMOTE_ROOT_SCHEMA)
         uri = f"http://{server.host}:{server.port}"
         prepared = json.dumps(schema).replace(REMOTE_PLACEHOLDER, uri)
         schema = json.loads(prepared)
-    return uri, schema
+    return uri, scope, schema
 
 
 @pytest.mark.parametrize(
@@ -303,6 +330,16 @@ def setup_schema(request, uri, schema):
             },
         ),
         (
+            FILE_URI,
+            NESTED_SCOPE,
+            FILE_SCOPED_REF,
+            COMPONENTS,
+            {
+                "properties": {"nested-2": {"$ref": "#/x-inlined-reference/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
+                "x-inlined-reference": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
+            },
+        ),
+        (
             REMOTE_URI,
             "",
             REMOTE_REF_NO_NESTING,
@@ -360,6 +397,7 @@ def setup_schema(request, uri, schema):
         "file-nested-file-ref-nested-in-object",
         "file-nested-file-ref-nested-in-object-multiple",
         "file-relative-ref",
+        "file-scoped-ref",
         "remote-ref-no-nesting",
         "remote-ref-nested-in-object",
         "remote-ref-nested-in-object-multiple",
@@ -368,8 +406,8 @@ def setup_schema(request, uri, schema):
     ),
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
-    uri, schema = setup_schema(request, uri, schema)
-    inline_references(uri, scope, schema, components)
+    uri, scope, schema = setup_schema(request, uri, scope, schema)
+    schema = inline_references(uri, scope, schema, components)
 
     assert schema == expected
 
