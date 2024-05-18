@@ -319,31 +319,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         if isinstance(item, dict):
             ref = item.get("$ref")
             if isinstance(ref, str):
-                if ref.startswith(INLINED_REFERENCE_PREFIX):
-                    logger.debug("Already inlined %s", ref)
-                    return
-                logger.debug("Resolving %s", ref)
-                try:
-                    resolved = resolver.lookup(ref)
-                    contents = fast_deepcopy(resolved.contents)
-                    key = _make_reference_key(ref)
-                    collected[key] = contents
-                    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-                    item["$ref"] = new_ref
-                    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-                    if path.count(ref) < MAX_RECURSION_DEPTH:
-                        stack.append((contents, resolved.resolver, path + (ref,)))
-                    else:
-                        logger.debug("Max recursion depth reached for %s at %s", ref, path)
-                except PointerToNowhere as exc:
-                    try:
-                        resolved = resolver.lookup(f"{self_urn}{ref}")
-                        contents = fast_deepcopy(resolved.contents)
-                        logger.debug("Keep local reference: %s", ref)
-                    except PointerToNowhere:
-                        logger.debug("Failed to resolve %s: %s", ref, exc)
-                        raise exc from None
-                logger.debug("Resolved %s -> %s", ref, contents)
+                process_reference(ref, path)
             else:
                 for sub_item in item.values():
                     if sub_item and isinstance(sub_item, (dict, list)):
@@ -352,6 +328,33 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
             for sub_item in item:
                 if sub_item and isinstance(sub_item, (dict, list)):
                     stack.append((sub_item, resolver, path))
+
+    def process_reference(ref: str, path: tuple[str, ...] = ()) -> None:
+        if ref.startswith(INLINED_REFERENCE_PREFIX):
+            logger.debug("Already inlined %s", ref)
+            return
+        logger.debug("Resolving %s", ref)
+        try:
+            resolved = resolver.lookup(ref)
+            contents = fast_deepcopy(resolved.contents)
+            key = _make_reference_key(ref)
+            collected[key] = contents
+            new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+            item["$ref"] = new_ref
+            logger.debug("Inlined reference: %s -> %s", ref, new_ref)
+            if path.count(ref) < MAX_RECURSION_DEPTH:
+                stack.append((contents, resolved.resolver, path + (ref,)))
+            else:
+                logger.debug("Max recursion depth reached for %s at %s", ref, path)
+        except PointerToNowhere as exc:
+            try:
+                resolved = resolver.lookup(f"{self_urn}{ref}")
+                contents = fast_deepcopy(resolved.contents)
+                logger.debug("Keep local reference: %s", ref)
+            except PointerToNowhere:
+                logger.debug("Failed to resolve %s: %s", ref, exc)
+                raise exc from None
+        logger.debug("Resolved %s -> %s", ref, contents)
 
     # TODO:
     #  - use different drafts depending on the open API spec
