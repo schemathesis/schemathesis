@@ -336,6 +336,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         logger.debug("Resolving %s", ref)
         try:
             resolved = resolver.lookup(ref)
+            # Copy the data as it might be mutated
             contents = fast_deepcopy(resolved.contents)
             key = _make_reference_key(ref)
             collected[key] = contents
@@ -349,7 +350,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         except PointerToNowhere as exc:
             try:
                 resolved = resolver.lookup(f"{self_urn}{ref}")
-                contents = fast_deepcopy(resolved.contents)
+                contents = resolved.contents
                 logger.debug("Keep local reference: %s", ref)
             except PointerToNowhere:
                 logger.debug("Failed to resolve %s: %s", ref, exc)
