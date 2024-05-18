@@ -277,7 +277,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(uri: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
+def inline_references(uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
     """Inline all non-local and recursive references in the given schema."""
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)  # type: ignore[misc]

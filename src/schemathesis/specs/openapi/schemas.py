@@ -678,7 +678,7 @@ class BaseOpenAPISchema(BaseSchema):
         for path in self.component_locations:
             if path in self.raw_schema:
                 components[path] = fast_deepcopy(self.raw_schema[path])
-        return inline_references(self.location or "", schema, components)
+        return inline_references(self.location or "", operation.definition.scope, schema, components)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

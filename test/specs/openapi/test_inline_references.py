@@ -103,6 +103,7 @@ def httpserver():
 
 
 def setup_schema(request, uri, schema):
+    schema = fast_deepcopy(schema)
     if uri is FILE_URI:
         testdir = request.getfixturevalue("testdir")
         root = testdir.mkdir("root")
@@ -122,6 +123,9 @@ def setup_schema(request, uri, schema):
     (
         # Schema URI
         "uri",
+        # Scope in which the schema was resolved
+        # This is needed to properly handle relative references
+        "scope",
         # Parameter schema intended for data generation
         "schema",
         # Components shared between different operations
@@ -131,12 +135,14 @@ def setup_schema(request, uri, schema):
     (
         (
             DEFAULT_URI,
+            "",
             {},
             {},
             {},
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_REF_NO_NESTING,
             COMPONENTS,
             {
@@ -146,6 +152,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
@@ -155,6 +162,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_NESTED_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
@@ -169,6 +177,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_REF_NESTED_IN_OBJECT_MULTIPLE,
             COMPONENTS,
             {
@@ -181,6 +190,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE,
             COMPONENTS,
             {
@@ -198,6 +208,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_REF_NESTED_IN_ARRAY,
             COMPONENTS,
             {
@@ -207,6 +218,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             DEFAULT_URI,
+            "",
             LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE,
             COMPONENTS,
             {
@@ -219,6 +231,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_REF_NO_NESTING,
             COMPONENTS,
             {
@@ -228,6 +241,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_REF_WITH_SCHEME_NO_NESTING,
             COMPONENTS,
             {
@@ -237,6 +251,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
@@ -246,6 +261,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_NESTED_FILE_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
@@ -260,6 +276,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE,
             COMPONENTS,
             {
@@ -277,6 +294,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             FILE_RELATIVE_REF,
             COMPONENTS,
             {
@@ -286,24 +304,28 @@ def setup_schema(request, uri, schema):
         ),
         (
             REMOTE_URI,
+            "",
             REMOTE_REF_NO_NESTING,
             COMPONENTS,
             ANY,
         ),
         (
             REMOTE_URI,
+            "",
             REMOTE_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             ANY,
         ),
         (
             REMOTE_URI,
+            "",
             REMOTE_REF_NESTED_IN_OBJECT_MULTIPLE,
             COMPONENTS,
             ANY,
         ),
         (
             DEFAULT_URI,
+            "",
             INNER_REF,
             {},
             {
@@ -313,6 +335,7 @@ def setup_schema(request, uri, schema):
         ),
         (
             FILE_URI,
+            "",
             INNER_REF_WITH_NESTED_FILE_REF,
             {},
             {
@@ -344,10 +367,9 @@ def setup_schema(request, uri, schema):
         "inner-ref-with-nested-file-ref",
     ),
 )
-def test_inline_references_valid(request, uri, schema, components, expected):
-    schema = fast_deepcopy(schema)
+def test_inline_references_valid(request, uri, scope, schema, components, expected):
     uri, schema = setup_schema(request, uri, schema)
-    inline_references(uri, schema, components)
+    inline_references(uri, scope, schema, components)
 
     assert schema == expected
 
