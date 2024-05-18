@@ -187,8 +187,8 @@ def setup_schema(request, uri, scope, schema):
             LOCAL_REF_NO_NESTING,
             COMPONENTS,
             {
-                "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
-                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
+                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -197,8 +197,8 @@ def setup_schema(request, uri, scope, schema):
             LOCAL_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
-                "properties": {"example": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
-                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "properties": {"example": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
+                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -207,10 +207,10 @@ def setup_schema(request, uri, scope, schema):
             LOCAL_NESTED_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
-                "properties": {"example": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"}},
-                "x-inlined-reference": {
+                "properties": {"example": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"}},
+                "x-inlined-references": {
                     "58d4bb06ad165cda74c28d601b154ace1019890c": {
-                        "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                        "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
                     },
                     "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
                 },
@@ -223,10 +223,10 @@ def setup_schema(request, uri, scope, schema):
             COMPONENTS,
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
-                    "example-2": {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    "example-1": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    "example-2": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
                 },
-                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -236,12 +236,12 @@ def setup_schema(request, uri, scope, schema):
             COMPONENTS,
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"},
-                    "example-2": {"$ref": "#/x-inlined-reference/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                    "example-1": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                    "example-2": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
                 },
-                "x-inlined-reference": {
+                "x-inlined-references": {
                     "58d4bb06ad165cda74c28d601b154ace1019890c": {
-                        "$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                        "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
                     },
                     "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
                 },
@@ -253,8 +253,8 @@ def setup_schema(request, uri, scope, schema):
             LOCAL_REF_NESTED_IN_ARRAY,
             COMPONENTS,
             {
-                "allOf": [{"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
-                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "allOf": [{"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
+                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -264,10 +264,10 @@ def setup_schema(request, uri, scope, schema):
             COMPONENTS,
             {
                 "allOf": [
-                    {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
-                    {"$ref": "#/x-inlined-reference/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
                 ],
-                "x-inlined-reference": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -276,8 +276,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_NO_NESTING,
             COMPONENTS,
             {
-                "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
-                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
+                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -286,8 +286,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_WITH_SCHEME_NO_NESTING,
             COMPONENTS,
             {
-                "$ref": "#/x-inlined-reference/c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6",
-                "x-inlined-reference": {"c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6": {"type": "integer"}},
+                "$ref": "#/x-inlined-references/c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6",
+                "x-inlined-references": {"c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6": {"type": "integer"}},
             },
         ),
         (
@@ -296,8 +296,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
-                "properties": {"example": {"$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
-                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "properties": {"example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -306,10 +306,10 @@ def setup_schema(request, uri, scope, schema):
             FILE_NESTED_FILE_REF_NESTED_IN_OBJECT,
             COMPONENTS,
             {
-                "properties": {"example": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"}},
-                "x-inlined-reference": {
+                "properties": {"example": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"}},
+                "x-inlined-references": {
                     "685e4330057cf6ab44313ea387bdf57a2416782a": {
-                        "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
                     },
                     "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
                 },
@@ -322,12 +322,12 @@ def setup_schema(request, uri, scope, schema):
             COMPONENTS,
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"},
-                    "example-2": {"$ref": "#/x-inlined-reference/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                    "example-1": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                    "example-2": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
                 },
-                "x-inlined-reference": {
+                "x-inlined-references": {
                     "685e4330057cf6ab44313ea387bdf57a2416782a": {
-                        "$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
                     },
                     "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
                 },
@@ -339,8 +339,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_RELATIVE_REF,
             COMPONENTS,
             {
-                "$ref": "#/x-inlined-reference/4f2e7403753928e6b218cb8e72afb242f55ca267",
-                "x-inlined-reference": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
+                "$ref": "#/x-inlined-references/4f2e7403753928e6b218cb8e72afb242f55ca267",
+                "x-inlined-references": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
             },
         ),
         (
@@ -349,8 +349,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_SCOPED_REF,
             COMPONENTS,
             {
-                "properties": {"nested-2": {"$ref": "#/x-inlined-reference/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
-                "x-inlined-reference": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
+                "properties": {"nested-2": {"$ref": "#/x-inlined-references/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
+                "x-inlined-references": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
             },
         ),
         (
@@ -391,8 +391,8 @@ def setup_schema(request, uri, scope, schema):
             {},
             {
                 "properties": {"example": {"$ref": "#/definitions/Example"}},
-                "definitions": {"Example": {"$ref": "#/x-inlined-reference/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
-                "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "definitions": {"Example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (

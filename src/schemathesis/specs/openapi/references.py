@@ -266,7 +266,7 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 
 logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
-INLINED_REFERENCE_ROOT_KEY = "x-inlined-reference"
+INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
 
 
@@ -315,21 +315,21 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         logger.debug("Unretrievable %s", target)
         raise Unretrievable(target)
 
-    def process_item(item: Any, resolver: Any, path: tuple[str, ...] = ()):
+    def process_item(item: Any, resolver: Any) -> None:
         if isinstance(item, dict):
             ref = item.get("$ref")
             if isinstance(ref, str):
-                process_reference(ref, path)
+                process_reference(ref)
             else:
                 for sub_item in item.values():
                     if sub_item and isinstance(sub_item, (dict, list)):
-                        stack.append((sub_item, resolver, path))
+                        stack.append((sub_item, resolver))
         elif isinstance(item, list):
             for sub_item in item:
                 if sub_item and isinstance(sub_item, (dict, list)):
-                    stack.append((sub_item, resolver, path))
+                    stack.append((sub_item, resolver))
 
-    def process_reference(ref: str, path: tuple[str, ...] = ()) -> None:
+    def process_reference(ref: str) -> None:
         if ref.startswith(INLINED_REFERENCE_PREFIX):
             logger.debug("Already inlined %s", ref)
             return
@@ -343,10 +343,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
             new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
             item["$ref"] = new_ref
             logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-            if path.count(ref) < MAX_RECURSION_DEPTH:
-                stack.append((contents, resolved.resolver, path + (ref,)))
-            else:
-                logger.debug("Max recursion depth reached for %s at %s", ref, path)
+            stack.append((contents, resolved.resolver))
         except PointerToNowhere as exc:
             try:
                 resolved = resolver.lookup(f"{self_urn}{ref}")
@@ -377,11 +374,11 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
 
     collected: dict[str, dict[str, Any]] = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = collected
-    stack: list[tuple[Any, Any, tuple[str, ...]]] = [(schema, registry.resolver(), ())]
+    stack: list[tuple[Any, Any]] = [(schema, registry.resolver())]
     while stack:
-        item, resolver, path = stack.pop()
+        item, resolver = stack.pop()
         logger.debug("Processing %r", item)
-        process_item(item, resolver, path)
+        process_item(item, resolver)
     if not collected:
         logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
