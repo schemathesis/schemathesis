@@ -277,8 +277,14 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
+MAX_RECURSION_DEPTH = 3
+
+
 def inline_references(uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any]) -> dict[str, Any]:
-    """Inline all non-local and recursive references in the given schema."""
+    """Inline all non-local and recursive references in the given schema.
+
+    Recursive references are inlined up to 3 levels because `hypothesis-jsonschema` does not support them natively yet.
+    """
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=DRAFT4.create_resource)  # type: ignore[misc]
     def cached_retrieve(target: str) -> Any:
@@ -309,13 +315,50 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         logger.debug("Unretrievable %s", target)
         raise Unretrievable(target)
 
+    def process_item(item: Any, resolver: Any, path: tuple[str, ...] = ()):
+        if isinstance(item, dict):
+            ref = item.get("$ref")
+            if isinstance(ref, str):
+                if ref.startswith(INLINED_REFERENCE_PREFIX):
+                    logger.debug("Already inlined %s", ref)
+                    return
+                logger.debug("Resolving %s", ref)
+                try:
+                    resolved = resolver.lookup(ref)
+                    contents = fast_deepcopy(resolved.contents)
+                    key = _make_reference_key(ref)
+                    collected[key] = contents
+                    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+                    item["$ref"] = new_ref
+                    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
+                    if path.count(ref) < MAX_RECURSION_DEPTH:
+                        stack.append((contents, resolved.resolver, path + (ref,)))
+                    else:
+                        logger.debug("Max recursion depth reached for %s at %s", ref, path)
+                except PointerToNowhere as exc:
+                    try:
+                        resolved = resolver.lookup(f"{self_urn}{ref}")
+                        contents = fast_deepcopy(resolved.contents)
+                        logger.debug("Keep local reference: %s", ref)
+                    except PointerToNowhere:
+                        logger.debug("Failed to resolve %s: %s", ref, exc)
+                        raise exc from None
+                logger.debug("Resolved %s -> %s", ref, contents)
+            else:
+                for sub_item in item.values():
+                    if sub_item and isinstance(sub_item, (dict, list)):
+                        stack.append((sub_item, resolver, path))
+        elif isinstance(item, list):
+            for sub_item in item:
+                if sub_item and isinstance(sub_item, (dict, list)):
+                    stack.append((sub_item, resolver, path))
+
     # TODO:
     #  - use different drafts depending on the open API spec
     #  - use caching for input schemas
     #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
     #  - Raise custom error when the referenced value is invalid
     #  - Handle circular references
-    #  - is it possible to avoid purely "$ref" -> "$ref" jumps?
     #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
 
     logger.debug("Inlining references in %s", schema)
@@ -330,48 +373,11 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
 
     collected: dict[str, dict[str, Any]] = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = collected
-    stack: list[tuple[Any, Any]] = [(schema, registry.resolver())]
+    stack: list[tuple[Any, Any, tuple[str, ...]]] = [(schema, registry.resolver(), ())]
     while stack:
-        item, resolver = stack.pop()
+        item, resolver, path = stack.pop()
         logger.debug("Processing %r", item)
-        if isinstance(item, dict):
-            ref = item.get("$ref")
-            if isinstance(ref, str):
-                if ref.startswith(INLINED_REFERENCE_PREFIX):
-                    # May happen if the same schema is referenced multiple times, so it is added to
-                    # the stack from different places
-                    logger.debug("Already inlined %s", ref)
-                    continue
-                logger.debug("Resolving %s", ref)
-                try:
-                    resolved = resolver.lookup(ref)
-                    contents = fast_deepcopy(resolved.contents)
-                    key = _make_reference_key(ref)
-                    collected[key] = contents
-                    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-                    item["$ref"] = new_ref
-                    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-                except PointerToNowhere as exc:
-                    try:
-                        # Do not replace local references
-                        resolved = resolver.lookup(f"{self_urn}{ref}")
-                        contents = fast_deepcopy(resolved.contents)
-                        logger.debug("Keep local reference: %s", ref)
-                    except PointerToNowhere:
-                        logger.debug("Failed to resolve %s: %s", ref, exc)
-                        raise exc from None
-                logger.debug("Resolved %s -> %s", ref, contents)
-                stack.append((contents, resolved.resolver))
-            else:
-                # The current object has no references, but its children might
-                for sub_item in item.values():
-                    if sub_item and isinstance(sub_item, (dict, list)):
-                        stack.append((sub_item, resolver))
-        elif isinstance(item, list):
-            # All potentially nested items are added to the stack
-            for sub_item in item:
-                if sub_item and isinstance(sub_item, (dict, list)):
-                    stack.append((sub_item, resolver))
+        process_item(item, resolver, path)
     if not collected:
         logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]

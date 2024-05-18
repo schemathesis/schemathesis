@@ -105,6 +105,20 @@ INNER_REF_WITH_NESTED_FILE_REF = {
         "Example": TARGET_FILE_REF,
     },
 }
+# Recursive references
+RECURSION_SCHEMA_ONE_HOP = {
+    "$ref": "#/definitions/SchemaA",
+    "definitions": {
+        "SchemaA": {
+            "type": "object",
+            "properties": {
+                "value": {"type": "integer"},
+                # Points back to itself
+                "recursive": {"$ref": "#/definitions/SchemaA"},
+            },
+        }
+    },
+}
 
 
 @pytest.fixture(scope="module")
@@ -381,6 +395,13 @@ def setup_schema(request, uri, scope, schema):
                 "x-inlined-reference": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
+        (
+            DEFAULT_URI,
+            "",
+            RECURSION_SCHEMA_ONE_HOP,
+            {},
+            {},
+        ),
     ),
     ids=(
         "empty",
@@ -403,6 +424,7 @@ def setup_schema(request, uri, scope, schema):
         "remote-ref-nested-in-object-multiple",
         "inner-ref",
         "inner-ref-with-nested-file-ref",
+        "recursive-one-hop",
     ),
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
