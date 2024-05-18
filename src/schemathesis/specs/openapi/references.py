@@ -319,7 +319,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         if isinstance(item, dict):
             ref = item.get("$ref")
             if isinstance(ref, str):
-                process_reference(ref)
+                process_reference(item, ref)
             else:
                 for sub_item in item.values():
                     if sub_item and isinstance(sub_item, (dict, list)):
@@ -329,7 +329,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
                 if sub_item and isinstance(sub_item, (dict, list)):
                     stack.append((sub_item, resolver))
 
-    def process_reference(ref: str) -> None:
+    def process_reference(item: dict[str, Any], ref: str) -> None:
         if ref.startswith(INLINED_REFERENCE_PREFIX):
             logger.debug("Already inlined %s", ref)
             return
@@ -354,6 +354,21 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
                 raise exc from None
         logger.debug("Resolved %s -> %s", ref, contents)
 
+    def inline_recursive_references(data: dict[str, Any] | list, path: tuple[str, ...] = ()) -> None:
+        if isinstance(data, dict):
+            ref = data.get("$ref")
+            if isinstance(ref, str):
+                # TODO: handle recursion
+                pass
+            else:
+                for value in data.values():
+                    if isinstance(value, (dict, list)):
+                        inline_recursive_references(value, path)
+        else:
+            for item in data:
+                if isinstance(item, (dict, list)):
+                    inline_recursive_references(item, path)
+
     # TODO:
     #  - use different drafts depending on the open API spec
     #  - use caching for input schemas
@@ -361,6 +376,7 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
     #  - Raise custom error when the referenced value is invalid
     #  - Handle circular references
     #  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
+    #  - consider recursion without explicit stack
 
     logger.debug("Inlining references in %s", schema)
 
@@ -379,10 +395,15 @@ def inline_references(uri: str, scope: str, schema: dict[str, Any], components: 
         item, resolver = stack.pop()
         logger.debug("Processing %r", item)
         process_item(item, resolver)
+
     if not collected:
         logger.debug("No references were inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
     else:
+        stack_ = [collected]
+        while stack_:
+            item = stack_.pop()
+            inline_recursive_references(item)
         logger.debug("Inlined schema: %s", schema)
     return schema
 
