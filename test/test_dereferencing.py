@@ -91,7 +91,6 @@ def build_schema_with_recursion(schema, definition):
 )
 @pytest.mark.hypothesis_nested
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
-@pytest.mark.skip(reason="TODO")
 def test_drop_recursive_references_from_the_last_resolution_level(empty_open_api_3_schema, definition):
     build_schema_with_recursion(empty_open_api_3_schema, definition)
     schema = schemathesis.from_dict(empty_open_api_3_schema)
@@ -139,7 +138,6 @@ def test_drop_recursive_references_from_the_last_resolution_level(empty_open_api
     ),
 )
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
-@pytest.mark.skip(reason="TODO")
 def test_non_removable_recursive_references(empty_open_api_3_schema, definition):
     build_schema_with_recursion(empty_open_api_3_schema, definition)
     schema = schemathesis.from_dict(empty_open_api_3_schema)
@@ -153,7 +151,6 @@ def test_non_removable_recursive_references(empty_open_api_3_schema, definition)
         test()
 
 
-@pytest.mark.skip(reason="TODO")
 def test_nested_recursive_references(empty_open_api_3_schema):
     empty_open_api_3_schema["paths"]["/folders"] = {
         "post": {
@@ -630,7 +627,6 @@ REFERENCE_TO_PARAM = {
 }
 
 
-@pytest.mark.skip(reason="TODO")
 def test_unresolvable_reference_during_generation(empty_open_api_3_schema, testdir):
     # When there is a reference that can't be resolved during generation
     # Then it should be properly reported

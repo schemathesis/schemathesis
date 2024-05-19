@@ -93,7 +93,6 @@ if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-# TODO: Extend with reference resolution errors
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, PointerToNowhere)
 
 
@@ -282,7 +281,6 @@ class BaseOpenAPISchema(BaseSchema):
             method = None
             try:
                 full_path = get_full_path(path)  # Should be available for later use
-                # TODO: get back the error handling
                 if should_skip_endpoint(full_path, endpoint):
                     continue
                 dispatch_hook("before_process_path", context, path, path_item)
@@ -292,7 +290,6 @@ class BaseOpenAPISchema(BaseSchema):
                     if method not in HTTP_METHODS:
                         continue
                     try:
-                        # TODO: some resolving might be needed
                         if should_skip(method, entry):
                             continue
                         parameters = entry.get("parameters", ())
@@ -423,7 +420,9 @@ class BaseOpenAPISchema(BaseSchema):
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
 
-    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
@@ -638,7 +637,7 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             # No response defined for the received response status code
             return None
-        schema = self.get_response_schema(definition, operation.definition.resolver)
+        resolver, schema = self.get_response_schema(definition, operation.definition.resolver)
         if not schema:
             # No schema to check against
             return None
@@ -673,9 +672,12 @@ class BaseOpenAPISchema(BaseSchema):
             cls = jsonschema.Draft202012Validator
         else:
             cls = jsonschema.Draft4Validator
+        registry = self._registry
+        last_scope = next(iter(resolver.dynamic_scope()), None)
+        if last_scope is not None:
+            _, registry = last_scope
         try:
-            # TODO: pass proper registry (i.e. the definition for this response could be in a separate file)
-            jsonschema.validate(data, schema, cls=cls, registry=self._registry)
+            jsonschema.validate(data, schema, cls=cls, registry=registry)
         except jsonschema.ValidationError as exc:
             exc_class = get_schema_validation_error(exc)
             ctx = failures.ValidationErrorContext.from_exception(exc)
@@ -705,7 +707,8 @@ class BaseOpenAPISchema(BaseSchema):
                 else:
                     break
             else:
-                target.update(fast_deepcopy(source))
+                # TODO: Bring back fast_deepcopy
+                target.update(source)
         if isinstance(schema, dict):
             schema.update(components)
         # TODO: properly pass resolver
@@ -868,15 +871,19 @@ class SwaggerV20(BaseOpenAPISchema):
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
         if "$ref" in definition:
-            definition = resolver.lookup(definition["$ref"]).contents
+            resolved = resolver.lookup(definition["$ref"])
+            resolver = resolved.resolver
+            definition = resolved.contents
         schema = definition.get("schema")
         if not schema:
-            return None
+            return resolver, None
         # Extra conversion to JSON Schema is needed here if there was one $ref in the input
         # because it is not converted
-        return to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
+        return resolver, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
 
     def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
         produces = operation.definition.value.get("produces", None)
@@ -1038,17 +1045,21 @@ class OpenApi30(SwaggerV20):
                 )
         return collected
 
-    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
         if "$ref" in definition:
-            definition = resolver.lookup(definition["$ref"]).contents
+            resolved = resolver.lookup(definition["$ref"])
+            resolver = resolved.resolver
+            definition = resolved.contents
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object
         if option and "schema" in option:
             # Extra conversion to JSON Schema is needed here if there was one $ref in the input
             # because it is not converted
-            return to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
-        return None
+            return resolver, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
+        return resolver, None
 
     def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""

@@ -3,7 +3,7 @@ import json
 from typing import Any
 
 import pytest
-from hypothesis import given, settings
+from hypothesis import given, settings, Phase
 
 import schemathesis
 from schemathesis import DataGenerationMethod, models
@@ -493,7 +493,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
     schema = schemathesis.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
-    @settings(max_examples=3, deadline=None)
+    @settings(max_examples=3, deadline=None, phases=[Phase.generate])
     def test(case):
         response = response_factory.requests(content=json.dumps({"foo": 1}).encode())
         with pytest.raises(AssertionError):
@@ -509,7 +509,7 @@ def test_response_schema_conformance_references_valid(complex_schema, value, res
     schema = schemathesis.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
-    @settings(max_examples=3, deadline=None)
+    @settings(max_examples=3, deadline=None, phases=[Phase.generate])
     def test(case):
         response = response_factory.requests(content=json.dumps({"key": value, "referenced": value}).encode())
         case.validate_response(response)

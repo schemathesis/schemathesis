@@ -175,8 +175,6 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
 #  - Raise custom error when the referenced value is invalid
 #  - Traverse only components that may have references (before passing here)
-#  - maybe drop "components" after transformation? all schemas will be there anyway.
-#    So, just pass schema + components, and then remove components
 
 logger = logging.getLogger(__name__)
 MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
