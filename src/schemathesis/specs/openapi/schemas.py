@@ -24,6 +24,7 @@ from typing import (
 from urllib.parse import urlsplit
 
 import jsonschema
+from referencing import Registry
 from hypothesis.strategies import SearchStrategy
 from packaging import version
 from referencing.jsonschema import DRAFT4, DRAFT202012
@@ -78,7 +79,6 @@ from .parameters import (
     OpenAPIParameter,
 )
 from .references import (
-    RECURSION_DEPTH_LIMIT,
     ConvertingResolver,
     InliningResolver,
     inline_references,
@@ -229,17 +229,11 @@ class BaseOpenAPISchema(BaseSchema):
             _, value = self.resolver.resolve(value["$ref"])
         return value
 
-    def _resolve_shared_parameters(self, path_item: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return self.resolver.resolve_all(path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-
-    def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
-        return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
-
     def _collect_operation_parameters(
         self, path_item: Mapping[str, Any], operation: dict[str, Any]
     ) -> list[OpenAPIParameter]:
-        shared_parameters = self._resolve_shared_parameters(path_item)
-        parameters = self.resolver.resolve_all(operation.get("parameters", ()), RECURSION_DEPTH_LIMIT - 8)
+        shared_parameters = path_item.get("parameters", ())
+        parameters = operation.get("parameters", ())
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(
@@ -276,42 +270,36 @@ class BaseOpenAPISchema(BaseSchema):
         endpoint = self.endpoint
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
-        resolve_all = self.resolver.resolve_all
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
         make_operation = self.make_operation
         hooks = self.hooks
         for path, path_item in paths.items():
             method = None
-            try:
-                full_path = get_full_path(path)  # Should be available for later use
-                if should_skip_endpoint(full_path, endpoint):
+            full_path = get_full_path(path)  # Should be available for later use
+            # TODO: get back the error handling
+            if should_skip_endpoint(full_path, endpoint):
+                continue
+            dispatch_hook("before_process_path", context, path, path_item)
+            scope, path_item = resolve_path_item(path_item)
+            shared_parameters = path_item.get("parameters", ())
+            for method, entry in path_item.items():
+                if method not in HTTP_METHODS:
                     continue
-                dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                shared_parameters = path_item.get("parameters", ())
-                for method, entry in path_item.items():
-                    if method not in HTTP_METHODS:
-                        continue
-                    try:
-                        # TODO: some resolving might be needed
-                        if should_skip(method, entry):
-                            continue
-                        parameters = resolve_all(entry.get("parameters", ()), RECURSION_DEPTH_LIMIT - 8)
-                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
-                        operation = make_operation(path, method, parameters, entry, scope)
-                        context = HookContext(operation=operation)
-                        if (
-                            should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
-                            or should_skip_operation(hooks, context)
-                            or (hooks and should_skip_operation(hooks, context))
-                        ):
-                            continue
-                        yield Ok(operation)
-                    except SCHEMA_PARSING_ERRORS as exc:
-                        yield self._into_err(exc, path, method)
-            except SCHEMA_PARSING_ERRORS as exc:
-                yield self._into_err(exc, path, method)
+                # TODO: some resolving might be needed
+                if should_skip(method, entry):
+                    continue
+                parameters = entry.get("parameters", ())
+                parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
+                operation = make_operation(path, method, parameters, entry, scope)
+                context = HookContext(operation=operation)
+                if (
+                    should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
+                    or should_skip_operation(hooks, context)
+                    or (hooks and should_skip_operation(hooks, context))
+                ):
+                    continue
+                yield Ok(operation)
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[OperationSchemaError]:
         __tracebackhide__ = True
@@ -396,6 +384,11 @@ class BaseOpenAPISchema(BaseSchema):
         if not hasattr(self, "_resolver"):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
+
+    # @property
+    # def _registry(self) -> Registry:
+    #     if not hasattr(self, "_registry_cache"):
+    #         self._registry_cache = Regis
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
@@ -991,7 +984,7 @@ class OpenApi30(SwaggerV20):
         if "requestBody" in definition:
             body = definition["requestBody"]
             while "$ref" in body:
-                body = self.resolver.resolve_all(body, RECURSION_DEPTH_LIMIT)
+                _, body = self.resolver.resolve(body["$ref"])
             required = body.get("required", False)
             description = body.get("description")
             for media_type, content in body["content"].items():
@@ -1040,7 +1033,7 @@ class OpenApi30(SwaggerV20):
         files = []
         definition = operation.definition.raw
         if "$ref" in definition["requestBody"]:
-            body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+            _, body = self.resolver.resolve(definition["requestBody"]["$ref"])
         else:
             body = definition["requestBody"]
         content = body["content"]
@@ -1067,7 +1060,7 @@ class OpenApi30(SwaggerV20):
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         if "requestBody" in definition:
             if "$ref" in definition["requestBody"]:
-                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+                _, body = self.resolver.resolve(definition["requestBody"]["$ref"])
             else:
                 body = definition["requestBody"]
             if "content" in body:

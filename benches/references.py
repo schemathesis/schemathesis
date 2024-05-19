@@ -1,6 +1,5 @@
 import pytest
 
-import schemathesis
 from schemathesis.specs.openapi.references import resolve_pointer
 
 RECURSIVE_SCHEMA = {
@@ -34,14 +33,6 @@ RECURSIVE_SCHEMA = {
         }
     },
 }
-
-
-@pytest.mark.benchmark
-def test_inlining_during_resolution():
-    schema = schemathesis.from_dict(RECURSIVE_SCHEMA)
-    schema.resolver.resolve_all(
-        RECURSIVE_SCHEMA["paths"]["/foo"]["post"]["requestBody"]["content"]["application/json"]["schema"]
-    )
 
 
 @pytest.mark.benchmark

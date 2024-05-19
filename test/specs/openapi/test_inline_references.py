@@ -11,7 +11,7 @@ from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi.references import inline_references
 
 REMOTE_PLACEHOLDER = "http://example.com"
-DEFAULT_URI = "urn:schemathesis:schema"
+DEFAULT_URI = ""
 FILE_URI = object()
 REMOTE_URI = object()
 TARGET = {"type": "integer"}
@@ -175,6 +175,7 @@ def setup_schema(request, uri, scope, schema):
         "expected",
     ),
     (
+        (DEFAULT_URI, "", True, {}, True),
         (
             DEFAULT_URI,
             "",
@@ -405,6 +406,7 @@ def setup_schema(request, uri, scope, schema):
         ),
     ),
     ids=(
+        "boolean",
         "empty",
         "local-ref-no-nesting",
         "local-ref-nested-in-object",

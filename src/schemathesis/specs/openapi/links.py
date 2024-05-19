@@ -254,7 +254,8 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
     for status_code, definition in operation.definition.raw["responses"].items():
-        definition = operation.schema.resolver.resolve_all(definition)  # type: ignore[attr-defined]
+        if "$ref" in definition:
+            _, definition = operation.schema.resolver.resolve(definition["$ref"])  # type: ignore[attr-defined]
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 

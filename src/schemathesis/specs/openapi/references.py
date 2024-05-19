@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha1
-from typing import Any, Callable, Dict, Union, overload
+from typing import Any, Callable, Dict, MutableMapping, Protocol, Union
 from urllib.parse import urljoin, urlsplit
 from urllib.request import urlopen
 
@@ -13,7 +13,6 @@ import referencing.retrieval
 import requests
 from referencing import Registry, Resource, Specification
 from referencing.exceptions import PointerToNowhere, Unretrievable
-from referencing.jsonschema import DRAFT4
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
@@ -62,44 +61,6 @@ class InliningResolver(jsonschema.RefResolver):
             "handlers", {"file": load_file_uri, "": load_file, "http": load_remote_uri, "https": load_remote_uri}
         )
         super().__init__(*args, **kwargs)
-
-    @overload
-    def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]:
-        pass
-
-    @overload
-    def resolve_all(self, item: list, recursion_level: int = 0) -> list:
-        pass
-
-    def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
-        """Recursively resolve all references in the given object."""
-        resolve = self.resolve_all
-        if isinstance(item, dict):
-            ref = item.get("$ref")
-            if isinstance(ref, str):
-                url, resolved = self.resolve(ref)
-                self.push_scope(url)
-                try:
-                    # If the next level of recursion exceeds the limit, then we need to copy it explicitly
-                    # In other cases, this method create new objects for mutable types (dict & list)
-                    next_recursion_level = recursion_level + 1
-                    if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        copied = fast_deepcopy(resolved)
-                        remove_optional_references(copied)
-                        return copied
-                    return resolve(resolved, next_recursion_level)
-                finally:
-                    self.pop_scope()
-            return {
-                key: resolve(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
-                for key, sub_item in item.items()
-            }
-        if isinstance(item, list):
-            return [
-                self.resolve_all(sub_item, recursion_level) if isinstance(sub_item, (dict, list)) else sub_item
-                for sub_item in item
-            ]
-        return item
 
     def resolve_in_scope(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any]]:
         scopes = [scope]
@@ -270,8 +231,19 @@ INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
 SELF_URN = "urn:self"
 MAX_RECURSION_DEPTH = 5
+ObjectSchema = MutableMapping[str, Any]
+Schema = Union[bool, ObjectSchema]
+ReferencedSchemas = Dict[str, ObjectSchema]
 
-ReferencedSchemas = Dict[str, Dict[str, Any]]
+
+class Resolved(Protocol):
+    contents: Any
+    resolver: Resolver
+
+
+class Resolver(Protocol):
+    def lookup(self, ref: str) -> Resolved: ...
+
 
 # TODO:
 #  - use caching for input schemas
@@ -288,9 +260,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(
-    uri: str, scope: str, schema: dict[str, Any], components: dict[str, Any], draft: Specification
-) -> dict[str, Any]:
+def inline_references(uri: str, scope: str, schema: Schema, components: dict[str, Any], draft: Specification) -> Schema:
     """Inline all non-local and recursive references in the given schema.
 
     This function performs three passes:
@@ -315,6 +285,8 @@ def inline_references(
     NOTE: Recursive references are inlined up to `MAX_RECURSION_DEPTH` levels because `hypothesis-jsonschema` does not yet
     support generating recursive data.
     """
+    if isinstance(schema, bool):
+        return schema
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
     def cached_retrieve(ref: str) -> Any:
@@ -349,8 +321,8 @@ def inline_references(
 
     registry = Registry(retrieve=cached_retrieve).with_resources(
         [
-            ("", Resource(contents=components, specification=DRAFT4)),
-            (SELF_URN, Resource(contents=schema, specification=DRAFT4)),
+            ("", Resource(contents=components, specification=draft)),
+            (SELF_URN, Resource(contents=schema, specification=draft)),
         ]
     )
 
@@ -370,7 +342,7 @@ def inline_references(
     return schema
 
 
-def collect_referenced_schemas(schema: dict[str, Any], resolver: Any) -> ReferencedSchemas:
+def collect_referenced_schemas(schema: ObjectSchema, resolver: Resolver) -> ReferencedSchemas:
     referenced_schemas: ReferencedSchemas = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = referenced_schemas
     _collect_referenced_schemas(schema, referenced_schemas, resolver)
@@ -378,7 +350,7 @@ def collect_referenced_schemas(schema: dict[str, Any], resolver: Any) -> Referen
 
 
 def _collect_referenced_schemas(
-    item: dict[str, Any] | list, referenced_schemas: ReferencedSchemas, resolver: Any
+    item: ObjectSchema | list[ObjectSchema], referenced_schemas: ReferencedSchemas, resolver: Resolver
 ) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
@@ -399,8 +371,8 @@ def _collect_referenced_schemas(
 
 
 def move_referenced_data(
-    item: dict[str, Any], ref: str, referenced_schemas: ReferencedSchemas, resolver: Any
-) -> tuple[dict[str, Any], Any] | None:
+    item: ObjectSchema, ref: str, referenced_schemas: ReferencedSchemas, resolver: Resolver
+) -> tuple[Any, Resolver] | None:
     if ref.startswith(INLINED_REFERENCE_PREFIX):
         logger.debug("Already inlined %s", ref)
         return None
@@ -439,7 +411,7 @@ def find_recursive_references(schema_storage: ReferencedSchemas) -> set[str]:
 
 
 def _find_recursive_references(
-    item: dict[str, Any] | list,
+    item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: ReferencedSchemas,
     references: set[str],
     path: tuple[str, ...] = (),
@@ -468,7 +440,7 @@ def _find_recursive_references(
 
 
 def inline_recursive_references(
-    item: dict[str, Any] | list,
+    item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: ReferencedSchemas,
     references: set[str],
     path: tuple[str, ...] = (),
@@ -500,7 +472,7 @@ def inline_recursive_references(
 
 
 def _make_reference_key(reference: str) -> str:
-    # TODO: use traversal path to make the key
+    # TODO: use traversal path to make the key - in different files there could be different objects with the same name
     # TODO: or maybe don't use hash at all and have readable keys
     digest = sha1()
     digest.update(reference.encode("utf-8"))
