@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
-from contextlib import ExitStack, contextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from json import JSONDecodeError
@@ -21,7 +21,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin, urldefrag
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
@@ -61,8 +61,6 @@ from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
 from ._jsonschema import (
-    ConvertingResolver,
-    InliningResolver,
     TransformConfig,
     Resolver,
     get_remote_schema_retriever,
@@ -93,7 +91,8 @@ if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
+# TODO: Extend with reference resolution errors
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError)
 
 
 @dataclass(eq=False, repr=False)
@@ -167,7 +166,7 @@ class BaseOpenAPISchema(BaseSchema):
             return
         get_full_path = self.get_full_path
         endpoint = self.endpoint
-        resolve = self.resolver.resolve
+        resolve = self.resolver.lookup
         should_skip = self._should_skip
         for path, path_item in paths.items():
             full_path = get_full_path(path)
@@ -175,7 +174,7 @@ class BaseOpenAPISchema(BaseSchema):
                 continue
             try:
                 if "$ref" in path_item:
-                    _, path_item = resolve(path_item["$ref"])
+                    path_item = resolve(path_item["$ref"]).contents
                 # Straightforward iteration is faster than converting to a set & calculating length.
                 for method, definition in path_item.items():
                     if should_skip(method, definition):
@@ -196,12 +195,12 @@ class BaseOpenAPISchema(BaseSchema):
     @property
     def links_count(self) -> int:
         total = 0
-        resolve = self.resolver.resolve
+        resolve = self.resolver.lookup
         links_field = self.links_field
         for definition in self._operation_iter():
             for response in definition.get("responses", {}).values():
                 if "$ref" in response:
-                    _, response = resolve(response["$ref"])
+                    response = resolve(response["$ref"]).contents
                 defined_links = response.get(links_field)
                 if defined_links is not None:
                     total += len(defined_links)
@@ -229,7 +228,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
         while "$ref" in value:
-            _, value = self.resolver.resolve(value["$ref"])
+            value = self.resolver.lookup(value["$ref"]).contents
         return value
 
     def _collect_operation_parameters(
@@ -284,7 +283,7 @@ class BaseOpenAPISchema(BaseSchema):
             if should_skip_endpoint(full_path, endpoint):
                 continue
             dispatch_hook("before_process_path", context, path, path_item)
-            scope, path_item = resolve_path_item(path_item)
+            resolver, path_item = resolve_path_item(path_item)
             shared_parameters = path_item.get("parameters", ())
             for method, entry in path_item.items():
                 if method not in HTTP_METHODS:
@@ -294,7 +293,7 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 parameters = entry.get("parameters", ())
                 parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
-                operation = make_operation(path, method, parameters, entry, scope)
+                operation = make_operation(path, method, parameters, entry, resolver)
                 context = HookContext(operation=operation)
                 if (
                     should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -349,13 +348,14 @@ class BaseOpenAPISchema(BaseSchema):
         """
         raise NotImplementedError
 
-    def _resolve_path_item(self, path_item: dict[str, Any]) -> tuple[str, dict[str, Any]]:
+    def _resolve_path_item(self, path_item: dict[str, Any]) -> tuple[Resolver, dict[str, Any]]:
         # The path item could be behind a reference
         # In this case, we need to resolve it to get the proper scope for reference inside the item.
         # It is mostly for validating responses.
         if "$ref" in path_item:
-            return self.resolver.resolve(path_item["$ref"])
-        return self.resolver.resolution_scope, path_item
+            resolved = self.resolver.lookup(path_item["$ref"])
+            return resolved.resolver, resolved.contents
+        return self.resolver, path_item
 
     def make_operation(
         self,
@@ -363,7 +363,7 @@ class BaseOpenAPISchema(BaseSchema):
         method: str,
         parameters: list[OpenAPIParameter],
         raw: dict[str, Any],
-        scope: str,
+        resolver: Resolver,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -371,7 +371,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
             path=path,
             method=method,
-            definition=OperationDefinition(raw, scope),
+            definition=OperationDefinition(raw, resolver),
             base_url=base_url,
             app=self.app,
             schema=self,
@@ -381,12 +381,6 @@ class BaseOpenAPISchema(BaseSchema):
         self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
-
-    @property
-    def resolver(self) -> InliningResolver:
-        if not hasattr(self, "_resolver"):
-            self._resolver = InliningResolver(self.location or "", self.raw_schema)
-        return self._resolver
 
     @property
     def _draft(self) -> Specification:
@@ -404,10 +398,15 @@ class BaseOpenAPISchema(BaseSchema):
         return self._registry_cache
 
     @property
-    def resolver2(self) -> Resolver:
-        if not hasattr(self, "_resolver2"):
-            self._resolver2 = self._registry.resolver(base_uri=self.location or "")
-        return self._resolver2
+    def resolver(self) -> Resolver:
+        if not hasattr(self, "_resolver"):
+            self._resolver = self._registry.resolver(base_uri=self.location or "")
+        return self._resolver
+
+    def _maybe_resolve(self, item: dict[str, Any], resolver: Resolver | None = None) -> dict[str, Any]:
+        if "$ref" in item:
+            return (resolver or self.resolver).lookup(item["$ref"]).contents
+        return item
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
@@ -421,7 +420,7 @@ class BaseOpenAPISchema(BaseSchema):
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
+    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
@@ -444,22 +443,22 @@ class BaseOpenAPISchema(BaseSchema):
         if instance is not None:
             return instance
         parameters = self._collect_operation_parameters(entry.path_item, entry.operation)
-        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, entry.scope)
+        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, entry.resolver)
         cache.insert_operation_by_traversal_key(entry.scope, entry.path, entry.method, initialized)
         cache.insert_operation_by_id(operation_id, initialized)
         return initialized
 
     def _populate_operation_id_cache(self, cache: OperationCache) -> None:
         """Collect all operation IDs from the schema."""
-        resolve = self.resolver.resolve
-        default_scope = self.resolver.resolution_scope
+        lookup = self.resolver.lookup
         for path, path_item in self.raw_schema.get("paths", {}).items():
             # If the path is behind a reference we have to keep the scope
             # The scope is used to resolve nested components later on
             if "$ref" in path_item:
-                scope, path_item = resolve(path_item["$ref"])
+                resolved = lookup(path_item["$ref"])
+                resolver, path_item = resolved.resolver, resolved.contents
             else:
-                scope = default_scope
+                resolver = self.resolver
             for key, entry in path_item.items():
                 if key not in HTTP_METHODS:
                     continue
@@ -468,7 +467,7 @@ class BaseOpenAPISchema(BaseSchema):
                         entry["operationId"],
                         path=path,
                         method=key,
-                        scope=scope,
+                        resolver=resolver,
                         path_item=path_item,
                         operation=entry,
                     )
@@ -482,18 +481,25 @@ class BaseOpenAPISchema(BaseSchema):
         cached = cache.get_operation_by_reference(reference)
         if cached is not None:
             return cached
-        scope, operation = self.resolver.resolve(reference)
-        path, method = scope.rsplit("/", maxsplit=2)[-2:]
+        resolved = self.resolver.lookup(reference)
+        operation = resolved.contents
+        if reference.startswith("#"):
+            fragment = reference[1:]
+        else:
+            _, fragment = urldefrag(urljoin(self.location or "", reference))
+        path, method = fragment.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
         # Check the traversal cache as it could've been populated in other places
-        traversal_key = (self.resolver.resolution_scope, path, method)
+        scope: tuple[str, ...] = tuple(uri for uri, _ in resolved.resolver.dynamic_scope())
+        traversal_key = (scope, path, method)
         cached = cache.get_operation_by_traversal_key(*traversal_key)
         if cached is not None:
             return cached
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, path_item = self.resolver.resolve(parent_ref)
+        resolved = self.resolver.lookup(parent_ref)
+        path_item = resolved.contents
         parameters = self._collect_operation_parameters(path_item, operation)
-        initialized = self.make_operation(path, method, parameters, operation, scope)
+        initialized = self.make_operation(path, method, parameters, operation, resolved.resolver)
         cache.insert_operation_by_traversal_key(*traversal_key, initialized)
         cache.insert_operation_by_reference(reference, initialized)
         return initialized
@@ -541,11 +547,13 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
-            _, response = self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
-            return response
+            if "$ref" in responses[status_code]:
+                return operation.definition.resolver.lookup(responses[status_code]["$ref"]).contents
+            return responses[status_code]
         if "default" in responses:
-            _, response = self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
-            return response
+            if "$ref" in responses["default"]:
+                return operation.definition.resolver.lookup(responses["default"]["$ref"]).contents
+            return responses["default"]
         return None
 
     def get_headers(self, operation: APIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
@@ -628,7 +636,7 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             # No response defined for the received response status code
             return None
-        scopes, schema = self.get_response_schema(definition, operation.definition.scope)
+        schema = self.get_response_schema(definition, operation.definition.resolver)
         if not schema:
             # No schema to check against
             return None
@@ -658,23 +666,21 @@ class BaseOpenAPISchema(BaseSchema):
             except Exception as exc:
                 errors.append(exc)
                 _maybe_raise_one_or_more(errors)
-        resolver = ConvertingResolver(
-            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
-        )
+        # TODO: Cache response schema
         if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
             cls = jsonschema.Draft202012Validator
         else:
             cls = jsonschema.Draft4Validator
-        with in_scopes(resolver, scopes):
+        try:
+            # TODO: pass proper registry (i.e. the definition for this response could be in a separate file)
+            jsonschema.validate(data, schema, cls=cls, registry=self._registry)
+        except jsonschema.ValidationError as exc:
+            exc_class = get_schema_validation_error(exc)
+            ctx = failures.ValidationErrorContext.from_exception(exc)
             try:
-                jsonschema.validate(data, schema, cls=cls, resolver=resolver)
-            except jsonschema.ValidationError as exc:
-                exc_class = get_schema_validation_error(exc)
-                ctx = failures.ValidationErrorContext.from_exception(exc)
-                try:
-                    raise exc_class(ctx.title, context=ctx) from exc
-                except Exception as exc:
-                    errors.append(exc)
+                raise exc_class(ctx.title, context=ctx) from exc
+            except Exception as exc:
+                errors.append(exc)
         _maybe_raise_one_or_more(errors)
         return None  # explicitly return None for mypy
 
@@ -698,9 +704,10 @@ class BaseOpenAPISchema(BaseSchema):
                     break
             else:
                 target.update(fast_deepcopy(source))
-        schema.update(components)
-        # TODO: store `resolver` in operation instead of collecting the scope
-        uri = operation.definition.scope or self.location or ""
+        if isinstance(schema, dict):
+            schema.update(components)
+        # TODO: properly pass resolver
+        uri = operation.definition.resolver._base_uri or self.location or ""
         registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
         resolver = registry.resolver(base_uri=uri)
         config = TransformConfig(nullable_key=self.nullable_name, component_names=list(components))
@@ -716,29 +723,6 @@ def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
         raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
 
 
-@contextmanager
-def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, None, None]:
-    resolver.push_scope(scope)
-    try:
-        yield
-    finally:
-        resolver.pop_scope()
-
-
-@contextmanager
-def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[None, None, None]:
-    """Push all available scopes into the resolver.
-
-    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
-    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
-    way.
-    """
-    with ExitStack() as stack:
-        for scope in scopes:
-            stack.enter_context(in_scope(resolver, scope))
-        yield
-
-
 @dataclass
 class MethodMap(Mapping):
     """Container for accessing API operations.
@@ -747,14 +731,14 @@ class MethodMap(Mapping):
     """
 
     _parent: APIOperationMap
-    # Reference resolution scope
-    _scope: str
+    # Reference resolver
+    _resolver: Resolver
     # Methods are stored for this path
     _path: str
     # Storage for definitions
     _path_item: CaseInsensitiveDict
 
-    __slots__ = ("_parent", "_scope", "_path", "_path_item")
+    __slots__ = ("_parent", "_resolver", "_path", "_path_item")
 
     def __len__(self) -> int:
         return len(self._path_item)
@@ -767,13 +751,14 @@ class MethodMap(Mapping):
         operation = self._path_item[method]
         schema = cast(BaseOpenAPISchema, self._parent._schema)
         cache = schema._operation_cache
+        resolver = self._resolver
+        scope = tuple(uri for uri, _ in resolver.dynamic_scope())
         path = self._path
-        scope = self._scope
         cached = cache.get_operation_by_traversal_key(scope, path, method)
         if cached is not None:
             return cached
         parameters = schema._collect_operation_parameters(self._path_item, operation)
-        initialized = schema.make_operation(path, method, parameters, operation, scope)
+        initialized = schema.make_operation(path, method, parameters, operation, resolver)
         cache.insert_operation_by_traversal_key(scope, path, method, initialized)
         return initialized
 
@@ -838,7 +823,7 @@ class SwaggerV20(BaseOpenAPISchema):
         form_parameters = []
         for parameter in parameters:
             if "$ref" in parameter:
-                parameter = self.resolver2.lookup(parameter["$ref"]).contents
+                parameter = self.resolver.lookup(parameter["$ref"]).contents
             if parameter["in"] == "formData":
                 # We need to gather form parameters first before creating a composite parameter for them
                 form_parameters.append(parameter)
@@ -860,14 +845,15 @@ class SwaggerV20(BaseOpenAPISchema):
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
+    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
+        if "$ref" in definition:
+            definition = resolver.lookup(definition["$ref"]).contents
         schema = definition.get("schema")
         if not schema:
-            return scopes, None
+            return None
         # Extra conversion to JSON Schema is needed here if there was one $ref in the input
         # because it is not converted
-        return scopes, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
+        return to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
@@ -1013,12 +999,12 @@ class OpenApi30(SwaggerV20):
         collected: list[OpenAPIParameter] = []
         for parameter in parameters:
             if "$ref" in parameter:
-                parameter = self.resolver2.lookup(parameter["$ref"]).contents
+                parameter = self.resolver.lookup(parameter["$ref"]).contents
             collected.append(OpenAPI30Parameter(definition=parameter))
         if "requestBody" in definition:
             body = definition["requestBody"]
             while "$ref" in body:
-                body = self.resolver2.lookup(body["$ref"]).contents
+                body = self.resolver.lookup(body["$ref"]).contents
             required = body.get("required", False)
             description = body.get("description")
             for media_type, content in body["content"].items():
@@ -1027,16 +1013,17 @@ class OpenApi30(SwaggerV20):
                 )
         return collected
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
+    def get_response_schema(self, definition: dict[str, Any], resolver: Resolver) -> dict[str, Any] | None:
+        if "$ref" in definition:
+            definition = resolver.lookup(definition["$ref"]).contents
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object
         if option and "schema" in option:
             # Extra conversion to JSON Schema is needed here if there was one $ref in the input
             # because it is not converted
-            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
-        return scopes, None
+            return to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
+        return None
 
     def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -1067,7 +1054,7 @@ class OpenApi30(SwaggerV20):
         files = []
         definition = operation.definition.raw
         if "$ref" in definition["requestBody"]:
-            _, body = self.resolver.resolve(definition["requestBody"]["$ref"])
+            body = self.resolver.lookup(definition["requestBody"]["$ref"]).contents
         else:
             body = definition["requestBody"]
         content = body["content"]
@@ -1094,7 +1081,7 @@ class OpenApi30(SwaggerV20):
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         if "requestBody" in definition:
             if "$ref" in definition["requestBody"]:
-                _, body = self.resolver.resolve(definition["requestBody"]["$ref"])
+                body = self.resolver.lookup(definition["requestBody"]["$ref"]).contents
             else:
                 body = definition["requestBody"]
             if "content" in body:

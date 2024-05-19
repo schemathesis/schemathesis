@@ -6,23 +6,28 @@ from typing import TYPE_CHECKING, Any, Tuple
 if TYPE_CHECKING:
     from ...models import APIOperation
     from ...schemas import APIOperationMap
+    from ._jsonschema import Resolver
 
 
 @dataclass
 class OperationCacheEntry:
     path: str
     method: str
-    # The resolution scope of the operation
-    scope: str
+    # Reference resolver used to resolve the operation
+    resolver: Resolver
     # Parent path item
     path_item: dict[str, Any]
     # Unresolved operation definition
     operation: dict[str, Any]
-    __slots__ = ("path", "method", "scope", "path_item", "operation")
+    __slots__ = ("path", "method", "resolver", "path_item", "operation")
+
+    @property
+    def scope(self) -> tuple[str, ...]:
+        return tuple(uri for uri, _ in self.resolver.dynamic_scope())
 
 
 # During traversal, we need to keep track of the scope, path, and method
-TraversalKey = Tuple[str, str, str]
+TraversalKey = Tuple[Tuple[str, ...], str, str]
 OperationId = str
 Reference = str
 
@@ -65,13 +70,13 @@ class OperationCache:
         operation_id: str,
         path: str,
         method: str,
-        scope: str,
+        resolver: Resolver,
         path_item: dict[str, Any],
         operation: dict[str, Any],
     ) -> None:
         """Insert a new operation definition into cache."""
         self._id_to_definition[operation_id] = OperationCacheEntry(
-            path=path, method=method, scope=scope, path_item=path_item, operation=operation
+            path=path, method=method, resolver=resolver, path_item=path_item, operation=operation
         )
 
     def get_definition_by_id(self, operation_id: str) -> OperationCacheEntry:
@@ -87,7 +92,9 @@ class OperationCache:
         """Insert a new operation into cache by reference."""
         self._reference_to_operation[reference] = self._append_operation(operation)
 
-    def insert_operation_by_traversal_key(self, scope: str, path: str, method: str, operation: APIOperation) -> None:
+    def insert_operation_by_traversal_key(
+        self, scope: tuple[str, ...], path: str, method: str, operation: APIOperation
+    ) -> None:
         """Insert a new operation into cache by traversal key."""
         self._traversal_key_to_operation[(scope, path, method)] = self._append_operation(operation)
 
@@ -105,7 +112,7 @@ class OperationCache:
             return self._operations[idx]
         return None
 
-    def get_operation_by_traversal_key(self, scope: str, path: str, method: str) -> APIOperation | None:
+    def get_operation_by_traversal_key(self, scope: tuple[str, ...], path: str, method: str) -> APIOperation | None:
         """Get an operation by its traverse key."""
         idx = self._traversal_key_to_operation.get((scope, path, method))
         if idx is not None:

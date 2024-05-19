@@ -221,7 +221,7 @@ class GraphQLSchema(BaseSchema):
             # Parameters are not yet supported
             definition=GraphQLOperationDefinition(
                 raw=field,
-                scope="",
+                resolver=None,
                 type_=operation_type,
                 field_name=field_name,
                 root_type=root_type,

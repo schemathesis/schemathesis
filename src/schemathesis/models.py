@@ -548,9 +548,9 @@ class OperationDefinition(Generic[D]):
     """
 
     raw: D
-    scope: str
+    resolver: Any
 
-    __slots__ = ("raw", "scope")
+    __slots__ = ("raw", "resolver")
 
 
 C = TypeVar("C", bound=Case)

@@ -2,8 +2,14 @@ import pytest
 from hypothesis import given
 
 import schemathesis
-from schemathesis.specs.openapi._jsonschema import InliningResolver
+from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
+
+
+def get_resolver(schema):
+    registry = Registry().with_resource("", Resource(contents=schema, specification=DRAFT4))
+    return registry.resolver()
 
 
 def test_ref_resolving():
@@ -15,7 +21,7 @@ def test_ref_resolving():
         "paths": {"foo": {"get": {"responses": {"200": {"description": "OK"}}}}},
         "components": {"securitySchemes": {"$ref": "#/components/HTTPSchema"}, "HTTPSchema": http_schema},
     }
-    resolver = InliningResolver("", schema)
+    resolver = get_resolver(schema)
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == http_schema
 
 
@@ -31,7 +37,7 @@ def test_ref_resolving_nested():
             "HTTPSchema": http_schema,
         },
     }
-    resolver = InliningResolver("", schema)
+    resolver = get_resolver(schema)
     assert OpenAPISecurityProcessor().get_security_definitions(schema, resolver) == {"basic_auth": http_schema}
 
 

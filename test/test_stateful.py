@@ -23,7 +23,7 @@ def add_link(schema, target, **kwargs):
     schema.add_link(source=schema["/users/"]["POST"], target=target, status_code="201", **kwargs)
     responses = schema["/users/"]["POST"].definition.raw["responses"]["201"]
     if "$ref" in responses:
-        _, responses = schema.resolver.resolve(responses["$ref"])
+        responses = schema.resolver.lookup(responses["$ref"]).contents
     return responses["links"]
 
 
@@ -61,7 +61,7 @@ def test_add_link_no_operations_cache(schema_url, status_code):
     # Then it should be added without errors
     response = schema["/users/"]["POST"].definition.raw["responses"]["201"]
     if "$ref" in response:
-        _, response = schema.resolver.resolve(response["$ref"])
+        response = schema.resolver.lookup(response["$ref"]).contents
     links = response["links"]
     assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
@@ -123,7 +123,7 @@ def test_add_link_behind_a_reference(schema_url):
     operation = schema["/users/"]["POST"]
     response = operation.definition.raw["responses"]["201"]
     if "$ref" in response:
-        _, response = schema.resolver.resolve(response["$ref"])
+        response = schema.resolver.lookup(response["$ref"]).contents
     links = response["links"]
     assert len(links) == 3
     assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}

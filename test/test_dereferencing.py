@@ -1,6 +1,5 @@
 import json
 import platform
-from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -530,9 +529,8 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def test_complex_dereference(testdir, complex_schema):
+def test_complex_dereference(complex_schema):
     schema = schemathesis.from_path(complex_schema)
-    path = Path(str(testdir))
     body_definition = {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}
     operation = schema["/teapot"]["POST"]
     assert operation.base_url == "file:///"
@@ -552,16 +550,14 @@ def test_complex_dereference(testdir, complex_schema):
         "summary": "Test",
         "tags": ["ancillaries"],
     }
-    assert operation.definition.scope == f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath"
     assert operation.body[0].required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):
-    scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
-    assert scope.endswith("#/info/title")
-    assert resolved == "Example API"
+    resolved = swagger_20.resolver.lookup(f"{schema_url}#/info/title")
+    assert resolved.contents == "Example API"
 
 
 def assert_unique_objects(item):

@@ -1,12 +1,12 @@
 """Processing of ``securityDefinitions`` or ``securitySchemes`` keywords."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from typing import Any, ClassVar, Generator
 
-from jsonschema import RefResolver
-
 from ...models import APIOperation
+from ._jsonschema import Resolver
 from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 
 
@@ -16,7 +16,7 @@ class BaseSecurityProcessor:
     http_security_name: ClassVar[str] = "basic"
     parameter_cls: ClassVar[type[OpenAPIParameter]] = OpenAPI20Parameter
 
-    def process_definitions(self, schema: dict[str, Any], operation: APIOperation, resolver: RefResolver) -> None:
+    def process_definitions(self, schema: dict[str, Any], operation: APIOperation, resolver: Resolver) -> None:
         """Add relevant security parameters to data generation."""
         __tracebackhide__ = True
         for definition in self._get_active_definitions(schema, operation, resolver):
@@ -44,7 +44,7 @@ class BaseSecurityProcessor:
         return [key for requirement in requirements for key in requirement]
 
     def _get_active_definitions(
-        self, schema: dict[str, Any], operation: APIOperation, resolver: RefResolver
+        self, schema: dict[str, Any], operation: APIOperation, resolver: Resolver
     ) -> Generator[dict[str, Any], None, None]:
         """Get only security definitions active for the given API operation."""
         definitions = self.get_security_definitions(schema, resolver)
@@ -53,11 +53,11 @@ class BaseSecurityProcessor:
             if name in requirements:
                 yield definition
 
-    def get_security_definitions(self, schema: dict[str, Any], resolver: RefResolver) -> dict[str, Any]:
+    def get_security_definitions(self, schema: dict[str, Any], resolver: Resolver) -> dict[str, Any]:
         return schema.get("securityDefinitions", {})
 
     def get_security_definitions_as_parameters(
-        self, schema: dict[str, Any], operation: APIOperation, resolver: RefResolver, location: str
+        self, schema: dict[str, Any], operation: APIOperation, resolver: Resolver, location: str
     ) -> list[dict[str, Any]]:
         """Security definitions converted to OAS parameters.
 
@@ -121,14 +121,16 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
     http_security_name: ClassVar[str] = "http"
     parameter_cls: ClassVar[type[OpenAPIParameter]] = OpenAPI30Parameter
 
-    def get_security_definitions(self, schema: dict[str, Any], resolver: RefResolver) -> dict[str, Any]:
+    def get_security_definitions(self, schema: dict[str, Any], resolver: Resolver) -> dict[str, Any]:
         """In Open API 3 security definitions are located in ``components`` and may have references inside."""
         components = schema.get("components", {})
         security_schemes = components.get("securitySchemes", {})
-        resolve = resolver.resolve
+        lookup = resolver.lookup
         if "$ref" in security_schemes:
-            return resolve(security_schemes["$ref"])[1]
-        return {key: resolve(value["$ref"])[1] if "$ref" in value else value for key, value in security_schemes.items()}
+            return lookup(security_schemes["$ref"]).contents
+        return {
+            key: lookup(value["$ref"]).contents if "$ref" in value else value for key, value in security_schemes.items()
+        }
 
     def _make_http_auth_parameter(self, definition: dict[str, Any]) -> dict[str, Any]:
         schema = make_auth_header_schema(definition)

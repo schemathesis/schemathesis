@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, NoReturn, Sequence, Union
 
-from jsonschema import RefResolver
-
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
@@ -21,7 +19,7 @@ from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-from ._jsonschema import Unresolvable
+from ._jsonschema import Unresolvable, Resolver
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
@@ -43,9 +41,7 @@ class Link(StatefulTest):
     @classmethod
     def from_definition(cls, name: str, definition: dict[str, dict[str, Any]], source_operation: APIOperation) -> Link:
         # Links can be behind a reference
-        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_operation.definition.scope
-        )
+        definition = source_operation.definition.resolver.lookup(definition).contents  # type: ignore[attr-defined]
         if "operationId" in definition:
             # source_operation.schema is `BaseOpenAPISchema` and has this method
             operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
@@ -165,7 +161,8 @@ def get_links(response: GenericResponse, operation: APIOperation, field: str) ->
         definition = responses.get("default", {})
     if not definition:
         return []
-    _, definition = operation.schema.resolver.resolve_in_scope(definition, operation.definition.scope)  # type: ignore[attr-defined]
+    if "$ref" in definition:
+        definition = operation.definition.resolver.lookup(definition["$ref"]).contents  # type: ignore[attr-defined]
     links = definition.get(field, {})
     return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
@@ -253,10 +250,13 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
+    lookup = operation.schema.resolver.lookup  # type: ignore[attr-defined]
     for status_code, definition in operation.definition.raw["responses"].items():
         if "$ref" in definition:
-            _, definition = operation.schema.resolver.resolve(definition["$ref"])  # type: ignore[attr-defined]
+            definition = lookup(definition["$ref"]).contents
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+            if "$ref" in link_definition:
+                link_definition = lookup(link_definition["$ref"]).contents  # type: ignore[attr-defined]
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
@@ -282,7 +282,7 @@ def _get_response_by_status_code(responses: dict[StatusCode, dict[str, Any]], st
 
 
 def add_link(
-    resolver: RefResolver,
+    resolver: Resolver,
     responses: dict[StatusCode, dict[str, Any]],
     links_field: str,
     parameters: dict[str, str] | None,
@@ -293,7 +293,7 @@ def add_link(
 ) -> None:
     response = _get_response_by_status_code(responses, status_code)
     if "$ref" in response:
-        _, response = resolver.resolve(response["$ref"])
+        response = resolver.lookup(response["$ref"]).contents
     links_definition = response.setdefault(links_field, {})
     new_link: dict[str, str | dict[str, str]] = {}
     if parameters is not None:

@@ -149,7 +149,7 @@ def _find_parameter_examples_definition(
     parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
     for parameter in parameters:
         if "$ref" in parameter:
-            _, parameter = schema.resolver.resolve(parameter["$ref"])
+            parameter = operation.definition.resolver.lookup(parameter["$ref"]).contents
         if parameter["name"] == parameter_name:
             return parameter[field_name]
     raise RuntimeError("Example definition is not found. It should not happen")
@@ -168,13 +168,13 @@ def _find_request_body_examples_definition(
         parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
         for parameter in parameters:
             if "$ref" in parameter:
-                _, parameter = schema.resolver.resolve(parameter["$ref"])
+                parameter = operation.definition.resolver.lookup(parameter["$ref"]).contents
             if parameter["in"] == "body":
                 return parameter[alternative.examples_field]
         raise RuntimeError("Example definition is not found. It should not happen")
     request_body = operation.definition.raw["requestBody"]
     while "$ref" in request_body:
-        _, request_body = schema.resolver.resolve(request_body["$ref"])
+        request_body = operation.definition.resolver.lookup(request_body["$ref"]).contents
     return request_body["content"][alternative.media_type][alternative.examples_field]
 
 
