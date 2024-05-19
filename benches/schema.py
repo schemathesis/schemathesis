@@ -169,7 +169,7 @@ def test_get_operation_by_reference_repeatedly(schema, key):
 def test_as_json_schema(operations):
     for operation in operations:
         for parameter in operation.ok().iter_parameters():
-            _ = parameter.as_json_schema(operation)
+            _ = parameter.as_json_schema(operation.ok())
 
 
 @pytest.mark.benchmark

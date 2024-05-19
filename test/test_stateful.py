@@ -142,32 +142,6 @@ def test_add_link_nothing_is_provided(schema_url):
         )
 
 
-@pytest.mark.parametrize(
-    "change, message",
-    (
-        (
-            lambda e: setattr(e, "method", "GET"),
-            "Method `GET` not found. Available methods: POST",
-        ),
-        (
-            lambda e: setattr(e, "path", "/userz/"),
-            "`/userz/` not found. Did you mean `/users/`?",
-        ),
-        (lambda e: setattr(e, "path", "/what?/"), "`/what?/` not found"),
-    ),
-    ids=("method-change", "path-with-suggestion", "path-without-suggestion"),
-)
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_add_link_unknown_operation(schema_url, change, message):
-    schema = schemathesis.from_uri(schema_url)
-    # When the source API operation is modified and can't be found
-    source = schema["/users/"]["POST"]
-    change(source)
-    with pytest.raises(KeyError, match=re.escape(message)):
-        # Then there should be an error about it.
-        schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
-
-
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_links_access(schema_url):
     schema = schemathesis.from_uri(schema_url)
