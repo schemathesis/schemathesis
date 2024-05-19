@@ -2,7 +2,7 @@ import pytest
 from hypothesis import given
 
 import schemathesis
-from schemathesis.specs.openapi.references import InliningResolver
+from schemathesis.specs.openapi._jsonschema import InliningResolver
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 
 

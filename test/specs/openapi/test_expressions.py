@@ -10,7 +10,7 @@ from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi.references import resolve_pointer, UNRESOLVABLE
+from schemathesis.specs.openapi._jsonschema import resolve_pointer, UNRESOLVABLE
 
 DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4, "i\\j": 5, 'k"l': 6, " ": 7, "m~n": 8}
 
