@@ -64,6 +64,7 @@ from ._hypothesis import get_case_strategy
 from ._jsonschema import (
     TransformConfig,
     Resolver,
+    dynamic_scope,
     get_remote_schema_retriever,
     to_jsonschema,
 )
@@ -452,13 +453,15 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _populate_operation_id_cache(self, cache: OperationCache) -> None:
         """Collect all operation IDs from the schema."""
-        lookup = self.resolver.lookup
+        resolver = self.resolver
+        lookup = resolver.lookup
         for path, path_item in self.raw_schema.get("paths", {}).items():
             # If the path is behind a reference we have to keep the scope
             # The scope is used to resolve nested components later on
             if "$ref" in path_item:
                 resolved = lookup(path_item["$ref"])
-                resolver, path_item = resolved.resolver, resolved.contents
+                resolver = resolved.resolver
+                path_item = resolved.contents
             else:
                 resolver = self.resolver
             for key, entry in path_item.items():
@@ -492,7 +495,7 @@ class BaseOpenAPISchema(BaseSchema):
         path, method = fragment.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
         # Check the traversal cache as it could've been populated in other places
-        scope: tuple[str, ...] = tuple(uri for uri, _ in resolved.resolver.dynamic_scope())
+        scope = dynamic_scope(resolved.resolver)
         traversal_key = (scope, path, method)
         cached = cache.get_operation_by_traversal_key(*traversal_key)
         if cached is not None:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Tuple
+from ._jsonschema import dynamic_scope
 
 if TYPE_CHECKING:
     from ...models import APIOperation
@@ -23,7 +24,7 @@ class OperationCacheEntry:
 
     @property
     def scope(self) -> tuple[str, ...]:
-        return tuple(uri for uri, _ in self.resolver.dynamic_scope())
+        return dynamic_scope(self.resolver)
 
 
 # During traversal, we need to keep track of the scope, path, and method

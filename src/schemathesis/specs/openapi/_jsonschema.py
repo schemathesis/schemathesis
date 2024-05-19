@@ -136,6 +136,10 @@ def remove_optional_references(schema: dict[str, Any]) -> None:
                 del definition[k]
 
 
+def dynamic_scope(resolver: Resolver) -> tuple[str, ...]:
+    return tuple(uri for uri, _ in resolver.dynamic_scope())
+
+
 def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
     """Implementation is adapted from Rust's `serde-json` crate.
 
