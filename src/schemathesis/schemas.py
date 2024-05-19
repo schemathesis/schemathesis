@@ -24,6 +24,7 @@ from typing import (
     NoReturn,
     Sequence,
     TypeVar,
+    Generic,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
@@ -45,7 +46,7 @@ from .generation import (
 )
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .internal.result import Ok, Result
-from .models import APIOperation, Case
+from .models import APIOperation, Case, OperationDefinition
 from .stateful import Stateful, StatefulTest
 from .stateful.state_machine import APIStateMachine
 from .types import (
@@ -67,6 +68,7 @@ if TYPE_CHECKING:
 
 
 C = TypeVar("C", bound=Case)
+D = TypeVar("D", bound=OperationDefinition)
 
 
 @lru_cache
@@ -75,7 +77,7 @@ def get_full_path(base_path: str, path: str) -> str:
 
 
 @dataclass(eq=False)
-class BaseSchema(Mapping):
+class BaseSchema(Mapping, Generic[C, D]):
     raw_schema: dict[str, Any]
     transport: Transport
     location: str | None = None
@@ -425,7 +427,7 @@ class BaseSchema(Mapping):
                 return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
         return nullcontext()
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
+    def _get_payload_schema(self, definition: D, media_type: str) -> dict[str, Any] | None:
         raise NotImplementedError
 
     def as_strategy(

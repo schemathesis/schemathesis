@@ -17,14 +17,17 @@ from schemathesis.checks import (
 from schemathesis._compat import MultipleFailures
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.experimental import OPEN_API_3_1
-from schemathesis.models import OperationDefinition, TestResult
+from schemathesis.models import TestResult
 from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.serialization import deduplicate_failures
 from schemathesis.schemas import BaseSchema
+from schemathesis.specs.openapi.schemas import OpenAPIOperationDefinition
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
-    operation = models.APIOperation("/path", "GET", definition=OperationDefinition(definition, ""), schema=schema)
+    operation = models.APIOperation(
+        "/path", "GET", definition=OpenAPIOperationDefinition(definition, schema.resolver), schema=schema
+    )
     return models.Case(operation, generation_time=0.0)
 
 

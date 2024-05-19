@@ -10,17 +10,17 @@ import requests
 from hypothesis.strategies import SearchStrategy
 from hypothesis_jsonschema import from_schema
 
-from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...models import APIOperation, Case
 from ..._hypothesis import get_single_example
+from ...constants import DEFAULT_RESPONSE_TIMEOUT
+from ...models import Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies
-from .formats import STRING_FORMATS
 from .constants import LOCATION_TO_CONTAINER
-from .parameters import OpenAPIBody, OpenAPIParameter
-
+from .formats import STRING_FORMATS
+from .parameters import OpenAPIBody
 
 if TYPE_CHECKING:
     from ...generation import GenerationConfig
+    from .schemas import OpenAPIOperation
 
 
 @dataclass
@@ -44,7 +44,7 @@ Example = Union[ParameterExample, BodyExample]
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter, Case], examples_field: str = "examples"
+    operation: OpenAPIOperation, examples_field: str = "examples"
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
@@ -73,7 +73,7 @@ def get_strategies_from_examples(
     ]
 
 
-def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+def extract_top_level(operation: OpenAPIOperation) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
@@ -138,7 +138,7 @@ def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any
 
 
 def _find_parameter_examples_definition(
-    operation: APIOperation[OpenAPIParameter, Case], parameter_name: str, field_name: str
+    operation: OpenAPIOperation, parameter_name: str, field_name: str
 ) -> dict[str, Any]:
     """Find the original, unresolved `examples` definition of a parameter."""
     from .schemas import BaseOpenAPISchema
@@ -155,9 +155,7 @@ def _find_parameter_examples_definition(
     raise RuntimeError("Example definition is not found. It should not happen")
 
 
-def _find_request_body_examples_definition(
-    operation: APIOperation[OpenAPIParameter, Case], alternative: OpenAPIBody
-) -> dict[str, Any]:
+def _find_request_body_examples_definition(operation: OpenAPIOperation, alternative: OpenAPIBody) -> dict[str, Any]:
     """Find the original, unresolved `examples` definition of a request body variant."""
     from .schemas import BaseOpenAPISchema
 
@@ -172,7 +170,7 @@ def _find_request_body_examples_definition(
             if parameter["in"] == "body":
                 return parameter[alternative.examples_field]
         raise RuntimeError("Example definition is not found. It should not happen")
-    request_body = operation.definition.raw["requestBody"]
+    request_body = operation.definition.value["requestBody"]
     while "$ref" in request_body:
         request_body = operation.definition.resolver.lookup(request_body["$ref"]).contents
     return request_body["content"][alternative.media_type][alternative.examples_field]
@@ -203,7 +201,7 @@ def load_external_example(url: str) -> bytes:
     return response.content
 
 
-def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+def extract_from_schemas(operation: OpenAPIOperation) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
@@ -219,7 +217,7 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Gen
 
 
 def extract_from_schema(
-    operation: APIOperation[OpenAPIParameter, Case],
+    operation: OpenAPIOperation,
     schema: dict[str, Any],
     example_field_name: str,
     examples_field_name: str,

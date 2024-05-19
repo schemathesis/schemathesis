@@ -9,6 +9,8 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, NoReturn, Sequence, Union
 
+from referencing.exceptions import Unresolvable
+
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
@@ -19,7 +21,7 @@ from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-from ._jsonschema import Unresolvable, Resolver
+from ._jsonschema import Resolver
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
@@ -152,7 +154,7 @@ class Link(StatefulTest):
 
 def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
-    responses = operation.definition.raw["responses"]
+    responses = operation.definition.value["responses"]
     if str(response.status_code) in responses:
         definition = responses[str(response.status_code)]
     elif response.status_code in responses:
@@ -251,7 +253,7 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
     lookup = operation.schema.resolver.lookup  # type: ignore[attr-defined]
-    for status_code, definition in operation.definition.raw["responses"].items():
+    for status_code, definition in operation.definition.value["responses"].items():
         if "$ref" in definition:
             definition = lookup(definition["$ref"]).contents
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
@@ -307,8 +309,8 @@ def add_link(
         name = name or f"{target.method.upper()} {target.path}"
         # operationId is a dict lookup which is more efficient than using `operationRef`, since it
         # doesn't involve reference resolving when we will look up for this target during testing.
-        if "operationId" in target.definition.raw:
-            new_link["operationId"] = target.definition.raw["operationId"]
+        if "operationId" in target.definition.value:
+            new_link["operationId"] = target.definition.value["operationId"]
         else:
             new_link["operationRef"] = target.operation_reference
     # The name is arbitrary, so we don't really case what it is,

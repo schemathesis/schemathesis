@@ -5,10 +5,11 @@ import pytest
 import requests
 
 import schemathesis
-from schemathesis.models import APIOperation, Case, OperationDefinition
+from schemathesis.models import APIOperation, Case
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi.links import Link, get_container, get_links
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI30Body, OpenAPI30Parameter
+from schemathesis.specs.openapi.schemas import OpenAPIOperationDefinition
 from schemathesis.stateful import ParsedData, Stateful
 
 API_OPERATION = APIOperation(
@@ -307,7 +308,7 @@ def test_get_container_invalid_location(swagger_20):
         method="get",
         schema=swagger_20,
         verbose_name="GET /users/{user_id}",
-        definition=OperationDefinition(raw={}, scope=""),
+        definition=OpenAPIOperationDefinition(value={}, resolver=ANY),
     )
     parameters = [
         OpenAPI30Parameter({"in": "query", "name": "code", "type": "integer"}),

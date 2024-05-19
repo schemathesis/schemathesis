@@ -36,7 +36,7 @@ class BaseSecurityProcessor:
         # > This definition overrides any declared top-level security.
         # > To remove a top-level security declaration, an empty array can be used.
         global_requirements = schema.get("security", [])
-        local_requirements = operation.definition.raw.get("security", None)
+        local_requirements = operation.definition.value.get("security", None)
         if local_requirements is not None:
             requirements = local_requirements
         else:

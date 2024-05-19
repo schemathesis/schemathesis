@@ -11,7 +11,7 @@ from urllib.request import urlopen
 import referencing.retrieval
 import requests
 from referencing import Resource, Specification, Registry
-from referencing.exceptions import Unretrievable
+from referencing.exceptions import Unresolvable, Unretrievable
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
@@ -136,14 +136,6 @@ def remove_optional_references(schema: dict[str, Any]) -> None:
                 del definition[k]
 
 
-@dataclass
-class Unresolvable:
-    pass
-
-
-UNRESOLVABLE = Unresolvable()
-
-
 def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
     """Implementation is adapted from Rust's `serde-json` crate.
 
@@ -152,7 +144,7 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     if not pointer:
         return document
     if not pointer.startswith("/"):
-        return UNRESOLVABLE
+        return Unresolvable(pointer)
 
     def replace(value: str) -> str:
         return value.replace("~1", "/").replace("~0", "~")
@@ -161,16 +153,16 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     target = document
     for token in tokens:
         if isinstance(target, dict):
-            target = target.get(token, UNRESOLVABLE)
-            if target is UNRESOLVABLE:
-                return UNRESOLVABLE
+            target = target.get(token)
+            if target is None:
+                return Unresolvable(pointer)
         elif isinstance(target, list):
             try:
                 target = target[int(token)]
             except IndexError:
-                return UNRESOLVABLE
+                return Unresolvable(pointer)
         else:
-            return UNRESOLVABLE
+            return Unresolvable(pointer)
     return target
 
 

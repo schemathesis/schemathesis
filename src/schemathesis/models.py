@@ -534,30 +534,18 @@ def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generato
                 client.delete_cookie("localhost", key=key)
 
 
-P = TypeVar("P", bound=Parameter)
-D = TypeVar("D", bound=dict)
-
-
 @dataclass
-class OperationDefinition(Generic[D]):
-    """A wrapper to store not resolved API operation definitions.
-
-    To prevent recursion errors we need to store definitions without resolving references. But operation definitions
-    itself can be behind a reference (when there is a ``$ref`` in ``paths`` values), therefore we need to store this
-    scope change to have a proper reference resolving later.
-    """
-
-    raw: D
-    resolver: Any
-
-    __slots__ = ("raw", "resolver")
+class OperationDefinition:
+    pass
 
 
+P = TypeVar("P", bound=Parameter)
 C = TypeVar("C", bound=Case)
+D = TypeVar("D", bound=OperationDefinition)
 
 
 @dataclass(eq=False)
-class APIOperation(Generic[P, C]):
+class APIOperation(Generic[P, C, D]):
     """A single operation defined in an API.
 
     You can get one via a ``schema`` instance.
@@ -574,7 +562,7 @@ class APIOperation(Generic[P, C]):
     # https://swagger.io/docs/specification/2-0/api-host-and-base-path/
     path: str
     method: str
-    definition: OperationDefinition = field(repr=False)
+    definition: D = field(repr=False)
     schema: BaseSchema
     verbose_name: str = None  # type: ignore
     app: Any = None
@@ -772,7 +760,7 @@ class APIOperation(Generic[P, C]):
             return False
 
     def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition.raw, media_type)
+        return self.schema._get_payload_schema(self.definition, media_type)
 
 
 # backward-compatibility

@@ -3,6 +3,7 @@ from base64 import b64decode
 from unittest.mock import ANY
 
 import pytest
+from referencing.jsonschema import EMPTY_REGISTRY
 from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
@@ -10,7 +11,7 @@ import schemathesis
 from schemathesis.models import Case
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.exceptions import OperationSchemaError
-from schemathesis.models import APIOperation, OperationDefinition
+from schemathesis.models import APIOperation
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
@@ -23,13 +24,22 @@ from schemathesis.specs.openapi._hypothesis import (
     quote_all,
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+from schemathesis.specs.openapi.schemas import OpenAPIOperationDefinition
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
 from schemathesis.constants import NOT_SET
 from test.utils import assert_requests_call
 
+STUB_DEFINITION = OpenAPIOperationDefinition(value={}, resolver=EMPTY_REGISTRY.resolver())
+
 
 def make_operation(schema, **kwargs) -> APIOperation:
-    return APIOperation("/users", "POST", definition=OperationDefinition({}, ""), schema=schema, **kwargs)
+    return APIOperation(
+        "/users",
+        "POST",
+        definition=STUB_DEFINITION,
+        schema=schema,
+        **kwargs,
+    )
 
 
 @pytest.mark.parametrize("location", sorted(LOCATION_TO_CONTAINER))
@@ -85,7 +95,7 @@ def test_no_body_in_get(swagger_20):
     operation = APIOperation(
         path="/api/success",
         method="GET",
-        definition=OperationDefinition({}, ""),
+        definition=STUB_DEFINITION,
         schema=swagger_20,
         query=ParameterSet(
             [
@@ -112,7 +122,7 @@ def test_invalid_body_in_get(swagger_20):
     operation = APIOperation(
         path="/foo",
         method="GET",
-        definition=OperationDefinition({}, ""),
+        definition=STUB_DEFINITION,
         schema=swagger_20,
         body=PayloadAlternatives(
             [
@@ -138,7 +148,7 @@ def test_invalid_body_in_get_disable_validation(simple_schema):
     operation = APIOperation(
         path="/foo",
         method="GET",
-        definition=OperationDefinition({}, ""),
+        definition=STUB_DEFINITION,
         schema=schema,
         body=PayloadAlternatives(
             [
@@ -266,7 +276,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
     operation = APIOperation(
         "/api/success",
         "GET",
-        definition=OperationDefinition({}, ""),
+        definition=STUB_DEFINITION,
         schema=swagger_20,
         base_url=openapi2_base_url,
         headers=ParameterSet([OpenAPI20Parameter(definition)]),

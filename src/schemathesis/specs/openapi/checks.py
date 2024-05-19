@@ -22,7 +22,7 @@ def status_code_conformance(response: GenericResponse, case: Case) -> bool | Non
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
-    responses = case.operation.definition.raw.get("responses", {})
+    responses = case.operation.definition.value.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
     if "default" in responses:
         return None
