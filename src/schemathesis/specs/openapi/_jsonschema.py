@@ -231,8 +231,8 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 #    So, just pass schema + components, and then remove components
 
 logger = logging.getLogger(__name__)
-INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
-INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
+MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
+MOVED_REFERENCE_PREFIX = f"#/{MOVED_REFERENCE_ROOT_KEY}"
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 ReferencedSchemas = Dict[str, ObjectSchema]
@@ -268,7 +268,7 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
 
     1. Inlining of non-local references:
        - Resolve all non-local references in the schema.
-       - Store the referenced data in the root of the schema under the key "x-inlined-references".
+       - Store the referenced data in the root of the schema under the key "x-moved-references".
        - Modify the references to point to the locally stored data.
        - Repeat this process until all external references are resolved.
 
@@ -298,8 +298,8 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
         inline_recursive_references(referenced_schemas, referenced_schemas, references, config)
     else:
         # Trivial case - no extra processing needed, just remove the key
-        logger.debug("No references inlined")
-        del schema[INLINED_REFERENCE_ROOT_KEY]
+        logger.debug("No references found")
+        del schema[MOVED_REFERENCE_ROOT_KEY]
     for name in config.component_names:
         del schema[name]
     logger.debug("Output: %s", schema)
@@ -310,7 +310,7 @@ def to_self_contained_jsonschema(
     schema: ObjectSchema, resolver: Resolver, config: TransformConfig
 ) -> ReferencedSchemas:
     referenced_schemas: ReferencedSchemas = {}
-    schema[INLINED_REFERENCE_ROOT_KEY] = referenced_schemas
+    schema[MOVED_REFERENCE_ROOT_KEY] = referenced_schemas
     _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config)
     return referenced_schemas
 
@@ -343,7 +343,7 @@ def _to_self_contained_jsonschema(
 def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas: ReferencedSchemas) -> None:
     if item.get(nullable_key) is True:
         del item[nullable_key]
-        # Move all other keys to a new object, except for `x-inlined-references` which should
+        # Move all other keys to a new object, except for `x-moved-references` which should
         # always be at the root level
         inner = {}
         for key, value in list(item.items()):
@@ -357,8 +357,8 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas:
 def move_referenced_data(
     item: ObjectSchema, ref: str, referenced_schemas: ReferencedSchemas, resolver: Resolver
 ) -> tuple[Any, Resolver] | None:
-    if ref.startswith(INLINED_REFERENCE_PREFIX):
-        logger.debug("Already inlined %s", ref)
+    if ref.startswith(MOVED_REFERENCE_PREFIX):
+        logger.debug("Already moved %s", ref)
         return None
     if ref.startswith("file://"):
         ref = ref[7:]
@@ -366,9 +366,9 @@ def move_referenced_data(
     resolved = resolver.lookup(ref)
     key = _make_reference_key(ref)
     referenced_schemas[key] = resolved.contents
-    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+    new_ref = f"{MOVED_REFERENCE_PREFIX}/{key}"
     item["$ref"] = new_ref
-    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
+    logger.debug("Moved reference: %s -> %s", ref, new_ref)
     logger.debug("Resolved %s -> %s", ref, resolved.contents)
     return resolved.contents, resolved.resolver
 

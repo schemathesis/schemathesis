@@ -171,8 +171,8 @@ def setup_schema(request, uri, scope, schema):
                 }
             },
             {
-                "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
-                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
+                "x-moved-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -187,8 +187,8 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
-                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "properties": {"example": {"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
+                "x-moved-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -204,10 +204,10 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"}},
-                "x-inlined-references": {
+                "properties": {"example": {"$ref": "#/x-moved-references/58d4bb06ad165cda74c28d601b154ace1019890c"}},
+                "x-moved-references": {
                     "58d4bb06ad165cda74c28d601b154ace1019890c": {
-                        "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                        "$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
                     },
                     "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
                 },
@@ -227,10 +227,10 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
-                    "example-2": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    "example-1": {"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    "example-2": {"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
                 },
-                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "x-moved-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -247,12 +247,12 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
-                    "example-2": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                    "example-1": {"$ref": "#/x-moved-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
+                    "example-2": {"$ref": "#/x-moved-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
                 },
-                "x-inlined-references": {
+                "x-moved-references": {
                     "58d4bb06ad165cda74c28d601b154ace1019890c": {
-                        "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
+                        "$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"
                     },
                     "aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"},
                 },
@@ -270,8 +270,8 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "allOf": [{"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
-                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "allOf": [{"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
+                "x-moved-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -287,10 +287,10 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "allOf": [
-                    {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
-                    {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    {"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
+                    {"$ref": "#/x-moved-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
                 ],
-                "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
+                "x-moved-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
         (
@@ -299,8 +299,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_NO_NESTING,
             {},
             {
-                "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
-                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
+                "x-moved-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -309,8 +309,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_WITH_SCHEME_NO_NESTING,
             {},
             {
-                "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
-                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
+                "x-moved-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -319,8 +319,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_NESTED_IN_OBJECT,
             {},
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
-                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "properties": {"example": {"$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-moved-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -335,10 +335,10 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"}},
-                "x-inlined-references": {
+                "properties": {"example": {"$ref": "#/x-moved-references/685e4330057cf6ab44313ea387bdf57a2416782a"}},
+                "x-moved-references": {
                     "685e4330057cf6ab44313ea387bdf57a2416782a": {
-                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                        "$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
                     },
                     "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
                 },
@@ -357,12 +357,12 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "properties": {
-                    "example-1": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
-                    "example-2": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                    "example-1": {"$ref": "#/x-moved-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
+                    "example-2": {"$ref": "#/x-moved-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
                 },
-                "x-inlined-references": {
+                "x-moved-references": {
                     "685e4330057cf6ab44313ea387bdf57a2416782a": {
-                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                        "$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
                     },
                     "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
                 },
@@ -374,8 +374,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_RELATIVE_REF,
             {},
             {
-                "$ref": "#/x-inlined-references/4f2e7403753928e6b218cb8e72afb242f55ca267",
-                "x-inlined-references": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
+                "$ref": "#/x-moved-references/4f2e7403753928e6b218cb8e72afb242f55ca267",
+                "x-moved-references": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
             },
         ),
         (
@@ -384,8 +384,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_SCOPED_REF,
             {},
             {
-                "properties": {"nested-2": {"$ref": "#/x-inlined-references/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
-                "x-inlined-references": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
+                "properties": {"nested-2": {"$ref": "#/x-moved-references/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
+                "x-moved-references": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
             },
         ),
         (
@@ -415,9 +415,9 @@ def setup_schema(request, uri, scope, schema):
             INNER_REF,
             {},
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
+                "properties": {"example": {"$ref": "#/x-moved-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
                 "definitions": {"Example": {"type": "integer"}},
-                "x-inlined-references": {"8c3ff8eb23370337fe1f4d50625776ca412cf3ce": {"type": "integer"}},
+                "x-moved-references": {"8c3ff8eb23370337fe1f4d50625776ca412cf3ce": {"type": "integer"}},
             },
         ),
         (
@@ -426,11 +426,11 @@ def setup_schema(request, uri, scope, schema):
             INNER_REF_WITH_NESTED_FILE_REF,
             {},
             {
-                "properties": {"example": {"$ref": "#/x-inlined-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
-                "definitions": {"Example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
-                "x-inlined-references": {
+                "properties": {"example": {"$ref": "#/x-moved-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
+                "definitions": {"Example": {"$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
+                "x-moved-references": {
                     "8c3ff8eb23370337fe1f4d50625776ca412cf3ce": {
-                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                        "$ref": "#/x-moved-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
                     },
                     "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
                 },
@@ -453,8 +453,8 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "$ref": "#/x-inlined-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
-                "x-inlined-references": {
+                "$ref": "#/x-moved-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
+                "x-moved-references": {
                     "eebcedb296ce3a3a3e7ac8c3938de062de9ea618": {
                         "type": "object",
                         "properties": {
@@ -483,8 +483,8 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
             {
-                "$ref": "#/x-inlined-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
-                "x-inlined-references": {
+                "$ref": "#/x-moved-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
+                "x-moved-references": {
                     "eebcedb296ce3a3a3e7ac8c3938de062de9ea618": {
                         "anyOf": [
                             {"type": "integer"},
