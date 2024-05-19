@@ -21,10 +21,10 @@ from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-from ._jsonschema import Resolver
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
+    from .schemas import OpenAPIOperation
 
 
 @dataclass(repr=False)
@@ -163,8 +163,7 @@ def get_links(response: GenericResponse, operation: APIOperation, field: str) ->
         definition = responses.get("default", {})
     if not definition:
         return []
-    if "$ref" in definition:
-        definition = operation.definition.resolver.lookup(definition["$ref"]).contents  # type: ignore[attr-defined]
+    definition = operation.definition.maybe_resolve(definition)
     links = definition.get(field, {})
     return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
@@ -252,13 +251,10 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
-    lookup = operation.schema.resolver.lookup  # type: ignore[attr-defined]
     for status_code, definition in operation.definition.value["responses"].items():
-        if "$ref" in definition:
-            definition = lookup(definition["$ref"]).contents
+        definition = operation.definition.maybe_resolve(definition)
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
-            if "$ref" in link_definition:
-                link_definition = lookup(link_definition["$ref"]).contents  # type: ignore[attr-defined]
+            link_definition = operation.definition.maybe_resolve(link_definition)
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
@@ -284,8 +280,7 @@ def _get_response_by_status_code(responses: dict[StatusCode, dict[str, Any]], st
 
 
 def add_link(
-    resolver: Resolver,
-    responses: dict[StatusCode, dict[str, Any]],
+    source: OpenAPIOperation,
     links_field: str,
     parameters: dict[str, str] | None,
     request_body: Any,
@@ -293,9 +288,9 @@ def add_link(
     target: str | APIOperation,
     name: str | None = None,
 ) -> None:
+    responses = source.definition.value["responses"]
     response = _get_response_by_status_code(responses, status_code)
-    if "$ref" in response:
-        response = resolver.lookup(response["$ref"]).contents
+    response = source.definition.maybe_resolve(response)
     links_definition = response.setdefault(links_field, {})
     new_link: dict[str, str | dict[str, str]] = {}
     if parameters is not None:

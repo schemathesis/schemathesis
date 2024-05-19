@@ -404,11 +404,6 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = self._registry.resolver(base_uri=self.location or "")
         return self._resolver
 
-    def _maybe_resolve(self, item: dict[str, Any], resolver: Resolver | None = None) -> dict[str, Any]:
-        if "$ref" in item:
-            return (resolver or self.resolver).lookup(item["$ref"]).contents
-        return item
-
     def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
         raise NotImplementedError
@@ -550,13 +545,9 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
-            if "$ref" in responses[status_code]:
-                return operation.definition.resolver.lookup(responses[status_code]["$ref"]).contents
-            return responses[status_code]
+            return operation.definition.maybe_resolve(responses[status_code])
         if "default" in responses:
-            if "$ref" in responses["default"]:
-                return operation.definition.resolver.lookup(responses["default"]["$ref"]).contents
-            return responses["default"]
+            return operation.definition.maybe_resolve(responses["default"])
         return None
 
     def get_headers(self, operation: OpenAPIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
@@ -610,8 +601,7 @@ class BaseOpenAPISchema(BaseSchema):
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
         links.add_link(
-            resolver=self.resolver,
-            responses=self[source.path][source.method].definition.value["responses"],
+            source=source,
             links_field=self.links_field,
             parameters=parameters,
             request_body=request_body,
@@ -731,8 +721,11 @@ class OpenAPIOperationDefinition(OperationDefinition):
     value: dict[str, Any]
     resolver: Resolver
 
-    def maybe_resolve(self, item: dict[str, Any]) -> Any:
-        if "$ref" in item:
+    def maybe_resolve(self, item: dict[str, Any], unlimited: bool = False) -> Any:
+        if unlimited:
+            while "$ref" in item:
+                item = self.lookup(item["$ref"])
+        elif "$ref" in item:
             return self.lookup(item["$ref"])
         return item
 
@@ -843,6 +836,7 @@ class SwaggerV20(BaseOpenAPISchema):
         form_parameters = []
         for parameter in parameters:
             if "$ref" in parameter:
+                # TODO: use specific resolver for this operation
                 parameter = self.resolver.lookup(parameter["$ref"]).contents
             if parameter["in"] == "formData":
                 # We need to gather form parameters first before creating a composite parameter for them
@@ -1018,11 +1012,13 @@ class OpenApi30(SwaggerV20):
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
         collected: list[OpenAPIParameter] = []
         for parameter in parameters:
+            # TODO: use specific resolver for this operation
             if "$ref" in parameter:
                 parameter = self.resolver.lookup(parameter["$ref"]).contents
             collected.append(OpenAPI30Parameter(definition=parameter))
         if "requestBody" in definition:
             body = definition["requestBody"]
+            # TODO: use specific resolver for this operation
             while "$ref" in body:
                 body = self.resolver.lookup(body["$ref"]).contents
             required = body.get("required", False)
@@ -1059,7 +1055,7 @@ class OpenApi30(SwaggerV20):
         return serialization.serialize_openapi3_parameters(definitions)
 
     def get_request_payload_content_types(self, operation: OpenAPIOperation) -> list[str]:
-        request_body = self._resolve_until_no_references(operation.definition.value["requestBody"])
+        request_body = operation.definition.maybe_resolve(operation.definition.value["requestBody"], unlimited=True)
         return list(request_body["content"])
 
     def prepare_multipart(
@@ -1072,11 +1068,7 @@ class OpenApi30(SwaggerV20):
         :return: `files` and `data` values for `requests.request`.
         """
         files = []
-        definition = operation.definition.value
-        if "$ref" in definition["requestBody"]:
-            body = self.resolver.lookup(definition["requestBody"]["$ref"]).contents
-        else:
-            body = definition["requestBody"]
+        body = operation.definition.maybe_resolve(operation.definition.value["requestBody"], unlimited=True)
         content = body["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
@@ -1100,10 +1092,7 @@ class OpenApi30(SwaggerV20):
 
     def _get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
         if "requestBody" in definition.value:
-            if "$ref" in definition.value["requestBody"]:
-                body = self.resolver.lookup(definition.value["requestBody"]["$ref"]).contents
-            else:
-                body = definition.value["requestBody"]
+            body = definition.maybe_resolve(definition.value["requestBody"], unlimited=True)
             if "content" in body:
                 main, sub = parse_content_type(media_type)
                 for defined_media_type, item in body["content"].items():
