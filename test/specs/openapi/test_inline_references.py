@@ -482,9 +482,12 @@ def setup_schema(request, uri, scope, schema):
     ),
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
+    # TODO: Cleanup - remove unused variables
     components = fast_deepcopy(components)
+    if isinstance(schema, dict):
+        schema.update(components)
     uri, scope, schema = setup_schema(request, uri, scope, schema)
-    schema = inline_references(scope or uri, schema, components, DRAFT4)
+    schema = inline_references(scope or uri, schema, DRAFT4)
 
     # assert schema == expected
 

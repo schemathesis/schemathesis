@@ -667,16 +667,15 @@ class BaseOpenAPISchema(BaseSchema):
         references with local ones.
         """
         schema = fast_deepcopy(schema)
-        components = {}
         for path in self.component_locations:
             if path in self.raw_schema:
-                components[path] = fast_deepcopy(self.raw_schema[path])
+                schema[path] = fast_deepcopy(self.raw_schema[path])
 
         if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
             draft = DRAFT202012
         else:
             draft = DRAFT4
-        return inline_references(operation.definition.scope or self.location or "", schema, components, draft)
+        return inline_references(operation.definition.scope or self.location or "", schema, draft)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

@@ -259,7 +259,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(uri: str, schema: Schema, components: dict[str, Any], draft: Specification) -> Schema:
+def inline_references(uri: str, schema: Schema, draft: Specification) -> Schema:
     """Inline all non-local and recursive references in the given schema.
 
     This function performs three passes:
@@ -307,7 +307,6 @@ def inline_references(uri: str, schema: Schema, components: dict[str, Any], draf
         logger.debug("Unretrievable %s", ref)
         raise Unretrievable(ref)
 
-    schema = {**schema, **components}
     registry = Registry(retrieve=cached_retrieve).with_resource(uri, Resource(contents=schema, specification=draft))
 
     logger.debug("Inlining non-local references: %s", schema)
