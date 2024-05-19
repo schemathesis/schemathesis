@@ -731,6 +731,14 @@ class OpenAPIOperationDefinition(OperationDefinition):
     value: dict[str, Any]
     resolver: Resolver
 
+    def maybe_resolve(self, item: dict[str, Any]) -> Any:
+        if "$ref" in item:
+            return self.lookup(item["$ref"])
+        return item
+
+    def lookup(self, key: str) -> Any:
+        return self.resolver.lookup(key).contents
+
 
 OpenAPIOperation = APIOperation[OpenAPIParameter, Case, OpenAPIOperationDefinition]
 

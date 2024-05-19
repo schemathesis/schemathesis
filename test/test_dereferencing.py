@@ -540,7 +540,7 @@ def test_complex_dereference(complex_schema):
     assert operation.body[0].required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
-    assert operation.definition.raw == {
+    assert operation.definition.value == {
         "requestBody": {
             "content": {"application/json": body_definition},
             "description": "Test.",

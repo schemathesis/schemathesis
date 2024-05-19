@@ -334,7 +334,7 @@ def test_get_links_numeric_response_codes(status_code, openapi_30, expected):
     # When API definition contains response statuses as integers
     operation = openapi_30["/users"]["GET"]
     link_definition = {"operationRef": "#/paths/~1users/get"}
-    operation.definition.raw["responses"] = {
+    operation.definition.value["responses"] = {
         "200": {"description": "OK", "links": {"Foo": link_definition}},
         # Could be here due to YAML parsing + disabled schema validation
         201: {"description": "OK", "links": {"Bar": link_definition}},

@@ -1,6 +1,7 @@
 import json
 
 import pytest
+from referencing.exceptions import Unresolvable
 import requests
 from hypothesis import given, settings
 from hypothesis import strategies as st
@@ -10,7 +11,7 @@ from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi._jsonschema import resolve_pointer, UNRESOLVABLE
+from schemathesis.specs.openapi._jsonschema import resolve_pointer
 
 DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4, "i\\j": 5, 'k"l': 6, " ": 7, "m~n": 8}
 
@@ -146,14 +147,14 @@ def test_lexer(expr, expected):
     "pointer, expected",
     (
         ("", DOCUMENT),
-        ("abc", UNRESOLVABLE),
-        ("/foo/123", UNRESOLVABLE),
+        ("abc", Unresolvable("abc")),
+        ("/foo/123", Unresolvable("/foo/123")),
         ("/foo", ["bar", "baz"]),
         ("/foo/0", "bar"),
         ("/", 0),
         ("/a~1b", 1),
         ("/c%d", 2),
-        ("/c%d/foo", UNRESOLVABLE),
+        ("/c%d/foo", Unresolvable("/c%d/foo")),
         ("/e^f", 3),
         ("/g|h", 4),
         ("/i\\j", 5),

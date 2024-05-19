@@ -43,7 +43,7 @@ class Link(StatefulTest):
     @classmethod
     def from_definition(cls, name: str, definition: dict[str, dict[str, Any]], source_operation: APIOperation) -> Link:
         # Links can be behind a reference
-        definition = source_operation.definition.resolver.lookup(definition).contents  # type: ignore[attr-defined]
+        definition = source_operation.definition.maybe_resolve(definition)
         if "operationId" in definition:
             # source_operation.schema is `BaseOpenAPISchema` and has this method
             operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
