@@ -107,7 +107,7 @@ class BaseOpenAPISchema(BaseSchema):
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
     _override: CaseOverride | None = field(default=None)
-    component_locations: ClassVar[tuple[str, ...]] = ()
+    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
 
     @property
     def spec_version(self) -> str:
@@ -677,13 +677,24 @@ class BaseOpenAPISchema(BaseSchema):
         references with local ones.
         """
         schema = fast_deepcopy(schema)
+        components: dict[str, Any] = {}
         for path in self.component_locations:
-            if path in self.raw_schema:
-                schema[path] = fast_deepcopy(self.raw_schema[path])
+            source = self.raw_schema
+            target = components
+            for segment in path:
+                if segment in source:
+                    source = source[segment]
+                    target = target.setdefault(segment, {})
+                else:
+                    break
+            else:
+                target.update(fast_deepcopy(source))
+        schema.update(components)
+        # TODO: store `resolver` in operation instead of collecting the scope
         uri = operation.definition.scope or self.location or ""
         registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
         resolver = registry.resolver(base_uri=uri)
-        config = TransformConfig(nullable_key=self.nullable_name)
+        config = TransformConfig(nullable_key=self.nullable_name, component_names=list(components))
         return to_jsonschema(schema, resolver, config)
 
 
@@ -779,7 +790,7 @@ class SwaggerV20(BaseOpenAPISchema):
     examples_field = "x-examples"
     header_required_field = "x-required"
     security = SwaggerSecurityProcessor()
-    component_locations: ClassVar[tuple[str, ...]] = ("definitions",)
+    component_locations: ClassVar[tuple[tuple[str, ...], ...]] = (("definitions",),)
     links_field = "x-links"
 
     @property
@@ -957,7 +968,7 @@ class OpenApi30(SwaggerV20):
     examples_field = "examples"
     header_required_field = "required"
     security = OpenAPISecurityProcessor()
-    component_locations = ("components", "schemas")
+    component_locations = (("components", "schemas"),)
     links_field = "links"
 
     @property

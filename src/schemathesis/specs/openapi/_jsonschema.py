@@ -21,9 +21,6 @@ from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
 from .utils import get_type
 
-# Reference resolving will stop after this depth
-RECURSION_DEPTH_LIMIT = 100
-
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
     """Load a schema from the given file."""
@@ -225,6 +222,14 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     return target
 
 
+# TODO:
+#  - use caching for input schemas
+#  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
+#  - Raise custom error when the referenced value is invalid
+#  - Traverse only components that may have references (before passing here)
+#  - maybe drop "components" after transformation? all schemas will be there anyway.
+#    So, just pass schema + components, and then remove components
+
 logger = logging.getLogger(__name__)
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
@@ -242,26 +247,14 @@ class Resolver(Protocol):
     def lookup(self, ref: str) -> Resolved: ...
 
 
-# TODO:
-#  - use caching for input schemas
-#  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
-#  - Raise custom error when the referenced value is invalid
-#  - Traverse only components that may have references (before passing here)
-#  - maybe drop "components" after transformation? all schemas will be there anyway
-
-
-def retrieve_from_file(url: str) -> Any:
-    url = url.rstrip("/")
-    retrieved = load_file_impl(url, open)
-    logger.debug("Retrieved %s", url)
-    return retrieved
-
-
 @dataclass
 class TransformConfig:
     # The name of the keyword that represents nullable values
     # Usually `nullable` in Open API 3 and `x-nullable` in Open API 2
     nullable_key: str
+    # List of components that are added to the schema
+    component_names: list[str]
+    # Maximum depth of recursive schemas inlining
     max_recursion_depth: int = 5
 
 
@@ -308,33 +301,9 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
         # Trivial case - no extra processing needed, just remove the key
         logger.debug("No references inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
+    for name in config.component_names:
+        del schema[name]
     return schema
-
-
-def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
-    """Create a retriever for the given draft."""
-
-    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
-    def cached_retrieve(ref: str) -> Any:
-        """Resolve non-local reference."""
-        logger.debug("Retrieving %s", ref)
-        parsed = urlsplit(ref)
-        try:
-            if parsed.scheme == "":
-                return retrieve_from_file(ref)
-            if parsed.scheme == "file":
-                return retrieve_from_file(parsed.path)
-            if parsed.scheme in ("http", "https"):
-                retrieved = load_remote_uri(ref)
-                logger.debug("Retrieved %s", ref)
-                return retrieved
-        except Exception as exc:
-            logger.debug("Failed to retrieve %s: %s", ref, exc)
-            raise
-        logger.debug("Unretrievable %s", ref)
-        raise Unretrievable(ref)
-
-    return cached_retrieve
 
 
 def to_self_contained_jsonschema(
@@ -465,3 +434,36 @@ def _make_reference_key(reference: str) -> str:
     digest = sha1()
     digest.update(reference.encode("utf-8"))
     return digest.hexdigest()
+
+
+def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
+    """Create a retriever for the given draft."""
+
+    @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
+    def cached_retrieve(ref: str) -> Any:
+        """Resolve non-local reference."""
+        logger.debug("Retrieving %s", ref)
+        parsed = urlsplit(ref)
+        try:
+            if parsed.scheme == "":
+                return retrieve_from_file(ref)
+            if parsed.scheme == "file":
+                return retrieve_from_file(parsed.path)
+            if parsed.scheme in ("http", "https"):
+                retrieved = load_remote_uri(ref)
+                logger.debug("Retrieved %s", ref)
+                return retrieved
+        except Exception as exc:
+            logger.debug("Failed to retrieve %s: %s", ref, exc)
+            raise
+        logger.debug("Unretrievable %s", ref)
+        raise Unretrievable(ref)
+
+    return cached_retrieve
+
+
+def retrieve_from_file(url: str) -> Any:
+    url = url.rstrip("/")
+    retrieved = load_file_impl(url, open)
+    logger.debug("Retrieved %s", url)
+    return retrieved

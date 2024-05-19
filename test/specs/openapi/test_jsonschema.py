@@ -95,19 +95,7 @@ INNER_REF_WITH_NESTED_FILE_REF = {
     },
 }
 # Recursive references
-RECURSION_SCHEMA_ONE_HOP = {
-    "$ref": "#/definitions/SchemaA",
-    "definitions": {
-        "SchemaA": {
-            "type": "object",
-            "properties": {
-                "value": {"type": "integer"},
-                # Points back to itself
-                "recursive": {"$ref": "#/definitions/SchemaA"},
-            },
-        }
-    },
-}
+RECURSION_SCHEMA_ONE_HOP = {"$ref": "#/definitions/SchemaA"}
 
 
 @pytest.fixture(scope="module")
@@ -184,7 +172,6 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
-                "components": {"schemas": {"Example": {"type": "integer"}}},
                 "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
@@ -322,8 +309,8 @@ def setup_schema(request, uri, scope, schema):
             FILE_REF_WITH_SCHEME_NO_NESTING,
             {},
             {
-                "$ref": "#/x-inlined-references/c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6",
-                "x-inlined-references": {"c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6": {"type": "integer"}},
+                "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
+                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
             },
         ),
         (
@@ -428,8 +415,9 @@ def setup_schema(request, uri, scope, schema):
             INNER_REF,
             {},
             {
-                "properties": {"example": {"$ref": "#/definitions/Example"}},
-                "definitions": {"Example": TARGET},
+                "properties": {"example": {"$ref": "#/x-inlined-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
+                "definitions": {"Example": {"type": "integer"}},
+                "x-inlined-references": {"8c3ff8eb23370337fe1f4d50625776ca412cf3ce": {"type": "integer"}},
             },
         ),
         (
@@ -438,17 +426,47 @@ def setup_schema(request, uri, scope, schema):
             INNER_REF_WITH_NESTED_FILE_REF,
             {},
             {
-                "properties": {"example": {"$ref": "#/definitions/Example"}},
+                "properties": {"example": {"$ref": "#/x-inlined-references/8c3ff8eb23370337fe1f4d50625776ca412cf3ce"}},
                 "definitions": {"Example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
-                "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
+                "x-inlined-references": {
+                    "8c3ff8eb23370337fe1f4d50625776ca412cf3ce": {
+                        "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"
+                    },
+                    "77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"},
+                },
             },
         ),
         (
             DEFAULT_URI,
             "",
             RECURSION_SCHEMA_ONE_HOP,
-            {},
-            {},
+            {
+                "definitions": {
+                    "SchemaA": {
+                        "type": "object",
+                        "properties": {
+                            "value": {"type": "integer"},
+                            # Points back to itself
+                            "recursive": {"$ref": "#/definitions/SchemaA"},
+                        },
+                    }
+                },
+            },
+            {
+                "$ref": "#/x-inlined-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
+                "x-inlined-references": {
+                    "eebcedb296ce3a3a3e7ac8c3938de062de9ea618": {
+                        "type": "object",
+                        "properties": {
+                            "value": {"type": "integer"},
+                            "recursive": {
+                                "type": "object",
+                                "properties": {"value": {"type": "integer"}, "recursive": {}},
+                            },
+                        },
+                    }
+                },
+            },
         ),
         (
             DEFAULT_URI,
@@ -485,18 +503,19 @@ def setup_schema(request, uri, scope, schema):
     ),
 )
 def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
+    schema = fast_deepcopy(schema)
     components = fast_deepcopy(components)
     if isinstance(schema, dict):
         schema.update(components)
+
     uri, scope, schema = setup_schema(request, uri, scope, schema)
     uri = scope or uri
     retrieve = get_remote_schema_retriever(DRAFT4)
     registry = Registry(retrieve=retrieve).with_resource(uri, Resource(contents=schema, specification=DRAFT4))
     resolver = registry.resolver(base_uri=uri)
-    config = TransformConfig(nullable_key="nullable")
+    config = TransformConfig(nullable_key="nullable", component_names=list(components))
     schema = to_jsonschema(schema, resolver, config)
-
-    # assert schema == expected
+    assert schema == expected
 
     # Hypothesis-jsonschema should be able to generate data for the inlined schema
 
