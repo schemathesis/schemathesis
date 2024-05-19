@@ -972,7 +972,7 @@ class SwaggerV20(BaseOpenAPISchema):
             consumes = global_consumes
         return consumes
 
-    def _get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
+    def get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
         for parameter in definition.value.get("parameters", []):
             if parameter["in"] == "body":
                 return parameter["schema"]
@@ -1096,7 +1096,7 @@ class OpenApi30(SwaggerV20):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
 
-    def _get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
+    def get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
         if "requestBody" in definition.value:
             body = definition.maybe_resolve(definition.value["requestBody"], unlimited=True)
             if "content" in body:

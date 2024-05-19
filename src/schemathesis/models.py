@@ -759,8 +759,8 @@ class APIOperation(Generic[P, C, D]):
         except CheckFailed:
             return False
 
-    def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:
-        return self.schema._get_payload_schema(self.definition, media_type)
+    def get_payload_schema(self, media_type: str) -> dict[str, Any] | None:
+        return self.schema.get_payload_schema(self.definition, media_type)
 
 
 # backward-compatibility

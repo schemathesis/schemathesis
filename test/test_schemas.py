@@ -239,13 +239,12 @@ def test_missing_payload_schema(request, fixture, path):
     raw_schema = request.getfixturevalue(fixture)
     schema = schemathesis.from_dict(raw_schema)
     operation = schema[path]["GET"]
-    assert operation.get_raw_payload_schema("application/xml") is None
-    assert operation.get_resolved_payload_schema("application/xml") is None
+    assert operation.get_payload_schema("application/xml") is None
 
 
 def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
     schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
-    assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
+    assert schema["/yaml"]["POST"].get_payload_schema("application/xml") is None
 
 
 def test_ssl_error(openapi3_schema_url, server):

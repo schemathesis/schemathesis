@@ -9,7 +9,6 @@ from typing import (
     Any,
     Callable,
     Collection,
-    Dict,
     Generator,
     Protocol,
     cast,
@@ -57,15 +56,6 @@ class SerializerContext:
     def media_type(self) -> str:
         # `media_type` is a string, otherwise we won't serialize anything
         return cast(str, self.case.media_type)
-
-    # Note on type casting below.
-    # If we serialize data, then there should be non-empty definition for it in the first place
-    # Therefore `schema` is never `None` if called from here. However, `APIOperation.get_raw_payload_schema` is
-    # generic and can be called from other places where it may return `None`
-
-    def get_raw_payload_schema(self) -> dict[str, Any]:
-        schema = self.case.operation.get_raw_payload_schema(self.media_type)
-        return cast(Dict[str, Any], schema)
 
 
 @runtime_checkable
@@ -181,10 +171,10 @@ class YAMLSerializer:
 @register("application/xml", aliases=("text/xml",))
 class XMLSerializer:
     def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-        return _to_xml(value, context.get_raw_payload_schema())
+        return _to_xml(value, context.case.operation, context.media_type)
 
     def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-        return _to_xml(value, context.get_raw_payload_schema())
+        return _to_xml(value, context.case.operation, context.media_type)
 
 
 def _should_coerce_to_bytes(item: Any) -> bool:
