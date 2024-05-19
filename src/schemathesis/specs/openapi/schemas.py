@@ -24,9 +24,9 @@ from typing import (
 from urllib.parse import urlsplit
 
 import jsonschema
-from referencing import Registry, Specification, Resource
 from hypothesis.strategies import SearchStrategy
 from packaging import version
+from referencing import Registry, Resource, Specification
 from referencing.jsonschema import DRAFT4, DRAFT202012
 from requests.structures import CaseInsensitiveDict
 
@@ -60,6 +60,14 @@ from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, Path
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
+from ._jsonschema import (
+    ConvertingResolver,
+    InliningResolver,
+    TransformConfig,
+    Resolver,
+    get_remote_schema_retriever,
+    to_jsonschema,
+)
 from .converter import to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
@@ -77,13 +85,6 @@ from .parameters import (
     OpenAPI30Body,
     OpenAPI30Parameter,
     OpenAPIParameter,
-)
-from ._jsonschema import (
-    ConvertingResolver,
-    InliningResolver,
-    get_remote_schema_retriever,
-    TransformConfig,
-    to_jsonschema,
 )
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -397,8 +398,16 @@ class BaseOpenAPISchema(BaseSchema):
     def _registry(self) -> Registry:
         if not hasattr(self, "_registry_cache"):
             retrieve = get_remote_schema_retriever(self._draft)
-            self._registry_cache = Registry(retrieve=retrieve)
+            self._registry_cache = Registry(retrieve=retrieve).with_resource(
+                self.location or "", Resource(contents=self.raw_schema, specification=self._draft)
+            )
         return self._registry_cache
+
+    @property
+    def resolver2(self) -> Resolver:
+        if not hasattr(self, "_resolver2"):
+            self._resolver2 = self._registry.resolver(base_uri=self.location or "")
+        return self._resolver2
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
@@ -828,6 +837,8 @@ class SwaggerV20(BaseOpenAPISchema):
 
         form_parameters = []
         for parameter in parameters:
+            if "$ref" in parameter:
+                parameter = self.resolver2.lookup(parameter["$ref"]).contents
             if parameter["in"] == "formData":
                 # We need to gather form parameters first before creating a composite parameter for them
                 form_parameters.append(parameter)
@@ -999,7 +1010,11 @@ class OpenApi30(SwaggerV20):
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
     ) -> list[OpenAPIParameter]:
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
-        collected: list[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
+        collected: list[OpenAPIParameter] = []
+        for parameter in parameters:
+            if "$ref" in parameter:
+                parameter = self.resolver2.lookup(parameter["$ref"]).contents
+            collected.append(OpenAPI30Parameter(definition=parameter))
         if "requestBody" in definition:
             body = definition["requestBody"]
             while "$ref" in body:
