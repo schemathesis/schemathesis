@@ -78,11 +78,12 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import (
+from ._jsonschema import (
     ConvertingResolver,
     InliningResolver,
-    get_retriever,
-    inline_references,
+    get_remote_schema_retriever,
+    TransformConfig,
+    to_jsonschema,
 )
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
@@ -395,7 +396,7 @@ class BaseOpenAPISchema(BaseSchema):
     @property
     def _registry(self) -> Registry:
         if not hasattr(self, "_registry_cache"):
-            retrieve = get_retriever(self._draft)
+            retrieve = get_remote_schema_retriever(self._draft)
             self._registry_cache = Registry(retrieve=retrieve)
         return self._registry_cache
 
@@ -682,7 +683,8 @@ class BaseOpenAPISchema(BaseSchema):
         uri = operation.definition.scope or self.location or ""
         registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
         resolver = registry.resolver(base_uri=uri)
-        return inline_references(schema, resolver)
+        config = TransformConfig(nullable_key=self.nullable_name)
+        return to_jsonschema(schema, resolver, config)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

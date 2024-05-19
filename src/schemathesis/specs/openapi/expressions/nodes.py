@@ -7,7 +7,7 @@ from typing import Any
 
 from requests.structures import CaseInsensitiveDict
 
-from .. import references
+from .._jsonschema import resolve_pointer
 from .context import ExpressionContext
 
 
@@ -96,7 +96,7 @@ class BodyRequest(Node):
         document = context.case.body
         if self.pointer is None:
             return document
-        return references.resolve_pointer(document, self.pointer[1:])
+        return resolve_pointer(document, self.pointer[1:])
 
 
 @dataclass
@@ -125,4 +125,4 @@ class BodyResponse(Node):
         if self.pointer is None:
             # We need the parsed document - data will be serialized before sending to the application
             return document
-        return references.resolve_pointer(document, self.pointer[1:])
+        return resolve_pointer(document, self.pointer[1:])

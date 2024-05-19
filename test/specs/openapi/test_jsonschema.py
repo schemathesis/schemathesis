@@ -9,7 +9,11 @@ from referencing.jsonschema import DRAFT4
 from referencing import Registry, Resource
 
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.specs.openapi.references import get_retriever, inline_references
+from schemathesis.specs.openapi._jsonschema import (
+    get_remote_schema_retriever,
+    to_jsonschema,
+    TransformConfig,
+)
 
 REMOTE_PLACEHOLDER = "http://example.com"
 DEFAULT_URI = ""
@@ -180,6 +184,7 @@ def setup_schema(request, uri, scope, schema):
             },
             {
                 "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
+                "components": {"schemas": {"Example": {"type": "integer"}}},
                 "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
             },
         ),
@@ -445,6 +450,13 @@ def setup_schema(request, uri, scope, schema):
             {},
             {},
         ),
+        (
+            DEFAULT_URI,
+            "",
+            {"type": "integer", "nullable": True},
+            {},
+            {},
+        ),
     ),
     ids=(
         "boolean",
@@ -469,18 +481,20 @@ def setup_schema(request, uri, scope, schema):
         "inner-ref",
         "inner-ref-with-nested-file-ref",
         "recursive-one-hop",
+        "with-nullable",
     ),
 )
-def test_inline_references_valid(request, uri, scope, schema, components, expected):
+def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
     components = fast_deepcopy(components)
     if isinstance(schema, dict):
         schema.update(components)
     uri, scope, schema = setup_schema(request, uri, scope, schema)
     uri = scope or uri
-    retrieve = get_retriever(DRAFT4)
+    retrieve = get_remote_schema_retriever(DRAFT4)
     registry = Registry(retrieve=retrieve).with_resource(uri, Resource(contents=schema, specification=DRAFT4))
     resolver = registry.resolver(base_uri=uri)
-    schema = inline_references(schema, resolver)
+    config = TransformConfig(nullable_key="nullable")
+    schema = to_jsonschema(schema, resolver, config)
 
     # assert schema == expected
 

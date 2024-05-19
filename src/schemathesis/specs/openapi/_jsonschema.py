@@ -225,11 +225,9 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
     return target
 
 
-# logging.basicConfig(level=logging.DEBUG, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
-MAX_RECURSION_DEPTH = 5
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 ReferencedSchemas = Dict[str, ObjectSchema]
@@ -249,6 +247,7 @@ class Resolver(Protocol):
 #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
 #  - Raise custom error when the referenced value is invalid
 #  - Traverse only components that may have references (before passing here)
+#  - maybe drop "components" after transformation? all schemas will be there anyway
 
 
 def retrieve_from_file(url: str) -> Any:
@@ -258,42 +257,52 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(schema: Schema, resolver: Resolver) -> Schema:
-    """Inline all non-local and recursive references in the given schema.
+@dataclass
+class TransformConfig:
+    # The name of the keyword that represents nullable values
+    # Usually `nullable` in Open API 3 and `x-nullable` in Open API 2
+    nullable_key: str
+    max_recursion_depth: int = 5
 
-    This function performs three passes:
 
-    1. Inline all non-local references. Each external reference is resolved and the referenced data is stored
-       in the root of the schema under a special key. The reference itself is modified so it points to the locally
-       stored data. The stored data may contain its own references, therefore this routine is repeated until there
-       are no more references to process.
+def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -> Schema:
+    """Transform the given schema to a JSON Schema.
 
-    2. Find all recursive references. At this point, schema is self-contained, meaning it has no external references.
-       This step traverses the schema and finds all references whose resolution would lead to themselves immediately,
-       or through a chain of references.
+    The resulting schema is compatible with `hypothesis-jsonschema`, specifically it will contain
+    only local, non-recursive references.
 
-    3. Limited inlining of recursive references. The input schema is a tree and this step traverses it and if it finds
-       a recursive reference (as detected in the previous step), it merges the referenced data into the place of the
-       reference. To avoid infinite recursion, this process is limited by `MAX_RECURSION_DEPTH` iterations.
-       At the last iteration, the reference is not inlined, but instead it is removed from the parent schema in a way
-       so the parent schema remains valid. It includes removing optional parts of the schema that contain
-       this reference. The only exception is when the schema describes infinitely recursive data, in which case an
-       error is raised.
+    This function does the following:
 
-    NOTE: Recursive references are inlined up to `MAX_RECURSION_DEPTH` levels because `hypothesis-jsonschema` does not yet
-    support generating recursive data.
+    1. Inlining of non-local references:
+       - Resolve all non-local references in the schema.
+       - Store the referenced data in the root of the schema under the key "x-inlined-references".
+       - Modify the references to point to the locally stored data.
+       - Repeat this process until all external references are resolved.
+
+    2. Detection of recursive references:
+       - Collect all references that lead to themselves, either directly or through a chain of references.
+
+    3. Limited inlining of recursive references:
+       - Inline recursive references are up to a maximum depth of `MAX_RECURSION_DEPTH`.
+       - At each level, merge the referenced data into the place of the reference.
+       - If the maximum recursion depth is reached, remove the reference from the parent schema
+         in a way that maintains its validity.
+       - Raise an error if the schema describes infinitely recursive data.
+
+    4. Transformation of Open API specific keywords:
+       - Transform Open API specific keywords, such as `nullable`, are to their JSON Schema equivalents.
     """
     if isinstance(schema, bool):
         return schema
 
     logger.debug("Inlining non-local references: %s", schema)
-    referenced_schemas = collect_referenced_schemas(schema, resolver)
+    referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schemas:
         # Check for recursive references
         references = find_recursive_references(referenced_schemas)
         logger.debug("Found %s recursive references", len(references))
-        inline_recursive_references(referenced_schemas, referenced_schemas, references)
+        inline_recursive_references(referenced_schemas, referenced_schemas, references, config)
         logger.debug("Inlined schema: %s", schema)
     else:
         # Trivial case - no extra processing needed, just remove the key
@@ -302,7 +311,7 @@ def inline_references(schema: Schema, resolver: Resolver) -> Schema:
     return schema
 
 
-def get_retriever(draft: Specification) -> Callable[[str], Resource]:
+def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
     """Create a retriever for the given draft."""
 
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
@@ -328,15 +337,20 @@ def get_retriever(draft: Specification) -> Callable[[str], Resource]:
     return cached_retrieve
 
 
-def collect_referenced_schemas(schema: ObjectSchema, resolver: Resolver) -> ReferencedSchemas:
+def to_self_contained_jsonschema(
+    schema: ObjectSchema, resolver: Resolver, config: TransformConfig
+) -> ReferencedSchemas:
     referenced_schemas: ReferencedSchemas = {}
     schema[INLINED_REFERENCE_ROOT_KEY] = referenced_schemas
-    _collect_referenced_schemas(schema, referenced_schemas, resolver)
+    _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config)
     return referenced_schemas
 
 
-def _collect_referenced_schemas(
-    item: ObjectSchema | list[ObjectSchema], referenced_schemas: ReferencedSchemas, resolver: Resolver
+def _to_self_contained_jsonschema(
+    item: ObjectSchema | list[ObjectSchema],
+    referenced_schemas: ReferencedSchemas,
+    resolver: Resolver,
+    config: TransformConfig,
 ) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
@@ -345,15 +359,15 @@ def _collect_referenced_schemas(
             resolved = move_referenced_data(item, ref, referenced_schemas, resolver)
             if resolved is not None:
                 item, resolver = resolved
-                _collect_referenced_schemas(item, referenced_schemas, resolver)
+                _to_self_contained_jsonschema(item, referenced_schemas, resolver, config)
         else:
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
-                    _collect_referenced_schemas(sub_item, referenced_schemas, resolver)
+                    _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
     elif isinstance(item, list):
         for sub_item in item:
             if sub_item and isinstance(sub_item, (dict, list)):
-                _collect_referenced_schemas(sub_item, referenced_schemas, resolver)
+                _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
 
 
 def move_referenced_data(
@@ -416,6 +430,7 @@ def inline_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: ReferencedSchemas,
     references: set[str],
+    config: TransformConfig,
     path: tuple[str, ...] = (),
 ) -> None:
     """Inline all recursive references in the given item."""
@@ -425,23 +440,23 @@ def inline_recursive_references(
             subtree_path = path + (ref,)
             referenced_item = referenced_schemas[ref.split("/")[-1]]
             if ref in references:
-                if path.count(ref) < MAX_RECURSION_DEPTH:
+                if path.count(ref) < config.max_recursion_depth:
                     logger.debug("Inlining recursive reference: %s", ref)
                     item.clear()
                     item.update(fast_deepcopy(referenced_item))
-                    inline_recursive_references(item, referenced_schemas, references, subtree_path)
+                    inline_recursive_references(item, referenced_schemas, references, config, subtree_path)
                 else:
                     logger.debug("Max recursion depth reached for %s at %s", ref, path)
             else:
-                inline_recursive_references(referenced_item, referenced_schemas, references, subtree_path)
+                inline_recursive_references(referenced_item, referenced_schemas, references, config, subtree_path)
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
-                    inline_recursive_references(value, referenced_schemas, references, path)
+                    inline_recursive_references(value, referenced_schemas, references, config, path)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                inline_recursive_references(sub_item, referenced_schemas, references, path)
+                inline_recursive_references(sub_item, referenced_schemas, references, config, path)
 
 
 def _make_reference_key(reference: str) -> str:
