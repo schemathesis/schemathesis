@@ -354,8 +354,11 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
     # In Open API 3.0, there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
         schema = data["schema"]
+        resolver = operation.definition.resolver
         while "$ref" in schema:
-            schema = operation.definition.lookup(schema["$ref"])
+            resolved = resolver.lookup(schema["$ref"])
+            resolver = resolved.resolver
+            schema = resolved.contents
             if not isinstance(schema, dict):
                 raise OperationSchemaError(
                     INVALID_SCHEMA_MESSAGE.format(

@@ -72,20 +72,7 @@ def test_resolving_multiple_files():
     assert isinstance(body, OpenAPI20Body)
     assert body.media_type == "application/json"
     assert body.definition == {
-        "schema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "format": "int64"},
-                "username": {"type": "string"},
-                "firstName": {"type": "string"},
-                "lastName": {"type": "string"},
-                "email": {"type": "string"},
-                "password": {"type": "string"},
-                "phone": {"type": "string"},
-                "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
-            },
-            "xml": {"name": "User"},
-        },
+        "schema": {"$ref": "test/data/petstore_v2.yaml#/definitions/User"},
         "in": "body",
         "name": "user",
         "required": True,
