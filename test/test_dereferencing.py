@@ -658,7 +658,7 @@ def test_unresolvable_reference_during_generation(empty_open_api_3_schema, testd
     "key, expected",
     (
         ("Key7", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
-        ("Key8", "Unresolvable JSON pointer: 'components/schemas/Key8'"),
+        ("Key8", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
     ),
 )
 def test_uncommon_type_in_generation(empty_open_api_3_schema, testdir, key, expected):

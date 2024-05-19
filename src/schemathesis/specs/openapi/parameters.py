@@ -353,16 +353,19 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
     """Extract `schema` from Open API 3.0 `Parameter`."""
     # In Open API 3.0, there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
-        if not isinstance(data["schema"], dict):
-            raise OperationSchemaError(
-                INVALID_SCHEMA_MESSAGE.format(
-                    location=data.get("in", ""), name=data.get("name", "<UNKNOWN>"), schema=data["schema"]
-                ),
-                path=operation.path,
-                method=operation.method,
-                full_path=operation.full_path,
-            )
-        return data["schema"]
+        schema = data["schema"]
+        while "$ref" in schema:
+            schema = operation.definition.lookup(schema["$ref"])
+            if not isinstance(schema, dict):
+                raise OperationSchemaError(
+                    INVALID_SCHEMA_MESSAGE.format(
+                        location=data.get("in", ""), name=data.get("name", "<UNKNOWN>"), schema=schema
+                    ),
+                    path=operation.path,
+                    method=operation.method,
+                    full_path=operation.full_path,
+                )
+        return schema
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
     # > The map MUST only contain one entry.
     try:

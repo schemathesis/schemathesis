@@ -27,7 +27,7 @@ import jsonschema
 from hypothesis.strategies import SearchStrategy
 from packaging import version
 from referencing import Registry, Resource, Specification
-from referencing.exceptions import Unresolvable
+from referencing.exceptions import PointerToNowhere, Unresolvable
 from referencing.jsonschema import DRAFT4, DRAFT202012
 from requests.structures import CaseInsensitiveDict
 
@@ -93,7 +93,7 @@ if TYPE_CHECKING:
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 # TODO: Extend with reference resolution errors
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError)
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, PointerToNowhere)
 
 
 @dataclass(eq=False, repr=False)
@@ -279,30 +279,36 @@ class BaseOpenAPISchema(BaseSchema):
         hooks = self.hooks
         for path, path_item in paths.items():
             method = None
-            full_path = get_full_path(path)  # Should be available for later use
-            # TODO: get back the error handling
-            if should_skip_endpoint(full_path, endpoint):
-                continue
-            dispatch_hook("before_process_path", context, path, path_item)
-            resolver, path_item = resolve_path_item(path_item)
-            shared_parameters = path_item.get("parameters", ())
-            for method, entry in path_item.items():
-                if method not in HTTP_METHODS:
+            try:
+                full_path = get_full_path(path)  # Should be available for later use
+                # TODO: get back the error handling
+                if should_skip_endpoint(full_path, endpoint):
                     continue
-                # TODO: some resolving might be needed
-                if should_skip(method, entry):
-                    continue
-                parameters = entry.get("parameters", ())
-                parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
-                operation = make_operation(path, method, parameters, entry, resolver)
-                context = HookContext(operation=operation)
-                if (
-                    should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
-                    or should_skip_operation(hooks, context)
-                    or (hooks and should_skip_operation(hooks, context))
-                ):
-                    continue
-                yield Ok(operation)
+                dispatch_hook("before_process_path", context, path, path_item)
+                resolver, path_item = resolve_path_item(path_item)
+                shared_parameters = path_item.get("parameters", ())
+                for method, entry in path_item.items():
+                    if method not in HTTP_METHODS:
+                        continue
+                    try:
+                        # TODO: some resolving might be needed
+                        if should_skip(method, entry):
+                            continue
+                        parameters = entry.get("parameters", ())
+                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), entry)
+                        operation = make_operation(path, method, parameters, entry, resolver)
+                        context = HookContext(operation=operation)
+                        if (
+                            should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
+                            or should_skip_operation(hooks, context)
+                            or (hooks and should_skip_operation(hooks, context))
+                        ):
+                            continue
+                        yield Ok(operation)
+                    except SCHEMA_PARSING_ERRORS as exc:
+                        yield self._into_err(exc, path, method)
+            except SCHEMA_PARSING_ERRORS as exc:
+                yield self._into_err(exc, path, method)
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[OperationSchemaError]:
         __tracebackhide__ = True
