@@ -403,7 +403,6 @@ def test_serializing_shared_header_parameters():
 
     @given(schema["/data"]["GET"].as_strategy())
     def test(case):
-        print(case)
         assert is_valid_header(case.headers)
 
     test()

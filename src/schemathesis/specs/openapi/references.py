@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha1
 from typing import Any, Callable, Dict, MutableMapping, Protocol, Union
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 import jsonschema
@@ -249,7 +249,6 @@ class Resolver(Protocol):
 #  - use caching for input schemas
 #  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
 #  - Raise custom error when the referenced value is invalid
-#  - What if scope is not needed? I.e. we can just use uri of the resource and then all relative refs will be properly handled. Check how it works with local refs
 #  - Traverse only components that may have references (before passing here)
 
 
@@ -260,7 +259,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(uri: str, scope: str, schema: Schema, components: dict[str, Any], draft: Specification) -> Schema:
+def inline_references(uri: str, schema: Schema, components: dict[str, Any], draft: Specification) -> Schema:
     """Inline all non-local and recursive references in the given schema.
 
     This function performs three passes:
@@ -292,23 +291,12 @@ def inline_references(uri: str, scope: str, schema: Schema, components: dict[str
     def cached_retrieve(ref: str) -> Any:
         """Resolve non-local reference."""
         logger.debug("Retrieving %s", ref)
-
-        if scope:
-            base = scope
-        else:
-            base = uri
-
         parsed = urlsplit(ref)
         try:
             if parsed.scheme == "":
-                url = urljoin(base, ref)
-                parsed = urlsplit(url)
-                if parsed.scheme == "file":
-                    url = parsed.path
-                return retrieve_from_file(url)
+                return retrieve_from_file(ref)
             if parsed.scheme == "file":
-                url = urljoin(base, parsed.netloc)
-                return retrieve_from_file(url)
+                return retrieve_from_file(parsed.path)
             if parsed.scheme in ("http", "https"):
                 retrieved = load_remote_uri(ref)
                 logger.debug("Retrieved %s", ref)
@@ -319,15 +307,11 @@ def inline_references(uri: str, scope: str, schema: Schema, components: dict[str
         logger.debug("Unretrievable %s", ref)
         raise Unretrievable(ref)
 
-    registry = Registry(retrieve=cached_retrieve).with_resources(
-        [
-            ("", Resource(contents=components, specification=draft)),
-            (SELF_URN, Resource(contents=schema, specification=draft)),
-        ]
-    )
+    schema = {**schema, **components}
+    registry = Registry(retrieve=cached_retrieve).with_resource(uri, Resource(contents=schema, specification=draft))
 
     logger.debug("Inlining non-local references: %s", schema)
-    referenced_schemas = collect_referenced_schemas(schema, registry.resolver())
+    referenced_schemas = collect_referenced_schemas(schema, registry.resolver(base_uri=uri))
 
     if referenced_schemas:
         # Check for recursive references
@@ -376,30 +360,17 @@ def move_referenced_data(
     if ref.startswith(INLINED_REFERENCE_PREFIX):
         logger.debug("Already inlined %s", ref)
         return None
+    if ref.startswith("file://"):
+        ref = ref[7:]
     logger.debug("Resolving %s", ref)
-    try:
-        resolved = resolver.lookup(ref)
-        # Copy the data as it might be mutated
-        contents = fast_deepcopy(resolved.contents)
-        key = _make_reference_key(ref)
-        referenced_schemas[key] = contents
-        new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-        item["$ref"] = new_ref
-        logger.debug("Inlined reference: %s -> %s", ref, new_ref)
-    except PointerToNowhere as exc:
-        try:
-            resolved = resolver.lookup(f"{SELF_URN}{ref}")
-            contents = resolved.contents
-            key = _make_reference_key(ref)
-            referenced_schemas[key] = contents
-            new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
-            item["$ref"] = new_ref
-            logger.debug("Keep local reference: %s", ref)
-        except PointerToNowhere:
-            logger.debug("Failed to resolve %s: %s", ref, exc)
-            raise exc from None
-    logger.debug("Resolved %s -> %s", ref, contents)
-    return contents, resolved.resolver
+    resolved = resolver.lookup(ref)
+    key = _make_reference_key(ref)
+    referenced_schemas[key] = resolved.contents
+    new_ref = f"{INLINED_REFERENCE_PREFIX}/{key}"
+    item["$ref"] = new_ref
+    logger.debug("Inlined reference: %s -> %s", ref, new_ref)
+    logger.debug("Resolved %s -> %s", ref, resolved.contents)
+    return resolved.contents, resolved.resolver
 
 
 def find_recursive_references(schema_storage: ReferencedSchemas) -> set[str]:

@@ -197,7 +197,13 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_REF_NESTED_IN_OBJECT,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                    },
+                },
+            },
             {
                 "properties": {"example": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}},
                 "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
@@ -207,7 +213,14 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_NESTED_REF_NESTED_IN_OBJECT,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                        "Nested": TARGET_LOCAL_REF,
+                    },
+                },
+            },
             {
                 "properties": {"example": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"}},
                 "x-inlined-references": {
@@ -222,7 +235,14 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_REF_NESTED_IN_OBJECT_MULTIPLE,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                        "Nested": TARGET_LOCAL_REF,
+                    },
+                },
+            },
             {
                 "properties": {
                     "example-1": {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
@@ -235,7 +255,14 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                        "Nested": TARGET_LOCAL_REF,
+                    },
+                },
+            },
             {
                 "properties": {
                     "example-1": {"$ref": "#/x-inlined-references/58d4bb06ad165cda74c28d601b154ace1019890c"},
@@ -253,7 +280,13 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_REF_NESTED_IN_ARRAY,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                    },
+                },
+            },
             {
                 "allOf": [{"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"}],
                 "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
@@ -263,7 +296,13 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                    },
+                },
+            },
             {
                 "allOf": [
                     {"$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795"},
@@ -286,7 +325,7 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_REF_WITH_SCHEME_NO_NESTING,
-            COMPONENTS,
+            {},
             {
                 "$ref": "#/x-inlined-references/c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6",
                 "x-inlined-references": {"c8fc5743d39fda5bb10fc6c66c9cadfd2ccf8bf6": {"type": "integer"}},
@@ -296,7 +335,7 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_REF_NESTED_IN_OBJECT,
-            COMPONENTS,
+            {},
             {
                 "properties": {"example": {"$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719"}},
                 "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
@@ -306,7 +345,13 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_NESTED_FILE_REF_NESTED_IN_OBJECT,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Nested-File": TARGET_FILE_REF,
+                    },
+                },
+            },
             {
                 "properties": {"example": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"}},
                 "x-inlined-references": {
@@ -321,7 +366,13 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_NESTED_FILE_REF_IN_OBJECT_MULTIPLE,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Nested-File": TARGET_FILE_REF,
+                    },
+                },
+            },
             {
                 "properties": {
                     "example-1": {"$ref": "#/x-inlined-references/685e4330057cf6ab44313ea387bdf57a2416782a"},
@@ -349,7 +400,7 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             NESTED_SCOPE,
             FILE_SCOPED_REF,
-            COMPONENTS,
+            {},
             {
                 "properties": {"nested-2": {"$ref": "#/x-inlined-references/6c00c9b97a929ead696fd076eb0f208b33ee9583"}},
                 "x-inlined-references": {"6c00c9b97a929ead696fd076eb0f208b33ee9583": {"type": "integer"}},
@@ -366,14 +417,14 @@ def setup_schema(request, uri, scope, schema):
             REMOTE_URI,
             "",
             REMOTE_REF_NESTED_IN_OBJECT,
-            COMPONENTS,
+            {},
             ANY,
         ),
         (
             REMOTE_URI,
             "",
             REMOTE_REF_NESTED_IN_OBJECT_MULTIPLE,
-            COMPONENTS,
+            {},
             ANY,
         ),
         (
@@ -431,8 +482,9 @@ def setup_schema(request, uri, scope, schema):
     ),
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
+    components = fast_deepcopy(components)
     uri, scope, schema = setup_schema(request, uri, scope, schema)
-    schema = inline_references(uri, scope, schema, components, DRAFT4)
+    schema = inline_references(scope or uri, schema, components, DRAFT4)
 
     # assert schema == expected
 

@@ -676,7 +676,7 @@ class BaseOpenAPISchema(BaseSchema):
             draft = DRAFT202012
         else:
             draft = DRAFT4
-        return inline_references(self.location or "", operation.definition.scope, schema, components, draft)
+        return inline_references(operation.definition.scope or self.location or "", schema, components, draft)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
