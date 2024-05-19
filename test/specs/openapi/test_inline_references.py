@@ -6,9 +6,10 @@ from hypothesis import HealthCheck, Phase, Verbosity, given, settings
 from hypothesis_jsonschema import from_schema
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
 from referencing.jsonschema import DRAFT4
+from referencing import Registry, Resource
 
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.specs.openapi.references import inline_references
+from schemathesis.specs.openapi.references import get_retriever, inline_references
 
 REMOTE_PLACEHOLDER = "http://example.com"
 DEFAULT_URI = ""
@@ -487,7 +488,11 @@ def test_inline_references_valid(request, uri, scope, schema, components, expect
     if isinstance(schema, dict):
         schema.update(components)
     uri, scope, schema = setup_schema(request, uri, scope, schema)
-    schema = inline_references(scope or uri, schema, DRAFT4)
+    uri = scope or uri
+    retrieve = get_retriever(DRAFT4)
+    registry = Registry(retrieve=retrieve).with_resource(uri, Resource(contents=schema, specification=DRAFT4))
+    resolver = registry.resolver(base_uri=uri)
+    schema = inline_references(uri, schema, resolver)
 
     # assert schema == expected
 

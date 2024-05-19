@@ -24,7 +24,7 @@ from typing import (
 from urllib.parse import urlsplit
 
 import jsonschema
-from referencing import Registry
+from referencing import Registry, Specification, Resource
 from hypothesis.strategies import SearchStrategy
 from packaging import version
 from referencing.jsonschema import DRAFT4, DRAFT202012
@@ -81,6 +81,7 @@ from .parameters import (
 from .references import (
     ConvertingResolver,
     InliningResolver,
+    get_retriever,
     inline_references,
 )
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
@@ -385,10 +386,18 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
-    # @property
-    # def _registry(self) -> Registry:
-    #     if not hasattr(self, "_registry_cache"):
-    #         self._registry_cache = Regis
+    @property
+    def _draft(self) -> Specification:
+        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+            return DRAFT202012
+        return DRAFT4
+
+    @property
+    def _registry(self) -> Registry:
+        if not hasattr(self, "_registry_cache"):
+            retrieve = get_retriever(self._draft)
+            self._registry_cache = Registry(retrieve=retrieve)
+        return self._registry_cache
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
@@ -670,12 +679,10 @@ class BaseOpenAPISchema(BaseSchema):
         for path in self.component_locations:
             if path in self.raw_schema:
                 schema[path] = fast_deepcopy(self.raw_schema[path])
-
-        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
-            draft = DRAFT202012
-        else:
-            draft = DRAFT4
-        return inline_references(operation.definition.scope or self.location or "", schema, draft)
+        uri = operation.definition.scope or self.location or ""
+        registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
+        resolver = registry.resolver(base_uri=uri)
+        return inline_references(uri, schema, resolver)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

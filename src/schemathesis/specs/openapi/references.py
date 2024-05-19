@@ -11,8 +11,8 @@ from urllib.request import urlopen
 import jsonschema
 import referencing.retrieval
 import requests
-from referencing import Registry, Resource, Specification
-from referencing.exceptions import PointerToNowhere, Unretrievable
+from referencing import Resource, Specification
+from referencing.exceptions import Unretrievable
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
@@ -259,7 +259,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(uri: str, schema: Schema, draft: Specification) -> Schema:
+def inline_references(uri: str, schema: Schema, resolver: Resolver) -> Schema:
     """Inline all non-local and recursive references in the given schema.
 
     This function performs three passes:
@@ -287,6 +287,25 @@ def inline_references(uri: str, schema: Schema, draft: Specification) -> Schema:
     if isinstance(schema, bool):
         return schema
 
+    logger.debug("Inlining non-local references: %s", schema)
+    referenced_schemas = collect_referenced_schemas(schema, resolver)
+
+    if referenced_schemas:
+        # Check for recursive references
+        references = find_recursive_references(referenced_schemas)
+        logger.debug("Found %s recursive references", len(references))
+        inline_recursive_references(referenced_schemas, referenced_schemas, references)
+        logger.debug("Inlined schema: %s", schema)
+    else:
+        # Trivial case - no extra processing needed, just remove the key
+        logger.debug("No references inlined")
+        del schema[INLINED_REFERENCE_ROOT_KEY]
+    return schema
+
+
+def get_retriever(draft: Specification) -> Callable[[str], Resource]:
+    """Create a retriever for the given draft."""
+
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
     def cached_retrieve(ref: str) -> Any:
         """Resolve non-local reference."""
@@ -307,22 +326,7 @@ def inline_references(uri: str, schema: Schema, draft: Specification) -> Schema:
         logger.debug("Unretrievable %s", ref)
         raise Unretrievable(ref)
 
-    registry = Registry(retrieve=cached_retrieve).with_resource(uri, Resource(contents=schema, specification=draft))
-
-    logger.debug("Inlining non-local references: %s", schema)
-    referenced_schemas = collect_referenced_schemas(schema, registry.resolver(base_uri=uri))
-
-    if referenced_schemas:
-        # Check for recursive references
-        references = find_recursive_references(referenced_schemas)
-        logger.debug("Found %s recursive references", len(references))
-        inline_recursive_references(referenced_schemas, referenced_schemas, references)
-        logger.debug("Inlined schema: %s", schema)
-    else:
-        # Trivial case - no extra processing needed, just remove the key
-        logger.debug("No references inlined")
-        del schema[INLINED_REFERENCE_ROOT_KEY]
-    return schema
+    return cached_retrieve
 
 
 def collect_referenced_schemas(schema: ObjectSchema, resolver: Resolver) -> ReferencedSchemas:
