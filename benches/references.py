@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.specs.openapi.references import resolve_pointer
+from schemathesis.specs.openapi._jsonschema import resolve_pointer
 
 RECURSIVE_SCHEMA = {
     "openapi": "3.0.0",

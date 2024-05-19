@@ -1018,7 +1018,7 @@ class OpenApi30(SwaggerV20):
         if "requestBody" in definition:
             body = definition["requestBody"]
             while "$ref" in body:
-                _, body = self.resolver.resolve(body["$ref"])
+                body = self.resolver2.lookup(body["$ref"]).contents
             required = body.get("required", False)
             description = body.get("description")
             for media_type, content in body["content"].items():
