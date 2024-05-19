@@ -229,7 +229,6 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 logger = logging.getLogger(__name__)
 INLINED_REFERENCE_ROOT_KEY = "x-inlined-references"
 INLINED_REFERENCE_PREFIX = f"#/{INLINED_REFERENCE_ROOT_KEY}"
-SELF_URN = "urn:self"
 MAX_RECURSION_DEPTH = 5
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
@@ -259,7 +258,7 @@ def retrieve_from_file(url: str) -> Any:
     return retrieved
 
 
-def inline_references(uri: str, schema: Schema, resolver: Resolver) -> Schema:
+def inline_references(schema: Schema, resolver: Resolver) -> Schema:
     """Inline all non-local and recursive references in the given schema.
 
     This function performs three passes:

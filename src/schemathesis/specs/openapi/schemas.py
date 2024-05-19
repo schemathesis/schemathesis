@@ -682,7 +682,7 @@ class BaseOpenAPISchema(BaseSchema):
         uri = operation.definition.scope or self.location or ""
         registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
         resolver = registry.resolver(base_uri=uri)
-        return inline_references(uri, schema, resolver)
+        return inline_references(schema, resolver)
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:

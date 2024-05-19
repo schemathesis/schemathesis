@@ -41,20 +41,6 @@ TARGET_FILE_RELATIVE_SCHEMA = {"RelativeItem": TARGET}
 TARGET_FILE_NESTED_2_SCHEMA = {"Nested-2": TARGET}
 TARGET_REMOTE_REF = {"$ref": f"{REMOTE_PLACEHOLDER}/schema.json#/RootItem"}
 TARGET_REMOTE_ROOT_SCHEMA = {"RootItem": TARGET}
-INTEGER = 1
-COMPONENTS = {
-    "components": {
-        "schemas": {
-            "Example": TARGET,
-            # Not really valid, but used to test the traversal
-            # Validation error will be raised later on
-            "Integer": INTEGER,
-            "Nested": TARGET_LOCAL_REF,
-            "Nested-File": TARGET_FILE_REF,
-            "Nested-Remote": TARGET_REMOTE_REF,
-        },
-    },
-}
 # Local references
 LOCAL_REF_NO_NESTING = TARGET_LOCAL_REF
 LOCAL_REF_NESTED_IN_OBJECT = {"properties": {"example": TARGET_LOCAL_REF}}
@@ -67,9 +53,6 @@ LOCAL_NESTED_REF_NESTED_IN_OBJECT_MULTIPLE = {
 }
 LOCAL_REF_NESTED_IN_ARRAY = {"allOf": [TARGET_LOCAL_REF]}
 LOCAL_REF_NESTED_IN_ARRAY_MULTIPLE = {"allOf": [TARGET_LOCAL_REF, TARGET_LOCAL_REF]}
-# TODO: Write a separate test for this case
-# Test cases with nested file refs
-LOCAL_REF_NON_SCHEMA = {"$ref": "#/components/schemas/Integer"}
 # File references
 FILE_REF_NO_NESTING = TARGET_FILE_REF
 FILE_REF_WITH_SCHEME_NO_NESTING = TARGET_FILE_WITH_SCHEME_REF
@@ -188,7 +171,13 @@ def setup_schema(request, uri, scope, schema):
             DEFAULT_URI,
             "",
             LOCAL_REF_NO_NESTING,
-            COMPONENTS,
+            {
+                "components": {
+                    "schemas": {
+                        "Example": TARGET,
+                    },
+                }
+            },
             {
                 "$ref": "#/x-inlined-references/aa54005f4a84cceab1fb666434aba9aa1a1bc795",
                 "x-inlined-references": {"aa54005f4a84cceab1fb666434aba9aa1a1bc795": {"type": "integer"}},
@@ -316,7 +305,7 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_REF_NO_NESTING,
-            COMPONENTS,
+            {},
             {
                 "$ref": "#/x-inlined-references/77c17a5efa18bdd0d75b1b8686d8daf4f881c719",
                 "x-inlined-references": {"77c17a5efa18bdd0d75b1b8686d8daf4f881c719": {"type": "integer"}},
@@ -391,7 +380,7 @@ def setup_schema(request, uri, scope, schema):
             FILE_URI,
             "",
             FILE_RELATIVE_REF,
-            COMPONENTS,
+            {},
             {
                 "$ref": "#/x-inlined-references/4f2e7403753928e6b218cb8e72afb242f55ca267",
                 "x-inlined-references": {"4f2e7403753928e6b218cb8e72afb242f55ca267": {"type": "integer"}},
@@ -411,7 +400,7 @@ def setup_schema(request, uri, scope, schema):
             REMOTE_URI,
             "",
             REMOTE_REF_NO_NESTING,
-            COMPONENTS,
+            {},
             ANY,
         ),
         (
@@ -483,7 +472,6 @@ def setup_schema(request, uri, scope, schema):
     ),
 )
 def test_inline_references_valid(request, uri, scope, schema, components, expected):
-    # TODO: Cleanup - remove unused variables
     components = fast_deepcopy(components)
     if isinstance(schema, dict):
         schema.update(components)
@@ -492,7 +480,7 @@ def test_inline_references_valid(request, uri, scope, schema, components, expect
     retrieve = get_retriever(DRAFT4)
     registry = Registry(retrieve=retrieve).with_resource(uri, Resource(contents=schema, specification=DRAFT4))
     resolver = registry.resolver(base_uri=uri)
-    schema = inline_references(uri, schema, resolver)
+    schema = inline_references(schema, resolver)
 
     # assert schema == expected
 
