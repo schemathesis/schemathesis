@@ -288,7 +288,7 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
     if isinstance(schema, bool):
         return schema
 
-    logger.debug("Inlining non-local references: %s", schema)
+    logger.debug("Input: %s", schema)
     referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schemas:
@@ -296,13 +296,13 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
         references = find_recursive_references(referenced_schemas)
         logger.debug("Found %s recursive references", len(references))
         inline_recursive_references(referenced_schemas, referenced_schemas, references, config)
-        logger.debug("Inlined schema: %s", schema)
     else:
         # Trivial case - no extra processing needed, just remove the key
         logger.debug("No references inlined")
         del schema[INLINED_REFERENCE_ROOT_KEY]
     for name in config.component_names:
         del schema[name]
+    logger.debug("Output: %s", schema)
     return schema
 
 
@@ -323,6 +323,7 @@ def _to_self_contained_jsonschema(
 ) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
+        _replace_nullable(item, config.nullable_key, referenced_schemas)
         ref = item.get("$ref")
         if isinstance(ref, str):
             resolved = move_referenced_data(item, ref, referenced_schemas, resolver)
@@ -337,6 +338,20 @@ def _to_self_contained_jsonschema(
         for sub_item in item:
             if sub_item and isinstance(sub_item, (dict, list)):
                 _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
+
+
+def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas: ReferencedSchemas) -> None:
+    if item.get(nullable_key) is True:
+        del item[nullable_key]
+        # Move all other keys to a new object, except for `x-inlined-references` which should
+        # always be at the root level
+        inner = {}
+        for key, value in list(item.items()):
+            if value is referenced_schemas:
+                continue
+            inner[key] = value
+            del item[key]
+        item["anyOf"] = [inner, {"type": "null"}]
 
 
 def move_referenced_data(
@@ -392,7 +407,7 @@ def _find_recursive_references(
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                _find_recursive_references(item, referenced_schemas, references, path)
+                _find_recursive_references(sub_item, referenced_schemas, references, path)
 
 
 def inline_recursive_references(

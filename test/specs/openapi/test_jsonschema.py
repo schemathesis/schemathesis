@@ -471,9 +471,37 @@ def setup_schema(request, uri, scope, schema):
         (
             DEFAULT_URI,
             "",
+            RECURSION_SCHEMA_ONE_HOP,
+            {
+                "definitions": {
+                    "SchemaA": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"$ref": "#/definitions/SchemaA"},
+                        ]
+                    }
+                },
+            },
+            {
+                "$ref": "#/x-inlined-references/eebcedb296ce3a3a3e7ac8c3938de062de9ea618",
+                "x-inlined-references": {
+                    "eebcedb296ce3a3a3e7ac8c3938de062de9ea618": {
+                        "anyOf": [
+                            {"type": "integer"},
+                            {"anyOf": [{"type": "integer"}, {}]},
+                        ]
+                    }
+                },
+            },
+        ),
+        (
+            DEFAULT_URI,
+            "",
             {"type": "integer", "nullable": True},
             {},
-            {},
+            {
+                "anyOf": [{"type": "integer"}, {"type": "null"}],
+            },
         ),
     ),
     ids=(
@@ -499,6 +527,7 @@ def setup_schema(request, uri, scope, schema):
         "inner-ref",
         "inner-ref-with-nested-file-ref",
         "recursive-one-hop",
+        "recursive-one-hop-in-array",
         "with-nullable",
     ),
 )

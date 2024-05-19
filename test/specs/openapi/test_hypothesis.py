@@ -8,7 +8,7 @@ import schemathesis
 from schemathesis.generation import GenerationConfig, HeaderConfig
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import get_case_strategy, is_valid_header, make_positive_strategy
-from schemathesis.specs.openapi.references import load_file
+from schemathesis.specs.openapi._jsonschema import load_file
 from test.utils import assert_requests_call
 
 
