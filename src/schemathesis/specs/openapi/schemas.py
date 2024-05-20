@@ -440,14 +440,14 @@ class BaseOpenAPISchema(BaseSchema):
         except KeyError as exc:
             matches = get_close_matches(operation_id, cache.known_operation_ids)
             self._on_missing_operation(operation_id, exc, matches)
-        # It could'be been already accessed in a different place
-        instance = cache.get_operation_by_traversal_key(entry.scope, entry.path, entry.method)
+        # It could've been already accessed in a different place
+        traversal_key = (entry.scope, entry.path, entry.method)
+        instance = cache.get_operation_by_traversal_key(traversal_key)
         if instance is not None:
             return instance
         parameters = self._collect_operation_parameters(entry.path_item, entry.operation)
         initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, entry.resolver)
-        cache.insert_operation_by_traversal_key(entry.scope, entry.path, entry.method, initialized)
-        cache.insert_operation_by_id(operation_id, initialized)
+        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation_id)
         return initialized
 
     def _populate_operation_id_cache(self, cache: OperationCache) -> None:
@@ -496,7 +496,7 @@ class BaseOpenAPISchema(BaseSchema):
         # Check the traversal cache as it could've been populated in other places
         scope = dynamic_scope(resolved.resolver)
         traversal_key = (scope, path, method)
-        cached = cache.get_operation_by_traversal_key(*traversal_key)
+        cached = cache.get_operation_by_traversal_key(traversal_key)
         if cached is not None:
             return cached
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
@@ -504,8 +504,7 @@ class BaseOpenAPISchema(BaseSchema):
         path_item = resolved.contents
         parameters = self._collect_operation_parameters(path_item, operation)
         initialized = self.make_operation(path, method, parameters, operation, resolved.resolver)
-        cache.insert_operation_by_traversal_key(*traversal_key, initialized)
-        cache.insert_operation_by_reference(reference, initialized)
+        cache.insert_operation(initialized, traversal_key=traversal_key, reference=reference)
         return initialized
 
     def get_case_strategy(
@@ -779,12 +778,13 @@ class MethodMap(Mapping):
         resolver = self._resolver
         scope = tuple(uri for uri, _ in resolver.dynamic_scope())
         path = self._path
-        cached = cache.get_operation_by_traversal_key(scope, path, method)
+        traversal_key = (scope, path, method)
+        cached = cache.get_operation_by_traversal_key(traversal_key)
         if cached is not None:
             return cached
         parameters = schema._collect_operation_parameters(self._path_item, operation)
         initialized = schema.make_operation(path, method, parameters, operation, resolver)
-        cache.insert_operation_by_traversal_key(scope, path, method, initialized)
+        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation.get("operationId"))
         return initialized
 
     def __getitem__(self, item: str) -> OpenAPIOperation:

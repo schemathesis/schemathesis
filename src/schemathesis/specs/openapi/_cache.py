@@ -85,19 +85,21 @@ class OperationCache:
         # TODO: Avoid KeyError in the future
         return self._id_to_definition[operation_id]
 
-    def insert_operation_by_id(self, operation_id: str, operation: APIOperation) -> None:
-        """Insert a new operation into cache by ID."""
-        self._id_to_operation[operation_id] = self._append_operation(operation)
-
-    def insert_operation_by_reference(self, reference: str, operation: APIOperation) -> None:
-        """Insert a new operation into cache by reference."""
-        self._reference_to_operation[reference] = self._append_operation(operation)
-
-    def insert_operation_by_traversal_key(
-        self, scope: tuple[str, ...], path: str, method: str, operation: APIOperation
+    def insert_operation(
+        self,
+        operation: APIOperation,
+        *,
+        traversal_key: TraversalKey,
+        operation_id: str | None = None,
+        reference: str | None = None,
     ) -> None:
-        """Insert a new operation into cache by traversal key."""
-        self._traversal_key_to_operation[(scope, path, method)] = self._append_operation(operation)
+        """Insert a new operation into cache by one or multiple keys."""
+        idx = self._append_operation(operation)
+        self._traversal_key_to_operation[traversal_key] = idx
+        if operation_id is not None:
+            self._id_to_operation[operation_id] = idx
+        if reference is not None:
+            self._reference_to_operation[reference] = idx
 
     def get_operation_by_id(self, operation_id: str) -> APIOperation | None:
         """Get an operation by its ID."""
@@ -113,9 +115,9 @@ class OperationCache:
             return self._operations[idx]
         return None
 
-    def get_operation_by_traversal_key(self, scope: tuple[str, ...], path: str, method: str) -> APIOperation | None:
+    def get_operation_by_traversal_key(self, key: TraversalKey) -> APIOperation | None:
         """Get an operation by its traverse key."""
-        idx = self._traversal_key_to_operation.get((scope, path, method))
+        idx = self._traversal_key_to_operation.get(key)
         if idx is not None:
             return self._operations[idx]
         return None
