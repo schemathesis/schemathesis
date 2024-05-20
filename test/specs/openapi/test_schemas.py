@@ -33,15 +33,14 @@ def test_get_operation_via_remote_reference(openapi_version, schema_url):
         }
 
 
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "update_user")
 def test_operation_cache_sharing(mocker, schema_url):
     # When the same operation is accessed via different methods
     # The second access should use cache
 
-    def setup_mock(schema):
-        mocker.patch.object(
-            schema._operation_cache, "insert_operation_by_traversal_key", side_effect=ValueError("Not cached")
-        )
+    def setup_mock(schema, key):
+        return mocker.patch.object(schema._operation_cache, key, side_effect=ValueError("Not cached"))
 
     reference = f"{schema_url}#/paths/~1users~1{{user_id}}/patch"
     operation_id = "updateUser"
@@ -49,15 +48,23 @@ def test_operation_cache_sharing(mocker, schema_url):
     schema = schemathesis.from_uri(schema_url)
     first = schema.get_operation_by_reference(reference)
     # After accessing by reference, there should not be an attempt to insert it again
-    setup_mock(schema)
+    setup_mock(schema, "insert_operation")
     second = schema.get_operation_by_id(operation_id)
     assert first is second
     # And the other way around
     schema = schemathesis.from_uri(schema_url)
     first = schema.get_operation_by_id(operation_id)
-    setup_mock(schema)
     second = schema.get_operation_by_reference(reference)
     assert first is second
+    # And the cache has just a single entry
+    assert len(schema._operation_cache._operations) == 1
+    # Direct access should also add an entry to the "by-id" cache
+    first = schema["/users/{user_id}"]["GET"]
+    # It should be taken from the "by-id" cache
+    setup_mock(schema, "get_operation_by_traversal_key")
+    second = schema.get_operation_by_id("getUser")
+    assert first is second
+    assert len(schema._operation_cache._operations) == 2
 
 
 SINGLE_METHOD_PATHS = {
