@@ -20,7 +20,7 @@ from .parameters import OpenAPIBody
 
 if TYPE_CHECKING:
     from ...generation import GenerationConfig
-    from .schemas import OpenAPIOperation, BaseOpenAPISchema
+    from .schemas import OpenAPIOperation
 
 
 @dataclass
@@ -219,6 +219,8 @@ def extract_from_schema(
     examples_field_name: str,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
+    from .schemas import BaseOpenAPISchema
+
     # This implementation supports only `properties` and `items`
     if "properties" in schema:
         variants = {}

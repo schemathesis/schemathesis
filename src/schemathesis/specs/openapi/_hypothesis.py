@@ -37,8 +37,8 @@ from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
 from .parameters import OpenAPIBody, parameters_to_json_schema
-from .schemas import BaseOpenAPISchema
 from .utils import is_header_location
+
 
 HEADER_FORMAT = "_header_value"
 SLASH = "/"
@@ -226,6 +226,8 @@ def _get_body_strategy(
     operation: APIOperation,
     generation_config: GenerationConfig,
 ) -> st.SearchStrategy:
+    from .schemas import BaseOpenAPISchema
+
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
     # The cache key relies on object ids, which means that the parameter should not be mutated
@@ -359,6 +361,8 @@ def get_parameters_strategy(
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
+    from .schemas import BaseOpenAPISchema
+
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
         # The cache key relies on object ids, which means that the parameter should not be mutated
