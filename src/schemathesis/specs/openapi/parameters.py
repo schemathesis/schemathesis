@@ -1,4 +1,5 @@
 from __future__ import annotations
+from functools import cached_property
 import json
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable
@@ -48,30 +49,14 @@ class OpenAPIParameter(Parameter):
     def is_header(self) -> bool:
         raise NotImplementedError
 
-    def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
-        """Convert parameter's definition to JSON Schema."""
-        schema = self.from_open_api_to_json_schema(operation, self.definition)
-        return self.transform_keywords(schema)
+    @cached_property
+    def schema(self) -> dict[str, Any]:
+        raise NotImplementedError
 
-    def transform_keywords(self, schema: dict[str, Any]) -> dict[str, Any]:
-        """Transform Open API specific keywords into JSON Schema compatible form."""
-        # TODO: unify this logic with `_jsonschema.py`
-        # Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly, we
-        # can achieve significant performance improvements for such cases.
-        # For reference (my machine) - running a single test with 100 examples with the resulting strategy:
-        #   - without: 4.37 s
-        #   - with: 294 ms
-        #
-        # It also reduces the number of cases when the "filter_too_much" health check fails during testing.
-        if self.is_header:
-            schema.setdefault("type", "string")
-        return schema
-
-    def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
-        """Convert Open API's `Schema` to JSON Schema."""
+    def _filter_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
         return {
             key: value
-            for key, value in open_api_schema.items()
+            for key, value in schema.items()
             # Allow only supported keywords or vendor extensions
             if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_field
         }
@@ -79,7 +64,7 @@ class OpenAPIParameter(Parameter):
     def serialize(self, operation: APIOperation) -> str:
         # For simplicity, JSON Schema semantics is not taken into account (e.g. 1 == 1.0)
         # I.e. two semantically equal schemas may have different representation
-        return json.dumps(self.as_json_schema(operation), sort_keys=True)
+        return json.dumps(self.definition, sort_keys=True)
 
 
 @dataclass(eq=False)
@@ -120,6 +105,10 @@ class OpenAPI20Parameter(OpenAPIParameter):
     @property
     def is_header(self) -> bool:
         return self.location == "header"
+
+    @cached_property
+    def schema(self) -> dict[str, Any]:
+        return self._filter_schema(self.definition)
 
 
 @dataclass(eq=False)
@@ -167,9 +156,10 @@ class OpenAPI30Parameter(OpenAPIParameter):
     def is_header(self) -> bool:
         return self.location in ("header", "cookie")
 
-    def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
-        open_api_schema = get_parameter_schema(operation, open_api_schema)
-        return super().from_open_api_to_json_schema(operation, open_api_schema)
+    @property
+    def schema(self) -> dict[str, Any]:
+        schema = self.definition.get("schema")
+        return schema
 
 
 @dataclass(eq=False)
@@ -184,6 +174,10 @@ class OpenAPIBody(OpenAPIParameter):
     def name(self) -> str:
         # The name doesn't matter but is here for the interface completeness.
         return "body"
+
+    @property
+    def is_form(self) -> bool:
+        raise NotImplementedError
 
 
 @dataclass(eq=False)
@@ -219,11 +213,14 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     # NOTE. For Open API 2.0 bodies, we still give `x-example` precedence over the schema-level `example` field to keep
     # the precedence rules consistent.
 
-    def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
-        """Convert body definition to JSON Schema."""
+    @property
+    def is_form(self) -> bool:
+        return False
+
+    @property
+    def schema(self) -> dict[str, Any]:
         # `schema` is required in Open API 2.0 when the `in` keyword is `body`
-        schema = self.definition["schema"]
-        return self.transform_keywords(schema)
+        return self.definition["schema"]
 
 
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
@@ -242,17 +239,8 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     required: bool = False
     description: str | None = None
 
-    def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
-        """Convert body definition to JSON Schema."""
-        schema = get_media_type_schema(self.definition)
-        return self.transform_keywords(schema)
-
-    def transform_keywords(self, schema: dict[str, Any]) -> dict[str, Any]:
-        definition = super().transform_keywords(schema)
-        if self.is_form:
-            # It significantly reduces the "filtering" part of data generation.
-            definition.setdefault("type", "object")
-        return definition
+    def get_schema(self) -> dict[str, Any]:
+        return get_media_type_schema(self.definition)
 
     @property
     def is_form(self) -> bool:
@@ -286,12 +274,17 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
         # We generate an object for formData - it is always required.
         return bool(self.definition)
 
-    def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
-        """The composite body is transformed into an "object" JSON Schema."""
-        return parameters_to_json_schema(operation, self.definition)
+    @property
+    def is_form(self) -> bool:
+        return True
+
+    @cached_property
+    def schema(self) -> dict[str, Any]:
+        # TODO: it should be filtered first before passing
+        return parameters_to_json_schema(self.definition)
 
 
-def parameters_to_json_schema(operation: APIOperation, parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
+def parameters_to_json_schema(parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
     """Create an "object" JSON schema from a list of Open API parameters.
 
     :param List[OpenAPIParameter] parameters: A list of Open API parameters related to the same location. All of
@@ -331,7 +324,7 @@ def parameters_to_json_schema(operation: APIOperation, parameters: Iterable[Open
     required = []
     for parameter in parameters:
         name = parameter.name
-        properties[name] = parameter.as_json_schema(operation)
+        properties[name] = parameter.schema
         # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
         if parameter.is_required and name not in required:
             required.append(name)

@@ -156,7 +156,7 @@ def get_case_strategy(
             body_generator = generator
             if generator.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                candidates = [item for item in operation.body.items if can_negate(item.schema)]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
@@ -234,11 +234,12 @@ def _get_body_strategy(
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
-    schema = parameter.as_json_schema(operation)
     api_schema = cast(BaseOpenAPISchema, operation.schema)
     schema = api_schema.convert_schema_to_jsonschema(
-        schema, operation.definition.resolver, remove_write_only=False, remove_read_only=True
-    )  # type: ignore
+        parameter.schema, operation.definition.resolver, remove_write_only=False, remove_read_only=True
+    )
+    if parameter.is_form:
+        schema.setdefault("type", "object")
     strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
@@ -334,7 +335,7 @@ def generate_parameter(
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
     """Check if any path parameter can be negated."""
-    schema = parameters_to_json_schema(operation, operation.path_parameters)
+    schema = parameters_to_json_schema(operation.path_parameters)
     # No path parameters to negate
     parameters = schema["properties"]
     if not parameters:
@@ -345,7 +346,7 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 def can_negate_headers(operation: APIOperation, location: str) -> bool:
     """Check if any header can be negated."""
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
-    schema = parameters_to_json_schema(operation, parameters)
+    schema = parameters_to_json_schema(parameters)
     # No headers to negate
     headers = schema["properties"]
     if not headers:
@@ -369,12 +370,7 @@ def get_parameters_strategy(
         nested_cache_key = (strategy_factory, location, tuple(sorted(exclude)))
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
-        schema = parameters_to_json_schema(operation, parameters)
-        if not operation.schema.validate_schema and location == "path":
-            # If schema validation is disabled, we try to generate data even if the parameter definition
-            # contains errors.
-            # In this case, we know that the `required` keyword should always be `True`.
-            schema["required"] = list(schema["properties"])
+        schema = parameters_to_json_schema(parameters)
         api_schema = cast(BaseOpenAPISchema, operation.schema)
         schema = api_schema.convert_schema_to_jsonschema(
             schema,
@@ -386,8 +382,16 @@ def get_parameters_strategy(
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
             # that may be invalid
             schema["properties"].pop(name, None)
-            with suppress(ValueError):
-                schema["required"].remove(name)
+            if "required" in schema:
+                with suppress(ValueError):
+                    schema["required"].remove(name)
+        if not operation.schema.validate_schema and location == "path":
+            # If schema validation is disabled, we try to generate data even if the parameter definition
+            # contains errors.
+            # In this case, we know that the `required` keyword should always be `True`.
+            schema["required"] = list(schema["properties"])
+        if is_header_location(location):
+            schema.setdefault("type", "string")
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()

@@ -200,15 +200,17 @@ def load_external_example(url: str) -> bytes:
 def extract_from_schemas(operation: OpenAPIOperation) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
-        schema = parameter.as_json_schema(operation)
-        for value in extract_from_schema(operation, schema, parameter.example_field, parameter.examples_field):
+        for value in extract_from_schema(
+            operation, parameter.schema, parameter.example_field, parameter.examples_field
+        ):
             yield ParameterExample(
                 container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
             )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
-        schema = alternative.as_json_schema(operation)
-        for value in extract_from_schema(operation, schema, alternative.example_field, alternative.examples_field):
+        for value in extract_from_schema(
+            operation, alternative.schema, alternative.example_field, alternative.examples_field
+        ):
             yield BodyExample(value=value, media_type=alternative.media_type)
 
 
