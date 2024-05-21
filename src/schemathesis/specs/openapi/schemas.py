@@ -20,8 +20,9 @@ from typing import (
     Sequence,
     TypeVar,
     cast,
+    overload,
 )
-from urllib.parse import urlsplit, urljoin, urldefrag
+from urllib.parse import urldefrag, urljoin, urlsplit
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
@@ -62,13 +63,14 @@ from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
 from ._jsonschema import (
-    TransformConfig,
+    ObjectSchema,
     Resolver,
+    Schema,
+    TransformConfig,
     dynamic_scope,
     get_remote_schema_retriever,
     to_jsonschema,
 )
-from .converter import to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .filters import (
@@ -627,6 +629,8 @@ class BaseOpenAPISchema(BaseSchema):
         return operation.definition.value.get("tags")
 
     def validate_response(self, operation: OpenAPIOperation, response: GenericResponse) -> bool | None:
+        """Validate the response against the schema."""
+        # First, get the high-level response definition
         responses = {str(key): value for key, value in operation.definition.value.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
@@ -636,10 +640,13 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             # No response defined for the received response status code
             return None
+        # Then the actual schema may be behind a reference, so we need to resolve it
+        # and take into account the differences in response definitions between different Open API versions
         resolver, schema = self.get_response_schema(definition, operation.definition.resolver)
         if not schema:
             # No schema to check against
             return None
+        # Reject responses with unknown content types
         content_type = response.headers.get("Content-Type")
         errors = []
         if content_type is None:
@@ -656,6 +663,7 @@ class BaseOpenAPISchema(BaseSchema):
         if content_type and not is_json_media_type(content_type):
             _maybe_raise_one_or_more(errors)
             return None
+        # Deserialize the response into JSON
         try:
             data = get_json(response)
         except JSONDecodeError as exc:
@@ -666,18 +674,28 @@ class BaseOpenAPISchema(BaseSchema):
             except Exception as exc:
                 errors.append(exc)
                 _maybe_raise_one_or_more(errors)
+        # At this point, the response schema should be converted to a valid JSON schema.
+        # There are a few things requiring special attention:
+        #
+        # 1. Open API specific keywords like `nullable` or `writeOnly` should be properly processed.
+        # 2. The schema may contain references to other parts of the root schema, so we need to make them resolvable.
+        # 3. The schema itself may already be loaded from an external location, therefore the proper resolving scope
+        #    should be used.
         # TODO: Cache response schema
+        # TODO: prepare the schema
         if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
             cls = jsonschema.Draft202012Validator
+            id_key = "$id"
         else:
             cls = jsonschema.Draft4Validator
-        registry = self._registry
-        last_scope = next(iter(resolver.dynamic_scope()), None)
-        if last_scope is not None:
-            _, registry = last_scope
+            id_key = "id"
+        if resolver._base_uri != self.resolver._base_uri:
+            schema[id_key] = resolver._base_uri
         try:
-            jsonschema.validate(data, schema, cls=cls, registry=registry)
+            jsonschema.validate(data, schema, cls=cls, registry=resolver._registry)
         except jsonschema.ValidationError as exc:
+            if exc.schema == schema and id_key in exc.schema:
+                del exc.schema[id_key]
             exc_class = get_schema_validation_error(exc)
             ctx = failures.ValidationErrorContext.from_exception(exc)
             try:
@@ -685,37 +703,65 @@ class BaseOpenAPISchema(BaseSchema):
             except Exception as exc:
                 errors.append(exc)
         _maybe_raise_one_or_more(errors)
-        return None  # explicitly return None for mypy
+        return None
 
-    def prepare_schema(self, operation: OpenAPIOperation, schema: Any) -> Any:
-        """Adjust references in the schema to make them suitable for data generation.
+    @overload
+    def convert_schema_to_jsonschema(
+        self, schema: ObjectSchema, resolver: Resolver, remove_write_only: bool, remove_read_only: bool
+    ) -> ObjectSchema: ...
 
-        Hypothesis-jsonschema does not support remote or recursive references.
-        Therefore, we have to move such referenced data to the root of the schema as components and replace
-        references with local ones.
+    @overload
+    def convert_schema_to_jsonschema(
+        self, schema: bool, resolver: Resolver, remove_write_only: bool, remove_read_only: bool
+    ) -> bool: ...
+
+    def convert_schema_to_jsonschema(
+        self, schema: Schema, resolver: Resolver, remove_write_only: bool, remove_read_only: bool
+    ) -> Schema:
+        """Convert the given schema to a JSON schema.
+
+        The Open API specification adds an extra layer of complexity on top of JSON schemas by introducing
+        additional keywords and structuring the spcification in a way so it requires extra processing in order
+        to be used for data generation or response validation. Additionally, the underlying data generation library,
+        `hypothesis-jsonschema` does not support remote or recursive references.
+
+        Generally, all use cases require all references to be resolvable and Open API specific keywords to be replaced
+        with their JSON schema counterparts. Specifically, this method moves referenced data to the root of the schema
+        as components and replaces references with local ones.
         """
-        schema = fast_deepcopy(schema)
-        components: dict[str, Any] = {}
-        for path in self.component_locations:
-            source = self.raw_schema
-            target = components
-            for segment in path:
-                if segment in source:
-                    source = source[segment]
-                    target = target.setdefault(segment, {})
+        if isinstance(schema, bool):
+            # Fast path for boolean schemas
+            return schema
+        config = TransformConfig(
+            nullable_key=self.nullable_name,
+            remove_write_only=remove_write_only,
+            remove_read_only=remove_read_only,
+            # If the schema is local in respect to the root schema, then it may contain references to the root schema
+            # components. Therefore they should be visible to the schema so references can be resolved.
+            components=self._components_cache,
+        )
+        return to_jsonschema(resolver._base_uri, schema, self._registry, self._draft, config)
+
+    @property
+    def _components_cache(self) -> dict[str, ObjectSchema]:
+        """A mutable copy of components defined in the schema."""
+        #
+        if not hasattr(self, "_components_cache_"):
+            components: dict[str, Any] = {}
+            for path in self.component_locations:
+                source = self.raw_schema
+                target = components
+                for segment in path:
+                    if segment in source:
+                        source = source[segment]
+                        target = target.setdefault(segment, {})
+                    else:
+                        break
                 else:
-                    break
-            else:
-                # TODO: Bring back fast_deepcopy
-                target.update(source)
-        if isinstance(schema, dict):
-            schema.update(components)
-        # TODO: properly pass resolver
-        uri = operation.definition.resolver._base_uri or self.location or ""
-        registry = self._registry.with_resource(uri, Resource(contents=schema, specification=self._draft))
-        resolver = registry.resolver(base_uri=uri)
-        config = TransformConfig(nullable_key=self.nullable_name, component_names=list(components))
-        return to_jsonschema(schema, resolver, config)
+                    target.update(fast_deepcopy(source))
+            self._components_cache_ = components
+            return components
+        return self._components_cache_
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
@@ -878,12 +924,7 @@ class SwaggerV20(BaseOpenAPISchema):
             resolved = resolver.lookup(definition["$ref"])
             resolver = resolved.resolver
             definition = resolved.contents
-        schema = definition.get("schema")
-        if not schema:
-            return resolver, None
-        # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-        # because it is not converted
-        return resolver, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
+        return resolver, definition.get("schema")
 
     def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
         produces = operation.definition.value.get("produces", None)
@@ -1055,11 +1096,7 @@ class OpenApi30(SwaggerV20):
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object
-        if option and "schema" in option:
-            # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-            # because it is not converted
-            return resolver, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
-        return resolver, None
+        return resolver, (option or {}).get("schema")
 
     def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""

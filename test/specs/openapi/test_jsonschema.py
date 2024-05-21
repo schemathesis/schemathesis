@@ -5,14 +5,18 @@ import pytest
 from hypothesis import HealthCheck, Phase, Verbosity, given, settings
 from hypothesis_jsonschema import from_schema
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
-from referencing.jsonschema import DRAFT4
-from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4, EMPTY_REGISTRY
+from referencing import Registry
 
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi._jsonschema import (
     get_remote_schema_retriever,
     to_jsonschema,
     TransformConfig,
+    forbid_properties,
+    is_read_only,
+    is_write_only,
+    rewrite_properties,
 )
 
 REMOTE_PLACEHOLDER = "http://example.com"
@@ -494,15 +498,6 @@ def setup_schema(request, uri, scope, schema):
                 },
             },
         ),
-        (
-            DEFAULT_URI,
-            "",
-            {"type": "integer", "nullable": True},
-            {},
-            {
-                "anyOf": [{"type": "integer"}, {"type": "null"}],
-            },
-        ),
     ),
     ids=(
         "boolean",
@@ -528,24 +523,24 @@ def setup_schema(request, uri, scope, schema):
         "inner-ref-with-nested-file-ref",
         "recursive-one-hop",
         "recursive-one-hop-in-array",
-        "with-nullable",
     ),
 )
 def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
-    schema = fast_deepcopy(schema)
     components = fast_deepcopy(components)
-    if isinstance(schema, dict):
-        schema.update(components)
-
     uri, scope, schema = setup_schema(request, uri, scope, schema)
-    uri = scope or uri
-    retrieve = get_remote_schema_retriever(DRAFT4)
-    registry = Registry(retrieve=retrieve).with_resource(uri, Resource(contents=schema, specification=DRAFT4))
-    resolver = registry.resolver(base_uri=uri)
-    config = TransformConfig(nullable_key="nullable", component_names=list(components))
-    schema = to_jsonschema(schema, resolver, config)
+    registry = Registry(retrieve=get_remote_schema_retriever(DRAFT4))
+    config = TransformConfig(
+        nullable_key="nullable",
+        remove_write_only=False,
+        remove_read_only=False,
+        components=components,
+    )
+    schema = to_jsonschema(scope or uri, schema, registry, DRAFT4, config)
     assert schema == expected
+    assert_generates(schema)
 
+
+def assert_generates(schema):
     # Hypothesis-jsonschema should be able to generate data for the inlined schema
 
     @given(from_schema(schema))
@@ -561,3 +556,105 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
         pass
 
     generate()
+
+
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    (
+        (
+            {"type": "integer", "nullable": True},
+            {
+                "anyOf": [{"type": "integer"}, {"type": "null"}],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "boolean", "nullable": True}},
+                "required": ["success"],
+            },
+            {
+                "type": "object",
+                "properties": {"success": {"anyOf": [{"type": "boolean"}, {"type": "null"}]}},
+                "required": ["success"],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "array", "items": [{"type": "boolean", "nullable": True}]}},
+                "required": ["success"],
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "success": {"type": "array", "items": [{"anyOf": [{"type": "boolean"}, {"type": "null"}]}]}
+                },
+                "required": ["success"],
+            },
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "boolean", "writeOnly": True}},
+                "required": ["success"],
+            },
+            {"not": {"required": ["success"]}, "type": "object"},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"success": {"type": "boolean", "readOnly": True}},
+                "required": ["success"],
+            },
+            {"not": {"required": ["success"]}, "type": "object"},
+        ),
+    ),
+)
+def test_openapi_specifics(schema, expected):
+    config = TransformConfig(nullable_key="nullable", remove_write_only=True, remove_read_only=True, components={})
+    schema = to_jsonschema("", schema, EMPTY_REGISTRY, DRAFT4, config)
+    assert schema == expected
+    assert_generates(schema)
+
+
+@pytest.mark.parametrize(
+    "schema, forbidden, expected",
+    (
+        ({}, ["foo"], {"not": {"required": {"foo"}}}),
+        ({"not": {"type": "array"}}, ["foo"], {"not": {"required": {"foo"}, "type": "array"}}),
+        ({"not": {"required": ["bar"]}}, ["foo"], {"not": {"required": {"bar", "foo"}}}),
+        ({"not": {"required": ["foo"]}}, ["foo"], {"not": {"required": {"foo"}}}),
+        ({"not": {"required": ["bar", "foo"]}}, ["foo"], {"not": {"required": {"bar", "foo"}}}),
+    ),
+)
+def test_forbid_properties(schema, forbidden, expected):
+    forbid_properties(schema, forbidden)
+    schema["not"]["required"] = set(schema["not"]["required"])
+    assert schema == expected
+    schema["not"]["required"] = list(schema["not"]["required"])
+    assert_generates(schema)
+
+
+@pytest.mark.parametrize(
+    "schema, expected",
+    (
+        ({"properties": {"a": {"readOnly": True}}}, {"not": {"required": ["a"]}}),
+        ({"properties": {"a": {"readOnly": True}}, "required": ["a"]}, {"not": {"required": ["a"]}}),
+    ),
+)
+def test_rewrite_read_only(schema, expected):
+    rewrite_properties(schema, is_read_only)
+    assert schema == expected
+
+
+@pytest.mark.parametrize(
+    "schema, expected",
+    (
+        ({"properties": {"a": {"writeOnly": True}}}, {"not": {"required": ["a"]}}),
+        ({"properties": {"a": {"writeOnly": True}}, "required": ["a"]}, {"not": {"required": ["a"]}}),
+    ),
+)
+def test_rewrite_write_only(schema, expected):
+    rewrite_properties(schema, is_write_only)
+    assert schema == expected

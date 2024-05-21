@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha1
-from typing import Any, Callable, Dict, MutableMapping, Protocol, Union, Iterable
+from typing import Any, Callable, Dict, MutableMapping, Protocol, Union, Iterable, cast
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
@@ -172,7 +172,6 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 
 # TODO:
 #  - use caching for input schemas
-#  - avoid mutating the original + don't create a copy unless necessary. HashTrie?
 #  - Raise custom error when the referenced value is invalid
 #  - Traverse only components that may have references (before passing here)
 
@@ -199,13 +198,21 @@ class TransformConfig:
     # The name of the keyword that represents nullable values
     # Usually `nullable` in Open API 3 and `x-nullable` in Open API 2
     nullable_key: str
-    # List of components that are added to the schema
-    component_names: list[str]
+    # Remove properties with the "writeOnly" flag set to `True`.
+    # Write only properties are used in requests and should not be present in responses.
+    remove_write_only: bool
+    # Remove properties with the "readOnly" flag set to `True`.
+    # Read only properties are used in responses and should not be present in requests.
+    remove_read_only: bool
+    # Unprocessed components that could be potentially referenced by the schema
+    components: dict[str, ObjectSchema]
     # Maximum depth of recursive schemas inlining
     max_recursion_depth: int = 5
 
 
-def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -> Schema:
+def to_jsonschema(
+    uri: str, schema: Schema, registry: Registry, specification: Specification, config: TransformConfig
+) -> Schema:
     """Transform the given schema to a JSON Schema.
 
     The resulting schema is compatible with `hypothesis-jsonschema`, specifically it will contain
@@ -234,6 +241,11 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
     """
     if isinstance(schema, bool):
         return schema
+    # The input schema comes from the Open API spec and should not be modified in place
+    schema = cast(ObjectSchema, fast_deepcopy(schema))
+    schema.update(config.components)
+    registry = registry.with_resource(uri, Resource(contents=schema, specification=specification))
+    resolver = registry.resolver(base_uri=uri)
 
     logger.debug("Input: %s", schema)
     referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
@@ -247,7 +259,8 @@ def to_jsonschema(schema: Schema, resolver: Resolver, config: TransformConfig) -
         # Trivial case - no extra processing needed, just remove the key
         logger.debug("No references found")
         del schema[MOVED_REFERENCE_ROOT_KEY]
-    for name in config.component_names:
+    # Remove components from the schema as all references in the schema are pointing to `x-moved-references`
+    for name in config.components:
         del schema[name]
     logger.debug("Output: %s", schema)
     return schema
@@ -270,7 +283,18 @@ def _to_self_contained_jsonschema(
 ) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
-        _replace_nullable(item, config.nullable_key, referenced_schemas)
+        type_ = item.get("type")
+        if type_ == "file":
+            _replace_file_type(item)
+        if type_ == "object":
+            if config.remove_write_only:
+                # Write-only properties should not occur in responses
+                rewrite_properties(item, is_write_only)
+            if config.remove_read_only:
+                # Read-only properties should not occur in requests
+                rewrite_properties(item, is_read_only)
+        if item.get(config.nullable_key) is True:
+            _replace_nullable(item, config.nullable_key, referenced_schemas)
         ref = item.get("$ref")
         if isinstance(ref, str):
             resolved = move_referenced_data(item, ref, referenced_schemas, resolver)
@@ -287,18 +311,59 @@ def _to_self_contained_jsonschema(
                 _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
 
 
+def _replace_file_type(item: ObjectSchema) -> None:
+    item["type"] = "string"
+    item["format"] = "binary"
+
+
+def rewrite_properties(schema: ObjectSchema, predicate: Callable[[ObjectSchema], bool]) -> None:
+    required = schema.get("required", [])
+    forbidden = []
+    for name, subschema in list(schema.get("properties", {}).items()):
+        if predicate(subschema):
+            if name in required:
+                required.remove(name)
+            del schema["properties"][name]
+            forbidden.append(name)
+    if forbidden:
+        forbid_properties(schema, forbidden)
+    if not schema.get("required"):
+        schema.pop("required", None)
+    if not schema.get("properties"):
+        schema.pop("properties", None)
+
+
+def forbid_properties(schema: ObjectSchema, forbidden: list[str]) -> None:
+    """Explicitly forbid properties via the `not` keyword."""
+    not_schema = schema.setdefault("not", {})
+    already_forbidden = not_schema.setdefault("required", [])
+    already_forbidden.extend(forbidden)
+    not_schema["required"] = list(set(already_forbidden))
+
+
+def is_write_only(schema: Schema) -> bool:
+    if isinstance(schema, bool):
+        return False
+    return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
+
+
+def is_read_only(schema: Schema) -> bool:
+    if isinstance(schema, bool):
+        return False
+    return schema.get("readOnly", False) or schema.get("x-readOnly", False)
+
+
 def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas: ReferencedSchemas) -> None:
-    if item.get(nullable_key) is True:
-        del item[nullable_key]
-        # Move all other keys to a new object, except for `x-moved-references` which should
-        # always be at the root level
-        inner = {}
-        for key, value in list(item.items()):
-            if value is referenced_schemas:
-                continue
-            inner[key] = value
-            del item[key]
-        item["anyOf"] = [inner, {"type": "null"}]
+    del item[nullable_key]
+    # Move all other keys to a new object, except for `x-moved-references` which should
+    # always be at the root level
+    inner = {}
+    for key, value in list(item.items()):
+        if value is referenced_schemas:
+            continue
+        inner[key] = value
+        del item[key]
+    item["anyOf"] = [inner, {"type": "null"}]
 
 
 def move_referenced_data(

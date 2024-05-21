@@ -1,40 +1,43 @@
 from __future__ import annotations
+
 import string
 import time
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, cast
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-from hypothesis import strategies as st, reject
+from hypothesis import reject
+from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 from requests.utils import to_key_val_list
 
+from ... import auths, serializers
 from ..._hypothesis import prepare_urlencoded
 from ...constants import NOT_SET
-from .formats import STRING_FORMATS
-from ... import auths, serializers
+from ...exceptions import BodyInGetRequestError, SerializationNotPossible
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...internal.copy import fast_deepcopy
-from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from ...internal.copy import fast_deepcopy
 from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, cant_serialize
+from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
-from ...serializers import Binary
 from ...utils import compose, skip
 from .constants import LOCATION_TO_CONTAINER
+from .formats import STRING_FORMATS
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
 from .parameters import OpenAPIBody, parameters_to_json_schema
+from .schemas import BaseOpenAPISchema
 from .utils import is_header_location
 
 HEADER_FORMAT = "_header_value"
@@ -230,7 +233,10 @@ def _get_body_strategy(
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
-    schema = operation.schema.prepare_schema(operation, schema)
+    api_schema = cast(BaseOpenAPISchema, operation.schema)
+    schema = api_schema.convert_schema_to_jsonschema(
+        schema, operation.definition.resolver, remove_write_only=False, remove_read_only=True
+    )  # type: ignore
     strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
@@ -365,7 +371,13 @@ def get_parameters_strategy(
             # contains errors.
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
-        schema = operation.schema.prepare_schema(operation, schema)
+        api_schema = cast(BaseOpenAPISchema, operation.schema)
+        schema = api_schema.convert_schema_to_jsonschema(
+            schema,
+            operation.definition.resolver,
+            remove_write_only=False,
+            remove_read_only=True,
+        )
         for name in exclude:
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
             # that may be invalid

@@ -414,9 +414,6 @@ class BaseSchema(Mapping, Generic[C, D]):
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         raise NotImplementedError
 
-    def prepare_schema(self, operation: APIOperation, schema: Any) -> Any:
-        raise NotImplementedError
-
     def ratelimit(self) -> ContextManager:
         """Limit the rate of sending generated requests."""
         label = urlparse(self.base_url).netloc

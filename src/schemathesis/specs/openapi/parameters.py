@@ -6,7 +6,6 @@ from typing import Any, ClassVar, Iterable
 from ...exceptions import OperationSchemaError
 from ...models import APIOperation
 from ...parameters import Parameter
-from .converter import to_json_schema_recursive
 
 
 @dataclass(eq=False)
@@ -56,7 +55,7 @@ class OpenAPIParameter(Parameter):
 
     def transform_keywords(self, schema: dict[str, Any]) -> dict[str, Any]:
         """Transform Open API specific keywords into JSON Schema compatible form."""
-        definition = to_json_schema_recursive(schema, self.nullable_field)
+        # TODO: unify this logic with `_jsonschema.py`
         # Headers are strings, but it is not always explicitly defined in the schema. By preparing them properly, we
         # can achieve significant performance improvements for such cases.
         # For reference (my machine) - running a single test with 100 examples with the resulting strategy:
@@ -65,8 +64,8 @@ class OpenAPIParameter(Parameter):
         #
         # It also reduces the number of cases when the "filter_too_much" health check fails during testing.
         if self.is_header:
-            definition.setdefault("type", "string")
-        return definition
+            schema.setdefault("type", "string")
+        return schema
 
     def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
         """Convert Open API's `Schema` to JSON Schema."""
