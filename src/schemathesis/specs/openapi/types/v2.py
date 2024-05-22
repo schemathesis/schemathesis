@@ -4,6 +4,10 @@ from typing import Literal, TypedDict
 from .common import Reference, Operation as OperationBase
 
 
+class Specification(TypedDict):
+    swagger: Literal["2.0"]
+
+
 class Operation(OperationBase):
     parameters: list[Parameter | Reference]
 

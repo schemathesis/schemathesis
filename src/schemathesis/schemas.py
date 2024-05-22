@@ -69,6 +69,7 @@ if TYPE_CHECKING:
 
 C = TypeVar("C", bound=Case)
 D = TypeVar("D", bound=OperationDefinition)
+S = TypeVar("S", bound=Mapping)
 
 
 @lru_cache
@@ -77,8 +78,8 @@ def get_full_path(base_path: str, path: str) -> str:
 
 
 @dataclass(eq=False)
-class BaseSchema(Mapping, Generic[C, D]):
-    raw_schema: dict[str, Any]
+class BaseSchema(Mapping, Generic[C, D, S]):
+    raw_schema: S
     transport: Transport
     location: str | None = None
     base_url: str | None = None

@@ -5,6 +5,10 @@ from .common import Reference, Operation as OperationBase
 from .._jsonschema import Schema
 
 
+class Specification(TypedDict):
+    openapi: str
+
+
 class Operation(OperationBase):
     requestBody: RequestBody | Reference
     parameters: list[Parameter | Reference]

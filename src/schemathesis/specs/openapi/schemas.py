@@ -62,6 +62,7 @@ from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
 from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
 from . import links, serialization, types as t
+from .types import v2, v3
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
 from ._jsonschema import (
@@ -234,11 +235,6 @@ class BaseOpenAPISchema(BaseSchema):
 
         return _add_override
 
-    def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
-        while "$ref" in value:
-            value = self.resolver.lookup(value["$ref"]).contents
-        return value
-
     def get_all_operations(
         self, hooks: HookDispatcher | None = None
     ) -> Generator[Result[OpenAPIOperation, OperationSchemaError], None, None]:
@@ -268,41 +264,31 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc)
 
         context = HookContext()
-        # Optimization: local variables are faster than attribute access
-        get_full_path = self.get_full_path
-        endpoint = self.endpoint
-        dispatch_hook = self.dispatch_hook
-        resolve_path_item = self._resolve_path_item
-        should_skip = self._should_skip
-        initialize_shared_parameters = self.initialize_shared_parameters
-        update_shared_parameters = self.update_shared_parameters
-        initialize_local_parameters = self.initialize_local_parameters
-        make_operation = self.make_operation
-        hooks = self.hooks
+        hooks = hooks or self.hooks
         for path, path_item in paths.items():
             method = None
             try:
-                full_path = get_full_path(path)  # Should be available for later use
-                if should_skip_endpoint(full_path, endpoint):
+                full_path = self.get_full_path(path)
+                if should_skip_endpoint(full_path, self.endpoint):
                     continue
-                dispatch_hook("before_process_path", context, path, path_item)
-                resolver, path_item = resolve_path_item(path_item)
-                shared_parameters = initialize_shared_parameters(path_item.get("parameters", []), resolver)
+                self.dispatch_hook("before_process_path", context, path, path_item)
+                resolver, path_item = self._maybe_resolve(path_item, self.resolver)
+                shared_parameters = self.initialize_shared_parameters(path_item.get("parameters", []), resolver)
                 for method, entry in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
                     try:
-                        if should_skip(method, entry):
+                        if self._should_skip(method, entry):
                             continue
-                        local_parameters = initialize_local_parameters(entry, resolver)
-                        shared_parameters = update_shared_parameters(shared_parameters, entry)
+                        local_parameters = self.initialize_local_parameters(entry, resolver)
+                        shared_parameters = self.update_shared_parameters(shared_parameters, entry)
                         parameters = shared_parameters + local_parameters
-                        operation = make_operation(path, method, parameters, entry, resolver)
+                        operation = self.make_operation(path, method, parameters, entry, resolver)
                         context = HookContext(operation=operation)
                         if (
                             should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
                             or should_skip_operation(hooks, context)
-                            or (hooks and should_skip_operation(hooks, context))
+                            or (self.hooks and should_skip_operation(self.hooks, context))
                         ):
                             continue
                         yield Ok(operation)
@@ -364,15 +350,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def _validate(self) -> None:
         raise NotImplementedError
-
-    def _resolve_path_item(self, path_item: dict[str, Any]) -> tuple[Resolver, dict[str, Any]]:
-        # The path item could be behind a reference
-        # In this case, we need to resolve it to get the proper scope for reference inside the item.
-        # It is mostly for validating responses.
-        if "$ref" in path_item:
-            resolved = self.resolver.lookup(path_item["$ref"])
-            return resolved.resolver, resolved.contents
-        return self.resolver, path_item
 
     def make_operation(
         self,
@@ -874,6 +851,7 @@ C = TypeVar("C", bound=Case)
 
 
 class SwaggerV20(BaseOpenAPISchema):
+    raw_schema: v2.Specification
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
@@ -998,7 +976,6 @@ class SwaggerV20(BaseOpenAPISchema):
                 if parameter.get("required", False) and name not in required:
                     required.append(name)
             schema = {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
-            print(schema)
             for media_type in form_data_media_types:
                 # TODO: properly collect it - maybe remove "composite" at all?
                 # Remove `definition` from params as well?
