@@ -535,8 +535,6 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
         moved_references={},
     )
     schema = to_jsonschema(scope or uri, schema, registry, DRAFT4, config)
-    print("XX", schema)
-    print("YY", expected)
     assert schema == expected
     assert_generates(schema)
 

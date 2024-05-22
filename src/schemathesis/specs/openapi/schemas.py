@@ -546,7 +546,9 @@ class BaseOpenAPISchema(BaseSchema):
         )
 
     def get_parameter_serializer(self, operation: OpenAPIOperation, location: str) -> Callable | None:
-        definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
+        # TODO: Evaluate it eagerly
+        # definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
+        definitions = []
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, operation, self.resolver, location
         )
@@ -920,18 +922,29 @@ class SwaggerV20(BaseOpenAPISchema):
     def update_shared_parameters(
         self, parameters: list[OpenAPIParameter], operation: t.Operation
     ) -> list[OpenAPIParameter]:
-        # TODO: Clone body params
-        raise NotImplementedError
+        if not parameters:
+            return parameters
 
-    def initialize_local_parameters(self, operation: t.v3.Operation, resolver: Resolver) -> list[OpenAPIParameter]:
-        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
-        # differently.
-        collected: list[OpenAPIParameter] = []
-        # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
-        # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET operations without payloads).
-        # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
-        # we have operations with a payload.
+        updated: list[OpenAPIParameter] = []
+
+        media_types = self._get_consumes_for_operation(operation)
+        body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
+        form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
+        for parameter in parameters:
+            if isinstance(parameter, OpenAPI20Body):
+                for media_type in body_media_types:
+                    updated.append(
+                        OpenAPI20Body(definition=parameter.definition, schema=parameter.schema, media_type=media_type)
+                    )
+            else:
+                # TODO: What about form parameters?
+                updated.append(parameter)
+        return updated
+
+    def initialize_local_parameters(
+        self, operation: t.v2.Operation, operation_resolver: Resolver
+    ) -> list[OpenAPIParameter]:
+        initialized: list[OpenAPIParameter] = []
         media_types = self._get_consumes_for_operation(operation)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
         body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
@@ -941,26 +954,56 @@ class SwaggerV20(BaseOpenAPISchema):
         form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
         form_parameters = []
-        for parameter in parameters:
-            if "$ref" in parameter:
-                # TODO: use specific resolver for this operation
-                parameter = self.resolver.lookup(parameter["$ref"]).contents
-            if parameter["in"] == "formData":
-                # We need to gather form parameters first before creating a composite parameter for them
-                form_parameters.append(parameter)
-            elif parameter["in"] == "body":
+        parameters = operation.get("parameters", [])
+        for parameter_or_ref in parameters:
+            resolver, parameter = self._maybe_resolve(parameter_or_ref, operation_resolver)
+            if parameter["in"] == "body":
+                schema_or_ref = parameter["schema"]
+                resolver, schema = self._maybe_resolve(schema_or_ref, resolver)
+                cleaned_schema = OpenAPI20Body.clean_schema(schema)
+                converted_schema = self.convert_schema_to_jsonschema(
+                    cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+                )
                 for media_type in body_media_types:
-                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
+                    initialized.append(
+                        OpenAPI20Body(definition=parameter, schema=converted_schema, media_type=media_type)
+                    )
             else:
-                collected.append(OpenAPI20Parameter(definition=parameter))
+                # Open API 2.0 non-body parameters define schema keywords directly in the parameter object
+                cleaned_schema = OpenAPI20Parameter.clean_schema(parameter)
+                converted_schema = self.convert_schema_to_jsonschema(
+                    cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+                )
+                if parameter["in"] == "formData":
+                    # We need to gather form parameters first before creating a composite parameter for them
+                    form_parameters.append((parameter, converted_schema))
+                    continue
+                initialized.append(
+                    OpenAPI20Parameter(
+                        name=parameter["name"],
+                        location=parameter["in"],
+                        required=parameter.get("required", False),
+                        definition=parameter,
+                        schema=converted_schema,
+                    )
+                )
 
         if form_parameters:
+            properties = {}
+            required = []
+            for parameter, schema in form_parameters:
+                name = parameter["name"]
+                properties[name] = schema
+                # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
+                if parameter.get("required", False) and name not in required:
+                    required.append(name)
+            schema = {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
+            print(schema)
             for media_type in form_data_media_types:
-                collected.append(
-                    # Individual `formData` parameters are joined into a single "composite" one.
-                    OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type=media_type)
-                )
-        return collected
+                # TODO: properly collect it - maybe remove "composite" at all?
+                # Remove `definition` from params as well?
+                initialized.append(OpenAPI20CompositeBody(definition={}, schema=schema, media_type=media_type))
+        return initialized
 
     def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
@@ -1126,7 +1169,15 @@ class OpenApi30(SwaggerV20):
             converted_schema = self.convert_schema_to_jsonschema(
                 cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
             )
-            initialized.append(OpenAPI30Parameter(definition=parameter, schema=converted_schema))
+            initialized.append(
+                OpenAPI30Parameter(
+                    name=parameter["name"],
+                    location=parameter["in"],
+                    required=parameter.get("required", False),
+                    definition=parameter,
+                    schema=converted_schema,
+                )
+            )
         return initialized
 
     def update_shared_parameters(
@@ -1154,7 +1205,15 @@ class OpenApi30(SwaggerV20):
             converted_schema = self.convert_schema_to_jsonschema(
                 cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
             )
-            initialized.append(OpenAPI30Parameter(definition=parameter, schema=converted_schema))
+            initialized.append(
+                OpenAPI30Parameter(
+                    name=parameter["name"],
+                    location=parameter["in"],
+                    required=parameter.get("required", False),
+                    definition=parameter,
+                    schema=converted_schema,
+                )
+            )
         if "requestBody" in operation:
             resolver, body = self._maybe_resolve(operation["requestBody"], operation_resolver)
             required = body.get("required", False)
@@ -1166,7 +1225,14 @@ class OpenApi30(SwaggerV20):
                     cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
                 )
                 initialized.append(
-                    OpenAPI30Body(content, schema=converted_schema, media_type=media_type, required=required)
+                    OpenAPI30Body(
+                        name="body",
+                        required=required,
+                        location="body",
+                        definition=content,
+                        schema=converted_schema,
+                        media_type=media_type,
+                    )
                 )
         return initialized
 

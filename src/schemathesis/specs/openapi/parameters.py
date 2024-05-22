@@ -1,6 +1,4 @@
 from __future__ import annotations
-from functools import cached_property
-import json
 from dataclasses import dataclass
 from typing import Any, ClassVar, Iterable, Mapping
 
@@ -13,6 +11,8 @@ from ...parameters import Parameter
 class OpenAPIParameter(Parameter):
     """A single Open API operation parameter."""
 
+    required: bool
+    location: Literal["query", "header", "path", "cookie", "body"]
     # JSON Schema to generate this parameter
     schema: dict[str, Any]
 
@@ -20,37 +20,6 @@ class OpenAPIParameter(Parameter):
     examples_field: ClassVar[str]
     nullable_field: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[tuple[str, ...]]
-
-    @property
-    def description(self) -> str | None:
-        """A brief parameter description."""
-        return self.definition.get("description")
-
-    @property
-    def location(self) -> str:
-        """Where this parameter is located.
-
-        E.g. "query".
-        """
-        return {"formData": "body"}.get(self.raw_location, self.raw_location)
-
-    @property
-    def raw_location(self) -> str:
-        """Open API specific location name."""
-        return self.definition["in"]
-
-    @property
-    def name(self) -> str:
-        """Parameter name."""
-        return self.definition["name"]
-
-    @property
-    def is_required(self) -> bool:
-        return self.definition.get("required", False)
-
-    @property
-    def is_header(self) -> bool:
-        raise NotImplementedError
 
     @classmethod
     def clean_schema(cls, schema: Mapping[str, Any]) -> dict[str, Any]:
@@ -60,11 +29,6 @@ class OpenAPIParameter(Parameter):
             # Allow only supported keywords or vendor extensions
             if key in cls.supported_jsonschema_keywords or key.startswith("x-") or key == cls.nullable_field
         }
-
-    def serialize(self, operation: APIOperation) -> str:
-        # For simplicity, JSON Schema semantics is not taken into account (e.g. 1 == 1.0)
-        # I.e. two semantically equal schemas may have different representation
-        return json.dumps(self.definition, sort_keys=True)
 
 
 @dataclass(eq=False)
@@ -157,19 +121,6 @@ class OpenAPI30Parameter(OpenAPIParameter):
 class OpenAPIBody(OpenAPIParameter):
     media_type: str
 
-    @property
-    def location(self) -> str:
-        return "body"
-
-    @property
-    def name(self) -> str:
-        # The name doesn't matter but is here for the interface completeness.
-        return "body"
-
-    @property
-    def is_form(self) -> bool:
-        raise NotImplementedError
-
 
 @dataclass(eq=False)
 class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
@@ -204,10 +155,6 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     # NOTE. For Open API 2.0 bodies, we still give `x-example` precedence over the schema-level `example` field to keep
     # the precedence rules consistent.
 
-    @property
-    def is_form(self) -> bool:
-        return False
-
 
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
@@ -220,45 +167,10 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     The value of the `definition` field is essentially the Open API 3.0 `MediaType`.
     """
 
-    # The `required` keyword is located above the schema for concrete media-type;
-    # Therefore, it is passed here explicitly
-    required: bool = False
-
-    @property
-    def is_form(self) -> bool:
-        """Whether this payload represent a form."""
-        return self.media_type in FORM_MEDIA_TYPES
-
-    @property
-    def is_required(self) -> bool:
-        return self.required
-
 
 @dataclass(eq=False)
 class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     """A special container to abstract over multiple `formData` parameters."""
-
-    definition: list[OpenAPI20Parameter]
-
-    @classmethod
-    def from_parameters(cls, *parameters: dict[str, Any], media_type: str) -> OpenAPI20CompositeBody:
-        return cls(
-            definition=[OpenAPI20Parameter(parameter) for parameter in parameters],
-            media_type=media_type,
-        )
-
-    @property
-    def description(self) -> str | None:
-        return None
-
-    @property
-    def is_required(self) -> bool:
-        # We generate an object for formData - it is always required.
-        return bool(self.definition)
-
-    @property
-    def is_form(self) -> bool:
-        return True
 
 
 def parameters_to_json_schema(parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
@@ -303,7 +215,7 @@ def parameters_to_json_schema(parameters: Iterable[OpenAPIParameter]) -> dict[st
         name = parameter.name
         properties[name] = parameter.schema
         # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
-        if parameter.is_required and name not in required:
+        if parameter.required and name not in required:
             required.append(name)
     return {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
 

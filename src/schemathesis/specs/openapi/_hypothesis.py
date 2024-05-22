@@ -226,22 +226,16 @@ def _get_body_strategy(
     operation: APIOperation,
     generation_config: GenerationConfig,
 ) -> st.SearchStrategy:
-    from .schemas import BaseOpenAPISchema
-
     if parameter.media_type in MEDIA_TYPES:
         return MEDIA_TYPES[parameter.media_type]
     # The cache key relies on object ids, which means that the parameter should not be mutated
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
-    api_schema = cast(BaseOpenAPISchema, operation.schema)
-    schema = api_schema.convert_schema_to_jsonschema(
-        parameter.schema, operation.definition.resolver, remove_write_only=False, remove_read_only=True
+    strategy = strategy_factory(
+        parameter.schema, operation.verbose_name, "body", parameter.media_type, generation_config
     )
-    if parameter.is_form:
-        schema.setdefault("type", "object")
-    strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
-    if not parameter.is_required:
+    if not parameter.required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
     return strategy
@@ -362,8 +356,6 @@ def get_parameters_strategy(
     exclude: Iterable[str] = (),
 ) -> st.SearchStrategy:
     """Create a new strategy for the case's component from the API operation parameters."""
-    from .schemas import BaseOpenAPISchema
-
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
     if parameters:
         # The cache key relies on object ids, which means that the parameter should not be mutated
@@ -371,13 +363,6 @@ def get_parameters_strategy(
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
         schema = parameters_to_json_schema(parameters)
-        api_schema = cast(BaseOpenAPISchema, operation.schema)
-        schema = api_schema.convert_schema_to_jsonschema(
-            schema,
-            operation.definition.resolver,
-            remove_write_only=False,
-            remove_read_only=True,
-        )
         for name in exclude:
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
             # that may be invalid
