@@ -180,7 +180,7 @@ MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
 MOVED_REFERENCE_PREFIX = f"#/{MOVED_REFERENCE_ROOT_KEY}"
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
-ReferencedSchemas = Dict[str, ObjectSchema]
+MovedSchemas = Dict[str, ObjectSchema]
 
 
 class Resolved(Protocol):
@@ -204,15 +204,17 @@ class TransformConfig:
     # Remove properties with the "readOnly" flag set to `True`.
     # Read only properties are used in responses and should not be present in requests.
     remove_read_only: bool
-    # Unprocessed components that could be potentially referenced by the schema
+    # Components that could be potentially referenced by the schema
     components: dict[str, ObjectSchema]
+    # Previously moved references
+    moved_references: MovedSchemas
     # Maximum depth of recursive schemas inlining
     max_recursion_depth: int = 5
 
 
 def to_jsonschema(
-    uri: str, schema: Schema, registry: Registry, specification: Specification, config: TransformConfig
-) -> Schema:
+    uri: str, schema: ObjectSchema, registry: Registry, specification: Specification, config: TransformConfig
+) -> ObjectSchema:
     """Transform the given schema to a JSON Schema.
 
     The resulting schema is compatible with `hypothesis-jsonschema`, specifically it will contain
@@ -238,12 +240,15 @@ def to_jsonschema(
 
     4. Transformation of Open API specific keywords:
        - Transform Open API specific keywords, such as `nullable`, are to their JSON Schema equivalents.
+
+    It accepts shared components and already moved references as input and mutates them to make subsequent calls
+    cheaper.
     """
-    if isinstance(schema, bool):
-        return schema
     # The input schema comes from the Open API spec and should not be modified in place
-    schema = cast(ObjectSchema, fast_deepcopy(schema))
+    schema = fast_deepcopy(schema)
     schema.update(config.components)
+
+    schema[MOVED_REFERENCE_ROOT_KEY] = config.moved_references
     registry = registry.with_resource(uri, Resource(contents=schema, specification=specification))
     resolver = registry.resolver(base_uri=uri)
 
@@ -252,9 +257,13 @@ def to_jsonschema(
 
     if referenced_schemas:
         # Check for recursive references
-        references = find_recursive_references(referenced_schemas)
+        references = find_recursive_references(referenced_schemas, config.moved_references)
         logger.debug("Found %s recursive references", len(references))
-        inline_recursive_references(referenced_schemas, referenced_schemas, references, config)
+        inline_recursive_references(config.moved_references, config.moved_references, references, config)
+        # Leave only references that are used in this particular schema
+        schema[MOVED_REFERENCE_ROOT_KEY] = {
+            key: value for key, value in schema[MOVED_REFERENCE_ROOT_KEY].items() if key in referenced_schemas
+        }
     else:
         # Trivial case - no extra processing needed, just remove the key
         logger.debug("No references found")
@@ -266,18 +275,15 @@ def to_jsonschema(
     return schema
 
 
-def to_self_contained_jsonschema(
-    schema: ObjectSchema, resolver: Resolver, config: TransformConfig
-) -> ReferencedSchemas:
-    referenced_schemas: ReferencedSchemas = {}
-    schema[MOVED_REFERENCE_ROOT_KEY] = referenced_schemas
+def to_self_contained_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> set[str]:
+    referenced_schemas: set[str] = set()
     _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config)
     return referenced_schemas
 
 
 def _to_self_contained_jsonschema(
     item: ObjectSchema | list[ObjectSchema],
-    referenced_schemas: ReferencedSchemas,
+    referenced_schemas: set[str],
     resolver: Resolver,
     config: TransformConfig,
 ) -> None:
@@ -294,10 +300,10 @@ def _to_self_contained_jsonschema(
                 # Read-only properties should not occur in requests
                 rewrite_properties(item, is_read_only)
         if item.get(config.nullable_key) is True:
-            _replace_nullable(item, config.nullable_key, referenced_schemas)
+            _replace_nullable(item, config.nullable_key, config.moved_references)
         ref = item.get("$ref")
         if isinstance(ref, str):
-            resolved = move_referenced_data(item, ref, referenced_schemas, resolver)
+            resolved = move_referenced_data(item, ref, referenced_schemas, config, resolver)
             if resolved is not None:
                 item, resolver = resolved
                 _to_self_contained_jsonschema(item, referenced_schemas, resolver, config)
@@ -353,13 +359,14 @@ def is_read_only(schema: Schema) -> bool:
     return schema.get("readOnly", False) or schema.get("x-readOnly", False)
 
 
-def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas: ReferencedSchemas) -> None:
+def _replace_nullable(item: ObjectSchema, nullable_key: str, moved_schemas: MovedSchemas) -> None:
     del item[nullable_key]
     # Move all other keys to a new object, except for `x-moved-references` which should
     # always be at the root level
     inner = {}
     for key, value in list(item.items()):
-        if value is referenced_schemas:
+        # Prevent removing `x-moved-references` from the root
+        if value is moved_schemas:
             continue
         inner[key] = value
         del item[key]
@@ -367,7 +374,7 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str, referenced_schemas:
 
 
 def move_referenced_data(
-    item: ObjectSchema, ref: str, referenced_schemas: ReferencedSchemas, resolver: Resolver
+    item: ObjectSchema, ref: str, referenced_schemas: set[str], config: TransformConfig, resolver: Resolver
 ) -> tuple[Any, Resolver] | None:
     if ref.startswith(MOVED_REFERENCE_PREFIX):
         logger.debug("Already moved %s", ref)
@@ -377,7 +384,8 @@ def move_referenced_data(
     logger.debug("Resolving %s", ref)
     resolved = resolver.lookup(ref)
     key = _make_reference_key(ref)
-    referenced_schemas[key] = resolved.contents
+    config.moved_references[key] = resolved.contents
+    referenced_schemas.add(key)
     new_ref = f"{MOVED_REFERENCE_PREFIX}/{key}"
     item["$ref"] = new_ref
     logger.debug("Moved reference: %s -> %s", ref, new_ref)
@@ -385,17 +393,17 @@ def move_referenced_data(
     return resolved.contents, resolved.resolver
 
 
-def find_recursive_references(schema_storage: ReferencedSchemas) -> set[str]:
+def find_recursive_references(moved_references: set[str], schema_storage: MovedSchemas) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
-    for item in schema_storage.values():
-        _find_recursive_references(item, schema_storage, references)
+    for key in moved_references:
+        _find_recursive_references(schema_storage[key], schema_storage, references)
     return references
 
 
 def _find_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
-    referenced_schemas: ReferencedSchemas,
+    referenced_schemas: MovedSchemas,
     references: set[str],
     path: tuple[str, ...] = (),
 ) -> None:
@@ -424,7 +432,7 @@ def _find_recursive_references(
 
 def inline_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
-    referenced_schemas: ReferencedSchemas,
+    referenced_schemas: MovedSchemas,
     references: set[str],
     config: TransformConfig,
     path: tuple[str, ...] = (),

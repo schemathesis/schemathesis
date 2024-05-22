@@ -155,7 +155,6 @@ def setup_schema(request, uri, scope, schema):
         "expected",
     ),
     (
-        (DEFAULT_URI, "", True, {}, True),
         (
             DEFAULT_URI,
             "",
@@ -500,7 +499,6 @@ def setup_schema(request, uri, scope, schema):
         ),
     ),
     ids=(
-        "boolean",
         "empty",
         "local-ref-no-nesting",
         "local-ref-nested-in-object",
@@ -534,8 +532,11 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
         remove_write_only=False,
         remove_read_only=False,
         components=components,
+        moved_references={},
     )
     schema = to_jsonschema(scope or uri, schema, registry, DRAFT4, config)
+    print("XX", schema)
+    print("YY", expected)
     assert schema == expected
     assert_generates(schema)
 
@@ -612,7 +613,9 @@ def assert_generates(schema):
     ),
 )
 def test_openapi_specifics(schema, expected):
-    config = TransformConfig(nullable_key="nullable", remove_write_only=True, remove_read_only=True, components={})
+    config = TransformConfig(
+        nullable_key="nullable", remove_write_only=True, remove_read_only=True, components={}, moved_references={}
+    )
     schema = to_jsonschema("", schema, EMPTY_REGISTRY, DRAFT4, config)
     assert schema == expected
     assert_generates(schema)

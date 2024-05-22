@@ -2,7 +2,7 @@ from __future__ import annotations
 from functools import cached_property
 import json
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable
+from typing import Any, ClassVar, Iterable, Mapping
 
 from ...exceptions import OperationSchemaError
 from ...models import APIOperation
@@ -12,6 +12,9 @@ from ...parameters import Parameter
 @dataclass(eq=False)
 class OpenAPIParameter(Parameter):
     """A single Open API operation parameter."""
+
+    # JSON Schema to generate this parameter
+    schema: dict[str, Any]
 
     example_field: ClassVar[str]
     examples_field: ClassVar[str]
@@ -49,16 +52,13 @@ class OpenAPIParameter(Parameter):
     def is_header(self) -> bool:
         raise NotImplementedError
 
-    @cached_property
-    def schema(self) -> dict[str, Any]:
-        raise NotImplementedError
-
-    def _filter_schema(self, schema: dict[str, Any]) -> dict[str, Any]:
+    @classmethod
+    def clean_schema(cls, schema: Mapping[str, Any]) -> dict[str, Any]:
         return {
             key: value
             for key, value in schema.items()
             # Allow only supported keywords or vendor extensions
-            if key in self.supported_jsonschema_keywords or key.startswith("x-") or key == self.nullable_field
+            if key in cls.supported_jsonschema_keywords or key.startswith("x-") or key == cls.nullable_field
         }
 
     def serialize(self, operation: APIOperation) -> str:
@@ -106,10 +106,6 @@ class OpenAPI20Parameter(OpenAPIParameter):
     def is_header(self) -> bool:
         return self.location == "header"
 
-    @cached_property
-    def schema(self) -> dict[str, Any]:
-        return self._filter_schema(self.definition)
-
 
 @dataclass(eq=False)
 class OpenAPI30Parameter(OpenAPIParameter):
@@ -155,11 +151,6 @@ class OpenAPI30Parameter(OpenAPIParameter):
     @property
     def is_header(self) -> bool:
         return self.location in ("header", "cookie")
-
-    @property
-    def schema(self) -> dict[str, Any]:
-        schema = self.definition.get("schema")
-        return schema
 
 
 @dataclass(eq=False)
@@ -217,11 +208,6 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
     def is_form(self) -> bool:
         return False
 
-    @property
-    def schema(self) -> dict[str, Any]:
-        # `schema` is required in Open API 2.0 when the `in` keyword is `body`
-        return self.definition["schema"]
-
 
 FORM_MEDIA_TYPES = ("multipart/form-data", "application/x-www-form-urlencoded")
 
@@ -237,10 +223,6 @@ class OpenAPI30Body(OpenAPIBody, OpenAPI30Parameter):
     # The `required` keyword is located above the schema for concrete media-type;
     # Therefore, it is passed here explicitly
     required: bool = False
-    description: str | None = None
-
-    def get_schema(self) -> dict[str, Any]:
-        return get_media_type_schema(self.definition)
 
     @property
     def is_form(self) -> bool:
@@ -277,11 +259,6 @@ class OpenAPI20CompositeBody(OpenAPIBody, OpenAPI20Parameter):
     @property
     def is_form(self) -> bool:
         return True
-
-    @cached_property
-    def schema(self) -> dict[str, Any]:
-        # TODO: it should be filtered first before passing
-        return parameters_to_json_schema(self.definition)
 
 
 def parameters_to_json_schema(parameters: Iterable[OpenAPIParameter]) -> dict[str, Any]:
