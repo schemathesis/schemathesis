@@ -214,6 +214,33 @@ class TransformConfig:
     recursive_references: RecursiveReferencesCache
 
 
+META = {"keys": {}, "calls": 0}
+
+PLAIN_KEYWORDS = {
+    "format",
+    "multipleOf",
+    "maximum",
+    "exclusiveMaximum",
+    "minimum",
+    "exclusiveMinimum",
+    "maxLength",
+    "minLength",
+    "pattern",
+    "maxItems",
+    "minItems",
+    "uniqueItems",
+    "maxProperties",
+    "minProperties",
+    "required",
+    "enum",
+    "type",
+}
+
+
+def _should_skip(schema: ObjectSchema) -> bool:
+    return schema.get("type") != "file" and not set(schema) - PLAIN_KEYWORDS
+
+
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
     """Transform the given schema to a JSON Schema.
 
@@ -245,6 +272,8 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     cheaper.
     """
     logger.debug("Input: %s", schema)
+    if _should_skip(schema):
+        return schema
 
     referenced_schema_names = to_self_contained_jsonschema(schema, resolver, config)
 
@@ -375,9 +404,6 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
 def move_referenced_data(
     item: ObjectSchema, ref: str, referenced_schemas: set[str], config: TransformConfig, resolver: Resolver
 ) -> tuple[Any, Resolver] | None:
-    if ref.startswith(MOVED_REFERENCE_PREFIX):
-        logger.debug("Already moved %s", ref)
-        return None
     if ref.startswith("file://"):
         ref = ref[7:]
     key = _make_reference_key(ref)
