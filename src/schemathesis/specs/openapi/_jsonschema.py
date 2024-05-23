@@ -4,13 +4,13 @@ import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha1
-from typing import Any, Callable, Dict, MutableMapping, Protocol, Union, Iterable, cast
+from typing import Any, Callable, Dict, Iterable, MutableMapping, Protocol, Union, cast
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 import referencing.retrieval
 import requests
-from referencing import Resource, Specification, Registry
+from referencing import Registry, Resource, Specification
 from referencing.exceptions import Unresolvable, Unretrievable
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
@@ -255,7 +255,7 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
             if ref in cache:
                 references.update(cache[ref])
             else:
-                found = find_recursive_references(ref, config.moved_references)
+                found = find_recursive_references(ref, config.moved_references, cache)
                 cache[ref] = found
                 references.update(found)
         logger.debug("Found %s recursive references", len(references))
@@ -391,53 +391,47 @@ def move_referenced_data(
     return resolved.contents, resolved.resolver
 
 
-def find_recursive_references(key: str, schema_storage: MovedSchemas) -> set[str]:
+def find_recursive_references(key: str, schema_storage: MovedSchemas, cache: dict[str, set[str]]) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
-    _find_recursive_references(schema_storage[key], schema_storage, references, [])
+    _find_recursive_references(schema_storage[key], schema_storage, references, [], cache)
     return references
-
-
-META = {
-    "total": 0,
-    "unique": 0,
-}
-UNIQUE = set()
 
 
 def _find_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: MovedSchemas,
-    references: set[str],
+    recursive: set[str],
     path: list[str],
+    cache: dict[str, set[str]],
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
     if isinstance(item, dict):
         ref = item.get("$ref")
-        # META["total"] += 1
-        # UNIQUE.add(ref)
-        # META["unique"] = len(UNIQUE)
-        # print(META)
         if isinstance(ref, str):
             if ref in path:
                 # The reference was already seen in the current traversl path, it means that it's recursive
                 logger.debug("Found recursive reference: %s at %r", ref, path)
-                references.add(ref)
+                recursive.add(ref)
             else:
                 # Otherwise explore the referenced item
                 key = ref[MOVED_REFERENCE_KEY_LENGTH:]
+                cached = cache.get(key)
+                if cached is not None and not cached:
+                    # The reference was already explored and it's not recursive
+                    return
                 referenced_item = referenced_schemas[key]
                 path.append(ref)
-                _find_recursive_references(referenced_item, referenced_schemas, references, path)
+                _find_recursive_references(referenced_item, referenced_schemas, recursive, path, cache)
                 path.pop()
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
-                    _find_recursive_references(value, referenced_schemas, references, path)
+                    _find_recursive_references(value, referenced_schemas, recursive, path, cache)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                _find_recursive_references(sub_item, referenced_schemas, references, path)
+                _find_recursive_references(sub_item, referenced_schemas, recursive, path, cache)
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
