@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, MutableMapping, Mapping
 
 
 def fast_deepcopy(value: Any) -> Any:
@@ -11,3 +11,12 @@ def fast_deepcopy(value: Any) -> Any:
     if isinstance(value, list):
         return [fast_deepcopy(v) for v in value]
     return value
+
+
+def merge_into(target: MutableMapping[str, Any], source: Mapping[str, Any]) -> None:
+    """Merge the contents of the `source` dictionary into the `target` dictionary in-place.
+
+    This function only merges the top-level dictionary, and uses `fast_deepcopy` for the nested values.
+    """
+    for key, value in source.items():
+        target[key] = fast_deepcopy(value)

@@ -14,7 +14,7 @@ from referencing import Registry, Resource, Specification
 from referencing.exceptions import Unresolvable, Unretrievable
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...internal.copy import fast_deepcopy
+from ...internal.copy import fast_deepcopy, merge_into
 from ...loaders import load_yaml
 from .constants import ALL_KEYWORDS
 from .utils import get_type
@@ -294,7 +294,7 @@ def _to_self_contained_jsonschema(
         type_ = item.get("type")
         if type_ == "file":
             _replace_file_type(item)
-        if type_ == "object":
+        elif type_ == "object":
             if config.remove_write_only:
                 # Write-only properties should not occur in responses
                 rewrite_properties(item, is_write_only)
@@ -380,16 +380,19 @@ def move_referenced_data(
         return None
     if ref.startswith("file://"):
         ref = ref[7:]
-    logger.debug("Resolving %s", ref)
-    resolved = resolver.lookup(ref)
     key = _make_reference_key(ref)
-    config.moved_references[key] = resolved.contents
-    referenced_schemas.add(key)
     new_ref = f"{MOVED_REFERENCE_PREFIX}{key}"
+    referenced_schemas.add(key)
     item["$ref"] = new_ref
-    logger.debug("Moved reference: %s -> %s", ref, new_ref)
-    logger.debug("Resolved %s -> %s", ref, resolved.contents)
-    return resolved.contents, resolved.resolver
+    if key not in config.moved_references:
+        logger.debug("Resolving %s", ref)
+        resolved = resolver.lookup(ref)
+        config.moved_references[key] = resolved.contents
+        logger.debug("Moved reference: %s -> %s", ref, new_ref)
+        logger.debug("Resolved %s -> %s", ref, resolved.contents)
+        return resolved.contents, resolved.resolver
+    logger.debug("Already resolved %s", ref)
+    return None
 
 
 def find_recursive_references(key: str, schema_storage: MovedSchemas, cache: RecursiveReferencesCache) -> set[str]:
@@ -427,7 +430,7 @@ def _find_recursive_references(
                 path.pop()
         else:
             for value in item.values():
-                if isinstance(value, (dict, list)):
+                if isinstance(value, (dict, list)) and value:
                     _find_recursive_references(value, referenced_schemas, recursive, path, cache)
     else:
         for sub_item in item:
@@ -460,8 +463,7 @@ def _inline_recursive_references(
                 if path.count(key) < 3:
                     logger.debug("Inlining recursive reference: %s", ref)
                     # Extend with a deep copy as the tree should grow with owned data
-                    # TODO: update could be faster - i.e. the top level container already exists
-                    item.update(fast_deepcopy(referenced_item))
+                    merge_into(item, referenced_item)
                     _inline_recursive_references(item, referenced_schemas, references, path + (key,))
                 else:
                     logger.debug("Max recursion depth reached for %s at %s", key, path)
