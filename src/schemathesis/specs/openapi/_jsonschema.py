@@ -209,8 +209,6 @@ class TransformConfig:
     components: dict[str, ObjectSchema]
     # Previously moved references
     moved_references: MovedSchemas
-    # Maximum depth of recursive schemas inlining
-    max_recursion_depth: int = 3
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
@@ -264,7 +262,7 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
             #     import pdb
             #
             #     pdb.set_trace()
-            inline_recursive_references(used_moved_references, references, config)
+            inline_recursive_references(used_moved_references, references)
     else:
         logger.debug("No references found")
     logger.debug("Output: %s", schema)
@@ -425,20 +423,15 @@ def _find_recursive_references(
                 _find_recursive_references(sub_item, referenced_schemas, references, path)
 
 
-def inline_recursive_references(
-    referenced_schemas: MovedSchemas,
-    references: set[str],
-    config: TransformConfig,
-) -> None:
+def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
     for key, item in referenced_schemas.items():
-        _inline_recursive_references(item, referenced_schemas, references, config, (key,))
+        _inline_recursive_references(item, referenced_schemas, references, (key,))
 
 
 def _inline_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: MovedSchemas,
     references: set[str],
-    config: TransformConfig,
     path: tuple[str, ...],
 ) -> None:
     """Inline all recursive references in the given item."""
@@ -451,7 +444,7 @@ def _inline_recursive_references(
             # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
             #       Just copy the value and directly jump to the next ref in it, or iterate over them
             if ref in references:
-                if path.count(ref) < config.max_recursion_depth:
+                if path.count(ref) < 3:
                     logger.debug("Inlining recursive reference: %s", ref)
                     if referenced_item is item:
                         # Direct reference to itself, schema is infinitely recursive and cannot be inlined
@@ -460,19 +453,19 @@ def _inline_recursive_references(
                         return
                     item.clear()
                     item.update(fast_deepcopy(referenced_item))
-                    _inline_recursive_references(item, referenced_schemas, references, config, path + (ref,))
+                    _inline_recursive_references(item, referenced_schemas, references, path + (ref,))
                 else:
                     logger.debug("Max recursion depth reached for %s at %s", ref, path)
             else:
-                _inline_recursive_references(referenced_item, referenced_schemas, references, config, path + (ref,))
+                _inline_recursive_references(referenced_item, referenced_schemas, references, path + (ref,))
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
-                    _inline_recursive_references(value, referenced_schemas, references, config, path)
+                    _inline_recursive_references(value, referenced_schemas, references, path)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                _inline_recursive_references(sub_item, referenced_schemas, references, config, path)
+                _inline_recursive_references(sub_item, referenced_schemas, references, path)
 
 
 def _make_reference_key(reference: str) -> str:
