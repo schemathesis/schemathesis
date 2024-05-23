@@ -1,0 +1,19 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/1c24e494af1fb2a1dc61566b6826f0a6197b3426",
+        "x-moved-references": {
+          "1c24e494af1fb2a1dc61566b6826f0a6197b3426": {}
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-0",
+  "path_parameters": [],
+  "query": []
+}

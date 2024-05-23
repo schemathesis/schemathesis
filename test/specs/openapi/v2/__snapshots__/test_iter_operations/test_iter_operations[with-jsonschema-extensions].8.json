@@ -1,0 +1,52 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/ac93145f4980ad46c568e6c02a3f56969319717e",
+        "x-moved-references": {
+          "a0bf5feec069d7525bb02754ffe8191aaadb5942": {
+            "properties": {
+              "address": {
+                "format": "email",
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "ac93145f4980ad46c568e6c02a3f56969319717e": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "user": {
+                "$ref": "#/x-moved-references/e8fba7786849973df5b38f3b4f84ae1f247d4ec0"
+              }
+            },
+            "type": "object"
+          },
+          "e8fba7786849973df5b38f3b4f84ae1f247d4ec0": {
+            "properties": {
+              "email": {
+                "$ref": "#/x-moved-references/a0bf5feec069d7525bb02754ffe8191aaadb5942"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/nested-refs",
+  "path_parameters": [],
+  "query": []
+}

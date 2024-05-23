@@ -169,6 +169,46 @@
           }
         }
       }
+    },
+    "/nested-refs": {
+      "post": {
+        "summary": "Create with nested references",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NestedRefBody"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/ref-cycle-0": {
+      "post": {
+        "summary": "Create with 0-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle0"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -278,6 +318,43 @@
           }
         }
       ]
+    },
+    "NestedRefBody": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/definitions/User"
+        }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "$ref": "#/definitions/Email"
+        }
+      }
+    },
+    "Email": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "format": "email"
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RefCycle0": {
+      "$ref": "#/definitions/RefCycle0"
     }
   }
 }
