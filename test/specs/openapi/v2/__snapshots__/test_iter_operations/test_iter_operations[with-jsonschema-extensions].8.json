@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/ac93145f4980ad46c568e6c02a3f56969319717e",
+        "$ref": "#/x-moved-references/-definitions-NestedRefBody",
         "x-moved-references": {
-          "a0bf5feec069d7525bb02754ffe8191aaadb5942": {
+          "-definitions-Email": {
             "properties": {
               "address": {
                 "format": "email",
@@ -18,21 +18,21 @@
             },
             "type": "object"
           },
-          "ac93145f4980ad46c568e6c02a3f56969319717e": {
+          "-definitions-NestedRefBody": {
             "properties": {
               "id": {
                 "type": "string"
               },
               "user": {
-                "$ref": "#/x-moved-references/e8fba7786849973df5b38f3b4f84ae1f247d4ec0"
+                "$ref": "#/x-moved-references/-definitions-User"
               }
             },
             "type": "object"
           },
-          "e8fba7786849973df5b38f3b4f84ae1f247d4ec0": {
+          "-definitions-User": {
             "properties": {
               "email": {
-                "$ref": "#/x-moved-references/a0bf5feec069d7525bb02754ffe8191aaadb5942"
+                "$ref": "#/x-moved-references/-definitions-Email"
               },
               "name": {
                 "type": "string"

@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/bc607981a224391ef513910798980f1765b9833f",
+        "$ref": "#/x-moved-references/-definitions-NullableFalse",
         "x-moved-references": {
-          "bc607981a224391ef513910798980f1765b9833f": {
+          "-definitions-NullableFalse": {
             "properties": {
               "email": {
                 "type": "string"

@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/95bea4508f5ec11d76fb5b1e53f82282442e8591",
+        "$ref": "#/x-moved-references/-definitions-ReadOnlyTrueRequired",
         "x-moved-references": {
-          "95bea4508f5ec11d76fb5b1e53f82282442e8591": {
+          "-definitions-ReadOnlyTrueRequired": {
             "not": {
               "required": [
                 "id"

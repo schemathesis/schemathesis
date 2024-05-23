@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/305cda45a5e30d678f0014f51e9261005d880072",
+        "$ref": "#/x-moved-references/-definitions-RefCycle1",
         "x-moved-references": {
-          "305cda45a5e30d678f0014f51e9261005d880072": {
+          "-definitions-RefCycle1": {
             "properties": {
               "id": {
                 "type": "string"
@@ -39,7 +39,7 @@
             },
             "type": "object"
           },
-          "31a8d0f931dd0af3fc1b0fe06ac6bf0f4cc8da65": {
+          "-definitions-RefCycle1B": {
             "properties": {
               "name": {
                 "type": "string"

@@ -4,9 +4,58 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/71e522da3f9c45c7d1f8516fc3e8cd142b0cea70",
+        "$ref": "#/x-moved-references/-definitions-RefCycle2",
         "x-moved-references": {
-          "12a6abf733282fc59e6bb6420d8ded53d5ac8895": {
+          "-definitions-RefCycle2": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "properties": {
+                      "email": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ref": {
+                                "properties": {
+                                  "email": {
+                                    "type": "string"
+                                  },
+                                  "ref": {}
+                                },
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle2B": {
             "properties": {
               "name": {
                 "type": "string"
@@ -71,7 +120,7 @@
             },
             "type": "object"
           },
-          "46c764c2a95ae565aab43bec82b14c5a581c1e4a": {
+          "-definitions-RefCycle2C": {
             "properties": {
               "email": {
                 "type": "string"
@@ -110,55 +159,6 @@
                                     },
                                     "type": "object"
                                   }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          "71e522da3f9c45c7d1f8516fc3e8cd142b0cea70": {
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "ref": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "properties": {
-                      "email": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "ref": {
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "ref": {
-                                "properties": {
-                                  "email": {
-                                    "type": "string"
-                                  },
-                                  "ref": {}
                                 },
                                 "type": "object"
                               }

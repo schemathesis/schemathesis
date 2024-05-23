@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/1c24e494af1fb2a1dc61566b6826f0a6197b3426",
+        "$ref": "#/x-moved-references/-definitions-RefCycle0",
         "x-moved-references": {
-          "1c24e494af1fb2a1dc61566b6826f0a6197b3426": {}
+          "-definitions-RefCycle0": {}
         }
       }
     }

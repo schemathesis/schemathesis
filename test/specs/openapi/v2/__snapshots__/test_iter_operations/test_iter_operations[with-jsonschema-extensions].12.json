@@ -4,9 +4,90 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/ebc40abea886239e50fe53783e23885095b18b4a",
+        "$ref": "#/x-moved-references/-definitions-RefCycle4",
         "x-moved-references": {
-          "435ad087493aceff9aa44011a9797560f86427ac": {
+          "-definitions-RefCycle4": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "properties": {
+                      "email": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "phone": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "properties": {
+                              "address": {
+                                "type": "string"
+                              },
+                              "ref": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "ref": {
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "ref": {
+                                        "properties": {
+                                          "email": {
+                                            "type": "string"
+                                          },
+                                          "ref": {
+                                            "properties": {
+                                              "phone": {
+                                                "type": "string"
+                                              },
+                                              "ref": {
+                                                "properties": {
+                                                  "address": {
+                                                    "type": "string"
+                                                  },
+                                                  "ref": {}
+                                                },
+                                                "type": "object"
+                                              }
+                                            },
+                                            "type": "object"
+                                          }
+                                        },
+                                        "type": "object"
+                                      }
+                                    },
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle4B": {
             "properties": {
               "name": {
                 "type": "string"
@@ -119,193 +200,7 @@
             },
             "type": "object"
           },
-          "81017094b971f176095f8820e27fd33ce208aa6e": {
-            "properties": {
-              "address": {
-                "type": "string"
-              },
-              "ref": {
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "properties": {
-                          "email": {
-                            "type": "string"
-                          },
-                          "ref": {
-                            "properties": {
-                              "phone": {
-                                "type": "string"
-                              },
-                              "ref": {
-                                "properties": {
-                                  "address": {
-                                    "type": "string"
-                                  },
-                                  "ref": {
-                                    "properties": {
-                                      "id": {
-                                        "type": "string"
-                                      },
-                                      "ref": {
-                                        "properties": {
-                                          "name": {
-                                            "type": "string"
-                                          },
-                                          "ref": {
-                                            "properties": {
-                                              "email": {
-                                                "type": "string"
-                                              },
-                                              "ref": {
-                                                "properties": {
-                                                  "phone": {
-                                                    "type": "string"
-                                                  },
-                                                  "ref": {
-                                                    "properties": {
-                                                      "address": {
-                                                        "type": "string"
-                                                      },
-                                                      "ref": {}
-                                                    },
-                                                    "type": "object"
-                                                  }
-                                                },
-                                                "type": "object"
-                                              }
-                                            },
-                                            "type": "object"
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          "c52019b24bff8e5ea9622eaa38b11d5dea87e18c": {
-            "properties": {
-              "phone": {
-                "type": "string"
-              },
-              "ref": {
-                "properties": {
-                  "address": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "ref": {
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "ref": {
-                            "properties": {
-                              "email": {
-                                "type": "string"
-                              },
-                              "ref": {
-                                "properties": {
-                                  "phone": {
-                                    "type": "string"
-                                  },
-                                  "ref": {
-                                    "properties": {
-                                      "address": {
-                                        "type": "string"
-                                      },
-                                      "ref": {
-                                        "properties": {
-                                          "id": {
-                                            "type": "string"
-                                          },
-                                          "ref": {
-                                            "properties": {
-                                              "name": {
-                                                "type": "string"
-                                              },
-                                              "ref": {
-                                                "properties": {
-                                                  "email": {
-                                                    "type": "string"
-                                                  },
-                                                  "ref": {
-                                                    "properties": {
-                                                      "phone": {
-                                                        "type": "string"
-                                                      },
-                                                      "ref": {
-                                                        "properties": {
-                                                          "address": {
-                                                            "type": "string"
-                                                          },
-                                                          "ref": {}
-                                                        },
-                                                        "type": "object"
-                                                      }
-                                                    },
-                                                    "type": "object"
-                                                  }
-                                                },
-                                                "type": "object"
-                                              }
-                                            },
-                                            "type": "object"
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          },
-          "e0f0e3d91bff33921e6e0f913fb197b55f20cbe1": {
+          "-definitions-RefCycle4C": {
             "properties": {
               "email": {
                 "type": "string"
@@ -410,57 +305,162 @@
             },
             "type": "object"
           },
-          "ebc40abea886239e50fe53783e23885095b18b4a": {
+          "-definitions-RefCycle4D": {
             "properties": {
-              "id": {
+              "phone": {
                 "type": "string"
               },
               "ref": {
                 "properties": {
-                  "name": {
+                  "address": {
                     "type": "string"
                   },
                   "ref": {
                     "properties": {
-                      "email": {
+                      "id": {
                         "type": "string"
                       },
                       "ref": {
                         "properties": {
-                          "phone": {
+                          "name": {
                             "type": "string"
                           },
                           "ref": {
                             "properties": {
-                              "address": {
+                              "email": {
                                 "type": "string"
                               },
                               "ref": {
                                 "properties": {
-                                  "id": {
+                                  "phone": {
                                     "type": "string"
                                   },
                                   "ref": {
                                     "properties": {
-                                      "name": {
+                                      "address": {
                                         "type": "string"
                                       },
                                       "ref": {
                                         "properties": {
-                                          "email": {
+                                          "id": {
                                             "type": "string"
                                           },
                                           "ref": {
                                             "properties": {
-                                              "phone": {
+                                              "name": {
                                                 "type": "string"
                                               },
                                               "ref": {
                                                 "properties": {
-                                                  "address": {
+                                                  "email": {
                                                     "type": "string"
                                                   },
-                                                  "ref": {}
+                                                  "ref": {
+                                                    "properties": {
+                                                      "phone": {
+                                                        "type": "string"
+                                                      },
+                                                      "ref": {
+                                                        "properties": {
+                                                          "address": {
+                                                            "type": "string"
+                                                          },
+                                                          "ref": {}
+                                                        },
+                                                        "type": "object"
+                                                      }
+                                                    },
+                                                    "type": "object"
+                                                  }
+                                                },
+                                                "type": "object"
+                                              }
+                                            },
+                                            "type": "object"
+                                          }
+                                        },
+                                        "type": "object"
+                                      }
+                                    },
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle4E": {
+            "properties": {
+              "address": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "email": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "properties": {
+                              "phone": {
+                                "type": "string"
+                              },
+                              "ref": {
+                                "properties": {
+                                  "address": {
+                                    "type": "string"
+                                  },
+                                  "ref": {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "ref": {
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "ref": {
+                                            "properties": {
+                                              "email": {
+                                                "type": "string"
+                                              },
+                                              "ref": {
+                                                "properties": {
+                                                  "phone": {
+                                                    "type": "string"
+                                                  },
+                                                  "ref": {
+                                                    "properties": {
+                                                      "address": {
+                                                        "type": "string"
+                                                      },
+                                                      "ref": {}
+                                                    },
+                                                    "type": "object"
+                                                  }
                                                 },
                                                 "type": "object"
                                               }
