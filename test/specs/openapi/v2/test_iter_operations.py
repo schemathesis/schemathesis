@@ -35,6 +35,7 @@ def spec(request):
         "ref-params",
         "ref-path-item",
         "with-jsonschema-extensions",
+        "recursive-with-non-recursive",
     ],
     indirect=True,
 )

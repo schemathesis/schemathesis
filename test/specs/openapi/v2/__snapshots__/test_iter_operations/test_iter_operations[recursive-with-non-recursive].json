@@ -1,0 +1,143 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/-definitions-RefCycle1RecursiveA",
+        "x-moved-references": {
+          "-definitions-NonRecursiveRef": {
+            "properties": {
+              "email": {
+                "format": "email",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle1RecursiveA": {
+            "properties": {
+              "a-to-b": {
+                "properties": {
+                  "b-to-a": {
+                    "properties": {
+                      "a-to-b": {
+                        "properties": {
+                          "b-to-a": {
+                            "properties": {
+                              "a-to-b": {
+                                "properties": {
+                                  "b-to-a": {},
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "nonRecursiveRef": {
+                                "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "nonRecursiveRef": {
+                        "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              "id": {
+                "type": "string"
+              },
+              "nonRecursiveRef": {
+                "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle1RecursiveB": {
+            "properties": {
+              "b-to-a": {
+                "properties": {
+                  "a-to-b": {
+                    "properties": {
+                      "b-to-a": {
+                        "properties": {
+                          "a-to-b": {
+                            "properties": {
+                              "b-to-a": {
+                                "properties": {
+                                  "a-to-b": {},
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "nonRecursiveRef": {
+                                    "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "nonRecursiveRef": {
+                            "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "nonRecursiveRef": {
+                    "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                  }
+                },
+                "type": "object"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-1-recursive",
+  "path_parameters": [],
+  "query": []
+}

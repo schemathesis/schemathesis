@@ -1,0 +1,70 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test Schema Reference Cycles",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/ref-cycle-1-recursive": {
+      "post": {
+        "summary": "Create with 1-hop recursive reference",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle1RecursiveA"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "RefCycle1RecursiveA": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "a-to-b": {
+          "$ref": "#/definitions/RefCycle1RecursiveB"
+        },
+        "nonRecursiveRef": {
+          "$ref": "#/definitions/NonRecursiveRef"
+        }
+      }
+    },
+    "RefCycle1RecursiveB": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "b-to-a": {
+          "$ref": "#/definitions/RefCycle1RecursiveA"
+        }
+      }
+    },
+    "NonRecursiveRef": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email"
+        }
+      }
+    }
+  }
+}

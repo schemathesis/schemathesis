@@ -11,32 +11,56 @@
               "id": {
                 "type": "string"
               },
-              "ref": {
+              "ref-cycle-2-root": {
                 "properties": {
                   "name": {
                     "type": "string"
                   },
-                  "ref": {
+                  "ref-cycle-2-b": {
                     "properties": {
                       "email": {
                         "type": "string"
                       },
-                      "ref": {
+                      "ref-cycle-2-c": {
                         "properties": {
                           "id": {
                             "type": "string"
                           },
-                          "ref": {
+                          "ref-cycle-2-root": {
                             "properties": {
                               "name": {
                                 "type": "string"
                               },
-                              "ref": {
+                              "ref-cycle-2-b": {
                                 "properties": {
                                   "email": {
                                     "type": "string"
                                   },
-                                  "ref": {}
+                                  "ref-cycle-2-c": {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "ref-cycle-2-root": {
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "ref-cycle-2-b": {
+                                            "properties": {
+                                              "email": {
+                                                "type": "string"
+                                              },
+                                              "ref-cycle-2-c": {}
+                                            },
+                                            "type": "object"
+                                          }
+                                        },
+                                        "type": "object"
+                                      }
+                                    },
+                                    "type": "object"
+                                  }
                                 },
                                 "type": "object"
                               }
@@ -60,42 +84,50 @@
               "name": {
                 "type": "string"
               },
-              "ref": {
+              "ref-cycle-2-b": {
                 "properties": {
                   "email": {
                     "type": "string"
                   },
-                  "ref": {
+                  "ref-cycle-2-c": {
                     "properties": {
                       "id": {
                         "type": "string"
                       },
-                      "ref": {
+                      "ref-cycle-2-root": {
                         "properties": {
                           "name": {
                             "type": "string"
                           },
-                          "ref": {
+                          "ref-cycle-2-b": {
                             "properties": {
                               "email": {
                                 "type": "string"
                               },
-                              "ref": {
+                              "ref-cycle-2-c": {
                                 "properties": {
                                   "id": {
                                     "type": "string"
                                   },
-                                  "ref": {
+                                  "ref-cycle-2-root": {
                                     "properties": {
                                       "name": {
                                         "type": "string"
                                       },
-                                      "ref": {
+                                      "ref-cycle-2-b": {
                                         "properties": {
                                           "email": {
                                             "type": "string"
                                           },
-                                          "ref": {}
+                                          "ref-cycle-2-c": {
+                                            "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
+                                              "ref-cycle-2-root": {}
+                                            },
+                                            "type": "object"
+                                          }
                                         },
                                         "type": "object"
                                       }
@@ -125,37 +157,53 @@
               "email": {
                 "type": "string"
               },
-              "ref": {
+              "ref-cycle-2-c": {
                 "properties": {
                   "id": {
                     "type": "string"
                   },
-                  "ref": {
+                  "ref-cycle-2-root": {
                     "properties": {
                       "name": {
                         "type": "string"
                       },
-                      "ref": {
+                      "ref-cycle-2-b": {
                         "properties": {
                           "email": {
                             "type": "string"
                           },
-                          "ref": {
+                          "ref-cycle-2-c": {
                             "properties": {
                               "id": {
                                 "type": "string"
                               },
-                              "ref": {
+                              "ref-cycle-2-root": {
                                 "properties": {
                                   "name": {
                                     "type": "string"
                                   },
-                                  "ref": {
+                                  "ref-cycle-2-b": {
                                     "properties": {
                                       "email": {
                                         "type": "string"
                                       },
-                                      "ref": {}
+                                      "ref-cycle-2-c": {
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "ref-cycle-2-root": {
+                                            "properties": {
+                                              "name": {
+                                                "type": "string"
+                                              },
+                                              "ref-cycle-2-b": {}
+                                            },
+                                            "type": "object"
+                                          }
+                                        },
+                                        "type": "object"
+                                      }
                                     },
                                     "type": "object"
                                   }

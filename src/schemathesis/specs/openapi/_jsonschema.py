@@ -253,15 +253,12 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         used_moved_references = {
             key: value for key, value in config.moved_references.items() if key in referenced_schemas
         }
+        # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         schema[MOVED_REFERENCE_ROOT_KEY] = used_moved_references
         if references:
             # TODO: Probably this could be done just once per test run, or exploring just only what is needed
             # and caching already explored schemas
             #
-            # if "#/x-moved-references/-definitions-RefCycle1" in references:
-            #     import pdb
-            #
-            #     pdb.set_trace()
             inline_recursive_references(used_moved_references, references)
     else:
         logger.debug("No references found")
@@ -424,8 +421,9 @@ def _find_recursive_references(
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
+    originals = fast_deepcopy(referenced_schemas)
     for key, item in referenced_schemas.items():
-        _inline_recursive_references(item, referenced_schemas, references, (key,))
+        _inline_recursive_references(item, originals, references, (key,))
 
 
 def _inline_recursive_references(
@@ -438,26 +436,22 @@ def _inline_recursive_references(
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
-            print(f"{path} + {ref}")
             key = ref[MOVED_REFERENCE_KEY_LENGTH:]
             referenced_item = referenced_schemas[key]
             # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
             #       Just copy the value and directly jump to the next ref in it, or iterate over them
             if ref in references:
-                if path.count(ref) < 3:
+                item.clear()
+                if path.count(key) < 3:
                     logger.debug("Inlining recursive reference: %s", ref)
-                    if referenced_item is item:
-                        # Direct reference to itself, schema is infinitely recursive and cannot be inlined
-                        # Remove the reference, but keep the schema valid
-                        item.clear()
-                        return
-                    item.clear()
+                    # Extend with a deep copy as the tree should grow with owned data
+                    # TODO: update could be faster - i.e. the top level container already exists
                     item.update(fast_deepcopy(referenced_item))
-                    _inline_recursive_references(item, referenced_schemas, references, path + (ref,))
+                    _inline_recursive_references(item, referenced_schemas, references, path + (key,))
                 else:
-                    logger.debug("Max recursion depth reached for %s at %s", ref, path)
-            else:
-                _inline_recursive_references(referenced_item, referenced_schemas, references, path + (ref,))
+                    logger.debug("Max recursion depth reached for %s at %s", key, path)
+            # else:
+            #     _inline_recursive_references(referenced_item, referenced_schemas, references, path + (key,))
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):

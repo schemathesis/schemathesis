@@ -4,9 +4,9 @@
       "media_type": "application/json",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/19155575a6e38b228d907b376ab45f4ed29a0641",
+        "$ref": "#/x-moved-references/-definitions-SharedBody",
         "x-moved-references": {
-          "19155575a6e38b228d907b376ab45f4ed29a0641": {
+          "-definitions-SharedBody": {
             "properties": {
               "shared_property": {
                 "type": "string"
@@ -21,9 +21,9 @@
       "media_type": "multipart/form-data",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/19155575a6e38b228d907b376ab45f4ed29a0641",
+        "$ref": "#/x-moved-references/-definitions-SharedBody",
         "x-moved-references": {
-          "19155575a6e38b228d907b376ab45f4ed29a0641": {
+          "-definitions-SharedBody": {
             "properties": {
               "shared_property": {
                 "type": "string"

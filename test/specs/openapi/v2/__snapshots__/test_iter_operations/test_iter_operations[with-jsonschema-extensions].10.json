@@ -11,22 +11,38 @@
               "id": {
                 "type": "string"
               },
-              "ref": {
+              "ref-cycle-1-root": {
                 "properties": {
                   "name": {
                     "type": "string"
                   },
-                  "ref": {
+                  "ref-cycle-1-b": {
                     "properties": {
                       "id": {
                         "type": "string"
                       },
-                      "ref": {
+                      "ref-cycle-1-root": {
                         "properties": {
                           "name": {
                             "type": "string"
                           },
-                          "ref": {}
+                          "ref-cycle-1-b": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "ref-cycle-1-root": {
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "ref-cycle-1-b": {}
+                                },
+                                "type": "object"
+                              }
+                            },
+                            "type": "object"
+                          }
                         },
                         "type": "object"
                       }
@@ -44,27 +60,35 @@
               "name": {
                 "type": "string"
               },
-              "ref": {
+              "ref-cycle-1-b": {
                 "properties": {
                   "id": {
                     "type": "string"
                   },
-                  "ref": {
+                  "ref-cycle-1-root": {
                     "properties": {
                       "name": {
                         "type": "string"
                       },
-                      "ref": {
+                      "ref-cycle-1-b": {
                         "properties": {
                           "id": {
                             "type": "string"
                           },
-                          "ref": {
+                          "ref-cycle-1-root": {
                             "properties": {
                               "name": {
                                 "type": "string"
                               },
-                              "ref": {}
+                              "ref-cycle-1-b": {
+                                "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
+                                  "ref-cycle-1-root": {}
+                                },
+                                "type": "object"
+                              }
                             },
                             "type": "object"
                           }
