@@ -209,6 +209,8 @@ class TransformConfig:
     components: dict[str, ObjectSchema]
     # Previously moved references
     moved_references: MovedSchemas
+    # Known recursive references
+    recursive_references: dict[str, set[str]]
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
@@ -243,15 +245,23 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     """
     logger.debug("Input: %s", schema)
 
-    referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
+    referenced_schema_names = to_self_contained_jsonschema(schema, resolver, config)
 
-    if referenced_schemas:
-        # Check for recursive references
-        references = find_recursive_references(referenced_schemas, config.moved_references)
+    if referenced_schema_names:
+        # Look for recursive references places reachable from the schema
+        references = set()
+        cache = config.recursive_references
+        for ref in referenced_schema_names:
+            if ref in cache:
+                references.update(cache[ref])
+            else:
+                found = find_recursive_references(ref, config.moved_references)
+                cache[ref] = found
+                references.update(found)
         logger.debug("Found %s recursive references", len(references))
         # Leave only references that are used in this particular schema
         used_moved_references = {
-            key: value for key, value in config.moved_references.items() if key in referenced_schemas
+            key: value for key, value in config.moved_references.items() if key in referenced_schema_names
         }
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         schema[MOVED_REFERENCE_ROOT_KEY] = used_moved_references
@@ -381,24 +391,33 @@ def move_referenced_data(
     return resolved.contents, resolved.resolver
 
 
-def find_recursive_references(moved_references: set[str], schema_storage: MovedSchemas) -> set[str]:
+def find_recursive_references(key: str, schema_storage: MovedSchemas) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
-    for key in moved_references:
-        # TODO: Some objects might already been searched
-        _find_recursive_references(schema_storage[key], schema_storage, references, ())
+    _find_recursive_references(schema_storage[key], schema_storage, references, [])
     return references
+
+
+META = {
+    "total": 0,
+    "unique": 0,
+}
+UNIQUE = set()
 
 
 def _find_recursive_references(
     item: ObjectSchema | list[ObjectSchema],
     referenced_schemas: MovedSchemas,
     references: set[str],
-    path: tuple[str, ...],
+    path: list[str],
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
     if isinstance(item, dict):
         ref = item.get("$ref")
+        # META["total"] += 1
+        # UNIQUE.add(ref)
+        # META["unique"] = len(UNIQUE)
+        # print(META)
         if isinstance(ref, str):
             if ref in path:
                 # The reference was already seen in the current traversl path, it means that it's recursive
@@ -408,8 +427,9 @@ def _find_recursive_references(
                 # Otherwise explore the referenced item
                 key = ref[MOVED_REFERENCE_KEY_LENGTH:]
                 referenced_item = referenced_schemas[key]
-                subtree_path = path + (ref,)
-                _find_recursive_references(referenced_item, referenced_schemas, references, subtree_path)
+                path.append(ref)
+                _find_recursive_references(referenced_item, referenced_schemas, references, path)
+                path.pop()
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
