@@ -83,3 +83,4 @@ def test_iter_operations(spec, snapshot_json, assert_generates):
         for param in operation.body + operation.headers + operation.path_parameters + operation.query:
             assert_generates(param.schema)
             # assert_no_unused_components(param.schema)
+    list(iter_operations(spec, ""))

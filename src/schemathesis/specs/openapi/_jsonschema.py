@@ -4,7 +4,7 @@ import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha1
-from typing import Any, Callable, Dict, Iterable, MutableMapping, Protocol, Union, cast
+from typing import Any, Callable, Dict, Iterable, MutableMapping, Protocol, Union
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
@@ -182,6 +182,7 @@ MOVED_REFERENCE_KEY_LENGTH = len(MOVED_REFERENCE_PREFIX)
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 MovedSchemas = Dict[str, ObjectSchema]
+RecursiveReferencesCache = dict[str, set[str]]
 
 
 class Resolved(Protocol):
@@ -210,7 +211,7 @@ class TransformConfig:
     # Previously moved references
     moved_references: MovedSchemas
     # Known recursive references
-    recursive_references: dict[str, set[str]]
+    recursive_references: RecursiveReferencesCache
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
@@ -391,7 +392,7 @@ def move_referenced_data(
     return resolved.contents, resolved.resolver
 
 
-def find_recursive_references(key: str, schema_storage: MovedSchemas, cache: dict[str, set[str]]) -> set[str]:
+def find_recursive_references(key: str, schema_storage: MovedSchemas, cache: RecursiveReferencesCache) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
     _find_recursive_references(schema_storage[key], schema_storage, references, [], cache)
@@ -403,7 +404,7 @@ def _find_recursive_references(
     referenced_schemas: MovedSchemas,
     recursive: set[str],
     path: list[str],
-    cache: dict[str, set[str]],
+    cache: RecursiveReferencesCache,
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
     if isinstance(item, dict):
