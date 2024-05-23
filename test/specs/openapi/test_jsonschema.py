@@ -18,6 +18,7 @@ from schemathesis.specs.openapi._jsonschema import (
     is_write_only,
     rewrite_properties,
 )
+from test.specs.openapi.conftest import assert_generates
 
 REMOTE_PLACEHOLDER = "http://example.com"
 DEFAULT_URI = ""
@@ -523,7 +524,7 @@ def setup_schema(request, uri, scope, schema):
         "recursive-one-hop-in-array",
     ),
 )
-def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
+def test_to_jsonschema_valid(request, uri, scope, schema, components, expected, assert_generates):
     components = fast_deepcopy(components)
     uri, scope, schema = setup_schema(request, uri, scope, schema)
     registry = Registry(retrieve=get_remote_schema_retriever(DRAFT4))
@@ -537,24 +538,6 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected):
     schema = to_jsonschema(scope or uri, schema, registry, DRAFT4, config)
     assert schema == expected
     assert_generates(schema)
-
-
-def assert_generates(schema):
-    # Hypothesis-jsonschema should be able to generate data for the inlined schema
-
-    @given(from_schema(schema))
-    @settings(
-        deadline=None,
-        database=None,
-        max_examples=1,
-        suppress_health_check=list(HealthCheck),
-        phases=[Phase.explicit, Phase.generate],
-        verbosity=Verbosity.quiet,
-    )
-    def generate(_):
-        pass
-
-    generate()
 
 
 @pytest.mark.parametrize(
@@ -610,7 +593,7 @@ def assert_generates(schema):
         ),
     ),
 )
-def test_openapi_specifics(schema, expected):
+def test_openapi_specifics(schema, expected, assert_generates):
     config = TransformConfig(
         nullable_key="nullable", remove_write_only=True, remove_read_only=True, components={}, moved_references={}
     )
@@ -629,7 +612,7 @@ def test_openapi_specifics(schema, expected):
         ({"not": {"required": ["bar", "foo"]}}, ["foo"], {"not": {"required": {"bar", "foo"}}}),
     ),
 )
-def test_forbid_properties(schema, forbidden, expected):
+def test_forbid_properties(schema, forbidden, expected, assert_generates):
     forbid_properties(schema, forbidden)
     schema["not"]["required"] = set(schema["not"]["required"])
     assert schema == expected

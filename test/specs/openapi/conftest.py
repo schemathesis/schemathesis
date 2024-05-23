@@ -2,6 +2,8 @@ from dataclasses import fields
 
 import pytest
 from syrupy.extensions.json import JSONSnapshotExtension
+from hypothesis import given, settings, Phase, HealthCheck, Verbosity
+from hypothesis_jsonschema import from_schema
 
 import schemathesis
 from schemathesis.internal.copy import fast_deepcopy
@@ -161,3 +163,24 @@ def assert_parameters():
 @pytest.fixture
 def snapshot_json(snapshot):
     return snapshot.use_extension(JSONSnapshotExtension)
+
+
+@pytest.fixture
+def assert_generates():
+    # Hypothesis-jsonschema should be able to generate data for the inlined schema
+    def inner(schema):
+        @given(from_schema(schema))
+        @settings(
+            deadline=None,
+            database=None,
+            max_examples=1,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.explicit, Phase.generate],
+            verbosity=Verbosity.quiet,
+        )
+        def generate(_):
+            pass
+
+        generate()
+
+    return inner

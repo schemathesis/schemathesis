@@ -29,8 +29,10 @@ def spec(request):
     ["empty", "basic", "form-data", "no-definitions", "shared-params", "ref-params", "ref-path-item"],
     indirect=True,
 )
-def test_iter_operations(spec, snapshot_json):
+def test_iter_operations(spec, snapshot_json, assert_generates):
     for operation in iter_operations(spec, ""):
         assert isinstance(operation, Ok)
         operation = operation.ok()
         assert asdict(operation) == snapshot_json
+        for param in operation.body + operation.headers + operation.path_parameters + operation.query:
+            assert_generates(param.schema)

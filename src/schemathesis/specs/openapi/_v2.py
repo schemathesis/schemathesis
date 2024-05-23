@@ -112,10 +112,6 @@ class SharedParameters:
                 )
 
 
-# TODO:
-#   -
-
-
 def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
     """Iterate over all operations in the given OpenAPI 2.0 specification."""
     # TODO: How to copy only what is needed?
