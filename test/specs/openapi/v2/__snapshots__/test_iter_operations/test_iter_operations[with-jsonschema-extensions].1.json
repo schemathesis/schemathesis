@@ -1,0 +1,30 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/b2092af6179220f33389427b0e3a6362d61d7b19",
+        "x-moved-references": {
+          "b2092af6179220f33389427b0e3a6362d61d7b19": {
+            "properties": {
+              "id": {
+                "readOnly": false,
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/read-only-false",
+  "path_parameters": [],
+  "query": []
+}

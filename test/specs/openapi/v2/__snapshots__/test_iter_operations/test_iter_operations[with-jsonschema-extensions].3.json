@@ -1,0 +1,30 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/bc607981a224391ef513910798980f1765b9833f",
+        "x-moved-references": {
+          "bc607981a224391ef513910798980f1765b9833f": {
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string",
+                "x-nullable": false
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/nullable-false",
+  "path_parameters": [],
+  "query": []
+}

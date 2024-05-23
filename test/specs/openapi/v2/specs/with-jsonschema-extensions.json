@@ -1,0 +1,187 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test Schema Properties",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/read-only-true": {
+      "post": {
+        "summary": "Create with read-only property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrue"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/read-only-false": {
+      "post": {
+        "summary": "Create with read-write property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyFalse"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nullable-true": {
+      "post": {
+        "summary": "Create with nullable property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableTrue"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nullable-false": {
+      "post": {
+        "summary": "Create with non-nullable property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableFalse"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/all-of": {
+      "post": {
+        "summary": "Create with allOf schema",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AllOf"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "ReadOnlyTrue": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ReadOnlyFalse": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": false
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableTrue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableFalse": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-nullable": false
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "AllOf": {
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

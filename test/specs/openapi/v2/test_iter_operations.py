@@ -26,7 +26,16 @@ def spec(request):
 
 @pytest.mark.parametrize(
     "spec",
-    ["empty", "basic", "form-data", "no-definitions", "shared-params", "ref-params", "ref-path-item"],
+    [
+        "empty",
+        "basic",
+        "form-data",
+        "no-definitions",
+        "shared-params",
+        "ref-params",
+        "ref-path-item",
+        "with-jsonschema-extensions",
+    ],
     indirect=True,
 )
 def test_iter_operations(spec, snapshot_json, assert_generates):
