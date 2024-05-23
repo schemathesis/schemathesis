@@ -465,8 +465,6 @@ def _inline_recursive_references(
                     _inline_recursive_references(item, referenced_schemas, references, path + (key,))
                 else:
                     logger.debug("Max recursion depth reached for %s at %s", key, path)
-            # else:
-            #     _inline_recursive_references(referenced_item, referenced_schemas, references, path + (key,))
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)):
@@ -481,9 +479,6 @@ def _make_reference_key(reference: str) -> str:
     # TODO: use traversal path to make the key - in different files there could be different objects with the same name
     # TODO: or maybe don't use hash at all and have readable keys
     return reference.replace("/", "-").replace("#", "")
-    digest = sha1()
-    digest.update(reference.encode("utf-8"))
-    return digest.hexdigest()
 
 
 def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:

@@ -1,0 +1,158 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/-definitions-RefCycleAllOf",
+        "x-moved-references": {
+          "-definitions-RefCycleAllOf": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "allOf": [
+                              {
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  },
+                                  "ref": {
+                                    "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
+                                      "ref": {
+                                        "allOf": [
+                                          {
+                                            "properties": {
+                                              "name": {
+                                                "type": "string"
+                                              },
+                                              "ref": {}
+                                            },
+                                            "type": "object"
+                                          },
+                                          {
+                                            "pattern": "^foo"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "pattern": "^foo"
+                              }
+                            ]
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "pattern": "^foo"
+                  }
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycleAllOfItem": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "allOf": [
+                      {
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "ref": {
+                                "allOf": [
+                                  {
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "ref": {
+                                        "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
+                                          "ref": {
+                                            "allOf": [
+                                              {},
+                                              {
+                                                "pattern": "^foo"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "type": "object"
+                                      }
+                                    },
+                                    "type": "object"
+                                  },
+                                  {
+                                    "pattern": "^foo"
+                                  }
+                                ]
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      {
+                        "pattern": "^foo"
+                      }
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-anyof",
+  "path_parameters": [],
+  "query": []
+}

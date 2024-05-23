@@ -72,6 +72,7 @@ def assert_no_unused_components(schema):
         "ref-path-item",
         "with-jsonschema-extensions",
         "recursive-with-non-recursive",
+        "recursive-with-list",
     ],
     indirect=True,
 )

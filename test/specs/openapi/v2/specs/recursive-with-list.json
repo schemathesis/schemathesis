@@ -1,0 +1,65 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test Schema Reference Cycles",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/ref-cycle-anyof": {
+      "post": {
+        "summary": "Create with recursive reference in allOf",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycleAllOf"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "RefCycleAllOf": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "allOf": [
+            {
+              "$ref": "#/definitions/RefCycleAllOfItem"
+            },
+            {
+              "pattern": "^foo"
+            }
+          ]
+        }
+      }
+    },
+    "RefCycleAllOfItem": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycleAllOf"
+        }
+      }
+    }
+  }
+}
