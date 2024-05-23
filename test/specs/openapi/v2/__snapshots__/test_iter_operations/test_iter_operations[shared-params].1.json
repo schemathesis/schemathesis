@@ -1,0 +1,86 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-references/19155575a6e38b228d907b376ab45f4ed29a0641",
+        "x-moved-references": {
+          "19155575a6e38b228d907b376ab45f4ed29a0641": {
+            "properties": {
+              "shared_property": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-references/19155575a6e38b228d907b376ab45f4ed29a0641",
+        "x-moved-references": {
+          "19155575a6e38b228d907b376ab45f4ed29a0641": {
+            "properties": {
+              "shared_property": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [
+    {
+      "location": "header",
+      "name": "local_header",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "location": "header",
+      "name": "shared_header",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "method": "post",
+  "path": "/shared-params/{id}/",
+  "path_parameters": [
+    {
+      "location": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "query": [
+    {
+      "location": "query",
+      "name": "local_query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "location": "query",
+      "name": "shared_query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ]
+}

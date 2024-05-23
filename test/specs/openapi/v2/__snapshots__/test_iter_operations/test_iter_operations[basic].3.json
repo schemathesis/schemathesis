@@ -1,0 +1,90 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/e8fba7786849973df5b38f3b4f84ae1f247d4ec0",
+        "x-moved-references": {
+          "e8fba7786849973df5b38f3b4f84ae1f247d4ec0": {
+            "properties": {
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "email": {
+                "format": "email",
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "email"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/e8fba7786849973df5b38f3b4f84ae1f247d4ec0",
+        "x-moved-references": {
+          "e8fba7786849973df5b38f3b4f84ae1f247d4ec0": {
+            "properties": {
+              "createdAt": {
+                "format": "date-time",
+                "type": "string"
+              },
+              "email": {
+                "format": "email",
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "format": "date-time",
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "email"
+            ],
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "put",
+  "path": "/users/{userId}",
+  "path_parameters": [
+    {
+      "location": "path",
+      "name": "userId",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "query": []
+}

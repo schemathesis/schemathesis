@@ -1,10 +1,11 @@
 from dataclasses import fields
 
 import pytest
+from syrupy.extensions.json import JSONSnapshotExtension
 
 import schemathesis
-from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 
 
 def make_object_schema(is_loose=False, **properties):
@@ -155,3 +156,8 @@ def assert_parameters():
         assert [item.schema for item in container] == schemas
 
     return check
+
+
+@pytest.fixture
+def snapshot_json(snapshot):
+    return snapshot.use_extension(JSONSnapshotExtension)

@@ -177,7 +177,8 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 
 logger = logging.getLogger(__name__)
 MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
-MOVED_REFERENCE_PREFIX = f"#/{MOVED_REFERENCE_ROOT_KEY}"
+MOVED_REFERENCE_PREFIX = f"#/{MOVED_REFERENCE_ROOT_KEY}/"
+MOVED_REFERENCE_KEY_LENGTH = len(MOVED_REFERENCE_PREFIX)
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 MovedSchemas = Dict[str, ObjectSchema]
@@ -212,9 +213,7 @@ class TransformConfig:
     max_recursion_depth: int = 5
 
 
-def to_jsonschema(
-    uri: str, schema: ObjectSchema, registry: Registry, specification: Specification, config: TransformConfig
-) -> ObjectSchema:
+def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
     """Transform the given schema to a JSON Schema.
 
     The resulting schema is compatible with `hypothesis-jsonschema`, specifically it will contain
@@ -244,33 +243,24 @@ def to_jsonschema(
     It accepts shared components and already moved references as input and mutates them to make subsequent calls
     cheaper.
     """
-    # The input schema comes from the Open API spec and should not be modified in place
-    schema = fast_deepcopy(schema)
-    schema.update(config.components)
-
-    schema[MOVED_REFERENCE_ROOT_KEY] = config.moved_references
-    registry = registry.with_resource(uri, Resource(contents=schema, specification=specification))
-    resolver = registry.resolver(base_uri=uri)
-
     logger.debug("Input: %s", schema)
+
     referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schemas:
         # Check for recursive references
         references = find_recursive_references(referenced_schemas, config.moved_references)
         logger.debug("Found %s recursive references", len(references))
-        inline_recursive_references(config.moved_references, config.moved_references, references, config)
+        if references:
+            # TODO: Probably this could be done just once per test run, or exploring just only what is needed
+            # and caching already explored schemas
+            inline_recursive_references(config.moved_references, config.moved_references, references, config)
         # Leave only references that are used in this particular schema
         schema[MOVED_REFERENCE_ROOT_KEY] = {
-            key: value for key, value in schema[MOVED_REFERENCE_ROOT_KEY].items() if key in referenced_schemas
+            key: value for key, value in config.moved_references.items() if key in referenced_schemas
         }
     else:
-        # Trivial case - no extra processing needed, just remove the key
         logger.debug("No references found")
-        del schema[MOVED_REFERENCE_ROOT_KEY]
-    # Remove components from the schema as all references in the schema are pointing to `x-moved-references`
-    for name in config.components:
-        del schema[name]
     logger.debug("Output: %s", schema)
     return schema
 
@@ -356,7 +346,7 @@ def is_write_only(schema: Schema) -> bool:
 def is_read_only(schema: Schema) -> bool:
     if isinstance(schema, bool):
         return False
-    return schema.get("readOnly", False) or schema.get("x-readOnly", False)
+    return schema.get("readOnly", False)
 
 
 def _replace_nullable(item: ObjectSchema, nullable_key: str, moved_schemas: MovedSchemas) -> None:
@@ -386,7 +376,7 @@ def move_referenced_data(
     key = _make_reference_key(ref)
     config.moved_references[key] = resolved.contents
     referenced_schemas.add(key)
-    new_ref = f"{MOVED_REFERENCE_PREFIX}/{key}"
+    new_ref = f"{MOVED_REFERENCE_PREFIX}{key}"
     item["$ref"] = new_ref
     logger.debug("Moved reference: %s -> %s", ref, new_ref)
     logger.debug("Resolved %s -> %s", ref, resolved.contents)
@@ -397,6 +387,7 @@ def find_recursive_references(moved_references: set[str], schema_storage: MovedS
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
     for key in moved_references:
+        # TODO: Some objects might already been searched
         _find_recursive_references(schema_storage[key], schema_storage, references)
     return references
 
@@ -417,7 +408,8 @@ def _find_recursive_references(
                 references.add(ref)
             else:
                 # Otherwise explore the referenced item
-                referenced_item = referenced_schemas[ref.split("/")[-1]]
+                key = ref[MOVED_REFERENCE_KEY_LENGTH:]
+                referenced_item = referenced_schemas[key]
                 subtree_path = path + (ref,)
                 _find_recursive_references(referenced_item, referenced_schemas, references, subtree_path)
         else:

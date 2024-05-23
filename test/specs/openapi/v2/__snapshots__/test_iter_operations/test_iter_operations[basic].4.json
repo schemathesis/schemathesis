@@ -1,0 +1,17 @@
+{
+  "body": [],
+  "headers": [],
+  "method": "delete",
+  "path": "/users/{userId}",
+  "path_parameters": [
+    {
+      "location": "path",
+      "name": "userId",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "query": []
+}

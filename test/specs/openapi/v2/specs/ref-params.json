@@ -1,0 +1,151 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Referenced Parameters Test API",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json",
+    "multipart/form-data"
+  ],
+  "paths": {
+    "/referenced-params-body": {
+      "parameters": [
+        {
+          "$ref": "#/parameters/SharedQueryParam"
+        },
+        {
+          "$ref": "#/parameters/SharedHeaderParam"
+        }
+      ],
+      "post": {
+        "summary": "Post with referenced parameters",
+        "parameters": [
+          {
+            "$ref": "#/parameters/LocalQueryParam"
+          },
+          {
+            "$ref": "#/parameters/LocalHeaderParam"
+          },
+          {
+            "$ref": "#/parameters/LocalBodyParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/referenced-params-form": {
+      "parameters": [
+        {
+          "$ref": "#/parameters/SharedQueryParam"
+        },
+        {
+          "$ref": "#/parameters/SharedHeaderParam"
+        },
+        {
+          "$ref": "#/parameters/SharedFormParam"
+        }
+      ],
+      "post": {
+        "summary": "Post with referenced parameters",
+        "parameters": [
+          {
+            "$ref": "#/parameters/LocalQueryParam"
+          },
+          {
+            "$ref": "#/parameters/LocalHeaderParam"
+          },
+          {
+            "$ref": "#/parameters/LocalFormParam"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SharedBodySchema": {
+      "type": "object",
+      "properties": {
+        "shared_property": {
+          "type": "string"
+        }
+      }
+    },
+    "LocalBodySchema": {
+      "type": "object",
+      "properties": {
+        "local_property": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "parameters": {
+    "SharedQueryParam": {
+      "name": "shared_query",
+      "in": "query",
+      "required": false,
+      "type": "string"
+    },
+    "SharedHeaderParam": {
+      "name": "shared_header",
+      "in": "header",
+      "required": false,
+      "type": "string"
+    },
+    "SharedBodyParam": {
+      "name": "shared_body",
+      "in": "body",
+      "required": false,
+      "schema": {
+        "$ref": "#/definitions/SharedBodySchema"
+      }
+    },
+    "SharedFormParam": {
+      "name": "shared_form",
+      "in": "formData",
+      "required": false,
+      "type": "string"
+    },
+    "LocalQueryParam": {
+      "name": "local_query",
+      "in": "query",
+      "required": false,
+      "type": "string"
+    },
+    "LocalHeaderParam": {
+      "name": "local_header",
+      "in": "header",
+      "required": false,
+      "type": "string"
+    },
+    "LocalBodyParam": {
+      "name": "local_body",
+      "in": "body",
+      "required": false,
+      "schema": {
+        "$ref": "#/definitions/LocalBodySchema"
+      }
+    },
+    "LocalFormParam": {
+      "name": "local_form",
+      "in": "formData",
+      "required": false,
+      "type": "string"
+    }
+  }
+}

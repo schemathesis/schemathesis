@@ -1,0 +1,99 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "local_form": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "local_form": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "shared_form": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "shared_form": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    }
+  ],
+  "headers": [
+    {
+      "location": "header",
+      "name": "local_header",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "location": "header",
+      "name": "shared_header",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "method": "post",
+  "path": "/referenced-params-form",
+  "path_parameters": [],
+  "query": [
+    {
+      "location": "query",
+      "name": "local_query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    },
+    {
+      "location": "query",
+      "name": "shared_query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ]
+}

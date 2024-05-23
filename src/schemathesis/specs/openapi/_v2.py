@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generator, Literal, Mapping, TypedDict, cast
+from typing import TYPE_CHECKING, Any, Generator, Literal, Mapping, MutableMapping, TypedDict, cast
 
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT4
 
+from schemathesis.internal.copy import fast_deepcopy
+
 from ...constants import HTTP_METHODS
 from ...internal.result import Ok, Result
+from ._jsonschema import to_jsonschema, TransformConfig
 
 if TYPE_CHECKING:
     from ._jsonschema import Resolver
-    from .schemas import OpenAPIOperation, OperationSchemaError
+    from .schemas import OperationSchemaError
 
 DEFAULT_BODY_MEDIA_TYPES = ["application/json"]
 DEFAULT_FORM_MEDIA_TYPES = ["multipart/form-data"]
@@ -22,6 +25,7 @@ Reference = TypedDict("Reference", {"$ref": str})
 class Specification(TypedDict):
     consumes: list[str]
     paths: Mapping[str, PathItem | Reference]
+    definitions: Mapping[str, Mapping[str, Any]]
 
 
 @dataclass
@@ -108,11 +112,28 @@ class SharedParameters:
                 )
 
 
+# TODO:
+#   -
+
+
 def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
     """Iterate over all operations in the given OpenAPI 2.0 specification."""
-    # TODO: initialize registry + resolver just here
-    registry = Registry().with_resource(uri, Resource(contents=spec, specification=DRAFT4))
+    # TODO: How to copy only what is needed?
+    registry = Registry().with_resource(uri, Resource(contents=fast_deepcopy(spec), specification=DRAFT4))
     root_resolver = registry.resolver()
+    definitions = spec.get("definitions")
+    components: dict[str, MutableMapping[str, Any]]
+    if definitions is not None:
+        components = {"definitions": fast_deepcopy(definitions)}
+    else:
+        components = {}
+    config = TransformConfig(
+        nullable_key="x-nullable",
+        remove_write_only=False,
+        remove_read_only=True,
+        components=components,
+        moved_references={},
+    )
     paths = spec["paths"]
     global_media_types = spec.get("consumes", [])
     for path, path_item_or_ref in paths.items():
@@ -124,13 +145,15 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
         else:
             path_item_resolver = root_resolver
             path_item = path_item_or_ref
-        shared_parameters = _init_shared_parameters(path_item.get("parameters", []), path_item_resolver)
+        shared_parameters = _init_shared_parameters(path_item.get("parameters", []), path_item_resolver, config)
         for method, entry in path_item.items():
             if method not in HTTP_METHODS:
                 continue
             operation = cast(Operation, entry)
             media_types = operation.get("consumes", global_media_types)
-            local_parameters = _init_local_parameters(operation.get("parameters", []), media_types, path_item_resolver)
+            local_parameters = _init_local_parameters(
+                operation.get("parameters", []), media_types, path_item_resolver, config
+            )
             path_parameters = []
             headers = []
             query = []
@@ -167,7 +190,9 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
 
 
 def _init_shared_parameters(
-    parameters: list[NonBodyParameter | BodyParameter | Reference], path_item_resolver: Resolver
+    parameters: list[NonBodyParameter | BodyParameter | Reference],
+    path_item_resolver: Resolver,
+    config: TransformConfig,
 ) -> SharedParameters:
     complete: list[OpenAPINonBodyParameter] = []
     incomplete: list[OpenAPIBodyParameter] = []
@@ -184,11 +209,11 @@ def _init_shared_parameters(
         required = parameter.get("required", False)
         if parameter["in"] == "formData":
             schema = _extract_non_body_parameter_schema(parameter)
-            # TODO: Convert to jsonschema
+            schema = to_jsonschema(schema, parameter_resolver, config)
             form_parameters.append((parameter["name"], required, schema))
         elif parameter["in"] == "body":
-            schema = parameter["schema"]
-            # TODO: Convert to jsonschema + filter out
+            schema = _extract_body_parameter_schema(parameter)
+            schema = to_jsonschema(schema, parameter_resolver, config)
             incomplete.append(
                 OpenAPIBodyParameter(
                     required=required,
@@ -198,7 +223,7 @@ def _init_shared_parameters(
             )
         else:
             schema = _extract_non_body_parameter_schema(parameter)
-            # TODO: Convert to jsonschema
+            schema = to_jsonschema(schema, parameter_resolver, config)
             complete.append(
                 OpenAPINonBodyParameter(
                     name=parameter["name"],
@@ -220,7 +245,10 @@ def _init_shared_parameters(
 
 
 def _init_local_parameters(
-    parameters: list[NonBodyParameter | BodyParameter | Reference], media_types: list[str], path_item_resolver: Resolver
+    parameters: list[NonBodyParameter | BodyParameter | Reference],
+    media_types: list[str],
+    path_item_resolver: Resolver,
+    config: TransformConfig,
 ) -> list[OpenAPINonBodyParameter | OpenAPIBodyParameter]:
     initialized: list[OpenAPINonBodyParameter | OpenAPIBodyParameter] = []
     body_media_types = media_types or DEFAULT_BODY_MEDIA_TYPES
@@ -238,11 +266,11 @@ def _init_local_parameters(
         required = parameter.get("required", False)
         if parameter["in"] == "formData":
             schema = _extract_non_body_parameter_schema(parameter)
-            # TODO: Convert to jsonschema
+            schema = to_jsonschema(schema, parameter_resolver, config)
             form_parameters.append((parameter["name"], required, schema))
         elif parameter["in"] == "body":
-            schema = parameter["schema"]
-            # TODO: Convert to jsonschema + filter out
+            schema = _extract_body_parameter_schema(parameter)
+            schema = to_jsonschema(schema, parameter_resolver, config)
             for media_type in body_media_types:
                 initialized.append(
                     OpenAPIBodyParameter(
@@ -253,7 +281,7 @@ def _init_local_parameters(
                 )
         else:
             schema = _extract_non_body_parameter_schema(parameter)
-            # TODO: Convert to jsonschema
+            schema = to_jsonschema(schema, parameter_resolver, config)
             initialized.append(
                 OpenAPINonBodyParameter(
                     name=parameter["name"],
@@ -288,12 +316,11 @@ def _parameters_to_json_schema(parameters: list[tuple[str, bool, Mapping[str, An
 
 def _extract_non_body_parameter_schema(parameter: NonBodyParameter) -> Mapping[str, Any]:
     return {
-        key: value
+        key: fast_deepcopy(value) if isinstance(value, (dict, list)) else value
         for key, value in parameter.items()
-        # Allow only supported keywords or vendor extensions
         if key
         in {
-            "type",  # only as a string
+            "type",
             "format",
             "items",
             "maximum",
@@ -310,5 +337,38 @@ def _extract_non_body_parameter_schema(parameter: NonBodyParameter) -> Mapping[s
             "multipleOf",
         }
         or key.startswith("x-")
-        or key == "x-nullable"
+    }
+
+
+def _extract_body_parameter_schema(parameter: BodyParameter) -> Mapping[str, Any]:
+    return {
+        key: fast_deepcopy(value) if isinstance(value, (dict, list)) else value
+        for key, value in parameter["schema"].items()
+        if key
+        in {
+            "$ref",
+            "format",
+            "multipleOf",
+            "maximum",
+            "exclusiveMaximum",
+            "minimum",
+            "exclusiveMinimum",
+            "maxLength",
+            "minLength",
+            "pattern",
+            "maxItems",
+            "minItems",
+            "uniqueItems",
+            "maxProperties",
+            "minProperties",
+            "required",
+            "enum",
+            "type",
+            "items",
+            "allOf",
+            "properties",
+            "additionalProperties",
+            "readOnly",
+        }
+        or key.startswith("x-")
     }
