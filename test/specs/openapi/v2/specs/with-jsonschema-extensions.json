@@ -30,6 +30,46 @@
         }
       }
     },
+    "/read-only-true-required": {
+      "post": {
+        "summary": "Create with read-only required property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrueRequired"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/read-only-true-single": {
+      "post": {
+        "summary": "Create with single read-only property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrueSingle"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
     "/read-only-false": {
       "post": {
         "summary": "Create with read-write property",
@@ -90,6 +130,26 @@
         }
       }
     },
+    "/nullable-root": {
+      "post": {
+        "summary": "Create with nullable root property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableRoot"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
     "/all-of": {
       "post": {
         "summary": "Create with allOf schema",
@@ -124,6 +184,30 @@
         }
       }
     },
+    "ReadOnlyTrueRequired": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ReadOnlyTrueSingle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
     "ReadOnlyFalse": {
       "type": "object",
       "properties": {
@@ -154,6 +238,18 @@
         "name": {
           "type": "string",
           "x-nullable": false
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableRoot": {
+      "type": "object",
+      "x-nullable": true,
+      "properties": {
+        "name": {
+          "type": "string"
         },
         "email": {
           "type": "string"

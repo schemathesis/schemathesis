@@ -4,23 +4,13 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/adf2aad722bcb9da04e2bcabe659d0221255207e",
+        "$ref": "#/x-moved-references/6ca113f930547dfb031c57b3e3ab48acdcab34be",
         "x-moved-references": {
-          "adf2aad722bcb9da04e2bcabe659d0221255207e": {
-            "properties": {
-              "email": {
-                "type": "string"
-              },
-              "name": {
-                "anyOf": [
-                  {
-                    "type": "string"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
+          "6ca113f930547dfb031c57b3e3ab48acdcab34be": {
+            "not": {
+              "required": [
+                "id"
+              ]
             },
             "type": "object"
           }
@@ -30,7 +20,7 @@
   ],
   "headers": [],
   "method": "post",
-  "path": "/nullable-true",
+  "path": "/read-only-true-single",
   "path_parameters": [],
   "query": []
 }

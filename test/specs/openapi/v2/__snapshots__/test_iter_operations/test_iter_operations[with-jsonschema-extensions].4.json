@@ -4,30 +4,25 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/b063e6de97e60de8c16eb63db93d187000bb5f2f",
+        "$ref": "#/x-moved-references/adf2aad722bcb9da04e2bcabe659d0221255207e",
         "x-moved-references": {
-          "b063e6de97e60de8c16eb63db93d187000bb5f2f": {
-            "allOf": [
-              {
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
+          "adf2aad722bcb9da04e2bcabe659d0221255207e": {
+            "properties": {
+              "email": {
+                "type": "string"
               },
-              {
-                "properties": {
-                  "email": {
+              "name": {
+                "anyOf": [
+                  {
                     "type": "string"
                   },
-                  "name": {
-                    "type": "string"
+                  {
+                    "type": "null"
                   }
-                },
-                "type": "object"
+                ]
               }
-            ]
+            },
+            "type": "object"
           }
         }
       }
@@ -35,7 +30,7 @@
   ],
   "headers": [],
   "method": "post",
-  "path": "/all-of",
+  "path": "/nullable-true",
   "path_parameters": [],
   "query": []
 }

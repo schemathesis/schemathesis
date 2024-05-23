@@ -290,7 +290,7 @@ def _to_self_contained_jsonschema(
                 # Read-only properties should not occur in requests
                 rewrite_properties(item, is_read_only)
         if item.get(config.nullable_key) is True:
-            _replace_nullable(item, config.nullable_key, config.moved_references)
+            _replace_nullable(item, config.nullable_key)
         ref = item.get("$ref")
         if isinstance(ref, str):
             resolved = move_referenced_data(item, ref, referenced_schemas, config, resolver)
@@ -301,7 +301,7 @@ def _to_self_contained_jsonschema(
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
                     _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
-    elif isinstance(item, list):
+    else:
         for sub_item in item:
             if sub_item and isinstance(sub_item, (dict, list)):
                 _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
@@ -349,15 +349,12 @@ def is_read_only(schema: Schema) -> bool:
     return schema.get("readOnly", False)
 
 
-def _replace_nullable(item: ObjectSchema, nullable_key: str, moved_schemas: MovedSchemas) -> None:
+def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
     del item[nullable_key]
     # Move all other keys to a new object, except for `x-moved-references` which should
     # always be at the root level
     inner = {}
     for key, value in list(item.items()):
-        # Prevent removing `x-moved-references` from the root
-        if value is moved_schemas:
-            continue
         inner[key] = value
         del item[key]
     item["anyOf"] = [inner, {"type": "null"}]
