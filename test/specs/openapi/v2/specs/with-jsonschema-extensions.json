@@ -249,6 +249,26 @@
           }
         }
       }
+    },
+    "/ref-cycle-4": {
+      "post": {
+        "summary": "Create with 4-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle4"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -448,6 +468,61 @@
         },
         "ref": {
           "$ref": "#/definitions/RefCycle2"
+        }
+      }
+    },
+    "RefCycle4": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle4B"
+        }
+      }
+    },
+    "RefCycle4B": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle4C"
+        }
+      }
+    },
+    "RefCycle4C": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle4D"
+        }
+      }
+    },
+    "RefCycle4D": {
+      "type": "object",
+      "properties": {
+        "phone": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle4E"
+        }
+      }
+    },
+    "RefCycle4E": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle4"
         }
       }
     }

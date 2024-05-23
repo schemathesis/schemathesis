@@ -210,7 +210,7 @@ class TransformConfig:
     # Previously moved references
     moved_references: MovedSchemas
     # Maximum depth of recursive schemas inlining
-    max_recursion_depth: int = 5
+    max_recursion_depth: int = 3
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
