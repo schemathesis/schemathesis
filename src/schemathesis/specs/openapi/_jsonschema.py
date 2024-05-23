@@ -212,9 +212,12 @@ class TransformConfig:
     moved_references: MovedSchemas
     # Known recursive references
     recursive_references: RecursiveReferencesCache
+    # Cache for transformed schemas
+    transformed_references: dict[str, ObjectSchema]
 
 
-META = {"keys": {}, "calls": 0}
+META = {"keys": {}, "calls": 0, "unique_refs": 0}
+UNIQUE_REFS = set()
 
 PLAIN_KEYWORDS = {
     "format",
@@ -275,6 +278,12 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     if _should_skip(schema):
         return schema
 
+    reference_cache_key: str | None = None
+    if len(schema) == 1 and "$ref" in schema:
+        reference_cache_key = schema["$ref"]
+        if reference_cache_key in config.transformed_references:
+            return config.transformed_references[reference_cache_key]
+
     referenced_schema_names = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schema_names:
@@ -303,6 +312,8 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     else:
         logger.debug("No references found")
     logger.debug("Output: %s", schema)
+    if reference_cache_key is not None:
+        config.transformed_references[reference_cache_key] = schema
     return schema
 
 

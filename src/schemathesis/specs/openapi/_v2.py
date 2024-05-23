@@ -130,6 +130,7 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
         components=components,
         moved_references={},
         recursive_references={},
+        transformed_references={},
     )
     paths = spec["paths"]
     global_media_types = spec.get("consumes", [])
