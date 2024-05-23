@@ -209,6 +209,26 @@
           }
         }
       }
+    },
+    "/ref-cycle-1": {
+      "post": {
+        "summary": "Create with 1-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle1"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
     }
   },
   "definitions": {
@@ -355,6 +375,28 @@
     },
     "RefCycle0": {
       "$ref": "#/definitions/RefCycle0"
+    },
+    "RefCycle1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle1B"
+        }
+      }
+    },
+    "RefCycle1B": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref": {
+          "$ref": "#/definitions/RefCycle1"
+        }
+      }
     }
   }
 }

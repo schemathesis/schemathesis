@@ -1,0 +1,92 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/305cda45a5e30d678f0014f51e9261005d880072",
+        "x-moved-references": {
+          "305cda45a5e30d678f0014f51e9261005d880072": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "ref": {}
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "31a8d0f931dd0af3fc1b0fe06ac6bf0f4cc8da65": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ref": {
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "ref": {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              },
+                              "ref": {}
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-1",
+  "path_parameters": [],
+  "query": []
+}
