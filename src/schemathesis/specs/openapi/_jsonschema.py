@@ -3,8 +3,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
-from hashlib import sha1
-from typing import Any, Callable, Dict, Iterable, MutableMapping, Protocol, Union
+from typing import Any, Callable, Dict, Iterable, MutableMapping, NewType, Protocol, Set, Union, cast
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
@@ -15,7 +14,7 @@ from referencing.exceptions import Unresolvable, Unretrievable
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy, merge_into
-from ...loaders import load_yaml
+from ...loaders import R, load_yaml
 from .constants import ALL_KEYWORDS
 from .utils import get_type
 
@@ -177,10 +176,11 @@ logger = logging.getLogger(__name__)
 MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
 MOVED_REFERENCE_PREFIX = f"#/{MOVED_REFERENCE_ROOT_KEY}/"
 MOVED_REFERENCE_KEY_LENGTH = len(MOVED_REFERENCE_PREFIX)
+SchemaKey = NewType("SchemaKey", str)
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 MovedSchemas = Dict[str, ObjectSchema]
-ReferencesCache = dict[str, set[str]]
+ReferencesCache = Dict[str, Set[SchemaKey]]
 
 
 class Resolved(Protocol):
@@ -209,15 +209,12 @@ class TransformConfig:
     # Previously moved references
     moved_references: MovedSchemas
     # Cache for what other referenced are used by the moved references
-    used_by_moved_references: ReferencesCache
+    used_by_moved_references: dict[str, set[SchemaKey]]
     # Known recursive references
-    recursive_references: ReferencesCache
+    recursive_references: dict[SchemaKey, Set[str]]
     # Cache for transformed schemas
     transformed_references: dict[str, ObjectSchema]
 
-
-META = {"keys": {}, "calls": 0, "unique_refs": 0}
-UNIQUE_REFS = set()
 
 PLAIN_KEYWORDS = {
     "format",
@@ -321,15 +318,15 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     return schema
 
 
-def to_self_contained_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> set[str]:
-    referenced_schemas: set[str] = set()
+def to_self_contained_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> set[SchemaKey]:
+    referenced_schemas: set[SchemaKey] = set()
     _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config, [])
     return referenced_schemas
 
 
 def _to_self_contained_jsonschema(
     item: ObjectSchema | list[ObjectSchema],
-    referenced_schemas: set[str],
+    referenced_schemas: set[SchemaKey],
     resolver: Resolver,
     config: TransformConfig,
     path: list[str],
@@ -359,7 +356,7 @@ def _to_self_contained_jsonschema(
                 resolved = move_referenced_data(item, ref, referenced_schemas, config, resolver)
                 if resolved is not None:
                     item, resolver = resolved
-                    used_by_reference = set()
+                    used_by_reference: set[SchemaKey] = set()
                     path.append(ref)
                     _to_self_contained_jsonschema(item, used_by_reference, resolver, config, path)
                     config.used_by_moved_references[ref] = used_by_reference
@@ -367,7 +364,6 @@ def _to_self_contained_jsonschema(
                 else:
                     cycle = {_make_reference_key(ref): ref for ref in path[path.index(ref) :]}
                     referenced_schemas.update(cycle)
-
         else:
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
@@ -432,7 +428,7 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
 
 
 def move_referenced_data(
-    item: ObjectSchema, ref: str, referenced_schemas: set[str], config: TransformConfig, resolver: Resolver
+    item: ObjectSchema, ref: str, referenced_schemas: set[SchemaKey], config: TransformConfig, resolver: Resolver
 ) -> tuple[Any, Resolver] | None:
     key = _make_reference_key(ref)
     new_ref = f"{MOVED_REFERENCE_PREFIX}{key}"
@@ -450,7 +446,7 @@ def move_referenced_data(
 
 
 def find_recursive_references(
-    key: str, schema_storage: MovedSchemas, cache: ReferencesCache, cutoff: int = MOVED_REFERENCE_KEY_LENGTH
+    key: str, schema_storage: MovedSchemas, cache: dict[SchemaKey, Set[str]], cutoff: int = MOVED_REFERENCE_KEY_LENGTH
 ) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
@@ -463,7 +459,7 @@ def _find_recursive_references(
     referenced_schemas: MovedSchemas,
     recursive: set[str],
     path: list[str],
-    cache: ReferencesCache,
+    cache: dict[SchemaKey, Set[str]],
     cutoff: int = MOVED_REFERENCE_KEY_LENGTH,
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
@@ -480,7 +476,7 @@ def _find_recursive_references(
                 # TODO: update the cache for each reference in the chain - all of them are recursive
             else:
                 # Otherwise explore the referenced item
-                key = ref[cutoff:]
+                key = _extract_key_from_ref(ref, cutoff)
                 cached = cache.get(key)
                 if cached is not None and not cached:
                     # The reference was already explored and it's not recursive
@@ -540,16 +536,16 @@ def _inline_recursive_references(
                 _inline_recursive_references(sub_item, referenced_schemas, references, path)
 
 
-def _extract_key_from_ref(ref: str) -> str:
-    return ref[MOVED_REFERENCE_KEY_LENGTH:]
+def _extract_key_from_ref(ref: str, cutoff: int = MOVED_REFERENCE_KEY_LENGTH) -> SchemaKey:
+    return cast(SchemaKey, ref[cutoff:])
 
 
-def _make_reference_key(reference: str) -> str:
+def _make_reference_key(reference: str) -> SchemaKey:
     # TODO: use traversal path to make the key - in different files there could be different objects with the same name
     # TODO: or maybe don't use hash at all and have readable keys
     if reference.startswith("file://"):
         reference = reference[7:]
-    return reference.replace("/", "-").replace("#", "")
+    return cast(SchemaKey, reference.replace("/", "-").replace("#", ""))
 
 
 def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
