@@ -291,14 +291,6 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         if reference_cache_key in config.transformed_references:
             return config.transformed_references[reference_cache_key]
 
-    keys = ",".join(sorted(set(schema)))
-    META["keys"][keys] = META["keys"].get(keys, 0) + 1
-    META["calls"] += 1
-    if "$ref" in schema:
-        UNIQUE_REFS.add(schema["$ref"])
-        META["unique_refs"] = len(UNIQUE_REFS)
-
-    #    print(META)
     referenced_schema_names = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schema_names:
@@ -447,10 +439,12 @@ def move_referenced_data(
     return None
 
 
-def find_recursive_references(key: str, schema_storage: MovedSchemas, cache: RecursiveReferencesCache) -> set[str]:
+def find_recursive_references(
+    key: str, schema_storage: MovedSchemas, cache: RecursiveReferencesCache, cutoff: int = MOVED_REFERENCE_KEY_LENGTH
+) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
-    _find_recursive_references(schema_storage[key], schema_storage, references, [], cache)
+    _find_recursive_references(schema_storage[key], schema_storage, references, [key], cache, cutoff)
     return references
 
 
@@ -460,6 +454,7 @@ def _find_recursive_references(
     recursive: set[str],
     path: list[str],
     cache: RecursiveReferencesCache,
+    cutoff: int = MOVED_REFERENCE_KEY_LENGTH,
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
     if isinstance(item, dict):
@@ -468,26 +463,29 @@ def _find_recursive_references(
             if ref in path:
                 # The reference was already seen in the current traversl path, it means that it's recursive
                 logger.debug("Found recursive reference: %s at %r", ref, path)
-                recursive.add(ref)
+                # Add all refs starting from the current one in the path, as they make a recursive chain
+                # and every one of them is recursive
+                idx = path.index(ref)
+                recursive.update(path[idx:])
             else:
                 # Otherwise explore the referenced item
-                key = ref[MOVED_REFERENCE_KEY_LENGTH:]
+                key = ref[cutoff:]
                 cached = cache.get(key)
                 if cached is not None and not cached:
                     # The reference was already explored and it's not recursive
                     return
                 referenced_item = referenced_schemas[key]
                 path.append(ref)
-                _find_recursive_references(referenced_item, referenced_schemas, recursive, path, cache)
+                _find_recursive_references(referenced_item, referenced_schemas, recursive, path, cache, cutoff)
                 path.pop()
         else:
             for value in item.values():
                 if isinstance(value, (dict, list)) and value:
-                    _find_recursive_references(value, referenced_schemas, recursive, path, cache)
+                    _find_recursive_references(value, referenced_schemas, recursive, path, cache, cutoff)
     else:
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
-                _find_recursive_references(sub_item, referenced_schemas, recursive, path, cache)
+                _find_recursive_references(sub_item, referenced_schemas, recursive, path, cache, cutoff)
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
