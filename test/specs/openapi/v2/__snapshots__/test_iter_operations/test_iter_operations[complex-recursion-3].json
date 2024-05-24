@@ -1,0 +1,66 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/-definitions-Patch",
+        "x-moved-references": {
+          "-definitions-Leaf": {},
+          "-definitions-Patch": {
+            "$ref": "#/x-moved-references/-definitions-Shared"
+          },
+          "-definitions-Put": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-references/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                  },
+                  "right": {
+                    "properties": {
+                      "left": {
+                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                      },
+                      "right": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "-definitions-Shared": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-references/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                  },
+                  "right": {
+                    "properties": {
+                      "left": {
+                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                      },
+                      "right": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "patch",
+  "path": "/first",
+  "path_parameters": [],
+  "query": []
+}

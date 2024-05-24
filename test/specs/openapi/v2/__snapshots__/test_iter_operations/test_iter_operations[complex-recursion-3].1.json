@@ -1,0 +1,63 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-references/-definitions-Put",
+        "x-moved-references": {
+          "-definitions-Leaf": {},
+          "-definitions-Put": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-references/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                  },
+                  "right": {
+                    "properties": {
+                      "left": {
+                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                      },
+                      "right": {}
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "-definitions-Shared": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-references/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                  },
+                  "right": {
+                    "properties": {
+                      "left": {
+                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                      },
+                      "right": {}
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "put",
+  "path": "/second",
+  "path_parameters": [],
+  "query": []
+}

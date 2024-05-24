@@ -362,13 +362,11 @@ def _to_self_contained_jsonschema(
                     used_by_reference = set()
                     path.append(ref)
                     _to_self_contained_jsonschema(item, used_by_reference, resolver, config, path)
-                    path.pop()
-
                     config.used_by_moved_references[ref] = used_by_reference
                     referenced_schemas.update(used_by_reference)
                 else:
-                    keys = {_make_reference_key(ref) for ref in path[path.index(ref) :]}
-                    referenced_schemas.update(keys)
+                    cycle = {_make_reference_key(ref): ref for ref in path[path.index(ref) :]}
+                    referenced_schemas.update(cycle)
 
         else:
             for sub_item in item.values():
