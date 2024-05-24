@@ -241,7 +241,14 @@ PLAIN_KEYWORDS = {
 
 
 def _should_skip(schema: ObjectSchema) -> bool:
-    return schema.get("type") != "file" and not set(schema) - PLAIN_KEYWORDS
+    return (
+        "x-nullable" not in schema
+        and "writeOnly" not in schema
+        and "x-writeOnly" not in schema
+        and "readOnly" not in schema
+        and schema.get("type") != "file"
+        and not set(schema) - PLAIN_KEYWORDS
+    )
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
@@ -284,6 +291,14 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         if reference_cache_key in config.transformed_references:
             return config.transformed_references[reference_cache_key]
 
+    keys = ",".join(sorted(set(schema)))
+    META["keys"][keys] = META["keys"].get(keys, 0) + 1
+    META["calls"] += 1
+    if "$ref" in schema:
+        UNIQUE_REFS.add(schema["$ref"])
+        META["unique_refs"] = len(UNIQUE_REFS)
+
+    #    print(META)
     referenced_schema_names = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schema_names:
