@@ -1,29 +1,39 @@
+import os
 import pathlib
+import sys
 from typing import NoReturn
 
-import os
 import hypothesis
 import pytest
 from flask import Flask
-from jsonschema import RefResolutionError
 from hypothesis import HealthCheck, Phase, Verbosity
+from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import ALL_CHECKS
-from schemathesis.extra._flask import run_server
-from schemathesis.exceptions import SchemaError, CheckFailed, UsageError, format_exception
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.models import Status
+from schemathesis.exceptions import CheckFailed, SchemaError, UsageError, format_exception
+from schemathesis.extra._flask import run_server
 from schemathesis.internal.result import Err
+from schemathesis.models import Status
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
 from schemathesis.service.client import ServiceClient
-from schemathesis.service.constants import URL_ENV_VAR, TOKEN_ENV_VAR
-from schemathesis.service.models import SuccessState, AnalysisError
+from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
+from schemathesis.service.models import AnalysisError, SuccessState
 from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
-CATALOG_DIR = CURRENT_DIR / "openapi-directory/APIs/"
+sys.path.append(str(CURRENT_DIR.parent))
+
+from corpus.tools import read_corpus_file, json_loads  # noqa: E402
+
+CORPUS_FILE_NAMES = (
+    "swagger-2.0",
+    "openapi-3.0",
+    "openapi-3.1",
+)
+CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
 schemathesis.experimental.OPEN_API_3_1.enable()
 VERIFY_SCHEMA_ANALYSIS = os.getenv("VERIFY_SCHEMA_ANALYSIS", "false").lower() in ("true", "1")
 SCHEMATHESIS_IO_URL = os.getenv(URL_ENV_VAR)
@@ -38,76 +48,63 @@ def default():
     return '{"success": true}'
 
 
-def get_id(path):
-    return str(path).replace(f"{CATALOG_DIR}/", "")
-
-
 def pytest_generate_tests(metafunc):
-    allowed_schemas = (path for path in walk(CATALOG_DIR) if path.name in ("swagger.yaml", "openapi.yaml"))
-    metafunc.parametrize("schema_path", allowed_schemas, ids=get_id)
-
-
-def walk(path: pathlib.Path):
-    # It is a bit faster than `glob`
-    if path.is_dir():
-        for item in path.iterdir():
-            yield from walk(item)
-    else:
-        yield path
+    filenames = [(filename, member.name) for filename, corpus in CORPUS_FILES.items() for member in corpus.getmembers()]
+    metafunc.parametrize("corpus, filename", filenames)
 
 
 SLOW = {
-    "stripe.com/2020-08-27/openapi.yaml",
-    "azure.com/network-applicationGateway/2018-08-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2019-06-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-11-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2019-02-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-10-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2019-07-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-12-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-02-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2019-08-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-06-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-07-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2015-06-15/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-04-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-09-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-10-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-11-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2016-12-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2018-01-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-08-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-03-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2019-04-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2016-09-01/swagger.yaml",
-    "azure.com/network-applicationGateway/2017-06-01/swagger.yaml",
-    "azure.com/web-WebApps/2018-02-01/swagger.yaml",
-    "azure.com/web-WebApps/2019-08-01/swagger.yaml",
-    "azure.com/web-WebApps/2018-11-01/swagger.yaml",
-    "azure.com/web-WebApps/2016-08-01/swagger.yaml",
-    "azure.com/devtestlabs-DTL/2016-05-15/swagger.yaml",
-    "azure.com/devtestlabs-DTL/2018-09-15/swagger.yaml",
-    "amazonaws.com/resource-groups/2017-11-27/openapi.yaml",
-    "amazonaws.com/ivs/2020-07-14/openapi.yaml",
-    "amazonaws.com/workspaces-web/2020-07-08/openapi.yaml",
-    "presalytics.io/ooxml/0.1.0/openapi.yaml",
-    "kubernetes.io/v1.10.0/swagger.yaml",
-    "kubernetes.io/unversioned/swagger.yaml",
-    "microsoft.com/graph/1.0.1/openapi.yaml",
-    "microsoft.com/graph-beta/1.0.1/openapi.yaml",
-    "wedpax.com/v1/swagger.yaml",
-    "stripe.com/2022-11-15/openapi.yaml",
-    "xero.com/xero-payroll-au/2.9.4/openapi.yaml",
-    "xero.com/xero_accounting/2.9.4/openapi.yaml",
-    "portfoliooptimizer.io/1.0.9/openapi.yaml",
-    "amazonaws.com/proton/2020-07-20/openapi.yaml",
-    "bungie.net/2.18.0/openapi.yaml",
-    "amazonaws.com/sagemaker-geospatial/2020-05-27/openapi.yaml",
+    "stripe.com/2020-08-27.json",
+    "azure.com/network-applicationGateway/2018-08-01.json",
+    "azure.com/network-applicationGateway/2019-06-01.json",
+    "azure.com/network-applicationGateway/2017-11-01.json",
+    "azure.com/network-applicationGateway/2019-02-01.json",
+    "azure.com/network-applicationGateway/2017-10-01.json",
+    "azure.com/network-applicationGateway/2019-07-01.json",
+    "azure.com/network-applicationGateway/2018-12-01.json",
+    "azure.com/network-applicationGateway/2018-02-01.json",
+    "azure.com/network-applicationGateway/2019-08-01.json",
+    "azure.com/network-applicationGateway/2018-06-01.json",
+    "azure.com/network-applicationGateway/2018-07-01.json",
+    "azure.com/network-applicationGateway/2015-06-15.json",
+    "azure.com/network-applicationGateway/2018-04-01.json",
+    "azure.com/network-applicationGateway/2017-09-01.json",
+    "azure.com/network-applicationGateway/2018-10-01.json",
+    "azure.com/network-applicationGateway/2018-11-01.json",
+    "azure.com/network-applicationGateway/2016-12-01.json",
+    "azure.com/network-applicationGateway/2018-01-01.json",
+    "azure.com/network-applicationGateway/2017-08-01.json",
+    "azure.com/network-applicationGateway/2017-03-01.json",
+    "azure.com/network-applicationGateway/2019-04-01.json",
+    "azure.com/network-applicationGateway/2016-09-01.json",
+    "azure.com/network-applicationGateway/2017-06-01.json",
+    "azure.com/web-WebApps/2018-02-01.json",
+    "azure.com/web-WebApps/2019-08-01.json",
+    "azure.com/web-WebApps/2018-11-01.json",
+    "azure.com/web-WebApps/2016-08-01.json",
+    "azure.com/devtestlabs-DTL/2016-05-15.json",
+    "azure.com/devtestlabs-DTL/2018-09-15.json",
+    "amazonaws.com/resource-groups/2017-11-27.json",
+    "amazonaws.com/ivs/2020-07-14.json",
+    "amazonaws.com/workspaces-web/2020-07-08.json",
+    "presalytics.io/ooxml/0.1.0.json",
+    "kubernetes.io/v1.10.0.json",
+    "kubernetes.io/unversioned.json",
+    "microsoft.com/graph/1.0.1.json",
+    "microsoft.com/graph-beta/1.0.1.json",
+    "wedpax.com/v1.json",
+    "stripe.com/2022-11-15.json",
+    "xero.com/xero-payroll-au/2.9.4.json",
+    "xero.com/xero_accounting/2.9.4.json",
+    "portfoliooptimizer.io/1.0.9.json",
+    "amazonaws.com/proton/2020-07-20.json",
+    "bungie.net/2.18.0.json",
+    "amazonaws.com/sagemaker-geospatial/2020-05-27.json",
 }
 KNOWN_ISSUES = {
     # Regex that includes surrogates which is incompatible with the default alphabet for regex in Hypothesis (UTF-8)
-    ("amazonaws.com/cleanrooms/2022-02-17/openapi.yaml", "POST /collaborations"),
-    ("amazonaws.com/cleanrooms/2022-02-17/openapi.yaml", "POST /configuredTables"),
+    ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /collaborations"),
+    ("amazonaws.com/cleanrooms/2022-02-17.json", "POST /configuredTables"),
 }
 
 
@@ -126,12 +123,13 @@ def combined_check(response, case):
             pass
 
 
-def test_corpus(schema_path, app_port):
-    schema_id = get_id(schema_path)
-    if schema_id in SLOW:
+def test_corpus(corpus, filename, app_port):
+    if filename in SLOW:
         pytest.skip("Data generation is extremely slow for this schema")
+    raw_content = CORPUS_FILES[corpus].extractfile(filename)
+    raw_schema = json_loads(raw_content.read())
     try:
-        schema = loaders.from_path(schema_path, validate_schema=False, base_url=f"http://127.0.0.1:{app_port}/")
+        schema = loaders.from_dict(raw_schema, validate_schema=False, base_url=f"http://127.0.0.1:{app_port}/")
     except SchemaError as exc:
         assert_invalid_schema(exc)
     try:
@@ -162,7 +160,7 @@ def test_corpus(schema_path, app_port):
     for event in runner.execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
-        assert_event(schema_id, event)
+        assert_event(filename, event)
 
 
 def assert_invalid_schema(exc: SchemaError) -> NoReturn:
@@ -212,7 +210,7 @@ def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
 
 def should_ignore_error(schema_id: str, error: SerializedError, event: events.AfterExecution) -> bool:
     if (
-        schema_id == "launchdarkly.com/3.10.0/swagger.yaml" or schema_id == "launchdarkly.com/5.3.0/swagger.yaml"
+        schema_id == "launchdarkly.com/3.10.0.json" or schema_id == "launchdarkly.com/5.3.0.json"
     ) and "'<' not supported between instances" in error.exception:
         return True
     if (
