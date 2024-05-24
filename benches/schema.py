@@ -36,13 +36,14 @@ CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 APPVEYOR = load_from_corpus("appveyor.com/1.0.0.json", CORPUS_SWAGGER_20)
 EVETECH = load_from_corpus("evetech.net/0.8.6.json", CORPUS_SWAGGER_20)
 OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
+ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "raw_schema",
-    [APPVEYOR, EVETECH, OSISOFT],
-    ids=("appveyor", "evetech", "osisoft"),
+    [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES],
+    ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
 )
 def test_iter_operations_v2(raw_schema):
     _ = list(iter_operations(raw_schema, ""))

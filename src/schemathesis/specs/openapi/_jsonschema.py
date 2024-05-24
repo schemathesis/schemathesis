@@ -171,9 +171,7 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 
 
 # TODO:
-#  - use caching for input schemas
 #  - Raise custom error when the referenced value is invalid
-#  - Traverse only components that may have references (before passing here)
 
 logger = logging.getLogger(__name__)
 MOVED_REFERENCE_ROOT_KEY = "x-moved-references"
@@ -314,9 +312,6 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         schema[MOVED_REFERENCE_ROOT_KEY] = used_moved_references
         if references:
-            # TODO: Probably this could be done just once per test run, or exploring just only what is needed
-            # and caching already explored schemas
-            #
             inline_recursive_references(used_moved_references, references)
     else:
         logger.debug("No references found")
@@ -500,10 +495,10 @@ def _find_recursive_references(
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
-    # TODO: Filter out what is not used - non recursive references wont be modified, therefore there is no need to copy them
-    originals = fast_deepcopy(referenced_schemas)
-    for recursive in references:
-        key = recursive[MOVED_REFERENCE_KEY_LENGTH:]
+    keys = {_extract_key_from_ref(ref) for ref in references}
+    originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
+    for ref in references:
+        key = _extract_key_from_ref(ref)
         _inline_recursive_references(referenced_schemas[key], originals, references, (key,))
 
 
@@ -517,7 +512,7 @@ def _inline_recursive_references(
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
-            key = ref[MOVED_REFERENCE_KEY_LENGTH:]
+            key = _extract_key_from_ref(ref)
             referenced_item = referenced_schemas[key]
             # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
             #       Just copy the value and directly jump to the next ref in it, or iterate over them
@@ -538,6 +533,10 @@ def _inline_recursive_references(
         for sub_item in item:
             if isinstance(sub_item, (dict, list)):
                 _inline_recursive_references(sub_item, referenced_schemas, references, path)
+
+
+def _extract_key_from_ref(ref: str) -> str:
+    return ref[MOVED_REFERENCE_KEY_LENGTH:]
 
 
 def _make_reference_key(reference: str) -> str:
