@@ -323,7 +323,7 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
 
 def to_self_contained_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> set[str]:
     referenced_schemas: set[str] = set()
-    _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config)
+    _to_self_contained_jsonschema(schema, referenced_schemas, resolver, config, [])
     return referenced_schemas
 
 
@@ -332,6 +332,7 @@ def _to_self_contained_jsonschema(
     referenced_schemas: set[str],
     resolver: Resolver,
     config: TransformConfig,
+    path: list[str],
 ) -> None:
     logger.debug("Processing %r", item)
     if isinstance(item, dict):
@@ -359,18 +360,24 @@ def _to_self_contained_jsonschema(
                 if resolved is not None:
                     item, resolver = resolved
                     used_by_reference = set()
-                    _to_self_contained_jsonschema(item, used_by_reference, resolver, config)
+                    path.append(ref)
+                    _to_self_contained_jsonschema(item, used_by_reference, resolver, config, path)
+                    path.pop()
+
                     config.used_by_moved_references[ref] = used_by_reference
                     referenced_schemas.update(used_by_reference)
+                else:
+                    keys = {_make_reference_key(ref) for ref in path[path.index(ref) :]}
+                    referenced_schemas.update(keys)
 
         else:
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
-                    _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
+                    _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config, path)
     else:
         for sub_item in item:
             if sub_item and isinstance(sub_item, (dict, list)):
-                _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config)
+                _to_self_contained_jsonschema(sub_item, referenced_schemas, resolver, config, path)
 
 
 def _replace_file_type(item: ObjectSchema) -> None:

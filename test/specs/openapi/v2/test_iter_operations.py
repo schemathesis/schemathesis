@@ -74,6 +74,7 @@ def assert_no_unused_components(schema):
         "recursive-with-non-recursive",
         "recursive-with-list",
         "complex-definitions",
+        "complex-recursion-2",
     ],
     indirect=True,
 )

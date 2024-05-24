@@ -1,0 +1,21 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-references/-definitions-Put",
+        "x-moved-references": {
+          "-definitions-Put": {},
+          "-definitions-Shared-1": {},
+          "-definitions-Shared-2": {}
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "put",
+  "path": "/second",
+  "path_parameters": [],
+  "query": []
+}
