@@ -182,7 +182,7 @@ MOVED_REFERENCE_KEY_LENGTH = len(MOVED_REFERENCE_PREFIX)
 ObjectSchema = MutableMapping[str, Any]
 Schema = Union[bool, ObjectSchema]
 MovedSchemas = Dict[str, ObjectSchema]
-RecursiveReferencesCache = dict[str, set[str]]
+ReferencesCache = dict[str, set[str]]
 
 
 class Resolved(Protocol):
@@ -210,8 +210,10 @@ class TransformConfig:
     components: dict[str, ObjectSchema]
     # Previously moved references
     moved_references: MovedSchemas
+    # Cache for what other referenced are used by the moved references
+    used_by_moved_references: ReferencesCache
     # Known recursive references
-    recursive_references: RecursiveReferencesCache
+    recursive_references: ReferencesCache
     # Cache for transformed schemas
     transformed_references: dict[str, ObjectSchema]
 
@@ -352,10 +354,20 @@ def _to_self_contained_jsonschema(
             _replace_nullable(item, config.nullable_key)
         ref = item.get("$ref")
         if isinstance(ref, str):
-            resolved = move_referenced_data(item, ref, referenced_schemas, config, resolver)
-            if resolved is not None:
-                item, resolver = resolved
-                _to_self_contained_jsonschema(item, referenced_schemas, resolver, config)
+            if ref in config.used_by_moved_references:
+                referenced_schemas.update(config.used_by_moved_references[ref])
+                key = _make_reference_key(ref)
+                referenced_schemas.add(key)
+                item["$ref"] = f"{MOVED_REFERENCE_PREFIX}{key}"
+            else:
+                resolved = move_referenced_data(item, ref, referenced_schemas, config, resolver)
+                if resolved is not None:
+                    item, resolver = resolved
+                    used_by_reference = set()
+                    _to_self_contained_jsonschema(item, used_by_reference, resolver, config)
+                    config.used_by_moved_references[ref] = used_by_reference
+                    referenced_schemas.update(used_by_reference)
+
         else:
             for sub_item in item.values():
                 if sub_item and isinstance(sub_item, (dict, list)):
@@ -422,8 +434,6 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
 def move_referenced_data(
     item: ObjectSchema, ref: str, referenced_schemas: set[str], config: TransformConfig, resolver: Resolver
 ) -> tuple[Any, Resolver] | None:
-    if ref.startswith("file://"):
-        ref = ref[7:]
     key = _make_reference_key(ref)
     new_ref = f"{MOVED_REFERENCE_PREFIX}{key}"
     referenced_schemas.add(key)
@@ -440,7 +450,7 @@ def move_referenced_data(
 
 
 def find_recursive_references(
-    key: str, schema_storage: MovedSchemas, cache: RecursiveReferencesCache, cutoff: int = MOVED_REFERENCE_KEY_LENGTH
+    key: str, schema_storage: MovedSchemas, cache: ReferencesCache, cutoff: int = MOVED_REFERENCE_KEY_LENGTH
 ) -> set[str]:
     """Find all recursive references in the given schema storage."""
     references: set[str] = set()
@@ -453,7 +463,7 @@ def _find_recursive_references(
     referenced_schemas: MovedSchemas,
     recursive: set[str],
     path: list[str],
-    cache: RecursiveReferencesCache,
+    cache: ReferencesCache,
     cutoff: int = MOVED_REFERENCE_KEY_LENGTH,
 ) -> None:
     logger.debug("Traversing %r at %r", item, path)
@@ -467,6 +477,7 @@ def _find_recursive_references(
                 # and every one of them is recursive
                 idx = path.index(ref)
                 recursive.update(path[idx:])
+                # TODO: update the cache for each reference in the chain - all of them are recursive
             else:
                 # Otherwise explore the referenced item
                 key = ref[cutoff:]
@@ -489,9 +500,11 @@ def _find_recursive_references(
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
+    # TODO: Filter out what is not used - non recursive references wont be modified, therefore there is no need to copy them
     originals = fast_deepcopy(referenced_schemas)
-    for key, item in referenced_schemas.items():
-        _inline_recursive_references(item, originals, references, (key,))
+    for recursive in references:
+        key = recursive[MOVED_REFERENCE_KEY_LENGTH:]
+        _inline_recursive_references(referenced_schemas[key], originals, references, (key,))
 
 
 def _inline_recursive_references(
@@ -530,6 +543,8 @@ def _inline_recursive_references(
 def _make_reference_key(reference: str) -> str:
     # TODO: use traversal path to make the key - in different files there could be different objects with the same name
     # TODO: or maybe don't use hash at all and have readable keys
+    if reference.startswith("file://"):
+        reference = reference[7:]
     return reference.replace("/", "-").replace("#", "")
 
 
