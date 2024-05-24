@@ -1,5 +1,5 @@
-import json
 import pathlib
+import sys
 
 import hypothesis
 import pytest
@@ -10,32 +10,32 @@ from schemathesis.runner import from_schema
 from schemathesis.specs.openapi._v2 import iter_operations
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
+sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
 
-
-def read_json_from_catalog(path: str):
-    with (CATALOG_DIR / path).open() as fd:
-        return json.load(fd)
+from corpus.tools import read_corpus_file, load_from_corpus  # noqa: E402
 
 
+CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
+CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 # Small size (~2k lines in YAML)
-BBCI = read_json_from_catalog("bbci.json")
+# BBCI = load_from_corpus("bbci.co.uk/1.0.json", CORPUS_OPENAPI_30)
 # BBCI_SCHEMA = schemathesis.from_dict(BBCI)
 # BBCI_OPERATIONS = list(BBCI_SCHEMA.get_all_operations())
 # Medium size (~8k lines in YAML)
-VMWARE = read_json_from_catalog("vmware.json")
+# VMWARE = load_from_corpus("vmware.local/vrni/1.0.0.json", CORPUS_OPENAPI_30)
 # VMWARE_SCHEMA = schemathesis.from_dict(VMWARE)
 # VMWARE_OPERATIONS = list(VMWARE_SCHEMA.get_all_operations())
 # Large size (~92k lines in YAML)
-STRIPE = read_json_from_catalog("stripe.json")
+# STRIPE = load_from_corpus("stripe.com/2022-11-15.json", CORPUS_OPENAPI_30)
 # STRIPE_SCHEMA = schemathesis.from_dict(STRIPE)
 # Medium GraphQL schema (~6k lines)
 # UNIVERSE = read_json_from_catalog("universe.json")
 # UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
 
-APPVEYOR = read_json_from_catalog("appveyor.json")
-EVETECH = read_json_from_catalog("evetech.json")
-OSISOFT = read_json_from_catalog("osisoft.json")
+APPVEYOR = load_from_corpus("appveyor.com/1.0.0.json", CORPUS_SWAGGER_20)
+EVETECH = load_from_corpus("evetech.net/0.8.6.json", CORPUS_SWAGGER_20)
+OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 
 
 @pytest.mark.benchmark
