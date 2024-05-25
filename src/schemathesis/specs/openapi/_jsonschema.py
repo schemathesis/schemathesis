@@ -272,6 +272,8 @@ def _should_skip(schema: ObjectSchema) -> bool:
 META = {
     "total": 0,
     "unique": 0,
+    "iter_schema": 0,
+    "dfs": 0,
 }
 UNIQUE = set()
 
@@ -380,16 +382,25 @@ def dfs(item: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], config:
             config.cache.moved_schemas[key] = resolved.contents
             resolver = resolved.resolver
             item = resolved.contents
-        if not _should_skip(item):
-            dfs(item, resolver, visited, config)
+        dfs(item, resolver, visited, config)
     else:
-        for value in item.values():
-            if isinstance(value, dict):
+        for key, value in item.items():
+            if key == "additionalProperties" and isinstance(value, dict):
                 dfs(value, resolver, visited, config)
-            if isinstance(value, list):
-                for sub_item in value:
-                    if isinstance(sub_item, dict):
-                        dfs(sub_item, resolver, visited, config)
+            elif key in ("properties", "patternProperties"):
+                for subschema in value.values():
+                    dfs(subschema, resolver, visited, config)
+            elif key in ("additionalProperties", "not"):
+                dfs(value, resolver, visited, config)
+            elif key == "items":
+                if isinstance(value, dict):
+                    dfs(value, resolver, visited, config)
+                elif isinstance(value, list):
+                    for subschema in value:
+                        dfs(subschema, resolver, visited, config)
+            elif key in ("anyOf", "oneOf", "allOf"):
+                for subschema in value:
+                    dfs(subschema, resolver, visited, config)
 
 
 def iter_schema(
@@ -448,16 +459,25 @@ def iter_schema(
                 item = resolved.contents
                 resolver = resolved.resolver
             visited.add(key)
-            if not _should_skip(item):
-                stack.append((item, resolver, path))
+            stack.append((item, resolver, path))
         else:
-            for value in item.values():
-                if isinstance(value, dict):
+            for key, value in item.items():
+                if key == "additionalProperties" and isinstance(value, dict):
                     stack.append((value, resolver, path))
-                elif isinstance(value, list):
-                    for sub_item in value:
-                        if isinstance(sub_item, dict):
-                            stack.append((sub_item, resolver, path))
+                elif key in ("properties", "patternProperties"):
+                    for subschema in value.values():
+                        stack.append((subschema, resolver, path))
+                elif key in ("additionalProperties", "not"):
+                    stack.append((value, resolver, path))
+                elif key == "items":
+                    if isinstance(value, dict):
+                        stack.append((value, resolver, path))
+                    elif isinstance(value, list):
+                        for subschema in value:
+                            stack.append((subschema, resolver, path))
+                elif key in ("anyOf", "oneOf", "allOf"):
+                    for subschema in value:
+                        stack.append((subschema, resolver, path))
 
 
 def _ref_to_key(ref: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> SchemaKey:
