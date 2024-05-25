@@ -129,6 +129,7 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
         remove_read_only=True,
         components=components,
         moved_schemas={},
+        replaced_references={},
         schemas_behind_references={},
         recursive_references={},
         transformed_references={},

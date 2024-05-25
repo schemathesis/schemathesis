@@ -167,6 +167,7 @@ def build_config(spec):
         remove_read_only=True,
         components=spec,
         moved_schemas={},
+        replaced_references={},
         schemas_behind_references={},
         recursive_references={},
         transformed_references={},
@@ -222,9 +223,6 @@ def test_recursive_1_hop(ctx: Context):
     assert ctx.config.schemas_behind_references == {
         "#/definitions/A": {"-definitions-A", "-definitions-B"},
         "#/definitions/B": {"-definitions-A", "-definitions-B"},
-        # Added on the second iteration. Schemas already have their references replaced with "moved" ones.
-        "#/x-moved-schemas/-definitions-A": {"-definitions-A", "-definitions-B"},
-        "#/x-moved-schemas/-definitions-B": {"-definitions-A", "-definitions-B"},
     }
     assert ctx.config.moved_schemas == {
         "-definitions-A": {
@@ -251,9 +249,6 @@ def test_recursive_1_hop_in_array(ctx: Context):
     assert ctx.config.schemas_behind_references == {
         "#/definitions/A": {"-definitions-A", "-definitions-B"},
         "#/definitions/B": {"-definitions-A", "-definitions-B"},
-        # Added on the second iteration. Schemas already have their references replaced with "moved" ones.
-        "#/x-moved-schemas/-definitions-A": {"-definitions-A", "-definitions-B"},
-        "#/x-moved-schemas/-definitions-B": {"-definitions-A", "-definitions-B"},
     }
     assert ctx.config.moved_schemas == {
         "-definitions-A": {
@@ -283,10 +278,6 @@ def test_recursive_2_hops(ctx: Context):
         "#/definitions/A": {"-definitions-A", "-definitions-B", "-definitions-C"},
         "#/definitions/B": {"-definitions-A", "-definitions-B", "-definitions-C"},
         "#/definitions/C": {"-definitions-A", "-definitions-B", "-definitions-C"},
-        # Added on the second iteration. Schemas already have their references replaced with "moved" ones.
-        "#/x-moved-schemas/-definitions-A": {"-definitions-A", "-definitions-B", "-definitions-C"},
-        "#/x-moved-schemas/-definitions-B": {"-definitions-A", "-definitions-B", "-definitions-C"},
-        "#/x-moved-schemas/-definitions-C": {"-definitions-A", "-definitions-B", "-definitions-C"},
     }
     assert ctx.config.moved_schemas == {
         "-definitions-A": {
@@ -384,19 +375,6 @@ def test_recursive_with_nested(ctx: Context):
             "-definitions-RecursiveRoot",
             "-definitions-Shared",
         },
-        "#/x-moved-schemas/-definitions-RecursiveA": {"-definitions-RecursiveA", "-definitions-RecursiveB"},
-        "#/x-moved-schemas/-definitions-RecursiveB": {"-definitions-RecursiveA", "-definitions-RecursiveB"},
-        "#/x-moved-schemas/-definitions-RecursiveRoot": {
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-        },
-        "#/x-moved-schemas/-definitions-Shared": {
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-            "-definitions-Shared",
-        },
     }
     assert ctx.config.moved_schemas == {
         "-definitions-Patch": {"$ref": "#/x-moved-schemas/-definitions-Shared"},
@@ -433,14 +411,7 @@ def test_recursive_with_leaf(ctx: Context):
             if idx != ITERATIONS - 1:
                 ctx.reset()
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Patch"}, ctx.resolver, ctx.config)
-    assert ctx.config.schemas_behind_references == {
-        **expected_visits,
-        # Added on the second iteration. Schemas already have their references replaced with "moved" ones.
-        # Except for `Patch` as it is not referenced anywhere
-        "#/x-moved-schemas/-definitions-Shared": {"-definitions-Leaf", "-definitions-Put", "-definitions-Shared"},
-        "#/x-moved-schemas/-definitions-Put": {"-definitions-Leaf", "-definitions-Put", "-definitions-Shared"},
-        "#/x-moved-schemas/-definitions-Leaf": {"-definitions-Leaf"},
-    }
+    assert ctx.config.schemas_behind_references == expected_visits
     # assert config.recursive_references == {
     #     # From `Shared` one can find 2 recursive references, `Shared` itself and `Put`
     #     "-definitions-Shared": {"-definitions-Shared", "-definitions-Put"},
