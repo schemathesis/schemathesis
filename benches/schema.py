@@ -41,17 +41,16 @@ OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 
 
+@pytest.mark.benchmark
 @pytest.mark.parametrize(
     "raw_schema",
     [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES],
     ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
 )
-def test_iter_operations_v2(raw_schema, benchmark):
+def test_iter_operations_v2(raw_schema):
     schema = fast_deepcopy(raw_schema)
-
-    @benchmark
-    def bench():
-        _ = list(iter_operations(schema, ""))
+    for _ in iter_operations(schema, ""):
+        pass
 
 
 @pytest.mark.benchmark
@@ -66,7 +65,8 @@ def test_iter_operations_v2(raw_schema, benchmark):
     ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
 )
 def test_iter_operations_v2_cached(raw_schema, cache):
-    _ = list(iter_operations(raw_schema, "", cache=cache))
+    for _ in iter_operations(raw_schema, "", cache=cache):
+        pass
 
 
 # @pytest.mark.benchmark
