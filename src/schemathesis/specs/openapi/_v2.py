@@ -10,7 +10,7 @@ from schemathesis.internal.copy import fast_deepcopy
 
 from ...constants import HTTP_METHODS
 from ...internal.result import Ok, Result
-from ._jsonschema import to_jsonschema, TransformConfig
+from ._jsonschema import to_jsonschema, TransformConfig, TransformCache
 
 if TYPE_CHECKING:
     from ._jsonschema import Resolver
@@ -112,10 +112,12 @@ class SharedParameters:
                 )
 
 
-def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
+def iter_operations(
+    spec: Specification, uri: str, cache: TransformCache | None = None
+) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
     """Iterate over all operations in the given OpenAPI 2.0 specification."""
     # TODO: How to copy only what is needed? Or better, make the mutated version work as the original
-    registry = Registry().with_resource(uri, Resource(contents=fast_deepcopy(spec), specification=DRAFT4))
+    registry = Registry().with_resource(uri, Resource(contents=spec, specification=DRAFT4))
     root_resolver = registry.resolver()
     definitions = spec.get("definitions")
     components: dict[str, MutableMapping[str, Any]]
@@ -128,11 +130,7 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
         remove_write_only=False,
         remove_read_only=True,
         components=components,
-        moved_schemas={},
-        replaced_references={},
-        schemas_behind_references={},
-        recursive_references={},
-        transformed_references={},
+        cache=cache or TransformCache(),
     )
     paths = spec["paths"]
     global_media_types = spec.get("consumes", [])

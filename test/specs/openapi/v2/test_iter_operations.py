@@ -8,7 +8,7 @@ from referencing import Registry, Resource
 
 from schemathesis.internal.result import Ok
 from schemathesis.specs.openapi._v2 import iter_operations
-from schemathesis.specs.openapi._jsonschema import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH
+from schemathesis.specs.openapi._jsonschema import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH, TransformCache
 from schemathesis.specs.openapi.definitions import SWAGGER_20_VALIDATOR
 
 HERE = Path(__file__).parent.absolute()
@@ -60,6 +60,22 @@ def assert_no_unused_components(schema):
         assert not set(schema[MOVED_SCHEMAS_KEY]) - references
 
 
+class FrozenDict(dict):
+    def __setitem__(self, _, __):
+        raise TypeError("FrozenDict is immutable")
+
+    def __delitem__(self, _):
+        raise TypeError("FrozenDict is immutable")
+
+
+def to_frozen_dict(obj):
+    if isinstance(obj, dict):
+        return FrozenDict({k: to_frozen_dict(v) for k, v in obj.items()})
+    if isinstance(obj, list):
+        return [to_frozen_dict(item) for item in obj]
+    return obj
+
+
 @pytest.mark.parametrize(
     "spec",
     [
@@ -80,11 +96,12 @@ def assert_no_unused_components(schema):
     indirect=True,
 )
 def test_iter_operations(spec, snapshot_json, assert_generates):
-    for operation in iter_operations(spec, ""):
+    cache = TransformCache()
+    for operation in iter_operations(spec, "", cache=cache):
         assert isinstance(operation, Ok)
         operation = operation.ok()
         assert asdict(operation) == snapshot_json
         for param in operation.body + operation.headers + operation.path_parameters + operation.query:
             assert_generates(param.schema)
             # assert_no_unused_components(param.schema)
-    list(iter_operations(spec, ""))
+    list(iter_operations(spec, "", cache=cache))

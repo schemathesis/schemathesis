@@ -8,6 +8,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 import schemathesis
 from schemathesis.runner import from_schema
 from schemathesis.specs.openapi._v2 import iter_operations
+from schemathesis.specs.openapi._jsonschema import TransformCache
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -41,12 +42,17 @@ ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
-    "raw_schema",
-    [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES],
+    "raw_schema, cache",
+    [
+        (APPVEYOR, TransformCache()),
+        (EVETECH, TransformCache()),
+        (OSISOFT, TransformCache()),
+        (ML_WEBSERVICES, TransformCache()),
+    ],
     ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
 )
-def test_iter_operations_v2(raw_schema):
-    _ = list(iter_operations(raw_schema, ""))
+def test_iter_operations_v2(raw_schema, cache):
+    _ = list(iter_operations(raw_schema, "", cache=cache))
 
 
 # @pytest.mark.benchmark
