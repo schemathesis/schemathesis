@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, Mapping, MutableMappi
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT4
 
-from schemathesis.internal.copy import fast_deepcopy
-
 from ...constants import HTTP_METHODS
 from ...internal.result import Ok, Result
 from ._jsonschema import to_jsonschema, TransformConfig, TransformCache
@@ -313,7 +311,7 @@ def _parameters_to_json_schema(parameters: list[tuple[str, bool, Mapping[str, An
 
 def _extract_non_body_parameter_schema(parameter: NonBodyParameter) -> Mapping[str, Any]:
     return {
-        key: fast_deepcopy(value) if isinstance(value, (dict, list)) else value
+        key: value
         for key, value in parameter.items()
         if key
         in {
@@ -339,7 +337,7 @@ def _extract_non_body_parameter_schema(parameter: NonBodyParameter) -> Mapping[s
 
 def _extract_body_parameter_schema(parameter: BodyParameter) -> Mapping[str, Any]:
     return {
-        key: fast_deepcopy(value) if isinstance(value, (dict, list)) else value
+        key: value
         for key, value in parameter["schema"].items()
         if key
         in {
