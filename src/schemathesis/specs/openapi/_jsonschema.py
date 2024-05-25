@@ -531,29 +531,28 @@ def inline_recursive_references(referenced_schemas: MovedSchemas, references: se
     originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
     for ref in references:
         key = _ref_to_key(ref)
-        _inline_recursive_references(referenced_schemas[key], originals, references, (key,))
+        _inline_recursive_references(referenced_schemas[key], originals, references, [key])
 
 
 def _inline_recursive_references(
-    item: ObjectSchema,
-    referenced_schemas: MovedSchemas,
-    references: set[str],
-    path: tuple[str, ...],
+    item: ObjectSchema, referenced_schemas: MovedSchemas, references: set[str], path: list[str]
 ) -> None:
     """Inline all recursive references in the given item."""
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
-            key = _ref_to_key(ref)
-            referenced_item = referenced_schemas[key]
             # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
             #       Just copy the value and directly jump to the next ref in it, or iterate over them
             if ref in references:
                 item.clear()
+                key = _ref_to_key(ref)
                 if path.count(key) < 3:
+                    referenced_item = referenced_schemas[key]
                     # Extend with a deep copy as the tree should grow with owned data
                     merge_into(item, referenced_item)
-                    _inline_recursive_references(item, referenced_schemas, references, path + (key,))
+                    path.append(key)
+                    _inline_recursive_references(item, referenced_schemas, references, path)
+                    path.pop()
             return
     for subschema in iter_subschemas(item):
         _inline_recursive_references(subschema, referenced_schemas, references, path)
