@@ -240,18 +240,40 @@ PLAIN_KEYWORDS = {
     "required",
     "enum",
     "type",
+    "description",
+    "title",
+    "collectionFormat",
+    "default",
 }
 
 
 def _should_skip(schema: ObjectSchema) -> bool:
-    return (
-        "x-nullable" not in schema
-        and "writeOnly" not in schema
-        and "x-writeOnly" not in schema
-        and "readOnly" not in schema
-        and schema.get("type") != "file"
-        and not set(schema) - PLAIN_KEYWORDS
-    )
+    if (
+        "x-nullable" in schema
+        or "writeOnly" in schema
+        or "x-writeOnly" in schema
+        or "readOnly" in schema
+        or schema.get("type") == "file"
+    ):
+        return False
+    nested = set(schema) - PLAIN_KEYWORDS
+    if not nested:
+        return True
+    if nested == {"items"}:
+        items = schema["items"]
+        if isinstance(items, dict):
+            return _should_skip(items)
+    if nested == {"properties"}:
+        properties = schema["properties"]
+        return all(_should_skip(value) for value in properties.values())
+    return False
+
+
+META = {
+    "total": 0,
+    "unique": 0,
+}
+UNIQUE = set()
 
 
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
@@ -300,8 +322,9 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         recursive = set()
         cache = config.cache.recursive_references
         for key in visited:
-            if key in cache:
-                recursive.update(cache[key])
+            cached = cache.get(key)
+            if cached is not None:
+                recursive.update(cached)
         # Leave only references that are used in this particular schema
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         if recursive:

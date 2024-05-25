@@ -116,7 +116,6 @@ def iter_operations(
     spec: Specification, uri: str, cache: TransformCache | None = None
 ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
     """Iterate over all operations in the given OpenAPI 2.0 specification."""
-    # TODO: How to copy only what is needed? Or better, make the mutated version work as the original
     registry = Registry().with_resource(uri, Resource(contents=spec, specification=DRAFT4))
     root_resolver = registry.resolver()
     definitions = spec.get("definitions")
