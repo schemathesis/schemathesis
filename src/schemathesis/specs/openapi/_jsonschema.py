@@ -269,12 +269,7 @@ def _should_skip(schema: ObjectSchema) -> bool:
     return False
 
 
-META = {
-    "total": 0,
-    "unique": 0,
-    "iter_schema": 0,
-    "dfs": 0,
-}
+META = {"total": 0, "unique": 0, "iter_schema": 0, "dfs": 0, "inline": 0}
 UNIQUE = set()
 
 
@@ -384,23 +379,28 @@ def dfs(item: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], config:
             item = resolved.contents
         dfs(item, resolver, visited, config)
     else:
-        for key, value in item.items():
-            if key == "additionalProperties" and isinstance(value, dict):
-                dfs(value, resolver, visited, config)
-            elif key in ("properties", "patternProperties"):
-                for subschema in value.values():
-                    dfs(subschema, resolver, visited, config)
-            elif key in ("additionalProperties", "not"):
-                dfs(value, resolver, visited, config)
-            elif key == "items":
-                if isinstance(value, dict):
-                    dfs(value, resolver, visited, config)
-                elif isinstance(value, list):
-                    for subschema in value:
-                        dfs(subschema, resolver, visited, config)
-            elif key in ("anyOf", "oneOf", "allOf"):
+        for subschema in iter_subschemas(item):
+            dfs(subschema, resolver, visited, config)
+
+
+def iter_subschemas(item: ObjectSchema) -> Iterable[ObjectSchema]:
+    for key, value in item.items():
+        if key == "additionalProperties" and isinstance(value, dict):
+            yield value
+        elif key in ("properties", "patternProperties"):
+            for subschema in value.values():
+                yield subschema
+        elif key in ("additionalProperties", "not"):
+            yield value
+        elif key == "items":
+            if isinstance(value, dict):
+                yield value
+            elif isinstance(value, list):
                 for subschema in value:
-                    dfs(subschema, resolver, visited, config)
+                    yield subschema
+        elif key in ("anyOf", "oneOf", "allOf"):
+            for subschema in value:
+                yield subschema
 
 
 def iter_schema(
@@ -461,23 +461,8 @@ def iter_schema(
             visited.add(key)
             stack.append((item, resolver, path))
         else:
-            for key, value in item.items():
-                if key == "additionalProperties" and isinstance(value, dict):
-                    stack.append((value, resolver, path))
-                elif key in ("properties", "patternProperties"):
-                    for subschema in value.values():
-                        stack.append((subschema, resolver, path))
-                elif key in ("additionalProperties", "not"):
-                    stack.append((value, resolver, path))
-                elif key == "items":
-                    if isinstance(value, dict):
-                        stack.append((value, resolver, path))
-                    elif isinstance(value, list):
-                        for subschema in value:
-                            stack.append((subschema, resolver, path))
-                elif key in ("anyOf", "oneOf", "allOf"):
-                    for subschema in value:
-                        stack.append((subschema, resolver, path))
+            for subschema in iter_subschemas(item):
+                stack.append((subschema, resolver, path))
 
 
 def _ref_to_key(ref: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> SchemaKey:
@@ -554,6 +539,8 @@ def _inline_recursive_references(
     path: tuple[str, ...],
 ) -> None:
     """Inline all recursive references in the given item."""
+    META["inline"] += 1
+    print(META)
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
