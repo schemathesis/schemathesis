@@ -384,11 +384,11 @@ def dfs(item: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], config:
             dfs(item, resolver, visited, config)
     else:
         for value in item.values():
-            if isinstance(value, dict) and not _should_skip(value):
+            if isinstance(value, dict):
                 dfs(value, resolver, visited, config)
             if isinstance(value, list):
                 for sub_item in value:
-                    if isinstance(sub_item, dict) and not _should_skip(sub_item):
+                    if isinstance(sub_item, dict):
                         dfs(sub_item, resolver, visited, config)
 
 
@@ -452,11 +452,11 @@ def iter_schema(
                 stack.append((item, resolver, path))
         else:
             for value in item.values():
-                if isinstance(value, dict) and not _should_skip(value):
+                if isinstance(value, dict):
                     stack.append((value, resolver, path))
                 elif isinstance(value, list):
                     for sub_item in value:
-                        if isinstance(sub_item, dict) and not _should_skip(sub_item):
+                        if isinstance(sub_item, dict):
                             stack.append((sub_item, resolver, path))
 
 
