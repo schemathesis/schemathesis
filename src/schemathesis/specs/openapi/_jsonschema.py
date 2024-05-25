@@ -389,8 +389,9 @@ def iter_subschemas(item: ObjectSchema) -> Iterable[ObjectSchema]:
             yield value
         elif key in ("properties", "patternProperties"):
             for subschema in value.values():
-                yield subschema
-        elif key in ("additionalProperties", "not"):
+                if isinstance(subschema, dict):
+                    yield subschema
+        elif key in ("additionalProperties", "not") and isinstance(value, dict):
             yield value
         elif key == "items":
             if isinstance(value, dict):
@@ -400,7 +401,8 @@ def iter_subschemas(item: ObjectSchema) -> Iterable[ObjectSchema]:
                     yield subschema
         elif key in ("anyOf", "oneOf", "allOf"):
             for subschema in value:
-                yield subschema
+                if isinstance(subschema, dict):
+                    yield subschema
 
 
 def iter_schema(
