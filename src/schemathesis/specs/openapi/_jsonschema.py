@@ -533,14 +533,12 @@ def inline_recursive_references(referenced_schemas: MovedSchemas, references: se
 
 
 def _inline_recursive_references(
-    item: ObjectSchema | list[ObjectSchema],
+    item: ObjectSchema,
     referenced_schemas: MovedSchemas,
     references: set[str],
     path: tuple[str, ...],
 ) -> None:
     """Inline all recursive references in the given item."""
-    META["inline"] += 1
-    print(META)
     if isinstance(item, dict):
         ref = item.get("$ref")
         if isinstance(ref, str):
@@ -554,14 +552,9 @@ def _inline_recursive_references(
                     # Extend with a deep copy as the tree should grow with owned data
                     merge_into(item, referenced_item)
                     _inline_recursive_references(item, referenced_schemas, references, path + (key,))
-        else:
-            for value in item.values():
-                if isinstance(value, (dict, list)):
-                    _inline_recursive_references(value, referenced_schemas, references, path)
-    else:
-        for sub_item in item:
-            if isinstance(sub_item, (dict, list)):
-                _inline_recursive_references(sub_item, referenced_schemas, references, path)
+            return
+    for subschema in iter_subschemas(item):
+        _inline_recursive_references(subschema, referenced_schemas, references, path)
 
 
 def _extract_key_from_ref(ref: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> SchemaKey:
