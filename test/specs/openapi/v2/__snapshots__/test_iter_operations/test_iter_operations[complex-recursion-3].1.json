@@ -4,23 +4,23 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-Put",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-Put",
+        "x-moved-schemas": {
           "-definitions-Leaf": {},
           "-definitions-Put": {
             "properties": {
               "left": {
-                "$ref": "#/x-moved-references/-definitions-Leaf"
+                "$ref": "#/x-moved-schemas/-definitions-Leaf"
               },
               "right": {
                 "properties": {
                   "left": {
-                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                    "$ref": "#/x-moved-schemas/-definitions-Leaf"
                   },
                   "right": {
                     "properties": {
                       "left": {
-                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                        "$ref": "#/x-moved-schemas/-definitions-Leaf"
                       },
                       "right": {}
                     }
@@ -32,17 +32,17 @@
           "-definitions-Shared": {
             "properties": {
               "left": {
-                "$ref": "#/x-moved-references/-definitions-Leaf"
+                "$ref": "#/x-moved-schemas/-definitions-Leaf"
               },
               "right": {
                 "properties": {
                   "left": {
-                    "$ref": "#/x-moved-references/-definitions-Leaf"
+                    "$ref": "#/x-moved-schemas/-definitions-Leaf"
                   },
                   "right": {
                     "properties": {
                       "left": {
-                        "$ref": "#/x-moved-references/-definitions-Leaf"
+                        "$ref": "#/x-moved-schemas/-definitions-Leaf"
                       },
                       "right": {}
                     }

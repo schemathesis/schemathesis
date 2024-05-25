@@ -4,8 +4,8 @@
       "media_type": "application/json",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-Put",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-Put",
+        "x-moved-schemas": {
           "-definitions-Put": {},
           "-definitions-Shared-1": {},
           "-definitions-Shared-2": {}

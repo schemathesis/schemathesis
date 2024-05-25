@@ -128,8 +128,8 @@ def iter_operations(spec: Specification, uri: str) -> Generator[Result[APIOperat
         remove_write_only=False,
         remove_read_only=True,
         components=components,
-        moved_references={},
-        used_by_moved_references={},
+        moved_schemas={},
+        schemas_behind_references={},
         recursive_references={},
         transformed_references={},
     )

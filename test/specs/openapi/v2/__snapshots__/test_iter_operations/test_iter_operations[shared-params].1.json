@@ -4,8 +4,8 @@
       "media_type": "application/json",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-SharedBody",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-SharedBody",
+        "x-moved-schemas": {
           "-definitions-SharedBody": {
             "properties": {
               "shared_property": {
@@ -21,8 +21,8 @@
       "media_type": "multipart/form-data",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-SharedBody",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-SharedBody",
+        "x-moved-schemas": {
           "-definitions-SharedBody": {
             "properties": {
               "shared_property": {

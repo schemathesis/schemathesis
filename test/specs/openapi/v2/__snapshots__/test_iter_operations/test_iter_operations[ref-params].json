@@ -4,8 +4,8 @@
       "media_type": "application/json",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-LocalBodySchema",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-LocalBodySchema",
+        "x-moved-schemas": {
           "-definitions-LocalBodySchema": {
             "properties": {
               "local_property": {
@@ -21,8 +21,8 @@
       "media_type": "multipart/form-data",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-LocalBodySchema",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-LocalBodySchema",
+        "x-moved-schemas": {
           "-definitions-LocalBodySchema": {
             "properties": {
               "local_property": {

@@ -4,10 +4,10 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-Patch",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-Patch",
+        "x-moved-schemas": {
           "-definitions-Patch": {
-            "$ref": "#/x-moved-references/-definitions-Shared-1"
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
           },
           "-definitions-Put": {},
           "-definitions-Shared-1": {},

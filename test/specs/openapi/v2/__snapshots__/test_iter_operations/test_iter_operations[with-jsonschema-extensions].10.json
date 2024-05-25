@@ -4,8 +4,8 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-RefCycle1",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycle1",
+        "x-moved-schemas": {
           "-definitions-RefCycle1": {
             "properties": {
               "id": {

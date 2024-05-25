@@ -8,7 +8,7 @@ from referencing import Registry, Resource
 
 from schemathesis.internal.result import Ok
 from schemathesis.specs.openapi._v2 import iter_operations
-from schemathesis.specs.openapi._jsonschema import MOVED_REFERENCE_ROOT_KEY, MOVED_REFERENCE_KEY_LENGTH
+from schemathesis.specs.openapi._jsonschema import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH
 from schemathesis.specs.openapi.definitions import SWAGGER_20_VALIDATOR
 
 HERE = Path(__file__).parent.absolute()
@@ -45,7 +45,7 @@ def _find_references(item, resolver, found) -> None:
             _find_references(resolved.contents, resolver, found)
         else:
             for key, sub_item in item.items():
-                if key != MOVED_REFERENCE_ROOT_KEY:
+                if key != MOVED_SCHEMAS_KEY:
                     _find_references(sub_item, resolver, found)
     elif isinstance(item, list):
         for sub_item in item:
@@ -53,11 +53,11 @@ def _find_references(item, resolver, found) -> None:
 
 
 def assert_no_unused_components(schema):
-    if MOVED_REFERENCE_ROOT_KEY in schema:
+    if MOVED_SCHEMAS_KEY in schema:
         registry = Registry().with_resource("", Resource(contents=schema, specification=DRAFT4))
         resolver = registry.resolver()
-        references = {ref[MOVED_REFERENCE_KEY_LENGTH:] for ref in find_references_from_root(schema, resolver)}
-        assert not set(schema[MOVED_REFERENCE_ROOT_KEY]) - references
+        references = {ref[MOVED_SCHEMAS_KEY_LENGTH:] for ref in find_references_from_root(schema, resolver)}
+        assert not set(schema[MOVED_SCHEMAS_KEY]) - references
 
 
 @pytest.mark.parametrize(

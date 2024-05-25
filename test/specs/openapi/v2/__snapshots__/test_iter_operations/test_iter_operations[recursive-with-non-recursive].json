@@ -4,8 +4,8 @@
       "media_type": "application/json",
       "required": true,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-RefCycle1RecursiveA",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycle1RecursiveA",
+        "x-moved-schemas": {
           "-definitions-NonRecursiveRef": {
             "properties": {
               "email": {
@@ -38,7 +38,7 @@
                                 "type": "string"
                               },
                               "nonRecursiveRef": {
-                                "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                                "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
                               }
                             },
                             "type": "object"
@@ -53,7 +53,7 @@
                         "type": "string"
                       },
                       "nonRecursiveRef": {
-                        "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                        "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
                       }
                     },
                     "type": "object"
@@ -68,7 +68,7 @@
                 "type": "string"
               },
               "nonRecursiveRef": {
-                "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
               }
             },
             "type": "object"
@@ -90,7 +90,7 @@
                                     "type": "string"
                                   },
                                   "nonRecursiveRef": {
-                                    "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                                    "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
                                   }
                                 },
                                 "type": "object"
@@ -105,7 +105,7 @@
                             "type": "string"
                           },
                           "nonRecursiveRef": {
-                            "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                            "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
                           }
                         },
                         "type": "object"
@@ -120,7 +120,7 @@
                     "type": "string"
                   },
                   "nonRecursiveRef": {
-                    "$ref": "#/x-moved-references/-definitions-NonRecursiveRef"
+                    "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
                   }
                 },
                 "type": "object"

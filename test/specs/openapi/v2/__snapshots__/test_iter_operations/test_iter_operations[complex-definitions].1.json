@@ -4,18 +4,18 @@
       "media_type": "application/json",
       "required": false,
       "schema": {
-        "$ref": "#/x-moved-references/-definitions-Put",
-        "x-moved-references": {
+        "$ref": "#/x-moved-schemas/-definitions-Put",
+        "x-moved-schemas": {
           "-definitions-Put": {
-            "$ref": "#/x-moved-references/-definitions-Shared"
+            "$ref": "#/x-moved-schemas/-definitions-Shared"
           },
           "-definitions-RecursiveA": {},
           "-definitions-RecursiveB": {},
           "-definitions-RecursiveRoot": {
-            "$ref": "#/x-moved-references/-definitions-RecursiveA"
+            "$ref": "#/x-moved-schemas/-definitions-RecursiveA"
           },
           "-definitions-Shared": {
-            "$ref": "#/x-moved-references/-definitions-RecursiveRoot"
+            "$ref": "#/x-moved-schemas/-definitions-RecursiveRoot"
           }
         }
       }

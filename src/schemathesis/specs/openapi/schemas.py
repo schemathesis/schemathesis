@@ -728,7 +728,7 @@ class BaseOpenAPISchema(BaseSchema):
             # If the schema is local in respect to the root schema, then it may contain references to the root schema
             # components. Therefore they should be visible to the schema so references can be resolved.
             components=self._components_cache,
-            moved_references=self._moved_references_cache,
+            moved_schemas=self._moved_references_cache,
         )
         converted = to_jsonschema(resolver._base_uri, schema, self._registry, self._draft, config)
         return cast(dict[str, Any], converted)

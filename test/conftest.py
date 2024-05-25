@@ -116,6 +116,7 @@ def pytest_generate_tests(metafunc):
 
 
 def pytest_configure(config):
+    config.addinivalue_line("markers", "schema(name): Fixture name for a specific schema.")
     config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
     config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
     config.addinivalue_line("markers", "analyze_schema(autouse=True, extensions=()): Configure schema analysis.")

@@ -533,7 +533,7 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected, 
         remove_write_only=False,
         remove_read_only=False,
         components=components,
-        moved_references={},
+        moved_schemas={},
     )
     schema = to_jsonschema(scope or uri, schema, registry, DRAFT4, config)
     assert schema == expected
@@ -595,7 +595,11 @@ def test_to_jsonschema_valid(request, uri, scope, schema, components, expected, 
 )
 def test_openapi_specifics(schema, expected, assert_generates):
     config = TransformConfig(
-        nullable_key="nullable", remove_write_only=True, remove_read_only=True, components={}, moved_references={}
+        nullable_key="nullable",
+        remove_write_only=True,
+        remove_read_only=True,
+        components={},
+        moved_schemas={},
     )
     schema = to_jsonschema("", schema, EMPTY_REGISTRY, DRAFT4, config)
     assert schema == expected
