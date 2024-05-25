@@ -326,6 +326,11 @@ def to_self_contained_jsonschema(
     moved_refs = {}
     all_visited = set()
     for ref, key, item, resolver in iter_schema(schema, root_resolver, config):
+        if ref in moved_refs:
+            old_name = moved_refs[ref]
+            if old_name in config.schemas_behind_references:
+                all_visited.update(config.schemas_behind_references[old_name])
+                continue
         # TODO: actually use the cache
         visited = set()
         dfs(item, resolver, visited, config, moved_refs)

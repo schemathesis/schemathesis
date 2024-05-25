@@ -356,9 +356,6 @@ def test_recursive_with_nested(ctx: Context):
                 assert visited == expected_visits[ref], ref
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    for ref in references:
-        moved_ref = ref.replace("#/definitions/", "#/x-moved-schemas/-definitions-")
-        print(moved_ref)
     assert ctx.config.schemas_behind_references == {
         "#/definitions/Patch": {
             "-definitions-Patch",
