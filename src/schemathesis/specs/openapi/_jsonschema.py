@@ -303,14 +303,15 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
                 recursive.update(found)
         logger.debug("Found %s recursive references", len(recursive))
         # Leave only references that are used in this particular schema
-        # TODO: Avoid copying if there are no recursive refs
-        moved_schemas = {
-            key: fast_deepcopy(value) for key, value in config.moved_schemas.items() if key in moved_schema_keys
-        }
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
-        schema[MOVED_SCHEMAS_KEY] = moved_schemas
         if recursive:
+            moved_schemas = {
+                key: fast_deepcopy(value) for key, value in config.moved_schemas.items() if key in moved_schema_keys
+            }
             inline_recursive_references(moved_schemas, recursive)
+        else:
+            moved_schemas = {key: value for key, value in config.moved_schemas.items() if key in moved_schema_keys}
+        schema[MOVED_SCHEMAS_KEY] = moved_schemas
     else:
         logger.debug("No references found")
     logger.debug("Output: %s", schema)
