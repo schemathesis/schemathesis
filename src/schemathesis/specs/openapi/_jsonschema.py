@@ -298,10 +298,6 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         for key in visited:
             if key in cache:
                 recursive.update(cache[key])
-            else:
-                found = find_recursive_references(key, config.moved_schemas, cache)
-                cache[key] = found
-                recursive.update(found)
         logger.debug("Found %s recursive references", len(recursive))
         # Leave only references that are used in this particular schema
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
@@ -372,10 +368,10 @@ def dfs(item: ObjectSchema, resolver, visited, config):
 
 def iter_schema(schema: ObjectSchema, resolver: Resolver, config) -> Iterable[tuple[str, ObjectSchema]]:
     """Iterate over all schemas reachable from the given schema."""
-    stack = [(schema, resolver)]
+    stack = [(schema, resolver, [])]
     visited = set()
     while stack:
-        item, resolver = stack.pop()
+        item, resolver, path = stack.pop()
         ref = item.get("$ref")
         type_ = item.get("type")
         if type_ == "file":
@@ -391,7 +387,26 @@ def iter_schema(schema: ObjectSchema, resolver: Resolver, config) -> Iterable[tu
             _replace_nullable(item, config.nullable_key)
         if isinstance(ref, str):
             key = _ref_to_key(ref)
+            path = path + [ref]
             if key in visited:
+                original_name = config.replaced_references.get(ref, ref)
+                if ref in path:
+                    ref_idx = path.index(ref)
+                else:
+                    ref_idx = None
+                if original_name in path:
+                    original_idx = path.index(original_name)
+                else:
+                    original_idx = None
+                if original_idx is None or (ref_idx is not None and ref_idx < original_idx):
+                    idx = ref_idx
+                else:
+                    idx = original_idx
+                cycle = path[idx:]
+                for item in cycle:
+                    key = _ref_to_key(item)
+                    recursive_cache = config.recursive_references.setdefault(key, set())
+                    recursive_cache.update(cycle)
                 continue
             moved = config.moved_schemas.get(key)
             if moved is not None:
@@ -405,15 +420,16 @@ def iter_schema(schema: ObjectSchema, resolver: Resolver, config) -> Iterable[tu
                 item = resolved.contents
                 resolver = resolved.resolver
             visited.add(key)
-            stack.append((item, resolver))
+            stack.append((item, resolver, path))
+
         else:
             for value in item.values():
                 if isinstance(value, dict):
-                    stack.append((value, resolver))
+                    stack.append((value, resolver, path))
                 elif isinstance(value, list):
                     for sub_item in value:
                         if isinstance(sub_item, dict):
-                            stack.append((sub_item, resolver))
+                            stack.append((sub_item, resolver, path))
 
 
 def _ref_to_key(ref: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> SchemaKey:
