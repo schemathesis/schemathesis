@@ -6,6 +6,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
+from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.runner import from_schema
 from schemathesis.specs.openapi._v2 import iter_operations
 from schemathesis.specs.openapi._jsonschema import TransformCache
@@ -40,6 +41,19 @@ OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 
 
+@pytest.mark.parametrize(
+    "raw_schema",
+    [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES],
+    ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
+)
+def test_iter_operations_v2(raw_schema, benchmark):
+    schema = fast_deepcopy(raw_schema)
+
+    @benchmark
+    def bench():
+        _ = list(iter_operations(schema, ""))
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "raw_schema, cache",
@@ -51,7 +65,7 @@ ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01
     ],
     ids=("appveyor", "evetech", "osisoft", "ml-webservices"),
 )
-def test_iter_operations_v2(raw_schema, cache):
+def test_iter_operations_v2_cached(raw_schema, cache):
     _ = list(iter_operations(raw_schema, "", cache=cache))
 
 
