@@ -546,7 +546,7 @@ def _inline_recursive_references(
             if ref in references:
                 item.clear()
                 key = _ref_to_key(ref)
-                if path.count(key) < 3:
+                if path.count(key) < 2:
                     referenced_item = referenced_schemas[key]
                     # Extend with a deep copy as the tree should grow with owned data
                     merge_into(item, referenced_item)
