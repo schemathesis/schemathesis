@@ -385,19 +385,15 @@ def dfs(item: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], config:
 
 def iter_subschemas(item: ObjectSchema) -> Iterable[ObjectSchema]:
     for key, value in item.items():
-        if key == "additionalProperties" and isinstance(value, dict):
+        if key in ("additionalProperties", "not", "items") and isinstance(value, dict):
             yield value
         elif key in ("properties", "patternProperties"):
             for subschema in value.values():
                 if isinstance(subschema, dict):
                     yield subschema
-        elif key in ("additionalProperties", "not") and isinstance(value, dict):
-            yield value
-        elif key == "items":
-            if isinstance(value, dict):
-                yield value
-            elif isinstance(value, list):
-                for subschema in value:
+        elif key == "items" and isinstance(value, list):
+            for subschema in value:
+                if isinstance(subschema, dict):
                     yield subschema
         elif key in ("anyOf", "oneOf", "allOf"):
             for subschema in value:
@@ -526,36 +522,35 @@ def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
     item["anyOf"] = [inner, {"type": "null"}]
 
 
-def inline_recursive_references(referenced_schemas: MovedSchemas, references: set[str]) -> None:
-    keys = {_ref_to_key(ref) for ref in references}
+def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
+    keys = {_ref_to_key(ref) for ref in recursive}
     originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
-    for ref in references:
+    for ref in recursive:
         key = _ref_to_key(ref)
-        _inline_recursive_references(referenced_schemas[key], originals, references, [key])
+        _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
 
 
 def _inline_recursive_references(
-    item: ObjectSchema, referenced_schemas: MovedSchemas, references: set[str], path: list[str]
+    item: ObjectSchema, referenced_schemas: MovedSchemas, recursive: set[str], path: list[str]
 ) -> None:
     """Inline all recursive references in the given item."""
-    if isinstance(item, dict):
-        ref = item.get("$ref")
-        if isinstance(ref, str):
-            # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
-            #       Just copy the value and directly jump to the next ref in it, or iterate over them
-            if ref in references:
-                item.clear()
-                key = _ref_to_key(ref)
-                if path.count(key) < 2:
-                    referenced_item = referenced_schemas[key]
-                    # Extend with a deep copy as the tree should grow with owned data
-                    merge_into(item, referenced_item)
-                    path.append(key)
-                    _inline_recursive_references(item, referenced_schemas, references, path)
-                    path.pop()
-            return
+    ref = item.get("$ref")
+    if isinstance(ref, str):
+        # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
+        #       Just copy the value and directly jump to the next ref in it, or iterate over them
+        if ref in recursive:
+            item.clear()
+            key = _ref_to_key(ref)
+            if path.count(key) < 3:
+                referenced_item = referenced_schemas[key]
+                # Extend with a deep copy as the tree should grow with owned data
+                merge_into(item, referenced_item)
+                path.append(key)
+                _inline_recursive_references(item, referenced_schemas, recursive, path)
+                path.pop()
+        return
     for subschema in iter_subschemas(item):
-        _inline_recursive_references(subschema, referenced_schemas, references, path)
+        _inline_recursive_references(subschema, referenced_schemas, recursive, path)
 
 
 def _extract_key_from_ref(ref: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> SchemaKey:
