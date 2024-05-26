@@ -9,7 +9,7 @@ import schemathesis
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.runner import from_schema
 from schemathesis.specs.openapi._v2 import iter_operations
-from schemathesis.specs.openapi._jsonschema import TransformCache
+from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))

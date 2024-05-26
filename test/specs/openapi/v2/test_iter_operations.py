@@ -8,7 +8,8 @@ from referencing import Registry, Resource
 
 from schemathesis.internal.result import Ok
 from schemathesis.specs.openapi._v2 import iter_operations
-from schemathesis.specs.openapi._jsonschema import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH, TransformCache
+from schemathesis.specs.openapi._jsonschema import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH
+from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 from schemathesis.specs.openapi.definitions import SWAGGER_20_VALIDATOR
 
 HERE = Path(__file__).parent.absolute()

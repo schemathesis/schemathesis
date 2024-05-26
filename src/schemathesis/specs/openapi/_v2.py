@@ -8,7 +8,8 @@ from referencing.jsonschema import DRAFT4
 
 from ...constants import HTTP_METHODS
 from ...internal.result import Ok, Result
-from ._jsonschema import to_jsonschema, TransformConfig, TransformCache
+from ._jsonschema import to_jsonschema, TransformConfig
+from ._jsonschema.cache import TransformCache
 
 if TYPE_CHECKING:
     from ._jsonschema import Resolver

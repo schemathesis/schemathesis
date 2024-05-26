@@ -9,7 +9,8 @@ from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT4
 
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.specs.openapi._jsonschema import TransformConfig, to_self_contained_jsonschema, TransformCache
+from schemathesis.specs.openapi._jsonschema import TransformConfig, to_self_contained_jsonschema
+from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 
 @dataclass

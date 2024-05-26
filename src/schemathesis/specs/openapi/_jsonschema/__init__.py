@@ -1,22 +1,25 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, MutableMapping, NewType, Protocol, Set, Union, cast
+from typing import Any, Callable, Iterable, Set, cast
 from urllib.parse import urlsplit
 from urllib.request import urlopen
 
 import referencing.retrieval
 import requests
-from referencing import Registry, Resource, Specification
+from referencing import Resource, Specification
 from referencing.exceptions import Unresolvable, Unretrievable
 
-from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...internal.copy import fast_deepcopy, merge_into
-from ...loaders import load_yaml
-from .constants import ALL_KEYWORDS
-from .utils import get_type
+from ....constants import DEFAULT_RESPONSE_TIMEOUT
+from ....internal.copy import fast_deepcopy, merge_into
+from ....loaders import load_yaml
+from ..constants import ALL_KEYWORDS
+from ..utils import get_type
+from .config import TransformConfig
+from .constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH, MOVED_SCHEMAS_PREFIX, PLAIN_KEYWORDS
+from .transformation import transform_schema
+from .types import MovedSchemas, ObjectSchema, Resolver, SchemaKey
 
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
@@ -173,78 +176,6 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
 #  - Raise custom error when the referenced value is invalid
 
 logger = logging.getLogger(__name__)
-MOVED_SCHEMAS_KEY = "x-moved-schemas"
-MOVED_SCHEMAS_PREFIX = f"#/{MOVED_SCHEMAS_KEY}/"
-MOVED_SCHEMAS_KEY_LENGTH = len(MOVED_SCHEMAS_PREFIX)
-SchemaKey = NewType("SchemaKey", str)
-ObjectSchema = MutableMapping[str, Any]
-Schema = Union[bool, ObjectSchema]
-MovedSchemas = Dict[SchemaKey, ObjectSchema]
-ReferencesCache = Dict[str, Set[SchemaKey]]
-
-
-class Resolved(Protocol):
-    contents: Any
-    resolver: Resolver
-
-
-class Resolver(Protocol):
-    def lookup(self, ref: str) -> Resolved: ...
-    def dynamic_scope(self) -> Iterable[tuple[str, Registry]]: ...
-
-
-@dataclass
-class TransformConfig:
-    # The name of the keyword that represents nullable values
-    # Usually `nullable` in Open API 3 and `x-nullable` in Open API 2
-    nullable_key: str
-    # Remove properties with the "writeOnly" flag set to `True`.
-    # Write only properties are used in requests and should not be present in responses.
-    remove_write_only: bool
-    # Remove properties with the "readOnly" flag set to `True`.
-    # Read only properties are used in responses and should not be present in requests.
-    remove_read_only: bool
-    # Components that could be potentially referenced by the schema
-    components: dict[str, ObjectSchema]
-    cache: TransformCache
-
-
-@dataclass
-class TransformCache:
-    # Schemas that were referenced and therefore moved to the root of the schema
-    moved_schemas: MovedSchemas = field(default_factory=dict)
-    replaced_references: dict[str, str] = field(default_factory=dict)
-    # Cache for what other referenced are used by the moved references
-    schemas_behind_references: dict[str, set[SchemaKey]] = field(default_factory=dict)
-    # Known recursive references
-    recursive_references: dict[SchemaKey, Set[str]] = field(default_factory=dict)
-    # Cache for transformed schemas
-    transformed_references: dict[str, ObjectSchema] = field(default_factory=dict)
-
-
-PLAIN_KEYWORDS = {
-    "format",
-    "multipleOf",
-    "maximum",
-    "exclusiveMaximum",
-    "minimum",
-    "exclusiveMinimum",
-    "maxLength",
-    "minLength",
-    "pattern",
-    "maxItems",
-    "minItems",
-    "uniqueItems",
-    "maxProperties",
-    "minProperties",
-    "required",
-    "enum",
-    "type",
-    "description",
-    "title",
-    "collectionFormat",
-    "default",
-}
 
 
 def _should_skip(schema: ObjectSchema) -> bool:
@@ -312,29 +243,22 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         if reference_cache_key in config.cache.transformed_references:
             return config.cache.transformed_references[reference_cache_key]
 
-    used_named_schemas = to_self_contained_jsonschema(schema, resolver, config)
+    referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
 
-    if used_named_schemas:
+    if referenced_schemas:
         # Look for recursive references places reachable from the schema
         recursive = set()
         cache = config.cache.recursive_references
-        for key in used_named_schemas:
+        for key in referenced_schemas:
             cached = cache.get(key)
             if cached is not None:
                 recursive.update(cached)
         # Leave only references that are used in this particular schema
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
+        moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
         if recursive:
-            moved_schemas = {
-                key: fast_deepcopy(value)
-                for key, value in config.cache.moved_schemas.items()
-                if key in used_named_schemas
-            }
+            # TODO: Track what was already inlined and avoid inlining it again
             inline_recursive_references(moved_schemas, recursive)
-        else:
-            moved_schemas = {
-                key: value for key, value in config.cache.moved_schemas.items() if key in used_named_schemas
-            }
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema
@@ -342,31 +266,36 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
 
 
 def to_self_contained_jsonschema(
-    schema: ObjectSchema, root_resolver: Resolver, config: TransformConfig
+    root: ObjectSchema, root_resolver: Resolver, config: TransformConfig
 ) -> set[SchemaKey]:
-    all_visited = set()
-    for ref, key, item, resolver in iter_schema(schema, root_resolver, config):
-        original_name = config.cache.replaced_references.get(ref, ref)
+    """Moves all references to the root of the schema and returns the set of all referenced schemas."""
+    referenced = set()
+    # The goal is to find what schemas are reachable from each schema which is done by running DFS
+    # on each schema that contains a reference. The result is a set of all referenced schemas.
+    for reference, schema, resolver in iter_schema(root, root_resolver, config):
+        original_name = config.cache.replaced_references.get(reference, reference)
         if original_name in config.cache.schemas_behind_references:
-            all_visited.update(config.cache.schemas_behind_references[original_name])
+            referenced.update(config.cache.schemas_behind_references[original_name])
             continue
-        visited: Set[SchemaKey] = set()
-        dfs(item, resolver, visited, config)
-        visited.add(key)
-        all_visited.update(visited)
-        original_name = config.cache.replaced_references.get(ref, ref)
-        config.cache.schemas_behind_references[original_name] = visited
-    return all_visited
+        referenced_by_schema: Set[SchemaKey] = set()
+        traverse_schema(schema, resolver, referenced_by_schema, config)
+        key, _ = _key_for_reference(reference)
+        referenced_by_schema.add(key)
+        referenced.update(referenced_by_schema)
+        config.cache.schemas_behind_references[original_name] = referenced_by_schema
+    return referenced
 
 
-def dfs(schema: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], config: TransformConfig) -> None:
-    """Traverse the schema and replace all references with their contents."""
+def traverse_schema(
+    schema: ObjectSchema, resolver: Resolver, referenced: set[SchemaKey], config: TransformConfig
+) -> None:
+    """Traverse the schema by using DFS and replace all references with their contents."""
     reference = schema.get("$ref")
     if isinstance(reference, str):
         key, is_moved = _key_for_reference(reference)
-        if key in visited:
+        if key in referenced:
             return
-        visited.add(key)
+        referenced.add(key)
         if is_moved:
             # Reference has already been moved, don't replace it
             # Traversal is needed for recursive references
@@ -382,11 +311,11 @@ def dfs(schema: ObjectSchema, resolver: Resolver, visited: set[SchemaKey], confi
             # Update caches
             config.cache.moved_schemas[key] = resolved_schema
             config.cache.replaced_references[moved_reference] = reference
-        dfs(resolved_schema, resolver, visited, config)
+        traverse_schema(resolved_schema, resolver, referenced, config)
     else:
         # Traverse subschemas
         for subschema in iter_subschemas(schema):
-            dfs(subschema, resolver, visited, config)
+            traverse_schema(subschema, resolver, referenced, config)
 
 
 def iter_subschemas(schema: ObjectSchema) -> Iterable[ObjectSchema]:
@@ -410,7 +339,7 @@ def iter_subschemas(schema: ObjectSchema) -> Iterable[ObjectSchema]:
 
 def iter_schema(
     root: ObjectSchema, resolver: Resolver, config: TransformConfig
-) -> Iterable[tuple[str, SchemaKey, ObjectSchema, Resolver]]:
+) -> Iterable[tuple[str, ObjectSchema, Resolver]]:
     """Iterate over all schemas reachable from the given schema."""
     stack: list[tuple[ObjectSchema, Resolver, list[str]]] = [(root, resolver, [])]
     visited = set()
@@ -418,7 +347,6 @@ def iter_schema(
         schema, resolver, path = stack.pop()
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            key, _ = _key_for_reference(reference)
             if reference in path:
                 original_name = config.cache.replaced_references.get(reference, reference)
                 reference_idx = path.index(reference)
@@ -436,92 +364,24 @@ def iter_schema(
                     recursive_cache = config.cache.recursive_references.setdefault(key, set())
                     recursive_cache.update(cycle)
             else:
+                key, _ = _key_for_reference(reference)
                 moved = config.cache.moved_schemas.get(key)
                 if moved is not None:
                     if not reference.startswith(MOVED_SCHEMAS_PREFIX):
                         schema["$ref"] = _make_moved_reference(key)
                     schema = moved
-                    yield reference, key, schema, resolver
+                    yield reference, schema, resolver
                 else:
-                    yield reference, key, schema, resolver
+                    yield reference, schema, resolver
                     resolved = resolver.lookup(reference)
                     schema = resolved.contents
                     resolver = resolved.resolver
                 visited.add(key)
                 stack.append((schema, resolver, path + [reference]))
         else:
-            _transform_schema(schema, config)
+            transform_schema(schema, config)
             for subschema in iter_subschemas(schema):
                 stack.append((subschema, resolver, path))
-
-
-def _transform_schema(schema: ObjectSchema, config: TransformConfig) -> None:
-    """Replace all Open API specific keywords with their JSON Schema equivalents."""
-    type_ = schema.get("type")
-    if type_ == "file":
-        _replace_file_type(schema)
-    elif type_ == "object":
-        if config.remove_write_only:
-            # Write-only properties should not occur in responses
-            rewrite_properties(schema, is_write_only)
-        if config.remove_read_only:
-            # Read-only properties should not occur in requests
-            rewrite_properties(schema, is_read_only)
-    if schema.get(config.nullable_key) is True:
-        _replace_nullable(schema, config.nullable_key)
-
-
-def _replace_file_type(item: ObjectSchema) -> None:
-    item["type"] = "string"
-    item["format"] = "binary"
-
-
-def rewrite_properties(schema: ObjectSchema, predicate: Callable[[ObjectSchema], bool]) -> None:
-    required = schema.get("required", [])
-    forbidden = []
-    for name, subschema in list(schema.get("properties", {}).items()):
-        if predicate(subschema):
-            if name in required:
-                required.remove(name)
-            del schema["properties"][name]
-            forbidden.append(name)
-    if forbidden:
-        forbid_properties(schema, forbidden)
-    if not schema.get("required"):
-        schema.pop("required", None)
-    if not schema.get("properties"):
-        schema.pop("properties", None)
-
-
-def forbid_properties(schema: ObjectSchema, forbidden: list[str]) -> None:
-    """Explicitly forbid properties via the `not` keyword."""
-    not_schema = schema.setdefault("not", {})
-    already_forbidden = not_schema.setdefault("required", [])
-    already_forbidden.extend(forbidden)
-    not_schema["required"] = list(set(already_forbidden))
-
-
-def is_write_only(schema: Schema) -> bool:
-    if isinstance(schema, bool):
-        return False
-    return schema.get("writeOnly", False) or schema.get("x-writeOnly", False)
-
-
-def is_read_only(schema: Schema) -> bool:
-    if isinstance(schema, bool):
-        return False
-    return schema.get("readOnly", False)
-
-
-def _replace_nullable(item: ObjectSchema, nullable_key: str) -> None:
-    del item[nullable_key]
-    # Move all other keys to a new object, except for `x-moved-references` which should
-    # always be at the root level
-    inner = {}
-    for key, value in list(item.items()):
-        inner[key] = value
-        del item[key]
-    item["anyOf"] = [inner, {"type": "null"}]
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
@@ -543,7 +403,7 @@ def _inline_recursive_references(
         if reference in recursive:
             schema.clear()
             key, _ = _key_for_reference(reference)
-            if path.count(key) < 3:
+            if path.count(key) < 2:
                 referenced_item = referenced_schemas[key]
                 # Extend with a deep copy as the tree should grow with owned data
                 merge_into(schema, referenced_item)
