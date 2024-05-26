@@ -257,8 +257,10 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
         if recursive:
-            # TODO: Track what was already inlined and avoid inlining it again
-            inline_recursive_references(moved_schemas, recursive)
+            not_inlined = recursive - config.cache.inlined_schemas
+            if not_inlined:
+                inline_recursive_references(moved_schemas, not_inlined)
+                config.cache.inlined_schemas.update(recursive)
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema

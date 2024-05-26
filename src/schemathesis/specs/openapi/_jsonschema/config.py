@@ -19,4 +19,5 @@ class TransformConfig:
     remove_read_only: bool
     # Components that could be potentially referenced by the schema
     components: dict[str, ObjectSchema]
+    # Cache storing metadata about already transformed schemas
     cache: TransformCache

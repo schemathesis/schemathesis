@@ -15,5 +15,7 @@ class TransformCache:
     schemas_behind_references: dict[str, set[SchemaKey]] = field(default_factory=dict)
     # Known recursive references
     recursive_references: dict[SchemaKey, Set[str]] = field(default_factory=dict)
-    # Cache for transformed schemas
+    # Already transformed schemas
     transformed_references: dict[str, ObjectSchema] = field(default_factory=dict)
+    # Already inlined schemas
+    inlined_schemas: set[SchemaKey] = field(default_factory=set)
