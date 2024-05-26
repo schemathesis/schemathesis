@@ -337,6 +337,52 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     return schema
 
 
+def find_recursive_references(
+    key: SchemaKey,
+    schema_storage: MovedSchemas,
+    cutoff: int = MOVED_SCHEMAS_KEY_LENGTH,
+) -> set[str]:
+    """Find all recursive references in the given schema storage."""
+    references: set[str] = set()
+    _find_recursive_references(schema_storage[key], schema_storage, references, [key], cutoff)
+    return references
+
+
+def _find_recursive_references(
+    item: ObjectSchema | list[ObjectSchema],
+    referenced_schemas: MovedSchemas,
+    recursive: set[str],
+    path: list[str],
+    cutoff: int = MOVED_SCHEMAS_KEY_LENGTH,
+) -> None:
+    logger.debug("Traversing %r at %r", item, path)
+    if isinstance(item, dict):
+        ref = item.get("$ref")
+        if isinstance(ref, str):
+            if ref in path:
+                # The reference was already seen in the current traversl path, it means that it's recursive
+                logger.debug("Found recursive reference: %s at %r", ref, path)
+                # Add all refs starting from the current one in the path, as they make a recursive chain
+                # and every one of them is recursive
+                idx = path.index(ref)
+                recursive.update(path[idx:])
+            else:
+                # Otherwise explore the referenced item
+                key = _ref_to_key(ref, cutoff)
+                referenced_item = referenced_schemas[key]
+                path.append(ref)
+                _find_recursive_references(referenced_item, referenced_schemas, recursive, path, cutoff)
+                path.pop()
+        else:
+            for value in item.values():
+                if isinstance(value, (dict, list)) and value:
+                    _find_recursive_references(value, referenced_schemas, recursive, path, cutoff)
+    else:
+        for sub_item in item:
+            if isinstance(sub_item, (dict, list)):
+                _find_recursive_references(sub_item, referenced_schemas, recursive, path, cutoff)
+
+
 def to_self_contained_jsonschema(
     schema: ObjectSchema, root_resolver: Resolver, config: TransformConfig
 ) -> set[SchemaKey]:
@@ -541,7 +587,7 @@ def _inline_recursive_references(
         if ref in recursive:
             item.clear()
             key = _ref_to_key(ref)
-            if path.count(key) < 3:
+            if path.count(key) < 2:
                 referenced_item = referenced_schemas[key]
                 # Extend with a deep copy as the tree should grow with owned data
                 merge_into(item, referenced_item)
