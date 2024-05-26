@@ -194,9 +194,12 @@ def _should_skip(schema: ObjectSchema) -> bool:
         items = schema["items"]
         if isinstance(items, dict):
             return _should_skip(items)
+        if isinstance(items, list):
+            return all(_should_skip(value) for value in items if isinstance(value, dict))
+        return True
     if nested == {"properties"}:
         properties = schema["properties"]
-        return all(_should_skip(value) for value in properties.values())
+        return all(_should_skip(value) for value in properties.values() if isinstance(value, dict))
     return False
 
 
@@ -350,27 +353,24 @@ def iter_schema(
         reference = schema.get("$ref")
         if isinstance(reference, str):
             if reference in path:
-                original_name = config.cache.replaced_references.get(reference, reference)
-                reference_idx = path.index(reference)
-                if original_name in path:
-                    original_idx = path.index(original_name)
-                else:
-                    original_idx = None
-                if original_idx is None or (reference_idx is not None and reference_idx < original_idx):
-                    idx = reference_idx
-                else:
-                    idx = original_idx
+                # This reference is recursive forming a cycle in `path`
+                # Each reference in the cycle is also recursive as it can form the same cycle by
+                # traversal a schema that uses that reference
+                idx = path.index(reference)
                 cycle = path[idx:]
                 for segment in cycle:
                     key, _ = _key_for_reference(segment)
-                    recursive_cache = config.cache.recursive_references.setdefault(key, set())
-                    recursive_cache.update(cycle)
+                    cache = config.cache.recursive_references.setdefault(key, set())
+                    cache.update(cycle)
             else:
                 key, _ = _key_for_reference(reference)
                 moved = config.cache.moved_schemas.get(key)
                 if moved is not None:
                     if not reference.startswith(MOVED_SCHEMAS_PREFIX):
-                        schema["$ref"] = _make_moved_reference(key)
+                        # The referenced schema was already moved, but not all usages of this reference were updated
+                        moved_reference = _make_moved_reference(key)
+                        schema["$ref"] = moved_reference
+                        reference = moved_reference
                     schema = moved
                     yield reference, schema, resolver
                 else:
@@ -378,6 +378,7 @@ def iter_schema(
                     resolved = resolver.lookup(reference)
                     schema = resolved.contents
                     resolver = resolved.resolver
+                    reference = _make_moved_reference(key)
                 visited.add(key)
                 stack.append((schema, resolver, path + [reference]))
         else:
@@ -389,8 +390,8 @@ def iter_schema(
 def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
     keys = {_key_for_reference(ref)[0] for ref in recursive}
     originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
-    for ref in recursive:
-        key, _ = _key_for_reference(ref)
+    for reference in recursive:
+        key, _ = _key_for_reference(reference)
         _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
 
 

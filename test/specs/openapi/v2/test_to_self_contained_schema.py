@@ -41,7 +41,17 @@ def non_recursive_ref() -> Context:
     return Context.from_spec(
         {
             "definitions": {
-                "A": {"type": "object", "properties": {"id": {"type": "string"}}},
+                "A": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "foo": True,
+                        "bar": {
+                            "anyOf": [True, {"type": "integer"}],
+                        },
+                    },
+                },
+                "B": {"type": "array", "items": [True, {"type": "object"}]},
             }
         }
     )
@@ -199,12 +209,34 @@ ITERATIONS = 2
 
 @pytest.mark.schema("non_recursive_ref")
 def test_non_recursive_ref(ctx: Context):
-    for _ in range(ITERATIONS):
-        visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
-        assert visited == {"-definitions-A"}
-    assert ctx.config.cache.schemas_behind_references == {"#/definitions/A": {"-definitions-A"}}
+    references = ("#/definitions/A", "#/definitions/B")
+    expected_visits = {
+        "#/definitions/A": {"-definitions-A"},
+        "#/definitions/B": {"-definitions-B"},
+    }
+    for idx in range(ITERATIONS):
+        for combo in permutations(references, len(references)):
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
+                assert visited == expected_visits[reference]
+            if idx != ITERATIONS - 1:
+                ctx.reset()
+    assert ctx.config.cache.schemas_behind_references == {
+        "#/definitions/A": {"-definitions-A"},
+        "#/definitions/B": {"-definitions-B"},
+    }
     assert ctx.config.cache.moved_schemas == {
-        "-definitions-A": {"type": "object", "properties": {"id": {"type": "string"}}}
+        "-definitions-A": {
+            "type": "object",
+            "properties": {
+                "id": {"type": "string"},
+                "foo": True,
+                "bar": {
+                    "anyOf": [True, {"type": "integer"}],
+                },
+            },
+        },
+        "-definitions-B": {"type": "array", "items": [True, {"type": "object"}]},
     }
     assert ctx.config.cache.recursive_references == {}
 
@@ -256,8 +288,8 @@ def test_recursive_1_hop(ctx: Context):
     references = ("#/definitions/A", "#/definitions/B")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
-            for ref in combo:
-                visited = to_self_contained_jsonschema({"$ref": ref}, ctx.resolver, ctx.config)
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
                 assert visited == {"-definitions-A", "-definitions-B"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
@@ -292,8 +324,8 @@ def test_recursive_1_hop_in_array(ctx: Context):
     references = ("#/definitions/A", "#/definitions/B")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
-            for ref in combo:
-                visited = to_self_contained_jsonschema({"$ref": ref}, ctx.resolver, ctx.config)
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
                 assert visited == {"-definitions-A", "-definitions-B"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
@@ -330,8 +362,8 @@ def test_recursive_2_hops(ctx: Context):
     references = ("#/definitions/A", "#/definitions/B", "#/definitions/C")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
-            for ref in combo:
-                visited = to_self_contained_jsonschema({"$ref": ref}, ctx.resolver, ctx.config)
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
                 assert visited == {"-definitions-A", "-definitions-B", "-definitions-C"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
@@ -420,9 +452,9 @@ def test_recursive_with_nested(ctx: Context):
     }
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
-            for ref in combo:
-                visited = to_self_contained_jsonschema({"$ref": ref}, ctx.resolver, ctx.config)
-                assert visited == expected_visits[ref], ref
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
+                assert visited == expected_visits[reference], reference
             if idx != ITERATIONS - 1:
                 ctx.reset()
     assert ctx.config.cache.schemas_behind_references == {
@@ -493,9 +525,9 @@ def test_recursive_with_leaf(ctx: Context):
     }
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
-            for ref in combo:
-                visited = to_self_contained_jsonschema({"$ref": ref}, ctx.resolver, ctx.config)
-                assert visited == expected_visits[ref]
+            for reference in combo:
+                visited = to_self_contained_jsonschema({"$ref": reference}, ctx.resolver, ctx.config)
+                assert visited == expected_visits[reference]
             if idx != ITERATIONS - 1:
                 ctx.reset()
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Patch"}, ctx.resolver, ctx.config)
