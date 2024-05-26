@@ -47,6 +47,24 @@ def non_recursive_ref() -> Context:
 
 
 @pytest.fixture
+def non_recursive_with_multiple_refs() -> Context:
+    return Context.from_spec(
+        {
+            "definitions": {
+                "A": {
+                    "type": "object",
+                    "properties": {
+                        "first": {"$ref": "#/definitions/B"},
+                        "second": {"$ref": "#/definitions/B"},
+                    },
+                },
+                "B": {"type": "string"},
+            }
+        }
+    )
+
+
+@pytest.fixture
 def schema_transformation() -> Context:
     return Context.from_spec(
         {
@@ -190,6 +208,28 @@ def test_non_recursive_ref(ctx: Context):
     assert ctx.config.cache.recursive_references == {}
 
 
+@pytest.mark.schema("non_recursive_with_multiple_refs")
+def test_non_recursive_with_multiple_refs(ctx: Context):
+    for _ in range(ITERATIONS):
+        visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
+        assert visited == {"-definitions-A", "-definitions-B"}
+    assert ctx.config.cache.schemas_behind_references == {
+        "#/definitions/A": {"-definitions-A", "-definitions-B"},
+        "#/definitions/B": {"-definitions-B"},
+    }
+    assert ctx.config.cache.moved_schemas == {
+        "-definitions-A": {
+            "type": "object",
+            "properties": {
+                "first": {"$ref": "#/x-moved-schemas/-definitions-B"},
+                "second": {"$ref": "#/x-moved-schemas/-definitions-B"},
+            },
+        },
+        "-definitions-B": {"type": "string"},
+    }
+    assert ctx.config.cache.recursive_references == {}
+
+
 @pytest.mark.schema("schema_transformation")
 def test_schema_transformation(ctx: Context):
     for _ in range(ITERATIONS):
@@ -236,14 +276,10 @@ def test_recursive_1_hop(ctx: Context):
     }
     assert ctx.config.cache.recursive_references == {
         "-definitions-A": {
-            "#/definitions/A",
-            "#/definitions/B",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
         },
         "-definitions-B": {
-            "#/definitions/A",
-            "#/definitions/B",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
         },
@@ -278,14 +314,10 @@ def test_recursive_1_hop_in_array(ctx: Context):
     }
     assert ctx.config.cache.recursive_references == {
         "-definitions-A": {
-            "#/definitions/A",
-            "#/definitions/B",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
         },
         "-definitions-B": {
-            "#/definitions/A",
-            "#/definitions/B",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
         },
@@ -323,25 +355,16 @@ def test_recursive_2_hops(ctx: Context):
     }
     assert ctx.config.cache.recursive_references == {
         "-definitions-A": {
-            "#/definitions/A",
-            "#/definitions/B",
-            "#/definitions/C",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
             "#/x-moved-schemas/-definitions-C",
         },
         "-definitions-B": {
-            "#/definitions/A",
-            "#/definitions/B",
-            "#/definitions/C",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
             "#/x-moved-schemas/-definitions-C",
         },
         "-definitions-C": {
-            "#/definitions/A",
-            "#/definitions/B",
-            "#/definitions/C",
             "#/x-moved-schemas/-definitions-A",
             "#/x-moved-schemas/-definitions-B",
             "#/x-moved-schemas/-definitions-C",
@@ -440,14 +463,10 @@ def test_recursive_with_nested(ctx: Context):
     }
     assert ctx.config.cache.recursive_references == {
         "-definitions-RecursiveA": {
-            "#/definitions/RecursiveA",
-            "#/definitions/RecursiveB",
             "#/x-moved-schemas/-definitions-RecursiveA",
             "#/x-moved-schemas/-definitions-RecursiveB",
         },
         "-definitions-RecursiveB": {
-            "#/definitions/RecursiveA",
-            "#/definitions/RecursiveB",
             "#/x-moved-schemas/-definitions-RecursiveA",
             "#/x-moved-schemas/-definitions-RecursiveB",
         },
@@ -482,14 +501,10 @@ def test_recursive_with_leaf(ctx: Context):
     assert ctx.config.cache.schemas_behind_references == expected_visits
     assert ctx.config.cache.recursive_references == {
         "-definitions-Shared": {
-            "#/definitions/Put",
-            "#/definitions/Shared",
             "#/x-moved-schemas/-definitions-Shared",
             "#/x-moved-schemas/-definitions-Put",
         },
         "-definitions-Put": {
-            "#/definitions/Put",
-            "#/definitions/Shared",
             "#/x-moved-schemas/-definitions-Shared",
             "#/x-moved-schemas/-definitions-Put",
         },
@@ -508,12 +523,10 @@ def test_recursive_with_leaf(ctx: Context):
     }
     assert ctx.config.cache.recursive_references == {
         "-definitions-Shared": {
-            "#/definitions/Put",
             "#/x-moved-schemas/-definitions-Shared",
             "#/x-moved-schemas/-definitions-Put",
         },
         "-definitions-Put": {
-            "#/definitions/Put",
             "#/x-moved-schemas/-definitions-Shared",
             "#/x-moved-schemas/-definitions-Put",
         },
@@ -534,12 +547,10 @@ def test_recursive_with_leaf(ctx: Context):
         "-definitions-Shared": {
             "#/x-moved-schemas/-definitions-Put",
             "#/x-moved-schemas/-definitions-Shared",
-            "#/definitions/Shared",
         },
         "-definitions-Put": {
             "#/x-moved-schemas/-definitions-Put",
             "#/x-moved-schemas/-definitions-Shared",
-            "#/definitions/Shared",
         },
     }
     ctx.reset()

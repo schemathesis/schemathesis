@@ -424,8 +424,7 @@ def iter_schema(
             _replace_nullable(item, config.nullable_key)
         if isinstance(ref, str):
             key = _ref_to_key(ref)
-            path = path + [ref]
-            if key in visited:
+            if ref in path:
                 original_name = config.cache.replaced_references.get(ref, ref)
                 if ref in path:
                     ref_idx = path.index(ref)
@@ -445,6 +444,7 @@ def iter_schema(
                     recursive_cache = config.cache.recursive_references.setdefault(key, set())
                     recursive_cache.update(cycle)
                 continue
+            path = path + [ref]
             moved = config.cache.moved_schemas.get(key)
             if moved is not None:
                 if not ref.startswith(MOVED_SCHEMAS_PREFIX):
