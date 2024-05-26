@@ -16,10 +16,13 @@ from ....internal.copy import fast_deepcopy, merge_into
 from ....loaders import load_yaml
 from ..constants import ALL_KEYWORDS
 from ..utils import get_type
+from .iteration import iter_subschemas
+from .inlining import inline_recursive_references
 from .config import TransformConfig
-from .constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH, MOVED_SCHEMAS_PREFIX, PLAIN_KEYWORDS
+from .keys import _key_for_reference, _make_moved_reference
+from .constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_PREFIX, PLAIN_KEYWORDS
 from .transformation import transform_schema
-from .types import MovedSchemas, ObjectSchema, Resolver, SchemaKey
+from .types import ObjectSchema, Resolver, SchemaKey
 
 
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
@@ -323,25 +326,6 @@ def traverse_schema(
             traverse_schema(subschema, resolver, referenced, config)
 
 
-def iter_subschemas(schema: ObjectSchema) -> Iterable[ObjectSchema]:
-    """Iterate over all subschemas in the given schema."""
-    for key, value in schema.items():
-        if key in ("additionalProperties", "not", "items") and isinstance(value, dict):
-            yield value
-        elif key in ("properties", "patternProperties"):
-            for subschema in value.values():
-                if isinstance(subschema, dict):
-                    yield subschema
-        elif key == "items" and isinstance(value, list):
-            for subschema in value:
-                if isinstance(subschema, dict):
-                    yield subschema
-        elif key in ("anyOf", "oneOf", "allOf"):
-            for subschema in value:
-                if isinstance(subschema, dict):
-                    yield subschema
-
-
 def iter_schema(
     root: ObjectSchema, resolver: Resolver, config: TransformConfig
 ) -> Iterable[tuple[str, ObjectSchema, Resolver]]:
@@ -385,54 +369,6 @@ def iter_schema(
             transform_schema(schema, config)
             for subschema in iter_subschemas(schema):
                 stack.append((subschema, resolver, path))
-
-
-def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
-    keys = {_key_for_reference(ref)[0] for ref in recursive}
-    originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
-    for reference in recursive:
-        key, _ = _key_for_reference(reference)
-        _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
-
-
-def _inline_recursive_references(
-    schema: ObjectSchema, referenced_schemas: MovedSchemas, recursive: set[str], path: list[str]
-) -> None:
-    """Inline all recursive references in the given item."""
-    reference = schema.get("$ref")
-    if isinstance(reference, str):
-        # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
-        #       Just copy the value and directly jump to the next ref in it, or iterate over them
-        if reference in recursive:
-            schema.clear()
-            key, _ = _key_for_reference(reference)
-            if path.count(key) < 2:
-                referenced_item = referenced_schemas[key]
-                # Extend with a deep copy as the tree should grow with owned data
-                merge_into(schema, referenced_item)
-                path.append(key)
-                _inline_recursive_references(schema, referenced_schemas, recursive, path)
-                path.pop()
-        return
-    for subschema in iter_subschemas(schema):
-        _inline_recursive_references(subschema, referenced_schemas, recursive, path)
-
-
-def _key_for_reference(reference: str, cutoff: int = MOVED_SCHEMAS_KEY_LENGTH) -> tuple[SchemaKey, bool]:
-    """Extract the schema key from a reference."""
-    if reference.startswith("file://"):
-        reference = reference[7:]
-    if reference.startswith(MOVED_SCHEMAS_PREFIX):
-        is_moved = True
-        key = reference[cutoff:]
-    else:
-        key = reference.replace("/", "-").replace("#", "")
-        is_moved = False
-    return cast(SchemaKey, key), is_moved
-
-
-def _make_moved_reference(key: SchemaKey) -> str:
-    return f"{MOVED_SCHEMAS_PREFIX}{key}"
 
 
 def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
