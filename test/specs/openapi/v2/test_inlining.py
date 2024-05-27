@@ -46,6 +46,15 @@ def get_by_path(schema, path):
         ),
         (
             {
+                "type": "object",
+                "properties": {
+                    "friend": RECURSIVE_REFERENCE,
+                },
+            },
+            [],
+        ),
+        (
+            {
                 "type": "array",
                 "items": {"type": "object"},
             },
@@ -235,13 +244,24 @@ def get_by_path(schema, path):
         ),
         (
             {
-                "not": {
-                    "type": "array",
-                    "items": {
-                        "type": "array",
-                        "items": RECURSIVE_REFERENCE,
-                    },
-                }
+                "contains": {
+                    "type": "object",
+                    "properties": {"friend": RECURSIVE_REFERENCE},
+                },
+            },
+            [],
+        ),
+        (
+            {
+                "type": "object",
+                "patternProperties": {"^x-": {"type": "object"}},
+            },
+            [[]],
+        ),
+        (
+            {
+                "type": "object",
+                "patternProperties": {"^x-": RECURSIVE_REFERENCE},
             },
             [],
         ),
@@ -302,11 +322,42 @@ def get_by_path(schema, path):
             },
             [],
         ),
+        (
+            {
+                "type": "object",
+                "patternProperties": {
+                    "^x-": {
+                        "properties": {
+                            "friend": RECURSIVE_REFERENCE,
+                        },
+                        "required": ["friend"],
+                    }
+                },
+            },
+            [],
+        ),
+        (
+            {
+                "type": "object",
+                "patternProperties": {
+                    "^t-": True,
+                    "^y-": {"type": "integer"},
+                    "^x-": {
+                        "type": "object",
+                        "properties": {
+                            "friend": RECURSIVE_REFERENCE,
+                        },
+                    },
+                },
+            },
+            [],
+        ),
     ],
     ids=[
         "self-ref",
         "non-recursive-ref",
         "properties",
+        "properties-one-prop",
         "items-no-change",
         "items-no-change-bool",
         "items",
@@ -326,11 +377,15 @@ def get_by_path(schema, path):
         "allOf-nested",
         "allOf-no-change",
         "not-no-change",
-        "not-nested",
+        "contains-nested",
+        "pattern-properties-no-change",
+        "pattern-properties-one-prop",
         "non-removable-in-removable-properties",
         "non-removable-in-removable-additional-properties",
         "non-removable-in-removable-items",
         "non-removable-in-removable-anyOf",
+        "non-removable-in-removable-pattern-properties",
+        "removable-in-removable-pattern-properties",
     ],
 )
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
@@ -427,6 +482,30 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         {
             "not": RECURSIVE_REFERENCE,
         },
+        {
+            "not": {"not": RECURSIVE_REFERENCE},
+        },
+        {
+            "not": {
+                "anyOf": [
+                    RECURSIVE_REFERENCE,
+                    {"type": "object"},
+                ],
+            },
+        },
+        {
+            "patternProperties": {"^x": RECURSIVE_REFERENCE},
+            "required": ["x-foo"],
+        },
+        {
+            "patternProperties": {
+                "^x": {
+                    "type": "object",
+                    "anyOf": [RECURSIVE_REFERENCE],
+                },
+            },
+            "required": ["x-foo"],
+        },
     ],
     ids=[
         "properties",
@@ -439,6 +518,10 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         "allOf",
         "allOf-nested",
         "not",
+        "not-nested",
+        "not-with-modification",
+        "patternProperties-with-required",
+        "patternProperties-nested-with-required",
     ],
 )
 def test_on_reached_limit_non_removable(schema):
