@@ -114,7 +114,7 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
             )
         elif key in ("contains", "if", "then", "else", "not"):
             result = _on_schema_reached_limit(new, value, key, recursive, allow_modification=key != "not")
-        elif key in ("allOf", "oneOf", "additionalItems"):
+        elif key in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
             result = _on_list_of_schemas_reached_limit(new, value, key, recursive)
         else:
             continue
@@ -343,7 +343,7 @@ def _on_schema_reached_limit(
 
 
 def _on_list_of_schemas_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str]
+    new: ObjectSchema, schema: list[ObjectSchema], key: str, recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
     replacement = {}
     for idx, subschema in enumerate(schema):
