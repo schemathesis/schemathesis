@@ -1,0 +1,14 @@
+{
+  "allOf": [
+    {
+      "type": "object"
+    },
+    {
+      "anyOf": [
+        {
+          "type": "object"
+        }
+      ]
+    }
+  ]
+}

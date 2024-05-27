@@ -66,6 +66,20 @@ def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
     raise result.err()
 
 
+# TODO:
+#     "additionalItems",
+# "additionalProperties",
+# "contains",
+# "dependencies",
+# "else",
+# "if",
+# "not",
+# "oneOf",
+# "patternProperties",
+# "propertyNames",
+# "then",
+
+
 def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
     reference = schema.get("$ref")
     if isinstance(reference, str) and reference in recursive or not schema:
@@ -90,6 +104,10 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
                 return result
         elif key == "anyOf":
             result = _on_any_of_reached_limit(new, value, recursive)
+            if isinstance(result, Err):
+                return result
+        elif key in ("allOf", "oneOf"):
+            result = _on_all_of_one_of_reached_limit(new, value, key, recursive)
             if isinstance(result, Err):
                 return result
     if not new:
@@ -217,4 +235,28 @@ def _on_any_of_reached_limit(
             elif idx not in removal:
                 combinators.append(subschema)
         parent["anyOf"] = combinators
+    return Ok(None)
+
+
+def _on_all_of_one_of_reached_limit(parent: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str]):
+    replacement = {}
+    for idx, subschema in enumerate(schema):
+        if isinstance(subschema, dict):
+            if subschema.get("$ref") in recursive:
+                return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
+            else:
+                result = _on_reached_limit(subschema, recursive)
+                if isinstance(result, Err):
+                    return result
+                new_subschema = result.ok()
+                if new_subschema is not subschema:
+                    replacement[idx] = new_subschema
+    if replacement:
+        combinators = []
+        for idx, subschema in enumerate(schema):
+            if idx in replacement:
+                combinators.append(replacement[idx])
+            else:
+                combinators.append(subschema)
+        parent[key] = combinators
     return Ok(None)

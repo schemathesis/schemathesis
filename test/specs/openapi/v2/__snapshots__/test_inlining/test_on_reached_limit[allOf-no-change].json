@@ -1,0 +1,8 @@
+{
+  "allOf": [
+    {
+      "type": "object"
+    },
+    true
+  ]
+}

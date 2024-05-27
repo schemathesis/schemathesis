@@ -15,6 +15,7 @@ def can_validate(request):
         "self-ref",
         "anyOf-0th",
         "anyOf-1st",
+        "allOf-nested",
     )
 
 
@@ -207,6 +208,29 @@ def get_by_path(schema, path):
         ),
         (
             {
+                "allOf": [
+                    {"type": "object"},
+                    {
+                        "anyOf": [
+                            RECURSIVE_REFERENCE,
+                            {"type": "object"},
+                        ],
+                    },
+                ],
+            },
+            [["allOf", 0], [("allOf", 1, "anyOf", 1), ("allOf", 1, "anyOf", 0)]],
+        ),
+        (
+            {
+                "allOf": [
+                    {"type": "object"},
+                    True,
+                ],
+            },
+            [],
+        ),
+        (
+            {
                 "type": "object",
                 "properties": {
                     "friend": {
@@ -283,6 +307,8 @@ def get_by_path(schema, path):
         "anyOf-0th",
         "anyOf-1st",
         "anyOf-nested",
+        "allOf-nested",
+        "allOf-no-change",
         "non-removable-in-removable-properties",
         "non-removable-in-removable-additional-properties",
         "non-removable-in-removable-items",
@@ -366,6 +392,20 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
                 RECURSIVE_REFERENCE,
             ],
         },
+        {
+            "allOf": [
+                RECURSIVE_REFERENCE,
+            ],
+        },
+        {
+            "allOf": [
+                {
+                    "allOf": [
+                        RECURSIVE_REFERENCE,
+                    ]
+                }
+            ],
+        },
     ],
     ids=[
         "properties",
@@ -375,6 +415,8 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         "items-with-object-min-items",
         "items-with-object-nested",
         "items-with-array-nested",
+        "allOf",
+        "allOf-nested",
     ],
 )
 def test_on_reached_limit_non_removable(schema):
