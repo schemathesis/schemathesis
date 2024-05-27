@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import re
 
 from ....internal.copy import fast_deepcopy, merge_into
@@ -68,30 +70,12 @@ def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
     raise result.err()
 
 
-# TODO:
-# "dependencies",
-# E           jsonschema.exceptions.ValidationError: [[{'ºi¶-\x89K': 28, '\x98oe\x9d\x03\U000c90a4±B\x9c\x1b\x89': True, '\U0007b08fÝ': 1.1125369292536007e-308}], [], []] is not of type 'object'
-# E
-# E           Failed validating 'type' in schema['patternProperties']['^x-']:
-# E               {'patternProperties': {'^x-': {'$ref': '#/definitions/Person'}},
-# E                'type': 'object'}
-# E
-# E           On instance['x-']:
-# E               [[{'\x98oe\x9d\x03\U000c90a4±B\x9c\x1b\x89': True,
-# E                  'ºi¶-\x89K': 28,
-# E                  '\U0007b08fÝ': 1.1125369292536007e-308}],
-# E                [],
-# E                []]
-#
-#
-
-
 def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
     reference = schema.get("$ref")
     if isinstance(reference, str) and reference in recursive or not schema:
         return Ok({})
-    new = {}
-    remove_keywords = []
+    new: ObjectSchema = {}
+    remove_keywords: list[str] = []
     for key, value in schema.items():
         if key == "additionalProperties" and isinstance(value, dict):
             result = _on_additional_properties_reached_limit(
@@ -120,7 +104,6 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
             continue
         if isinstance(result, Err):
             return result
-    # TODO: Do not add "Allow-all" subschemas
     if not new and not remove_keywords:
         return Ok(schema)
     for key, value in schema.items():
@@ -154,7 +137,11 @@ def _on_additional_properties_reached_limit(
 
 
 def _on_items_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, min_items: int, remove_keywords: list[str], recursive: set[str]
+    new: ObjectSchema,
+    schema: ObjectSchema | list[Schema],
+    min_items: int,
+    remove_keywords: list[str],
+    recursive: set[str],
 ) -> Result[None, InfiniteRecursionError]:
     if isinstance(schema, dict):
         if schema.get("$ref") in recursive:
@@ -191,9 +178,10 @@ def _on_items_reached_limit(
 def _on_property_names_reached_limit(
     new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
-    def forbid():
+    def forbid() -> None:
         new["maxProperties"] = 0
         remove_keywords.append("propertyNames")
+        return None
 
     if schema.get("$ref") in recursive:
         if min_properties > 0:
@@ -268,7 +256,6 @@ def _on_pattern_properties_reached_limit(
                 if any(re.match(pattern, entry) for entry in required):
                     return Err(InfiniteRecursionError(f"Infinite recursion in {pattern}"))
                 # This pattern should be removed from `patternProperties`
-                # TODO: Additionally it should be removed from `properties`
                 removal.append(pattern)
             else:
                 result = _on_reached_limit(subschema, recursive)
@@ -295,10 +282,10 @@ def _on_pattern_properties_reached_limit(
 
 
 def _on_any_of_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, recursive: set[str]
+    new: ObjectSchema, schema: list[Schema], recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
-    removal = []
-    replacement = {}
+    removal: list[int] = []
+    replacement: dict[int, Schema] = {}
     for idx, subschema in enumerate(schema):
         if isinstance(subschema, dict):
             if subschema.get("$ref") in recursive:

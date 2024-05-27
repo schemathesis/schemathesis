@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import cast
 
 from .constants import MOVED_SCHEMAS_KEY_LENGTH, MOVED_SCHEMAS_PREFIX
