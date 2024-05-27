@@ -1,0 +1,7 @@
+{
+  "additionalProperties": {
+    "additionalProperties": false,
+    "type": "object"
+  },
+  "type": "object"
+}

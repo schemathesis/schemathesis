@@ -168,18 +168,19 @@ def snapshot_json(snapshot):
 @pytest.fixture
 def assert_generates():
     # Hypothesis-jsonschema should be able to generate data for the inlined schema
-    def inner(schema):
+    def inner(schema, *, check=None, max_examples=1):
         @given(from_schema(schema))
         @settings(
             deadline=None,
             database=None,
-            max_examples=1,
+            max_examples=max_examples,
             suppress_health_check=list(HealthCheck),
             phases=[Phase.explicit, Phase.generate],
             verbosity=Verbosity.quiet,
         )
-        def generate(_):
-            pass
+        def generate(value):
+            if check:
+                check(value)
 
         generate()
 

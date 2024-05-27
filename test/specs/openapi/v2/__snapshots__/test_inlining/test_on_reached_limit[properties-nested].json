@@ -1,0 +1,16 @@
+{
+  "properties": {
+    "friend": {
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "type": "object"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "type": "object"
+}
