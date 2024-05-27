@@ -372,17 +372,6 @@ def get_by_path(schema, path):
             },
             [],
         ),
-        (
-            {
-                "propertyNames": {
-                    "type": "object",
-                    "properties": {
-                        "friend": RECURSIVE_REFERENCE,
-                    },
-                },
-            },
-            [],
-        ),
     ],
     ids=[
         "self-ref",
@@ -420,7 +409,6 @@ def get_by_path(schema, path):
         "property-names-no-change",
         "property-names",
         "property-names-nested",
-        "property-names-nested-empty",
     ],
 )
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
@@ -555,6 +543,14 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
             "propertyNames": RECURSIVE_REFERENCE,
             "minProperties": 1,
         },
+        {
+            "propertyNames": {
+                "anyOf": [
+                    RECURSIVE_REFERENCE,
+                ]
+            },
+            "minProperties": 1,
+        },
     ],
     ids=[
         "properties",
@@ -573,6 +569,7 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         "patternProperties-with-required",
         "patternProperties-nested-with-required",
         "property-names-with-min-properties",
+        "property-names-nested-with-min-properties",
     ],
 )
 def test_on_reached_limit_non_removable(schema):

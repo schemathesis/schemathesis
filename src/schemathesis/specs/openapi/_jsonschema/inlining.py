@@ -191,21 +191,28 @@ def _on_items_reached_limit(
 def _on_property_names_reached_limit(
     new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
+    def forbid():
+        new["maxProperties"] = 0
+        remove_keywords.append("propertyNames")
+
     if schema.get("$ref") in recursive:
         if min_properties > 0:
             return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
-        new["maxProperties"] = 0
-        remove_keywords.append("propertyNames")
+        forbid()
     else:
         result = _on_reached_limit(schema, recursive)
         if isinstance(result, Err):
-            # TODO: check for minProperties?
-            new["maxProperties"] = 0
-            remove_keywords.append("propertyNames")
+            if min_properties > 0:
+                return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
+            forbid()
         else:
             new_subschema = result.ok()
             if new_subschema is not schema:
-                new["propertyNames"] = new_subschema
+                if new_subschema:
+                    new["propertyNames"] = new_subschema
+                else:
+                    forbid()
+
     return Ok(None)
 
 
