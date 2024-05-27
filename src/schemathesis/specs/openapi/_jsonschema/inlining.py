@@ -70,6 +70,20 @@ def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
 
 # TODO:
 # "dependencies",
+# E           jsonschema.exceptions.ValidationError: [[{'ºi¶-\x89K': 28, '\x98oe\x9d\x03\U000c90a4±B\x9c\x1b\x89': True, '\U0007b08fÝ': 1.1125369292536007e-308}], [], []] is not of type 'object'
+# E
+# E           Failed validating 'type' in schema['patternProperties']['^x-']:
+# E               {'patternProperties': {'^x-': {'$ref': '#/definitions/Person'}},
+# E                'type': 'object'}
+# E
+# E           On instance['x-']:
+# E               [[{'\x98oe\x9d\x03\U000c90a4±B\x9c\x1b\x89': True,
+# E                  'ºi¶-\x89K': 28,
+# E                  '\U0007b08fÝ': 1.1125369292536007e-308}],
+# E                [],
+# E                []]
+#
+#
 
 
 def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
@@ -95,9 +109,9 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
                 new, value, schema.get("properties", {}), schema.get("required", []), remove_keywords, recursive
             )
         elif key == "propertyNames":
-            # TODO:Set `maxProperties` to 0 and remove `propertyNames`
-            # if `minProperties` is greater than 0, then error out
-            pass
+            result = _on_property_names_reached_limit(
+                new, value, schema.get("minProperties", 0), remove_keywords, recursive
+            )
         elif key in ("contains", "if", "then", "else", "not"):
             result = _on_schema_reached_limit(new, value, key, recursive, allow_modification=key != "not")
         elif key in ("allOf", "oneOf", "additionalItems"):
@@ -106,6 +120,7 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
             continue
         if isinstance(result, Err):
             return result
+    # TODO: Do not add "Allow-all" subschemas
     if not new and not remove_keywords:
         return Ok(schema)
     for key, value in schema.items():
@@ -116,22 +131,24 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
 
 def _on_additional_properties_reached_limit(
     new: ObjectSchema,
-    value: ObjectSchema,
+    schema: ObjectSchema,
     min_properties: int,
     properties: dict[str, Schema],
     recursive: set[str],
 ) -> Result[None, InfiniteRecursionError]:
-    if value.get("$ref") in recursive:
+    if schema.get("$ref") in recursive:
         if min_properties > len(properties):
             return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
         new["additionalProperties"] = False
     else:
-        result = _on_reached_limit(value, recursive)
+        result = _on_reached_limit(schema, recursive)
         if isinstance(result, Err):
+            if min_properties > len(properties):
+                return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
             new["additionalProperties"] = False
         else:
             new_subschema = result.ok()
-            if new_subschema is not value:
+            if new_subschema is not schema:
                 new["additionalProperties"] = new_subschema
     return Ok(None)
 
@@ -168,6 +185,27 @@ def _on_items_reached_limit(
                     else:
                         new["items"] = schema[:idx]
                     break
+    return Ok(None)
+
+
+def _on_property_names_reached_limit(
+    new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], recursive: set[str]
+) -> Result[None, InfiniteRecursionError]:
+    if schema.get("$ref") in recursive:
+        if min_properties > 0:
+            return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
+        new["maxProperties"] = 0
+        remove_keywords.append("propertyNames")
+    else:
+        result = _on_reached_limit(schema, recursive)
+        if isinstance(result, Err):
+            # TODO: check for minProperties?
+            new["maxProperties"] = 0
+            remove_keywords.append("propertyNames")
+        else:
+            new_subschema = result.ok()
+            if new_subschema is not schema:
+                new["propertyNames"] = new_subschema
     return Ok(None)
 
 

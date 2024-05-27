@@ -350,6 +350,37 @@ def get_by_path(schema, path):
                     },
                 },
             },
+            [["patternProperties", "^y-"]],
+        ),
+        (
+            {
+                "propertyNames": {"type": "string"},
+            },
+            [[]],
+        ),
+        (
+            {
+                "propertyNames": RECURSIVE_REFERENCE,
+            },
+            [],
+        ),
+        (
+            {
+                "propertyNames": {
+                    "not": RECURSIVE_REFERENCE,
+                },
+            },
+            [],
+        ),
+        (
+            {
+                "propertyNames": {
+                    "type": "object",
+                    "properties": {
+                        "friend": RECURSIVE_REFERENCE,
+                    },
+                },
+            },
             [],
         ),
     ],
@@ -386,6 +417,10 @@ def get_by_path(schema, path):
         "non-removable-in-removable-anyOf",
         "non-removable-in-removable-pattern-properties",
         "removable-in-removable-pattern-properties",
+        "property-names-no-change",
+        "property-names",
+        "property-names-nested",
+        "property-names-nested-empty",
     ],
 )
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
@@ -449,6 +484,16 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
             "additionalProperties": RECURSIVE_REFERENCE,
         },
         {
+            "type": "object",
+            "additionalProperties": {
+                "properties": {
+                    "friend": RECURSIVE_REFERENCE,
+                },
+                "required": ["friend"],
+            },
+            "minProperties": 1,
+        },
+        {
             "minItems": 1,
             "items": RECURSIVE_REFERENCE,
         },
@@ -506,12 +551,17 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
             },
             "required": ["x-foo"],
         },
+        {
+            "propertyNames": RECURSIVE_REFERENCE,
+            "minProperties": 1,
+        },
     ],
     ids=[
         "properties",
         "properties-nested",
         "anyOf-single-item",
         "additional-properties-min-properties",
+        "additional-properties-nested-min-properties",
         "items-with-object-min-items",
         "items-with-object-nested",
         "items-with-array-nested",
@@ -522,6 +572,7 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         "not-with-modification",
         "patternProperties-with-required",
         "patternProperties-nested-with-required",
+        "property-names-with-min-properties",
     ],
 )
 def test_on_reached_limit_non_removable(schema):
