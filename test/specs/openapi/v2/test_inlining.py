@@ -230,6 +230,22 @@ def get_by_path(schema, path):
             [],
         ),
         (
+            {"not": {"type": "object"}},
+            [[]],
+        ),
+        (
+            {
+                "not": {
+                    "type": "array",
+                    "items": {
+                        "type": "array",
+                        "items": RECURSIVE_REFERENCE,
+                    },
+                }
+            },
+            [],
+        ),
+        (
             {
                 "type": "object",
                 "properties": {
@@ -309,6 +325,8 @@ def get_by_path(schema, path):
         "anyOf-nested",
         "allOf-nested",
         "allOf-no-change",
+        "not-no-change",
+        "not-nested",
         "non-removable-in-removable-properties",
         "non-removable-in-removable-additional-properties",
         "non-removable-in-removable-items",
@@ -406,6 +424,9 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
                 }
             ],
         },
+        {
+            "not": RECURSIVE_REFERENCE,
+        },
     ],
     ids=[
         "properties",
@@ -417,6 +438,7 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
         "items-with-array-nested",
         "allOf",
         "allOf-nested",
+        "not",
     ],
 )
 def test_on_reached_limit_non_removable(schema):

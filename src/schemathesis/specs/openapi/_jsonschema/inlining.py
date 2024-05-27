@@ -67,17 +67,7 @@ def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
 
 
 # TODO:
-#     "additionalItems",
-# "additionalProperties",
-# "contains",
 # "dependencies",
-# "else",
-# "if",
-# "not",
-# "oneOf",
-# "patternProperties",
-# "propertyNames",
-# "then",
 
 
 def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
@@ -106,8 +96,19 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
             result = _on_any_of_reached_limit(new, value, recursive)
             if isinstance(result, Err):
                 return result
-        elif key in ("allOf", "oneOf"):
-            result = _on_all_of_one_of_reached_limit(new, value, key, recursive)
+        elif key == "patternProperties":
+            # TODO: Set `maxProperties` to 0 and remove `patternProperties` if there are no properties matching the pattern
+            pass
+        elif key == "propertyNames":
+            # TODO:Set `maxProperties` to 0 and remove `propertyNames`
+            # if `minProperties` is greater than 0, then error out
+            pass
+        elif key in ("contains", "if", "then", "else", "not"):
+            result = _on_schema_reached_limit(new, value, key, recursive)
+            if isinstance(result, Err):
+                return result
+        elif key in ("allOf", "oneOf", "additionalItems"):
+            result = _on_list_of_schemas_reached_limit(new, value, key, recursive)
             if isinstance(result, Err):
                 return result
     if not new:
@@ -119,7 +120,7 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
 
 
 def _on_additional_properties_reached_limit(
-    parent: ObjectSchema,
+    new: ObjectSchema,
     value: ObjectSchema,
     min_properties: int,
     properties: dict[str, ObjectSchema],
@@ -128,55 +129,55 @@ def _on_additional_properties_reached_limit(
     if value.get("$ref") in recursive:
         if min_properties > len(properties):
             return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
-        parent["additionalProperties"] = False
+        new["additionalProperties"] = False
     else:
         result = _on_reached_limit(value, recursive)
         if isinstance(result, Err):
-            parent["additionalProperties"] = False
+            new["additionalProperties"] = False
         else:
             new_subschema = result.ok()
             if new_subschema is not value:
-                parent["additionalProperties"] = new_subschema
+                new["additionalProperties"] = new_subschema
     return Ok(None)
 
 
 def _on_items_reached_limit(
-    parent: ObjectSchema, schema: ObjectSchema, min_items: int, skip_keywords: list[str], recursive: set[str]
+    new: ObjectSchema, schema: ObjectSchema, min_items: int, skip_keywords: list[str], recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
     if isinstance(schema, dict):
         if schema.get("$ref") in recursive:
             if min_items > 0:
                 return Err(InfiniteRecursionError("Infinite recursion in items"))
-            parent["maxItems"] = 0
+            new["maxItems"] = 0
             skip_keywords.append("items")
         else:
             result = _on_reached_limit(schema, recursive)
             if isinstance(result, Err):
                 if min_items > 0:
                     return Err(InfiniteRecursionError("Infinite recursion in items"))
-                parent["maxItems"] = 0
+                new["maxItems"] = 0
                 skip_keywords.append("items")
             else:
                 new_subschema = result.ok()
                 if new_subschema is not schema:
-                    parent["items"] = new_subschema
+                    new["items"] = new_subschema
     elif isinstance(schema, list):
         for idx, subschema in enumerate(schema):
             if isinstance(subschema, dict):
                 if subschema.get("$ref") in recursive:
                     if min_items > idx:
                         return Err(InfiniteRecursionError("Infinite recursion in items"))
-                    parent["maxItems"] = idx
+                    new["maxItems"] = idx
                     if idx == 0:
                         skip_keywords.append("items")
                     else:
-                        parent["items"] = schema[:idx]
+                        new["items"] = schema[:idx]
                     break
     return Ok(None)
 
 
 def _on_properties_reached_limit(
-    parent: ObjectSchema, schema: ObjectSchema, required: list[str], recursive: set[str]
+    new: ObjectSchema, schema: ObjectSchema, required: list[str], recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
     removal = []
     replacement = {}
@@ -204,12 +205,12 @@ def _on_properties_reached_limit(
                 properties[key] = replacement[key]
             elif key not in removal:
                 properties[key] = subschema
-        parent["properties"] = properties
+        new["properties"] = properties
     return Ok(None)
 
 
 def _on_any_of_reached_limit(
-    parent: ObjectSchema, schema: ObjectSchema, recursive: set[str]
+    new: ObjectSchema, schema: ObjectSchema, recursive: set[str]
 ) -> Result[None, InfiniteRecursionError]:
     removal = []
     replacement = {}
@@ -228,17 +229,33 @@ def _on_any_of_reached_limit(
     if len(removal) == len(schema):
         return Err(InfiniteRecursionError("Infinite recursion in anyOf"))
     if removal or replacement:
-        combinators = []
+        items = []
         for idx, subschema in enumerate(schema):
             if idx in replacement:
-                combinators.append(replacement[idx])
+                items.append(replacement[idx])
             elif idx not in removal:
-                combinators.append(subschema)
-        parent["anyOf"] = combinators
+                items.append(subschema)
+        new["anyOf"] = items
     return Ok(None)
 
 
-def _on_all_of_one_of_reached_limit(parent: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str]):
+def _on_schema_reached_limit(
+    new: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str]
+) -> Result[None, InfiniteRecursionError]:
+    if schema.get("$ref") in recursive:
+        return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
+    result = _on_reached_limit(schema, recursive)
+    if isinstance(result, Err):
+        return result
+    new_subschema = result.ok()
+    if new_subschema is not schema:
+        new[key] = new_subschema
+    return Ok(None)
+
+
+def _on_list_of_schemas_reached_limit(
+    new: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str]
+) -> Result[None, InfiniteRecursionError]:
     replacement = {}
     for idx, subschema in enumerate(schema):
         if isinstance(subschema, dict):
@@ -252,11 +269,11 @@ def _on_all_of_one_of_reached_limit(parent: ObjectSchema, schema: ObjectSchema, 
                 if new_subschema is not subschema:
                     replacement[idx] = new_subschema
     if replacement:
-        combinators = []
+        items = []
         for idx, subschema in enumerate(schema):
             if idx in replacement:
-                combinators.append(replacement[idx])
+                items.append(replacement[idx])
             else:
-                combinators.append(subschema)
-        parent[key] = combinators
+                items.append(subschema)
+        new[key] = items
     return Ok(None)
