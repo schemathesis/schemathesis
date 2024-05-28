@@ -166,7 +166,6 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
             if cached is not None:
                 recursive.update(cached)
         # Leave only references that are used in this particular schema
-        # TODO: Track references that are used only in the schema itself - then later traversal is cheaper
         moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
         if recursive:
             # TODO: fix type

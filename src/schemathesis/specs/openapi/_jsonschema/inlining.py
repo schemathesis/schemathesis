@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 import re
 
 from ....internal.copy import fast_deepcopy, merge_into
@@ -46,12 +47,17 @@ DEFAULT_MAX_DEPTH = 2
 DEFAULT_MAX_INLININGS = 100
 
 
-def unrecurse(
-    referenced_schemas: MovedSchemas,
-    recursive: set[str],
-    max_depth: int = DEFAULT_MAX_DEPTH,
-    max_inlinings: int = DEFAULT_MAX_INLININGS,
-) -> None:
+@dataclass
+class InlineContext:
+    """Context for inlining recursive references."""
+
+    total_inlinings: int = 0
+    path: list[str] = field(default_factory=list)
+    max_depth: int = DEFAULT_MAX_DEPTH
+    max_inlinings: int = DEFAULT_MAX_INLININGS
+
+
+def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: InlineContext | None = None) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
 
     Transformation is done by inlining the referenced schema into the schema that references it up to the
@@ -59,11 +65,53 @@ def unrecurse(
     that lead to the recursive reference are removed from the schema. If all such subschemas are required,
     which means infinite recursion, an error is raised.
     """
-    pass
+    # TODO: pass the list of keys that are actually used
+    # TODO: Get full paths to every recursive reference - it will save a lot of time here and there will be
+    #       much less traversal needed
+    context = context or InlineContext()
+    for name, schema in referenced_schemas.items():
+        new_schema = _unrecurse(schema, recursive, context)
+        if new_schema is not schema:
+            referenced_schemas[name] = new_schema
+
+
+def _unrecurse(schema: ObjectSchema, recursive: set[str], context: InlineContext) -> ObjectSchema:
+    reference = schema.get("$ref")
+    if reference in recursive or not schema:
+        return {}
+    elif reference is not None:
+        return schema
+    new = {}
+    for key, value in schema.items():
+        if key == "additionalProperties" and isinstance(value, dict):
+            pass
+        elif key == "items":
+            pass
+        elif key == "properties":
+            pass
+        elif key == "anyOf":
+            pass
+        elif key == "patternProperties":
+            pass
+        elif key == "propertyNames":
+            pass
+        elif key in ("contains", "if", "then", "else", "not"):
+            pass
+        elif key in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
+            pass
+        else:
+            continue
+    if not new:
+        return schema
+    for key, value in schema.items():
+        if key not in new:
+            new[key] = value
+    return new
 
 
 def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
     """Remove all optional subschemas that lead to recursive references."""
+    # TODO: results of `on_reached_limit` should be cached to avoid recalculating them
     result = _on_reached_limit(schema, recursive)
     if isinstance(result, Ok):
         return result.ok()
