@@ -4,6 +4,7 @@ from dataclasses import asdict
 
 import pytest
 from referencing.jsonschema import DRAFT4
+from jsonschema import Draft7Validator
 from referencing import Registry, Resource
 
 from schemathesis.internal.result import Ok
@@ -103,6 +104,9 @@ def test_iter_operations(spec, snapshot_json, assert_generates):
         operation = operation.ok()
         assert asdict(operation) == snapshot_json
         for param in operation.body + operation.headers + operation.path_parameters + operation.query:
+            for schema in param.schema.get(MOVED_SCHEMAS_KEY, {}).values():
+                Draft7Validator.check_schema(schema)
+            Draft7Validator.check_schema(param.schema)
             assert_generates(param.schema)
             # assert_no_unused_components(param.schema)
     list(iter_operations(spec, "", cache=cache))
