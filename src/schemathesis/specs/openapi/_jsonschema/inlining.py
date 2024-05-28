@@ -30,7 +30,7 @@ def _inline_recursive_references(
         if reference in recursive:
             schema.clear()
             key, _ = _key_for_reference(reference)
-            if path.count(key) < 3:
+            if path.count(key) < DEFAULT_MAX_DEPTH:
                 referenced_item = referenced_schemas[key]
                 # Extend with a deep copy as the tree should grow with owned data
                 merge_into(schema, referenced_item)
@@ -42,7 +42,7 @@ def _inline_recursive_references(
         _inline_recursive_references(subschema, referenced_schemas, recursive, path)
 
 
-DEFAULT_MAX_DEPTH = 3
+DEFAULT_MAX_DEPTH = 2
 DEFAULT_MAX_INLININGS = 100
 
 

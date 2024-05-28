@@ -196,7 +196,13 @@ def _init_shared_parameters(
     for parameter_or_ref in parameters:
         parameter: NonBodyParameter | BodyParameter
         if "$ref" in parameter_or_ref:  # type: ignore[typeddict-item]
-            resolved = path_item_resolver.lookup(parameter_or_ref["$ref"])  # type: ignore[typeddict-item]
+            reference = parameter_or_ref["$ref"]
+            # TODO: Use scope in cache key
+            if reference in config.cache.parameter_lookups:
+                resolved = config.cache.parameter_lookups[reference]
+            else:
+                resolved = path_item_resolver.lookup(parameter_or_ref["$ref"])  # type: ignore[typeddict-item]
+                config.cache.parameter_lookups[reference] = resolved
             parameter = resolved.contents
             parameter_resolver = resolved.resolver
         else:
@@ -253,7 +259,12 @@ def _init_local_parameters(
     for parameter_or_ref in parameters:
         parameter: NonBodyParameter | BodyParameter
         if "$ref" in parameter_or_ref:  # type: ignore[typeddict-item]
-            resolved = path_item_resolver.lookup(parameter_or_ref["$ref"])  # type: ignore[typeddict-item]
+            reference = parameter_or_ref["$ref"]
+            if reference in config.cache.parameter_lookups:
+                resolved = config.cache.parameter_lookups[reference]
+            else:
+                resolved = path_item_resolver.lookup(parameter_or_ref["$ref"])  # type: ignore[typeddict-item]
+                config.cache.parameter_lookups[reference] = resolved
             parameter = resolved.contents
             parameter_resolver = resolved.resolver
         else:

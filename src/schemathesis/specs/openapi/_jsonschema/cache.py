@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Set
 
-from .types import MovedSchemas, ObjectSchema, SchemaKey
+from .types import MovedSchemas, ObjectSchema, Resolved, SchemaKey, ParameterReferenceCacheKey
 
 
 @dataclass
@@ -19,3 +19,5 @@ class TransformCache:
     transformed_references: dict[str, ObjectSchema] = field(default_factory=dict)
     # Already inlined schemas
     inlined_schemas: set[SchemaKey] = field(default_factory=set)
+    # References to parameter definitions
+    parameter_lookups: dict[ParameterReferenceCacheKey, Resolved] = field(default_factory=dict)
