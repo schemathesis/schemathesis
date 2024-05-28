@@ -17,7 +17,6 @@ CATALOG_DIR = CURRENT_DIR / "data"
 
 from corpus.tools import read_corpus_file, load_from_corpus  # noqa: E402
 
-
 CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
 CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 # Small size (~2k lines in YAML)
@@ -41,6 +40,12 @@ OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
 
+APPVEYOR = load_from_corpus("appveyor.com/1.0.0.json", CORPUS_SWAGGER_20)
+EVETECH = load_from_corpus("evetech.net/0.8.6.json", CORPUS_SWAGGER_20)
+OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
+ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
+AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
+
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
@@ -48,7 +53,7 @@ AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWA
     [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES, AZURE_NETWORK],
     ids=("appveyor", "evetech", "osisoft", "ml-webservices", "azure-network"),
 )
-def test_iter_operations_v2(raw_schema):
+def test_iter_operations(raw_schema):
     schema = fast_deepcopy(raw_schema)
     for _ in iter_operations(schema, ""):
         pass
