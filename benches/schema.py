@@ -53,7 +53,7 @@ AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWA
     ],
     ids=("bbci", "vmware", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
-def test_get_all_operations(raw_schema, loader):
+def test_iter_operations(raw_schema, loader):
     schema = loader(raw_schema)
 
     for _ in schema.get_all_operations():
@@ -68,8 +68,13 @@ def test_get_all_operations(raw_schema, loader):
         (VMWARE, schemathesis.from_dict),
         (STRIPE, schemathesis.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
+        (APPVEYOR, schemathesis.from_dict),
+        (EVETECH, schemathesis.from_dict),
+        (OSISOFT, schemathesis.from_dict),
+        (ML_WEBSERVICES, schemathesis.from_dict),
+        (AZURE_NETWORK, schemathesis.from_dict),
     ],
-    ids=("bbci", "vmware", "stripe", "universe"),
+    ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_length(raw_schema, loader):
     schema = loader(raw_schema)
