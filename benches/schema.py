@@ -14,22 +14,28 @@ CATALOG_DIR = CURRENT_DIR / "data"
 
 from corpus.tools import read_corpus_file, load_from_corpus  # noqa: E402
 
-
-CORPUS = read_corpus_file("openapi-3.0")
+CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
+CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 # Small size (~2k lines in YAML)
-BBCI = load_from_corpus("bbci.co.uk/1.0.json", CORPUS)
+BBCI = load_from_corpus("bbci.co.uk/1.0.json", CORPUS_OPENAPI_30)
 BBCI_SCHEMA = schemathesis.from_dict(BBCI)
 BBCI_OPERATIONS = list(BBCI_SCHEMA.get_all_operations())
 # Medium size (~8k lines in YAML)
-VMWARE = load_from_corpus("vmware.local/vrni/1.0.0.json", CORPUS)
+VMWARE = load_from_corpus("vmware.local/vrni/1.0.0.json", CORPUS_OPENAPI_30)
 VMWARE_SCHEMA = schemathesis.from_dict(VMWARE)
 VMWARE_OPERATIONS = list(VMWARE_SCHEMA.get_all_operations())
 # Large size (~92k lines in YAML)
-STRIPE = load_from_corpus("stripe.com/2022-11-15.json", CORPUS)
+STRIPE = load_from_corpus("stripe.com/2022-11-15.json", CORPUS_OPENAPI_30)
 STRIPE_SCHEMA = schemathesis.from_dict(STRIPE)
 # Medium GraphQL schema (~6k lines)
 UNIVERSE = load_from_corpus("universe.json", "graphql")
 UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
+
+APPVEYOR = load_from_corpus("appveyor.com/1.0.0.json", CORPUS_SWAGGER_20)
+EVETECH = load_from_corpus("evetech.net/0.8.6.json", CORPUS_SWAGGER_20)
+OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
+ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
+AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
 
 
 @pytest.mark.benchmark
@@ -39,8 +45,13 @@ UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
         (BBCI, schemathesis.from_dict),
         (VMWARE, schemathesis.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
+        (APPVEYOR, schemathesis.from_dict),
+        (EVETECH, schemathesis.from_dict),
+        (OSISOFT, schemathesis.from_dict),
+        (ML_WEBSERVICES, schemathesis.from_dict),
+        (AZURE_NETWORK, schemathesis.from_dict),
     ],
-    ids=("bbci", "vmware", "universe"),
+    ids=("bbci", "vmware", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_get_all_operations(raw_schema, loader):
     schema = loader(raw_schema)
