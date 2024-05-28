@@ -51,7 +51,7 @@ AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWA
 @pytest.mark.parametrize(
     "raw_schema",
     [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES, AZURE_NETWORK],
-    ids=("appveyor", "evetech", "osisoft", "ml-webservices", "azure-network"),
+    ids=("appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_iter_operations(raw_schema):
     schema = fast_deepcopy(raw_schema)
@@ -69,7 +69,7 @@ def test_iter_operations(raw_schema):
         (ML_WEBSERVICES, TransformCache()),
         (AZURE_NETWORK, TransformCache()),
     ],
-    ids=("appveyor", "evetech", "osisoft", "ml-webservices", "azure-network"),
+    ids=("appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_iter_operations_v2_cached(raw_schema, cache):
     for _ in iter_operations(raw_schema, "", cache=cache):
