@@ -72,8 +72,10 @@ def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
 
 def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
     reference = schema.get("$ref")
-    if isinstance(reference, str) and reference in recursive or not schema:
+    if reference in recursive or not schema:
         return Ok({})
+    elif reference is not None:
+        return Ok(schema)
     new: ObjectSchema = {}
     remove_keywords: list[str] = []
     for key, value in schema.items():
@@ -196,11 +198,7 @@ def _on_property_names_reached_limit(
         else:
             new_subschema = result.ok()
             if new_subschema is not schema:
-                if new_subschema:
-                    new["propertyNames"] = new_subschema
-                else:
-                    forbid()
-
+                new["propertyNames"] = new_subschema
     return Ok(None)
 
 

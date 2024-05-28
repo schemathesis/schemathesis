@@ -1,0 +1,9 @@
+{
+  "propertyNames": {
+    "anyOf": [
+      {
+        "type": "string"
+      }
+    ]
+  }
+}

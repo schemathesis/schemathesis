@@ -372,6 +372,17 @@ def get_by_path(schema, path):
             },
             [],
         ),
+        (
+            {
+                "propertyNames": {
+                    "anyOf": [
+                        RECURSIVE_REFERENCE,
+                        {"type": "string"},
+                    ]
+                },
+            },
+            [],
+        ),
     ],
     ids=[
         "self-ref",
@@ -409,6 +420,7 @@ def get_by_path(schema, path):
         "property-names-no-change",
         "property-names",
         "property-names-nested",
+        "property-names-with-modification",
     ],
 )
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
