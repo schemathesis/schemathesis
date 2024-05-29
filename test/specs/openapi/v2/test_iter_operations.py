@@ -99,8 +99,8 @@ def to_frozen_dict(obj):
     indirect=True,
 )
 def test_iter_operations(spec, snapshot_json, assert_generates, snapshot):
-    cache = TransformCache()
-    for operation in iter_operations(spec, "", cache=cache):
+    first_cache = TransformCache()
+    for operation in iter_operations(spec, "", cache=first_cache):
         assert isinstance(operation, Ok)
         operation = operation.ok()
         assert asdict(operation) == snapshot_json
@@ -110,8 +110,9 @@ def test_iter_operations(spec, snapshot_json, assert_generates, snapshot):
             Draft7Validator.check_schema(param.schema)
             assert_generates(param.schema)
             # assert_no_unused_components(param.schema)
-    snapshot_json = snapshot.use_extension(JSONSnapshotExtension)
-    for operation in iter_operations(spec, "", cache=cache):
-        assert isinstance(operation, Ok)
-        operation = operation.ok()
-        assert asdict(operation) == snapshot_json
+    for cache in [first_cache, None]:
+        snapshot_json = snapshot.use_extension(JSONSnapshotExtension)
+        for operation in iter_operations(spec, "", cache=cache):
+            assert isinstance(operation, Ok)
+            operation = operation.ok()
+            assert asdict(operation) == snapshot_json

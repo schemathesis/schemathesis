@@ -10,6 +10,7 @@ from ...constants import HTTP_METHODS
 from ...internal.result import Ok, Result
 from ._jsonschema import to_jsonschema, TransformConfig
 from ._jsonschema.cache import TransformCache
+from ._jsonschema.constants import MOVED_SCHEMAS_KEY
 
 if TYPE_CHECKING:
     from ._jsonschema import Resolver
@@ -130,6 +131,7 @@ def iter_operations(
         components=components,
         cache=cache or TransformCache(),
     )
+    spec.setdefault(MOVED_SCHEMAS_KEY, config.cache.moved_schemas)
     paths = spec["paths"]
     global_media_types = spec.get("consumes", [])
     for path, path_item_or_ref in paths.items():

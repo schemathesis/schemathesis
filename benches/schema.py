@@ -61,6 +61,17 @@ def test_iter_operations(raw_schema):
 
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
+    "raw_schema",
+    [APPVEYOR, EVETECH, OSISOFT, ML_WEBSERVICES, AZURE_NETWORK],
+    ids=("appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
+)
+def test_iter_operations_rerun(raw_schema):
+    for _ in iter_operations(raw_schema, ""):
+        pass
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
     "raw_schema, cache",
     [
         (APPVEYOR, TransformCache()),
