@@ -165,18 +165,9 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         # them from `referenced_schemas` when inlining
         #
         # Look for recursive references places reachable from the schema
-        recursive = set()
-        cache = config.cache.recursive_references
-        for key in referenced_schemas:
-            cached = cache.get(key)
-            if cached is not None:
-                for item in cached:
-                    if item not in config.cache.inlined_schemas:
-                        recursive.add(item)
-        if recursive:
+        if config.cache.recursive_references:
             # Recursive schemas are inlined up to some limit in order to generate self-referential data
-            inline_recursive_references(moved_schemas, recursive)
-            # config.cache.inlined_schemas.update(recursive)
+            inline_recursive_references(moved_schemas, config.cache.recursive_references)
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema
@@ -252,10 +243,7 @@ def iter_schema(
                 # traversal a schema that uses that reference
                 idx = path.index(reference)
                 cycle = path[idx:]
-                for segment in cycle:
-                    key, _ = _key_for_reference(segment)
-                    cache = config.cache.recursive_references.setdefault(key, set())
-                    cache.update(cycle)
+                config.cache.recursive_references.update(cycle)
             else:
                 key, _ = _key_for_reference(reference)
                 moved = config.cache.moved_schemas.get(key)

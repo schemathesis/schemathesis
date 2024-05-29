@@ -3,46 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 import re
 
-from ....internal.copy import fast_deepcopy, merge_into
 from ....internal.result import Err, Ok, Result
 from .constants import MOVED_SCHEMAS_PREFIX
 from .errors import InfiniteRecursionError
-from .iteration import iter_subschemas
 from .keys import _key_for_reference
 from .types import MovedSchemas, ObjectSchema, Schema
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
     unrecurse(referenced_schemas, recursive)
-    # keys = {_key_for_reference(ref)[0] for ref in recursive}
-    # originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
-    # for reference in recursive:
-    #     # TODO. iterating only recursive schemas themselves could be not enough - what if some other schema contains a recursive ref???
-    #     key, _ = _key_for_reference(reference)
-    #     _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
-
-
-def _inline_recursive_references(
-    schema: ObjectSchema, referenced_schemas: MovedSchemas, recursive: set[str], path: list[str]
-) -> None:
-    """Inline all recursive references in the given item."""
-    reference = schema.get("$ref")
-    if isinstance(reference, str):
-        # TODO: There could be less traversal if we know where refs are located within `refrenced_item`.
-        #       Just copy the value and directly jump to the next ref in it, or iterate over them
-        if reference in recursive:
-            schema.clear()
-            key, _ = _key_for_reference(reference)
-            if path.count(key) < DEFAULT_MAX_DEPTH:
-                referenced_item = referenced_schemas[key]
-                # Extend with a deep copy as the tree should grow with owned data
-                merge_into(schema, referenced_item)
-                path.append(key)
-                _inline_recursive_references(schema, referenced_schemas, recursive, path)
-                path.pop()
-        return
-    for subschema in iter_subschemas(schema):
-        _inline_recursive_references(subschema, referenced_schemas, recursive, path)
 
 
 DEFAULT_MAX_DEPTH = 3
@@ -160,9 +129,6 @@ def _unrecurse(
                         if context.push(key):
                             replacement = _unrecurse(referenced_item, storage, recursive, context)
                         else:
-                            while "$ref" in referenced_item:
-                                k, _ = _key_for_reference(referenced_item["$ref"])
-                                referenced_item = storage[k]
                             replacement = on_reached_limit(referenced_item, recursive)
                         context.pop()
                         new_items[idx] = replacement
