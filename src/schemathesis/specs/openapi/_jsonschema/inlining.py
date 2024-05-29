@@ -49,11 +49,15 @@ def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: 
     #       much less traversal needed
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
+        if name in cache.inlined_schemas:
+            continue
         new_schema = _unrecurse(schema, referenced_schemas, cache, context)
         if new_schema is not schema:
             cache.recursive_references.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
-            context.cache.clear()
             referenced_schemas[name] = new_schema
+            context.cache.clear()
+        else:
+            cache.inlined_schemas.add(name)
 
 
 def _unrecurse(
