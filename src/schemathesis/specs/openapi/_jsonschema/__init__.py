@@ -202,6 +202,7 @@ def traverse_schema(
             # Reference has already been moved, don't replace it
             # Traversal is needed for recursive references
             resolved_schema = config.cache.moved_schemas[key]
+            return
         else:
             # Unprocessed reference, move the target
             resolved = resolver.lookup(reference)
