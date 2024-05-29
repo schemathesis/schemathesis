@@ -221,10 +221,6 @@ def test_non_recursive_ref(ctx: Context):
                 assert visited == expected_visits[reference]
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/A": {"-definitions-A"},
-        "#/definitions/B": {"-definitions-B"},
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "type": "object",
@@ -246,10 +242,6 @@ def test_non_recursive_with_multiple_refs(ctx: Context):
     for _ in range(ITERATIONS):
         visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
         assert visited == {"-definitions-A", "-definitions-B"}
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/A": {"-definitions-A", "-definitions-B"},
-        "#/definitions/B": {"-definitions-B"},
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "type": "object",
@@ -268,7 +260,6 @@ def test_schema_transformation(ctx: Context):
     for _ in range(ITERATIONS):
         visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
         assert visited == {"-definitions-A"}
-    assert ctx.config.cache.schemas_behind_references == {"#/definitions/A": {"-definitions-A"}}
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "not": {"required": ["third"]},
@@ -293,10 +284,6 @@ def test_recursive_1_hop(ctx: Context):
                 assert visited == {"-definitions-A", "-definitions-B"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/A": {"-definitions-A", "-definitions-B"},
-        "#/definitions/B": {"-definitions-A", "-definitions-B"},
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "type": "object",
@@ -323,10 +310,6 @@ def test_recursive_1_hop_in_array(ctx: Context):
                 assert visited == {"-definitions-A", "-definitions-B"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/A": {"-definitions-A", "-definitions-B"},
-        "#/definitions/B": {"-definitions-A", "-definitions-B"},
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "allOf": [
@@ -355,11 +338,6 @@ def test_recursive_2_hops(ctx: Context):
                 assert visited == {"-definitions-A", "-definitions-B", "-definitions-C"}
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/A": {"-definitions-A", "-definitions-B", "-definitions-C"},
-        "#/definitions/B": {"-definitions-A", "-definitions-B", "-definitions-C"},
-        "#/definitions/C": {"-definitions-A", "-definitions-B", "-definitions-C"},
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-A": {
             "type": "object",
@@ -433,35 +411,6 @@ def test_recursive_with_nested(ctx: Context):
                 assert visited == expected_visits[reference], reference
             if idx != ITERATIONS - 1:
                 ctx.reset()
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/Patch": {
-            "-definitions-Patch",
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-            "-definitions-Shared",
-        },
-        "#/definitions/Put": {
-            "-definitions-Put",
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-            "-definitions-Shared",
-        },
-        "#/definitions/RecursiveA": {"-definitions-RecursiveA", "-definitions-RecursiveB"},
-        "#/definitions/RecursiveB": {"-definitions-RecursiveA", "-definitions-RecursiveB"},
-        "#/definitions/RecursiveRoot": {
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-        },
-        "#/definitions/Shared": {
-            "-definitions-RecursiveA",
-            "-definitions-RecursiveB",
-            "-definitions-RecursiveRoot",
-            "-definitions-Shared",
-        },
-    }
     assert ctx.config.cache.moved_schemas == {
         "-definitions-Patch": {"$ref": "#/x-moved-schemas/-definitions-Shared"},
         "-definitions-Put": {"$ref": "#/x-moved-schemas/-definitions-Shared"},
@@ -501,7 +450,6 @@ def test_recursive_with_leaf(ctx: Context):
             if idx != ITERATIONS - 1:
                 ctx.reset()
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Patch"}, ctx.resolver, ctx.config)
-    assert ctx.config.cache.schemas_behind_references == expected_visits
     assert ctx.config.cache.recursive_references == {
         "#/x-moved-schemas/-definitions-Shared",
         "#/x-moved-schemas/-definitions-Put",
@@ -510,14 +458,6 @@ def test_recursive_with_leaf(ctx: Context):
 
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Put"}, ctx.resolver, ctx.config)
     assert visited == {"-definitions-Put", "-definitions-Shared", "-definitions-Leaf"}
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/Shared": {"-definitions-Shared", "-definitions-Leaf", "-definitions-Put"},
-        # `Put` -> `Shared`
-        # `Shared` -> `Leaf`, `Put`
-        "#/definitions/Put": {"-definitions-Put", "-definitions-Shared", "-definitions-Leaf"},
-        # `Leaf` has no children
-        "#/definitions/Leaf": {"-definitions-Leaf"},
-    }
     assert ctx.config.cache.recursive_references == {
         "#/x-moved-schemas/-definitions-Shared",
         "#/x-moved-schemas/-definitions-Put",
@@ -526,14 +466,6 @@ def test_recursive_with_leaf(ctx: Context):
 
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Shared"}, ctx.resolver, ctx.config)
     assert visited == {"-definitions-Put", "-definitions-Shared", "-definitions-Leaf"}
-    assert ctx.config.cache.schemas_behind_references == {
-        "#/definitions/Shared": {"-definitions-Shared", "-definitions-Leaf", "-definitions-Put"},
-        # `Put` -> `Shared`
-        # `Shared` -> `Leaf`, `Put`
-        "#/definitions/Put": {"-definitions-Put", "-definitions-Shared", "-definitions-Leaf"},
-        # `Leaf` has no children
-        "#/definitions/Leaf": {"-definitions-Leaf"},
-    }
     assert ctx.config.cache.recursive_references == {
         "#/x-moved-schemas/-definitions-Put",
         "#/x-moved-schemas/-definitions-Shared",
@@ -542,5 +474,4 @@ def test_recursive_with_leaf(ctx: Context):
 
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/Leaf"}, ctx.resolver, ctx.config)
     assert visited == {"-definitions-Leaf"}
-    assert ctx.config.cache.schemas_behind_references == {"#/definitions/Leaf": {"-definitions-Leaf"}}
     assert not ctx.config.cache.recursive_references

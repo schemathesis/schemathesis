@@ -182,16 +182,9 @@ def to_self_contained_jsonschema(
     # The goal is to find what schemas are reachable from each schema which is done by running DFS
     # on each schema that contains a reference. The result is a set of all referenced schemas.
     for reference, schema, resolver in iter_schema(root, root_resolver, config):
-        original_name = config.cache.replaced_references.get(reference, reference)
-        if original_name in config.cache.schemas_behind_references:
-            referenced.update(config.cache.schemas_behind_references[original_name])
-            continue
-        referenced_by_schema: Set[SchemaKey] = set()
-        traverse_schema(schema, resolver, referenced_by_schema, config)
+        traverse_schema(schema, resolver, referenced, config)
         key, _ = _key_for_reference(reference)
-        referenced_by_schema.add(key)
-        referenced.update(referenced_by_schema)
-        config.cache.schemas_behind_references[original_name] = referenced_by_schema
+        referenced.add(key)
     return referenced
 
 
