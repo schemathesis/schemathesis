@@ -35,8 +35,7 @@
                                 "properties": {
                                   "name": {
                                     "type": "string"
-                                  },
-                                  "ref-cycle-1-b": {}
+                                  }
                                 },
                                 "type": "object"
                               }
@@ -61,45 +60,7 @@
                 "type": "string"
               },
               "ref-cycle-1-b": {
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "ref-cycle-1-root": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      },
-                      "ref-cycle-1-b": {
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "ref-cycle-1-root": {
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "ref-cycle-1-b": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "ref-cycle-1-root": {}
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle1"
               }
             },
             "type": "object"

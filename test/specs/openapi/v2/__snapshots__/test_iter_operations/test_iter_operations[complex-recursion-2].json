@@ -6,12 +6,14 @@
       "schema": {
         "$ref": "#/x-moved-schemas/-definitions-Patch",
         "x-moved-schemas": {
-          "-definitions-Patch": {
+          "-definitions-Patch": {},
+          "-definitions-Put": {
             "$ref": "#/x-moved-schemas/-definitions-Shared-1"
           },
-          "-definitions-Put": {},
           "-definitions-Shared-1": {},
-          "-definitions-Shared-2": {}
+          "-definitions-Shared-2": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
+          }
         }
       }
     }

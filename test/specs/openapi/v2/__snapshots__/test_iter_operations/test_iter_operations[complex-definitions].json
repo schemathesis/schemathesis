@@ -10,10 +10,10 @@
             "$ref": "#/x-moved-schemas/-definitions-Shared"
           },
           "-definitions-RecursiveA": {},
-          "-definitions-RecursiveB": {},
-          "-definitions-RecursiveRoot": {
+          "-definitions-RecursiveB": {
             "$ref": "#/x-moved-schemas/-definitions-RecursiveA"
           },
+          "-definitions-RecursiveRoot": {},
           "-definitions-Shared": {
             "$ref": "#/x-moved-schemas/-definitions-RecursiveRoot"
           }

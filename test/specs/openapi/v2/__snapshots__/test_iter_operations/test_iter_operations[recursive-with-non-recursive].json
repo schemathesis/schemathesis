@@ -27,7 +27,6 @@
                             "properties": {
                               "a-to-b": {
                                 "properties": {
-                                  "b-to-a": {},
                                   "name": {
                                     "type": "string"
                                   }
@@ -76,54 +75,7 @@
           "-definitions-RefCycle1RecursiveB": {
             "properties": {
               "b-to-a": {
-                "properties": {
-                  "a-to-b": {
-                    "properties": {
-                      "b-to-a": {
-                        "properties": {
-                          "a-to-b": {
-                            "properties": {
-                              "b-to-a": {
-                                "properties": {
-                                  "a-to-b": {},
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "nonRecursiveRef": {
-                                    "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
-                                  }
-                                },
-                                "type": "object"
-                              },
-                              "name": {
-                                "type": "string"
-                              }
-                            },
-                            "type": "object"
-                          },
-                          "id": {
-                            "type": "string"
-                          },
-                          "nonRecursiveRef": {
-                            "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
-                          }
-                        },
-                        "type": "object"
-                      },
-                      "name": {
-                        "type": "string"
-                      }
-                    },
-                    "type": "object"
-                  },
-                  "id": {
-                    "type": "string"
-                  },
-                  "nonRecursiveRef": {
-                    "$ref": "#/x-moved-schemas/-definitions-NonRecursiveRef"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle1RecursiveA"
               },
               "name": {
                 "type": "string"

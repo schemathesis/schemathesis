@@ -5,6 +5,7 @@ import re
 
 from ....internal.copy import fast_deepcopy, merge_into
 from ....internal.result import Err, Ok, Result
+from .constants import MOVED_SCHEMAS_PREFIX
 from .errors import InfiniteRecursionError
 from .iteration import iter_subschemas
 from .keys import _key_for_reference
@@ -12,12 +13,13 @@ from .types import MovedSchemas, ObjectSchema, Schema
 
 
 def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
-    keys = {_key_for_reference(ref)[0] for ref in recursive}
-    originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
-    for reference in recursive:
-        # TODO. iterating only recursive schemas themselves could be not enough - what if some other schema contains a recursive ref???
-        key, _ = _key_for_reference(reference)
-        _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
+    unrecurse(referenced_schemas, recursive)
+    # keys = {_key_for_reference(ref)[0] for ref in recursive}
+    # originals = {key: fast_deepcopy(value) if key in keys else value for key, value in referenced_schemas.items()}
+    # for reference in recursive:
+    #     # TODO. iterating only recursive schemas themselves could be not enough - what if some other schema contains a recursive ref???
+    #     key, _ = _key_for_reference(reference)
+    #     _inline_recursive_references(referenced_schemas[key], originals, recursive, [key])
 
 
 def _inline_recursive_references(
@@ -60,7 +62,7 @@ class InlineContext:
         """Push the current path and check if the limit is reached."""
         self.path.append(reference)
         self.total_inlinings += 1
-        return self.total_inlinings < self.max_inlinings and len(self.path) < self.max_depth
+        return self.total_inlinings < self.max_inlinings and self.path.count(reference) < self.max_depth
 
     def pop(self) -> None:
         """Pop the current path."""
@@ -79,11 +81,13 @@ def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: In
     # TODO: Get full paths to every recursive reference - it will save a lot of time here and there will be
     #       much less traversal needed
     # TODO: Reuse already inlined schemas. I.e. if a dependency of the current schema is already inlined,
-    #      just reuse it instead of inlining it again. No modifications or traversals at all.
+    #      just reuse it instead of inlining it again. No modifications or traversals at all. OR! Drop it from the list of recursive
+    # TODO: Remove unrecursed schemas during `_unrecurse` as the same ref can appear again there so we need to skip it
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
         new_schema = _unrecurse(schema, referenced_schemas, recursive, context)
         if new_schema is not schema:
+            recursive.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
             referenced_schemas[name] = new_schema
 
 
@@ -91,10 +95,17 @@ def _unrecurse(
     schema: ObjectSchema, storage: MovedSchemas, recursive: set[str], context: InlineContext
 ) -> ObjectSchema:
     reference = schema.get("$ref")
-    if reference in recursive or not schema:
+    if reference in recursive:
+        key, _ = _key_for_reference(reference)
+        referenced_item = storage[key]
+        if context.push(key):
+            replacement = _unrecurse(referenced_item, storage, recursive, context)
+        else:
+            replacement = on_reached_limit(referenced_item, recursive)
+        context.pop()
+        return replacement
+    if not schema:
         return {}
-    elif reference is not None:
-        return schema
     new = {}
     for key, value in schema.items():
         if key == "additionalProperties" and isinstance(value, dict):
@@ -116,7 +127,11 @@ def _unrecurse(
                         if context.push(key):
                             replacement = _unrecurse(referenced_item, storage, recursive, context)
                         else:
+                            while "$ref" in referenced_item:
+                                key, _ = _key_for_reference(referenced_item["$ref"])
+                                referenced_item = storage[key]
                             replacement = on_reached_limit(referenced_item, recursive)
+                        context.pop()
                         properties[subkey] = replacement
                     # NOTE: Non-recursive references are left as is
             if properties:
@@ -124,16 +139,41 @@ def _unrecurse(
                     if subkey not in properties:
                         properties[subkey] = subschema
                 new["properties"] = properties
-        elif key == "anyOf":
-            pass
         elif key == "patternProperties":
             pass
         elif key == "propertyNames":
             pass
         elif key in ("contains", "if", "then", "else", "not"):
             pass
-        elif key in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
-            pass
+        elif key in ("anyOf", "allOf", "oneOf", "additionalItems") and isinstance(value, list):
+            new_items = {}
+            for idx, subschema in enumerate(value):
+                if isinstance(subschema, dict):
+                    reference = subschema.get("$ref")
+                    if reference is None:
+                        new_subschema = _unrecurse(subschema, storage, recursive, context)
+                        if new_subschema is not subschema:
+                            new_items[idx] = new_subschema
+                    elif reference in recursive:
+                        k, _ = _key_for_reference(reference)
+                        referenced_item = storage[k]
+                        if context.push(key):
+                            replacement = _unrecurse(referenced_item, storage, recursive, context)
+                        else:
+                            while "$ref" in referenced_item:
+                                k, _ = _key_for_reference(referenced_item["$ref"])
+                                referenced_item = storage[k]
+                            replacement = on_reached_limit(referenced_item, recursive)
+                        context.pop()
+                        new_items[idx] = replacement
+            if new_items:
+                items = []
+                for idx, subschema in enumerate(value):
+                    if idx in new_items:
+                        items.append(new_items[idx])
+                    else:
+                        items.append(subschema)
+                new[key] = items
         else:
             continue
     if not new:

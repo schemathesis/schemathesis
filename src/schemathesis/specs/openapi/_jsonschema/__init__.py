@@ -176,7 +176,7 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         if recursive:
             # Recursive schemas are inlined up to some limit in order to generate self-referential data
             inline_recursive_references(moved_schemas, recursive)
-            config.cache.inlined_schemas.update(recursive)
+            # config.cache.inlined_schemas.update(recursive)
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema

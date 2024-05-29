@@ -57,8 +57,6 @@ def test_iter_operations(raw_schema):
     schema = fast_deepcopy(raw_schema)
     for _ in iter_operations(schema, ""):
         pass
-    for _ in iter_operations(schema, ""):
-        pass
 
 
 @pytest.mark.benchmark

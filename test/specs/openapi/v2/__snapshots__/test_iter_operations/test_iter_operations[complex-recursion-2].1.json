@@ -6,9 +6,13 @@
       "schema": {
         "$ref": "#/x-moved-schemas/-definitions-Put",
         "x-moved-schemas": {
-          "-definitions-Put": {},
+          "-definitions-Put": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
+          },
           "-definitions-Shared-1": {},
-          "-definitions-Shared-2": {}
+          "-definitions-Shared-2": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
+          }
         }
       }
     }

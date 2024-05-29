@@ -45,15 +45,6 @@
                                         "properties": {
                                           "name": {
                                             "type": "string"
-                                          },
-                                          "ref-cycle-2-b": {
-                                            "properties": {
-                                              "email": {
-                                                "type": "string"
-                                              },
-                                              "ref-cycle-2-c": {}
-                                            },
-                                            "type": "object"
                                           }
                                         },
                                         "type": "object"
@@ -90,61 +81,7 @@
                     "type": "string"
                   },
                   "ref-cycle-2-c": {
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "ref-cycle-2-root": {
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "ref-cycle-2-b": {
-                            "properties": {
-                              "email": {
-                                "type": "string"
-                              },
-                              "ref-cycle-2-c": {
-                                "properties": {
-                                  "id": {
-                                    "type": "string"
-                                  },
-                                  "ref-cycle-2-root": {
-                                    "properties": {
-                                      "name": {
-                                        "type": "string"
-                                      },
-                                      "ref-cycle-2-b": {
-                                        "properties": {
-                                          "email": {
-                                            "type": "string"
-                                          },
-                                          "ref-cycle-2-c": {
-                                            "properties": {
-                                              "id": {
-                                                "type": "string"
-                                              },
-                                              "ref-cycle-2-root": {}
-                                            },
-                                            "type": "object"
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
+                    "$ref": "#/x-moved-schemas/-definitions-RefCycle2"
                   }
                 },
                 "type": "object"
@@ -158,69 +95,7 @@
                 "type": "string"
               },
               "ref-cycle-2-c": {
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "ref-cycle-2-root": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      },
-                      "ref-cycle-2-b": {
-                        "properties": {
-                          "email": {
-                            "type": "string"
-                          },
-                          "ref-cycle-2-c": {
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "ref-cycle-2-root": {
-                                "properties": {
-                                  "name": {
-                                    "type": "string"
-                                  },
-                                  "ref-cycle-2-b": {
-                                    "properties": {
-                                      "email": {
-                                        "type": "string"
-                                      },
-                                      "ref-cycle-2-c": {
-                                        "properties": {
-                                          "id": {
-                                            "type": "string"
-                                          },
-                                          "ref-cycle-2-root": {
-                                            "properties": {
-                                              "name": {
-                                                "type": "string"
-                                              },
-                                              "ref-cycle-2-b": {}
-                                            },
-                                            "type": "object"
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle2"
               }
             },
             "type": "object"

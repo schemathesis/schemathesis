@@ -41,8 +41,7 @@
                                             "properties": {
                                               "name": {
                                                 "type": "string"
-                                              },
-                                              "ref": {}
+                                              }
                                             },
                                             "type": "object"
                                           },
@@ -82,66 +81,7 @@
                 "type": "string"
               },
               "ref": {
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "ref": {
-                    "allOf": [
-                      {
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          },
-                          "ref": {
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "ref": {
-                                "allOf": [
-                                  {
-                                    "properties": {
-                                      "name": {
-                                        "type": "string"
-                                      },
-                                      "ref": {
-                                        "properties": {
-                                          "id": {
-                                            "type": "string"
-                                          },
-                                          "ref": {
-                                            "allOf": [
-                                              {},
-                                              {
-                                                "pattern": "^foo"
-                                              }
-                                            ]
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  },
-                                  {
-                                    "pattern": "^foo"
-                                  }
-                                ]
-                              }
-                            },
-                            "type": "object"
-                          }
-                        },
-                        "type": "object"
-                      },
-                      {
-                        "pattern": "^foo"
-                      }
-                    ]
-                  }
-                },
-                "type": "object"
+                "$ref": "#/x-moved-schemas/-definitions-RefCycleAllOf"
               }
             },
             "type": "object"
