@@ -1,16 +1,17 @@
 import json
-from pathlib import Path
 from dataclasses import asdict
+from pathlib import Path
 
 import pytest
-from referencing.jsonschema import DRAFT4
 from jsonschema import Draft7Validator
 from referencing import Registry, Resource
+from referencing.jsonschema import DRAFT4
+from syrupy.extensions.json import JSONSnapshotExtension
 
 from schemathesis.internal.result import Ok
-from schemathesis.specs.openapi._v2 import iter_operations
-from schemathesis.specs.openapi._jsonschema.constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH
 from schemathesis.specs.openapi._jsonschema.cache import TransformCache
+from schemathesis.specs.openapi._jsonschema.constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_KEY_LENGTH
+from schemathesis.specs.openapi._v2 import iter_operations
 from schemathesis.specs.openapi.definitions import SWAGGER_20_VALIDATOR
 
 HERE = Path(__file__).parent.absolute()
@@ -97,7 +98,7 @@ def to_frozen_dict(obj):
     ],
     indirect=True,
 )
-def test_iter_operations(spec, snapshot_json, assert_generates):
+def test_iter_operations(spec, snapshot_json, assert_generates, snapshot):
     cache = TransformCache()
     for operation in iter_operations(spec, "", cache=cache):
         assert isinstance(operation, Ok)
@@ -109,4 +110,8 @@ def test_iter_operations(spec, snapshot_json, assert_generates):
             Draft7Validator.check_schema(param.schema)
             assert_generates(param.schema)
             # assert_no_unused_components(param.schema)
-    list(iter_operations(spec, "", cache=cache))
+    snapshot_json = snapshot.use_extension(JSONSnapshotExtension)
+    for operation in iter_operations(spec, "", cache=cache):
+        assert isinstance(operation, Ok)
+        operation = operation.ok()
+        assert asdict(operation) == snapshot_json
