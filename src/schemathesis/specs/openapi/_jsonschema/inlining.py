@@ -23,6 +23,7 @@ class InlineContext:
     path: list[str] = field(default_factory=list)
     max_depth: int = DEFAULT_MAX_DEPTH
     max_inlinings: int = DEFAULT_MAX_INLININGS
+    cache: dict[str, ObjectSchema] = field(default_factory=dict)
 
     def push(self, reference: str) -> bool:
         """Push the current path and check if the limit is reached."""
@@ -46,14 +47,12 @@ def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: 
     # TODO: pass the list of keys that are actually used
     # TODO: Get full paths to every recursive reference - it will save a lot of time here and there will be
     #       much less traversal needed
-    # TODO: Reuse already inlined schemas. I.e. if a dependency of the current schema is already inlined,
-    #      just reuse it instead of inlining it again. No modifications or traversals at all. OR! Drop it from the list of recursive
-    # TODO: Remove unrecursed schemas during `_unrecurse` as the same ref can appear again there so we need to skip it
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
         new_schema = _unrecurse(schema, referenced_schemas, cache, context)
         if new_schema is not schema:
             cache.recursive_references.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
+            context.cache.clear()
             referenced_schemas[name] = new_schema
 
 
@@ -89,19 +88,23 @@ def _unrecurse(
                             properties[subkey] = new_subschema
                     elif reference in cache.recursive_references:
                         key, _ = _key_for_reference(reference)
-                        referenced_item = storage[key]
-                        if context.push(key):
-                            replacement = _unrecurse(referenced_item, storage, cache, context)
+                        if key in context.cache:
+                            replacement = context.cache[key]
                         else:
-                            while "$ref" in referenced_item:
-                                key, _ = _key_for_reference(referenced_item["$ref"])
-                                referenced_item = storage[key]
-                            if key in cache.unrecursed_schemas:
-                                replacement = cache.unrecursed_schemas[key]
+                            referenced_item = storage[key]
+                            if context.push(key):
+                                replacement = _unrecurse(referenced_item, storage, cache, context)
                             else:
-                                replacement = on_reached_limit(referenced_item, cache)
-                                cache.unrecursed_schemas[key] = replacement
-                        context.pop()
+                                while "$ref" in referenced_item:
+                                    key, _ = _key_for_reference(referenced_item["$ref"])
+                                    referenced_item = storage[key]
+                                if key in cache.unrecursed_schemas:
+                                    replacement = cache.unrecursed_schemas[key]
+                                else:
+                                    replacement = on_reached_limit(referenced_item, cache)
+                                    cache.unrecursed_schemas[key] = replacement
+                            context.cache[key] = replacement
+                            context.pop()
                         properties[subkey] = replacement
                     # NOTE: Non-recursive references are left as is
             if properties:
