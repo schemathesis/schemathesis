@@ -2,10 +2,17 @@ import jsonschema
 import pytest
 
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit
 from schemathesis.specs.openapi._jsonschema.errors import InfiniteRecursionError
+from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit, unrecurse
 
 RECURSIVE_REFERENCE = {"$ref": "#/definitions/Person"}
+RECURSIVE_NESTED = {
+    "type": "object",
+    "properties": {
+        "name": {"type": "string"},
+        "parent": {"$ref": "#/definitions/NestedPerson"},
+    },
+}
 RECURSIVE = set(RECURSIVE_REFERENCE.values())
 
 
@@ -587,3 +594,21 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
 def test_on_reached_limit_non_removable(schema):
     with pytest.raises(InfiniteRecursionError):
         on_reached_limit(schema, RECURSIVE)
+
+
+@pytest.mark.parametrize(
+    "schema",
+    (
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "friend": RECURSIVE_NESTED,
+            },
+        },
+    ),
+)
+def test_unrecurse_(schema, snapshot_json):
+    storage = {"-definitions-Root": schema, "-definitions-NestedPerson": RECURSIVE_NESTED}
+    unrecurse(storage, {"#/definitions/NestedPerson"})
+    assert storage == snapshot_json

@@ -56,6 +56,16 @@ class InlineContext:
     max_depth: int = DEFAULT_MAX_DEPTH
     max_inlinings: int = DEFAULT_MAX_INLININGS
 
+    def push(self, reference: str) -> bool:
+        """Push the current path and check if the limit is reached."""
+        self.path.append(reference)
+        self.total_inlinings += 1
+        return self.total_inlinings < self.max_inlinings and len(self.path) < self.max_depth
+
+    def pop(self) -> None:
+        """Pop the current path."""
+        self.path.pop()
+
 
 def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: InlineContext | None = None) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
@@ -68,14 +78,18 @@ def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: In
     # TODO: pass the list of keys that are actually used
     # TODO: Get full paths to every recursive reference - it will save a lot of time here and there will be
     #       much less traversal needed
+    # TODO: Reuse already inlined schemas. I.e. if a dependency of the current schema is already inlined,
+    #      just reuse it instead of inlining it again. No modifications or traversals at all.
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
-        new_schema = _unrecurse(schema, recursive, context)
+        new_schema = _unrecurse(schema, referenced_schemas, recursive, context)
         if new_schema is not schema:
             referenced_schemas[name] = new_schema
 
 
-def _unrecurse(schema: ObjectSchema, recursive: set[str], context: InlineContext) -> ObjectSchema:
+def _unrecurse(
+    schema: ObjectSchema, storage: MovedSchemas, recursive: set[str], context: InlineContext
+) -> ObjectSchema:
     reference = schema.get("$ref")
     if reference in recursive or not schema:
         return {}
@@ -88,7 +102,28 @@ def _unrecurse(schema: ObjectSchema, recursive: set[str], context: InlineContext
         elif key == "items":
             pass
         elif key == "properties":
-            pass
+            properties = {}
+            for subkey, subschema in value.items():
+                if isinstance(subschema, dict):
+                    reference = subschema.get("$ref")
+                    if reference is None:
+                        new_subschema = _unrecurse(subschema, storage, recursive, context)
+                        if new_subschema is not subschema:
+                            properties[subkey] = new_subschema
+                    elif reference in recursive:
+                        key, _ = _key_for_reference(reference)
+                        referenced_item = storage[key]
+                        if context.push(key):
+                            replacement = _unrecurse(referenced_item, storage, recursive, context)
+                        else:
+                            replacement = on_reached_limit(referenced_item, recursive)
+                        properties[subkey] = replacement
+                    # NOTE: Non-recursive references are left as is
+            if properties:
+                for subkey, subschema in value.items():
+                    if subkey not in properties:
+                        properties[subkey] = subschema
+                new["properties"] = properties
         elif key == "anyOf":
             pass
         elif key == "patternProperties":
@@ -273,6 +308,7 @@ def _on_properties_reached_limit(
                     if new_subschema is not subschema:
                         replacement[subkey] = new_subschema
     if removal or replacement:
+        # TODO: Maybe reuse `replacement`?
         properties = {}
         for key, subschema in schema.items():
             if key in replacement:

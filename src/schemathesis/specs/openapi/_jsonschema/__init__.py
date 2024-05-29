@@ -158,21 +158,25 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     referenced_schemas = to_self_contained_jsonschema(schema, resolver, config)
 
     if referenced_schemas:
+        # Leave only references that are used in this particular schema
+        moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
+        # TODO: Idea - as we know all the referenced schemas, including recursive ones, there is no reason to maintain
+        # mapping of what reference has what recursive references. we just store all recursive references and filter
+        # them from `referenced_schemas` when inlining
+        #
         # Look for recursive references places reachable from the schema
         recursive = set()
         cache = config.cache.recursive_references
         for key in referenced_schemas:
             cached = cache.get(key)
             if cached is not None:
-                recursive.update(cached)
-        # Leave only references that are used in this particular schema
-        moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
+                for item in cached:
+                    if item not in config.cache.inlined_schemas:
+                        recursive.add(item)
         if recursive:
-            # TODO: fix type
-            not_inlined = recursive - config.cache.inlined_schemas
-            if not_inlined:
-                inline_recursive_references(moved_schemas, not_inlined)
-                config.cache.inlined_schemas.update(recursive)
+            # Recursive schemas are inlined up to some limit in order to generate self-referential data
+            inline_recursive_references(moved_schemas, recursive)
+            config.cache.inlined_schemas.update(recursive)
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema
