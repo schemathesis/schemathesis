@@ -5,13 +5,10 @@ import re
 
 from ....internal.result import Err, Ok, Result
 from .constants import MOVED_SCHEMAS_PREFIX
+from .cache import TransformCache
 from .errors import InfiniteRecursionError
 from .keys import _key_for_reference
 from .types import MovedSchemas, ObjectSchema, Schema
-
-
-def inline_recursive_references(referenced_schemas: MovedSchemas, recursive: set[str]) -> None:
-    unrecurse(referenced_schemas, recursive)
 
 
 DEFAULT_MAX_DEPTH = 3
@@ -38,7 +35,7 @@ class InlineContext:
         self.path.pop()
 
 
-def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: InlineContext | None = None) -> None:
+def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: InlineContext | None = None) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
 
     Transformation is done by inlining the referenced schema into the schema that references it up to the
@@ -54,23 +51,23 @@ def unrecurse(referenced_schemas: MovedSchemas, recursive: set[str], context: In
     # TODO: Remove unrecursed schemas during `_unrecurse` as the same ref can appear again there so we need to skip it
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
-        new_schema = _unrecurse(schema, referenced_schemas, recursive, context)
+        new_schema = _unrecurse(schema, referenced_schemas, cache, context)
         if new_schema is not schema:
-            recursive.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
+            cache.recursive_references.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
             referenced_schemas[name] = new_schema
 
 
 def _unrecurse(
-    schema: ObjectSchema, storage: MovedSchemas, recursive: set[str], context: InlineContext
+    schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
 ) -> ObjectSchema:
     reference = schema.get("$ref")
-    if reference in recursive:
+    if reference in cache.recursive_references:
         key, _ = _key_for_reference(reference)
         referenced_item = storage[key]
         if context.push(key):
-            replacement = _unrecurse(referenced_item, storage, recursive, context)
+            replacement = _unrecurse(referenced_item, storage, cache, context)
         else:
-            replacement = on_reached_limit(referenced_item, recursive)
+            replacement = on_reached_limit(referenced_item, cache)
         context.pop()
         return replacement
     if not schema:
@@ -87,19 +84,23 @@ def _unrecurse(
                 if isinstance(subschema, dict):
                     reference = subschema.get("$ref")
                     if reference is None:
-                        new_subschema = _unrecurse(subschema, storage, recursive, context)
+                        new_subschema = _unrecurse(subschema, storage, cache, context)
                         if new_subschema is not subschema:
                             properties[subkey] = new_subschema
-                    elif reference in recursive:
+                    elif reference in cache.recursive_references:
                         key, _ = _key_for_reference(reference)
                         referenced_item = storage[key]
                         if context.push(key):
-                            replacement = _unrecurse(referenced_item, storage, recursive, context)
+                            replacement = _unrecurse(referenced_item, storage, cache, context)
                         else:
                             while "$ref" in referenced_item:
                                 key, _ = _key_for_reference(referenced_item["$ref"])
                                 referenced_item = storage[key]
-                            replacement = on_reached_limit(referenced_item, recursive)
+                            if key in cache.unrecursed_schemas:
+                                replacement = cache.unrecursed_schemas[key]
+                            else:
+                                replacement = on_reached_limit(referenced_item, cache)
+                                cache.unrecursed_schemas[key] = replacement
                         context.pop()
                         properties[subkey] = replacement
                     # NOTE: Non-recursive references are left as is
@@ -120,16 +121,20 @@ def _unrecurse(
                 if isinstance(subschema, dict):
                     reference = subschema.get("$ref")
                     if reference is None:
-                        new_subschema = _unrecurse(subschema, storage, recursive, context)
+                        new_subschema = _unrecurse(subschema, storage, cache, context)
                         if new_subschema is not subschema:
                             new_items[idx] = new_subschema
-                    elif reference in recursive:
+                    elif reference in cache.recursive_references:
                         k, _ = _key_for_reference(reference)
                         referenced_item = storage[k]
                         if context.push(key):
-                            replacement = _unrecurse(referenced_item, storage, recursive, context)
+                            replacement = _unrecurse(referenced_item, storage, cache, context)
                         else:
-                            replacement = on_reached_limit(referenced_item, recursive)
+                            if k in cache.unrecursed_schemas:
+                                replacement = cache.unrecursed_schemas[k]
+                            else:
+                                replacement = on_reached_limit(referenced_item, cache)
+                                cache.unrecursed_schemas[k] = replacement
                         context.pop()
                         new_items[idx] = replacement
             if new_items:
@@ -150,18 +155,17 @@ def _unrecurse(
     return new
 
 
-def on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> ObjectSchema:
+def on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> ObjectSchema:
     """Remove all optional subschemas that lead to recursive references."""
-    # TODO: results of `on_reached_limit` should be cached to avoid recalculating them
-    result = _on_reached_limit(schema, recursive)
+    result = _on_reached_limit(schema, cache)
     if isinstance(result, Ok):
         return result.ok()
     raise result.err()
 
 
-def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[ObjectSchema, InfiniteRecursionError]:
+def _on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[ObjectSchema, InfiniteRecursionError]:
     reference = schema.get("$ref")
-    if reference in recursive or not schema:
+    if reference in cache.recursive_references or not schema:
         return Ok({})
     elif reference is not None:
         return Ok(schema)
@@ -170,27 +174,27 @@ def _on_reached_limit(schema: ObjectSchema, recursive: set[str]) -> Result[Objec
     for key, value in schema.items():
         if key == "additionalProperties" and isinstance(value, dict):
             result = _on_additional_properties_reached_limit(
-                new, value, schema.get("minProperties", 0), schema.get("properties", {}), recursive
+                new, value, schema.get("minProperties", 0), schema.get("properties", {}), cache
             )
         elif key == "items":
-            result = _on_items_reached_limit(new, value, schema.get("minItems", 0), remove_keywords, recursive)
+            result = _on_items_reached_limit(new, value, schema.get("minItems", 0), remove_keywords, cache)
         elif key == "properties":
             required = schema.get("required", [])
-            result = _on_properties_reached_limit(new, value, required, remove_keywords, recursive)
+            result = _on_properties_reached_limit(new, value, required, remove_keywords, cache)
         elif key == "anyOf":
-            result = _on_any_of_reached_limit(new, value, recursive)
+            result = _on_any_of_reached_limit(new, value, cache)
         elif key == "patternProperties":
             result = _on_pattern_properties_reached_limit(
-                new, value, schema.get("properties", {}), schema.get("required", []), remove_keywords, recursive
+                new, value, schema.get("properties", {}), schema.get("required", []), remove_keywords, cache
             )
         elif key == "propertyNames":
             result = _on_property_names_reached_limit(
-                new, value, schema.get("minProperties", 0), remove_keywords, recursive
+                new, value, schema.get("minProperties", 0), remove_keywords, cache
             )
         elif key in ("contains", "if", "then", "else", "not"):
-            result = _on_schema_reached_limit(new, value, key, recursive, allow_modification=key != "not")
+            result = _on_schema_reached_limit(new, value, key, cache, allow_modification=key != "not")
         elif key in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
-            result = _on_list_of_schemas_reached_limit(new, value, key, recursive)
+            result = _on_list_of_schemas_reached_limit(new, value, key, cache)
         else:
             continue
         if isinstance(result, Err):
@@ -208,14 +212,14 @@ def _on_additional_properties_reached_limit(
     schema: ObjectSchema,
     min_properties: int,
     properties: dict[str, Schema],
-    recursive: set[str],
+    cache: TransformCache,
 ) -> Result[None, InfiniteRecursionError]:
-    if schema.get("$ref") in recursive:
+    if schema.get("$ref") in cache.recursive_references:
         if min_properties > len(properties):
             return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
         new["additionalProperties"] = False
     else:
-        result = _on_reached_limit(schema, recursive)
+        result = _on_reached_limit(schema, cache)
         if isinstance(result, Err):
             if min_properties > len(properties):
                 return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
@@ -232,16 +236,16 @@ def _on_items_reached_limit(
     schema: ObjectSchema | list[Schema],
     min_items: int,
     remove_keywords: list[str],
-    recursive: set[str],
+    cache: TransformCache,
 ) -> Result[None, InfiniteRecursionError]:
     if isinstance(schema, dict):
-        if schema.get("$ref") in recursive:
+        if schema.get("$ref") in cache.recursive_references:
             if min_items > 0:
                 return Err(InfiniteRecursionError("Infinite recursion in items"))
             new["maxItems"] = 0
             remove_keywords.append("items")
         else:
-            result = _on_reached_limit(schema, recursive)
+            result = _on_reached_limit(schema, cache)
             if isinstance(result, Err):
                 if min_items > 0:
                     return Err(InfiniteRecursionError("Infinite recursion in items"))
@@ -254,7 +258,7 @@ def _on_items_reached_limit(
     elif isinstance(schema, list):
         for idx, subschema in enumerate(schema):
             if isinstance(subschema, dict):
-                if subschema.get("$ref") in recursive:
+                if subschema.get("$ref") in cache.recursive_references:
                     if min_items > idx:
                         return Err(InfiniteRecursionError("Infinite recursion in items"))
                     new["maxItems"] = idx
@@ -267,19 +271,19 @@ def _on_items_reached_limit(
 
 
 def _on_property_names_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], recursive: set[str]
+    new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     def forbid() -> None:
         new["maxProperties"] = 0
         remove_keywords.append("propertyNames")
         return None
 
-    if schema.get("$ref") in recursive:
+    if schema.get("$ref") in cache.recursive_references:
         if min_properties > 0:
             return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
         forbid()
     else:
-        result = _on_reached_limit(schema, recursive)
+        result = _on_reached_limit(schema, cache)
         if isinstance(result, Err):
             if min_properties > 0:
                 return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
@@ -292,19 +296,19 @@ def _on_property_names_reached_limit(
 
 
 def _on_properties_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, required: list[str], remove_keywords: list[str], recursive: set[str]
+    new: ObjectSchema, schema: ObjectSchema, required: list[str], remove_keywords: list[str], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     removal = []
     replacement = {}
     for subkey, subschema in schema.items():
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in recursive:
+            if subschema.get("$ref") in cache.recursive_references:
                 if subkey in required:
                     return Err(InfiniteRecursionError(f"Infinite recursion in the required property: {subkey}"))
                 # New schema should not have this property
                 removal.append(subkey)
             else:
-                result = _on_reached_limit(subschema, recursive)
+                result = _on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
                     if subkey in required:
                         return result
@@ -314,15 +318,11 @@ def _on_properties_reached_limit(
                     if new_subschema is not subschema:
                         replacement[subkey] = new_subschema
     if removal or replacement:
-        # TODO: Maybe reuse `replacement`?
-        properties = {}
         for key, subschema in schema.items():
-            if key in replacement:
-                properties[key] = replacement[key]
-            elif key not in removal:
-                properties[key] = subschema
-        if properties:
-            new["properties"] = properties
+            if key not in replacement and key not in removal:
+                replacement[key] = subschema
+        if replacement:
+            new["properties"] = replacement
         else:
             remove_keywords.append("properties")
     return Ok(None)
@@ -334,19 +334,19 @@ def _on_pattern_properties_reached_limit(
     pattern_properties: dict[str, Schema],
     required: list[str],
     remove_keywords: list[str],
-    recursive: set[str],
+    cache: TransformCache,
 ) -> Result[None, InfiniteRecursionError]:
     removal = []
     replacement = {}
     for pattern, subschema in schema.items():
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in recursive:
+            if subschema.get("$ref") in cache.recursive_references:
                 if any(re.match(pattern, entry) for entry in required):
                     return Err(InfiniteRecursionError(f"Infinite recursion in {pattern}"))
                 # This pattern should be removed from `patternProperties`
                 removal.append(pattern)
             else:
-                result = _on_reached_limit(subschema, recursive)
+                result = _on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
                     if any(re.match(pattern, entry) for entry in required):
                         return result
@@ -356,30 +356,27 @@ def _on_pattern_properties_reached_limit(
                     if new_subschema is not subschema:
                         replacement[pattern] = new_subschema
     if removal or replacement:
-        pattern_properties = {}
         for pattern, subschema in schema.items():
-            if pattern in replacement:
-                pattern_properties[pattern] = replacement[pattern]
-            elif pattern not in removal:
-                pattern_properties[pattern] = subschema
-        if pattern_properties:
-            new["patternProperties"] = pattern_properties
+            if pattern not in removal and pattern not in replacement:
+                replacement[pattern] = subschema
+        if replacement:
+            new["patternProperties"] = replacement
         else:
             remove_keywords.append("patternProperties")
     return Ok(None)
 
 
 def _on_any_of_reached_limit(
-    new: ObjectSchema, schema: list[Schema], recursive: set[str]
+    new: ObjectSchema, schema: list[Schema], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     removal: list[int] = []
     replacement: dict[int, Schema] = {}
     for idx, subschema in enumerate(schema):
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in recursive:
+            if subschema.get("$ref") in cache.recursive_references:
                 removal.append(idx)
             else:
-                result = _on_reached_limit(subschema, recursive)
+                result = _on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
                     removal.append(idx)
                 else:
@@ -400,11 +397,11 @@ def _on_any_of_reached_limit(
 
 
 def _on_schema_reached_limit(
-    new: ObjectSchema, schema: ObjectSchema, key: str, recursive: set[str], allow_modification: bool = True
+    new: ObjectSchema, schema: ObjectSchema, key: str, cache: TransformCache, allow_modification: bool = True
 ) -> Result[None, InfiniteRecursionError]:
-    if schema.get("$ref") in recursive:
+    if schema.get("$ref") in cache.recursive_references:
         return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
-    result = _on_reached_limit(schema, recursive)
+    result = _on_reached_limit(schema, cache)
     if isinstance(result, Err):
         return result
     new_subschema = result.ok()
@@ -418,15 +415,15 @@ def _on_schema_reached_limit(
 
 
 def _on_list_of_schemas_reached_limit(
-    new: ObjectSchema, schema: list[ObjectSchema], key: str, recursive: set[str]
+    new: ObjectSchema, schema: list[ObjectSchema], key: str, cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     replacement = {}
     for idx, subschema in enumerate(schema):
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in recursive:
+            if subschema.get("$ref") in cache.recursive_references:
                 return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
             else:
-                result = _on_reached_limit(subschema, recursive)
+                result = _on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
                     return result
                 new_subschema = result.ok()

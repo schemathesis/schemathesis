@@ -17,3 +17,4 @@ class TransformCache:
     inlined_schemas: set[SchemaKey] = field(default_factory=set)
     # References to parameter definitions
     parameter_lookups: dict[ParameterReferenceCacheKey, Resolved] = field(default_factory=dict)
+    unrecursed_schemas: dict[SchemaKey, ObjectSchema] = field(default_factory=dict)

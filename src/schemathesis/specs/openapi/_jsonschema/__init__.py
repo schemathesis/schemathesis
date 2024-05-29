@@ -14,7 +14,7 @@ from referencing.exceptions import Unresolvable, Unretrievable
 from ....constants import DEFAULT_RESPONSE_TIMEOUT
 from ....loaders import load_yaml
 from .iteration import iter_subschemas
-from .inlining import inline_recursive_references
+from .inlining import unrecurse
 from .config import TransformConfig
 from .keys import _key_for_reference, _make_moved_reference
 from .constants import MOVED_SCHEMAS_KEY, MOVED_SCHEMAS_PREFIX, PLAIN_KEYWORDS
@@ -163,7 +163,7 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
         # Look for recursive references places reachable from the schema
         if config.cache.recursive_references:
             # Recursive schemas are inlined up to some limit in order to generate self-referential data
-            inline_recursive_references(moved_schemas, config.cache.recursive_references)
+            unrecurse(moved_schemas, config.cache)
         schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema

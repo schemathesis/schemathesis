@@ -4,6 +4,7 @@ import pytest
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi._jsonschema.errors import InfiniteRecursionError
 from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit, unrecurse
+from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 RECURSIVE_REFERENCE = {"$ref": "#/definitions/Person"}
 RECURSIVE_NESTED = {
@@ -24,9 +25,6 @@ def can_validate(request):
         "anyOf-1st",
         "allOf-nested",
     )
-
-
-# TODO: Run this on some corpus
 
 
 def get_by_path(schema, path):
@@ -433,7 +431,7 @@ def get_by_path(schema, path):
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
     original = schema
     schema = fast_deepcopy(schema)
-    unrecursed = on_reached_limit(schema, RECURSIVE)
+    unrecursed = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
     assert unrecursed == snapshot_json
     for path in same_objects:
         if path and isinstance(path[0], tuple):
@@ -593,7 +591,7 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
 )
 def test_on_reached_limit_non_removable(schema):
     with pytest.raises(InfiniteRecursionError):
-        on_reached_limit(schema, RECURSIVE)
+        on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
 
 
 @pytest.mark.parametrize(
@@ -610,5 +608,6 @@ def test_on_reached_limit_non_removable(schema):
 )
 def test_unrecurse_(schema, snapshot_json):
     storage = {"-definitions-Root": schema, "-definitions-NestedPerson": RECURSIVE_NESTED}
-    unrecurse(storage, {"#/definitions/NestedPerson"})
+    cache = TransformCache(recursive_references={"#/definitions/NestedPerson"})
+    unrecurse(storage, cache)
     assert storage == snapshot_json
