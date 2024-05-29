@@ -112,10 +112,6 @@ def _should_skip(schema: ObjectSchema) -> bool:
     return False
 
 
-META = {"total": 0, "unique": 0, "iter_schema": 0, "dfs": 0, "inline": 0}
-UNIQUE = set()
-
-
 def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformConfig) -> ObjectSchema:
     """Transform the given schema to a JSON Schema.
 
@@ -179,88 +175,46 @@ def to_self_contained_jsonschema(
 ) -> set[SchemaKey]:
     """Moves all references to the root of the schema and returns the set of all referenced schemas."""
     referenced = set()
-    # The goal is to find what schemas are reachable from each schema which is done by running DFS
-    # on each schema that contains a reference. The result is a set of all referenced schemas.
-    for reference, schema, resolver in iter_schema(root, root_resolver, config):
-        traverse_schema(schema, resolver, referenced, config)
-        key, _ = _key_for_reference(reference)
-        referenced.add(key)
-    return referenced
-
-
-def traverse_schema(
-    schema: ObjectSchema, resolver: Resolver, referenced: set[SchemaKey], config: TransformConfig
-) -> None:
-    """Traverse the schema by using DFS and replace all references with their contents."""
-    reference = schema.get("$ref")
-    if isinstance(reference, str):
-        key, is_moved = _key_for_reference(reference)
-        if key in referenced:
-            return
-        referenced.add(key)
-        if is_moved:
-            # Reference has already been moved, don't replace it
-            # Traversal is needed for recursive references
-            resolved_schema = config.cache.moved_schemas[key]
-            return
-        else:
-            # Unprocessed reference, move the target
-            resolved = resolver.lookup(reference)
-            resolved_schema = resolved.contents
-            resolver = resolved.resolver
-            # Replace the reference
-            moved_reference = _make_moved_reference(key)
-            schema["$ref"] = moved_reference
-            # Update caches
-            config.cache.moved_schemas[key] = resolved_schema
-            config.cache.replaced_references[moved_reference] = reference
-        traverse_schema(resolved_schema, resolver, referenced, config)
-    else:
-        # Traverse subschemas
-        for subschema in iter_subschemas(schema):
-            traverse_schema(subschema, resolver, referenced, config)
-
-
-def iter_schema(
-    root: ObjectSchema, resolver: Resolver, config: TransformConfig
-) -> Iterable[tuple[str, ObjectSchema, Resolver]]:
-    """Iterate over all schemas reachable from the given schema."""
-    stack: list[tuple[ObjectSchema, Resolver, list[str]]] = [(root, resolver, [])]
-    visited = set()
+    stack: list[tuple[ObjectSchema, Resolver, list[str]]] = [(root, root_resolver, [])]
     while stack:
         schema, resolver, path = stack.pop()
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            if reference in path:
+            key, is_moved = _key_for_reference(reference)
+            if not reference.startswith(MOVED_SCHEMAS_PREFIX):
+                moved_reference = _make_moved_reference(key)
+                schema["$ref"] = moved_reference
+            else:
+                moved_reference = reference
+            if moved_reference in path:
                 # This reference is recursive forming a cycle in `path`
                 # Each reference in the cycle is also recursive as it can form the same cycle by
                 # traversal a schema that uses that reference
-                idx = path.index(reference)
+                idx = path.index(moved_reference)
                 cycle = path[idx:]
                 config.cache.recursive_references.update(cycle)
             else:
-                key, _ = _key_for_reference(reference)
                 moved = config.cache.moved_schemas.get(key)
                 if moved is not None:
-                    if not reference.startswith(MOVED_SCHEMAS_PREFIX):
-                        # The referenced schema was already moved, but not all usages of this reference were updated
-                        moved_reference = _make_moved_reference(key)
-                        schema["$ref"] = moved_reference
-                        reference = moved_reference
-                    schema = moved
-                    yield reference, schema, resolver
+                    resolved_schema = moved
                 else:
-                    yield reference, schema, resolver
                     resolved = resolver.lookup(reference)
-                    schema = resolved.contents
+                    resolved_schema = resolved.contents
                     resolver = resolved.resolver
-                    reference = _make_moved_reference(key)
-                visited.add(key)
-                stack.append((schema, resolver, path + [reference]))
+                    moved_reference = _make_moved_reference(key)
+                    schema["$ref"] = moved_reference
+                    config.cache.moved_schemas[key] = resolved_schema
+                    config.cache.replaced_references[moved_reference] = reference
+                    reference = moved_reference
+                if key in referenced:
+                    continue
+                referenced.add(key)
+                stack.append((resolved_schema, resolver, path + [moved_reference]))
         else:
             transform_schema(schema, config)
             for subschema in iter_subschemas(schema):
                 stack.append((subschema, resolver, path))
+    return referenced
 
 
 def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resource]:
