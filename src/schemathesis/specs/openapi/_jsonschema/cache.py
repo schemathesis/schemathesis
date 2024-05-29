@@ -9,7 +9,6 @@ from .types import MovedSchemas, ObjectSchema, Resolved, SchemaKey, ParameterRef
 class TransformCache:
     # Schemas that were referenced and therefore moved to the root of the schema
     moved_schemas: MovedSchemas = field(default_factory=dict)
-    replaced_references: dict[str, str] = field(default_factory=dict)
     # Known recursive references
     recursive_references: set[str] = field(default_factory=set)
     # Already transformed schemas

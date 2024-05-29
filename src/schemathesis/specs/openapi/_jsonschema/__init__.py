@@ -180,7 +180,7 @@ def to_self_contained_jsonschema(
         schema, resolver, path = stack.pop()
         reference = schema.get("$ref")
         if isinstance(reference, str):
-            key, is_moved = _key_for_reference(reference)
+            key, _ = _key_for_reference(reference)
             if not reference.startswith(MOVED_SCHEMAS_PREFIX):
                 moved_reference = _make_moved_reference(key)
                 schema["$ref"] = moved_reference
@@ -191,9 +191,11 @@ def to_self_contained_jsonschema(
                 # Each reference in the cycle is also recursive as it can form the same cycle by
                 # traversal a schema that uses that reference
                 idx = path.index(moved_reference)
-                cycle = path[idx:]
-                config.cache.recursive_references.update(cycle)
+                config.cache.recursive_references.update(path[idx:])
             else:
+                if key in referenced:
+                    continue
+                referenced.add(key)
                 moved = config.cache.moved_schemas.get(key)
                 if moved is not None:
                     resolved_schema = moved
@@ -201,14 +203,8 @@ def to_self_contained_jsonschema(
                     resolved = resolver.lookup(reference)
                     resolved_schema = resolved.contents
                     resolver = resolved.resolver
-                    moved_reference = _make_moved_reference(key)
                     schema["$ref"] = moved_reference
                     config.cache.moved_schemas[key] = resolved_schema
-                    config.cache.replaced_references[moved_reference] = reference
-                    reference = moved_reference
-                if key in referenced:
-                    continue
-                referenced.add(key)
                 stack.append((resolved_schema, resolver, path + [moved_reference]))
         else:
             transform_schema(schema, config)
