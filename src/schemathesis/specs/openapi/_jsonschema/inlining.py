@@ -43,7 +43,7 @@ def _inline_recursive_references(
         _inline_recursive_references(subschema, referenced_schemas, recursive, path)
 
 
-DEFAULT_MAX_DEPTH = 2
+DEFAULT_MAX_DEPTH = 3
 DEFAULT_MAX_INLININGS = 100
 
 
