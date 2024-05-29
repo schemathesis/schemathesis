@@ -131,7 +131,10 @@ def iter_operations(
         components=components,
         cache=cache or TransformCache(),
     )
-    spec.setdefault(MOVED_SCHEMAS_KEY, config.cache.moved_schemas)
+    if MOVED_SCHEMAS_KEY not in spec:
+        spec[MOVED_SCHEMAS_KEY] = config.cache.moved_schemas
+    elif not config.cache.moved_schemas:
+        config.cache.moved_schemas = spec[MOVED_SCHEMAS_KEY]
     paths = spec["paths"]
     global_media_types = spec.get("consumes", [])
     for path, path_item_or_ref in paths.items():

@@ -201,6 +201,7 @@ def to_self_contained_jsonschema(
                     resolved_schema = moved
                 else:
                     if reference.startswith("#/definitions/"):
+                        # TODO: properly support other locations
                         resolved_schema = config.components["definitions"][reference[len("#/definitions/") :]]
                     else:
                         resolved = resolver.lookup(reference)
