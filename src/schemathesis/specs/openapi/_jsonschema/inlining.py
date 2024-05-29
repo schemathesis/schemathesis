@@ -140,6 +140,8 @@ def _unrecurse(
                             if k in cache.unrecursed_schemas:
                                 replacement = cache.unrecursed_schemas[k]
                             else:
+                                # TODO: Handle recursion error - it still should be propagated here and this property
+                                #      should be removed similar to the logic in `on_reached_limit`
                                 replacement = on_reached_limit(referenced_item, cache)
                                 cache.unrecursed_schemas[k] = replacement
                         context.pop()
@@ -311,7 +313,7 @@ def _on_properties_reached_limit(
         if isinstance(subschema, dict):
             if subschema.get("$ref") in cache.recursive_references:
                 if subkey in required:
-                    return Err(InfiniteRecursionError(f"Infinite recursion in the required property: {subkey}"))
+                    return Err(InfiniteRecursionError(f"Infinite recursion in a required property: {subkey}"))
                 # New schema should not have this property
                 removal.append(subkey)
             else:

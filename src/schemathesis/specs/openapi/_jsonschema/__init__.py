@@ -200,9 +200,12 @@ def to_self_contained_jsonschema(
                 if moved is not None:
                     resolved_schema = moved
                 else:
-                    resolved = resolver.lookup(reference)
-                    resolved_schema = resolved.contents
-                    resolver = resolved.resolver
+                    if reference.startswith("#/definitions/"):
+                        resolved_schema = config.components["definitions"][reference[len("#/definitions/") :]]
+                    else:
+                        resolved = resolver.lookup(reference)
+                        resolved_schema = resolved.contents
+                        resolver = resolved.resolver
                     schema["$ref"] = moved_reference
                     config.cache.moved_schemas[key] = resolved_schema
                 stack.append((resolved_schema, resolver, path + [moved_reference]))
