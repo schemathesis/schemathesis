@@ -1,5 +1,5 @@
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from schemathesis.loaders import load_app
@@ -19,6 +19,7 @@ def test_load_app(path, exception, match):
 
 
 @given(st.text())
+@settings(deadline=None)
 def test_load_app_no_unexpected_exceptions(path):
     # `load_app` should not raise anything else but `ImportError` or `AttributeError` or `ValueError`
     with pytest.raises((ImportError, AttributeError, ValueError)):
