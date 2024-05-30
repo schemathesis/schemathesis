@@ -22,31 +22,6 @@ from .transformation import transform_schema
 from .types import ObjectSchema, Resolver, SchemaKey
 
 
-def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
-    """Load a schema from the given file."""
-    with opener(location) as fd:
-        return load_yaml(fd)
-
-
-@lru_cache
-def load_file(location: str) -> dict[str, Any]:
-    """Load a schema from the given file."""
-    return load_file_impl(location, open)
-
-
-@lru_cache
-def load_file_uri(location: str) -> dict[str, Any]:
-    """Load a schema from the given file uri."""
-    return load_file_impl(location, urlopen)
-
-
-@lru_cache
-def load_remote_uri(uri: str) -> Any:
-    """Load the resource and parse it as YAML / JSON."""
-    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
-    return load_yaml(response.content)
-
-
 def dynamic_scope(resolver: Resolver) -> tuple[str, ...]:
     return tuple(uri for uri, _ in resolver.dynamic_scope())
 
@@ -223,28 +198,26 @@ def get_remote_schema_retriever(draft: Specification) -> Callable[[str], Resourc
     @referencing.retrieval.to_cached_resource(loads=lambda x: x, from_contents=draft.create_resource)  # type: ignore[misc]
     def cached_retrieve(ref: str) -> Any:
         """Resolve non-local reference."""
-        logger.debug("Retrieving %s", ref)
         parsed = urlsplit(ref)
-        try:
-            if parsed.scheme == "":
-                return retrieve_from_file(ref)
-            if parsed.scheme == "file":
-                return retrieve_from_file(parsed.path)
-            if parsed.scheme in ("http", "https"):
-                retrieved = load_remote_uri(ref)
-                logger.debug("Retrieved %s", ref)
-                return retrieved
-        except Exception as exc:
-            logger.debug("Failed to retrieve %s: %s", ref, exc)
-            raise
-        logger.debug("Unretrievable %s", ref)
+        if parsed.scheme == "":
+            return load_file(ref, open)
+        if parsed.scheme == "file":
+            return load_file(parsed.netloc, open)
+        if parsed.scheme in ("http", "https"):
+            return load_remote_uri(ref)
         raise Unretrievable(ref)
 
     return cached_retrieve
 
 
-def retrieve_from_file(url: str) -> Any:
-    url = url.rstrip("/")
-    retrieved = load_file_impl(url, open)
-    logger.debug("Retrieved %s", url)
-    return retrieved
+def load_file(location: str, opener: Callable) -> dict[str, Any]:
+    """Load a schema from the given file."""
+    with opener(location) as fd:
+        return load_yaml(fd)
+
+
+@lru_cache
+def load_remote_uri(uri: str) -> Any:
+    """Load the resource and parse it as YAML / JSON."""
+    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
+    return load_yaml(response.content)

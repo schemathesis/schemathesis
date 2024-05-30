@@ -1,15 +1,21 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from itertools import permutations
 from typing import Any
 
 import pytest
+import yaml
 from referencing import Registry, Resource
 from referencing.jsonschema import DRAFT4
 
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.specs.openapi._jsonschema import TransformConfig, to_self_contained_jsonschema
+from schemathesis.specs.openapi._jsonschema import (
+    TransformConfig,
+    to_self_contained_jsonschema,
+    get_remote_schema_retriever,
+)
 from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 
@@ -73,6 +79,17 @@ def non_recursive_with_multiple_refs() -> Context:
             }
         }
     )
+
+
+@pytest.fixture(
+    params=[
+        "./shared.json#/definitions/A",
+        "file://shared.json#/definitions/A",
+        "shared.yml#/definitions/A",
+    ]
+)
+def non_recursive_with_relative_file(request):
+    return {"definitions": {"A": {"$ref": request.param}}}
 
 
 @pytest.fixture
@@ -200,7 +217,8 @@ def build_config(spec):
 
 
 def build_resolver(spec):
-    registry = Registry().with_resource("", Resource(contents=spec, specification=DRAFT4))
+    retrieve = get_remote_schema_retriever(DRAFT4)
+    registry = Registry(retrieve=retrieve).with_resource("", Resource(contents=spec, specification=DRAFT4))
     return registry.resolver()
 
 
@@ -253,6 +271,32 @@ def test_non_recursive_with_multiple_refs(ctx: Context):
         "-definitions-B": {"type": "string"},
     }
     assert not ctx.config.cache.recursive_references
+
+
+def test_non_recursive_with_relative_file(testdir, non_recursive_with_relative_file):
+    filename = non_recursive_with_relative_file["definitions"]["A"]["$ref"].split("#")[0]
+    if filename.startswith("file://"):
+        filename = filename[7:].lstrip("./")
+    filename, extension = filename.rsplit(".", 1)
+    referenced = {
+        "definitions": {
+            "A": {
+                "type": "object",
+                "properties": {
+                    "first": {"type": "string"},
+                },
+            }
+        },
+    }
+    if filename.endswith(".yml"):
+        content = yaml.dumps(referenced)
+    else:
+        content = json.dumps(referenced)
+    testdir.makefile(extension, **{filename: content})
+    ctx = Context.from_spec(non_recursive_with_relative_file)
+    visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
+    expected = f"{filename}.{extension}-definitions-A".replace("/", "-")
+    assert visited == {"-definitions-A", expected}
 
 
 @pytest.mark.schema("schema_transformation")
