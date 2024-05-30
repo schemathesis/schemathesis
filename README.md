@@ -264,6 +264,10 @@ Schemathesis is used by a number of project and companies, including direct usag
 
 ### Articles
 
+- [Implementing Schemathesis at PayLead](https://medium.com/paylead/implementing-schemathesis-at-paylead-a469a5d43626) by **Jérémy Pelletier** at **PayLead**
+  - **Description**: In-depth walkthrough including custom hooks, stateful testing and CI/CD integration.
+  - **Date**: 29 May 2024
+
 - [Auto-Generating & Validating OpenAPI Docs in Rust: A Streamlined Approach with Utoipa and Schemathesis](https://identeco.de/en/blog/generating_and_validating_openapi_docs_in_rust/) by **identeco**
   - **Description**: Demonstrates OpenAPI doc generation with Utoipa and validating it with Schemathesis.
   - **Date**: 01 Jun 2023
