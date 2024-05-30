@@ -436,6 +436,8 @@ def _build_custom_formats(
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
     if generation_config.headers.strategy is not None:
         custom_formats[HEADER_FORMAT] = generation_config.headers.strategy
+    elif not generation_config.allow_x00:
+        custom_formats[HEADER_FORMAT] = header_values(blacklist_characters="\n\r\x00")
     return custom_formats
 
 

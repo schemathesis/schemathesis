@@ -1,8 +1,13 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.28.1...HEAD>` - TBD
+:version:`Unreleased <v3.29.0...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.29.0:
+
+:version:`3.29.0 <v3.28.1...v3.29.0>` - 2024-05-30
+--------------------------------------------------
 
 **Changed**:
 
@@ -14,6 +19,8 @@ Changelog
 - ``OperationNotFound`` raised in ``schema.get_operation_by_id`` if the relevant path item is behind a reference.
 - Missing parameters shared under the same path in stateful testing if the path is behind a reference.
 - ``KeyError`` instead of ``OperationNotFound`` when the operation ID is not found in Open API 3.1 without path entries.
+- Not respecting ``allow_x00=False`` in headers and cookies. :issue:`2220`
+- Internal error when building an error message for some network-related issues. :issue:`2219`
 
 **Performance**
 
