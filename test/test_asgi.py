@@ -1,7 +1,8 @@
+import sys
 from contextlib import asynccontextmanager
 
 import pytest
-from fastapi import Cookie, FastAPI
+from fastapi import Cookie, FastAPI, Header
 from hypothesis import HealthCheck, Phase, given, settings
 from pydantic import BaseModel
 
@@ -69,6 +70,37 @@ def test_null_byte(fastapi_app):
     def post_create(payload: Payload):
         payload = payload.model_dump()
         assert "\x00" not in payload["name"]
+        return {"success": True}
+
+    schema = schemathesis.from_asgi(
+        "/openapi.json", app=fastapi_app, generation_config=GenerationConfig(allow_x00=False)
+    )
+
+    strategy = schema["/data"]["POST"].as_strategy()
+
+    @given(case=strategy)
+    @settings(
+        max_examples=50, suppress_health_check=[HealthCheck.filter_too_much], deadline=None, phases=[Phase.generate]
+    )
+    def test(case):
+        response = case.call()
+        assert response.status_code == 200
+        assert response.json() == {"success": True}
+
+    test()
+
+
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
+@pytest.mark.hypothesis_nested
+def test_null_byte_in_headers(fastapi_app):
+    from typing import Annotated
+
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    @fastapi_app.post("/data")
+    def operation(x_header: Annotated[str, Header()], x_cookie: Annotated[str, Cookie()]):
+        assert "\x00" not in x_header
+        assert "\x00" not in x_cookie
         return {"success": True}
 
     schema = schemathesis.from_asgi(
