@@ -78,7 +78,7 @@ def _unrecurse(
         if key == "additionalProperties" and isinstance(value, dict):
             _unrecurse_additional_properties(new, value, storage, cache, context)
         elif key == "items":
-            pass
+            _unrecurse_items(new, value, storage, cache, context)
         elif key == "properties":
             _unrecurse_properties(new, value, storage, cache, context)
         elif key == "patternProperties":
