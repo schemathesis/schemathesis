@@ -601,10 +601,30 @@ def test_on_reached_limit_non_removable(schema):
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
+                "foo": True,
+            },
+        },
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
                 "friend": RECURSIVE_NESTED,
             },
         },
+        {
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "first": RECURSIVE_NESTED,
+                "second": RECURSIVE_NESTED,
+            },
+        },
     ),
+    ids=[
+        "properties-no-change",
+        "properties-direct",
+        "properties-multiple-recursive-refs",
+    ],
 )
 def test_unrecurse_(schema, snapshot_json):
     storage = {"-definitions-Root": schema, "-definitions-NestedPerson": RECURSIVE_NESTED}
