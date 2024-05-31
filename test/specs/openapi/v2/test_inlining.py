@@ -655,6 +655,13 @@ def test_on_reached_limit_non_removable(schema):
                 RECURSIVE_NESTED_REFERENCE,
             ]
         },
+        {
+            "anyOf": [
+                {"type": "object"},
+                {"$ref": "#/definitions/A"},
+                {"$ref": "#/definitions/A"},
+            ]
+        },
     ),
     ids=[
         "properties-no-change",
@@ -664,10 +671,16 @@ def test_on_reached_limit_non_removable(schema):
         "any-of-nested-recursive",
         "any-of-non-recursive",
         "any-of-multiple-recursive-refs",
+        "any-of-mutual-recursion",
     ],
 )
 def test_unrecurse_(schema, snapshot_json):
-    storage = {"-definitions-Root": schema, "-definitions-NestedPerson": RECURSIVE_NESTED}
-    cache = TransformCache(recursive_references={"#/definitions/NestedPerson"})
+    storage = {
+        "-definitions-Root": schema,
+        "-definitions-NestedPerson": RECURSIVE_NESTED,
+        "-definitions-A": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/B"}]},
+        "-definitions-B": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/A"}]},
+    }
+    cache = TransformCache(recursive_references={"#/definitions/NestedPerson", "#/definitions/A", "#/definitions/B"})
     unrecurse(storage, cache)
     assert storage["-definitions-Root"] == snapshot_json

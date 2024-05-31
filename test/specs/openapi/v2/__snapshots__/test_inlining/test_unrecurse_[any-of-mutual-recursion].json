@@ -1,0 +1,49 @@
+{
+  "anyOf": [
+    {
+      "type": "object"
+    },
+    {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "object"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "anyOf": [
+        {
+          "type": "object"
+        },
+        {
+          "anyOf": [
+            {
+              "type": "object"
+            },
+            {
+              "anyOf": [
+                {
+                  "type": "object"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

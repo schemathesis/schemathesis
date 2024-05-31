@@ -44,9 +44,7 @@ def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: 
     that lead to the recursive reference are removed from the schema. If all such subschemas are required,
     which means infinite recursion, an error is raised.
     """
-    # TODO: pass the list of keys that are actually used
-    # TODO: Get full paths to every recursive reference - it will save a lot of time here and there will be
-    #       much less traversal needed
+    # TODO: Get a list of paths to every recursive reference and use it instead of full traversal
     context = context or InlineContext()
     for name, schema in referenced_schemas.items():
         if name in cache.inlined_schemas:
