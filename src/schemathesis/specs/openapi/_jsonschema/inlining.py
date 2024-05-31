@@ -5,11 +5,10 @@ import re
 from typing import Mapping, Any
 
 from ....internal.result import Err, Ok, Result
-from .constants import MOVED_SCHEMAS_PREFIX
 from .cache import TransformCache
 from .errors import InfiniteRecursionError
-from .keys import _key_for_reference
-from .types import MovedSchemas, ObjectSchema, Schema
+from .keys import _key_for_reference, _make_moved_reference
+from .types import MovedSchemas, ObjectSchema, Schema, SchemaKey
 
 
 DEFAULT_MAX_DEPTH = 3
@@ -17,14 +16,15 @@ DEFAULT_MAX_INLININGS = 100
 
 
 @dataclass
-class InlineContext:
-    """Context for inlining recursive references."""
+class UnrecurseContext:
+    """Context for unrecursing schemas with recursive references."""
 
+    transform_cache: TransformCache
     total_inlinings: int = 0
     path: list[str] = field(default_factory=list)
     max_depth: int = DEFAULT_MAX_DEPTH
     max_inlinings: int = DEFAULT_MAX_INLININGS
-    cache: dict[str, ObjectSchema] = field(default_factory=dict)
+    local_cache: dict[str, ObjectSchema] = field(default_factory=dict)
 
     def push(self, reference: str) -> bool:
         """Push the current path and check if the limit is reached."""
@@ -36,8 +36,25 @@ class InlineContext:
         """Pop the current path."""
         self.path.pop()
 
+    def reset(self) -> None:
+        """Reset the context."""
+        self.total_inlinings = 0
+        self.local_cache.clear()
 
-def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache) -> None:
+    def get_cached_replacement(self, key: SchemaKey) -> ObjectSchema | None:
+        return self.local_cache.get(key)
+
+    def set_cached_replacement(self, key: SchemaKey, replacement: ObjectSchema) -> None:
+        self.local_cache[key] = replacement
+
+    def is_unrecursed(self, key: SchemaKey) -> bool:
+        return key in self.transform_cache.unrecursed_schemas
+
+    def discard_recursive_reference(self, key: SchemaKey) -> None:
+        self.transform_cache.recursive_references.discard(_make_moved_reference(key))
+
+
+def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
 
     Transformation is done by inlining the referenced schema into the schema that references it up to the
@@ -46,34 +63,30 @@ def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache) -> None:
     which means infinite recursion, an error is raised.
     """
     # TODO: Get a list of paths to every recursive reference and use it instead of full traversal
-    context = InlineContext()
-    for name, schema in referenced_schemas.items():
-        if name in cache.inlined_schemas:
+    ctx = UnrecurseContext(cache)
+    for name, original in schemas.items():
+        if ctx.is_unrecursed(name):
             continue
-        new_schema = _unrecurse(schema, referenced_schemas, cache, context)
-        if new_schema is not schema:
-            cache.recursive_references.discard(f"{MOVED_SCHEMAS_PREFIX}{name}")
-            referenced_schemas[name] = new_schema
-            context.cache.clear()
-        else:
-            cache.inlined_schemas.add(name)
+        new = _unrecurse(original, schemas, ctx)
+        if new is not original:
+            schemas[name] = new
+        ctx.discard_recursive_reference(name)
+        ctx.reset()
 
 
-def _unrecurse(
-    schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
-) -> ObjectSchema:
+def _unrecurse(schema: ObjectSchema, storage: MovedSchemas, ctx: UnrecurseContext) -> ObjectSchema:
     reference = schema.get("$ref")
-    if reference in cache.recursive_references:
+    if reference in ctx.transform_cache.recursive_references:
         schema_key, _ = _key_for_reference(reference)
         referenced_item = storage[schema_key]
-        if context.push(schema_key):
-            replacement = _unrecurse(referenced_item, storage, cache, context)
+        if ctx.push(schema_key):
+            replacement = _unrecurse(referenced_item, storage, ctx)
         else:
-            result = on_reached_limit(referenced_item, cache)
+            result = on_reached_limit(referenced_item, ctx.transform_cache)
             if isinstance(result, Err):
                 raise NotImplementedError("TODO!")
             replacement = result.ok()
-        context.pop()
+        ctx.pop()
         return replacement
     if not schema:
         return {}
@@ -89,11 +102,11 @@ def _unrecurse(
             "propertyNames",
             "items",
         ) and isinstance(value, dict):
-            _unrecurse_schema(new, key, value, storage, cache, context)
+            _unrecurse_schema(new, key, value, storage, ctx)
         elif key in ("properties", "patternProperties"):
-            _unrecurse_keyed_subschemas(new, key, value, storage, cache, context)
+            _unrecurse_keyed_subschemas(new, key, value, storage, ctx)
         elif key in ("anyOf", "allOf", "oneOf", "additionalItems", "items") and isinstance(value, list):
-            _unrecurse_list_of_schemas(new, key, value, storage, cache, context)
+            _unrecurse_list_of_schemas(new, key, value, storage, ctx)
         else:
             continue
     if not new:
@@ -109,10 +122,9 @@ def _unrecurse_schema(
     key: str,
     schema: ObjectSchema,
     storage: MovedSchemas,
-    cache: TransformCache,
-    context: InlineContext,
+    ctx: UnrecurseContext,
 ) -> None:
-    replacement = _unrecurse(schema, storage, cache, context)
+    replacement = _unrecurse(schema, storage, ctx)
     if replacement is not schema:
         new[key] = replacement
 
@@ -122,40 +134,40 @@ def _unrecurse_keyed_subschemas(
     key: str,
     schema: ObjectSchema,
     storage: MovedSchemas,
-    cache: TransformCache,
-    context: InlineContext,
+    ctx: UnrecurseContext,
 ) -> None:
     properties = {}
     for subkey, subschema in schema.items():
         if isinstance(subschema, dict):
             reference = subschema.get("$ref")
             if reference is None:
-                new_subschema = _unrecurse(subschema, storage, cache, context)
+                new_subschema = _unrecurse(subschema, storage, ctx)
                 if new_subschema is not subschema:
                     properties[subkey] = new_subschema
-            elif reference in cache.recursive_references:
+            elif reference in ctx.transform_cache.recursive_references:
                 schema_key, _ = _key_for_reference(reference)
-                if schema_key in context.cache:
-                    replacement = context.cache[schema_key]
+                cached = ctx.get_cached_replacement(schema_key)
+                if cached is not None:
+                    replacement = cached
                 else:
                     referenced_item = storage[schema_key]
-                    if context.push(schema_key):
-                        replacement = _unrecurse(referenced_item, storage, cache, context)
+                    if ctx.push(schema_key):
+                        replacement = _unrecurse(referenced_item, storage, ctx)
                     else:
                         while "$ref" in referenced_item:
                             schema_key, _ = _key_for_reference(referenced_item["$ref"])
                             referenced_item = storage[schema_key]
-                        if schema_key in cache.unrecursed_schemas:
-                            replacement = cache.unrecursed_schemas[schema_key]
+                        if schema_key in ctx.transform_cache.unrecursed_schemas:
+                            replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
                         else:
-                            result = on_reached_limit(referenced_item, cache)
+                            result = on_reached_limit(referenced_item, ctx.transform_cache)
                             if isinstance(result, Err):
                                 raise NotImplementedError("TODO!")
                             else:
                                 replacement = result.ok()
-                                cache.unrecursed_schemas[schema_key] = replacement
-                    context.cache[schema_key] = replacement
-                    context.pop()
+                                ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
+                    ctx.set_cached_replacement(schema_key, replacement)
+                    ctx.pop()
                 properties[subkey] = replacement
             # NOTE: Non-recursive references are left as is
     if properties:
@@ -170,33 +182,32 @@ def _unrecurse_list_of_schemas(
     keyword: str,
     schemas: list[Schema],
     storage: MovedSchemas,
-    cache: TransformCache,
-    context: InlineContext,
+    ctx: UnrecurseContext,
 ) -> None:
     new_items = {}
     for idx, subschema in enumerate(schemas):
         if isinstance(subschema, dict):
             reference = subschema.get("$ref")
             if reference is None:
-                replacement = _unrecurse(subschema, storage, cache, context)
+                replacement = _unrecurse(subschema, storage, ctx)
                 if replacement is not subschema:
                     new_items[idx] = replacement
-            elif reference in cache.recursive_references:
+            elif reference in ctx.transform_cache.recursive_references:
                 schema_key, _ = _key_for_reference(reference)
                 referenced_item = storage[schema_key]
-                if context.push(keyword):
-                    replacement = _unrecurse(referenced_item, storage, cache, context)
+                if ctx.push(keyword):
+                    replacement = _unrecurse(referenced_item, storage, ctx)
                 else:
-                    if schema_key in cache.unrecursed_schemas:
-                        replacement = cache.unrecursed_schemas[schema_key]
+                    if schema_key in ctx.transform_cache.unrecursed_schemas:
+                        replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
                     else:
-                        result = on_reached_limit(referenced_item, cache)
+                        result = on_reached_limit(referenced_item, ctx.transform_cache)
                         if isinstance(result, Err):
                             raise NotImplementedError("TODO!")
                         else:
                             replacement = result.ok()
-                            cache.unrecursed_schemas[schema_key] = replacement
-                context.pop()
+                            ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
+                ctx.pop()
                 new_items[idx] = replacement
 
     if new_items:

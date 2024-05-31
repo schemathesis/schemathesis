@@ -13,8 +13,7 @@ class TransformCache:
     recursive_references: set[str] = field(default_factory=set)
     # Already transformed schemas
     transformed_references: dict[str, ObjectSchema] = field(default_factory=dict)
-    # Already inlined schemas
-    inlined_schemas: set[SchemaKey] = field(default_factory=set)
     # References to parameter definitions
     parameter_lookups: dict[ParameterReferenceCacheKey, Resolved] = field(default_factory=dict)
+    # Schemas that passed through the unrecursing process
     unrecursed_schemas: dict[SchemaKey, ObjectSchema] = field(default_factory=dict)
