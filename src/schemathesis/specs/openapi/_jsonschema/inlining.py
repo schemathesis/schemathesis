@@ -79,10 +79,8 @@ def _unrecurse(
             _unrecurse_additional_properties(new, value, storage, cache, context)
         elif key == "items":
             _unrecurse_items(new, value, storage, cache, context)
-        elif key == "properties":
-            _unrecurse_properties(new, value, storage, cache, context)
-        elif key == "patternProperties":
-            pass
+        elif key in ("properties", "patternProperties"):
+            _unrecurse_keyed_subschemas(new, key, value, storage, cache, context)
         elif key == "propertyNames":
             pass
         elif key in ("contains", "if", "then", "else", "not"):
@@ -122,8 +120,13 @@ def _unrecurse_items(
         _unrecurse_list_of_schemas(new, "items", schema, storage, cache, context)
 
 
-def _unrecurse_properties(
-    new: ObjectSchema, schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
+def _unrecurse_keyed_subschemas(
+    new: ObjectSchema,
+    key: str,
+    schema: ObjectSchema,
+    storage: MovedSchemas,
+    cache: TransformCache,
+    context: InlineContext,
 ) -> None:
     properties = {}
     for subkey, subschema in schema.items():
@@ -158,7 +161,7 @@ def _unrecurse_properties(
         for subkey, subschema in schema.items():
             if subkey not in properties:
                 properties[subkey] = subschema
-        new["properties"] = properties
+        new[key] = properties
 
 
 def _unrecurse_list_of_schemas(
