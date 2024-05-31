@@ -76,7 +76,7 @@ def _unrecurse(
     new = {}
     for key, value in schema.items():
         if key == "additionalProperties" and isinstance(value, dict):
-            pass
+            _unrecurse_additional_properties(new, value, storage, cache, context)
         elif key == "items":
             pass
         elif key == "properties":
@@ -97,6 +97,14 @@ def _unrecurse(
         if key not in new:
             new[key] = value
     return new
+
+
+def _unrecurse_additional_properties(
+    new: ObjectSchema, value: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
+) -> None:
+    replacement = _unrecurse(value, storage, cache, context)
+    if replacement is not value:
+        new["additionalProperties"] = replacement
 
 
 def _unrecurse_properties(
