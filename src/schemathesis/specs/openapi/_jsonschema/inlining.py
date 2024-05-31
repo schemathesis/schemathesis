@@ -472,6 +472,35 @@ class NewSchemaContext:
         self._maybe_replace_list(keyword, schemas, replacement)
         return Ok(None)
 
+    def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
+        reference = self.original.get("$ref")
+        if self.has_recursive_reference(self.original) or not self.original:
+            return Ok({})
+        elif reference is not None:
+            return Ok(self.original)
+        for keyword, value in self.original.items():
+            if keyword == "additionalProperties" and isinstance(value, dict):
+                result = self.on_additional_properties(value)
+            elif keyword == "items":
+                result = self.on_items(value)
+            elif keyword == "properties":
+                result = self.on_properties(value)
+            elif keyword == "anyOf":
+                result = self.on_any_of(value)
+            elif keyword == "patternProperties":
+                result = self.on_pattern_properties(value)
+            elif keyword == "propertyNames":
+                result = self.on_property_names(value)
+            elif keyword in ("contains", "if", "then", "else", "not"):
+                result = self.on_schema(value, keyword, allow_modification=keyword != "not")
+            elif keyword in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
+                result = self.on_list_of_schemas(keyword, value)
+            else:
+                continue
+            if isinstance(result, Err):
+                return result
+        return Ok(self.finish())
+
     def finish(self) -> ObjectSchema:
         if not self.new and not self.remove:
             return self.original
@@ -482,36 +511,5 @@ class NewSchemaContext:
 
 
 def on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[ObjectSchema, InfiniteRecursionError]:
-    return _on_reached_limit(schema, cache)
-
-
-def _on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[ObjectSchema, InfiniteRecursionError]:
     """Remove all optional subschemas that lead to recursive references."""
-    reference = schema.get("$ref")
-    if reference in cache.recursive_references or not schema:
-        return Ok({})
-    elif reference is not None:
-        return Ok(schema)
-    ctx = NewSchemaContext(schema, cache)
-    for keyword, value in schema.items():
-        if keyword == "additionalProperties" and isinstance(value, dict):
-            result = ctx.on_additional_properties(value)
-        elif keyword == "items":
-            result = ctx.on_items(value)
-        elif keyword == "properties":
-            result = ctx.on_properties(value)
-        elif keyword == "anyOf":
-            result = ctx.on_any_of(value)
-        elif keyword == "patternProperties":
-            result = ctx.on_pattern_properties(value)
-        elif keyword == "propertyNames":
-            result = ctx.on_property_names(value)
-        elif keyword in ("contains", "if", "then", "else", "not"):
-            result = ctx.on_schema(value, keyword, allow_modification=keyword != "not")
-        elif keyword in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
-            result = ctx.on_list_of_schemas(keyword, value)
-        else:
-            continue
-        if isinstance(result, Err):
-            return result
-    return Ok(ctx.finish())
+    return NewSchemaContext(schema, cache).dispatch()
