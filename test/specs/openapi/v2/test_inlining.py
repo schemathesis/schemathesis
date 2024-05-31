@@ -3,8 +3,7 @@ import pytest
 
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.internal.result import Err
-from schemathesis.specs.openapi._jsonschema.errors import InfiniteRecursionError
-from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit, unrecurse
+from schemathesis.specs.openapi._jsonschema.inlining import NewSchemaContext, unrecurse, UnrecurseContext
 from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 RECURSIVE_REFERENCE = {"$ref": "#/definitions/Person"}
@@ -447,7 +446,9 @@ def get_by_path(schema, path):
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
     original = schema
     schema = fast_deepcopy(schema)
-    unrecursed = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE)).ok()
+    unrecursed = NewSchemaContext.run(
+        schema, UnrecurseContext.new({}, TransformCache(recursive_references=RECURSIVE))
+    ).ok()
     assert unrecursed == snapshot_json
     for path in same_objects:
         if path and isinstance(path[0], tuple):
@@ -606,7 +607,7 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
     ],
 )
 def test_on_reached_limit_non_removable(schema):
-    result = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
+    result = NewSchemaContext.run(schema, UnrecurseContext.new({}, TransformCache(recursive_references=RECURSIVE)))
     assert isinstance(result, Err)
 
 

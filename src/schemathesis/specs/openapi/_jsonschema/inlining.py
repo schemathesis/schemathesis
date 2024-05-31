@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import re
 from typing import Mapping, Any
 
@@ -28,6 +28,18 @@ class UnrecurseContext:
     local_cache: dict[str, ObjectSchema]
 
     __slots__ = ("schemas", "transform_cache", "total_inlinings", "path", "max_depth", "max_inlinings", "local_cache")
+
+    @classmethod
+    def new(cls, schemas: MovedSchemas, cache: TransformCache) -> UnrecurseContext:
+        return cls(
+            schemas,
+            cache,
+            total_inlinings=0,
+            path=[],
+            max_depth=DEFAULT_MAX_DEPTH,
+            max_inlinings=DEFAULT_MAX_INLININGS,
+            local_cache={},
+        )
 
     def push(self, reference: str) -> bool:
         """Push the current path and check if the limit is reached."""
@@ -66,15 +78,7 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
     which means infinite recursion, an error is raised.
     """
     # TODO: Get a list of paths to every recursive reference and use it instead of full traversal
-    ctx = UnrecurseContext(
-        schemas,
-        cache,
-        total_inlinings=0,
-        path=[],
-        max_depth=DEFAULT_MAX_DEPTH,
-        max_inlinings=DEFAULT_MAX_INLININGS,
-        local_cache={},
-    )
+    ctx = UnrecurseContext.new(schemas, cache)
     for name, original in schemas.items():
         if ctx.is_unrecursed(name):
             continue
@@ -93,7 +97,7 @@ def _unrecurse(schema: ObjectSchema, ctx: UnrecurseContext) -> ObjectSchema:
         if ctx.push(schema_key):
             replacement = _unrecurse(referenced_item, ctx)
         else:
-            result = on_reached_limit(referenced_item, ctx.transform_cache)
+            result = NewSchemaContext.run(referenced_item, ctx)
             if isinstance(result, Err):
                 raise NotImplementedError("TODO!")
             replacement = result.ok()
@@ -164,7 +168,7 @@ def _unrecurse_keyed_subschemas(
                         if schema_key in ctx.transform_cache.unrecursed_schemas:
                             replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
                         else:
-                            result = on_reached_limit(referenced_item, ctx.transform_cache)
+                            result = NewSchemaContext.run(referenced_item, ctx)
                             if isinstance(result, Err):
                                 raise NotImplementedError("TODO!")
                             else:
@@ -204,7 +208,7 @@ def _unrecurse_list_of_schemas(
                     if schema_key in ctx.transform_cache.unrecursed_schemas:
                         replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
                     else:
-                        result = on_reached_limit(referenced_item, ctx.transform_cache)
+                        result = NewSchemaContext.run(referenced_item, ctx)
                         if isinstance(result, Err):
                             raise NotImplementedError("TODO!")
                         else:
@@ -226,11 +230,11 @@ def _unrecurse_list_of_schemas(
 @dataclass
 class NewSchemaContext:
     original: ObjectSchema
-    cache: TransformCache
+    uctx: UnrecurseContext
     new: dict[str, Any]
     remove: list[str]
 
-    __slots__ = ("original", "cache", "new", "remove")
+    __slots__ = ("original", "uctx", "new", "remove")
 
     def set_keyword(self, keyword: str, value: Any) -> None:
         self.new[keyword] = value
@@ -255,7 +259,7 @@ class NewSchemaContext:
         return self.original.get("required", [])
 
     def is_recursive_reference(self, reference: Any) -> bool:
-        return reference in self.cache.recursive_references
+        return reference in self.uctx.transform_cache.recursive_references
 
     def has_recursive_reference(self, schema: ObjectSchema) -> bool:
         reference = schema.get("$ref")
@@ -325,7 +329,7 @@ class NewSchemaContext:
             if error is not None:
                 return error
         else:
-            result = on_reached_limit(schema, self.cache)
+            result = self.descend(schema)
             if isinstance(result, Err):
                 error = self.forbid_additional_properties()
                 if error is not None:
@@ -346,7 +350,7 @@ class NewSchemaContext:
                 if error is not None:
                     return error
             else:
-                result = on_reached_limit(schema, self.cache)
+                result = self.descend(schema)
                 if isinstance(result, Err):
                     error = self.forbid_items()
                     if error is not None:
@@ -380,7 +384,7 @@ class NewSchemaContext:
                     # New schema should not have this property
                     removal.append(key)
                 else:
-                    result = on_reached_limit(subschema, self.cache)
+                    result = self.descend(subschema)
                     if isinstance(result, Err):
                         if key in self.required:
                             return result
@@ -400,7 +404,7 @@ class NewSchemaContext:
                 if self.has_recursive_reference(subschema):
                     removal.append(idx)
                 else:
-                    result = on_reached_limit(subschema, self.cache)
+                    result = self.descend(subschema)
                     if isinstance(result, Err):
                         removal.append(idx)
                     else:
@@ -426,7 +430,7 @@ class NewSchemaContext:
                     # TODO: All matching properties should be removed from `properties` too
                     removal.append(pattern)
                 else:
-                    result = on_reached_limit(subschema, self.cache)
+                    result = self.descend(subschema)
                     if isinstance(result, Err):
                         if self.has_required_properties_matching(pattern):
                             return result
@@ -444,7 +448,7 @@ class NewSchemaContext:
             if error is not None:
                 return error
         else:
-            result = on_reached_limit(schema, self.cache)
+            result = self.descend(schema)
             if isinstance(result, Err):
                 error = self.forbid_property_names()
                 if error is not None:
@@ -460,7 +464,7 @@ class NewSchemaContext:
     ) -> Result[None, InfiniteRecursionError]:
         if self.has_recursive_reference(schema):
             return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
-        result = on_reached_limit(schema, self.cache)
+        result = self.descend(schema)
         if isinstance(result, Err):
             return result
         new = result.ok()
@@ -479,7 +483,7 @@ class NewSchemaContext:
                 if self.has_recursive_reference(subschema):
                     return Err(InfiniteRecursionError(f"Infinite recursion in {keyword}"))
                 else:
-                    result = on_reached_limit(subschema, self.cache)
+                    result = self.descend(subschema)
                     if isinstance(result, Err):
                         return result
                     new = result.ok()
@@ -487,6 +491,14 @@ class NewSchemaContext:
                         replacement[idx] = new
         self._maybe_replace_list(keyword, schemas, replacement)
         return Ok(None)
+
+    @classmethod
+    def run(cls, original: ObjectSchema, uctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
+        """Remove all optional subschemas that lead to recursive references."""
+        return cls(original, uctx, new={}, remove=[]).dispatch()
+
+    def descend(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
+        return NewSchemaContext.run(schema, self.uctx)
 
     def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
         reference = self.original.get("$ref")
@@ -524,8 +536,3 @@ class NewSchemaContext:
             if keyword not in self.remove and keyword not in self.new:
                 self.set_keyword(keyword, value)
         return self.new
-
-
-def on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[ObjectSchema, InfiniteRecursionError]:
-    """Remove all optional subschemas that lead to recursive references."""
-    return NewSchemaContext(schema, cache, new={}, remove=[]).dispatch()
