@@ -21,7 +21,7 @@ from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-from .references import Unresolvable
+from .references import Unresolvable, RECURSION_DEPTH_LIMIT
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
@@ -254,7 +254,7 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
     for status_code, definition in operation.definition.raw["responses"].items():
-        definition = operation.schema.resolver.resolve_all(definition)  # type: ignore[attr-defined]
+        definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 

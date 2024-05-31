@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.29.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Inlining too much in stateful testing.
+
 .. _v3.29.0:
 
 :version:`3.29.0 <v3.28.1...v3.29.0>` - 2024-05-30
