@@ -723,7 +723,7 @@ def test_on_reached_limit_non_removable(schema):
         "pattern-properties-multiple-recursive-refs",
     ],
 )
-def test_unrecurse_(schema, snapshot_json):
+def test_unrecurse(schema, snapshot_json):
     storage = {
         "-definitions-Root": schema,
         "-definitions-NestedPerson": RECURSIVE_NESTED,
