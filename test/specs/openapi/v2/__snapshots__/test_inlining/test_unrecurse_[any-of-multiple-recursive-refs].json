@@ -1,6 +1,9 @@
 {
-  "properties": {
-    "first": {
+  "anyOf": [
+    {
+      "type": "object"
+    },
+    {
       "properties": {
         "name": {
           "type": "string"
@@ -14,6 +17,14 @@
               "properties": {
                 "name": {
                   "type": "string"
+                },
+                "parent": {
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
                 }
               },
               "type": "object"
@@ -24,10 +35,7 @@
       },
       "type": "object"
     },
-    "name": {
-      "type": "string"
-    },
-    "second": {
+    {
       "properties": {
         "name": {
           "type": "string"
@@ -41,6 +49,14 @@
               "properties": {
                 "name": {
                   "type": "string"
+                },
+                "parent": {
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
                 }
               },
               "type": "object"
@@ -51,6 +67,5 @@
       },
       "type": "object"
     }
-  },
-  "type": "object"
+  ]
 }

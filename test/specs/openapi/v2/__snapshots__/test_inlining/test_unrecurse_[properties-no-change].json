@@ -1,43 +1,9 @@
 {
-  "-definitions-NestedPerson": {
-    "properties": {
-      "name": {
-        "type": "string"
-      },
-      "parent": {
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "parent": {
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "parent": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      }
-    },
-    "type": "object"
+  "properties": {
+    "foo": true,
+    "name": {
+      "type": "string"
+    }
   },
-  "-definitions-Root": {
-    "properties": {
-      "foo": true,
-      "name": {
-        "type": "string"
-      }
-    },
-    "type": "object"
-  }
+  "type": "object"
 }

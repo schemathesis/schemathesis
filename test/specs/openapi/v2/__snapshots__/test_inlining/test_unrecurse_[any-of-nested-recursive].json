@@ -1,80 +1,38 @@
 {
-  "-definitions-NestedPerson": {
-    "properties": {
-      "name": {
-        "type": "string"
-      },
-      "parent": {
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "parent": {
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "parent": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      }
+  "anyOf": [
+    {
+      "type": "object"
     },
-    "type": "object"
-  },
-  "-definitions-Root": {
-    "anyOf": [
-      {
-        "type": "object"
-      },
-      {
-        "properties": {
-          "friend": {
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "parent": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "parent": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      },
-                      "parent": {
-                        "properties": {
-                          "name": {
-                            "type": "string"
-                          }
-                        },
-                        "type": "object"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
+    {
+      "properties": {
+        "friend": {
+          "properties": {
+            "name": {
+              "type": "string"
             },
-            "type": "object"
+            "parent": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "parent": {
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              },
+              "type": "object"
+            }
           },
-          "name": {
-            "type": "string"
-          }
+          "type": "object"
+        },
+        "name": {
+          "type": "string"
         }
       }
-    ]
-  }
+    }
+  ]
 }

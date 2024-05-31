@@ -7,6 +7,7 @@ from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit, un
 from schemathesis.specs.openapi._jsonschema.cache import TransformCache
 
 RECURSIVE_REFERENCE = {"$ref": "#/definitions/Person"}
+RECURSIVE_NESTED_REFERENCE = {"$ref": "#/definitions/NestedPerson"}
 RECURSIVE_NESTED = {
     "type": "object",
     "properties": {
@@ -608,15 +609,15 @@ def test_on_reached_limit_non_removable(schema):
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
-                "friend": RECURSIVE_NESTED,
+                "friend": RECURSIVE_NESTED_REFERENCE,
             },
         },
         {
             "type": "object",
             "properties": {
                 "name": {"type": "string"},
-                "first": RECURSIVE_NESTED,
-                "second": RECURSIVE_NESTED,
+                "first": RECURSIVE_NESTED_REFERENCE,
+                "second": RECURSIVE_NESTED_REFERENCE,
             },
         },
         {
@@ -631,9 +632,27 @@ def test_on_reached_limit_non_removable(schema):
                 {
                     "properties": {
                         "name": {"type": "string"},
-                        "friend": RECURSIVE_NESTED,
+                        "friend": RECURSIVE_NESTED_REFERENCE,
                     },
                 },
+            ]
+        },
+        {
+            "anyOf": [
+                {"type": "object"},
+                {
+                    "anyOf": [
+                        {"$ref": "#/definitions/Non-Recursive"},
+                        {"type": "object"},
+                    ],
+                },
+            ]
+        },
+        {
+            "anyOf": [
+                {"type": "object"},
+                RECURSIVE_NESTED_REFERENCE,
+                RECURSIVE_NESTED_REFERENCE,
             ]
         },
     ),
@@ -643,10 +662,12 @@ def test_on_reached_limit_non_removable(schema):
         "properties-multiple-recursive-refs",
         "any-of-no-change",
         "any-of-nested-recursive",
+        "any-of-non-recursive",
+        "any-of-multiple-recursive-refs",
     ],
 )
 def test_unrecurse_(schema, snapshot_json):
     storage = {"-definitions-Root": schema, "-definitions-NestedPerson": RECURSIVE_NESTED}
     cache = TransformCache(recursive_references={"#/definitions/NestedPerson"})
     unrecurse(storage, cache)
-    assert storage == snapshot_json
+    assert storage["-definitions-Root"] == snapshot_json

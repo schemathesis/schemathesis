@@ -1,74 +1,32 @@
 {
-  "-definitions-NestedPerson": {
-    "properties": {
-      "name": {
-        "type": "string"
-      },
-      "parent": {
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "parent": {
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "parent": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
+  "properties": {
+    "friend": {
+      "properties": {
+        "name": {
+          "type": "string"
         },
-        "type": "object"
-      }
+        "parent": {
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "parent": {
+              "properties": {
+                "name": {
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
     },
-    "type": "object"
+    "name": {
+      "type": "string"
+    }
   },
-  "-definitions-Root": {
-    "properties": {
-      "friend": {
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "parent": {
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "parent": {
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "parent": {
-                    "properties": {
-                      "name": {
-                        "type": "string"
-                      }
-                    },
-                    "type": "object"
-                  }
-                },
-                "type": "object"
-              }
-            },
-            "type": "object"
-          }
-        },
-        "type": "object"
-      },
-      "name": {
-        "type": "string"
-      }
-    },
-    "type": "object"
-  }
+  "type": "object"
 }
