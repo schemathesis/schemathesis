@@ -68,6 +68,9 @@ class UnrecurseContext:
     def discard_recursive_reference(self, key: SchemaKey) -> None:
         self.transform_cache.recursive_references.discard(_make_moved_reference(key))
 
+    def to_leaf_schema(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
+        return LeafTransformer.run(schema, self)
+
 
 def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
@@ -82,159 +85,192 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
     for name, original in schemas.items():
         if ctx.is_unrecursed(name):
             continue
-        new = _unrecurse(original, ctx)
+        result = SchemaTransformer(original, ctx, new={}, remove=[]).dispatch()
+        if isinstance(result, Err):
+            raise NotImplementedError("TODO!")
+        new = result.ok()
         if new is not original:
             schemas[name] = new
         ctx.discard_recursive_reference(name)
         ctx.reset()
 
 
-def _unrecurse(schema: ObjectSchema, ctx: UnrecurseContext) -> ObjectSchema:
-    reference = schema.get("$ref")
-    if reference in ctx.transform_cache.recursive_references:
-        schema_key, _ = _key_for_reference(reference)
-        referenced_item = ctx.schemas[schema_key]
-        if ctx.push(schema_key):
-            replacement = _unrecurse(referenced_item, ctx)
+@dataclass
+class SchemaTransformer:
+    original: ObjectSchema
+    ctx: UnrecurseContext
+    new: dict[str, Any]
+    remove: list[str]
+
+    __slots__ = ("original", "ctx", "new", "remove")
+
+    @classmethod
+    def run(cls, original: ObjectSchema, uctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
+        return cls(original, uctx, new={}, remove=[]).dispatch()
+
+    def descend(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
+        return SchemaTransformer.run(schema, self.ctx)
+
+    def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
+        if not self.original:
+            return Ok({})
+        reference = self.original.get("$ref")
+        if reference in self.ctx.transform_cache.recursive_references:
+            schema_key, _ = _key_for_reference(reference)
+            referenced_item = self.ctx.schemas[schema_key]
+            if self.ctx.push(schema_key):
+                result = self.descend(referenced_item)
+                if isinstance(result, Err):
+                    raise NotImplementedError("TODO!")
+                replacement = result.ok()
+            else:
+                result = LeafTransformer.run(referenced_item, self.ctx)
+                if isinstance(result, Err):
+                    raise NotImplementedError("TODO!")
+                replacement = result.ok()
+            self.ctx.pop()
+            return Ok(replacement)
+        for key, value in self.original.items():
+            if key in (
+                "additionalProperties",
+                "contains",
+                "if",
+                "then",
+                "else",
+                "not",
+                "propertyNames",
+                "items",
+            ) and isinstance(value, dict):
+                r = self.on_schema(key, value)
+            elif key in ("properties", "patternProperties"):
+                r = self.on_keyed_subschemas(key, value)
+            elif key in ("anyOf", "allOf", "oneOf", "additionalItems", "items") and isinstance(value, list):
+                r = self.on_list_of_schemas(key, value)
+            else:
+                continue
+            if isinstance(r, Err):
+                return r
+        return Ok(self.finish())
+
+    def finish(self) -> ObjectSchema:
+        if not self.new:
+            return self.original
+        for key, value in self.original.items():
+            if key not in self.new:
+                self.new[key] = value
+        return self.new
+
+    def on_schema(self, key: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
+        result = self.descend(schema)
+        if isinstance(result, Err):
+            return result
         else:
-            result = NewSchemaContext.run(referenced_item, ctx)
-            if isinstance(result, Err):
-                raise NotImplementedError("TODO!")
-            replacement = result.ok()
-        ctx.pop()
-        return replacement
-    if not schema:
-        return {}
-    new: ObjectSchema = {}
-    for key, value in schema.items():
-        if key in (
-            "additionalProperties",
-            "contains",
-            "if",
-            "then",
-            "else",
-            "not",
-            "propertyNames",
-            "items",
-        ) and isinstance(value, dict):
-            _unrecurse_schema(new, key, value, ctx)
-        elif key in ("properties", "patternProperties"):
-            _unrecurse_keyed_subschemas(new, key, value, ctx)
-        elif key in ("anyOf", "allOf", "oneOf", "additionalItems", "items") and isinstance(value, list):
-            _unrecurse_list_of_schemas(new, key, value, ctx)
-        else:
-            continue
-    if not new:
-        return schema
-    for key, value in schema.items():
-        if key not in new:
-            new[key] = value
-    return new
+            new = result.ok()
+            if new is not schema:
+                # TODO: reuse set_keyword
+                self.new[key] = new
+        return Ok(None)
 
-
-def _unrecurse_schema(new: ObjectSchema, key: str, schema: ObjectSchema, ctx: UnrecurseContext) -> None:
-    replacement = _unrecurse(schema, ctx)
-    if replacement is not schema:
-        new[key] = replacement
-
-
-def _unrecurse_keyed_subschemas(
-    new: ObjectSchema,
-    key: str,
-    schema: ObjectSchema,
-    ctx: UnrecurseContext,
-) -> None:
-    properties = {}
-    for subkey, subschema in schema.items():
-        if isinstance(subschema, dict):
-            reference = subschema.get("$ref")
-            if reference is None:
-                new_subschema = _unrecurse(subschema, ctx)
-                if new_subschema is not subschema:
-                    properties[subkey] = new_subschema
-            elif reference in ctx.transform_cache.recursive_references:
-                schema_key, _ = _key_for_reference(reference)
-                cached = ctx.get_cached_replacement(schema_key)
-                if cached is not None:
-                    replacement = cached
-                else:
-                    referenced_item = ctx.schemas[schema_key]
-                    if ctx.push(schema_key):
-                        replacement = _unrecurse(referenced_item, ctx)
+    def on_keyed_subschemas(self, key: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
+        properties = {}
+        for subkey, subschema in schema.items():
+            if isinstance(subschema, dict):
+                reference = subschema.get("$ref")
+                if reference is None:
+                    result = self.descend(subschema)
+                    if isinstance(result, Err):
+                        raise NotImplementedError("TODO!")
+                    new = result.ok()
+                    if new is not subschema:
+                        properties[subkey] = new
+                elif reference in self.ctx.transform_cache.recursive_references:
+                    schema_key, _ = _key_for_reference(reference)
+                    cached = self.ctx.get_cached_replacement(schema_key)
+                    if cached is not None:
+                        replacement = cached
                     else:
-                        while "$ref" in referenced_item:
-                            schema_key, _ = _key_for_reference(referenced_item["$ref"])
-                            referenced_item = ctx.schemas[schema_key]
-                        if schema_key in ctx.transform_cache.unrecursed_schemas:
-                            replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
+                        referenced_item = self.ctx.schemas[schema_key]
+                        if self.ctx.push(schema_key):
+                            result = self.descend(referenced_item)
+                            if isinstance(result, Err):
+                                raise NotImplementedError("TODO!")
+                            replacement = result.ok()
                         else:
-                            result = NewSchemaContext.run(referenced_item, ctx)
+                            while "$ref" in referenced_item:
+                                schema_key, _ = _key_for_reference(referenced_item["$ref"])
+                                referenced_item = self.ctx.schemas[schema_key]
+                            if schema_key in self.ctx.transform_cache.unrecursed_schemas:
+                                replacement = self.ctx.transform_cache.unrecursed_schemas[schema_key]
+                            else:
+                                result = self.ctx.to_leaf_schema(referenced_item)
+                                if isinstance(result, Err):
+                                    raise NotImplementedError("TODO!")
+                                else:
+                                    replacement = result.ok()
+                                    self.ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
+                        self.ctx.set_cached_replacement(schema_key, replacement)
+                        self.ctx.pop()
+                    properties[subkey] = replacement
+                # NOTE: Non-recursive references are left as is
+        if properties:
+            for subkey, subschema in schema.items():
+                if subkey not in properties:
+                    properties[subkey] = subschema
+            self.new[key] = properties
+        return Ok(None)
+
+    def on_list_of_schemas(self, keyword: str, schemas: list[Schema]) -> Result[None, InfiniteRecursionError]:
+        new_items = {}
+        for idx, subschema in enumerate(schemas):
+            if isinstance(subschema, dict):
+                reference = subschema.get("$ref")
+                if reference is None:
+                    result = self.descend(subschema)
+                    if isinstance(result, Err):
+                        raise NotImplementedError("TODO!")
+                    replacement = result.ok()
+                    if replacement is not subschema:
+                        new_items[idx] = replacement
+                elif reference in self.ctx.transform_cache.recursive_references:
+                    schema_key, _ = _key_for_reference(reference)
+                    referenced_item = self.ctx.schemas[schema_key]
+                    if self.ctx.push(keyword):
+                        result = self.descend(referenced_item)
+                        if isinstance(result, Err):
+                            raise NotImplementedError("TODO!")
+                        replacement = result.ok()
+                    else:
+                        if schema_key in self.ctx.transform_cache.unrecursed_schemas:
+                            replacement = self.ctx.transform_cache.unrecursed_schemas[schema_key]
+                        else:
+                            result = self.ctx.to_leaf_schema(referenced_item)
                             if isinstance(result, Err):
                                 raise NotImplementedError("TODO!")
                             else:
                                 replacement = result.ok()
-                                ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
-                    ctx.set_cached_replacement(schema_key, replacement)
-                    ctx.pop()
-                properties[subkey] = replacement
-            # NOTE: Non-recursive references are left as is
-    if properties:
-        for subkey, subschema in schema.items():
-            if subkey not in properties:
-                properties[subkey] = subschema
-        new[key] = properties
-
-
-def _unrecurse_list_of_schemas(
-    new: ObjectSchema,
-    keyword: str,
-    schemas: list[Schema],
-    ctx: UnrecurseContext,
-) -> None:
-    new_items = {}
-    for idx, subschema in enumerate(schemas):
-        if isinstance(subschema, dict):
-            reference = subschema.get("$ref")
-            if reference is None:
-                replacement = _unrecurse(subschema, ctx)
-                if replacement is not subschema:
+                                self.ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
+                    self.ctx.pop()
                     new_items[idx] = replacement
-            elif reference in ctx.transform_cache.recursive_references:
-                schema_key, _ = _key_for_reference(reference)
-                referenced_item = ctx.schemas[schema_key]
-                if ctx.push(keyword):
-                    replacement = _unrecurse(referenced_item, ctx)
-                else:
-                    if schema_key in ctx.transform_cache.unrecursed_schemas:
-                        replacement = ctx.transform_cache.unrecursed_schemas[schema_key]
-                    else:
-                        result = NewSchemaContext.run(referenced_item, ctx)
-                        if isinstance(result, Err):
-                            raise NotImplementedError("TODO!")
-                        else:
-                            replacement = result.ok()
-                            ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
-                ctx.pop()
-                new_items[idx] = replacement
 
-    if new_items:
-        items = []
-        for idx, subschema in enumerate(schemas):
-            if idx in new_items:
-                items.append(new_items[idx])
-            else:
-                items.append(subschema)
-        new[keyword] = items
+        if new_items:
+            items: list[Schema] = []
+            for idx, subschema in enumerate(schemas):
+                if idx in new_items:
+                    items.append(new_items[idx])
+                else:
+                    items.append(subschema)
+            self.new[keyword] = items
+        return Ok(None)
 
 
 @dataclass
-class NewSchemaContext:
+class LeafTransformer:
     original: ObjectSchema
-    uctx: UnrecurseContext
+    ctx: UnrecurseContext
     new: dict[str, Any]
     remove: list[str]
 
-    __slots__ = ("original", "uctx", "new", "remove")
+    __slots__ = ("original", "ctx", "new", "remove")
 
     def set_keyword(self, keyword: str, value: Any) -> None:
         self.new[keyword] = value
@@ -259,7 +295,7 @@ class NewSchemaContext:
         return self.original.get("required", [])
 
     def is_recursive_reference(self, reference: Any) -> bool:
-        return reference in self.uctx.transform_cache.recursive_references
+        return reference in self.ctx.transform_cache.recursive_references
 
     def has_recursive_reference(self, schema: ObjectSchema) -> bool:
         reference = schema.get("$ref")
@@ -313,12 +349,14 @@ class NewSchemaContext:
             return Err(InfiniteRecursionError("Infinite recursion in items"))
         self.set_keyword("maxItems", 0)
         self.remove_keyword("items")
+        return None
 
     def forbid_property_names(self) -> Err[InfiniteRecursionError] | None:
         if self.min_properties > 0:
             return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
         self.set_keyword("maxProperties", 0)
         self.remove_keyword("propertyNames")
+        return None
 
     def on_additional_properties(
         self,
@@ -498,7 +536,7 @@ class NewSchemaContext:
         return cls(original, uctx, new={}, remove=[]).dispatch()
 
     def descend(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
-        return NewSchemaContext.run(schema, self.uctx)
+        return LeafTransformer.run(schema, self.ctx)
 
     def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
         reference = self.original.get("$ref")
