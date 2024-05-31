@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import re
+from typing import Mapping
 
 from ....internal.result import Err, Ok, Result
 from .constants import MOVED_SCHEMAS_PREFIX
@@ -198,14 +199,8 @@ def _unrecurse_list_of_schemas(
                             cache.unrecursed_schemas[schema_key] = replacement
                 context.pop()
                 new_items[idx] = replacement
-    if new_items:
-        items: list[Schema] = []
-        for idx, subschema in enumerate(schemas):
-            if idx in new_items:
-                items.append(new_items[idx])
-            else:
-                items.append(subschema)
-        new[keyword] = items
+
+    _maybe_replace_list(new, keyword, schemas, new_items)
 
 
 def on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[ObjectSchema, InfiniteRecursionError]:
@@ -217,39 +212,39 @@ def on_reached_limit(schema: ObjectSchema, cache: TransformCache) -> Result[Obje
         return Ok(schema)
     new: ObjectSchema = {}
     remove_keywords: list[str] = []
-    for key, value in schema.items():
-        if key == "additionalProperties" and isinstance(value, dict):
+    for keyword, value in schema.items():
+        if keyword == "additionalProperties" and isinstance(value, dict):
             result = _on_additional_properties_reached_limit(
                 new, value, schema.get("minProperties", 0), schema.get("properties", {}), cache
             )
-        elif key == "items":
+        elif keyword == "items":
             result = _on_items_reached_limit(new, value, schema.get("minItems", 0), remove_keywords, cache)
-        elif key == "properties":
+        elif keyword == "properties":
             required = schema.get("required", [])
             result = _on_properties_reached_limit(new, value, required, remove_keywords, cache)
-        elif key == "anyOf":
+        elif keyword == "anyOf":
             result = _on_any_of_reached_limit(new, value, cache)
-        elif key == "patternProperties":
+        elif keyword == "patternProperties":
             result = _on_pattern_properties_reached_limit(
                 new, value, schema.get("properties", {}), schema.get("required", []), remove_keywords, cache
             )
-        elif key == "propertyNames":
+        elif keyword == "propertyNames":
             result = _on_property_names_reached_limit(
                 new, value, schema.get("minProperties", 0), remove_keywords, cache
             )
-        elif key in ("contains", "if", "then", "else", "not"):
-            result = _on_schema_reached_limit(new, value, key, cache, allow_modification=key != "not")
-        elif key in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
-            result = _on_list_of_schemas_reached_limit(new, value, key, cache)
+        elif keyword in ("contains", "if", "then", "else", "not"):
+            result = _on_schema_reached_limit(new, value, keyword, cache, allow_modification=keyword != "not")
+        elif keyword in ("allOf", "oneOf", "additionalItems") and isinstance(value, list):
+            result = _on_list_of_schemas_reached_limit(new, keyword, value, cache)
         else:
             continue
         if isinstance(result, Err):
             return result
     if not new and not remove_keywords:
         return Ok(schema)
-    for key, value in schema.items():
-        if key not in remove_keywords and key not in new:
-            new[key] = value
+    for keyword, value in schema.items():
+        if keyword not in remove_keywords and keyword not in new:
+            new[keyword] = value
     return Ok(new)
 
 
@@ -413,11 +408,11 @@ def _on_pattern_properties_reached_limit(
 
 
 def _on_any_of_reached_limit(
-    new: ObjectSchema, schema: list[Schema], cache: TransformCache
+    new: ObjectSchema, schemas: list[Schema], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     removal: list[int] = []
     replacement: dict[int, Schema] = {}
-    for idx, subschema in enumerate(schema):
+    for idx, subschema in enumerate(schemas):
         if isinstance(subschema, dict):
             if subschema.get("$ref") in cache.recursive_references:
                 removal.append(idx)
@@ -429,16 +424,9 @@ def _on_any_of_reached_limit(
                     new_subschema = result.ok()
                     if new_subschema is not subschema:
                         replacement[idx] = new_subschema
-    if len(removal) == len(schema):
+    if len(removal) == len(schemas):
         return Err(InfiniteRecursionError("Infinite recursion in anyOf"))
-    if removal or replacement:
-        items = []
-        for idx, subschema in enumerate(schema):
-            if idx in replacement:
-                items.append(replacement[idx])
-            elif idx not in removal:
-                items.append(subschema)
-        new["anyOf"] = items
+    _maybe_replace_list(new, "anyOf", schemas, replacement, removal)
     return Ok(None)
 
 
@@ -461,13 +449,13 @@ def _on_schema_reached_limit(
 
 
 def _on_list_of_schemas_reached_limit(
-    new: ObjectSchema, schema: list[ObjectSchema], key: str, cache: TransformCache
+    new: ObjectSchema, keyword: str, schemas: list[Schema], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
     replacement = {}
-    for idx, subschema in enumerate(schema):
+    for idx, subschema in enumerate(schemas):
         if isinstance(subschema, dict):
             if subschema.get("$ref") in cache.recursive_references:
-                return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
+                return Err(InfiniteRecursionError(f"Infinite recursion in {keyword}"))
             else:
                 result = on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
@@ -475,12 +463,23 @@ def _on_list_of_schemas_reached_limit(
                 new_subschema = result.ok()
                 if new_subschema is not subschema:
                     replacement[idx] = new_subschema
-    if replacement:
+    _maybe_replace_list(new, keyword, schemas, replacement)
+    return Ok(None)
+
+
+def _maybe_replace_list(
+    new: ObjectSchema,
+    keyword: str,
+    schemas: list[Schema],
+    replacement: Mapping[int, Schema],
+    removal: list[int] | None = None,
+) -> None:
+    removal = removal or []
+    if replacement or removal:
         items = []
-        for idx, subschema in enumerate(schema):
+        for idx, subschema in enumerate(schemas):
             if idx in replacement:
                 items.append(replacement[idx])
-            else:
+            elif idx not in removal:
                 items.append(subschema)
-        new[key] = items
-    return Ok(None)
+        new[keyword] = items
