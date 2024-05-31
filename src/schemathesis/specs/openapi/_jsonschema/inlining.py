@@ -96,7 +96,7 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
 
 
 @dataclass
-class SchemaTransformer:
+class BaseTransformer:
     original: ObjectSchema
     ctx: UnrecurseContext
     new: dict[str, Any]
@@ -105,12 +105,18 @@ class SchemaTransformer:
     __slots__ = ("original", "ctx", "new", "remove")
 
     @classmethod
-    def run(cls, original: ObjectSchema, uctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
-        return cls(original, uctx, new={}, remove=[]).dispatch()
+    def run(cls, original: ObjectSchema, ctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
+        return cls(original, ctx, new={}, remove=[]).dispatch()
 
     def descend(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
-        return SchemaTransformer.run(schema, self.ctx)
+        return self.__class__.run(schema, self.ctx)
 
+    def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
+        raise NotImplementedError
+
+
+@dataclass
+class SchemaTransformer(BaseTransformer):
     def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
         if not self.original:
             return Ok({})
@@ -264,14 +270,7 @@ class SchemaTransformer:
 
 
 @dataclass
-class LeafTransformer:
-    original: ObjectSchema
-    ctx: UnrecurseContext
-    new: dict[str, Any]
-    remove: list[str]
-
-    __slots__ = ("original", "ctx", "new", "remove")
-
+class LeafTransformer(BaseTransformer):
     def set_keyword(self, keyword: str, value: Any) -> None:
         self.new[keyword] = value
 
@@ -529,14 +528,6 @@ class LeafTransformer:
                         replacement[idx] = new
         self._maybe_replace_list(keyword, schemas, replacement)
         return Ok(None)
-
-    @classmethod
-    def run(cls, original: ObjectSchema, uctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
-        """Remove all optional subschemas that lead to recursive references."""
-        return cls(original, uctx, new={}, remove=[]).dispatch()
-
-    def descend(self, schema: ObjectSchema) -> Result[ObjectSchema, InfiniteRecursionError]:
-        return LeafTransformer.run(schema, self.ctx)
 
     def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
         reference = self.original.get("$ref")
