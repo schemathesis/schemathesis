@@ -662,6 +662,11 @@ def test_on_reached_limit_non_removable(schema):
                 {"$ref": "#/definitions/A"},
             ]
         },
+        {
+            "additionalProperties": {
+                "type": "object",
+            }
+        },
     ),
     ids=[
         "properties-no-change",
@@ -672,6 +677,7 @@ def test_on_reached_limit_non_removable(schema):
         "any-of-non-recursive",
         "any-of-multiple-recursive-refs",
         "any-of-mutual-recursion",
+        "additional-properties-no-change",
     ],
 )
 def test_unrecurse_(schema, snapshot_json):

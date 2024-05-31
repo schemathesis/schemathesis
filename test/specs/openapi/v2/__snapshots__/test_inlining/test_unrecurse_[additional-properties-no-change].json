@@ -1,0 +1,5 @@
+{
+  "additionalProperties": {
+    "type": "object"
+  }
+}
