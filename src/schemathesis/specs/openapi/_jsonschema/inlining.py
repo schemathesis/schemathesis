@@ -150,7 +150,6 @@ def _unrecurse_keyed_subschemas(
                         else:
                             result = on_reached_limit(referenced_item, cache)
                             if isinstance(result, Err):
-                                print("RR", result.err())
                                 raise NotImplementedError("TODO!")
                             else:
                                 replacement = result.ok()
@@ -314,21 +313,19 @@ def _on_items_reached_limit(
 def _on_property_names_reached_limit(
     new: ObjectSchema, schema: ObjectSchema, min_properties: int, remove_keywords: list[str], cache: TransformCache
 ) -> Result[None, InfiniteRecursionError]:
-    def forbid() -> None:
-        new["maxProperties"] = 0
-        remove_keywords.append("propertyNames")
-        return None
-
-    if schema.get("$ref") in cache.recursive_references:
+    reference = schema.get("$ref")
+    if reference in cache.recursive_references:
         if min_properties > 0:
             return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
-        forbid()
+        new["maxProperties"] = 0
+        remove_keywords.append("propertyNames")
     else:
         result = on_reached_limit(schema, cache)
         if isinstance(result, Err):
             if min_properties > 0:
                 return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
-            forbid()
+            new["maxProperties"] = 0
+            remove_keywords.append("propertyNames")
         else:
             new_subschema = result.ok()
             if new_subschema is not schema:
@@ -341,31 +338,25 @@ def _on_properties_reached_limit(
 ) -> Result[None, InfiniteRecursionError]:
     removal = []
     replacement = {}
-    for subkey, subschema in schema.items():
+    for key, subschema in schema.items():
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in cache.recursive_references:
-                if subkey in required:
-                    return Err(InfiniteRecursionError(f"Infinite recursion in a required property: {subkey}"))
+            reference = subschema.get("$ref")
+            if reference in cache.recursive_references:
+                if key in required:
+                    return Err(InfiniteRecursionError(f"Infinite recursion in a required property: {key}"))
                 # New schema should not have this property
-                removal.append(subkey)
+                removal.append(key)
             else:
                 result = on_reached_limit(subschema, cache)
                 if isinstance(result, Err):
-                    if subkey in required:
+                    if key in required:
                         return result
-                    removal.append(subkey)
+                    removal.append(key)
                 else:
                     new_subschema = result.ok()
                     if new_subschema is not subschema:
-                        replacement[subkey] = new_subschema
-    if removal or replacement:
-        for key, subschema in schema.items():
-            if key not in replacement and key not in removal:
-                replacement[key] = subschema
-        if replacement:
-            new["properties"] = replacement
-        else:
-            remove_keywords.append("properties")
+                        replacement[key] = new_subschema
+    _maybe_replace_mapping(new, "properties", schema, replacement, removal, remove_keywords)
     return Ok(None)
 
 
@@ -396,14 +387,7 @@ def _on_pattern_properties_reached_limit(
                     new_subschema = result.ok()
                     if new_subschema is not subschema:
                         replacement[pattern] = new_subschema
-    if removal or replacement:
-        for pattern, subschema in schema.items():
-            if pattern not in removal and pattern not in replacement:
-                replacement[pattern] = subschema
-        if replacement:
-            new["patternProperties"] = replacement
-        else:
-            remove_keywords.append("patternProperties")
+    _maybe_replace_mapping(new, "patternProperties", schema, replacement, removal, remove_keywords)
     return Ok(None)
 
 
@@ -414,7 +398,8 @@ def _on_any_of_reached_limit(
     replacement: dict[int, Schema] = {}
     for idx, subschema in enumerate(schemas):
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in cache.recursive_references:
+            reference = subschema.get("$ref")
+            if reference in cache.recursive_references:
                 removal.append(idx)
             else:
                 result = on_reached_limit(subschema, cache)
@@ -433,7 +418,8 @@ def _on_any_of_reached_limit(
 def _on_schema_reached_limit(
     new: ObjectSchema, schema: ObjectSchema, key: str, cache: TransformCache, allow_modification: bool = True
 ) -> Result[None, InfiniteRecursionError]:
-    if schema.get("$ref") in cache.recursive_references:
+    reference = schema.get("$ref")
+    if reference in cache.recursive_references:
         return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
     result = on_reached_limit(schema, cache)
     if isinstance(result, Err):
@@ -454,7 +440,8 @@ def _on_list_of_schemas_reached_limit(
     replacement = {}
     for idx, subschema in enumerate(schemas):
         if isinstance(subschema, dict):
-            if subschema.get("$ref") in cache.recursive_references:
+            reference = subschema.get("$ref")
+            if reference in cache.recursive_references:
                 return Err(InfiniteRecursionError(f"Infinite recursion in {keyword}"))
             else:
                 result = on_reached_limit(subschema, cache)
@@ -465,6 +452,24 @@ def _on_list_of_schemas_reached_limit(
                     replacement[idx] = new_subschema
     _maybe_replace_list(new, keyword, schemas, replacement)
     return Ok(None)
+
+
+def _maybe_replace_mapping(
+    new: ObjectSchema,
+    keyword: str,
+    schema: ObjectSchema,
+    replacement: ObjectSchema,
+    removal: list[str],
+    remove_keywords: list[str],
+) -> None:
+    if removal or replacement:
+        for key, subschema in schema.items():
+            if key not in replacement and key not in removal:
+                replacement[key] = subschema
+        if replacement:
+            new[keyword] = replacement
+        else:
+            remove_keywords.append(keyword)
 
 
 def _maybe_replace_list(
