@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.29.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Remove temporary ``print`` calls.
+
 .. _v3.29.1:
 
 :version:`3.29.1 <v3.29.0...v3.29.1>` - 2024-05-31
