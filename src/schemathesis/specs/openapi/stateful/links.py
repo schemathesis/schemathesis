@@ -31,9 +31,7 @@ def apply(
 ) -> None:
     """Gather all connections based on Open API links definitions."""
     all_status_codes = operation.definition.raw["responses"].keys()
-    print("Ts")
     for status_code, link in get_all_links(operation):
-        print("XXX", status_code)
         target_operation = link.get_target_operation()
         strategy = bundles[operation.path][operation.method.upper()].filter(
             make_response_filter(status_code, all_status_codes)
