@@ -37,7 +37,7 @@ class InlineContext:
         self.path.pop()
 
 
-def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: InlineContext | None = None) -> None:
+def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache) -> None:
     """Transform all schemas containing recursive references into non-recursive ones.
 
     Transformation is done by inlining the referenced schema into the schema that references it up to the
@@ -46,7 +46,7 @@ def unrecurse(referenced_schemas: MovedSchemas, cache: TransformCache, context: 
     which means infinite recursion, an error is raised.
     """
     # TODO: Get a list of paths to every recursive reference and use it instead of full traversal
-    context = context or InlineContext()
+    context = InlineContext()
     for name, schema in referenced_schemas.items():
         if name in cache.inlined_schemas:
             continue
