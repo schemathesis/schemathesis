@@ -75,18 +75,20 @@ def _unrecurse(
         return {}
     new: ObjectSchema = {}
     for key, value in schema.items():
-        if key in ("additionalProperties", "contains", "if", "then", "else", "not", "propertyNames") and isinstance(
-            value, dict
-        ):
+        if key in (
+            "additionalProperties",
+            "contains",
+            "if",
+            "then",
+            "else",
+            "not",
+            "propertyNames",
+            "items",
+        ) and isinstance(value, dict):
             _unrecurse_schema(new, key, value, storage, cache, context)
-        elif key == "items":
-            if isinstance(value, dict):
-                _unrecurse_schema(new, key, value, storage, cache, context)
-            elif isinstance(value, list):
-                _unrecurse_list_of_schemas(new, key, value, storage, cache, context)
         elif key in ("properties", "patternProperties"):
             _unrecurse_keyed_subschemas(new, key, value, storage, cache, context)
-        elif key in ("anyOf", "allOf", "oneOf", "additionalItems") and isinstance(value, list):
+        elif key in ("anyOf", "allOf", "oneOf", "additionalItems", "items") and isinstance(value, list):
             _unrecurse_list_of_schemas(new, key, value, storage, cache, context)
         else:
             continue
