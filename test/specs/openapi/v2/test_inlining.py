@@ -685,6 +685,11 @@ def test_on_reached_limit_non_removable(schema):
         {
             "items": [RECURSIVE_NESTED_REFERENCE],
         },
+        {
+            "patternProperties": {
+                "^x": {"type": "object"},
+            }
+        },
     ),
     ids=[
         "properties-no-change",
@@ -702,6 +707,7 @@ def test_on_reached_limit_non_removable(schema):
         "items-array-no-change",
         "items-object-direct",
         "items-array-direct",
+        "pattern-properties-no-change",
     ],
 )
 def test_unrecurse_(schema, snapshot_json):

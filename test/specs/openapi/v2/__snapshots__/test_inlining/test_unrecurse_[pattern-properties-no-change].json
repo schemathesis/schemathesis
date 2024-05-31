@@ -1,0 +1,7 @@
+{
+  "patternProperties": {
+    "^x": {
+      "type": "object"
+    }
+  }
+}
