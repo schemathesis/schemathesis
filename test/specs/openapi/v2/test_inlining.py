@@ -2,6 +2,7 @@ import jsonschema
 import pytest
 
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.internal.result import Err
 from schemathesis.specs.openapi._jsonschema.errors import InfiniteRecursionError
 from schemathesis.specs.openapi._jsonschema.inlining import on_reached_limit, unrecurse
 from schemathesis.specs.openapi._jsonschema.cache import TransformCache
@@ -14,6 +15,20 @@ RECURSIVE_NESTED = {
         "name": {"type": "string"},
         "parent": {"$ref": "#/definitions/NestedPerson"},
     },
+}
+RECURSIVE_NESTED_UNREMOVABLE_REFERENCE = {"$ref": "#/definitions/UnremovableNestedPerson"}
+RECURSIVE_NESTED_UNREMOVABLE = {
+    "type": "object",
+    "properties": {
+        "first": {
+            "type": "object",
+            "properties": {
+                "second": RECURSIVE_NESTED_UNREMOVABLE_REFERENCE,
+            },
+            "required": ["second"],
+        },
+    },
+    "required": ["first"],
 }
 RECURSIVE = set(RECURSIVE_REFERENCE.values())
 
@@ -432,7 +447,7 @@ def get_by_path(schema, path):
 def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_generates):
     original = schema
     schema = fast_deepcopy(schema)
-    unrecursed = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
+    unrecursed = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE)).ok()
     assert unrecursed == snapshot_json
     for path in same_objects:
         if path and isinstance(path[0], tuple):
@@ -591,8 +606,8 @@ def test_on_reached_limit(request, schema, same_objects, snapshot_json, assert_g
     ],
 )
 def test_on_reached_limit_non_removable(schema):
-    with pytest.raises(InfiniteRecursionError):
-        on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
+    result = on_reached_limit(schema, TransformCache(recursive_references=RECURSIVE))
+    assert isinstance(result, Err)
 
 
 @pytest.mark.parametrize(
@@ -701,6 +716,12 @@ def test_on_reached_limit_non_removable(schema):
                 "^y": RECURSIVE_NESTED_REFERENCE,
             }
         },
+        {
+            "properties": {
+                "first": RECURSIVE_NESTED_UNREMOVABLE_REFERENCE,
+                "second": {"type": "string"},
+            },
+        },
     ),
     ids=[
         "properties-no-change",
@@ -721,15 +742,24 @@ def test_on_reached_limit_non_removable(schema):
         "pattern-properties-no-change",
         "pattern-properties-direct",
         "pattern-properties-multiple-recursive-refs",
+        "unremovable-behind-removable",
     ],
 )
-def test_unrecurse(schema, snapshot_json):
+def test_unrecurse(request, schema, snapshot_json):
     storage = {
         "-definitions-Root": schema,
         "-definitions-NestedPerson": RECURSIVE_NESTED,
         "-definitions-A": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/B"}]},
         "-definitions-B": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/A"}]},
     }
-    cache = TransformCache(recursive_references={"#/definitions/NestedPerson", "#/definitions/A", "#/definitions/B"})
+    recursive_references = {
+        "#/definitions/NestedPerson",
+        "#/definitions/A",
+        "#/definitions/B",
+    }
+    if "unremovable" in request.node.callspec.id:
+        storage["-definitions-UnremovableNestedPerson"] = RECURSIVE_NESTED_UNREMOVABLE
+        recursive_references.add("#/definitions/UnremovableNestedPerson")
+    cache = TransformCache(recursive_references=recursive_references)
     unrecurse(storage, cache)
     assert storage["-definitions-Root"] == snapshot_json
