@@ -63,9 +63,9 @@ def _unrecurse(
 ) -> ObjectSchema:
     reference = schema.get("$ref")
     if reference in cache.recursive_references:
-        key, _ = _key_for_reference(reference)
-        referenced_item = storage[key]
-        if context.push(key):
+        schema_key, _ = _key_for_reference(reference)
+        referenced_item = storage[schema_key]
+        if context.push(schema_key):
             replacement = _unrecurse(referenced_item, storage, cache, context)
         else:
             replacement = on_reached_limit(referenced_item, cache)
@@ -73,7 +73,7 @@ def _unrecurse(
         return replacement
     if not schema:
         return {}
-    new = {}
+    new: ObjectSchema = {}
     for key, value in schema.items():
         if key == "additionalProperties" and isinstance(value, dict):
             _unrecurse_additional_properties(new, value, storage, cache, context)
@@ -100,18 +100,33 @@ def _unrecurse(
 
 
 def _unrecurse_additional_properties(
-    new: ObjectSchema, value: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
+    new: ObjectSchema, schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
 ) -> None:
-    replacement = _unrecurse(value, storage, cache, context)
-    if replacement is not value:
+    replacement = _unrecurse(schema, storage, cache, context)
+    if replacement is not schema:
         new["additionalProperties"] = replacement
 
 
+def _unrecurse_items(
+    new: ObjectSchema,
+    schema: ObjectSchema | list[Schema],
+    storage: MovedSchemas,
+    cache: TransformCache,
+    context: InlineContext,
+) -> None:
+    if isinstance(schema, dict):
+        replacement = _unrecurse(schema, storage, cache, context)
+        if replacement is not schema:
+            new["items"] = replacement
+    elif isinstance(schema, list):
+        _unrecurse_list_of_schemas(new, "items", schema, storage, cache, context)
+
+
 def _unrecurse_properties(
-    new: ObjectSchema, value: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
+    new: ObjectSchema, schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
 ) -> None:
     properties = {}
-    for subkey, subschema in value.items():
+    for subkey, subschema in schema.items():
         if isinstance(subschema, dict):
             reference = subschema.get("$ref")
             if reference is None:
@@ -119,28 +134,28 @@ def _unrecurse_properties(
                 if new_subschema is not subschema:
                     properties[subkey] = new_subschema
             elif reference in cache.recursive_references:
-                key, _ = _key_for_reference(reference)
-                if key in context.cache:
-                    replacement = context.cache[key]
+                schema_key, _ = _key_for_reference(reference)
+                if schema_key in context.cache:
+                    replacement = context.cache[schema_key]
                 else:
-                    referenced_item = storage[key]
-                    if context.push(key):
+                    referenced_item = storage[schema_key]
+                    if context.push(schema_key):
                         replacement = _unrecurse(referenced_item, storage, cache, context)
                     else:
                         while "$ref" in referenced_item:
-                            key, _ = _key_for_reference(referenced_item["$ref"])
-                            referenced_item = storage[key]
-                        if key in cache.unrecursed_schemas:
-                            replacement = cache.unrecursed_schemas[key]
+                            schema_key, _ = _key_for_reference(referenced_item["$ref"])
+                            referenced_item = storage[schema_key]
+                        if schema_key in cache.unrecursed_schemas:
+                            replacement = cache.unrecursed_schemas[schema_key]
                         else:
                             replacement = on_reached_limit(referenced_item, cache)
-                            cache.unrecursed_schemas[key] = replacement
-                    context.cache[key] = replacement
+                            cache.unrecursed_schemas[schema_key] = replacement
+                    context.cache[schema_key] = replacement
                     context.pop()
                 properties[subkey] = replacement
             # NOTE: Non-recursive references are left as is
     if properties:
-        for subkey, subschema in value.items():
+        for subkey, subschema in schema.items():
             if subkey not in properties:
                 properties[subkey] = subschema
         new["properties"] = properties
@@ -149,7 +164,7 @@ def _unrecurse_properties(
 def _unrecurse_list_of_schemas(
     new: ObjectSchema,
     keyword: str,
-    schemas: list[ObjectSchema],
+    schemas: list[Schema],
     storage: MovedSchemas,
     cache: TransformCache,
     context: InlineContext,
@@ -159,26 +174,26 @@ def _unrecurse_list_of_schemas(
         if isinstance(subschema, dict):
             reference = subschema.get("$ref")
             if reference is None:
-                new_subschema = _unrecurse(subschema, storage, cache, context)
-                if new_subschema is not subschema:
-                    new_items[idx] = new_subschema
+                replacement = _unrecurse(subschema, storage, cache, context)
+                if replacement is not subschema:
+                    new_items[idx] = replacement
             elif reference in cache.recursive_references:
-                k, _ = _key_for_reference(reference)
-                referenced_item = storage[k]
+                schema_key, _ = _key_for_reference(reference)
+                referenced_item = storage[schema_key]
                 if context.push(keyword):
                     replacement = _unrecurse(referenced_item, storage, cache, context)
                 else:
-                    if k in cache.unrecursed_schemas:
-                        replacement = cache.unrecursed_schemas[k]
+                    if schema_key in cache.unrecursed_schemas:
+                        replacement = cache.unrecursed_schemas[schema_key]
                     else:
                         # TODO: Handle recursion error - it still should be propagated here and this property
                         #      should be removed similar to the logic in `on_reached_limit`
                         replacement = on_reached_limit(referenced_item, cache)
-                        cache.unrecursed_schemas[k] = replacement
+                        cache.unrecursed_schemas[schema_key] = replacement
                 context.pop()
                 new_items[idx] = replacement
     if new_items:
-        items = []
+        items: list[Schema] = []
         for idx, subschema in enumerate(schemas):
             if idx in new_items:
                 items.append(new_items[idx])
