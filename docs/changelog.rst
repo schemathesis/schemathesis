@@ -1,8 +1,17 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.29.1...HEAD>` - TBD
+:version:`Unreleased <v3.29.2...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.29.2:
+
+:version:`3.29.2 <v3.29.1...v3.29.2>` - 2024-05-31
+--------------------------------------------------
+
+**Fixed**
+
+- Remove temporary ``print`` calls.
 
 .. _v3.29.1:
 
