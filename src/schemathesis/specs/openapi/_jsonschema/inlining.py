@@ -104,6 +104,23 @@ class BaseTransformer:
 
     __slots__ = ("original", "ctx", "new", "remove")
 
+    def _maybe_replace_list(
+        self,
+        keyword: str,
+        schemas: list[Schema],
+        replacement: Mapping[int, Schema],
+        removal: list[int] | None = None,
+    ) -> None:
+        removal = removal or []
+        if replacement or removal:
+            items = []
+            for idx, subschema in enumerate(schemas):
+                if idx in replacement:
+                    items.append(replacement[idx])
+                elif idx not in removal:
+                    items.append(subschema)
+            self.new[keyword] = items
+
     @classmethod
     def run(cls, original: ObjectSchema, ctx: UnrecurseContext) -> Result[ObjectSchema, InfiniteRecursionError]:
         return cls(original, ctx, new={}, remove=[]).dispatch()
@@ -173,13 +190,12 @@ class SchemaTransformer(BaseTransformer):
         else:
             new = result.ok()
             if new is not schema:
-                # TODO: reuse set_keyword
                 self.new[key] = new
         return Ok(None)
 
-    def on_keyed_subschemas(self, key: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
-        properties = {}
-        for subkey, subschema in schema.items():
+    def on_keyed_subschemas(self, keyword: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
+        replacement = {}
+        for key, subschema in schema.items():
             if isinstance(subschema, dict):
                 reference = subschema.get("$ref")
                 if reference is None:
@@ -188,45 +204,44 @@ class SchemaTransformer(BaseTransformer):
                         raise NotImplementedError("TODO!")
                     new = result.ok()
                     if new is not subschema:
-                        properties[subkey] = new
+                        replacement[key] = new
                 elif reference in self.ctx.transform_cache.recursive_references:
                     schema_key, _ = _key_for_reference(reference)
                     cached = self.ctx.get_cached_replacement(schema_key)
                     if cached is not None:
-                        replacement = cached
+                        new = cached
                     else:
                         referenced_item = self.ctx.schemas[schema_key]
                         if self.ctx.push(schema_key):
                             result = self.descend(referenced_item)
                             if isinstance(result, Err):
                                 raise NotImplementedError("TODO!")
-                            replacement = result.ok()
+                            new = result.ok()
                         else:
                             while "$ref" in referenced_item:
                                 schema_key, _ = _key_for_reference(referenced_item["$ref"])
                                 referenced_item = self.ctx.schemas[schema_key]
                             if schema_key in self.ctx.transform_cache.unrecursed_schemas:
-                                replacement = self.ctx.transform_cache.unrecursed_schemas[schema_key]
+                                new = self.ctx.transform_cache.unrecursed_schemas[schema_key]
                             else:
                                 result = self.ctx.to_leaf_schema(referenced_item)
                                 if isinstance(result, Err):
                                     raise NotImplementedError("TODO!")
                                 else:
-                                    replacement = result.ok()
-                                    self.ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
-                        self.ctx.set_cached_replacement(schema_key, replacement)
+                                    new = result.ok()
+                                    self.ctx.transform_cache.unrecursed_schemas[schema_key] = new
+                        self.ctx.set_cached_replacement(schema_key, new)
                         self.ctx.pop()
-                    properties[subkey] = replacement
-                # NOTE: Non-recursive references are left as is
-        if properties:
-            for subkey, subschema in schema.items():
-                if subkey not in properties:
-                    properties[subkey] = subschema
-            self.new[key] = properties
+                    replacement[key] = new
+        if replacement:
+            for key, subschema in schema.items():
+                if key not in replacement:
+                    replacement[key] = subschema
+            self.new[keyword] = replacement
         return Ok(None)
 
     def on_list_of_schemas(self, keyword: str, schemas: list[Schema]) -> Result[None, InfiniteRecursionError]:
-        new_items = {}
+        replacement = {}
         for idx, subschema in enumerate(schemas):
             if isinstance(subschema, dict):
                 reference = subschema.get("$ref")
@@ -234,9 +249,9 @@ class SchemaTransformer(BaseTransformer):
                     result = self.descend(subschema)
                     if isinstance(result, Err):
                         raise NotImplementedError("TODO!")
-                    replacement = result.ok()
-                    if replacement is not subschema:
-                        new_items[idx] = replacement
+                    new = result.ok()
+                    if new is not subschema:
+                        replacement[idx] = new
                 elif reference in self.ctx.transform_cache.recursive_references:
                     schema_key, _ = _key_for_reference(reference)
                     referenced_item = self.ctx.schemas[schema_key]
@@ -244,36 +259,26 @@ class SchemaTransformer(BaseTransformer):
                         result = self.descend(referenced_item)
                         if isinstance(result, Err):
                             raise NotImplementedError("TODO!")
-                        replacement = result.ok()
+                        new = result.ok()
                     else:
                         if schema_key in self.ctx.transform_cache.unrecursed_schemas:
-                            replacement = self.ctx.transform_cache.unrecursed_schemas[schema_key]
+                            new = self.ctx.transform_cache.unrecursed_schemas[schema_key]
                         else:
                             result = self.ctx.to_leaf_schema(referenced_item)
                             if isinstance(result, Err):
                                 raise NotImplementedError("TODO!")
                             else:
-                                replacement = result.ok()
-                                self.ctx.transform_cache.unrecursed_schemas[schema_key] = replacement
+                                new = result.ok()
+                                self.ctx.transform_cache.unrecursed_schemas[schema_key] = new
                     self.ctx.pop()
-                    new_items[idx] = replacement
+                    replacement[idx] = new
 
-        if new_items:
-            items: list[Schema] = []
-            for idx, subschema in enumerate(schemas):
-                if idx in new_items:
-                    items.append(new_items[idx])
-                else:
-                    items.append(subschema)
-            self.new[keyword] = items
+        self._maybe_replace_list(keyword, schemas, replacement)
         return Ok(None)
 
 
 @dataclass
 class LeafTransformer(BaseTransformer):
-    def set_keyword(self, keyword: str, value: Any) -> None:
-        self.new[keyword] = value
-
     def remove_keyword(self, keyword: str) -> None:
         self.remove.append(keyword)
 
@@ -316,44 +321,27 @@ class LeafTransformer(BaseTransformer):
                 if key not in replacement and key not in removal:
                     replacement[key] = subschema
             if replacement:
-                self.set_keyword(keyword, replacement)
+                self.new[keyword] = replacement
             else:
                 self.remove_keyword(keyword)
-
-    def _maybe_replace_list(
-        self,
-        keyword: str,
-        schemas: list[Schema],
-        replacement: Mapping[int, Schema],
-        removal: list[int] | None = None,
-    ) -> None:
-        removal = removal or []
-        if replacement or removal:
-            items = []
-            for idx, subschema in enumerate(schemas):
-                if idx in replacement:
-                    items.append(replacement[idx])
-                elif idx not in removal:
-                    items.append(subschema)
-            self.set_keyword(keyword, items)
 
     def forbid_additional_properties(self) -> Err[InfiniteRecursionError] | None:
         if self.min_properties > len(self.properties):
             return Err(InfiniteRecursionError("Infinite recursion in additionalProperties"))
-        self.set_keyword("additionalProperties", False)
+        self.new["additionalProperties"] = False
         return None
 
     def forbid_items(self) -> Err[InfiniteRecursionError] | None:
         if self.min_items > 0:
             return Err(InfiniteRecursionError("Infinite recursion in items"))
-        self.set_keyword("maxItems", 0)
+        self.new["maxItems"] = 0
         self.remove_keyword("items")
         return None
 
     def forbid_property_names(self) -> Err[InfiniteRecursionError] | None:
         if self.min_properties > 0:
             return Err(InfiniteRecursionError("Infinite recursion in propertyNames"))
-        self.set_keyword("maxProperties", 0)
+        self.new["maxProperties"] = 0
         self.remove_keyword("propertyNames")
         return None
 
@@ -374,7 +362,7 @@ class LeafTransformer(BaseTransformer):
             else:
                 replacement = result.ok()
                 if replacement is not schema:
-                    self.set_keyword("additionalProperties", replacement)
+                    self.new["additionalProperties"] = replacement
         return Ok(None)
 
     def on_items(
@@ -395,18 +383,18 @@ class LeafTransformer(BaseTransformer):
                 else:
                     replacement = result.ok()
                     if replacement is not schema:
-                        self.set_keyword("items", replacement)
+                        self.new["items"] = replacement
         elif isinstance(schema, list):
             for idx, subschema in enumerate(schema):
                 if isinstance(subschema, dict):
                     if self.has_recursive_reference(subschema):
                         if self.min_items > idx:
                             return Err(InfiniteRecursionError("Infinite recursion in items"))
-                        self.set_keyword("maxItems", idx)
+                        self.new["maxItems"] = idx
                         if idx == 0:
                             self.remove_keyword("items")
                         else:
-                            self.set_keyword("items", schema[:idx])
+                            self.new["items"] = schema[:idx]
                         break
         return Ok(None)
 
@@ -493,7 +481,7 @@ class LeafTransformer(BaseTransformer):
             else:
                 new = result.ok()
                 if new is not schema:
-                    self.set_keyword("propertyNames", new)
+                    self.new["propertyNames"] = new
         return Ok(None)
 
     def on_schema(
@@ -507,7 +495,7 @@ class LeafTransformer(BaseTransformer):
         new = result.ok()
         if new is not schema:
             if allow_modification:
-                self.set_keyword(key, new)
+                self.new[key] = new
             else:
                 # `not` can't be modified
                 return Err(InfiniteRecursionError(f"Infinite recursion in {key}"))
