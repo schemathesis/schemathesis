@@ -109,7 +109,7 @@ def _unrecurse_additional_properties(
 
 def _unrecurse_items(
     new: ObjectSchema,
-    schema: ObjectSchema | list[Schema],
+    schema: Schema | list[Schema],
     storage: MovedSchemas,
     cache: TransformCache,
     context: InlineContext,

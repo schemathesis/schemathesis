@@ -671,6 +671,9 @@ def test_on_reached_limit_non_removable(schema):
             "additionalProperties": RECURSIVE_NESTED_REFERENCE,
         },
         {
+            "items": True,
+        },
+        {
             "items": {"type": "object"},
         },
         {
@@ -694,6 +697,7 @@ def test_on_reached_limit_non_removable(schema):
         "any-of-mutual-recursion",
         "additional-properties-no-change",
         "additional-properties-direct",
+        "items-bool",
         "items-object-no-change",
         "items-array-no-change",
         "items-object-direct",
