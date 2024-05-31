@@ -75,16 +75,17 @@ def _unrecurse(
         return {}
     new: ObjectSchema = {}
     for key, value in schema.items():
-        if key == "additionalProperties" and isinstance(value, dict):
-            _unrecurse_additional_properties(new, value, storage, cache, context)
+        if key in ("additionalProperties", "contains", "if", "then", "else", "not", "propertyNames") and isinstance(
+            value, dict
+        ):
+            _unrecurse_schema(new, key, value, storage, cache, context)
         elif key == "items":
-            _unrecurse_items(new, value, storage, cache, context)
+            if isinstance(value, dict):
+                _unrecurse_schema(new, key, value, storage, cache, context)
+            elif isinstance(value, list):
+                _unrecurse_list_of_schemas(new, key, value, storage, cache, context)
         elif key in ("properties", "patternProperties"):
             _unrecurse_keyed_subschemas(new, key, value, storage, cache, context)
-        elif key == "propertyNames":
-            pass
-        elif key in ("contains", "if", "then", "else", "not"):
-            pass
         elif key in ("anyOf", "allOf", "oneOf", "additionalItems") and isinstance(value, list):
             _unrecurse_list_of_schemas(new, key, value, storage, cache, context)
         else:
@@ -97,27 +98,17 @@ def _unrecurse(
     return new
 
 
-def _unrecurse_additional_properties(
-    new: ObjectSchema, schema: ObjectSchema, storage: MovedSchemas, cache: TransformCache, context: InlineContext
-) -> None:
-    replacement = _unrecurse(schema, storage, cache, context)
-    if replacement is not schema:
-        new["additionalProperties"] = replacement
-
-
-def _unrecurse_items(
+def _unrecurse_schema(
     new: ObjectSchema,
-    schema: Schema | list[Schema],
+    key: str,
+    schema: ObjectSchema,
     storage: MovedSchemas,
     cache: TransformCache,
     context: InlineContext,
 ) -> None:
-    if isinstance(schema, dict):
-        replacement = _unrecurse(schema, storage, cache, context)
-        if replacement is not schema:
-            new["items"] = replacement
-    elif isinstance(schema, list):
-        _unrecurse_list_of_schemas(new, "items", schema, storage, cache, context)
+    replacement = _unrecurse(schema, storage, cache, context)
+    if replacement is not schema:
+        new[key] = replacement
 
 
 def _unrecurse_keyed_subschemas(
