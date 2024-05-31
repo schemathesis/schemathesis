@@ -619,11 +619,18 @@ def test_on_reached_limit_non_removable(schema):
                 "second": RECURSIVE_NESTED,
             },
         },
+        {
+            "anyOf": [
+                {"type": "object"},
+                True,
+            ],
+        },
     ),
     ids=[
         "properties-no-change",
         "properties-direct",
         "properties-multiple-recursive-refs",
+        "any-of-no-change",
     ],
 )
 def test_unrecurse_(schema, snapshot_json):

@@ -1,0 +1,42 @@
+{
+  "-definitions-NestedPerson": {
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "parent": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "parent": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "parent": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  },
+  "-definitions-Root": {
+    "anyOf": [
+      {
+        "type": "object"
+      },
+      true
+    ]
+  }
+}
