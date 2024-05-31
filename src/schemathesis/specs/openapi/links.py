@@ -21,6 +21,7 @@ from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
+from .references import Unresolvable, RECURSION_DEPTH_LIMIT
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
