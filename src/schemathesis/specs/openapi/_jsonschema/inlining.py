@@ -114,6 +114,14 @@ class BaseTransformer:
     def dispatch(self) -> Result[ObjectSchema, InfiniteRecursionError]:
         raise NotImplementedError
 
+    def finish(self) -> ObjectSchema:
+        if not self.new and not self.remove:
+            return self.original
+        for keyword, value in self.original.items():
+            if keyword not in self.remove and keyword not in self.new:
+                self.new[keyword] = value
+        return self.new
+
 
 @dataclass
 class SchemaTransformer(BaseTransformer):
@@ -157,14 +165,6 @@ class SchemaTransformer(BaseTransformer):
             if isinstance(r, Err):
                 return r
         return Ok(self.finish())
-
-    def finish(self) -> ObjectSchema:
-        if not self.new:
-            return self.original
-        for key, value in self.original.items():
-            if key not in self.new:
-                self.new[key] = value
-        return self.new
 
     def on_schema(self, key: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
         result = self.descend(schema)
@@ -557,11 +557,3 @@ class LeafTransformer(BaseTransformer):
             if isinstance(result, Err):
                 return result
         return Ok(self.finish())
-
-    def finish(self) -> ObjectSchema:
-        if not self.new and not self.remove:
-            return self.original
-        for keyword, value in self.original.items():
-            if keyword not in self.remove and keyword not in self.new:
-                self.set_keyword(keyword, value)
-        return self.new
