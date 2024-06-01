@@ -210,7 +210,6 @@ class SchemaTransformer(BaseTransformer):
                     if cached is not None:
                         new = cached
                     else:
-                        print("Miss")
                         referenced_item = self.ctx.schemas[schema_key]
                         if self.ctx.push(schema_key):
                             result = self.descend(referenced_item)
