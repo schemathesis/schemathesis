@@ -86,7 +86,7 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
             continue
         result = SchemaTransformer(original, ctx, new={}, remove=[]).dispatch()
         if isinstance(result, Err):
-            continue
+            raise result.err()
         new = result.ok()
         if new is not original:
             schemas[name] = new
@@ -169,7 +169,7 @@ class SchemaTransformer(BaseTransformer):
         reference = self.original.get("$ref")
         if reference in self.ctx.transform_cache.recursive_references:
             schema_key, _ = _key_for_reference(reference)
-            referenced_item = self.ctx.schemas[schema_key]
+            referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
             if self.ctx.push(schema_key):
                 inner_result = self.descend(referenced_item)
                 if isinstance(inner_result, Err):
@@ -193,15 +193,15 @@ class SchemaTransformer(BaseTransformer):
                 "propertyNames",
                 "items",
             ) and isinstance(value, dict):
-                r = self.on_schema(key, value)
+                result = self.on_schema(key, value)
             elif key in ("properties", "patternProperties"):
-                r = self.on_mapping_of_schemas(key, value)
+                result = self.on_mapping_of_schemas(key, value)
             elif key in ("anyOf", "allOf", "oneOf", "additionalItems", "items") and isinstance(value, list):
-                r = self.on_list_of_schemas(key, value)
+                result = self.on_list_of_schemas(key, value)
             else:
                 continue
-            if isinstance(r, Err):
-                return r
+            if isinstance(result, Err):
+                return result
         return Ok(self.finish())
 
     def on_schema(self, key: str, schema: ObjectSchema) -> Result[None, InfiniteRecursionError]:
@@ -237,7 +237,7 @@ class SchemaTransformer(BaseTransformer):
                     if cached is not None:
                         new = cached
                     else:
-                        referenced_item = self.ctx.schemas[schema_key]
+                        referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
                         if self.ctx.push(schema_key):
                             result = self.descend(referenced_item)
                             if isinstance(result, Err):
@@ -250,7 +250,7 @@ class SchemaTransformer(BaseTransformer):
                         else:
                             while "$ref" in referenced_item:
                                 schema_key, _ = _key_for_reference(referenced_item["$ref"])
-                                referenced_item = self.ctx.schemas[schema_key]
+                                referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
                             if schema_key in self.ctx.transform_cache.unrecursed_schemas:
                                 new = self.ctx.transform_cache.unrecursed_schemas[schema_key]
                             else:
@@ -283,7 +283,7 @@ class SchemaTransformer(BaseTransformer):
                         replacement[idx] = new
                 elif reference in self.ctx.transform_cache.recursive_references:
                     schema_key, _ = _key_for_reference(reference)
-                    referenced_item = self.ctx.schemas[schema_key]
+                    referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
                     if self.ctx.push(keyword):
                         result = self.descend(referenced_item)
                         if isinstance(result, Err):

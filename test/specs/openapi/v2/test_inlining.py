@@ -723,6 +723,14 @@ def test_on_reached_limit_non_removable(schema):
                 "second": {"type": "string"},
             },
         },
+        {
+            "properties": {
+                "first": {
+                    "items": RECURSIVE_NESTED_UNREMOVABLE_REFERENCE,
+                },
+                "second": {"type": "string"},
+            }
+        },
     ),
     ids=[
         "properties-no-change",
@@ -744,23 +752,24 @@ def test_on_reached_limit_non_removable(schema):
         "pattern-properties-direct",
         "pattern-properties-multiple-recursive-refs",
         "unremovable-behind-removable",
+        "unremovable-in-schema",
     ],
 )
 def test_unrecurse(request, schema, snapshot_json):
-    storage = {
-        "-definitions-Root": schema,
-        "-definitions-NestedPerson": RECURSIVE_NESTED,
-        "-definitions-A": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/B"}]},
-        "-definitions-B": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/A"}]},
-    }
     recursive_references = {
         "#/definitions/NestedPerson",
         "#/definitions/A",
         "#/definitions/B",
     }
+    moved_schemas = {
+        "-definitions-NestedPerson": RECURSIVE_NESTED,
+        "-definitions-A": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/B"}]},
+        "-definitions-B": {"anyOf": [{"type": "object"}, {"$ref": "#/definitions/A"}]},
+    }
     if "unremovable" in request.node.callspec.id:
-        storage["-definitions-UnremovableNestedPerson"] = RECURSIVE_NESTED_UNREMOVABLE
+        moved_schemas["-definitions-UnremovableNestedPerson"] = RECURSIVE_NESTED_UNREMOVABLE
         recursive_references.add("#/definitions/UnremovableNestedPerson")
-    cache = TransformCache(recursive_references=recursive_references)
-    unrecurse(storage, cache)
-    assert storage["-definitions-Root"] == snapshot_json
+    cache = TransformCache(recursive_references=recursive_references, moved_schemas=moved_schemas)
+    schemas = {"-definitions-Root": schema}
+    unrecurse(schemas, cache)
+    assert schemas["-definitions-Root"] == snapshot_json
