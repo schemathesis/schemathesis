@@ -45,13 +45,6 @@
                     "properties": {
                       "left": {
                         "$ref": "#/x-moved-schemas/-definitions-Leaf"
-                      },
-                      "right": {
-                        "properties": {
-                          "left": {
-                            "$ref": "#/x-moved-schemas/-definitions-Leaf"
-                          }
-                        }
                       }
                     }
                   }

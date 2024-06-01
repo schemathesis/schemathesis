@@ -131,15 +131,10 @@ def to_jsonschema(schema: ObjectSchema, resolver: Resolver, config: TransformCon
     if referenced_schemas:
         # Leave only references that are used in this particular schema
         moved_schemas = {key: value for key, value in config.cache.moved_schemas.items() if key in referenced_schemas}
-        # TODO: Idea - as we know all the referenced schemas, including recursive ones, there is no reason to maintain
-        # mapping of what reference has what recursive references. we just store all recursive references and filter
-        # them from `referenced_schemas` when inlining
-        #
-        # Look for recursive references places reachable from the schema
+        schema[MOVED_SCHEMAS_KEY] = moved_schemas
         if config.cache.recursive_references:
             # Recursive schemas are inlined up to some limit in order to generate self-referential data
             unrecurse(moved_schemas, config.cache)
-        schema[MOVED_SCHEMAS_KEY] = moved_schemas
     if reference_cache_key is not None:
         config.cache.transformed_references[reference_cache_key] = schema
     return schema

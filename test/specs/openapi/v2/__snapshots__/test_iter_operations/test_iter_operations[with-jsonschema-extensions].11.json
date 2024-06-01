@@ -76,15 +76,7 @@
                 "type": "string"
               },
               "ref-cycle-2-b": {
-                "properties": {
-                  "email": {
-                    "type": "string"
-                  },
-                  "ref-cycle-2-c": {
-                    "$ref": "#/x-moved-schemas/-definitions-RefCycle2"
-                  }
-                },
-                "type": "object"
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle2C"
               }
             },
             "type": "object"
