@@ -2,27 +2,33 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Tuple
+from ._jsonschema import dynamic_scope
 
 if TYPE_CHECKING:
     from ...models import APIOperation
     from ...schemas import APIOperationMap
+    from ._jsonschema import Resolver
 
 
 @dataclass
 class OperationCacheEntry:
     path: str
     method: str
-    # The resolution scope of the operation
-    scope: str
+    # Reference resolver used to resolve the operation
+    resolver: Resolver
     # Parent path item
     path_item: dict[str, Any]
     # Unresolved operation definition
     operation: dict[str, Any]
-    __slots__ = ("path", "method", "scope", "path_item", "operation")
+    __slots__ = ("path", "method", "resolver", "path_item", "operation")
+
+    @property
+    def scope(self) -> tuple[str, ...]:
+        return dynamic_scope(self.resolver)
 
 
 # During traversal, we need to keep track of the scope, path, and method
-TraversalKey = Tuple[str, str, str]
+TraversalKey = Tuple[Tuple[str, ...], str, str]
 OperationId = str
 Reference = str
 
@@ -65,13 +71,13 @@ class OperationCache:
         operation_id: str,
         path: str,
         method: str,
-        scope: str,
+        resolver: Resolver,
         path_item: dict[str, Any],
         operation: dict[str, Any],
     ) -> None:
         """Insert a new operation definition into cache."""
         self._id_to_definition[operation_id] = OperationCacheEntry(
-            path=path, method=method, scope=scope, path_item=path_item, operation=operation
+            path=path, method=method, resolver=resolver, path_item=path_item, operation=operation
         )
 
     def get_definition_by_id(self, operation_id: str) -> OperationCacheEntry:

@@ -1,10 +1,13 @@
 from dataclasses import fields
 
 import pytest
+from syrupy.extensions.json import JSONSnapshotExtension
+from hypothesis import given, settings, Phase, HealthCheck, Verbosity
+from hypothesis_jsonschema import from_schema
 
 import schemathesis
-from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 
 
 def make_object_schema(is_loose=False, **properties):
@@ -147,11 +150,38 @@ def assert_parameters():
             else:
                 assert left_attr == right_attr
 
-    def check(schema, expected, json_schemas, location="body"):
+    def check(schema, expected, schemas, location="body"):
         schema = schemathesis.from_dict(schema)
         operation = schema["/users"]["POST"]
         container = getattr(operation, location)
         _compare(container, expected)
-        assert [item.as_json_schema(operation) for item in container] == json_schemas
+        assert [item.schema for item in container] == schemas
 
     return check
+
+
+@pytest.fixture
+def snapshot_json(snapshot):
+    return snapshot.use_extension(JSONSnapshotExtension)
+
+
+@pytest.fixture
+def assert_generates():
+    # Hypothesis-jsonschema should be able to generate data for the inlined schema
+    def inner(schema, *, check=None, max_examples=1):
+        @given(from_schema(schema))
+        @settings(
+            deadline=None,
+            database=None,
+            max_examples=max_examples,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.explicit, Phase.generate],
+            verbosity=Verbosity.quiet,
+        )
+        def generate(value):
+            if check:
+                check(value)
+
+        generate()
+
+    return inner

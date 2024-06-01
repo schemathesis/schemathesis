@@ -615,8 +615,6 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
     # Hypothesis's function digest depends on the test function signature. To reflect it for the web API case,
     # we use all API operation parameters in the digest.
     extra = operation.verbose_name.encode("utf8")
-    for parameter in operation.iter_parameters():
-        extra += parameter.serialize(operation).encode("utf8")
     test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore
 
 

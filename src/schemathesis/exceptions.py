@@ -9,12 +9,14 @@ from json import JSONDecodeError
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
 
+from referencing.exceptions import PointerToNowhere
+
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
 
 if TYPE_CHECKING:
     import hypothesis.errors
-    from jsonschema import RefResolutionError, ValidationError, SchemaError as JsonSchemaError
+    from jsonschema import ValidationError, SchemaError as JsonSchemaError
     from .transports.responses import GenericResponse
     from graphql.error import GraphQLFormattedError
     from requests import RequestException
@@ -209,12 +211,10 @@ class OperationSchemaError(Exception):
 
     @classmethod
     def from_reference_resolution_error(
-        cls, error: RefResolutionError, path: str | None, method: str | None, full_path: str | None
+        cls, error: PointerToNowhere, path: str | None, method: str | None, full_path: str | None
     ) -> OperationSchemaError:
         message = "Unresolvable JSON pointer in the schema"
-        # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
-        pointer = str(error).split(": ", 1)[-1]
-        message += f"\n\nError details:\n    JSON pointer: {pointer}"
+        message += f"\n\nError details:\n    JSON pointer: '{error.ref}'"
         message += "\n    This typically means that the schema is referencing a component that doesn't exist."
         message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
         return cls(message, path=path, method=method, full_path=full_path)

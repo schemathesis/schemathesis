@@ -1,0 +1,60 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/first": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "parameters",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Patch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok"
+          }
+        }
+      }
+    },
+    "/second": {
+      "put": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "parameters",
+            "schema": {
+              "$ref": "#/definitions/Put"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ok"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Patch": {
+      "$ref": "#/definitions/Shared-1"
+    },
+    "Put": {
+      "$ref": "#/definitions/Shared-1"
+    },
+    "Shared-1": {
+      "$ref": "#/definitions/Shared-2"
+    },
+    "Shared-2": {
+      "$ref": "#/definitions/Put"
+    }
+  }
+}

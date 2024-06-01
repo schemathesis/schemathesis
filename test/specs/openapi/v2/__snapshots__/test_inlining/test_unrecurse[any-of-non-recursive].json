@@ -1,0 +1,17 @@
+{
+  "anyOf": [
+    {
+      "type": "object"
+    },
+    {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Non-Recursive"
+        },
+        {
+          "type": "object"
+        }
+      ]
+    }
+  ]
+}

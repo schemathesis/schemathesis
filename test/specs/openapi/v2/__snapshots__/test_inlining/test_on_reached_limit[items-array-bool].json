@@ -1,0 +1,9 @@
+{
+  "items": [
+    {
+      "type": "string"
+    },
+    true
+  ],
+  "type": "array"
+}

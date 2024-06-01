@@ -1,0 +1,36 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-NullableTrue",
+        "x-moved-schemas": {
+          "-definitions-NullableTrue": {
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "name": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/nullable-true",
+  "path_parameters": [],
+  "query": []
+}

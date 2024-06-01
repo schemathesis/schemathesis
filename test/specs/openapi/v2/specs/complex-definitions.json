@@ -1,0 +1,64 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "Test",
+    "title": "Test API",
+    "version": "1.0"
+  },
+  "paths": {
+    "/test": {
+      "patch": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": {
+              "$ref": "#/definitions/Patch"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      },
+      "put": {
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "schema": {
+              "$ref": "#/definitions/Put"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Patch": {
+      "$ref": "#/definitions/Shared"
+    },
+    "Put": {
+      "$ref": "#/definitions/Shared"
+    },
+    "Shared": {
+      "$ref": "#/definitions/RecursiveRoot"
+    },
+    "RecursiveRoot": {
+      "$ref": "#/definitions/RecursiveA"
+    },
+    "RecursiveA": {
+      "$ref": "#/definitions/RecursiveB"
+    },
+    "RecursiveB": {
+      "$ref": "#/definitions/RecursiveA"
+    }
+  }
+}

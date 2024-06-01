@@ -1,41 +1,44 @@
 from __future__ import annotations
+
 import string
 import time
 from base64 import b64encode
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, cast
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-from hypothesis import strategies as st, reject
+from hypothesis import reject
+from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 from requests.utils import to_key_val_list
 
+from ... import auths, serializers
 from ..._hypothesis import prepare_urlencoded
 from ...constants import NOT_SET
-from .formats import STRING_FORMATS
-from ... import auths, serializers
+from ...exceptions import BodyInGetRequestError, SerializationNotPossible
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...internal.copy import fast_deepcopy
-from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from ...internal.copy import fast_deepcopy
 from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, cant_serialize
+from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
-from ...serializers import Binary
 from ...utils import compose, skip
 from .constants import LOCATION_TO_CONTAINER
+from .formats import STRING_FORMATS
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
 from .parameters import OpenAPIBody, parameters_to_json_schema
 from .utils import is_header_location
+
 
 HEADER_FORMAT = "_header_value"
 SLASH = "/"
@@ -153,7 +156,7 @@ def get_case_strategy(
             body_generator = generator
             if generator.is_negative:
                 # Consider only schemas that are possible to negate
-                candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
+                candidates = [item for item in operation.body.items if can_negate(item.schema)]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
@@ -229,10 +232,10 @@ def _get_body_strategy(
     # Note, the parent schema is not included as each parameter belong only to one schema
     if parameter in _BODY_STRATEGIES_CACHE and strategy_factory in _BODY_STRATEGIES_CACHE[parameter]:
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
-    schema = parameter.as_json_schema(operation)
-    schema = operation.schema.prepare_schema(schema)
-    strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
-    if not parameter.is_required:
+    strategy = strategy_factory(
+        parameter.schema, operation.verbose_name, "body", parameter.media_type, generation_config
+    )
+    if not parameter.required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
     return strategy
@@ -326,7 +329,7 @@ def generate_parameter(
 
 def can_negate_path_parameters(operation: APIOperation) -> bool:
     """Check if any path parameter can be negated."""
-    schema = parameters_to_json_schema(operation, operation.path_parameters)
+    schema = parameters_to_json_schema(operation.path_parameters)
     # No path parameters to negate
     parameters = schema["properties"]
     if not parameters:
@@ -337,7 +340,7 @@ def can_negate_path_parameters(operation: APIOperation) -> bool:
 def can_negate_headers(operation: APIOperation, location: str) -> bool:
     """Check if any header can be negated."""
     parameters = getattr(operation, LOCATION_TO_CONTAINER[location])
-    schema = parameters_to_json_schema(operation, parameters)
+    schema = parameters_to_json_schema(parameters)
     # No headers to negate
     headers = schema["properties"]
     if not headers:
@@ -359,19 +362,21 @@ def get_parameters_strategy(
         nested_cache_key = (strategy_factory, location, tuple(sorted(exclude)))
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
-        schema = parameters_to_json_schema(operation, parameters)
+        schema = parameters_to_json_schema(parameters)
+        for name in exclude:
+            # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
+            # that may be invalid
+            schema["properties"].pop(name, None)
+            if "required" in schema:
+                with suppress(ValueError):
+                    schema["required"].remove(name)
         if not operation.schema.validate_schema and location == "path":
             # If schema validation is disabled, we try to generate data even if the parameter definition
             # contains errors.
             # In this case, we know that the `required` keyword should always be `True`.
             schema["required"] = list(schema["properties"])
-        schema = operation.schema.prepare_schema(schema)
-        for name in exclude:
-            # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
-            # that may be invalid
-            schema["properties"].pop(name, None)
-            with suppress(ValueError):
-                schema["required"].remove(name)
+        if is_header_location(location):
+            schema.setdefault("type", "string")
         if not schema["properties"] and strategy_factory is make_negative_strategy:
             # Nothing to negate - all properties were excluded
             strategy = st.none()

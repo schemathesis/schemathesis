@@ -1,0 +1,35 @@
+{
+  "body": [],
+  "headers": [],
+  "method": "get",
+  "path": "/users",
+  "path_parameters": [],
+  "query": [
+    {
+      "location": "query",
+      "name": "page",
+      "required": false,
+      "schema": {
+        "format": "int32",
+        "type": "integer"
+      }
+    },
+    {
+      "location": "query",
+      "name": "limit",
+      "required": false,
+      "schema": {
+        "format": "int32",
+        "type": "integer"
+      }
+    },
+    {
+      "location": "query",
+      "name": "sort",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ]
+}

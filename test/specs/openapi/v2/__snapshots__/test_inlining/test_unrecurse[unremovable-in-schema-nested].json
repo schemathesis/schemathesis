@@ -1,0 +1,36 @@
+{
+  "properties": {
+    "first": {
+      "items": {
+        "properties": {
+          "first": {
+            "properties": {
+              "second": {
+                "properties": {
+                  "first": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "first"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "second"
+            ],
+            "type": "object"
+          }
+        },
+        "required": [
+          "first"
+        ],
+        "type": "object"
+      }
+    },
+    "third": {
+      "type": "string"
+    }
+  }
+}

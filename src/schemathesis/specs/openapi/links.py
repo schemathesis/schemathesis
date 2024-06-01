@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, NoReturn, Sequence, Union
 
-from jsonschema import RefResolver
+from referencing.exceptions import Unresolvable
 
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
@@ -25,6 +25,7 @@ from .references import Unresolvable, RECURSION_DEPTH_LIMIT
 
 if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
+    from .schemas import OpenAPIOperation
 
 
 @dataclass(repr=False)
@@ -43,9 +44,7 @@ class Link(StatefulTest):
     @classmethod
     def from_definition(cls, name: str, definition: dict[str, dict[str, Any]], source_operation: APIOperation) -> Link:
         # Links can be behind a reference
-        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_operation.definition.scope
-        )
+        definition = source_operation.definition.maybe_resolve(definition)
         if "operationId" in definition:
             # source_operation.schema is `BaseOpenAPISchema` and has this method
             operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
@@ -156,7 +155,7 @@ class Link(StatefulTest):
 
 def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
     """Get `x-links` / `links` definitions from the schema."""
-    responses = operation.definition.raw["responses"]
+    responses = operation.definition.value["responses"]
     if str(response.status_code) in responses:
         definition = responses[str(response.status_code)]
     elif response.status_code in responses:
@@ -165,7 +164,7 @@ def get_links(response: GenericResponse, operation: APIOperation, field: str) ->
         definition = responses.get("default", {})
     if not definition:
         return []
-    _, definition = operation.schema.resolver.resolve_in_scope(definition, operation.definition.scope)  # type: ignore[attr-defined]
+    definition = operation.definition.maybe_resolve(definition)
     links = definition.get(field, {})
     return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
@@ -253,9 +252,10 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
 
 
 def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
-    for status_code, definition in operation.definition.raw["responses"].items():
-        definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
+    for status_code, definition in operation.definition.value["responses"].items():
+        definition = operation.definition.maybe_resolve(definition)
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
+            link_definition = operation.definition.maybe_resolve(link_definition)
             yield status_code, OpenAPILink(name, status_code, link_definition, operation)
 
 
@@ -281,8 +281,7 @@ def _get_response_by_status_code(responses: dict[StatusCode, dict[str, Any]], st
 
 
 def add_link(
-    resolver: RefResolver,
-    responses: dict[StatusCode, dict[str, Any]],
+    source: OpenAPIOperation,
     links_field: str,
     parameters: dict[str, str] | None,
     request_body: Any,
@@ -290,9 +289,9 @@ def add_link(
     target: str | APIOperation,
     name: str | None = None,
 ) -> None:
+    responses = source.definition.value["responses"]
     response = _get_response_by_status_code(responses, status_code)
-    if "$ref" in response:
-        _, response = resolver.resolve(response["$ref"])
+    response = source.definition.maybe_resolve(response)
     links_definition = response.setdefault(links_field, {})
     new_link: dict[str, str | dict[str, str]] = {}
     if parameters is not None:
@@ -306,8 +305,8 @@ def add_link(
         name = name or f"{target.method.upper()} {target.path}"
         # operationId is a dict lookup which is more efficient than using `operationRef`, since it
         # doesn't involve reference resolving when we will look up for this target during testing.
-        if "operationId" in target.definition.raw:
-            new_link["operationId"] = target.definition.raw["operationId"]
+        if "operationId" in target.definition.value:
+            new_link["operationId"] = target.definition.value["operationId"]
         else:
             new_link["operationRef"] = target.operation_reference
     # The name is arbitrary, so we don't really case what it is,

@@ -1,0 +1,29 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-Put",
+        "x-moved-schemas": {
+          "-definitions-Put": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared"
+          },
+          "-definitions-RecursiveA": {},
+          "-definitions-RecursiveB": {
+            "$ref": "#/x-moved-schemas/-definitions-RecursiveA"
+          },
+          "-definitions-RecursiveRoot": {},
+          "-definitions-Shared": {
+            "$ref": "#/x-moved-schemas/-definitions-RecursiveRoot"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "put",
+  "path": "/test",
+  "path_parameters": [],
+  "query": []
+}

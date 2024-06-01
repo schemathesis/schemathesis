@@ -1,0 +1,36 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-NullableRoot",
+        "x-moved-schemas": {
+          "-definitions-NullableRoot": {
+            "anyOf": [
+              {
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/nullable-root",
+  "path_parameters": [],
+  "query": []
+}

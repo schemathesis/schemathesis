@@ -1,0 +1,30 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-ReadOnlyFalse",
+        "x-moved-schemas": {
+          "-definitions-ReadOnlyFalse": {
+            "properties": {
+              "id": {
+                "readOnly": false,
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/read-only-false",
+  "path_parameters": [],
+  "query": []
+}

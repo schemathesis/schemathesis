@@ -10,17 +10,17 @@ import requests
 from hypothesis.strategies import SearchStrategy
 from hypothesis_jsonschema import from_schema
 
-from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...models import APIOperation, Case
 from ..._hypothesis import get_single_example
+from ...constants import DEFAULT_RESPONSE_TIMEOUT
+from ...models import Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies
-from .formats import STRING_FORMATS
 from .constants import LOCATION_TO_CONTAINER
-from .parameters import OpenAPIBody, OpenAPIParameter
-
+from .formats import STRING_FORMATS
+from .parameters import OpenAPIBody
 
 if TYPE_CHECKING:
     from ...generation import GenerationConfig
+    from .schemas import OpenAPIOperation
 
 
 @dataclass
@@ -44,7 +44,7 @@ Example = Union[ParameterExample, BodyExample]
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter, Case], examples_field: str = "examples"
+    operation: OpenAPIOperation, examples_field: str = "examples"
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
@@ -73,59 +73,63 @@ def get_strategies_from_examples(
     ]
 
 
-def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+def extract_top_level(operation: OpenAPIOperation) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
-    for parameter in operation.iter_parameters():
-        if "schema" in parameter.definition:
-            definitions = [parameter.definition, *_expand_subschemas(parameter.definition["schema"])]
-        else:
-            definitions = [parameter.definition]
-        for definition in definitions:
-            # Open API 2 also supports `example`
-            for example_field in {"example", parameter.example_field}:
-                if isinstance(definition, dict) and example_field in definition:
-                    yield ParameterExample(
-                        container=LOCATION_TO_CONTAINER[parameter.location],
-                        name=parameter.name,
-                        value=definition[example_field],
-                    )
-        if parameter.examples_field in parameter.definition:
-            unresolved_definition = _find_parameter_examples_definition(
-                operation, parameter.name, parameter.examples_field
-            )
-            for value in extract_inner_examples(parameter.definition[parameter.examples_field], unresolved_definition):
-                yield ParameterExample(
-                    container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-                )
-        if "schema" in parameter.definition:
-            for schema in _expand_subschemas(parameter.definition["schema"]):
-                if isinstance(schema, dict) and parameter.examples_field in schema:
-                    for value in schema[parameter.examples_field]:
-                        yield ParameterExample(
-                            container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
-                        )
-    for alternative in operation.body:
-        alternative = cast(OpenAPIBody, alternative)
-        if "schema" in alternative.definition:
-            definitions = [alternative.definition, *_expand_subschemas(alternative.definition["schema"])]
-        else:
-            definitions = [alternative.definition]
-        for definition in definitions:
-            # Open API 2 also supports `example`
-            for example_field in {"example", alternative.example_field}:
-                if isinstance(definition, dict) and example_field in definition:
-                    yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
-        if alternative.examples_field in alternative.definition:
-            unresolved_definition = _find_request_body_examples_definition(operation, alternative)
-            for value in extract_inner_examples(
-                alternative.definition[alternative.examples_field], unresolved_definition
-            ):
-                yield BodyExample(value=value, media_type=alternative.media_type)
-        if "schema" in alternative.definition:
-            for schema in _expand_subschemas(alternative.definition["schema"]):
-                if isinstance(schema, dict) and alternative.examples_field in schema:
-                    for value in schema[alternative.examples_field]:
-                        yield BodyExample(value=value, media_type=alternative.media_type)
+    for i in []:
+        pass
+    if False:
+        yield
+    # for parameter in operation.iter_parameters():
+    #     if "schema" in parameter.definition:
+    #         definitions = [parameter.definition, *_expand_subschemas(parameter.definition["schema"])]
+    #     else:
+    #         definitions = [parameter.definition]
+    #     for definition in definitions:
+    #         # Open API 2 also supports `example`
+    #         for example_field in {"example", parameter.example_field}:
+    #             if isinstance(definition, dict) and example_field in definition:
+    #                 yield ParameterExample(
+    #                     container=LOCATION_TO_CONTAINER[parameter.location],
+    #                     name=parameter.name,
+    #                     value=definition[example_field],
+    #                 )
+    #     if parameter.examples_field in parameter.definition:
+    #         unresolved_definition = _find_parameter_examples_definition(
+    #             operation, parameter.name, parameter.examples_field
+    #         )
+    #         for value in extract_inner_examples(parameter.definition[parameter.examples_field], unresolved_definition):
+    #             yield ParameterExample(
+    #                 container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+    #             )
+    #     if "schema" in parameter.definition:
+    #         for schema in _expand_subschemas(parameter.definition["schema"]):
+    #             if isinstance(schema, dict) and parameter.examples_field in schema:
+    #                 for value in schema[parameter.examples_field]:
+    #                     yield ParameterExample(
+    #                         container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+    #                     )
+    # for alternative in operation.body:
+    #     alternative = cast(OpenAPIBody, alternative)
+    # if "schema" in alternative.definition:
+    #     definitions = [alternative.definition, *_expand_subschemas(alternative.definition["schema"])]
+    # else:
+    #     definitions = [alternative.definition]
+    # for definition in definitions:
+    #     # Open API 2 also supports `example`
+    #     for example_field in {"example", alternative.example_field}:
+    #         if isinstance(definition, dict) and example_field in definition:
+    #             yield BodyExample(value=definition[example_field], media_type=alternative.media_type)
+    # if alternative.examples_field in alternative.definition:
+    #     unresolved_definition = _find_request_body_examples_definition(operation, alternative)
+    #     for value in extract_inner_examples(
+    #         alternative.definition[alternative.examples_field], unresolved_definition
+    #     ):
+    #         yield BodyExample(value=value, media_type=alternative.media_type)
+    # if "schema" in alternative.definition:
+    #     for schema in _expand_subschemas(alternative.definition["schema"]):
+    #         if isinstance(schema, dict) and alternative.examples_field in schema:
+    #             for value in schema[alternative.examples_field]:
+    #                 yield BodyExample(value=value, media_type=alternative.media_type)
 
 
 def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any] | bool, None, None]:
@@ -138,7 +142,7 @@ def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any
 
 
 def _find_parameter_examples_definition(
-    operation: APIOperation[OpenAPIParameter, Case], parameter_name: str, field_name: str
+    operation: OpenAPIOperation, parameter_name: str, field_name: str
 ) -> dict[str, Any]:
     """Find the original, unresolved `examples` definition of a parameter."""
     from .schemas import BaseOpenAPISchema
@@ -148,16 +152,13 @@ def _find_parameter_examples_definition(
     path_data = raw_schema["paths"][operation.path]
     parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
     for parameter in parameters:
-        if "$ref" in parameter:
-            _, parameter = schema.resolver.resolve(parameter["$ref"])
+        parameter = operation.definition.maybe_resolve(parameter)
         if parameter["name"] == parameter_name:
             return parameter[field_name]
     raise RuntimeError("Example definition is not found. It should not happen")
 
 
-def _find_request_body_examples_definition(
-    operation: APIOperation[OpenAPIParameter, Case], alternative: OpenAPIBody
-) -> dict[str, Any]:
+def _find_request_body_examples_definition(operation: OpenAPIOperation, alternative: OpenAPIBody) -> dict[str, Any]:
     """Find the original, unresolved `examples` definition of a request body variant."""
     from .schemas import BaseOpenAPISchema
 
@@ -167,14 +168,11 @@ def _find_request_body_examples_definition(
         path_data = raw_schema["paths"][operation.path]
         parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))
         for parameter in parameters:
-            if "$ref" in parameter:
-                _, parameter = schema.resolver.resolve(parameter["$ref"])
+            parameter = operation.definition.maybe_resolve(parameter)
             if parameter["in"] == "body":
                 return parameter[alternative.examples_field]
         raise RuntimeError("Example definition is not found. It should not happen")
-    request_body = operation.definition.raw["requestBody"]
-    while "$ref" in request_body:
-        _, request_body = schema.resolver.resolve(request_body["$ref"])
+    request_body = operation.definition.maybe_resolve(operation.definition.value["requestBody"], unlimited=True)
     return request_body["content"][alternative.media_type][alternative.examples_field]
 
 
@@ -203,28 +201,32 @@ def load_external_example(url: str) -> bytes:
     return response.content
 
 
-def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
+def extract_from_schemas(operation: OpenAPIOperation) -> Generator[Example, None, None]:
     """Extract examples from parameters' schema definitions."""
     for parameter in operation.iter_parameters():
-        schema = parameter.as_json_schema(operation)
-        for value in extract_from_schema(operation, schema, parameter.example_field, parameter.examples_field):
+        for value in extract_from_schema(
+            operation, parameter.schema, parameter.example_field, parameter.examples_field
+        ):
             yield ParameterExample(
                 container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
             )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
-        schema = alternative.as_json_schema(operation)
-        for value in extract_from_schema(operation, schema, alternative.example_field, alternative.examples_field):
+        for value in extract_from_schema(
+            operation, alternative.schema, alternative.example_field, alternative.examples_field
+        ):
             yield BodyExample(value=value, media_type=alternative.media_type)
 
 
 def extract_from_schema(
-    operation: APIOperation[OpenAPIParameter, Case],
+    operation: OpenAPIOperation,
     schema: dict[str, Any],
     example_field_name: str,
     examples_field_name: str,
 ) -> Generator[Any, None, None]:
     """Extract all examples from a single schema definition."""
+    from .schemas import BaseOpenAPISchema
+
     # This implementation supports only `properties` and `items`
     if "properties" in schema:
         variants = {}
@@ -252,7 +254,13 @@ def extract_from_schema(
                 if name in variants:
                     # Generated by one of `anyOf` or similar sub-schemas
                     continue
-                subschema = operation.schema.prepare_schema(subschema)
+                api_schema = cast(BaseOpenAPISchema, operation.schema)
+                subschema = api_schema.convert_schema_to_jsonschema(
+                    subschema,
+                    operation.definition.resolver,
+                    remove_write_only=False,
+                    remove_read_only=True,
+                )
                 generated = _generate_single_example(subschema, operation.schema.generation_config)
                 variants[name] = [generated]
             # Calculate the maximum number of examples any property has

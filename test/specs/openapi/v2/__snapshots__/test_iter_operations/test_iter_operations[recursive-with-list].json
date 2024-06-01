@@ -1,0 +1,75 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycleAllOf",
+        "x-moved-schemas": {
+          "-definitions-RefCycleAllOf": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref": {
+                "allOf": [
+                  {
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "ref": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ref": {
+                            "allOf": [
+                              {
+                                "properties": {
+                                  "name": {
+                                    "type": "string"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              {
+                                "pattern": "^foo"
+                              }
+                            ]
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  {
+                    "pattern": "^foo"
+                  }
+                ]
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycleAllOfItem": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ref": {
+                "$ref": "#/x-moved-schemas/-definitions-RefCycleAllOf"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-anyof",
+  "path_parameters": [],
+  "query": []
+}

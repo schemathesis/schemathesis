@@ -1,0 +1,70 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-SharedBody",
+        "x-moved-schemas": {
+          "-definitions-SharedBody": {
+            "properties": {
+              "shared_property": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": false,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-SharedBody",
+        "x-moved-schemas": {
+          "-definitions-SharedBody": {
+            "properties": {
+              "shared_property": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [
+    {
+      "location": "header",
+      "name": "shared_header",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "method": "get",
+  "path": "/shared-params/{id}/",
+  "path_parameters": [
+    {
+      "location": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "query": [
+    {
+      "location": "query",
+      "name": "shared_query",
+      "required": false,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ]
+}

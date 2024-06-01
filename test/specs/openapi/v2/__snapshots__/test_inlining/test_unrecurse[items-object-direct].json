@@ -1,0 +1,18 @@
+{
+  "items": {
+    "properties": {
+      "name": {
+        "type": "string"
+      },
+      "parent": {
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      }
+    },
+    "type": "object"
+  }
+}

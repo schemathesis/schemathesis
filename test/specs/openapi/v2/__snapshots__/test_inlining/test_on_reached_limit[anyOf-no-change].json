@@ -1,0 +1,7 @@
+{
+  "anyOf": [
+    {
+      "type": "object"
+    }
+  ]
+}

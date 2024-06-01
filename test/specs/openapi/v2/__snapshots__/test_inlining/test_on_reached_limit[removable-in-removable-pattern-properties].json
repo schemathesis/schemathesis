@@ -1,0 +1,12 @@
+{
+  "patternProperties": {
+    "^t-": true,
+    "^x-": {
+      "type": "object"
+    },
+    "^y-": {
+      "type": "integer"
+    }
+  },
+  "type": "object"
+}

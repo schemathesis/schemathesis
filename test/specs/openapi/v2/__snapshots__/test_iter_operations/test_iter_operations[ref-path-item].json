@@ -1,0 +1,17 @@
+{
+  "body": [],
+  "headers": [],
+  "method": "get",
+  "path": "/referenced-path-item",
+  "path_parameters": [
+    {
+      "location": "path",
+      "name": "id",
+      "required": true,
+      "schema": {
+        "type": "string"
+      }
+    }
+  ],
+  "query": []
+}

@@ -1,0 +1,61 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycle1",
+        "x-moved-schemas": {
+          "-definitions-RefCycle1": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref-cycle-1-root": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref-cycle-1-b": {
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "ref-cycle-1-root": {
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle1B": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ref-cycle-1-b": {
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle1"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-1",
+  "path_parameters": [],
+  "query": []
+}

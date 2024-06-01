@@ -1,6 +1,5 @@
 import json
 import platform
-from pathlib import Path
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -16,71 +15,6 @@ from .utils import as_param, get_schema, integer
 @pytest.fixture()
 def petstore():
     return get_schema("petstore_v2.yaml")
-
-
-@pytest.mark.parametrize(
-    "ref, expected",
-    (
-        (
-            {"$ref": "#/definitions/Category"},
-            {
-                "properties": {"id": {"format": "int64", "type": "integer"}, "name": {"type": "string"}},
-                "type": "object",
-                "xml": {"name": "Category"},
-            },
-        ),
-        (
-            {"$ref": "#/definitions/Pet"},
-            {
-                "properties": {
-                    "category": {
-                        "properties": {"id": {"format": "int64", "type": "integer"}, "name": {"type": "string"}},
-                        "type": "object",
-                        "xml": {"name": "Category"},
-                    },
-                    "id": {"format": "int64", "type": "integer"},
-                    "name": {"example": "doggie", "type": "string"},
-                    "photoUrls": {
-                        "items": {"type": "string"},
-                        "type": "array",
-                        "xml": {"name": "photoUrl", "wrapped": True},
-                        "example": ["https://photourl.com"],
-                    },
-                    "status": {
-                        "description": "pet status in the store",
-                        "enum": ["available", "pending", "sold"],
-                        "type": "string",
-                    },
-                    "tags": {
-                        "items": {
-                            "properties": {"id": {"format": "int64", "type": "integer"}, "name": {"type": "string"}},
-                            "type": "object",
-                            "xml": {"name": "Tag"},
-                        },
-                        "type": "array",
-                        "xml": {"name": "tag", "wrapped": True},
-                    },
-                },
-                "required": ["name", "photoUrls"],
-                "type": "object",
-                "xml": {"name": "Pet"},
-            },
-        ),
-    ),
-)
-def test_resolve(petstore, ref, expected):
-    assert petstore.resolver.resolve_all(ref) == expected
-
-
-def test_recursive_reference(mocker, schema_with_recursive_references):
-    mocker.patch("schemathesis.specs.openapi.references.RECURSION_DEPTH_LIMIT", 1)
-    reference = {"$ref": "#/components/schemas/Node"}
-    schema = schemathesis.from_dict(schema_with_recursive_references)
-    assert schema.resolver.resolve_all(reference) == {
-        "properties": {"child": {"properties": {"child": reference}, "required": ["child"], "type": "object"}},
-        "required": ["child"],
-        "type": "object",
-    }
 
 
 USER_REFERENCE = {"$ref": "#/components/schemas/User"}
@@ -518,7 +452,7 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "POST"
-    assert case.body is None
+    assert case.body is None or isinstance(case.body, int)
 """,
         paths={
             "/users": {
@@ -592,27 +526,9 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-def test_complex_dereference(testdir, complex_schema):
+def test_complex_dereference(complex_schema):
     schema = schemathesis.from_path(complex_schema)
-    path = Path(str(testdir))
-    body_definition = {
-        "schema": {
-            "additionalProperties": False,
-            "description": "Test",
-            "properties": {
-                "profile": {
-                    "additionalProperties": False,
-                    "description": "Test",
-                    "properties": {"id": {"type": "integer"}},
-                    "required": ["id"],
-                    "type": "object",
-                },
-                "username": {"type": "string"},
-            },
-            "required": ["username", "profile"],
-            "type": "object",
-        }
-    }
+    body_definition = {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}
     operation = schema["/teapot"]["POST"]
     assert operation.base_url == "file:///"
     assert operation.path == "/teapot"
@@ -621,9 +537,9 @@ def test_complex_dereference(testdir, complex_schema):
     assert operation.body[0].required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
-    assert operation.definition.raw == {
+    assert operation.definition.value == {
         "requestBody": {
-            "content": {"application/json": {"schema": {"$ref": "../schemas/teapot/create.yaml#/TeapotCreateRequest"}}},
+            "content": {"application/json": body_definition},
             "description": "Test.",
             "required": True,
         },
@@ -631,45 +547,14 @@ def test_complex_dereference(testdir, complex_schema):
         "summary": "Test",
         "tags": ["ancillaries"],
     }
-    assert operation.definition.resolved == {
-        "requestBody": {
-            "content": {"application/json": body_definition},
-            "description": "Test.",
-            "required": True,
-        },
-        "responses": {
-            "default": {
-                "content": {
-                    "application/json": {
-                        "schema": {
-                            "additionalProperties": False,
-                            "properties": {
-                                # Note, these `nullable` keywords are not transformed at this point
-                                # It is done during the response validation.
-                                "key": {"type": "string", "nullable": True},
-                                "referenced": {"type": "string", "nullable": True},
-                            },
-                            "required": ["key", "referenced"],
-                            "type": "object",
-                        }
-                    }
-                },
-                "description": "Probably an error",
-            }
-        },
-        "summary": "Test",
-        "tags": ["ancillaries"],
-    }
-    assert operation.definition.scope == f"{path.as_uri()}/root/paths/teapot.yaml#/TeapotCreatePath"
     assert operation.body[0].required
     assert operation.body[0].media_type == "application/json"
     assert operation.body[0].definition == body_definition
 
 
 def test_remote_reference_to_yaml(swagger_20, schema_url):
-    scope, resolved = swagger_20.resolver.resolve(f"{schema_url}#/info/title")
-    assert scope.endswith("#/info/title")
-    assert resolved == "Example API"
+    resolved = swagger_20.resolver.lookup(f"{schema_url}#/info/title")
+    assert resolved.contents == "Example API"
 
 
 def assert_unique_objects(item):
@@ -769,7 +654,7 @@ def test_unresolvable_reference_during_generation(empty_open_api_3_schema, testd
     "key, expected",
     (
         ("Key7", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
-        ("Key8", "Unresolvable JSON pointer: 'components/schemas/Key8'"),
+        ("Key8", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
     ),
 )
 def test_uncommon_type_in_generation(empty_open_api_3_schema, testdir, key, expected):

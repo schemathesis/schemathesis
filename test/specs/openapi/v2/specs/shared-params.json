@@ -1,0 +1,88 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Shared Parameters Test API",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "application/json",
+    "multipart/form-data"
+  ],
+  "paths": {
+    "/shared-params/{id}/": {
+      "parameters": [
+        {
+          "name": "id",
+          "in": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "shared_query",
+          "in": "query",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "shared_header",
+          "in": "header",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "shared_body",
+          "in": "body",
+          "required": false,
+          "schema": {
+            "$ref": "#/definitions/SharedBody"
+          }
+        }
+      ],
+      "get": {
+        "summary": "Get shared parameters",
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create with shared parameters",
+        "parameters": [
+          {
+            "name": "local_query",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "local_header",
+            "in": "header",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SharedBody": {
+      "type": "object",
+      "properties": {
+        "shared_property": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycle0",
+        "x-moved-schemas": {
+          "-definitions-RefCycle0": {}
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-0",
+  "path_parameters": [],
+  "query": []
+}

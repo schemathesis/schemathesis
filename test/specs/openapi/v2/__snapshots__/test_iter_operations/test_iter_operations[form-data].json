@@ -1,0 +1,56 @@
+{
+  "body": [
+    {
+      "media_type": "multipart/form-data",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "local_age": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "local_file": {
+            "format": "binary",
+            "type": "string"
+          },
+          "local_name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "local_file",
+          "local_name"
+        ],
+        "type": "object"
+      }
+    },
+    {
+      "media_type": "multipart/form-data",
+      "required": true,
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "shared_age": {
+            "format": "int32",
+            "type": "integer"
+          },
+          "shared_file": {
+            "format": "binary",
+            "type": "string"
+          },
+          "shared_name": {
+            "type": "string"
+          }
+        },
+        "required": [],
+        "type": "object"
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/form-data",
+  "path_parameters": [],
+  "query": []
+}

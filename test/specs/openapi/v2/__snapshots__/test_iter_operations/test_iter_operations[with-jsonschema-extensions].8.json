@@ -1,0 +1,52 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-NestedRefBody",
+        "x-moved-schemas": {
+          "-definitions-Email": {
+            "properties": {
+              "address": {
+                "format": "email",
+                "type": "string"
+              },
+              "verified": {
+                "type": "boolean"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-NestedRefBody": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "user": {
+                "$ref": "#/x-moved-schemas/-definitions-User"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-User": {
+            "properties": {
+              "email": {
+                "$ref": "#/x-moved-schemas/-definitions-Email"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/nested-refs",
+  "path_parameters": [],
+  "query": []
+}

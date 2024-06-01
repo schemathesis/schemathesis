@@ -5,10 +5,7 @@ These are basic entities that describe what data could be sent to the API.
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar
-
-if TYPE_CHECKING:
-    from .models import APIOperation
+from typing import Any, Generator, Generic, TypeVar
 
 
 @dataclass(eq=False)
@@ -19,30 +16,9 @@ class Parameter:
     `Parameter` instance.
     """
 
+    name: str
     # The parameter definition in the language acceptable by the API
     definition: Any
-
-    @property
-    def location(self) -> str:
-        """Where this parameter is located.
-
-        E.g. "query" or "body"
-        """
-        raise NotImplementedError
-
-    @property
-    def name(self) -> str:
-        """Parameter name."""
-        raise NotImplementedError
-
-    @property
-    def is_required(self) -> bool:
-        """Whether the parameter is required for a successful API call."""
-        raise NotImplementedError
-
-    def serialize(self, operation: APIOperation) -> str:
-        """Get parameter's string representation."""
-        raise NotImplementedError
 
 
 P = TypeVar("P", bound=Parameter)

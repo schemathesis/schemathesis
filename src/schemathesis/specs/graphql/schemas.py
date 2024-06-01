@@ -88,6 +88,7 @@ C = TypeVar("C", bound=Case)
 
 @dataclass
 class GraphQLOperationDefinition(OperationDefinition):
+    value: graphql.GraphQlField
     field_name: str
     type_: graphql.GraphQLType
     root_type: RootType
@@ -218,11 +219,8 @@ class GraphQLSchema(BaseSchema):
             method="POST",
             app=self.app,
             schema=self,
-            # Parameters are not yet supported
             definition=GraphQLOperationDefinition(
-                raw=field,
-                resolved=field,
-                scope="",
+                value=field,
                 type_=operation_type,
                 field_name=field_name,
                 root_type=root_type,

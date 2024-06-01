@@ -1,0 +1,80 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-RefCycle2",
+        "x-moved-schemas": {
+          "-definitions-RefCycle2": {
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ref-cycle-2-root": {
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "ref-cycle-2-b": {
+                    "properties": {
+                      "email": {
+                        "type": "string"
+                      },
+                      "ref-cycle-2-c": {
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "ref-cycle-2-root": {
+                            "properties": {
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle2B": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "ref-cycle-2-b": {
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle2C"
+              }
+            },
+            "type": "object"
+          },
+          "-definitions-RefCycle2C": {
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "ref-cycle-2-c": {
+                "$ref": "#/x-moved-schemas/-definitions-RefCycle2"
+              }
+            },
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "post",
+  "path": "/ref-cycle-2",
+  "path_parameters": [],
+  "query": []
+}

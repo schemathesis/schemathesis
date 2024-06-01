@@ -1,0 +1,24 @@
+{
+  "properties": {
+    "friend": {
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parent": {
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "object"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "type": "object"
+}

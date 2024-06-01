@@ -1,0 +1,455 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Test Schema Properties",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "paths": {
+    "/read-only-true": {
+      "post": {
+        "summary": "Create with read-only property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrue"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/read-only-true-required": {
+      "post": {
+        "summary": "Create with read-only required property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrueRequired"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/read-only-true-single": {
+      "post": {
+        "summary": "Create with single read-only property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyTrueSingle"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/read-only-false": {
+      "post": {
+        "summary": "Create with read-write property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ReadOnlyFalse"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nullable-true": {
+      "post": {
+        "summary": "Create with nullable property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableTrue"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nullable-false": {
+      "post": {
+        "summary": "Create with non-nullable property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableFalse"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nullable-root": {
+      "post": {
+        "summary": "Create with nullable root property",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NullableRoot"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/all-of": {
+      "post": {
+        "summary": "Create with allOf schema",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/AllOf"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/nested-refs": {
+      "post": {
+        "summary": "Create with nested references",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/NestedRefBody"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/ref-cycle-0": {
+      "post": {
+        "summary": "Create with 0-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle0"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/ref-cycle-1": {
+      "post": {
+        "summary": "Create with 1-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle1"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    },
+    "/ref-cycle-2": {
+      "post": {
+        "summary": "Create with 2-hop reference cycle",
+        "parameters": [
+          {
+            "name": "data",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/RefCycle2"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "ReadOnlyTrue": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "ReadOnlyTrueRequired": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ]
+    },
+    "ReadOnlyTrueSingle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": true
+        }
+      }
+    },
+    "ReadOnlyFalse": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "readOnly": false
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableTrue": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-nullable": true
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableFalse": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "x-nullable": false
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "NullableRoot": {
+      "type": "object",
+      "x-nullable": true,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        }
+      }
+    },
+    "AllOf": {
+      "allOf": [
+        {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            }
+          }
+        }
+      ]
+    },
+    "NestedRefBody": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "user": {
+          "$ref": "#/definitions/User"
+        }
+      }
+    },
+    "User": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "email": {
+          "$ref": "#/definitions/Email"
+        }
+      }
+    },
+    "Email": {
+      "type": "object",
+      "properties": {
+        "address": {
+          "type": "string",
+          "format": "email"
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      }
+    },
+    "RefCycle0": {
+      "$ref": "#/definitions/RefCycle0"
+    },
+    "RefCycle1": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ref-cycle-1-root": {
+          "$ref": "#/definitions/RefCycle1B"
+        }
+      }
+    },
+    "RefCycle1B": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref-cycle-1-b": {
+          "$ref": "#/definitions/RefCycle1"
+        }
+      }
+    },
+    "RefCycle2": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "ref-cycle-2-root": {
+          "$ref": "#/definitions/RefCycle2B"
+        }
+      }
+    },
+    "RefCycle2B": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "ref-cycle-2-b": {
+          "$ref": "#/definitions/RefCycle2C"
+        }
+      }
+    },
+    "RefCycle2C": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string"
+        },
+        "ref-cycle-2-c": {
+          "$ref": "#/definitions/RefCycle2"
+        }
+      }
+    }
+  }
+}

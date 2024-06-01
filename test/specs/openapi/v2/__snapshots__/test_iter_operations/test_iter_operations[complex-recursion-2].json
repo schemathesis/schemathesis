@@ -1,0 +1,26 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-Patch",
+        "x-moved-schemas": {
+          "-definitions-Patch": {},
+          "-definitions-Put": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
+          },
+          "-definitions-Shared-1": {},
+          "-definitions-Shared-2": {
+            "$ref": "#/x-moved-schemas/-definitions-Shared-1"
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "patch",
+  "path": "/first",
+  "path_parameters": [],
+  "query": []
+}

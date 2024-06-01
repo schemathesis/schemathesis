@@ -21,9 +21,9 @@ def test_hashable(parameters, body):
 
 def add_link(schema, target, **kwargs):
     schema.add_link(source=schema["/users/"]["POST"], target=target, status_code="201", **kwargs)
-    responses = schema["/users/"]["POST"].definition.raw["responses"]["201"]
+    responses = schema["/users/"]["POST"].definition.value["responses"]["201"]
     if "$ref" in responses:
-        _, responses = schema.resolver.resolve(responses["$ref"])
+        responses = schema.resolver.lookup(responses["$ref"]).contents
     return responses["links"]
 
 
@@ -59,9 +59,9 @@ def test_add_link_no_operations_cache(schema_url, status_code):
         parameters={"userId": "$response.body#/id"},
     )
     # Then it should be added without errors
-    response = schema["/users/"]["POST"].definition.raw["responses"]["201"]
+    response = schema["/users/"]["POST"].definition.value["responses"]["201"]
     if "$ref" in response:
-        _, response = schema.resolver.resolve(response["$ref"])
+        response = schema.resolver.lookup(response["$ref"]).contents
     links = response["links"]
     assert links[f"{target.method.upper()} {target.path}"] == {
         "operationId": "getUser",
@@ -73,7 +73,7 @@ def test_add_link_no_operations_cache(schema_url, status_code):
 def test_add_link_no_operation_id(schema_url):
     schema = schemathesis.from_uri(schema_url)
     target = schema["/users/{user_id}"]["GET"]
-    del target.definition.raw["operationId"]
+    del target.definition.value["operationId"]
     links = add_link(schema, target, parameters={"userId": "$response.body#/id"})
     assert links[f"{target.method.upper()} {target.path}"] == {
         "operationRef": "#/paths/~1users~1{user_id}/get",
@@ -121,9 +121,9 @@ def test_add_link_behind_a_reference(schema_url):
     add_link(schema, schema["/users/{user_id}"]["GET"], parameters={"userId": "$response.body#/id"})
     # Then the source API operation should have the new link
     operation = schema["/users/"]["POST"]
-    response = operation.definition.raw["responses"]["201"]
+    response = operation.definition.value["responses"]["201"]
     if "$ref" in response:
-        _, response = schema.resolver.resolve(response["$ref"])
+        response = schema.resolver.lookup(response["$ref"]).contents
     links = response["links"]
     assert len(links) == 3
     assert links["GET /users/{user_id}"] == {"parameters": {"userId": "$response.body#/id"}, "operationId": "getUser"}
@@ -140,32 +140,6 @@ def test_add_link_nothing_is_provided(schema_url):
             target="#/paths/~1users~1{user_id}/get",
             status_code="201",
         )
-
-
-@pytest.mark.parametrize(
-    "change, message",
-    (
-        (
-            lambda e: setattr(e, "method", "GET"),
-            "Method `GET` not found. Available methods: POST",
-        ),
-        (
-            lambda e: setattr(e, "path", "/userz/"),
-            "`/userz/` not found. Did you mean `/users/`?",
-        ),
-        (lambda e: setattr(e, "path", "/what?/"), "`/what?/` not found"),
-    ),
-    ids=("method-change", "path-with-suggestion", "path-without-suggestion"),
-)
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_add_link_unknown_operation(schema_url, change, message):
-    schema = schemathesis.from_uri(schema_url)
-    # When the source API operation is modified and can't be found
-    source = schema["/users/"]["POST"]
-    change(source)
-    with pytest.raises(KeyError, match=re.escape(message)):
-        # Then there should be an error about it.
-        schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")

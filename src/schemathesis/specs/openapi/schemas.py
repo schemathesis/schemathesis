@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import itertools
 from collections import defaultdict
-from contextlib import ExitStack, contextmanager, suppress
+from contextlib import suppress
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from hashlib import sha1
 from json import JSONDecodeError
 from threading import RLock
 from typing import (
@@ -14,6 +13,7 @@ from typing import (
     Callable,
     ClassVar,
     Generator,
+    Dict,
     Iterable,
     Iterator,
     Mapping,
@@ -21,13 +21,18 @@ from typing import (
     Sequence,
     TypeVar,
     cast,
+    overload,
 )
-from urllib.parse import urlsplit
+from urllib.parse import urldefrag, urljoin, urlsplit
 
 import jsonschema
 from hypothesis.strategies import SearchStrategy
 from packaging import version
+from referencing import Registry, Resource, Specification
+from referencing.exceptions import PointerToNowhere, Unresolvable
+from referencing.jsonschema import DRAFT4, DRAFT202012
 from requests.structures import CaseInsensitiveDict
+
 
 from ... import experimental, failures
 from ..._compat import MultipleFailures
@@ -48,7 +53,6 @@ from ...exceptions import (
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
 from ...internal.copy import fast_deepcopy
-from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -57,10 +61,19 @@ from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
 from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
-from . import links, serialization
+from . import links, serialization, types as t
+from .types import v2, v3
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
-from .converter import to_json_schema, to_json_schema_recursive
+from ._jsonschema import (
+    ObjectSchema,
+    Resolver,
+    Schema,
+    TransformConfig,
+    dynamic_scope,
+    get_remote_schema_retriever,
+    to_jsonschema,
+)
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
 from .filters import (
@@ -78,7 +91,6 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, UNRESOLVABLE, ConvertingResolver, InliningResolver, resolve_pointer
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -86,7 +98,10 @@ if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, PointerToNowhere)
+SCHEMA_PARSING_ERRORS = (ValueError,)
+
+P = TypeVar("P")
 
 
 @dataclass(eq=False, repr=False)
@@ -108,7 +123,7 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
+        self, response: GenericResponse, operation: OpenAPIOperation, stateful: Stateful | None
     ) -> Sequence[StatefulTest]:
         if stateful == Stateful.links:
             return links.get_links(response, operation, field=self.links_field)
@@ -160,7 +175,7 @@ class BaseOpenAPISchema(BaseSchema):
             return
         get_full_path = self.get_full_path
         endpoint = self.endpoint
-        resolve = self.resolver.resolve
+        resolve = self.resolver.lookup
         should_skip = self._should_skip
         for path, path_item in paths.items():
             full_path = get_full_path(path)
@@ -168,7 +183,7 @@ class BaseOpenAPISchema(BaseSchema):
                 continue
             try:
                 if "$ref" in path_item:
-                    _, path_item = resolve(path_item["$ref"])
+                    path_item = resolve(path_item["$ref"]).contents
                 # Straightforward iteration is faster than converting to a set & calculating length.
                 for method, definition in path_item.items():
                     if should_skip(method, definition):
@@ -189,12 +204,12 @@ class BaseOpenAPISchema(BaseSchema):
     @property
     def links_count(self) -> int:
         total = 0
-        resolve = self.resolver.resolve
+        resolve = self.resolver.lookup
         links_field = self.links_field
         for definition in self._operation_iter():
             for response in definition.get("responses", {}).values():
                 if "$ref" in response:
-                    _, response = resolve(response["$ref"])
+                    response = resolve(response["$ref"]).contents
                 defined_links = response.get(links_field)
                 if defined_links is not None:
                     total += len(defined_links)
@@ -220,27 +235,9 @@ class BaseOpenAPISchema(BaseSchema):
 
         return _add_override
 
-    def _resolve_until_no_references(self, value: dict[str, Any]) -> dict[str, Any]:
-        while "$ref" in value:
-            _, value = self.resolver.resolve(value["$ref"])
-        return value
-
-    def _resolve_shared_parameters(self, path_item: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return self.resolver.resolve_all(path_item.get("parameters", []), RECURSION_DEPTH_LIMIT - 8)
-
-    def _resolve_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
-        return self.resolver.resolve_all(operation, RECURSION_DEPTH_LIMIT - 8)
-
-    def _collect_operation_parameters(
-        self, path_item: Mapping[str, Any], operation: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        shared_parameters = self._resolve_shared_parameters(path_item)
-        parameters = operation.get("parameters", ())
-        return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
-
     def get_all_operations(
         self, hooks: HookDispatcher | None = None
-    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
+    ) -> Generator[Result[OpenAPIOperation, OperationSchemaError], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -267,41 +264,31 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc)
 
         context = HookContext()
-        # Optimization: local variables are faster than attribute access
-        get_full_path = self.get_full_path
-        endpoint = self.endpoint
-        dispatch_hook = self.dispatch_hook
-        resolve_path_item = self._resolve_path_item
-        resolve_shared_parameters = self._resolve_shared_parameters
-        resolve_operation = self._resolve_operation
-        should_skip = self._should_skip
-        collect_parameters = self.collect_parameters
-        make_operation = self.make_operation
-        hooks = self.hooks
+        hooks = hooks or self.hooks
         for path, path_item in paths.items():
             method = None
             try:
-                full_path = get_full_path(path)  # Should be available for later use
-                if should_skip_endpoint(full_path, endpoint):
+                full_path = self.get_full_path(path)
+                if should_skip_endpoint(full_path, self.endpoint):
                     continue
-                dispatch_hook("before_process_path", context, path, path_item)
-                scope, path_item = resolve_path_item(path_item)
-                shared_parameters = resolve_shared_parameters(path_item)
+                self.dispatch_hook("before_process_path", context, path, path_item)
+                resolver, path_item = self._maybe_resolve(path_item, self.resolver)
+                shared_parameters = self.initialize_shared_parameters(path_item.get("parameters", []), resolver)
                 for method, entry in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
                     try:
-                        resolved = resolve_operation(entry)
-                        if should_skip(method, resolved):
+                        if self._should_skip(method, entry):
                             continue
-                        parameters = resolved.get("parameters", ())
-                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                        operation = make_operation(path, method, parameters, entry, resolved, scope)
+                        local_parameters = self.initialize_local_parameters(entry, resolver)
+                        shared_parameters = self.update_shared_parameters(shared_parameters, entry)
+                        parameters = shared_parameters + local_parameters
+                        operation = self.make_operation(path, method, parameters, entry, resolver)
                         context = HookContext(operation=operation)
                         if (
                             should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
                             or should_skip_operation(hooks, context)
-                            or (hooks and should_skip_operation(hooks, context))
+                            or (self.hooks and should_skip_operation(self.hooks, context))
                         ):
                             continue
                         yield Ok(operation)
@@ -309,6 +296,25 @@ class BaseOpenAPISchema(BaseSchema):
                         yield self._into_err(exc, path, method)
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
+
+    def _maybe_resolve(self, value_or_ref: P | t.Reference, resolver: Resolver) -> tuple[Resolver, P]:
+        if "$ref" in value_or_ref:
+            resolved = resolver.lookup(value_or_ref["$ref"])
+            return resolved.resolver, resolved.contents
+        return resolver, value_or_ref
+
+    def initialize_shared_parameters(
+        self, parameters: list[t.Parameter | t.Reference], resolver: Resolver
+    ) -> list[OpenAPIParameter]:
+        raise NotImplementedError
+
+    def update_shared_parameters(
+        self, parameters: list[OpenAPIParameter], operation: t.Operation
+    ) -> list[OpenAPIParameter]:
+        raise NotImplementedError
+
+    def initialize_local_parameters(self, operation: t.Operation, resolver: Resolver) -> list[OpenAPIParameter]:
+        raise NotImplementedError
 
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[OperationSchemaError]:
         __tracebackhide__ = True
@@ -326,7 +332,7 @@ class BaseOpenAPISchema(BaseSchema):
         method: str | None = None,
     ) -> NoReturn:
         __tracebackhide__ = True
-        if isinstance(error, jsonschema.exceptions.RefResolutionError):
+        if isinstance(error, Unresolvable):
             raise OperationSchemaError.from_reference_resolution_error(
                 error, path=path, method=method, full_path=full_path
             ) from None
@@ -345,74 +351,73 @@ class BaseOpenAPISchema(BaseSchema):
     def _validate(self) -> None:
         raise NotImplementedError
 
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
-    ) -> list[OpenAPIParameter]:
-        """Collect Open API parameters.
-
-        They should be used uniformly during the generation step; therefore, we need to convert them into
-        a spec-independent list of parameters.
-        """
-        raise NotImplementedError
-
-    def _resolve_path_item(self, methods: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-        # The path item could be behind a reference
-        # In this case, we need to resolve it to get the proper scope for reference inside the item.
-        # It is mostly for validating responses.
-        if "$ref" in methods:
-            return self.resolver.resolve(methods["$ref"])
-        return self.resolver.resolution_scope, methods
-
     def make_operation(
         self,
         path: str,
         method: str,
         parameters: list[OpenAPIParameter],
         raw: dict[str, Any],
-        resolved: dict[str, Any],
-        scope: str,
-    ) -> APIOperation:
+        resolver: Resolver,
+    ) -> OpenAPIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
         base_url = self.get_base_url()
-        operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
+        operation: OpenAPIOperation = APIOperation(
             path=path,
             method=method,
-            definition=OperationDefinition(raw, resolved, scope),
+            definition=OpenAPIOperationDefinition(raw, resolver),
             base_url=base_url,
             app=self.app,
             schema=self,
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
-        self.security.process_definitions(self.raw_schema, operation, self.resolver)
+        # TODO: fix
+        # self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
 
     @property
-    def resolver(self) -> InliningResolver:
+    def _draft(self) -> Specification:
+        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+            return DRAFT202012
+        return DRAFT4
+
+    @property
+    def _registry(self) -> Registry:
+        if not hasattr(self, "_registry_cache"):
+            retrieve = get_remote_schema_retriever(self._draft)
+            self._registry_cache = Registry(retrieve=retrieve).with_resource(
+                self.location or "", Resource(contents=self.raw_schema, specification=self._draft)
+            )
+        return self._registry_cache
+
+    @property
+    def resolver(self) -> Resolver:
         if not hasattr(self, "_resolver"):
-            self._resolver = InliningResolver(self.location or "", self.raw_schema)
+            self._resolver = self._registry.resolver(base_uri=self.location or "")
         return self._resolver
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
         """Content types available for this API operation."""
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
-    def get_security_requirements(self, operation: APIOperation) -> list[str]:
+    def get_security_requirements(self, operation: OpenAPIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
         return self.security.get_security_requirements(self.raw_schema, operation)
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
         """Extract response schema from `responses`."""
         raise NotImplementedError
 
-    def get_operation_by_id(self, operation_id: str) -> APIOperation:
-        """Get an `APIOperation` instance by its `operationId`."""
+    def get_operation_by_id(self, operation_id: str) -> OpenAPIOperation:
+        """Get an `OpenAPIOperation` instance by its `operationId`."""
         cache = self._operation_cache
         cached = cache.get_operation_by_id(operation_id)
         if cached is not None:
@@ -430,23 +435,27 @@ class BaseOpenAPISchema(BaseSchema):
         instance = cache.get_operation_by_traversal_key(traversal_key)
         if instance is not None:
             return instance
-        resolved = self._resolve_operation(entry.operation)
-        parameters = self._collect_operation_parameters(entry.path_item, resolved)
-        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, resolved, entry.scope)
+        shared_parameters = self.initialize_shared_parameters(entry.path_item.get("parameters", []), entry.resolver)
+        local_parameters = self.initialize_local_parameters(entry.operation, entry.resolver)
+        shared_parameters = self.update_shared_parameters(shared_parameters, entry.operation)
+        parameters = shared_parameters + local_parameters
+        initialized = self.make_operation(entry.path, entry.method, parameters, entry.operation, entry.resolver)
         cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation_id)
         return initialized
 
     def _populate_operation_id_cache(self, cache: OperationCache) -> None:
         """Collect all operation IDs from the schema."""
-        resolve = self.resolver.resolve
-        default_scope = self.resolver.resolution_scope
+        resolver = self.resolver
+        lookup = resolver.lookup
         for path, path_item in self.raw_schema.get("paths", {}).items():
             # If the path is behind a reference we have to keep the scope
             # The scope is used to resolve nested components later on
             if "$ref" in path_item:
-                scope, path_item = resolve(path_item["$ref"])
+                resolved = lookup(path_item["$ref"])
+                resolver = resolved.resolver
+                path_item = resolved.contents
             else:
-                scope = default_scope
+                resolver = self.resolver
             for key, entry in path_item.items():
                 if key not in HTTP_METHODS:
                     continue
@@ -455,13 +464,13 @@ class BaseOpenAPISchema(BaseSchema):
                         entry["operationId"],
                         path=path,
                         method=key,
-                        scope=scope,
+                        resolver=resolver,
                         path_item=path_item,
                         operation=entry,
                     )
 
-    def get_operation_by_reference(self, reference: str) -> APIOperation:
-        """Get local or external `APIOperation` instance by reference.
+    def get_operation_by_reference(self, reference: str) -> OpenAPIOperation:
+        """Get local or external `OpenAPIOperation` instance by reference.
 
         Reference example: #/paths/~1users~1{user_id}/patch
         """
@@ -469,25 +478,35 @@ class BaseOpenAPISchema(BaseSchema):
         cached = cache.get_operation_by_reference(reference)
         if cached is not None:
             return cached
-        scope, operation = self.resolver.resolve(reference)
-        path, method = scope.rsplit("/", maxsplit=2)[-2:]
+        resolved = self.resolver.lookup(reference)
+        operation_resolver = resolved.resolver
+        operation = resolved.contents
+        if reference.startswith("#"):
+            fragment = reference[1:]
+        else:
+            _, fragment = urldefrag(urljoin(self.location or "", reference))
+        path, method = fragment.rsplit("/", maxsplit=2)[-2:]
         path = path.replace("~1", "/").replace("~0", "~")
         # Check the traversal cache as it could've been populated in other places
-        traversal_key = (self.resolver.resolution_scope, path, method)
+        scope = dynamic_scope(operation_resolver)
+        traversal_key = (scope, path, method)
         cached = cache.get_operation_by_traversal_key(traversal_key)
         if cached is not None:
             return cached
-        resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
-        _, path_item = self.resolver.resolve(parent_ref)
-        parameters = self._collect_operation_parameters(path_item, resolved)
-        initialized = self.make_operation(path, method, parameters, operation, resolved, scope)
+        resolved = self.resolver.lookup(parent_ref)
+        path_item = resolved.contents
+        shared_parameters = self.initialize_shared_parameters(path_item.get("parameters", []), resolved.resolver)
+        local_parameters = self.initialize_local_parameters(operation, operation_resolver)
+        shared_parameters = self.update_shared_parameters(shared_parameters, operation)
+        parameters = shared_parameters + local_parameters
+        initialized = self.make_operation(path, method, parameters, operation, resolved.resolver)
         cache.insert_operation(initialized, traversal_key=traversal_key, reference=reference)
         return initialized
 
     def get_case_strategy(
         self,
-        operation: APIOperation,
+        operation: OpenAPIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
@@ -503,8 +522,10 @@ class BaseOpenAPISchema(BaseSchema):
             **kwargs,
         )
 
-    def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
-        definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
+    def get_parameter_serializer(self, operation: OpenAPIOperation, location: str) -> Callable | None:
+        # TODO: Evaluate it eagerly
+        # definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
+        definitions = []
         security_parameters = self.security.get_security_definitions_as_parameters(
             self.raw_schema, operation, self.resolver, location
         )
@@ -518,9 +539,11 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> dict[str, Any] | None:
+    def _get_response_definitions(
+        self, operation: OpenAPIOperation, response: GenericResponse
+    ) -> dict[str, Any] | None:
         try:
-            responses = operation.definition.raw["responses"]
+            responses = operation.definition.value["responses"]
         except KeyError as exc:
             # Possible to get if `validate_schema=False` is passed during schema creation
             path = operation.path
@@ -528,14 +551,12 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
-            _, response = self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
-            return response
+            return operation.definition.maybe_resolve(responses[status_code])
         if "default" in responses:
-            _, response = self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
-            return response
+            return operation.definition.maybe_resolve(responses["default"])
         return None
 
-    def get_headers(self, operation: APIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
+    def get_headers(self, operation: OpenAPIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
         definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return None
@@ -552,8 +573,8 @@ class BaseOpenAPISchema(BaseSchema):
 
     def add_link(
         self,
-        source: APIOperation,
-        target: str | APIOperation,
+        source: OpenAPIOperation,
+        target: str | OpenAPIOperation,
         status_code: str | int,
         parameters: dict[str, str] | None = None,
         request_body: Any = None,
@@ -561,7 +582,7 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> None:
         """Add a new Open API link to the schema definition.
 
-        :param APIOperation source: This operation is the source of data
+        :param OpenAPIOperation source: This operation is the source of data
         :param target: This operation will receive the data from this link.
             Can be an ``APIOperation`` instance or a reference like this - ``#/paths/~1users~1{userId}/get``
         :param str status_code: The link is triggered when the source API operation responds with this status code.
@@ -586,8 +607,7 @@ class BaseOpenAPISchema(BaseSchema):
         if parameters is None and request_body is None:
             raise ValueError("You need to provide `parameters` or `request_body`.")
         links.add_link(
-            resolver=self.resolver,
-            responses=self[source.path][source.method].definition.raw["responses"],
+            source=source,
             links_field=self.links_field,
             parameters=parameters,
             request_body=request_body,
@@ -596,17 +616,19 @@ class BaseOpenAPISchema(BaseSchema):
             name=name,
         )
 
-    def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
+    def get_links(self, operation: OpenAPIOperation) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = defaultdict(dict)
         for status_code, link in links.get_all_links(operation):
             result[status_code][link.name] = link
         return result
 
-    def get_tags(self, operation: APIOperation) -> list[str] | None:
-        return operation.definition.raw.get("tags")
+    def get_tags(self, operation: OpenAPIOperation) -> list[str] | None:
+        return operation.definition.value.get("tags")
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
-        responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
+    def validate_response(self, operation: OpenAPIOperation, response: GenericResponse) -> bool | None:
+        """Validate the response against the schema."""
+        # First, get the high-level response definition
+        responses = {str(key): value for key, value in operation.definition.value.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
             definition = responses[status_code]
@@ -615,10 +637,13 @@ class BaseOpenAPISchema(BaseSchema):
         else:
             # No response defined for the received response status code
             return None
-        scopes, schema = self.get_response_schema(definition, operation.definition.scope)
+        # Then the actual schema may be behind a reference, so we need to resolve it
+        # and take into account the differences in response definitions between different Open API versions
+        resolver, schema = self.get_response_schema(definition, operation.definition.resolver)
         if not schema:
             # No schema to check against
             return None
+        # Reject responses with unknown content types
         content_type = response.headers.get("Content-Type")
         errors = []
         if content_type is None:
@@ -635,6 +660,7 @@ class BaseOpenAPISchema(BaseSchema):
         if content_type and not is_json_media_type(content_type):
             _maybe_raise_one_or_more(errors)
             return None
+        # Deserialize the response into JSON
         try:
             data = get_json(response)
         except JSONDecodeError as exc:
@@ -645,114 +671,95 @@ class BaseOpenAPISchema(BaseSchema):
             except Exception as exc:
                 errors.append(exc)
                 _maybe_raise_one_or_more(errors)
-        resolver = ConvertingResolver(
-            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
-        )
+        # At this point, the response schema should be converted to a valid JSON schema.
+        # There are a few things requiring special attention:
+        #
+        # 1. Open API specific keywords like `nullable` or `writeOnly` should be properly processed.
+        # 2. The schema may contain references to other parts of the root schema, so we need to make them resolvable.
+        # 3. The schema itself may already be loaded from an external location, therefore the proper resolving scope
+        #    should be used.
+        # TODO: Cache response schema
+        # TODO: prepare the schema
         if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
             cls = jsonschema.Draft202012Validator
+            id_key = "$id"
         else:
             cls = jsonschema.Draft4Validator
-        with in_scopes(resolver, scopes):
+            id_key = "id"
+        if resolver._base_uri != self.resolver._base_uri:
+            schema[id_key] = resolver._base_uri
+        try:
+            jsonschema.validate(data, schema, cls=cls, registry=resolver._registry)
+        except jsonschema.ValidationError as exc:
+            if exc.schema == schema and id_key in exc.schema:
+                del exc.schema[id_key]
+            exc_class = get_schema_validation_error(exc)
+            ctx = failures.ValidationErrorContext.from_exception(exc)
             try:
-                jsonschema.validate(data, schema, cls=cls, resolver=resolver)
-            except jsonschema.ValidationError as exc:
-                exc_class = get_schema_validation_error(exc)
-                ctx = failures.ValidationErrorContext.from_exception(exc)
-                try:
-                    raise exc_class(ctx.title, context=ctx) from exc
-                except Exception as exc:
-                    errors.append(exc)
+                raise exc_class(ctx.title, context=ctx) from exc
+            except Exception as exc:
+                errors.append(exc)
         _maybe_raise_one_or_more(errors)
-        return None  # explicitly return None for mypy
+        return None
+
+    def convert_schema_to_jsonschema(
+        self, schema: Schema, resolver: Resolver, remove_write_only: bool, remove_read_only: bool
+    ) -> dict[str, Any]:
+        """Convert the given schema to a JSON schema.
+
+        The Open API specification adds an extra layer of complexity on top of JSON schemas by introducing
+        additional keywords and structuring the spcification in a way so it requires extra processing in order
+        to be used for data generation or response validation. Additionally, the underlying data generation library,
+        `hypothesis-jsonschema` does not support remote or recursive references.
+
+        Generally, all use cases require all references to be resolvable and Open API specific keywords to be replaced
+        with their JSON schema counterparts. Specifically, this method moves referenced data to the root of the schema
+        as components and replaces references with local ones.
+        """
+        # Fast path for boolean schemas
+        if schema is True:
+            return {}
+        elif schema is False:
+            return {"not": {}}
+        config = TransformConfig(
+            nullable_key=self.nullable_name,
+            remove_write_only=remove_write_only,
+            remove_read_only=remove_read_only,
+            # If the schema is local in respect to the root schema, then it may contain references to the root schema
+            # components. Therefore they should be visible to the schema so references can be resolved.
+            components=self._components_cache,
+            moved_schemas=self._moved_references_cache,
+        )
+        converted = to_jsonschema(resolver._base_uri, schema, self._registry, self._draft, config)
+        return cast(dict[str, Any], converted)
 
     @property
-    def rewritten_components(self) -> dict[str, Any]:
-        if not hasattr(self, "_rewritten_components"):
-
-            def callback(_schema: dict[str, Any], nullable_name: str) -> dict[str, Any]:
-                _schema = to_json_schema(_schema, nullable_name=nullable_name, copy=False)
-                return self._rewrite_references(_schema, self.resolver)
-
-            # Different spec versions allow different keywords to store possible reference targets
+    def _components_cache(self) -> dict[str, ObjectSchema]:
+        """A mutable copy of components defined in the schema."""
+        if not hasattr(self, "_components_cache_"):
             components: dict[str, Any] = {}
             for path in self.component_locations:
-                schema = self.raw_schema
+                source = self.raw_schema
                 target = components
-                for chunk in path:
-                    if chunk in schema:
-                        schema = schema[chunk]
-                        target = target.setdefault(chunk, {})
+                for segment in path:
+                    if segment in source:
+                        source = source[segment]
+                        target = target.setdefault(segment, {})
                     else:
                         break
                 else:
-                    target.update(traverse_schema(fast_deepcopy(schema), callback, self.nullable_name))
-            if self._inline_reference_cache:
-                components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
-            self._rewritten_components = components
-        return self._rewritten_components
+                    target.update(fast_deepcopy(source))
+            self._components_cache_ = components
+            return components
+        return self._components_cache_
 
-    def prepare_schema(self, schema: Any) -> Any:
-        """Inline Open API definitions.
-
-        Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
-        """
-        schema = fast_deepcopy(schema)
-        schema = traverse_schema(schema, self._rewrite_references, self.resolver)
-        # Only add definitions that are reachable from the schema via references
-        stack = [schema]
-        seen = set()
-        while stack:
-            item = stack.pop()
-            if isinstance(item, dict):
-                if "$ref" in item:
-                    reference = item["$ref"]
-                    if isinstance(reference, str) and reference.startswith("#/") and reference not in seen:
-                        seen.add(reference)
-                        # Resolve the component and add it to the proper place in the schema
-                        pointer = reference[1:]
-                        resolved = resolve_pointer(self.rewritten_components, pointer)
-                        if resolved is UNRESOLVABLE:
-                            raise SchemaError(
-                                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
-                                message=f"Unresolvable JSON pointer in the schema: {pointer}",
-                            )
-                        if isinstance(resolved, dict):
-                            container = schema
-                            for key in pointer.split("/")[1:]:
-                                container = container.setdefault(key, {})
-                            container.update(resolved)
-                        # Explore the resolved value too
-                        stack.append(resolved)
-                # Still explore other values as they may have nested references in other keys
-                for value in item.values():
-                    if isinstance(value, (dict, list)):
-                        stack.append(value)
-            elif isinstance(item, list):
-                for sub_item in item:
-                    if isinstance(sub_item, (dict, list)):
-                        stack.append(sub_item)
-        return schema
-
-    def _rewrite_references(self, schema: dict[str, Any], resolver: InliningResolver) -> dict[str, Any]:
-        """Rewrite references present in the schema.
-
-        The idea is to resolve references, cache the result and replace these references with new ones
-        that point to a local path which is populated from this cache later on.
-        """
-        reference = schema.get("$ref")
-        # If `$ref` is not a property name and should be processed
-        if reference is not None and isinstance(reference, str) and not reference.startswith("#/"):
-            key = _make_reference_key(resolver._scopes_stack, reference)
-            with self._inline_reference_cache_lock:
-                if key not in self._inline_reference_cache:
-                    with resolver.resolving(reference) as resolved:
-                        # Resolved object also may have references
-                        self._inline_reference_cache[key] = traverse_schema(
-                            resolved, lambda s: self._rewrite_references(s, resolver)
-                        )
-            # Rewrite the reference with the new location
-            schema["$ref"] = f"#/{INLINED_REFERENCES_KEY}/{key}"
-        return schema
+    @property
+    def _moved_references_cache(self) -> dict[str, ObjectSchema]:
+        if not hasattr(self, "_moved_references_cache_"):
+            cache = {}
+            self._moved_references_cache_ = cache
+            return cache
+        return self._moved_references_cache_
 
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
@@ -764,43 +771,24 @@ def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
         raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
 
 
-def _make_reference_key(scopes: list[str], reference: str) -> str:
-    """A name under which the resolved reference data will be stored."""
-    # Using a hexdigest is the simplest way to associate practically unique keys with each reference
-    digest = sha1()
-    for scope in scopes:
-        digest.update(scope.encode("utf-8"))
-        # Separator to avoid collisions like this: ["a"], "bc" vs. ["ab"], "c". Otherwise, the resulting digest
-        # will be the same for both cases
-        digest.update(b"#")
-    digest.update(reference.encode("utf-8"))
-    return digest.hexdigest()
+@dataclass
+class OpenAPIOperationDefinition(OperationDefinition):
+    value: dict[str, Any]
+    resolver: Resolver
+
+    def maybe_resolve(self, item: dict[str, Any], unlimited: bool = False) -> Any:
+        if unlimited:
+            while "$ref" in item:
+                item = self.lookup(item["$ref"])
+        elif "$ref" in item:
+            return self.lookup(item["$ref"])
+        return item
+
+    def lookup(self, key: str) -> Any:
+        return self.resolver.lookup(key).contents
 
 
-INLINED_REFERENCES_KEY = "x-inlined"
-
-
-@contextmanager
-def in_scope(resolver: jsonschema.RefResolver, scope: str) -> Generator[None, None, None]:
-    resolver.push_scope(scope)
-    try:
-        yield
-    finally:
-        resolver.pop_scope()
-
-
-@contextmanager
-def in_scopes(resolver: jsonschema.RefResolver, scopes: list[str]) -> Generator[None, None, None]:
-    """Push all available scopes into the resolver.
-
-    There could be an additional scope change during a schema resolving in `get_response_schema`, so in total there
-    could be a stack of two scopes maximum. This context manager handles both cases (1 or 2 scope changes) in the same
-    way.
-    """
-    with ExitStack() as stack:
-        for scope in scopes:
-            stack.enter_context(in_scope(resolver, scope))
-        yield
+OpenAPIOperation = APIOperation[OpenAPIParameter, Case, OpenAPIOperationDefinition]
 
 
 @dataclass
@@ -811,14 +799,14 @@ class MethodMap(Mapping):
     """
 
     _parent: APIOperationMap
-    # Reference resolution scope
-    _scope: str
+    # Reference resolver
+    _resolver: Resolver
     # Methods are stored for this path
     _path: str
     # Storage for definitions
     _path_item: CaseInsensitiveDict
 
-    __slots__ = ("_parent", "_scope", "_path", "_path_item")
+    __slots__ = ("_parent", "_resolver", "_path", "_path_item")
 
     def __len__(self) -> int:
         return len(self._path_item)
@@ -826,28 +814,27 @@ class MethodMap(Mapping):
     def __iter__(self) -> Iterator[str]:
         return iter(self._path_item)
 
-    def _init_operation(self, method: str) -> APIOperation:
+    def _init_operation(self, method: str) -> OpenAPIOperation:
         method = method.lower()
         operation = self._path_item[method]
         schema = cast(BaseOpenAPISchema, self._parent._schema)
         cache = schema._operation_cache
+        resolver = self._resolver
+        scope = tuple(uri for uri, _ in resolver.dynamic_scope())
         path = self._path
-        scope = self._scope
         traversal_key = (scope, path, method)
         cached = cache.get_operation_by_traversal_key(traversal_key)
         if cached is not None:
             return cached
-        schema.resolver.push_scope(scope)
-        try:
-            resolved = schema._resolve_operation(operation)
-        finally:
-            schema.resolver.pop_scope()
-        parameters = schema._collect_operation_parameters(self._path_item, resolved)
-        initialized = schema.make_operation(path, method, parameters, operation, resolved, scope)
-        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=resolved.get("operationId"))
+        shared_parameters = schema.initialize_shared_parameters(self._path_item.get("parameters", []), resolver)
+        local_parameters = schema.initialize_local_parameters(operation, resolver)
+        shared_parameters = schema.update_shared_parameters(shared_parameters, operation)
+        parameters = shared_parameters + local_parameters
+        initialized = schema.make_operation(path, method, parameters, operation, resolver)
+        cache.insert_operation(initialized, traversal_key=traversal_key, operation_id=operation.get("operationId"))
         return initialized
 
-    def __getitem__(self, item: str) -> APIOperation:
+    def __getitem__(self, item: str) -> OpenAPIOperation:
         try:
             return self._init_operation(item)
         except KeyError as exc:
@@ -864,6 +851,7 @@ C = TypeVar("C", bound=Case)
 
 
 class SwaggerV20(BaseOpenAPISchema):
+    raw_schema: v2.Specification
     nullable_name = "x-nullable"
     example_field = "x-example"
     examples_field = "x-examples"
@@ -886,18 +874,56 @@ class SwaggerV20(BaseOpenAPISchema):
     def _get_base_path(self) -> str:
         return self.raw_schema.get("basePath", "/")
 
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
+    def initialize_shared_parameters(
+        self, parameters: list[t.v2.Parameter | t.Reference], path_item_resolver: Resolver
     ) -> list[OpenAPIParameter]:
-        # The main difference with Open API 3.0 is that it has `body` and `form` parameters that we need to handle
-        # differently.
-        collected: list[OpenAPIParameter] = []
-        # NOTE. The Open API 2.0 spec doesn't strictly imply having media types in the "consumes" keyword.
-        # It is not enforced by the meta schema and has no "MUST" verb in the spec text.
-        # Also, not every API has operations with payload (they might have only GET operations without payloads).
-        # For these reasons, it might be (and often is) absent, and we need to provide the proper media type in case
-        # we have operations with a payload.
-        media_types = self._get_consumes_for_operation(definition)
+        initialized: list[OpenAPIParameter] = []
+        form_parameters = []
+        for parameter_or_ref in parameters:
+            resolver, parameter = self._maybe_resolve(parameter_or_ref, path_item_resolver)
+
+            if parameter["in"] == "formData":
+                # We need to gather form parameters first before creating a composite parameter for them
+                form_parameters.append(parameter_or_ref)
+            elif parameter["in"] == "body":
+                initialized.append(OpenAPI20Body(definition=parameter_or_ref, media_type=""))
+            else:
+                initialized.append(OpenAPI20Parameter(definition=parameter_or_ref))
+
+        if form_parameters:
+            initialized.append(
+                # Individual `formData` parameters are joined into a single "composite" one.
+                OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type="")
+            )
+        return initialized
+
+    def update_shared_parameters(
+        self, parameters: list[OpenAPIParameter], operation: t.Operation
+    ) -> list[OpenAPIParameter]:
+        if not parameters:
+            return parameters
+
+        updated: list[OpenAPIParameter] = []
+
+        media_types = self._get_consumes_for_operation(operation)
+        body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
+        form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
+        for parameter in parameters:
+            if isinstance(parameter, OpenAPI20Body):
+                for media_type in body_media_types:
+                    updated.append(
+                        OpenAPI20Body(definition=parameter.definition, schema=parameter.schema, media_type=media_type)
+                    )
+            else:
+                # TODO: What about form parameters?
+                updated.append(parameter)
+        return updated
+
+    def initialize_local_parameters(
+        self, operation: t.v2.Operation, operation_resolver: Resolver
+    ) -> list[OpenAPIParameter]:
+        initialized: list[OpenAPIParameter] = []
+        media_types = self._get_consumes_for_operation(operation)
         # For `in=body` parameters, we imply `application/json` as the default media type because it is the most common.
         body_media_types = media_types or (OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE,)
         # If an API operation has parameters with `in=formData`, Schemathesis should know how to serialize it.
@@ -906,39 +932,71 @@ class SwaggerV20(BaseOpenAPISchema):
         form_data_media_types = media_types or (OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE,)
 
         form_parameters = []
-        for parameter in parameters:
-            if parameter["in"] == "formData":
-                # We need to gather form parameters first before creating a composite parameter for them
-                form_parameters.append(parameter)
-            elif parameter["in"] == "body":
+        parameters = operation.get("parameters", [])
+        for parameter_or_ref in parameters:
+            resolver, parameter = self._maybe_resolve(parameter_or_ref, operation_resolver)
+            if parameter["in"] == "body":
+                schema_or_ref = parameter["schema"]
+                resolver, schema = self._maybe_resolve(schema_or_ref, resolver)
+                cleaned_schema = OpenAPI20Body.clean_schema(schema)
+                converted_schema = self.convert_schema_to_jsonschema(
+                    cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+                )
                 for media_type in body_media_types:
-                    collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
+                    initialized.append(
+                        OpenAPI20Body(definition=parameter, schema=converted_schema, media_type=media_type)
+                    )
             else:
-                collected.append(OpenAPI20Parameter(definition=parameter))
+                # Open API 2.0 non-body parameters define schema keywords directly in the parameter object
+                cleaned_schema = OpenAPI20Parameter.clean_schema(parameter)
+                converted_schema = self.convert_schema_to_jsonschema(
+                    cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+                )
+                if parameter["in"] == "formData":
+                    # We need to gather form parameters first before creating a composite parameter for them
+                    form_parameters.append((parameter, converted_schema))
+                    continue
+                initialized.append(
+                    OpenAPI20Parameter(
+                        name=parameter["name"],
+                        location=parameter["in"],
+                        required=parameter.get("required", False),
+                        definition=parameter,
+                        schema=converted_schema,
+                    )
+                )
 
         if form_parameters:
+            properties = {}
+            required = []
+            for parameter, schema in form_parameters:
+                name = parameter["name"]
+                properties[name] = schema
+                # If parameter names are duplicated, we need to avoid duplicate entries in `required` anyway
+                if parameter.get("required", False) and name not in required:
+                    required.append(name)
+            schema = {"properties": properties, "additionalProperties": False, "type": "object", "required": required}
             for media_type in form_data_media_types:
-                collected.append(
-                    # Individual `formData` parameters are joined into a single "composite" one.
-                    OpenAPI20CompositeBody.from_parameters(*form_parameters, media_type=media_type)
-                )
-        return collected
+                # TODO: properly collect it - maybe remove "composite" at all?
+                # Remove `definition` from params as well?
+                initialized.append(OpenAPI20CompositeBody(definition={}, schema=schema, media_type=media_type))
+        return initialized
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
-        schema = definition.get("schema")
-        if not schema:
-            return scopes, None
-        # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-        # because it is not converted
-        return scopes, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
+        if "$ref" in definition:
+            resolved = resolver.lookup(definition["$ref"])
+            resolver = resolved.resolver
+            definition = resolved.contents
+        return resolver, definition.get("schema")
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
-        produces = operation.definition.raw.get("produces", None)
+    def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
+        produces = operation.definition.value.get("produces", None)
         if produces:
             return produces
         return self.raw_schema.get("produces", [])
@@ -947,7 +1005,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
-        self, form_data: FormData, operation: APIOperation
+        self, form_data: FormData, operation: OpenAPIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         """Prepare form data for sending with `requests`.
 
@@ -982,14 +1040,14 @@ class SwaggerV20(BaseOpenAPISchema):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        return self._get_consumes_for_operation(operation.definition.raw)
+    def get_request_payload_content_types(self, operation: OpenAPIOperation) -> list[str]:
+        return self._get_consumes_for_operation(operation.definition.value)
 
     def make_case(
         self,
         *,
         case_cls: type[C],
-        operation: APIOperation,
+        operation: OpenAPIOperation,
         path_parameters: PathParameters | None = None,
         headers: Headers | None = None,
         cookies: Cookies | None = None,
@@ -1034,8 +1092,8 @@ class SwaggerV20(BaseOpenAPISchema):
             consumes = global_consumes
         return consumes
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
-        for parameter in definition.get("parameters", []):
+    def get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
+        for parameter in definition.value.get("parameters", []):
             if parameter["in"] == "body":
                 return parameter["schema"]
         return None
@@ -1074,36 +1132,104 @@ class OpenApi30(SwaggerV20):
             return urlsplit(url).path
         return "/"
 
-    def collect_parameters(
-        self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
+    def initialize_shared_parameters(
+        self,
+        parameters: list[t.v3.Parameter | t.Reference],
+        path_item_resolver: Resolver,
     ) -> list[OpenAPIParameter]:
-        # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
-        collected: list[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
-        if "requestBody" in definition:
-            required = definition["requestBody"].get("required", False)
-            description = definition["requestBody"].get("description")
-            for media_type, content in definition["requestBody"]["content"].items():
-                collected.append(
-                    OpenAPI30Body(content, description=description, media_type=media_type, required=required)
+        initialized: list[OpenAPIParameter] = []
+        for parameter_or_ref in parameters:
+            resolver, parameter = self._maybe_resolve(parameter_or_ref, path_item_resolver)
+            schema_or_ref = parameter["schema"]
+            resolver, schema = self._maybe_resolve(schema_or_ref, resolver)
+            cleaned_schema = OpenAPI30Parameter.clean_schema(schema)
+            converted_schema = self.convert_schema_to_jsonschema(
+                cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+            )
+            initialized.append(
+                OpenAPI30Parameter(
+                    name=parameter["name"],
+                    location=parameter["in"],
+                    required=parameter.get("required", False),
+                    definition=parameter,
+                    schema=converted_schema,
                 )
-        return collected
+            )
+        return initialized
 
-    def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
-        scopes, definition = self.resolver.resolve_in_scope(definition, scope)
+    def update_shared_parameters(
+        self, parameters: list[OpenAPIParameter], operation: t.Operation
+    ) -> list[OpenAPIParameter]:
+        return parameters
+
+    def initialize_local_parameters(
+        self,
+        operation: t.v3.Operation,
+        operation_resolver: Resolver,
+    ) -> list[OpenAPIParameter]:
+        """Initialize all parameters for an API operation.
+
+        Parameters contain metadata that is needed for data generation.
+        Initialization happens eagerly to avoid schema transformations during the generation phase.
+        """
+        initialized: list[OpenAPIParameter] = []
+        parameters = operation.get("parameters", [])
+        for parameter_or_ref in parameters:
+            resolver, parameter = self._maybe_resolve(parameter_or_ref, operation_resolver)
+            schema_or_ref = parameter["schema"]
+            resolver, schema = self._maybe_resolve(schema_or_ref, resolver)
+            cleaned_schema = OpenAPI30Parameter.clean_schema(schema)
+            converted_schema = self.convert_schema_to_jsonschema(
+                cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+            )
+            initialized.append(
+                OpenAPI30Parameter(
+                    name=parameter["name"],
+                    location=parameter["in"],
+                    required=parameter.get("required", False),
+                    definition=parameter,
+                    schema=converted_schema,
+                )
+            )
+        if "requestBody" in operation:
+            resolver, body = self._maybe_resolve(operation["requestBody"], operation_resolver)
+            required = body.get("required", False)
+            for media_type, content in body["content"].items():
+                schema_or_ref = content.get("schema", {})
+                resolver, schema = self._maybe_resolve(schema_or_ref, resolver)
+                cleaned_schema = OpenAPI30Body.clean_schema(schema)
+                converted_schema = self.convert_schema_to_jsonschema(
+                    cleaned_schema, resolver, remove_write_only=False, remove_read_only=True
+                )
+                initialized.append(
+                    OpenAPI30Body(
+                        name="body",
+                        required=required,
+                        location="body",
+                        definition=content,
+                        schema=converted_schema,
+                        media_type=media_type,
+                    )
+                )
+        return initialized
+
+    def get_response_schema(
+        self, definition: dict[str, Any], resolver: Resolver
+    ) -> tuple[Resolver, dict[str, Any] | None]:
+        if "$ref" in definition:
+            resolved = resolver.lookup(definition["$ref"])
+            resolver = resolved.resolver
+            definition = resolved.contents
         options = iter(definition.get("content", {}).values())
         option = next(options, None)
         # "schema" is an optional key in the `MediaType` object
-        if option and "schema" in option:
-            # Extra conversion to JSON Schema is needed here if there was one $ref in the input
-            # because it is not converted
-            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
-        return scopes, None
+        return resolver, (option or {}).get("schema")
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: OpenAPIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, self.examples_field)
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: OpenAPIOperation, response: GenericResponse) -> list[str]:
         definitions = self._get_response_definitions(operation, response)
         if not definitions:
             return []
@@ -1112,12 +1238,12 @@ class OpenApi30(SwaggerV20):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         return serialization.serialize_openapi3_parameters(definitions)
 
-    def get_request_payload_content_types(self, operation: APIOperation) -> list[str]:
-        request_body = self._resolve_until_no_references(operation.definition.raw["requestBody"])
+    def get_request_payload_content_types(self, operation: OpenAPIOperation) -> list[str]:
+        request_body = operation.definition.maybe_resolve(operation.definition.value["requestBody"], unlimited=True)
         return list(request_body["content"])
 
     def prepare_multipart(
-        self, form_data: FormData, operation: APIOperation
+        self, form_data: FormData, operation: OpenAPIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         """Prepare form data for sending with `requests`.
 
@@ -1126,11 +1252,7 @@ class OpenApi30(SwaggerV20):
         :return: `files` and `data` values for `requests.request`.
         """
         files = []
-        definition = operation.definition.raw
-        if "$ref" in definition["requestBody"]:
-            body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
-        else:
-            body = definition["requestBody"]
+        body = operation.definition.maybe_resolve(operation.definition.value["requestBody"], unlimited=True)
         content = body["content"]
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
@@ -1152,12 +1274,9 @@ class OpenApi30(SwaggerV20):
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
 
-    def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
-        if "requestBody" in definition:
-            if "$ref" in definition["requestBody"]:
-                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
-            else:
-                body = definition["requestBody"]
+    def get_payload_schema(self, definition: OpenAPIOperationDefinition, media_type: str) -> dict[str, Any] | None:
+        if "requestBody" in definition.value:
+            body = definition.maybe_resolve(definition.value["requestBody"], unlimited=True)
             if "content" in body:
                 main, sub = parse_content_type(media_type)
                 for defined_media_type, item in body["content"].items():

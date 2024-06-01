@@ -1,0 +1,69 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Shared FormData Parameters Test API",
+    "version": "1.0.0"
+  },
+  "host": "api.example.com",
+  "basePath": "/v1",
+  "schemes": [
+    "https"
+  ],
+  "consumes": [
+    "multipart/form-data"
+  ],
+  "paths": {
+    "/form-data": {
+      "parameters": [
+        {
+          "name": "shared_file",
+          "in": "formData",
+          "required": false,
+          "type": "file"
+        },
+        {
+          "name": "shared_name",
+          "in": "formData",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "shared_age",
+          "in": "formData",
+          "required": false,
+          "type": "integer",
+          "format": "int32"
+        }
+      ],
+      "post": {
+        "summary": "Create with shared form-data",
+        "parameters": [
+          {
+            "name": "local_file",
+            "in": "formData",
+            "required": true,
+            "type": "file"
+          },
+          {
+            "name": "local_name",
+            "in": "formData",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "local_age",
+            "in": "formData",
+            "required": false,
+            "type": "integer",
+            "format": "int32"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful response"
+          }
+        }
+      }
+    }
+  }
+}

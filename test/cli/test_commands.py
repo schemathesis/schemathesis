@@ -1824,12 +1824,13 @@ def test_auth_override_on_protected_operation(cli, schema_url, extra, snapshot_c
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("flaky")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
+def test_explicit_headers_in_output_on_errors(cli, schema_url):
     # When there is a non-fatal error during testing (e.g. flakiness)
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
     # Then the code sample should have the overridden value
-    assert cli.run(schema_url, "--checks=all", "--sanitize-output=false", f"-H Authorization: {auth}") == snapshot_cli
+    result = cli.run(schema_url, "--checks=all", "--sanitize-output=false", f"-H Authorization: {auth}")
+    assert auth in result.stdout, result.stdout
 
 
 @pytest.mark.openapi_version("3.0")

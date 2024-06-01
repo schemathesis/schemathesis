@@ -5,7 +5,6 @@ from schemathesis.exceptions import OperationNotFound, OperationSchemaError, Sch
 from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.internal.result import Err, Ok
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
-from schemathesis.specs.openapi.schemas import InliningResolver
 
 
 @pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
@@ -43,18 +42,6 @@ def test_open_api_verbose_name(openapi_30):
     assert openapi_30.spec_version == "3.0.0"
 
 
-def test_resolver_cache(simple_schema, mocker):
-    schema = schemathesis.from_dict(simple_schema)
-    spy = mocker.patch("schemathesis.specs.openapi.schemas.InliningResolver", wraps=InliningResolver)
-    assert "_resolver" not in schema.__dict__
-    assert isinstance(schema.resolver, InliningResolver)
-    assert spy.call_count == 1
-    # Cached
-    assert "_resolver" in schema.__dict__
-    assert isinstance(schema.resolver, InliningResolver)
-    assert spy.call_count == 1
-
-
 def test_resolving_multiple_files():
     raw_schema = {
         "swagger": "2.0",
@@ -85,20 +72,7 @@ def test_resolving_multiple_files():
     assert isinstance(body, OpenAPI20Body)
     assert body.media_type == "application/json"
     assert body.definition == {
-        "schema": {
-            "type": "object",
-            "properties": {
-                "id": {"type": "integer", "format": "int64"},
-                "username": {"type": "string"},
-                "firstName": {"type": "string"},
-                "lastName": {"type": "string"},
-                "email": {"type": "string"},
-                "password": {"type": "string"},
-                "phone": {"type": "string"},
-                "userStatus": {"type": "integer", "format": "int32", "description": "User Status"},
-            },
-            "xml": {"name": "User"},
-        },
+        "schema": {"$ref": "test/data/petstore_v2.yaml#/definitions/User"},
         "in": "body",
         "name": "user",
         "required": True,
@@ -252,13 +226,12 @@ def test_missing_payload_schema(request, fixture, path):
     raw_schema = request.getfixturevalue(fixture)
     schema = schemathesis.from_dict(raw_schema)
     operation = schema[path]["GET"]
-    assert operation.get_raw_payload_schema("application/xml") is None
-    assert operation.get_resolved_payload_schema("application/xml") is None
+    assert operation.get_payload_schema("application/xml") is None
 
 
 def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
     schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
-    assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
+    assert schema["/yaml"]["POST"].get_payload_schema("application/xml") is None
 
 
 def test_ssl_error(openapi3_schema_url, server):

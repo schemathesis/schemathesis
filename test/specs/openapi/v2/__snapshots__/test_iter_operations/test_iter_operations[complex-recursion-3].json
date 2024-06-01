@@ -1,0 +1,57 @@
+{
+  "body": [
+    {
+      "media_type": "application/json",
+      "required": true,
+      "schema": {
+        "$ref": "#/x-moved-schemas/-definitions-Patch",
+        "x-moved-schemas": {
+          "-definitions-Leaf": {},
+          "-definitions-Patch": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-schemas/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-schemas/-definitions-Leaf"
+                  }
+                }
+              }
+            }
+          },
+          "-definitions-Put": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-schemas/-definitions-Leaf"
+              },
+              "right": {
+                "properties": {
+                  "left": {
+                    "$ref": "#/x-moved-schemas/-definitions-Leaf"
+                  }
+                }
+              }
+            }
+          },
+          "-definitions-Shared": {
+            "properties": {
+              "left": {
+                "$ref": "#/x-moved-schemas/-definitions-Leaf"
+              },
+              "right": {
+                "$ref": "#/x-moved-schemas/-definitions-Put"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "headers": [],
+  "method": "patch",
+  "path": "/first",
+  "path_parameters": [],
+  "query": []
+}
