@@ -30,30 +30,6 @@
                             "properties": {
                               "name": {
                                 "type": "string"
-                              },
-                              "ref-cycle-2-b": {
-                                "properties": {
-                                  "email": {
-                                    "type": "string"
-                                  },
-                                  "ref-cycle-2-c": {
-                                    "properties": {
-                                      "id": {
-                                        "type": "string"
-                                      },
-                                      "ref-cycle-2-root": {
-                                        "properties": {
-                                          "name": {
-                                            "type": "string"
-                                          }
-                                        },
-                                        "type": "object"
-                                      }
-                                    },
-                                    "type": "object"
-                                  }
-                                },
-                                "type": "object"
                               }
                             },
                             "type": "object"

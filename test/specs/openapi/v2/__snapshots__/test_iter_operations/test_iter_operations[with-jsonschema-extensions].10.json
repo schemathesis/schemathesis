@@ -25,22 +25,6 @@
                         "properties": {
                           "name": {
                             "type": "string"
-                          },
-                          "ref-cycle-1-b": {
-                            "properties": {
-                              "id": {
-                                "type": "string"
-                              },
-                              "ref-cycle-1-root": {
-                                "properties": {
-                                  "name": {
-                                    "type": "string"
-                                  }
-                                },
-                                "type": "object"
-                              }
-                            },
-                            "type": "object"
                           }
                         },
                         "type": "object"

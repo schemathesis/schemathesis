@@ -310,7 +310,6 @@ class SchemaTransformer(BaseTransformer):
                                 self.ctx.transform_cache.unrecursed_schemas[schema_key] = new
                     self.ctx.pop()
                     replacement[idx] = new
-
         self._maybe_replace_list(keyword, schemas, replacement)
         return Ok(None)
 

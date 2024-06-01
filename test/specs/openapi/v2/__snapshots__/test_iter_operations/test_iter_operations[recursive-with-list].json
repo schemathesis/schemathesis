@@ -29,29 +29,6 @@
                                 "properties": {
                                   "name": {
                                     "type": "string"
-                                  },
-                                  "ref": {
-                                    "properties": {
-                                      "id": {
-                                        "type": "string"
-                                      },
-                                      "ref": {
-                                        "allOf": [
-                                          {
-                                            "properties": {
-                                              "name": {
-                                                "type": "string"
-                                              }
-                                            },
-                                            "type": "object"
-                                          },
-                                          {
-                                            "pattern": "^foo"
-                                          }
-                                        ]
-                                      }
-                                    },
-                                    "type": "object"
                                   }
                                 },
                                 "type": "object"
