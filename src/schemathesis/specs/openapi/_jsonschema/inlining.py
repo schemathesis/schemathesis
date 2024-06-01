@@ -54,7 +54,6 @@ class UnrecurseContext:
     def reset(self) -> None:
         """Reset the context."""
         self.total_inlinings = 0
-        self.local_cache.clear()
 
     def get_cached_replacement(self, key: SchemaKey) -> ObjectSchema | None:
         return self.local_cache.get(key)
@@ -211,6 +210,7 @@ class SchemaTransformer(BaseTransformer):
                     if cached is not None:
                         new = cached
                     else:
+                        print("Miss")
                         referenced_item = self.ctx.schemas[schema_key]
                         if self.ctx.push(schema_key):
                             result = self.descend(referenced_item)
