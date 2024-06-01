@@ -90,6 +90,8 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
         new = result.ok()
         if new is not original:
             schemas[name] = new
+        else:
+            cache.unrecursed_schemas[name] = new
             # TODO: Try to use the global cache here
         ctx.discard_recursive_reference(name)
         ctx.reset()
