@@ -86,10 +86,11 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
             continue
         result = SchemaTransformer(original, ctx, new={}, remove=[]).dispatch()
         if isinstance(result, Err):
-            raise result.err()
+            continue
         new = result.ok()
         if new is not original:
             schemas[name] = new
+            # TODO: Try to use the global cache here
         ctx.discard_recursive_reference(name)
         ctx.reset()
 
@@ -170,15 +171,15 @@ class SchemaTransformer(BaseTransformer):
             schema_key, _ = _key_for_reference(reference)
             referenced_item = self.ctx.schemas[schema_key]
             if self.ctx.push(schema_key):
-                result = self.descend(referenced_item)
-                if isinstance(result, Err):
-                    raise NotImplementedError("TODO!")
-                replacement = result.ok()
+                inner_result = self.descend(referenced_item)
+                if isinstance(inner_result, Err):
+                    return inner_result
+                replacement = inner_result.ok()
             else:
-                result = LeafTransformer.run(referenced_item, self.ctx)
-                if isinstance(result, Err):
-                    raise NotImplementedError("TODO!")
-                replacement = result.ok()
+                inner_result = LeafTransformer.run(referenced_item, self.ctx)
+                if isinstance(inner_result, Err):
+                    return inner_result
+                replacement = inner_result.ok()
             self.ctx.pop()
             return Ok(replacement)
         for key, value in self.original.items():
