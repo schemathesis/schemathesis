@@ -134,19 +134,17 @@ def test_non_recursive_with_multiple_refs():
     assert not ctx.config.cache.recursive_references
 
 
-@pytest.fixture(
-    params=[
+@pytest.mark.parametrize(
+    "reference",
+    [
         "./shared.json#/definitions/A",
         "file://shared.json#/definitions/A",
         "shared.yml#/definitions/A",
-    ]
+    ],
 )
-def non_recursive_with_relative_file(request):
-    return {"definitions": {"A": {"$ref": request.param}}}
-
-
-def test_non_recursive_with_relative_file(testdir, non_recursive_with_relative_file):
-    filename = non_recursive_with_relative_file["definitions"]["A"]["$ref"].split("#")[0]
+def test_non_recursive_with_relative_file(testdir, reference):
+    schema = {"definitions": {"A": {"$ref": reference}}}
+    filename = reference.split("#")[0]
     if filename.startswith("file://"):
         filename = filename[7:].lstrip("./")
     filename, extension = filename.rsplit(".", 1)
@@ -165,10 +163,41 @@ def test_non_recursive_with_relative_file(testdir, non_recursive_with_relative_f
     else:
         content = json.dumps(referenced)
     testdir.makefile(extension, **{filename: content})
-    ctx = Context.from_spec(non_recursive_with_relative_file)
+    ctx = Context.from_spec(schema)
     visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
     expected = f"{filename}.{extension}-definitions-A".replace("/", "-")
     assert visited == {"-definitions-A", expected}
+
+
+def test_non_recursive_with_nested_files(testdir):
+    schema = {"definitions": {"A": {"$ref": "shared.json#/definitions/A"}}}
+    shared = {
+        "definitions": {
+            "A": {
+                "$ref": "folder/first.json#/definitions/A",
+            },
+        }
+    }
+    first = {
+        "definitions": {
+            "A": {
+                "$ref": "second.json#/definitions/A",
+            },
+        }
+    }
+    second = {"definitions": {"A": {"type": "string"}}}
+    testdir.makefile("json", shared=json.dumps(shared))
+    folder = testdir.mkdir("folder")
+    (folder / "first.json").write_text(json.dumps(first), "utf8")
+    (folder / "second.json").write_text(json.dumps(second), "utf8")
+    ctx = Context.from_spec(schema)
+    visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
+    assert visited == {
+        "-definitions-A",
+        "folder-first.json-definitions-A",
+        "second.json-definitions-A",
+        "shared.json-definitions-A",
+    }
 
 
 def test_schema_transformation():
