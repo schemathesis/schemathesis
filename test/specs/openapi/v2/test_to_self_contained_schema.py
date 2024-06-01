@@ -38,174 +38,6 @@ class Context:
         self.config = build_config(spec)
 
 
-def pytest_configure(config):
-    config.addinivalue_line("markers", "schema(name): Add only specified API operations to the test application.")
-
-
-@pytest.fixture
-def non_recursive_ref() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {
-                    "type": "object",
-                    "properties": {
-                        "id": {"type": "string"},
-                        "foo": True,
-                        "bar": {
-                            "anyOf": [True, {"type": "integer"}],
-                        },
-                    },
-                },
-                "B": {"type": "array", "items": [True, {"type": "object"}]},
-            }
-        }
-    )
-
-
-@pytest.fixture
-def non_recursive_with_multiple_refs() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {
-                    "type": "object",
-                    "properties": {
-                        "first": {"$ref": "#/definitions/B"},
-                        "second": {"$ref": "#/definitions/B"},
-                    },
-                },
-                "B": {"type": "string"},
-            }
-        }
-    )
-
-
-@pytest.fixture(
-    params=[
-        "./shared.json#/definitions/A",
-        "file://shared.json#/definitions/A",
-        "shared.yml#/definitions/A",
-    ]
-)
-def non_recursive_with_relative_file(request):
-    return {"definitions": {"A": {"$ref": request.param}}}
-
-
-@pytest.fixture
-def schema_transformation() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {
-                    "type": "object",
-                    "properties": {
-                        "first": {"type": "file"},
-                        "second": {"type": "string", "x-nullable": True},
-                        "third": {
-                            "type": "integer",
-                            "readOnly": True,
-                        },
-                        "nested": {
-                            "allOf": [{"type": "file"}, {"type": "null"}],
-                        },
-                    },
-                },
-            }
-        }
-    )
-
-
-@pytest.fixture
-def recursive_1_hop() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {"type": "object", "properties": {"id": {"type": "string"}, "ref": {"$ref": "#/definitions/B"}}},
-                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}}},
-            }
-        }
-    )
-
-
-@pytest.fixture
-def recursive_1_hop_in_array() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {
-                    "allOf": [
-                        {"type": "string"},
-                        {"$ref": "#/definitions/B"},
-                    ]
-                },
-                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}}},
-            }
-        }
-    )
-
-
-@pytest.fixture
-def recursive_2_hops() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "A": {"type": "object", "properties": {"id": {"type": "string"}, "ref": {"$ref": "#/definitions/B"}}},
-                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/C"}}},
-                "C": {
-                    "type": "object",
-                    "properties": {"email": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}},
-                },
-            }
-        }
-    )
-
-
-@pytest.fixture
-def recursive_with_nested() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "Patch": {"$ref": "#/definitions/Shared"},
-                "Put": {"$ref": "#/definitions/Shared"},
-                "Shared": {"$ref": "#/definitions/RecursiveRoot"},
-                "RecursiveRoot": {"$ref": "#/definitions/RecursiveA"},
-                "RecursiveA": {"$ref": "#/definitions/RecursiveB"},
-                "RecursiveB": {"$ref": "#/definitions/RecursiveA"},
-            }
-        }
-    )
-
-
-@pytest.fixture
-def recursive_with_leaf() -> Context:
-    return Context.from_spec(
-        {
-            "definitions": {
-                "Patch": {"$ref": "#/definitions/Shared"},
-                "Put": {"$ref": "#/definitions/Shared"},
-                "Shared": {
-                    "properties": {
-                        "left": {
-                            "$ref": "#/definitions/Leaf",
-                        },
-                        "right": {
-                            "$ref": "#/definitions/Put",
-                        },
-                    },
-                },
-                "Leaf": {},
-            }
-        }
-    )
-
-
-@pytest.fixture
-def ctx(request) -> Context:
-    marker = request.node.get_closest_marker("schema")
-    return request.getfixturevalue(marker.args[0])
-
-
 def build_config(spec):
     return TransformConfig(
         nullable_key="x-nullable",
@@ -225,8 +57,24 @@ def build_resolver(spec):
 ITERATIONS = 2
 
 
-@pytest.mark.schema("non_recursive_ref")
-def test_non_recursive_ref(ctx: Context):
+def test_non_recursive_ref():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "string"},
+                        "foo": True,
+                        "bar": {
+                            "anyOf": [True, {"type": "integer"}],
+                        },
+                    },
+                },
+                "B": {"type": "array", "items": [True, {"type": "object"}]},
+            }
+        }
+    )
     references = ("#/definitions/A", "#/definitions/B")
     expected_visits = {
         "#/definitions/A": {"-definitions-A"},
@@ -255,8 +103,21 @@ def test_non_recursive_ref(ctx: Context):
     assert not ctx.config.cache.recursive_references
 
 
-@pytest.mark.schema("non_recursive_with_multiple_refs")
-def test_non_recursive_with_multiple_refs(ctx: Context):
+def test_non_recursive_with_multiple_refs():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {
+                    "type": "object",
+                    "properties": {
+                        "first": {"$ref": "#/definitions/B"},
+                        "second": {"$ref": "#/definitions/B"},
+                    },
+                },
+                "B": {"type": "string"},
+            }
+        }
+    )
     for _ in range(ITERATIONS):
         visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
         assert visited == {"-definitions-A", "-definitions-B"}
@@ -271,6 +132,17 @@ def test_non_recursive_with_multiple_refs(ctx: Context):
         "-definitions-B": {"type": "string"},
     }
     assert not ctx.config.cache.recursive_references
+
+
+@pytest.fixture(
+    params=[
+        "./shared.json#/definitions/A",
+        "file://shared.json#/definitions/A",
+        "shared.yml#/definitions/A",
+    ]
+)
+def non_recursive_with_relative_file(request):
+    return {"definitions": {"A": {"$ref": request.param}}}
 
 
 def test_non_recursive_with_relative_file(testdir, non_recursive_with_relative_file):
@@ -299,8 +171,27 @@ def test_non_recursive_with_relative_file(testdir, non_recursive_with_relative_f
     assert visited == {"-definitions-A", expected}
 
 
-@pytest.mark.schema("schema_transformation")
-def test_schema_transformation(ctx: Context):
+def test_schema_transformation():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {
+                    "type": "object",
+                    "properties": {
+                        "first": {"type": "file"},
+                        "second": {"type": "string", "x-nullable": True},
+                        "third": {
+                            "type": "integer",
+                            "readOnly": True,
+                        },
+                        "nested": {
+                            "allOf": [{"type": "file"}, {"type": "null"}],
+                        },
+                    },
+                },
+            }
+        }
+    )
     for _ in range(ITERATIONS):
         visited = to_self_contained_jsonschema({"$ref": "#/definitions/A"}, ctx.resolver, ctx.config)
         assert visited == {"-definitions-A"}
@@ -318,8 +209,15 @@ def test_schema_transformation(ctx: Context):
     assert not ctx.config.cache.recursive_references
 
 
-@pytest.mark.schema("recursive_1_hop")
-def test_recursive_1_hop(ctx: Context):
+def test_recursive_1_hop():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {"type": "object", "properties": {"id": {"type": "string"}, "ref": {"$ref": "#/definitions/B"}}},
+                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}}},
+            }
+        }
+    )
     references = ("#/definitions/A", "#/definitions/B")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
@@ -344,8 +242,20 @@ def test_recursive_1_hop(ctx: Context):
     }
 
 
-@pytest.mark.schema("recursive_1_hop_in_array")
-def test_recursive_1_hop_in_array(ctx: Context):
+def test_recursive_1_hop_in_array():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {
+                    "allOf": [
+                        {"type": "string"},
+                        {"$ref": "#/definitions/B"},
+                    ]
+                },
+                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}}},
+            }
+        }
+    )
     references = ("#/definitions/A", "#/definitions/B")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
@@ -372,8 +282,19 @@ def test_recursive_1_hop_in_array(ctx: Context):
     }
 
 
-@pytest.mark.schema("recursive_2_hops")
-def test_recursive_2_hops(ctx: Context):
+def test_recursive_2_hops():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "A": {"type": "object", "properties": {"id": {"type": "string"}, "ref": {"$ref": "#/definitions/B"}}},
+                "B": {"type": "object", "properties": {"name": {"type": "string"}, "ref": {"$ref": "#/definitions/C"}}},
+                "C": {
+                    "type": "object",
+                    "properties": {"email": {"type": "string"}, "ref": {"$ref": "#/definitions/A"}},
+                },
+            }
+        }
+    )
     references = ("#/definitions/A", "#/definitions/B", "#/definitions/C")
     for idx in range(ITERATIONS):
         for combo in permutations(references, len(references)):
@@ -403,8 +324,19 @@ def test_recursive_2_hops(ctx: Context):
     }
 
 
-@pytest.mark.schema("recursive_with_nested")
-def test_recursive_with_nested(ctx: Context):
+def test_recursive_with_nested():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "Patch": {"$ref": "#/definitions/Shared"},
+                "Put": {"$ref": "#/definitions/Shared"},
+                "Shared": {"$ref": "#/definitions/RecursiveRoot"},
+                "RecursiveRoot": {"$ref": "#/definitions/RecursiveA"},
+                "RecursiveA": {"$ref": "#/definitions/RecursiveB"},
+                "RecursiveB": {"$ref": "#/definitions/RecursiveA"},
+            }
+        }
+    )
     references = (
         "#/definitions/Patch",
         "#/definitions/Put",
@@ -469,8 +401,26 @@ def test_recursive_with_nested(ctx: Context):
     }
 
 
-@pytest.mark.schema("recursive_with_leaf")
-def test_recursive_with_leaf(ctx: Context):
+def test_recursive_with_leaf():
+    ctx = Context.from_spec(
+        {
+            "definitions": {
+                "Patch": {"$ref": "#/definitions/Shared"},
+                "Put": {"$ref": "#/definitions/Shared"},
+                "Shared": {
+                    "properties": {
+                        "left": {
+                            "$ref": "#/definitions/Leaf",
+                        },
+                        "right": {
+                            "$ref": "#/definitions/Put",
+                        },
+                    },
+                },
+                "Leaf": {},
+            }
+        }
+    )
     references = ("#/definitions/Patch", "#/definitions/Put", "#/definitions/Shared", "#/definitions/Leaf")
     expected_visits = {
         # `Patch` -> `Shared`

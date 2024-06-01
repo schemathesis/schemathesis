@@ -87,7 +87,6 @@ def unrecurse(schemas: MovedSchemas, cache: TransformCache) -> None:
     that lead to the recursive reference are removed from the schema. If all such subschemas are required,
     which means infinite recursion, an error is raised.
     """
-    # TODO: Get a list of paths to every recursive reference and use it instead of full traversal
     ctx = UnrecurseContext.new(schemas, cache)
     for name, original in schemas.items():
         if ctx.is_unrecursed(name):
@@ -286,7 +285,7 @@ class SchemaTransformer(BaseTransformer):
                 if reference is None:
                     result = self.descend(subschema)
                     if isinstance(result, Err):
-                        raise NotImplementedError("TODO!")
+                        return result
                     new = result.ok()
                     if new is not subschema:
                         replacement[idx] = new
@@ -296,7 +295,7 @@ class SchemaTransformer(BaseTransformer):
                     if self.ctx.push(schema_key):
                         result = self.descend(referenced_item)
                         if isinstance(result, Err):
-                            raise NotImplementedError("TODO!")
+                            return result
                         new = result.ok()
                     else:
                         if schema_key in self.ctx.transform_cache.unrecursed_schemas:
@@ -304,7 +303,7 @@ class SchemaTransformer(BaseTransformer):
                         else:
                             result = self.ctx.to_leaf_schema(referenced_item)
                             if isinstance(result, Err):
-                                raise NotImplementedError("TODO!")
+                                return result
                             else:
                                 new = result.ok()
                                 self.ctx.transform_cache.unrecursed_schemas[schema_key] = new
