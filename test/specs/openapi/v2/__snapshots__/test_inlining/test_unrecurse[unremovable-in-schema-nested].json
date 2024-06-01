@@ -8,35 +8,6 @@
               "second": {
                 "properties": {
                   "first": {
-                    "properties": {
-                      "second": {
-                        "properties": {
-                          "first": {
-                            "properties": {
-                              "second": {
-                                "properties": {
-                                  "first": {
-                                    "type": "object"
-                                  }
-                                },
-                                "required": [
-                                  "first"
-                                ],
-                                "type": "object"
-                              }
-                            },
-                            "required": [
-                              "second"
-                            ],
-                            "type": "object"
-                          }
-                        },
-                        "required": [
-                          "first"
-                        ],
-                        "type": "object"
-                      }
-                    },
                     "type": "object"
                   }
                 },

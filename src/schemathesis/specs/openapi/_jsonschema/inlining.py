@@ -11,7 +11,7 @@ from .keys import _key_for_reference, _make_moved_reference
 from .types import MovedSchemas, ObjectSchema, Schema, SchemaKey
 
 
-DEFAULT_MAX_DEPTH = 3
+DEFAULT_MAX_DEPTH = 2
 DEFAULT_MAX_INLININGS = 100
 
 
@@ -247,6 +247,9 @@ class SchemaTransformer(BaseTransformer):
                         new = cached
                     else:
                         referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
+                        while "$ref" in referenced_item:
+                            schema_key, _ = _key_for_reference(referenced_item["$ref"])
+                            referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
                         if self.ctx.push(schema_key):
                             result = self.descend(referenced_item)
                             if isinstance(result, Err):
@@ -257,9 +260,6 @@ class SchemaTransformer(BaseTransformer):
                             else:
                                 new = result.ok()
                         else:
-                            while "$ref" in referenced_item:
-                                schema_key, _ = _key_for_reference(referenced_item["$ref"])
-                                referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
                             if schema_key in self.ctx.transform_cache.unrecursed_schemas:
                                 new = self.ctx.transform_cache.unrecursed_schemas[schema_key]
                             else:
