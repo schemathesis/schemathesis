@@ -29,6 +29,33 @@ RECURSIVE_NESTED_UNREMOVABLE = {
     },
     "required": ["first"],
 }
+RECURSIVE_NESTED_UNREMOVABLE_CYCLE_A_REFERENCE = {"$ref": "#/definitions/UnremovableNestedPerson-Cycle-A"}
+RECURSIVE_NESTED_UNREMOVABLE_CYCLE_B_REFERENCE = {"$ref": "#/definitions/UnremovableNestedPerson-Cycle-B"}
+RECURSIVE_NESTED_UNREMOVABLE_CYCLE_A = {
+    "type": "object",
+    "properties": {
+        "first": {
+            "type": "object",
+            "properties": {
+                "second": RECURSIVE_NESTED_UNREMOVABLE_CYCLE_B_REFERENCE,
+            },
+            "required": ["second"],
+        },
+    },
+    "required": ["first"],
+}
+RECURSIVE_NESTED_UNREMOVABLE_CYCLE_B = {
+    "type": "object",
+    "properties": {
+        "first": {
+            "type": "object",
+            "properties": {
+                "second": RECURSIVE_NESTED_UNREMOVABLE_CYCLE_A_REFERENCE,
+            },
+        },
+    },
+    "required": ["first"],
+}
 RECURSIVE = set(RECURSIVE_REFERENCE.values())
 
 
@@ -731,6 +758,25 @@ def test_on_reached_limit_non_removable(schema):
                 "second": {"type": "string"},
             }
         },
+        {
+            "properties": {
+                "first": {
+                    "items": RECURSIVE_NESTED_UNREMOVABLE_REFERENCE,
+                },
+                "second": {
+                    "items": RECURSIVE_NESTED_UNREMOVABLE_REFERENCE,
+                },
+                "third": {"type": "string"},
+            }
+        },
+        {
+            "properties": {
+                "first": {
+                    "items": RECURSIVE_NESTED_UNREMOVABLE_CYCLE_A_REFERENCE,
+                },
+                "third": {"type": "string"},
+            }
+        },
     ),
     ids=[
         "properties-no-change",
@@ -753,6 +799,8 @@ def test_on_reached_limit_non_removable(schema):
         "pattern-properties-multiple-recursive-refs",
         "unremovable-behind-removable",
         "unremovable-in-schema",
+        "unremovable-in-schema-multiple",
+        "unremovable-in-schema-nested",
     ],
 )
 def test_unrecurse(request, schema, snapshot_json):
@@ -768,7 +816,11 @@ def test_unrecurse(request, schema, snapshot_json):
     }
     if "unremovable" in request.node.callspec.id:
         moved_schemas["-definitions-UnremovableNestedPerson"] = RECURSIVE_NESTED_UNREMOVABLE
+        moved_schemas["-definitions-UnremovableNestedPerson-Cycle-A"] = RECURSIVE_NESTED_UNREMOVABLE_CYCLE_A
+        moved_schemas["-definitions-UnremovableNestedPerson-Cycle-B"] = RECURSIVE_NESTED_UNREMOVABLE_CYCLE_B
         recursive_references.add("#/definitions/UnremovableNestedPerson")
+        recursive_references.add("#/definitions/UnremovableNestedPerson-Cycle-A")
+        recursive_references.add("#/definitions/UnremovableNestedPerson-Cycle-B")
     cache = TransformCache(recursive_references=recursive_references, moved_schemas=moved_schemas)
     schemas = {"-definitions-Root": schema}
     unrecurse(schemas, cache)
