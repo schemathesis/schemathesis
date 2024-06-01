@@ -22,12 +22,20 @@ class UnrecurseContext:
     schemas: MovedSchemas
     transform_cache: TransformCache
     total_inlinings: int
-    path: list[str]
+    path: list[SchemaKey]
     max_depth: int
     max_inlinings: int
     local_cache: dict[str, ObjectSchema]
 
-    __slots__ = ("schemas", "transform_cache", "total_inlinings", "path", "max_depth", "max_inlinings", "local_cache")
+    __slots__ = (
+        "schemas",
+        "transform_cache",
+        "total_inlinings",
+        "path",
+        "max_depth",
+        "max_inlinings",
+        "local_cache",
+    )
 
     @classmethod
     def new(cls, schemas: MovedSchemas, cache: TransformCache) -> UnrecurseContext:
@@ -41,11 +49,11 @@ class UnrecurseContext:
             local_cache={},
         )
 
-    def push(self, reference: str) -> bool:
+    def push(self, key: SchemaKey) -> bool:
         """Push the current path and check if the limit is reached."""
-        self.path.append(reference)
+        self.path.append(key)
         self.total_inlinings += 1
-        return self.total_inlinings < self.max_inlinings and self.path.count(reference) < self.max_depth
+        return self.total_inlinings < self.max_inlinings and self.path.count(key) < self.max_depth
 
     def pop(self) -> None:
         """Pop the current path."""
@@ -285,7 +293,7 @@ class SchemaTransformer(BaseTransformer):
                 elif reference in self.ctx.transform_cache.recursive_references:
                     schema_key, _ = _key_for_reference(reference)
                     referenced_item = self.ctx.transform_cache.moved_schemas[schema_key]
-                    if self.ctx.push(keyword):
+                    if self.ctx.push(schema_key):
                         result = self.descend(referenced_item)
                         if isinstance(result, Err):
                             raise NotImplementedError("TODO!")
