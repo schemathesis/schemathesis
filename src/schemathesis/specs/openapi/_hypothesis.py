@@ -360,11 +360,15 @@ def get_parameters_strategy(
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
         schema = parameters_to_json_schema(operation, parameters)
-        if not operation.schema.validate_schema and location == "path":
-            # If schema validation is disabled, we try to generate data even if the parameter definition
-            # contains errors.
-            # In this case, we know that the `required` keyword should always be `True`.
-            schema["required"] = list(schema["properties"])
+        if location == "path":
+            if not operation.schema.validate_schema:
+                # If schema validation is disabled, we try to generate data even if the parameter definition
+                # contains errors.
+                # In this case, we know that the `required` keyword should always be `True`.
+                schema["required"] = list(schema["properties"])
+            for prop in schema.get("properties", {}).values():
+                if prop.get("type") == "string":
+                    prop.setdefault("minLength", 1)
         schema = operation.schema.prepare_schema(schema)
         for name in exclude:
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
