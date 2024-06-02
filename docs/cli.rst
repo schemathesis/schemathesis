@@ -123,6 +123,7 @@ There are four built-in checks you can use via the `--checks / -c` CLI option:
 - ``status_code_conformance``. The response status is not defined in the API schema;
 - ``content_type_conformance``. The response content type is not defined in the API schema;
 - ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
+- ``negative_data_rejection``. The API accepts data that is invalid according to the schema;
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
 
 To make Schemathesis perform all built-in checks use ``--checks all`` CLI option:

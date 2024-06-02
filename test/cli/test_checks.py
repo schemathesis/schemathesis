@@ -51,7 +51,6 @@ def test_exclude_checks(
         @app.get("/api/failure")
         async def failure():
             raise HTTPException(status_code=500)
-            return {"failure": True}
         """
     )
     result = cli.run(
@@ -71,3 +70,26 @@ def test_exclude_checks(
     assert result.exit_code == expected_exit_code, result.stdout
 
     assert expected_result in result.stdout
+
+
+def test_negative_data_rejection(testdir, cli, empty_open_api_3_schema, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/success": {
+            "get": {
+                "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    result = cli.run(
+        str(schema_file),
+        f"--base-url={openapi3_base_url}",
+        "--checks",
+        "negative_data_rejection",
+        "-D",
+        "negative",
+        "--hypothesis-max-examples=5",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED
+    assert "Negative data was not rejected as expected by the API" in result.stdout

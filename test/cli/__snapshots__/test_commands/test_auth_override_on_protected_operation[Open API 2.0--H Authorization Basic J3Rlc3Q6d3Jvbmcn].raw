@@ -39,6 +39,7 @@ Performed checks:
     content_type_conformance                        N / N passed          PASSED 
     response_headers_conformance                    N / N passed          PASSED 
     response_schema_conformance                     N / N passed          PASSED 
+    negative_data_rejection                         N / N passed          PASSED 
 
 WARNING: Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
 

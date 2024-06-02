@@ -118,6 +118,15 @@ class UndefinedContentType(FailureContext):
 
 
 @dataclass(repr=False)
+class AcceptedNegativeData(FailureContext):
+    """Response with negative data was accepted."""
+
+    message: str
+    title: str = "Accepted negative data"
+    type: str = "accepted_negative_data"
+
+
+@dataclass(repr=False)
 class UndefinedStatusCode(FailureContext):
     """Response has a status code that is not defined in the schema."""
 
