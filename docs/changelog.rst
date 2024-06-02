@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.29.2...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on. 
+  This improves the performance of data generation.
+
 .. _v3.29.2:
 
 :version:`3.29.2 <v3.29.1...v3.29.2>` - 2024-05-31
