@@ -77,6 +77,7 @@ def context(case, response):
         ("eq.{$response.body#/g|h}", "eq.4"),
         ("eq.{$response.header.Content-Type#regex:/(.+)}", "eq.json"),
         ("eq.{$response.header.Content-Type#regex:qwe(.+)}", "eq."),
+        ("eq.{$response.header.Unknown}", "eq."),
         ("eq.{$request.query.username#regex:f(.+)}", "eq.oo"),
         ("eq.{$request.query.username#regex:t(.+)}", "eq."),
     ),

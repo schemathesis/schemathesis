@@ -117,5 +117,4 @@ def test_state_machine(schema):
     # Then the generated state machine should include only valid operations
     machine = schema.as_state_machine()
     assert len(machine.bundles) == 1
-    assert "GET" in machine.bundles["/bar"]
-    assert len(machine.bundles["/bar"]) == 1
+    assert list(machine.bundles.keys()) == ["GET /bar"]
