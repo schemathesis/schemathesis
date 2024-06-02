@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-import time
 import re
+import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -60,10 +60,6 @@ class APIStateMachine(RuleBasedStateMachine):
             # State machines suppose to be reproducible, hence it is OK to get kwargs here
             kwargs = self.get_call_kwargs(value)
             return _print_case(value, kwargs)
-        if isinstance(value, tuple) and len(value) == 2:
-            result, direction = value
-            wrapper = _DirectionWrapper(direction)
-            return super()._pretty_print((result, wrapper))  # type: ignore
         return super()._pretty_print(value)  # type: ignore
 
     if HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS:
@@ -85,6 +81,12 @@ class APIStateMachine(RuleBasedStateMachine):
         Does nothing by default.
         """
 
+    def _has_matching_response(self, predicate: Callable[["StepResult"], bool]) -> bool:
+        for value in self.names_to_values.values():
+            if predicate(value):
+                return True
+        return False
+
     def teardown(self) -> None:
         pass
 
@@ -94,12 +96,14 @@ class APIStateMachine(RuleBasedStateMachine):
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
-    def _step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
+    def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult:
         # This method is a proxy that is used under the hood during the state machine initialization.
         # The whole point of having it is to make it possible to override `step`; otherwise, custom "step" is ignored.
         # It happens because, at the point of initialization, the final class is not yet created.
         __tracebackhide__ = True
-        return self.step(case, previous)
+        if previous is not None and link is not None:
+            return self.step(case, (previous, link))
+        return self.step(case, None)
 
     def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
         """A single state machine step.

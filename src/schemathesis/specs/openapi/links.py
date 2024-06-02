@@ -184,6 +184,11 @@ class OpenAPILink(Direction):
     parameters: list[tuple[str | None, str, str]] = field(init=False)
     body: dict[str, Any] | NotSet = field(init=False)
 
+    def __repr__(self) -> str:
+        path = self.operation.path
+        method = self.operation.method
+        return f"state.schema['{path}']['{method}'].links['{self.status_code}']['{self.name}']"
+
     def __post_init__(self) -> None:
         self.parameters = [
             normalize_parameter(parameter, expression)

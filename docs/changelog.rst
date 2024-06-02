@@ -12,6 +12,11 @@ Changelog
 
 - Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on. 
   This improves the performance of data generation.
+- Rework building state machines for stateful testing to improve performance.
+
+**Fixed**
+
+- Internal error during Open API link resolution if the needed header is missing in the response.
 
 .. _v3.29.2:
 

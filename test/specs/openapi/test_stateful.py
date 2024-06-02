@@ -5,7 +5,7 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.specs.openapi.stateful.links import make_response_filter, match_status_code
+from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.stateful.state_machine import StepResult
 from src.schemathesis.models import CaseSource, Check, Status
 from src.schemathesis.runner.serialization import SerializedCheck
