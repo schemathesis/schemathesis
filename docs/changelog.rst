@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.29.2...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Ability to extract values from headers, path and query parameters using regular expressions in OpenAPI links.
+
 **Changed**
 
 - Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on. 

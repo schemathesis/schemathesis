@@ -75,6 +75,10 @@ def context(case, response):
         ("ID_{$response.body#/g|h}", "ID_4"),
         ("ID_{$response.body#/g|h}_{$response.body#/a~1b}", "ID_4_1"),
         ("eq.{$response.body#/g|h}", "eq.4"),
+        ("eq.{$response.header.Content-Type#regex:/(.+)}", "eq.json"),
+        ("eq.{$response.header.Content-Type#regex:qwe(.+)}", "eq."),
+        ("eq.{$request.query.username#regex:f(.+)}", "eq.oo"),
+        ("eq.{$request.query.username#regex:t(.+)}", "eq."),
     ),
 )
 def test_evaluate(context, expr, expected):
@@ -96,6 +100,9 @@ def test_evaluate(context, expr, expected):
         "$response.unknown",
         "$response.body.something",
         "$response.header..",
+        "$response.header.unknown#wrong",
+        "$response.header.unknown#regex:[",
+        "$response.header.unknown#regex:(.+)(.+)",
         "$response}",
     ),
 )
@@ -116,30 +123,38 @@ def test_random_expression(expr):
 @pytest.mark.parametrize(
     "expr, expected",
     (
-        ("$url", [Token.variable("$url")]),
-        ("foo", [Token.string("foo")]),
-        ("foo1", [Token.string("foo1")]),
-        ("{}", [Token.lbracket(), Token.rbracket()]),
-        ("{foo}", [Token.lbracket(), Token.string("foo"), Token.rbracket()]),
-        ("{$foo}", [Token.lbracket(), Token.variable("$foo"), Token.rbracket()]),
+        ("$url", [Token.variable("$url", 3)]),
+        ("foo", [Token.string("foo", 2)]),
+        ("foo1", [Token.string("foo1", 3)]),
+        ("{}", [Token.lbracket(0), Token.rbracket(1)]),
+        ("{foo}", [Token.lbracket(0), Token.string("foo", 3), Token.rbracket(4)]),
+        ("{$foo}", [Token.lbracket(0), Token.variable("$foo", 4), Token.rbracket(5)]),
         (
             "foo{$bar}spam",
-            [Token.string("foo"), Token.lbracket(), Token.variable("$bar"), Token.rbracket(), Token.string("spam")],
+            [
+                Token.string("foo", 2),
+                Token.lbracket(3),
+                Token.variable("$bar", 7),
+                Token.rbracket(8),
+                Token.string("spam", 12),
+            ],
         ),
-        ("$foo.bar", [Token.variable("$foo"), Token.dot(), Token.string("bar")]),
-        ("$foo.$bar", [Token.variable("$foo"), Token.dot(), Token.variable("$bar")]),
+        ("$foo.bar", [Token.variable("$foo", 3), Token.dot(4), Token.string("bar", 7)]),
+        ("$foo.$bar", [Token.variable("$foo", 3), Token.dot(4), Token.variable("$bar", 8)]),
         (
             "{$foo.$bar}",
-            [Token.lbracket(), Token.variable("$foo"), Token.dot(), Token.variable("$bar"), Token.rbracket()],
+            [Token.lbracket(0), Token.variable("$foo", 4), Token.dot(5), Token.variable("$bar", 9), Token.rbracket(10)],
         ),
         (
             "$request.body#/foo/bar",
-            [Token.variable("$request"), Token.dot(), Token.string("body"), Token.pointer("#/foo/bar")],
+            [Token.variable("$request", 7), Token.dot(8), Token.string("body", 12), Token.pointer("#/foo/bar", 21)],
         ),
     ),
 )
 def test_lexer(expr, expected):
-    assert list(expressions.lexer.tokenize(expr)) == expected
+    tokens = list(expressions.lexer.tokenize(expr))
+    assert tokens == expected
+    assert tokens[-1].end == len(expr) - 1
 
 
 @pytest.mark.parametrize(

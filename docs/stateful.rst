@@ -490,6 +490,38 @@ We plan to use the new approach in CLI in the future. It may include slight chan
 appearance and the way to configure it. It also means that using stateful testing in CLI is not yet as customizable
 as in the in-code approach.
 
+Extracting data from headers and query parameters
+-------------------------------------------------
+
+By default, Schemathesis allows you to extract data from the response body of an API endpoint, based on the provided schema. 
+However, sometimes you might need to extract data from other parts of the API response, such as headers, path or query parameters.
+
+Schemathesis provides an additional feature that allows you to use regular expressions to extract data from the string values of headers and query parameters.
+This can be particularly useful when the API response includes important information in these locations, and you need to use that data for further processing.
+
+Here's an example of how to extract the user ID from the ``Location`` header of a ``201 Created`` response:
+
+.. code-block::
+   :emphasize-lines: 12-12
+
+    paths:
+      /users:
+        post:
+          ...
+          responses:
+            '201':
+              ...
+              links:
+                GetUserByUserId:
+                  operationId: getUser
+                  parameters:
+                    userId: '$response.header.Location#regex:/users/(.+)'
+
+For example, if the ``Location`` header is ``/users/42``, the ``userId`` parameter will be set to ``42``.
+The regular expression should be a valid Python regular expression and should contain a single capturing group.
+
+If the regular expression does not match the value, the parameter will be set to empty.
+
 Open API links limitations
 --------------------------
 

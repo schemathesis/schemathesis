@@ -1,6 +1,7 @@
 """Expression nodes description and evaluation logic."""
 
 from __future__ import annotations
+
 from dataclasses import dataclass
 from enum import Enum, unique
 from typing import Any
@@ -9,6 +10,7 @@ from requests.structures import CaseInsensitiveDict
 
 from .. import references
 from .context import ExpressionContext
+from .extractors import Extractor
 
 
 @dataclass
@@ -74,6 +76,7 @@ class NonBodyRequest(Node):
 
     location: str
     parameter: str
+    extractor: Extractor | None = None
 
     def evaluate(self, context: ExpressionContext) -> str:
         container: dict | CaseInsensitiveDict = {
@@ -83,7 +86,10 @@ class NonBodyRequest(Node):
         }[self.location] or {}
         if self.location == "header":
             container = CaseInsensitiveDict(container)
-        return container[self.parameter]
+        value = container[self.parameter]
+        if self.extractor is not None:
+            return self.extractor.extract(value) or ""
+        return value
 
 
 @dataclass
@@ -104,9 +110,13 @@ class HeaderResponse(Node):
     """A node for `$response.header` expressions."""
 
     parameter: str
+    extractor: Extractor | None = None
 
     def evaluate(self, context: ExpressionContext) -> str:
-        return context.response.headers[self.parameter]
+        value = context.response.headers[self.parameter]
+        if self.extractor is not None:
+            return self.extractor.extract(value) or ""
+        return value
 
 
 @dataclass
