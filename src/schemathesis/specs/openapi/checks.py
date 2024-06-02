@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING, Any, Generator, NoReturn
 
 from ... import failures
@@ -6,6 +7,7 @@ from ...exceptions import (
     get_headers_error,
     get_malformed_media_type_error,
     get_missing_content_type_error,
+    get_negative_rejection_error,
     get_response_type_error,
     get_status_code_error,
 )
@@ -13,8 +15,8 @@ from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ...transports.responses import GenericResponse
     from ...models import Case
+    from ...transports.responses import GenericResponse
 
 
 def status_code_conformance(response: GenericResponse, case: Case) -> bool | None:
@@ -127,3 +129,17 @@ def response_schema_conformance(response: GenericResponse, case: Case) -> bool |
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
     return case.operation.validate_response(response)
+
+
+def negative_data_rejection(response: GenericResponse, case: Case) -> bool | None:
+    from .schemas import BaseOpenAPISchema
+
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+        return True
+    if case.data_generation_method and case.data_generation_method.is_negative and 200 <= response.status_code < 300:
+        exc_class = get_negative_rejection_error(response.status_code)
+        raise exc_class(
+            failures.AcceptedNegativeData.title,
+            context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),
+        )
+    return None

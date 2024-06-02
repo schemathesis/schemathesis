@@ -43,6 +43,7 @@ Performed checks:
     content_type_conformance                        N / N passed          PASSED 
     response_headers_conformance                    N / N passed          PASSED 
     response_schema_conformance                     N / N passed          PASSED 
+    negative_data_rejection                         N / N passed          PASSED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

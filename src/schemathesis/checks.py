@@ -8,6 +8,7 @@ from .specs.openapi.checks import (
     content_type_conformance,
     response_headers_conformance,
     response_schema_conformance,
+    negative_data_rejection,
     status_code_conformance,
 )
 
@@ -43,6 +44,7 @@ OPTIONAL_CHECKS = (
     content_type_conformance,
     response_headers_conformance,
     response_schema_conformance,
+    negative_data_rejection,
 )
 ALL_CHECKS: tuple[CheckFunction, ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
 

@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Ability to extract values from headers, path and query parameters using regular expressions in OpenAPI links.
+- The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema. 
 
 **Changed**
 
