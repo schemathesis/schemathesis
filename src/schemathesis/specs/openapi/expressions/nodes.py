@@ -113,7 +113,9 @@ class HeaderResponse(Node):
     extractor: Extractor | None = None
 
     def evaluate(self, context: ExpressionContext) -> str:
-        value = context.response.headers[self.parameter]
+        value = context.response.headers.get(self.parameter)
+        if value is None:
+            return ""
         if self.extractor is not None:
             return self.extractor.extract(value) or ""
         return value
