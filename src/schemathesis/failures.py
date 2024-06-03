@@ -127,6 +127,17 @@ class AcceptedNegativeData(FailureContext):
 
 
 @dataclass(repr=False)
+class UseAfterFree(FailureContext):
+    """Resource was used after a successful DELETE operation on it."""
+
+    message: str
+    free: str
+    usage: str
+    title: str = "Use after free"
+    type: str = "use_after_free"
+
+
+@dataclass(repr=False)
 class UndefinedStatusCode(FailureContext):
     """Response has a status code that is not defined in the schema."""
 

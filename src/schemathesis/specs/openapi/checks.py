@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator, NoReturn
 
 from ... import failures
@@ -10,6 +11,7 @@ from ...exceptions import (
     get_negative_rejection_error,
     get_response_type_error,
     get_status_code_error,
+    get_use_after_free_error,
 )
 from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
@@ -143,3 +145,73 @@ def negative_data_rejection(response: GenericResponse, case: Case) -> bool | Non
             context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),
         )
     return None
+
+
+def use_after_free(response: GenericResponse, original: Case) -> bool | None:
+    from .schemas import BaseOpenAPISchema
+    from ...transports.responses import get_reason
+
+    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+        return True
+    if response.status_code == 404 or not original.source:
+        return None
+    case = original
+    while case.source:
+        # Find the most recent successful DELETE call that corresponds to the current operation
+        if case != original and case.operation.method.lower() == "delete" and 200 <= response.status_code < 300:
+            if _is_prefix_operation(
+                ResourcePath(case.path, case.path_parameters or {}),
+                ResourcePath(original.path, original.path_parameters or {}),
+            ):
+                free = f"{case.operation.method.upper()} {case.formatted_path}"
+                usage = f"{original.operation.method} {original.formatted_path}"
+                exc_class = get_use_after_free_error(free, usage)
+                reason = get_reason(response.status_code)
+                message = (
+                    "The API did not return a `HTTP 404 Not Found` response "
+                    f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
+                )
+                raise exc_class(
+                    failures.UseAfterFree.title,
+                    context=failures.UseAfterFree(
+                        message=message,
+                        free=free,
+                        usage=usage,
+                    ),
+                )
+        response = case.source.response
+        case = case.source.case
+    return None
+
+
+@dataclass
+class ResourcePath:
+    """A path to a resource with variables."""
+
+    value: str
+    variables: dict[str, str]
+
+    __slots__ = ("value", "variables")
+
+    def get(self, key: str) -> str:
+        return self.variables[key.lstrip("{").rstrip("}")]
+
+
+def _is_prefix_operation(lhs: ResourcePath, rhs: ResourcePath) -> bool:
+    lhs_parts = lhs.value.rstrip("/").split("/")
+    rhs_parts = rhs.value.rstrip("/").split("/")
+
+    # Left has more parts, can't be a prefix
+    if len(lhs_parts) > len(rhs_parts):
+        return False
+
+    for left, right in zip(lhs_parts, rhs_parts):
+        if left.startswith("{") and right.startswith("{"):
+            if str(lhs.get(left)) != str(rhs.get(right)):
+                return False
+        elif left != right and left.rstrip("s") != right.rstrip("s"):
+            # Parts don't match, not a prefix
+            return False
+
+    # If we've reached this point, the LHS path is a prefix of the RHS path
+    return True
