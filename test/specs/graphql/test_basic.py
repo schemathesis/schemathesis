@@ -1,5 +1,6 @@
 import platform
 
+from schemathesis.specs.openapi.checks import use_after_free
 from schemathesis.transports import WSGITransport
 import strawberry
 
@@ -290,3 +291,9 @@ def test_schema_as_strategy(graphql_schema):
         for operation in operations.values():
             # All fields should be possible to generate
             find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
+
+
+def test_use_after_free_ignored(graphql_schema):
+    # Just in case
+    case = graphql_schema["Query"]["getBooks"].make_case()
+    assert use_after_free(None, case)

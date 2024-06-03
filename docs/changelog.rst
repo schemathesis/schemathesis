@@ -8,6 +8,8 @@ Changelog
 
 - Ability to extract values from headers, path and query parameters using regular expressions in OpenAPI links.
 - The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema. 
+- The ``use_after_free`` check. It ensures that the API returns 404 response after a successful DELETE operation on an object. 
+  At the moment it is only available in state-machine-based stateful testing.
 
 **Changed**
 

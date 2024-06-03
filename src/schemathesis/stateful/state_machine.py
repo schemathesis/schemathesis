@@ -114,6 +114,8 @@ class APIStateMachine(RuleBasedStateMachine):
         Schemathesis prepares data, makes a call and validates the received response.
         It is the most high-level point to extend the testing process. You probably don't need it in most cases.
         """
+        from ..specs.openapi.checks import use_after_free
+
         __tracebackhide__ = True
         if previous is not None:
             result, direction = previous
@@ -124,7 +126,7 @@ class APIStateMachine(RuleBasedStateMachine):
         response = self.call(case, **kwargs)
         elapsed = time.monotonic() - start
         self.after_call(response, case)
-        self.validate_response(response, case)
+        self.validate_response(response, case, additional_checks=(use_after_free,))
         return self.store_result(response, case, elapsed)
 
     def before_call(self, case: Case) -> None:
@@ -278,15 +280,3 @@ class Direction:
 
     def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
         raise NotImplementedError
-
-
-@dataclass(repr=False)
-class _DirectionWrapper:
-    """Purely to avoid modification of `Direction.__repr__`."""
-
-    direction: Direction
-
-    def __repr__(self) -> str:
-        path = self.direction.operation.path
-        method = self.direction.operation.method.upper()
-        return f"state.schema['{path}']['{method}'].links['{self.direction.status_code}']['{self.direction.name}']"
