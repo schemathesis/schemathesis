@@ -560,11 +560,14 @@ def extract_requests_exception_details(exc: RequestException) -> tuple[str, list
         message = "Connection failed"
         inner = exc.args[0]
         if isinstance(inner, MaxRetryError) and inner.reason is not None:
-            arg = str(inner.reason.args[0])
-            if ":" not in arg:
-                reason = arg
+            arg = inner.reason.args[0]
+            if isinstance(arg, str):
+                if ":" not in arg:
+                    reason = arg
+                else:
+                    _, reason = arg.split(":", maxsplit=1)
             else:
-                _, reason = arg.split(":", maxsplit=1)
+                reason = f"Max retries exceeded with url: {inner.url}"
             extra = [reason.strip()]
         else:
             extra = [" ".join(map(str, inner.args))]
