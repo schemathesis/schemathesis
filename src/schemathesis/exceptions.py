@@ -144,6 +144,10 @@ def get_negative_rejection_error(status: int) -> type[CheckFailed]:
     return _get_hashed_exception("AcceptedNegativeDataError", str(status))
 
 
+def get_use_after_free_error(free: str, usage: str) -> type[CheckFailed]:
+    return _get_hashed_exception("UseAfterFreeError", f"{free} -> {usage}")
+
+
 def get_timeout_error(deadline: float | int) -> type[CheckFailed]:
     """Request took too long."""
     return _get_hashed_exception("TimeoutError", str(deadline))

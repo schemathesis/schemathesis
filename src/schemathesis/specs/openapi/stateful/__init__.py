@@ -57,7 +57,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 )(
                     transition(
                         target=target_bundle,
-                        previous=bundles[source.verbose_name],
+                        previous=bundles[source.verbose_name].filter(predicate),
                         case=target.as_strategy(),
                         link=st.just(link),
                     )
