@@ -19,7 +19,8 @@ Changelog
 
 **Fixed**
 
-- Internal error during Open API link resolution if the needed header is missing in the response.
+- Internal error during Open API link resolution if the needed parameter is missing in the response.
+- Improper output when a JSON pointer can't be resolved during Open API link resolution.
 
 .. _v3.29.2:
 
