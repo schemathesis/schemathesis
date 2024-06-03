@@ -16,6 +16,7 @@ Changelog
 - Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on. 
   This improves the performance of data generation.
 - Rework building state machines for stateful testing to improve performance.
+- Improve error messages on ``MaxRetryError``. :issue:`2234`
 
 **Fixed**
 
