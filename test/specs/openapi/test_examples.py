@@ -915,3 +915,60 @@ def test_example_override():
     operation = schema["/success"]["GET"]
     extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
     assert extracted == [{"container": "query", "name": "key", "value": "query1"}]
+
+
+def test_no_wrapped_examples():
+    # See GH-2238
+    raw_schema = {
+        "openapi": "3.0.3",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/register": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Register"},
+                                "examples": {"objectExample": {"$ref": "#/components/examples/objectExample"}},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Successful operation"}},
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "Register": {
+                    "type": "object",
+                    "properties": {
+                        "username": {"type": "string", "example": "username"},
+                        "email": {"type": "string", "example": "john.doe@email.com"},
+                        "password": {"type": "string", "example": "password"},
+                    },
+                },
+            },
+            "examples": {
+                "objectExample": {
+                    "summary": "summary",
+                    "value": {"username": "username1", "email": "john.doe@email.com", "password": "password1"},
+                },
+            },
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema["/register"]["POST"]
+    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    assert extracted == [
+        {
+            "media_type": "application/json",
+            "value": {"username": "username", "email": "john.doe@email.com", "password": "password"},
+        }
+    ]
+    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    assert extracted == [
+        {
+            "media_type": "application/json",
+            "value": {"email": "john.doe@email.com", "password": "password1", "username": "username1"},
+        },
+    ]
