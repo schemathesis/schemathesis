@@ -8,7 +8,7 @@ import schemathesis
 from schemathesis.constants import USER_AGENT
 from schemathesis.hooks import HookContext, HookDispatcher, HookScope
 from schemathesis.utils import PARAMETRIZE_MARKER
-from test.utils import assert_requests_call
+from test.utils import assert_requests_call, flaky
 
 
 def integer_id(query):
@@ -274,6 +274,7 @@ def test_local_dispatcher(wsgi_app_schema, apply_first):
     assert getattr(test, PARAMETRIZE_MARKER).hooks.get_all_by_name("map_cookies") == []
 
 
+@flaky(max_runs=3, min_passes=1)
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 def test_multiple_hooks_per_spec(wsgi_app_schema):

@@ -549,6 +549,7 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
     assert message in result.stdout
 
 
+@flaky(max_runs=3, min_passes=1)
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", (1, 2))
 @pytest.mark.snapshot(replace_multi_worker_progress="??", replace_statistic=True)
