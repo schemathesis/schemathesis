@@ -24,6 +24,10 @@ Changelog
 - Improper output when a JSON pointer can't be resolved during Open API link resolution.
 - Generating invalid examples created by wrapping a named example value into another object. :issue:`2238`
 
+**Performance**
+
+- Improve performance of copying schemas.
+
 .. _v3.29.2:
 
 :version:`3.29.2 <v3.29.1...v3.29.2>` - 2024-05-31
