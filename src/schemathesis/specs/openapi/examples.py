@@ -183,7 +183,7 @@ def extract_inner_examples(
 ) -> Generator[Any, None, None]:
     """Extract exact examples values from the `examples` dictionary."""
     for name, example in examples.items():
-        if "$ref" in unresolved_definition[name]:
+        if "$ref" in unresolved_definition[name] and "value" not in example and "externalValue" not in example:
             # The example here is a resolved example and should be yielded as is
             yield example
         if isinstance(example, dict):
