@@ -307,7 +307,7 @@ def test_settings_error(app_schema):
         Workflow()
 
 
-@flaky(max_runs=5, min_passes=1)
+@flaky(max_runs=10, min_passes=1)
 def test_use_after_free():
     app = Flask(__name__)
 

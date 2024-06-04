@@ -261,7 +261,13 @@ def skip_unnecessary_hypothesis_output() -> Generator:
         yield
 
 
-@hookimpl(hookwrapper=True)
+if IS_PYTEST_ABOVE_54:
+    kwargs = {"wrapper": True}
+else:
+    kwargs = {"hookwrapper": True}
+
+
+@hookimpl(**kwargs)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 
@@ -278,10 +284,13 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
 
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
-        with skip_unnecessary_hypothesis_output():
-            outcome = yield
         try:
-            outcome.get_result()
+            with skip_unnecessary_hypothesis_output():
+                if IS_PYTEST_ABOVE_54:
+                    yield
+                else:
+                    outcome = yield
+                    outcome.get_result()
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 raise UsageError(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
@@ -316,5 +325,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         if invalid_headers is not None:
             raise InvalidHeadersExample.from_headers(invalid_headers) from None
     else:
-        outcome = yield
-        outcome.get_result()
+        if IS_PYTEST_ABOVE_54:
+            yield
+        else:
+            outcome = yield
+            outcome.get_result()
