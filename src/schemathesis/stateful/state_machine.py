@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     import hypothesis
     from requests.structures import CaseInsensitiveDict
 
+    from . import StateMachineConfig
     from ..schemas import BaseSchema
     from ..transports.responses import GenericResponse
 
@@ -45,6 +46,7 @@ class APIStateMachine(RuleBasedStateMachine):
     # attribute will be renamed in the future
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
     schema: BaseSchema
+    config: StateMachineConfig
 
     def __init__(self) -> None:
         try:
@@ -252,7 +254,7 @@ class APIStateMachine(RuleBasedStateMachine):
         all provided checks rather than only the first encountered exception.
         """
         __tracebackhide__ = True
-        case.validate_response(response, additional_checks=additional_checks)
+        case.validate_response(response, checks=tuple(self.config.checks), additional_checks=additional_checks)
 
     def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
         return StepResult(response, case, elapsed)

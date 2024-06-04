@@ -14,6 +14,7 @@ from ..links import get_all_links
 
 if TYPE_CHECKING:
     from ....models import Case
+    from ....stateful import StateMachineConfig
     from ..schemas import BaseOpenAPISchema
 
 FilterFunction = Callable[["StepResult"], bool]
@@ -26,7 +27,9 @@ class OpenAPIStateMachine(APIStateMachine):
         return case
 
 
-def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
+def create_state_machine(
+    schema: BaseOpenAPISchema, *, config: StateMachineConfig | None = None
+) -> type[APIStateMachine]:
     """Create a state machine class.
 
     It aims to avoid making calls that are not likely to lead to a stateful call later. For example:
@@ -75,8 +78,16 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 target=target_bundle, previous=st.none(), case=target.as_strategy()
             )
 
-    kwargs: dict[str, Any] = {"bundles": bundles, "schema": schema}
-    return type("APIWorkflow", (OpenAPIStateMachine,), {**kwargs, **rules})
+    return type(
+        "APIWorkflow",
+        (OpenAPIStateMachine,),
+        {
+            "schema": schema,
+            "config": config or StateMachineConfig(),
+            "bundles": bundles,
+            **rules,
+        },
+    )
 
 
 def transition(*args: Any, **kwargs: Any) -> Callable[[Callable], Rule]:

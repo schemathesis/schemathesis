@@ -10,6 +10,7 @@ Changelog
 - The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema. 
 - The ``use_after_free`` check. It ensures that the API returns 404 response after a successful DELETE operation on an object. 
   At the moment it is only available in state-machine-based stateful testing.
+- ``schemathesis.stateful.StateMachineConfig`` class to configure state machines by passing it as the ``config`` argument to ``schema.as_state_machine``.
 
 **Changed**
 
