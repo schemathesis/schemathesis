@@ -17,6 +17,7 @@ Changelog
   This improves the performance of data generation.
 - Rework building state machines for stateful testing to improve performance.
 - Improve error messages on ``MaxRetryError``. :issue:`2234`
+- Migrate to new-style ``pytest`` hooks. :issue:`2181``
 
 **Fixed**
 
