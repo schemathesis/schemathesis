@@ -155,10 +155,11 @@ def use_after_free(response: GenericResponse, original: Case) -> bool | None:
         return True
     if response.status_code == 404 or not original.source:
         return None
-    case = original
-    while case.source:
+    response = original.source.response
+    case = original.source.case
+    while True:
         # Find the most recent successful DELETE call that corresponds to the current operation
-        if case != original and case.operation.method.lower() == "delete" and 200 <= response.status_code < 300:
+        if case.operation.method.lower() == "delete" and 200 <= response.status_code < 300:
             if _is_prefix_operation(
                 ResourcePath(case.path, case.path_parameters or {}),
                 ResourcePath(original.path, original.path_parameters or {}),
@@ -179,6 +180,8 @@ def use_after_free(response: GenericResponse, original: Case) -> bool | None:
                         usage=usage,
                     ),
                 )
+        if case.source is None:
+            break
         response = case.source.response
         case = case.source.case
     return None
