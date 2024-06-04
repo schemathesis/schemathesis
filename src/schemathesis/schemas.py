@@ -46,7 +46,7 @@ from .generation import (
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
-from .stateful import Stateful, StatefulTest
+from .stateful import Stateful, StatefulTest, StateMachineConfig
 from .stateful.state_machine import APIStateMachine
 from .types import (
     Body,
@@ -396,7 +396,7 @@ class BaseSchema(Mapping):
     ) -> SearchStrategy:
         raise NotImplementedError
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, *, config: StateMachineConfig | None = None) -> type[APIStateMachine]:
         """Create a state machine class.
 
         Use it for stateful testing.

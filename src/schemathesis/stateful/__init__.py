@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from .. import GenerationConfig
 from ..exceptions import OperationSchemaError
-from ..models import APIOperation, Case
+from ..models import APIOperation, Case, CheckFunction
 from ..constants import NOT_SET
 from ..internal.result import Ok, Result
 
@@ -14,6 +14,13 @@ if TYPE_CHECKING:
     import hypothesis
     from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine
+
+
+@dataclass
+class StateMachineConfig:
+    """Configuration for a state machine."""
+
+    checks: list[CheckFunction] = field(default_factory=list)
 
 
 class UnresolvableLink(Exception):

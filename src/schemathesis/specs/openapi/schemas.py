@@ -52,7 +52,7 @@ from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...stateful import Stateful, StatefulTest
+from ...stateful import Stateful, StatefulTest, StateMachineConfig
 from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
@@ -541,9 +541,14 @@ class BaseOpenAPISchema(BaseSchema):
             return None
         return definitions.get("headers")
 
-    def as_state_machine(self) -> type[APIStateMachine]:
+    def as_state_machine(self, *, config: StateMachineConfig | None = None) -> type[APIStateMachine]:
+        from ...checks import ALL_CHECKS
+        from .checks import use_after_free
+
         try:
-            return create_state_machine(self)
+            return create_state_machine(
+                self, config=config or StateMachineConfig(checks=list(ALL_CHECKS) + [use_after_free])
+            )
         except OperationNotFound as exc:
             raise SchemaError(
                 type=SchemaErrorType.OPEN_API_INVALID_SCHEMA,
