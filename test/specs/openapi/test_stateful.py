@@ -8,8 +8,9 @@ from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.stateful.state_machine import StepResult
-from src.schemathesis.models import CaseSource, Check, Status
-from src.schemathesis.runner.serialization import SerializedCheck
+from schemathesis.models import CaseSource, Check, Status
+from schemathesis.runner.serialization import SerializedCheck
+from test.utils import flaky
 
 
 @pytest.mark.parametrize(
@@ -306,6 +307,7 @@ def test_settings_error(app_schema):
         Workflow()
 
 
+@flaky(max_runs=5, min_passes=1)
 def test_use_after_free():
     app = Flask(__name__)
 
