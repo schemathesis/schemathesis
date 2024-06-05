@@ -71,6 +71,10 @@ class APIStateMachine(RuleBasedStateMachine):
             return super()._new_name(target)  # type: ignore
 
     @classmethod
+    def format_rules(cls) -> str:
+        raise NotImplementedError
+
+    @classmethod
     def run(cls, *, settings: hypothesis.settings | None = None) -> None:
         """Run state machine as a test."""
         from . import run_state_machine_as_test

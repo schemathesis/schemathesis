@@ -11,6 +11,22 @@ Changelog
 - The ``use_after_free`` check. It ensures that the API returns 404 response after a successful DELETE operation on an object. 
   At the moment it is only available in state-machine-based stateful testing.
 - ``schemathesis.stateful.StateMachineConfig`` class to configure state machines by passing it as the ``config`` argument to ``schema.as_state_machine``.
+- ``APIStateMachine.format_rules`` method to format transition rules in a human-readable format.
+
+.. code-block::
+
+    POST /user
+    └── 201
+        ├── GET /users/{ids}
+        └── DELETE /user/{id}
+
+    GET /users/{ids}
+    └── 200
+        └── PATCH /user
+
+    DELETE /user/{id}
+    └── 204
+        └── DELETE /user/{id}
 
 **Changed**
 

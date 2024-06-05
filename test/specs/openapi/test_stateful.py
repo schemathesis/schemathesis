@@ -511,3 +511,44 @@ def test_use_after_free():
             "for a resource that was previously deleted.\n\n    The resource was deleted with `DELETE /users/"
         )
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_format_rules(app_schema):
+    schema = schemathesis.from_dict(app_schema)
+
+    for status_code in (200, 201):
+        schema.add_link(
+            source=schema["/users/{user_id}"]["GET"],
+            target=schema["/users/{user_id}"]["GET"],
+            status_code=status_code,
+            parameters={"user_id": "$response.body#/id"},
+            name="CustomLink",
+        )
+    schema.add_link(
+        source=schema["/users/"]["POST"],
+        target=schema["/users/{user_id}"]["GET"],
+        status_code=201,
+        parameters={"user_id": "$response.body#/id"},
+        name="CustomLink",
+    )
+
+    class Workflow(schema.as_state_machine()):
+        pass
+
+    assert (
+        Workflow.format_rules()
+        == """POST /api/users/
+└── 201
+    ├── GetUserByUserId -> GET /api/users/{user_id}
+    ├── CustomLink -> GET /api/users/{user_id}
+    └── PATCH /api/users/{user_id}
+
+GET /api/users/{user_id}
+├── 200
+│   ├── PATCH /api/users/{user_id}
+│   └── GET /api/users/{user_id}
+└── 201
+    └── GET /api/users/{user_id}"""
+    )
