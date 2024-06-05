@@ -535,9 +535,34 @@ following restriction:
   It is done due to ambiguity in the runtime expressions syntax, where ``}`` cannot be distinguished from an
   embedded runtime expression's closing bracket.
 
-**IMPORTANT**. The Open API standard defines ``requestBody`` keyword value in this way:
+For building ``requestBody``, the Open API standard only allows for literal values or expressions:
 
     A literal value or {expression} to use as a request body when calling the target operation.
 
-It means you cannot use multiple runtime expressions for different parameters, and you always have to provide either a literal
-or an expression.
+Schemathesis extends the Open API standard by allowing for the evaluation of runtime expressions within the ``requestBody`` object or array.
+
+For example, the following requestBody definition is valid:
+
+.. code-block:: json
+
+  {
+      "key": "$response.body#/key",
+      "items": ["$response.body#/first", "literal", 42]
+  }
+
+In this example, the ``$response.body#/key`` and ``$response.body#/first`` expressions are used to dynamically retrieve values from the response body. 
+
+If the response body is ``{"key": "foo", "first": "bar"}``, then the resulting payload will be:
+
+.. code-block:: json
+
+  {
+      "key": "foo",
+      "items": ["bar", "literal", 42]
+  }
+
+This allows for building dynamic payloads where nested items are not hardcoded but instead evaluated at runtime.
+
+**IMPORTANT**: Non-string object keys are converted to stringified JSON values during evaluation.
+
+By default, Schemathesis merges the evaluated structure with a generated value, giving the evaluated value precedence.

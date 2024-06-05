@@ -12,7 +12,19 @@ from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
 from schemathesis.specs.openapi.references import resolve_pointer, UNRESOLVABLE
 
-DOCUMENT = {"foo": ["bar", "baz"], "": 0, "a/b": 1, "c%d": 2, "e^f": 3, "g|h": 4, "i\\j": 5, 'k"l': 6, " ": 7, "m~n": 8}
+DOCUMENT = {
+    "foo": ["bar", "baz"],
+    "": 0,
+    "a/b": 1,
+    "c%d": 2,
+    "e^f": 3,
+    "g|h": 4,
+    "i\\j": 5,
+    'k"l': 6,
+    " ": 7,
+    "m~n": 8,
+    "bool-value": True,
+}
 
 
 @pytest.fixture(scope="module")
@@ -90,6 +102,26 @@ def context(case, response):
 )
 def test_evaluate(context, expr, expected):
     assert expressions.evaluate(expr, context) == expected
+
+
+@pytest.mark.parametrize(
+    "expr, expected",
+    [
+        ({"key": "value"}, {"key": "value"}),
+        ({"key": "$response.body#/a~1b"}, {"key": 1}),
+        ({"$response.body#/": "value"}, {"0": "value"}),
+        ({"$response.body#/unknown": "value"}, {"null": "value"}),
+        ({"$response.body#/foo": "value"}, {'["bar", "baz"]': "value"}),
+        ({"$response.body#/a~1b": "value"}, {"1": "value"}),
+        ({"$response.body#/bool-value": "value"}, {"true": "value"}),
+        (
+            {"key": "$response.body#/foo/0", "items": ["$response.body#/foo/1", "literal", 42]},
+            {"items": ["baz", "literal", 42], "key": "bar"},
+        ),
+    ],
+)
+def test_dynamic_body(context, expr, expected):
+    assert expressions.evaluate(expr, context, evaluate_nested=True) == expected
 
 
 @pytest.mark.parametrize(
