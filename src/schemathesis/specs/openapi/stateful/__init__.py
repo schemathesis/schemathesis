@@ -1,16 +1,18 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, TypedDict, Union
 
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from ....internal.result import Ok
+from ....stateful import StateMachineStatistic
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
-from ..utils import expand_status_code
 from ..links import get_all_links
+from ..utils import expand_status_code
 
 if TYPE_CHECKING:
     from ....models import Case
@@ -18,13 +20,119 @@ if TYPE_CHECKING:
     from ..schemas import BaseOpenAPISchema
 
 FilterFunction = Callable[["StepResult"], bool]
+StatusCode = str
+LinkName = str
+TargetName = str
+SourceName = str
+ResponseCounter = Dict[int, int]
+AggregatedResponseCounter = TypedDict("AggregatedResponseCounter", {"2xx": int, "4xx": int, "5xx": int})
+
+
+@dataclass
+class LinkSource:
+    name: str
+    responses: dict[StatusCode, dict[TargetName, dict[LinkName, ResponseCounter]]]
+    is_first: bool
+
+    __slots__ = ("name", "responses", "is_first")
+
+
+@dataclass
+class OperationResponse:
+    status_code: str
+    targets: dict[TargetName, dict[LinkName, ResponseCounter]]
+    is_last: bool
+
+    __slots__ = ("status_code", "targets", "is_last")
+
+
+@dataclass
+class Link:
+    name: str
+    target: str
+    responses: ResponseCounter
+    is_last: bool
+    is_single: bool
+
+    __slots__ = ("name", "target", "responses", "is_last", "is_single")
+
+
+StatisticEntry = Union[LinkSource, OperationResponse, Link]
+
+
+@dataclass
+class FormattedStatisticEntry:
+    line: str
+    entry: StatisticEntry
+    __slots__ = ("line", "entry")
+
+
+@dataclass
+class OpenAPIStateMachineStatistic(StateMachineStatistic):
+    """Statistics for a state machine run."""
+
+    data: dict[SourceName, dict[StatusCode, dict[TargetName, dict[LinkName, ResponseCounter]]]]
+
+    __slots__ = ("data",)
+
+    def iter(self) -> Iterator[StatisticEntry]:
+        for source_idx, (source, responses) in enumerate(self.data.items()):
+            yield LinkSource(name=source, responses=responses, is_first=source_idx == 0)
+            for response_idx, (status_code, targets) in enumerate(responses.items()):
+                yield OperationResponse(
+                    status_code=status_code, targets=targets, is_last=response_idx == len(responses) - 1
+                )
+                for target_idx, (target, links) in enumerate(targets.items()):
+                    for link_idx, (link_name, link_responses) in enumerate(links.items()):
+                        yield Link(
+                            name=link_name,
+                            target=target,
+                            responses=link_responses,
+                            is_last=target_idx == len(targets) - 1 and link_idx == len(links) - 1,
+                            is_single=len(links) == 1,
+                        )
+
+    def iter_with_format(self) -> Iterator[FormattedStatisticEntry]:
+        current_response = None
+        for entry in self.iter():
+            if isinstance(entry, LinkSource):
+                if not entry.is_first:
+                    yield FormattedStatisticEntry(line=f"\n{entry.name}", entry=entry)
+                else:
+                    yield FormattedStatisticEntry(line=f"{entry.name}", entry=entry)
+            elif isinstance(entry, OperationResponse):
+                current_response = entry
+                if entry.is_last:
+                    yield FormattedStatisticEntry(line=f"└── {entry.status_code}", entry=entry)
+                else:
+                    yield FormattedStatisticEntry(line=f"├── {entry.status_code}", entry=entry)
+            else:
+                if current_response is not None and current_response.is_last:
+                    line = "    "
+                else:
+                    line = "│   "
+                if entry.is_last:
+                    line += "└"
+                else:
+                    line += "├"
+                if entry.is_single or entry.name == entry.target:
+                    line += f"── {entry.target}"
+                else:
+                    line += f"── {entry.name} -> {entry.target}"
+                yield FormattedStatisticEntry(line=line, entry=entry)
 
 
 class OpenAPIStateMachine(APIStateMachine):
+    _statistic_template: OpenAPIStateMachineStatistic
+
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         context = expressions.ExpressionContext(case=result.case, response=result.response)
         direction.set_data(case, elapsed=result.elapsed, context=context)
         return case
+
+    @classmethod
+    def format_rules(cls) -> str:
+        return "\n".join(item.line for item in cls._statistic_template.iter_with_format())
 
 
 def create_state_machine(
@@ -41,10 +149,18 @@ def create_state_machine(
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {operation.verbose_name: Bundle(operation.verbose_name) for operation in operations}
     incoming_transitions = defaultdict(list)
+    # Statistic structure follows the links and count for each response status code
+    statistic = {}
     for operation in operations:
+        operation_links: dict[StatusCode, dict[TargetName, dict[LinkName, dict[int, int]]]] = {}
         for _, link in get_all_links(operation):
             target_operation = link.get_target_operation()
             incoming_transitions[target_operation.verbose_name].append(link)
+            response_targets = operation_links.setdefault(link.status_code, {})
+            target_links = response_targets.setdefault(target_operation.verbose_name, {})
+            target_links[link.name] = {}
+        if operation_links:
+            statistic[operation.verbose_name] = operation_links
     rules = {}
 
     for target in operations:
@@ -85,6 +201,7 @@ def create_state_machine(
             "schema": schema,
             "config": config or StateMachineConfig(),
             "bundles": bundles,
+            "_statistic_template": OpenAPIStateMachineStatistic(data=statistic),
             **rules,
         },
     )
