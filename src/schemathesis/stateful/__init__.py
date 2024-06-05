@@ -23,6 +23,11 @@ class StateMachineConfig:
     checks: list[CheckFunction] = field(default_factory=list)
 
 
+@dataclass
+class StateMachineStatistic:
+    """Statistics for a state machine run."""
+
+
 class UnresolvableLink(Exception):
     """Raised when a link cannot be resolved."""
 
