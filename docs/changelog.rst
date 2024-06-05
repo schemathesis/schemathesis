@@ -11,6 +11,7 @@ Changelog
 - The ``use_after_free`` check. It ensures that the API returns 404 response after a successful DELETE operation on an object. 
   At the moment it is only available in state-machine-based stateful testing.
 - ``schemathesis.stateful.StateMachineConfig`` class to configure state machines by passing it as the ``config`` argument to ``schema.as_state_machine``.
+- Support building dynamic payloads via Open API links. This allows for building objects or arrays where nested items are not hardcoded but dynamically evaluated.
 - ``APIStateMachine.format_rules`` method to format transition rules in a human-readable format.
 
 .. code-block::
