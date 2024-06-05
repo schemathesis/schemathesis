@@ -3,10 +3,11 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Generic, Type, TypeVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
+
 
 from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
 from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
@@ -17,7 +18,7 @@ if TYPE_CHECKING:
     import hypothesis
     from requests.structures import CaseInsensitiveDict
 
-    from . import StateMachineConfig
+    from . import StateMachineConfig, StateMachineStatistic
     from ..schemas import BaseSchema
     from ..transports.responses import GenericResponse
 
@@ -35,7 +36,10 @@ def _operation_name_to_identifier(name: str) -> str:
     return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
 
 
-class APIStateMachine(RuleBasedStateMachine):
+S = TypeVar("S", bound="StateMachineStatistic")
+
+
+class APIStateMachine(RuleBasedStateMachine, Generic[S]):
     """The base class for state machines generated from API schemas.
 
     Exposes additional extension points in the testing process.
@@ -47,6 +51,7 @@ class APIStateMachine(RuleBasedStateMachine):
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
     schema: BaseSchema
     config: StateMachineConfig
+    _statistic_template: S  # type: ignore
 
     def __init__(self) -> None:
         try:
@@ -75,11 +80,25 @@ class APIStateMachine(RuleBasedStateMachine):
         raise NotImplementedError
 
     @classmethod
-    def run(cls, *, settings: hypothesis.settings | None = None) -> None:
+    def run(
+        cls: Type[APIStateMachine],
+        *,
+        settings: hypothesis.settings | None = None,
+        statistic: S | None = None,
+    ) -> S:
         """Run state machine as a test."""
         from . import run_state_machine_as_test
 
-        return run_state_machine_as_test(cls, settings=settings)
+        statistic = statistic or cls._statistic_template.copy()
+
+        class _StateMachine(cls):  # type: ignore[valid-type,misc]
+            def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
+                result = super().step(case, previous)
+                self._flush_statistic(statistic, result, case, previous)
+                return result
+
+        run_state_machine_as_test(_StateMachine, settings=settings)
+        return statistic
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario.
@@ -98,6 +117,15 @@ class APIStateMachine(RuleBasedStateMachine):
 
     # To provide the return type in the rendered documentation
     teardown.__doc__ = RuleBasedStateMachine.teardown.__doc__
+
+    def _flush_statistic(
+        self,
+        statistic: S,
+        result: StepResult,
+        case: Case,
+        previous: tuple[StepResult, Direction] | None = None,
+    ) -> None:
+        raise NotImplementedError
 
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError

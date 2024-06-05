@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, Dict, Iterator, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Callable, Iterator, TypedDict, Union
 
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
+from ....internal.copy import fast_deepcopy
 from ....internal.result import Ok
 from ....stateful import StateMachineStatistic
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
@@ -24,7 +25,7 @@ StatusCode = str
 LinkName = str
 TargetName = str
 SourceName = str
-ResponseCounter = Dict[int, int]
+ResponseCounter = dict[int, int]
 AggregatedResponseCounter = TypedDict("AggregatedResponseCounter", {"2xx": int, "4xx": int, "5xx": int})
 
 
@@ -75,6 +76,9 @@ class OpenAPIStateMachineStatistic(StateMachineStatistic):
 
     __slots__ = ("data",)
 
+    def copy(self) -> OpenAPIStateMachineStatistic:
+        return self.__class__(data=fast_deepcopy(self.data))
+
     def iter(self) -> Iterator[StatisticEntry]:
         for source_idx, (source, responses) in enumerate(self.data.items()):
             yield LinkSource(name=source, responses=responses, is_first=source_idx == 0)
@@ -106,7 +110,7 @@ class OpenAPIStateMachineStatistic(StateMachineStatistic):
                     yield FormattedStatisticEntry(line=f"└── {entry.status_code}", entry=entry)
                 else:
                     yield FormattedStatisticEntry(line=f"├── {entry.status_code}", entry=entry)
-            else:
+            elif isinstance(entry, Link):
                 if current_response is not None and current_response.is_last:
                     line = "    "
                 else:
@@ -122,6 +126,10 @@ class OpenAPIStateMachineStatistic(StateMachineStatistic):
                 yield FormattedStatisticEntry(line=line, entry=entry)
 
 
+# TODO:
+#  - Count how many times links failed to follow
+
+
 class OpenAPIStateMachine(APIStateMachine):
     _statistic_template: OpenAPIStateMachineStatistic
 
@@ -130,9 +138,64 @@ class OpenAPIStateMachine(APIStateMachine):
         direction.set_data(case, elapsed=result.elapsed, context=context)
         return case
 
+    def _flush_statistic(
+        self,
+        statistic: OpenAPIStateMachineStatistic,
+        result: StepResult,
+        case: Case,
+        previous: tuple[StepResult, Direction] | None = None,
+    ) -> None:
+        if previous is not None:
+            # TODO: Maybe pass just the link?
+            _, link = previous
+            entry = statistic.data[link.operation.verbose_name][link.status_code][case.operation.verbose_name][
+                link.name
+            ]
+            if result.response.status_code not in entry:
+                entry[result.response.status_code] = 0
+            entry[result.response.status_code] += 1
+
     @classmethod
     def format_rules(cls) -> str:
         return "\n".join(item.line for item in cls._statistic_template.iter_with_format())
+
+    @classmethod
+    def iter_formatted_statistic_lines(cls, statistic: OpenAPIStateMachineStatistic) -> Iterator[str]:
+        entries = list(statistic.iter_with_format())
+        max_length = max(len(entry.line) for entry in entries)
+        header = "Total    2xx     4xx     5xx"
+        yield header.rjust(max_length + len(header) + 10)
+        for entry in entries:
+            if isinstance(entry.entry, LinkSource):
+                yield entry.line
+            elif isinstance(entry.entry, OperationResponse):
+                yield entry.line
+            elif isinstance(entry.entry, Link):
+                responses = _aggregate_responses(entry.entry.responses)
+                line = entry.line.ljust(max_length + 10)
+                line += "   " + str(sum(responses.values()))
+                for key in ("2xx", "4xx", "5xx"):
+                    line += f"       {responses[key]}"
+                yield line
+        # TODO: Total number of responses
+
+
+def _aggregate_responses(responses: dict[int, int]) -> AggregatedResponseCounter:
+    """Aggregate responses by status code ranges."""
+    output: AggregatedResponseCounter = {
+        "2xx": 0,
+        # NOTE: 3xx responses are not counted
+        "4xx": 0,
+        "5xx": 0,
+    }
+    for status_code, count in responses.items():
+        if 200 <= status_code < 300:
+            output["2xx"] += count
+        elif 400 <= status_code < 500:
+            output["4xx"] += count
+        elif 500 <= status_code < 600:
+            output["5xx"] += count
+    return output
 
 
 def create_state_machine(

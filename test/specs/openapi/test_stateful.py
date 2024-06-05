@@ -6,7 +6,7 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
+from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code, _aggregate_responses
 from schemathesis.stateful.state_machine import StepResult
 from schemathesis.stateful import StateMachineConfig
 from schemathesis.models import CaseSource, Check, Status
@@ -691,3 +691,16 @@ GET /api/users/{user_id}
 └── 201
     └── GET /api/users/{user_id}"""
     )
+
+
+def test_aggregate_responses():
+    responses = {
+        201: 2,
+        204: 3,
+        301: 1,
+        400: 1,
+        404: 1,
+        500: 1,
+        503: 1,
+    }
+    assert _aggregate_responses(responses) == {"2xx": 5, "4xx": 2, "5xx": 2}

@@ -27,6 +27,10 @@ class StateMachineConfig:
 class StateMachineStatistic:
     """Statistics for a state machine run."""
 
+    def copy(self) -> StateMachineStatistic:
+        """Create a copy of the statistic."""
+        raise NotImplementedError
+
 
 class UnresolvableLink(Exception):
     """Raised when a link cannot be resolved."""
