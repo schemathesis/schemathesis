@@ -333,7 +333,7 @@ def test_use_after_free():
 
     users = {}
 
-    next_user_id = 4
+    next_user_id = 1
     spec = {
         "openapi": "3.0.0",
         "info": {"title": "User Management API", "version": "1.0.0"},
@@ -397,9 +397,6 @@ def test_use_after_free():
                     "responses": {
                         "200": {
                             "description": "Successful response",
-                            "content": {
-                                "application/json": {"schema": {"$ref": "#/components/schemas/DeleteResponse"}}
-                            },
                             "links": {
                                 "GetUser": {
                                     "operationId": "getUser",
@@ -443,7 +440,6 @@ def test_use_after_free():
                     "additionalProperties": False,
                 },
                 "Error": {"type": "object", "properties": {"error": {"type": "string"}}},
-                "DeleteResponse": {"type": "object", "properties": {"message": {"type": "string"}}},
             }
         },
     }
@@ -509,6 +505,149 @@ def test_use_after_free():
         .startswith(
             "1. Use after free\n\n    The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`) "
             "for a resource that was previously deleted.\n\n    The resource was deleted with `DELETE /users/"
+        )
+    )
+
+
+@pytest.mark.parametrize("extension", ({"x-schemathesis": {"merge_body": False}}, {}))
+def test_dynamic_body(extension):
+    app = Flask(__name__)
+
+    users = {}
+
+    next_user_id = 1
+    last_modified = "2021-01-01T00:00:00Z"
+    spec = {
+        "openapi": "3.0.0",
+        "info": {"title": "User Management API", "version": "1.0.0"},
+        "paths": {
+            "/users": {
+                "post": {
+                    "summary": "Create a new user",
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                            "links": {
+                                "UpdateUser": {
+                                    "operationId": "updateUser",
+                                    "parameters": {"userId": "$response.body#/id"},
+                                    "requestBody": {
+                                        "last_modified": "$response.body#/last_modified",
+                                    },
+                                    **extension,
+                                },
+                            },
+                        },
+                        "400": {
+                            "description": "Bad request",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+                        },
+                    },
+                },
+            },
+            "/users/{userId}": {
+                "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                "patch": {
+                    "summary": "Update a user",
+                    "operationId": "updateUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        },
+                        "404": {
+                            "description": "User not found",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Error"}}},
+                        },
+                    },
+                },
+            },
+        },
+        "components": {
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "last_modified": {"type": "string"},
+                    },
+                    "required": ["id", "name", "last_modified"],
+                },
+                "NewUser": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string"}},
+                    "additionalProperties": False,
+                },
+                "UpdateUser": {
+                    "type": "object",
+                    "required": ["name", "last_modified"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "last_modified": {"type": "string"},
+                    },
+                    "additionalProperties": False,
+                },
+                "Error": {"type": "object", "properties": {"error": {"type": "string"}}},
+            }
+        },
+    }
+
+    @app.route("/openapi.json", methods=["GET"])
+    def get_spec():
+        return jsonify(spec)
+
+    @app.route("/users/<int:user_id>", methods=["PATCH"])
+    def update_user(user_id):
+        user = users.get(user_id)
+        if user:
+            data = request.get_json()
+            assert data["last_modified"] == user["last_modified"]
+            if extension:
+                assert len(data) == 1
+            else:
+                assert "name" in data
+                user["name"] = data["name"]
+            return jsonify(user)
+        else:
+            return jsonify({"error": "User not found"}), 404
+
+    @app.route("/users", methods=["POST"])
+    def create_user():
+        data = request.get_json()
+        name = data.get("name")
+        if not name:
+            return jsonify({"error": "Name is required"}), 400
+
+        nonlocal next_user_id
+        new_user = {"id": next_user_id, "name": name, "last_modified": last_modified}
+        users[next_user_id] = new_user
+        next_user_id += 1
+
+        return jsonify(new_user), 201
+
+    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+
+    state_machine = schema.as_state_machine()
+
+    state_machine.run(
+        settings=settings(
+            max_examples=100,
+            deadline=None,
+            suppress_health_check=list(HealthCheck),
+            phases=[Phase.generate],
+            stateful_step_count=2,
         )
     )
 
