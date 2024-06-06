@@ -169,7 +169,7 @@ class RequestsTransport:
             timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
             code_message = case._get_code_message(case.operation.schema.code_sample_style, request, verify=verify)
             message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
-            raise get_timeout_error(timeout)(
+            raise get_timeout_error(case.operation.verbose_name, timeout)(
                 f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_message}",
                 context=failures.RequestTimeout(message=message, timeout=timeout),
             ) from None

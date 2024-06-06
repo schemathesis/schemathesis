@@ -97,60 +97,60 @@ def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> type[Chec
     return _get_hashed_exception("GroupedException", f"{prefix}{message}")
 
 
-def get_server_error(status_code: int) -> type[CheckFailed]:
+def get_server_error(prefix: str, status_code: int) -> type[CheckFailed]:
     """Return new exception for the Internal Server Error cases."""
-    name = f"ServerError{status_code}"
+    name = f"ServerError{prefix}{status_code}"
     return get_exception(name)
 
 
-def get_status_code_error(status_code: int) -> type[CheckFailed]:
+def get_status_code_error(prefix: str, status_code: int) -> type[CheckFailed]:
     """Return new exception for an unexpected status code."""
-    name = f"StatusCodeError{status_code}"
+    name = f"StatusCodeError{prefix}{status_code}"
     return get_exception(name)
 
 
-def get_response_type_error(expected: str, received: str) -> type[CheckFailed]:
+def get_response_type_error(prefix: str, expected: str, received: str) -> type[CheckFailed]:
     """Return new exception for an unexpected response type."""
-    name = f"SchemaValidationError{expected}_{received}"
+    name = f"SchemaValidationError{prefix}{expected}_{received}"
     return get_exception(name)
 
 
-def get_malformed_media_type_error(media_type: str) -> type[CheckFailed]:
-    name = f"MalformedMediaType{media_type}"
+def get_malformed_media_type_error(prefix: str, media_type: str) -> type[CheckFailed]:
+    name = f"MalformedMediaType{prefix}{media_type}"
     return get_exception(name)
 
 
-def get_missing_content_type_error() -> type[CheckFailed]:
+def get_missing_content_type_error(prefix: str) -> type[CheckFailed]:
     """Return new exception for a missing Content-Type header."""
-    return get_exception("MissingContentTypeError")
+    return get_exception(f"MissingContentTypeError{prefix}")
 
 
-def get_schema_validation_error(exception: ValidationError) -> type[CheckFailed]:
+def get_schema_validation_error(prefix: str, exception: ValidationError) -> type[CheckFailed]:
     """Return new exception for schema validation error."""
-    return _get_hashed_exception("SchemaValidationError", str(exception))
+    return _get_hashed_exception(f"SchemaValidationError{prefix}", str(exception))
 
 
-def get_response_parsing_error(exception: JSONDecodeError) -> type[CheckFailed]:
+def get_response_parsing_error(prefix: str, exception: JSONDecodeError) -> type[CheckFailed]:
     """Return new exception for response parsing error."""
-    return _get_hashed_exception("ResponseParsingError", str(exception))
+    return _get_hashed_exception(f"ResponseParsingError{prefix}", str(exception))
 
 
-def get_headers_error(message: str) -> type[CheckFailed]:
+def get_headers_error(prefix: str, message: str) -> type[CheckFailed]:
     """Return new exception for missing headers."""
-    return _get_hashed_exception("MissingHeadersError", message)
+    return _get_hashed_exception(f"MissingHeadersError{prefix}", message)
 
 
-def get_negative_rejection_error(status: int) -> type[CheckFailed]:
-    return _get_hashed_exception("AcceptedNegativeDataError", str(status))
+def get_negative_rejection_error(prefix: str, status: int) -> type[CheckFailed]:
+    return _get_hashed_exception(f"AcceptedNegativeDataError{prefix}", str(status))
 
 
 def get_use_after_free_error(free: str, usage: str) -> type[CheckFailed]:
     return _get_hashed_exception("UseAfterFreeError", f"{free} -> {usage}")
 
 
-def get_timeout_error(deadline: float | int) -> type[CheckFailed]:
+def get_timeout_error(prefix: str, deadline: float | int) -> type[CheckFailed]:
     """Request took too long."""
-    return _get_hashed_exception("TimeoutError", str(deadline))
+    return _get_hashed_exception(f"TimeoutError{prefix}", str(deadline))
 
 
 def get_unexpected_graphql_response_error(type_: type) -> type[CheckFailed]:

@@ -34,7 +34,7 @@ def status_code_conformance(response: GenericResponse, case: Case) -> bool | Non
     if response.status_code not in allowed_status_codes:
         defined_status_codes = list(map(str, responses))
         responses_list = ", ".join(defined_status_codes)
-        exc_class = get_status_code_error(response.status_code)
+        exc_class = get_status_code_error(case.operation.verbose_name, response.status_code)
         raise exc_class(
             failures.UndefinedStatusCode.title,
             context=failures.UndefinedStatusCode(
@@ -63,7 +63,7 @@ def content_type_conformance(response: GenericResponse, case: Case) -> bool | No
     content_type = response.headers.get("Content-Type")
     if not content_type:
         formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
-        raise get_missing_content_type_error()(
+        raise get_missing_content_type_error(case.operation.verbose_name)(
             failures.MissingContentType.title,
             context=failures.MissingContentType(
                 message=f"The following media types are documented in the schema:{''.join(formatted_content_types)}",
@@ -74,14 +74,16 @@ def content_type_conformance(response: GenericResponse, case: Case) -> bool | No
         try:
             expected_main, expected_sub = parse_content_type(option)
         except ValueError as exc:
-            _reraise_malformed_media_type(exc, "Schema", option, option)
+            _reraise_malformed_media_type(case, exc, "Schema", option, option)
         try:
             received_main, received_sub = parse_content_type(content_type)
         except ValueError as exc:
-            _reraise_malformed_media_type(exc, "Response", content_type, option)
+            _reraise_malformed_media_type(case, exc, "Response", content_type, option)
         if (expected_main, expected_sub) == (received_main, received_sub):
             return None
-    exc_class = get_response_type_error(f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}")
+    exc_class = get_response_type_error(
+        case.operation.verbose_name, f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}"
+    )
     raise exc_class(
         failures.UndefinedContentType.title,
         context=failures.UndefinedContentType(
@@ -92,9 +94,9 @@ def content_type_conformance(response: GenericResponse, case: Case) -> bool | No
     )
 
 
-def _reraise_malformed_media_type(exc: ValueError, location: str, actual: str, defined: str) -> NoReturn:
+def _reraise_malformed_media_type(case: Case, exc: ValueError, location: str, actual: str, defined: str) -> NoReturn:
     message = f"Media type for {location} is incorrect\n\nReceived: {actual}\nDocumented: {defined}"
-    raise get_malformed_media_type_error(message)(
+    raise get_malformed_media_type_error(case.operation.verbose_name, message)(
         failures.MalformedMediaType.title,
         context=failures.MalformedMediaType(message=message, actual=actual, defined=defined),
     ) from exc
@@ -118,7 +120,7 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
         return None
     formatted_headers = [f"\n- `{header}`" for header in missing_headers]
     message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
-    exc_class = get_headers_error(message)
+    exc_class = get_headers_error(case.operation.verbose_name, message)
     raise exc_class(
         failures.MissingHeaders.title,
         context=failures.MissingHeaders(message=message, missing_headers=missing_headers),
@@ -139,7 +141,7 @@ def negative_data_rejection(response: GenericResponse, case: Case) -> bool | Non
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
     if case.data_generation_method and case.data_generation_method.is_negative and 200 <= response.status_code < 300:
-        exc_class = get_negative_rejection_error(response.status_code)
+        exc_class = get_negative_rejection_error(case.operation.verbose_name, response.status_code)
         raise exc_class(
             failures.AcceptedNegativeData.title,
             context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),

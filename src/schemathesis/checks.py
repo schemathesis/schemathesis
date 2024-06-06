@@ -25,14 +25,14 @@ def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
 
     status_code = response.status_code
     if status_code >= 500:
-        exc_class = get_server_error(status_code)
+        exc_class = get_server_error(case.operation.verbose_name, status_code)
         raise exc_class(failures.ServerError.title, context=failures.ServerError(status_code=status_code))
     if isinstance(case, GraphQLCase):
         try:
             data = get_json(response)
             validate_graphql_response(data)
         except json.JSONDecodeError as exc:
-            exc_class = get_response_parsing_error(exc)
+            exc_class = get_response_parsing_error(case.operation.verbose_name, exc)
             context = failures.JSONDecodeErrorContext.from_exception(exc)
             raise exc_class(context.title, context=context) from exc
     return None

@@ -631,7 +631,7 @@ class BaseOpenAPISchema(BaseSchema):
             formatted_content_types = [f"\n- `{content_type}`" for content_type in media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             try:
-                raise get_missing_content_type_error()(
+                raise get_missing_content_type_error(operation.verbose_name)(
                     failures.MissingContentType.title,
                     context=failures.MissingContentType(message=message, media_types=media_types),
                 )
@@ -643,7 +643,7 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             data = get_json(response)
         except JSONDecodeError as exc:
-            exc_class = get_response_parsing_error(exc)
+            exc_class = get_response_parsing_error(operation.verbose_name, exc)
             context = failures.JSONDecodeErrorContext.from_exception(exc)
             try:
                 raise exc_class(context.title, context=context) from exc
@@ -661,7 +661,7 @@ class BaseOpenAPISchema(BaseSchema):
             try:
                 jsonschema.validate(data, schema, cls=cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
-                exc_class = get_schema_validation_error(exc)
+                exc_class = get_schema_validation_error(operation.verbose_name, exc)
                 ctx = failures.ValidationErrorContext.from_exception(exc)
                 try:
                     raise exc_class(ctx.title, context=ctx) from exc
