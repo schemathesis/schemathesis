@@ -604,6 +604,7 @@ The available events are:
 These events are primarily used for monitoring and reporting purposes, allowing you to track the progress of the state machine test runner. 
 They provide information about the current state of the test run but do not offer any control over the test execution.
 
+To collect the events you may use a "sink" that consumes the events and collects statistics about the test run.
 
 .. code-block:: python
 
@@ -612,7 +613,13 @@ They provide information about the current state of the test run but do not offe
 
     schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
     state_machine = schema.as_state_machine()
+    sink = state_machine.sink()
+
     runner = state_machine.runner()
     for event in runner.execute():
+        sink.consume(event)
         if isinstance(event, events.RunFinished):
             print("Test run finished")
+    print("Duration:", sink.duration)
+    for failure in sink.failures:
+        print(failure)

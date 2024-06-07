@@ -191,7 +191,7 @@ def app_factory(empty_open_api_3_schema):
         data = request.get_json()
         name = data.get("name")
         expect_custom_headers()
-        if not name:
+        if name is None:
             return jsonify({"error": "Name is required"}), 400
 
         if config.multiple_conformance_issues:

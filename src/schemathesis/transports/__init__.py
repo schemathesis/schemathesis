@@ -186,6 +186,14 @@ def _merge_dict_to(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> 
     data[data_key] = original
 
 
+def prepare_timeout(timeout: int | None) -> float | None:
+    """Request timeout is in milliseconds, but `requests` uses seconds."""
+    output: int | float | None = timeout
+    if timeout is not None:
+        output = timeout / 1000
+    return output
+
+
 def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
     """Check arguments for `requests.Session.request`.
 

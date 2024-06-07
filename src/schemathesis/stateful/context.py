@@ -8,6 +8,7 @@ from ..exceptions import CheckFailed
 from . import events
 
 if TYPE_CHECKING:
+    from ..transports.responses import GenericResponse
     from ..models import Check
 
 FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
@@ -40,6 +41,7 @@ class RunnerContext:
     failures_for_suite: list[Check] = field(default_factory=list)
     # Status of the current step
     current_step_status: events.StepStatus = events.StepStatus.SUCCESS
+    current_response: GenericResponse | None = None
 
     @property
     def current_scenario_status(self) -> events.ScenarioStatus:
@@ -49,8 +51,9 @@ class RunnerContext:
             return events.ScenarioStatus.FAILURE
         return events.ScenarioStatus.ERROR
 
-    def reset_step_status(self) -> None:
+    def reset_step(self) -> None:
         self.current_step_status = events.StepStatus.SUCCESS
+        self.current_response = None
 
     def step_failed(self) -> None:
         self.current_step_status = events.StepStatus.FAILURE
@@ -87,4 +90,4 @@ class RunnerContext:
     def reset(self) -> None:
         self.failures_for_suite = []
         self.seen_in_suite.clear()
-        self.reset_step_status()
+        self.reset_step()

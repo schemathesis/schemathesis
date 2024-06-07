@@ -21,8 +21,6 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from schemathesis.transports import RequestsTransport
-
 from ... import failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import (
@@ -66,6 +64,7 @@ from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
 from ...targets import Target, TargetContext
+from ...transports import RequestsTransport, prepare_timeout
 from ...types import RawAuth, RequestCert
 from ...utils import capture_hypothesis_output
 from .. import probes
@@ -889,14 +888,6 @@ def get_session(auth: HTTPDigestAuth | RawAuth | None = None) -> Generator[reque
         if auth is not None:
             session.auth = auth
         yield session
-
-
-def prepare_timeout(timeout: int | None) -> float | None:
-    """Request timeout is in milliseconds, but `requests` uses seconds."""
-    output: int | float | None = timeout
-    if timeout is not None:
-        output = timeout / 1000
-    return output
 
 
 def wsgi_test(
