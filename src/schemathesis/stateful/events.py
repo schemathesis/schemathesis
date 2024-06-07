@@ -21,9 +21,11 @@ class RunStatus(str, Enum):
 class StatefulEvent:
     """Basic stateful test event."""
 
+    __slots__ = ("timestamp",)
+
 
 @dataclass
-class BeforeRun(StatefulEvent):
+class RunStarted(StatefulEvent):
     """Before executing all scenarios."""
 
     __slots__ = ("timestamp",)
@@ -33,7 +35,7 @@ class BeforeRun(StatefulEvent):
 
 
 @dataclass
-class AfterRun(StatefulEvent):
+class RunFinished(StatefulEvent):
     """After executing all scenarios."""
 
     status: RunStatus
@@ -55,7 +57,7 @@ class SuiteStatus(str, Enum):
 
 
 @dataclass
-class BeforeSuite(StatefulEvent):
+class SuiteStarted(StatefulEvent):
     """Before executing a set of scenarios."""
 
     __slots__ = ("timestamp",)
@@ -65,7 +67,7 @@ class BeforeSuite(StatefulEvent):
 
 
 @dataclass
-class AfterSuite(StatefulEvent):
+class SuiteFinished(StatefulEvent):
     """After executing a set of scenarios."""
 
     status: SuiteStatus
@@ -89,7 +91,7 @@ class ScenarioStatus(str, Enum):
 
 
 @dataclass
-class BeforeScenario(StatefulEvent):
+class ScenarioStarted(StatefulEvent):
     """Before a single state machine execution."""
 
     __slots__ = ("timestamp",)
@@ -99,7 +101,7 @@ class BeforeScenario(StatefulEvent):
 
 
 @dataclass
-class AfterScenario(StatefulEvent):
+class ScenarioFinished(StatefulEvent):
     """After a single state machine execution."""
 
     status: ScenarioStatus
@@ -120,7 +122,7 @@ class StepStatus(str, Enum):
 
 
 @dataclass
-class BeforeStep(StatefulEvent):
+class StepStarted(StatefulEvent):
     """Before a single state machine step."""
 
     __slots__ = ("timestamp",)
@@ -130,7 +132,7 @@ class BeforeStep(StatefulEvent):
 
 
 @dataclass
-class AfterStep(StatefulEvent):
+class StepFinished(StatefulEvent):
     """After a single state machine step."""
 
     status: StepStatus
@@ -153,7 +155,7 @@ class Interrupted(StatefulEvent):
 
 
 @dataclass
-class Error(StatefulEvent):
+class Errored(StatefulEvent):
     """An error occurred during the state machine execution."""
 
     exception: Exception

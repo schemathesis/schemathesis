@@ -1,35 +1,18 @@
 from dataclasses import dataclass
+from typing import List
+
 import hypothesis
 import hypothesis.errors
 import pytest
 
-import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
-from schemathesis.stateful.runner import (
-    events,
-    StatefulTestRunnerConfig,
-    _get_default_hypothesis_settings_kwargs,
-    _get_hypothesis_settings_kwargs_override,
-)
-
-
-@pytest.fixture
-def runner_factory(app_factory):
-    def _runner_factory(app_kwargs=None, config_kwargs=None):
-        app = app_factory(**(app_kwargs or {}))
-        schema = schemathesis.from_wsgi("/openapi.json", app=app)
-        state_machine = schema.as_state_machine()
-        config_kwargs = config_kwargs or {}
-        config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=10))
-        return state_machine.runner(config=StatefulTestRunnerConfig(**config_kwargs))
-
-    return _runner_factory
+from schemathesis.stateful.runner import events
 
 
 @dataclass
 class RunnerResult:
-    events: list[events.StatefulEvent]
+    events: List[events.StatefulEvent]
 
     @property
     def event_names(self):
@@ -37,12 +20,12 @@ class RunnerResult:
 
     @property
     def failures(self):
-        events_ = (event for event in self.events if isinstance(event, events.AfterSuite))
+        events_ = (event for event in self.events if isinstance(event, events.SuiteFinished))
         return [failure for event in events_ for failure in event.failures]
 
     @property
     def errors(self):
-        return [event for event in self.events if isinstance(event, events.Error)]
+        return [event for event in self.events if isinstance(event, events.Errored)]
 
 
 def collect_result(runner) -> RunnerResult:
@@ -62,6 +45,8 @@ def test_find_independent_5xx(runner_factory, kwargs):
         "PATCH /users/{userId}",
     }
     assert result.events[-1].status == events.RunStatus.FAILURE
+    for event in result.events:
+        assert event.timestamp is not None
     # If `exit_first` is set
     if kwargs.get("exit_first"):
         # Then only the first one should be found
@@ -71,31 +56,6 @@ def test_find_independent_5xx(runner_factory, kwargs):
         # Else, all of them should be found
         assert len(result.failures) == 2
         assert {check.example.operation.verbose_name for check in result.failures} == all_affected_operations
-
-
-@pytest.mark.parametrize(
-    "settings, expected",
-    (
-        (
-            {},
-            _get_default_hypothesis_settings_kwargs(),
-        ),
-        (
-            {"phases": [hypothesis.Phase.explicit]},
-            {"deadline": None},
-        ),
-        (_get_default_hypothesis_settings_kwargs(), {}),
-    ),
-)
-def test_hypothesis_settings(settings, expected):
-    assert _get_hypothesis_settings_kwargs_override(hypothesis.settings(**settings)) == expected
-
-
-def test_create_runner_with_default_hypothesis_settings(runner_factory):
-    runner = runner_factory(
-        config_kwargs={"hypothesis_settings": hypothesis.settings(**_get_default_hypothesis_settings_kwargs())}
-    )
-    assert runner.config.hypothesis_settings.deadline is None
 
 
 def keyboard_interrupt(r):
@@ -113,12 +73,12 @@ def test_stop_in_check(runner_factory, func):
 
     runner = runner_factory(config_kwargs={"checks": (stop_immediately,)})
     result = collect_result(runner)
-    assert "AfterStep" in result.event_names
-    assert "BeforeStep" in result.event_names
+    assert "StepStarted" in result.event_names
+    assert "StepFinished" in result.event_names
     assert result.events[-1].status == events.RunStatus.INTERRUPTED
 
 
-@pytest.mark.parametrize("event_cls", (events.BeforeScenario, events.AfterScenario))
+@pytest.mark.parametrize("event_cls", (events.ScenarioStarted, events.ScenarioFinished))
 def test_explicit_stop(runner_factory, event_cls):
     runner = runner_factory()
     collected = []
@@ -132,9 +92,11 @@ def test_explicit_stop(runner_factory, event_cls):
 
 def test_stop_outside_of_state_machine_execution(runner_factory, mocker):
     # When stop signal is received outside of state machine execution
-    runner = runner_factory(app_kwargs={"independent_500": True})
+    runner = runner_factory(
+        app_kwargs={"independent_500": True},
+    )
     mocker.patch(
-        "schemathesis.stateful.runner.FailureRegistry.mark_as_seen_in_run", side_effect=lambda *_, **__: runner.stop()
+        "schemathesis.stateful.runner.RunnerContext.mark_as_seen_in_run", side_effect=lambda *_, **__: runner.stop()
     )
     result = collect_result(runner)
     assert result.events[-2].status == events.SuiteStatus.INTERRUPTED
@@ -164,7 +126,10 @@ def test_custom_assertion_in_check(runner_factory, exception_args):
         raise AssertionError(*exception_args)
 
     runner = runner_factory(
-        config_kwargs={"checks": (custom_check,), "hypothesis_settings": hypothesis.settings(max_examples=1)}
+        config_kwargs={
+            "checks": (custom_check,),
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+        }
     )
     result = collect_result(runner)
     assert len(result.failures) == 1
@@ -179,21 +144,76 @@ def test_distinct_assertions(runner_factory):
     counter = 0
 
     # When a check contains different failing assertions
-    def custom_check(*args, **kwargs):
+    def custom_check(response, case):
         nonlocal counter
         counter += 1
         if counter == 1:
             raise AssertionError("First")
-        else:
+        elif counter == 2:
             raise AssertionError("Second")
+        elif counter == 3:
+            # No message
+            assert case.headers == 43
+        elif counter == 4:
+            # With message
+            assert case.headers == 43, "Fourth"
 
     runner = runner_factory(
-        config_kwargs={"checks": (custom_check,), "hypothesis_settings": hypothesis.settings(max_examples=1)}
+        config_kwargs={
+            "checks": (custom_check,),
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+        }
     )
     result = collect_result(runner)
-    # Then both of them should be reported
-    assert len(result.failures) == 2
-    assert {check.message for check in result.failures} == {"First", "Second"}
+    # Then all of them should be reported
+    assert len(result.failures) == 4
+    assert {check.message for check in result.failures} == {
+        "First",
+        "Second",
+        # Rewritten by pytest
+        "assert None == 43\n +  where None = Case(body={'name': ''}).headers",
+        "Fourth\nassert {} == 43\n +  where {} = Case(headers={}, body={'name': ''}).headers",
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    ({"exit_first": False}, {"exit_first": True}),
+)
+def test_flaky_assertions(runner_factory, kwargs):
+    counter = 0
+
+    # When a check contains different failing assertions and one of them is considered flaky by Hypothesis
+    def custom_check(response, case):
+        nonlocal counter
+        counter += 1
+        if counter == 1:
+            raise AssertionError("First")
+        elif counter == 2:
+            raise AssertionError("Second")
+        else:
+            assert case.headers == 43
+
+    runner = runner_factory(
+        config_kwargs={
+            "checks": (custom_check,),
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+            **kwargs,
+        }
+    )
+    result = collect_result(runner)
+    # Then all of them should be reported
+    if kwargs.get("exit_first"):
+        assert len(result.failures) == 2
+        assert {check.message for check in result.failures} == {"First", "Second"}
+    else:
+        assert len(result.failures) == 3
+        assert {check.message for check in result.failures} == {
+            "First",
+            "Second",
+            # Rewritten by pytest
+            "assert None == 43\n +  where None = Case(body={'name': ''}).headers",
+        }
 
 
 def test_failure_hidden_behind_another_failure(runner_factory):
@@ -209,11 +229,11 @@ def test_failure_hidden_behind_another_failure(runner_factory):
 
     runner = runner_factory(
         app_kwargs={"failure_behind_failure": True},
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=10), "checks": (dynamic_check,)},
+        config_kwargs={"checks": (dynamic_check,)},
     )
     failures = []
     for event in runner.execute():
-        if isinstance(event, events.AfterSuite):
+        if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
             suite_number += 1
     assert len(failures) == 2
@@ -221,7 +241,9 @@ def test_failure_hidden_behind_another_failure(runner_factory):
 
 
 def test_multiple_conformance_issues(runner_factory):
-    runner = runner_factory(app_kwargs={"multiple_conformance_issues": True})
+    runner = runner_factory(
+        app_kwargs={"multiple_conformance_issues": True},
+    )
     result = collect_result(runner)
     assert len(result.failures) == 2
     assert {check.message for check in result.failures} == {"Missing Content-Type header", "Response violates schema"}
@@ -230,7 +252,10 @@ def test_multiple_conformance_issues(runner_factory):
 def test_find_use_after_free(runner_factory):
     runner = runner_factory(
         app_kwargs={"use_after_free": True},
-        config_kwargs={"checks": (use_after_free,), "hypothesis_settings": hypothesis.settings(max_examples=25)},
+        config_kwargs={
+            "checks": (use_after_free,),
+            "hypothesis_settings": hypothesis.settings(max_examples=20, database=None),
+        },
     )
     result = collect_result(runner)
     assert len(result.failures) == 1
@@ -243,7 +268,10 @@ def test_failed_health_check(runner_factory):
         hypothesis.reject()
 
     runner = runner_factory(
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=10), "checks": (rejected_check,)},
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+            "checks": (rejected_check,),
+        },
     )
     result = collect_result(runner)
     assert result.errors
@@ -251,7 +279,11 @@ def test_failed_health_check(runner_factory):
     assert result.events[-1].status == events.RunStatus.ERROR
 
 
-def test_flaky(runner_factory):
+@pytest.mark.parametrize(
+    "kwargs",
+    ({"exit_first": False}, {"exit_first": True}),
+)
+def test_flaky(runner_factory, kwargs):
     found = False
 
     def flaky_check(*args, **kwargs):
@@ -261,20 +293,37 @@ def test_flaky(runner_factory):
             raise AssertionError("Flaky")
 
     runner = runner_factory(
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=10), "checks": (flaky_check,)},
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+            "checks": (flaky_check,),
+            **kwargs,
+        }
     )
     failures = []
     for event in runner.execute():
-        assert not isinstance(event, events.Error)
-        if isinstance(event, events.AfterSuite):
+        assert not isinstance(event, events.Errored)
+        if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     assert len(failures) == 1
     assert failures[0].message == "Flaky"
 
 
 def test_unsatisfiable(runner_factory):
-    runner = runner_factory(app_kwargs={"unsatisfiable": True})
+    runner = runner_factory(
+        app_kwargs={"unsatisfiable": True},
+        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=1, database=None)},
+    )
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, hypothesis.errors.InvalidArgument)
     assert result.events[-1].status == events.RunStatus.ERROR
+
+
+def test_custom_headers(runner_factory):
+    headers = {"X-Foo": "Bar"}
+    runner = runner_factory(
+        app_kwargs={"custom_headers": headers},
+        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=1, database=None), "headers": headers},
+    )
+    result = collect_result(runner)
+    assert result.events[-1].status == events.RunStatus.SUCCESS

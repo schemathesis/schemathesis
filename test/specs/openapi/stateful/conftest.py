@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 
+import hypothesis
 import pytest
 from flask import Flask, jsonify, request
+
+import schemathesis
+from schemathesis.stateful.runner import StatefulTestRunnerConfig
 
 
 @dataclass
@@ -12,6 +18,7 @@ class AppConfig:
     failure_behind_failure: bool = False
     multiple_conformance_issues: bool = False
     unsatisfiable: bool = False
+    custom_headers: dict | None = None
 
 
 @pytest.fixture
@@ -174,10 +181,16 @@ def app_factory(empty_open_api_3_schema):
         else:
             return jsonify({"error": "User not found"}), 404
 
+    def expect_custom_headers():
+        if config.custom_headers:
+            for key, value in config.custom_headers.items():
+                assert request.headers.get(key) == value
+
     @app.route("/users", methods=["POST"])
     def create_user():
         data = request.get_json()
         name = data.get("name")
+        expect_custom_headers()
         if not name:
             return jsonify({"error": "Name is required"}), 400
 
@@ -237,12 +250,14 @@ def app_factory(empty_open_api_3_schema):
         return jsonify({"message": "Nothing happened"}), 200
 
     def _factory(
+        *,
         use_after_free=False,
         merge_body=True,
         independent_500=False,
         failure_behind_failure=False,
         multiple_conformance_issues=False,
         unsatisfiable=False,
+        custom_headers=None,
     ):
         config.use_after_free = use_after_free
         config.merge_body = merge_body
@@ -256,7 +271,21 @@ def app_factory(empty_open_api_3_schema):
         config.unsatisfiable = unsatisfiable
         if unsatisfiable:
             empty_open_api_3_schema["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 100
-
+        if custom_headers:
+            config.custom_headers = custom_headers
         return app
 
     return _factory
+
+
+@pytest.fixture
+def runner_factory(app_factory):
+    def _runner_factory(app_kwargs=None, config_kwargs=None):
+        app = app_factory(**(app_kwargs or {}))
+        schema = schemathesis.from_wsgi("/openapi.json", app=app)
+        state_machine = schema.as_state_machine()
+        config_kwargs = config_kwargs or {}
+        config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=8, database=None))
+        return state_machine.runner(config=StatefulTestRunnerConfig(**config_kwargs))
+
+    return _runner_factory

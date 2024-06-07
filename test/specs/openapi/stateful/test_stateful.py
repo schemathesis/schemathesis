@@ -7,7 +7,6 @@ from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.stateful.state_machine import StepResult
-from schemathesis.stateful import StateMachineConfig
 from schemathesis.models import CaseSource, Check, Status
 from schemathesis.runner.serialization import SerializedCheck
 from test.utils import flaky
@@ -305,25 +304,6 @@ def test_settings_error(app_schema):
 
     with pytest.raises(InvalidDefinition):
         Workflow()
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_state_machine_config(app_schema, base_url):
-    schema = schemathesis.from_dict(app_schema, base_url=base_url)
-
-    def custom_check(response, case):
-        raise ValueError("Custom check")
-
-    config = StateMachineConfig(
-        checks=[custom_check],
-    )
-
-    class Workflow(schema.as_state_machine(config=config)):
-        pass
-
-    with pytest.raises(ValueError, match="Custom check"):
-        Workflow.run()
 
 
 @flaky(max_runs=10, min_passes=1)
