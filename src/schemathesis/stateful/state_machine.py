@@ -12,7 +12,9 @@ from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
 from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
 from ..models import APIOperation, Case, CheckFunction
+from .sink import StateMachineSink
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
+from .statistic import TransitionStats
 
 if TYPE_CHECKING:
     import hypothesis
@@ -46,6 +48,8 @@ class APIStateMachine(RuleBasedStateMachine):
     # attribute will be renamed in the future
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
     schema: BaseSchema
+    # A template for transition statistics that can be filled with data from the state machine during its execution
+    _transition_stats_template: ClassVar[TransitionStats]
 
     def __init__(self) -> None:
         try:
@@ -86,6 +90,11 @@ class APIStateMachine(RuleBasedStateMachine):
         from .runner import StatefulTestRunnerConfig
 
         return StatefulTestRunner(cls, config=config or StatefulTestRunnerConfig())
+
+    @classmethod
+    def sink(cls) -> StateMachineSink:
+        """Create a sink to collect events into."""
+        return StateMachineSink(transitions=cls._transition_stats_template.copy())
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario.

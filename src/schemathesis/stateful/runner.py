@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from contextlib import contextmanager
 import queue
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
@@ -126,7 +126,7 @@ def _execute_state_machine_loop(
             if stop_event.is_set():
                 raise KeyboardInterrupt
             event_queue.put(events.StepStarted())
-            ctx.reset_step_status()
+            ctx.reset_step()
             try:
                 result = super().step(case, previous)
             except CheckFailed:
@@ -136,12 +136,38 @@ def _execute_state_machine_loop(
                 ctx.step_errored()
                 raise
             finally:
-                event_queue.put(events.StepFinished(status=ctx.current_step_status))
+                transition_id: events.TransitionId | None
+                if previous is not None:
+                    transition = previous[1]
+                    transition_id = events.TransitionId(
+                        name=transition.name,
+                        status_code=transition.status_code,
+                        source=transition.operation.verbose_name,
+                    )
+                else:
+                    transition_id = None
+                response: events.ResponseData | None
+                if ctx.current_response is not None:
+                    response = events.ResponseData(
+                        status_code=ctx.current_response.status_code,
+                        elapsed=ctx.current_response.elapsed.total_seconds(),
+                    )
+                else:
+                    response = None
+                event_queue.put(
+                    events.StepFinished(
+                        status=ctx.current_step_status,
+                        transition_id=transition_id,
+                        target=case.operation.verbose_name,
+                        response=response,
+                    )
+                )
             return result
 
         def validate_response(
             self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
+            ctx.current_response = response
             validate_response(response, case, ctx, config.checks, additional_checks)
 
         def teardown(self) -> None:
