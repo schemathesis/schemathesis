@@ -16,7 +16,6 @@ from ..utils import expand_status_code
 
 if TYPE_CHECKING:
     from ....models import Case
-    from ....stateful import StateMachineConfig
     from ..schemas import BaseOpenAPISchema
 
 FilterFunction = Callable[["StepResult"], bool]
@@ -135,9 +134,7 @@ class OpenAPIStateMachine(APIStateMachine):
         return "\n".join(item.line for item in cls._statistic_template.iter_with_format())
 
 
-def create_state_machine(
-    schema: BaseOpenAPISchema, *, config: StateMachineConfig | None = None
-) -> type[APIStateMachine]:
+def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     """Create a state machine class.
 
     It aims to avoid making calls that are not likely to lead to a stateful call later. For example:
@@ -199,7 +196,6 @@ def create_state_machine(
         (OpenAPIStateMachine,),
         {
             "schema": schema,
-            "config": config or StateMachineConfig(),
             "bundles": bundles,
             "_statistic_template": OpenAPIStateMachineStatistic(data=statistic),
             **rules,

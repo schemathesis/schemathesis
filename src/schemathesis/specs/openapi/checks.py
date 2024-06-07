@@ -168,7 +168,7 @@ def use_after_free(response: GenericResponse, original: Case) -> bool | None:
             ):
                 free = f"{case.operation.method.upper()} {case.formatted_path}"
                 usage = f"{original.operation.method} {original.formatted_path}"
-                exc_class = get_use_after_free_error(free, usage)
+                exc_class = get_use_after_free_error(case.operation.verbose_name)
                 reason = get_reason(response.status_code)
                 message = (
                     "The API did not return a `HTTP 404 Not Found` response "

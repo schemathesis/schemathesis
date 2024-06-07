@@ -144,8 +144,8 @@ def get_negative_rejection_error(prefix: str, status: int) -> type[CheckFailed]:
     return _get_hashed_exception(f"AcceptedNegativeDataError{prefix}", str(status))
 
 
-def get_use_after_free_error(free: str, usage: str) -> type[CheckFailed]:
-    return _get_hashed_exception("UseAfterFreeError", f"{free} -> {usage}")
+def get_use_after_free_error(free: str) -> type[CheckFailed]:
+    return _get_hashed_exception("UseAfterFreeError", free)
 
 
 def get_timeout_error(prefix: str, deadline: float | int) -> type[CheckFailed]:
