@@ -16,11 +16,6 @@ if TYPE_CHECKING:
     from .state_machine import APIStateMachine
 
 
-@dataclass
-class StateMachineStatistic:
-    """Statistics for a state machine run."""
-
-
 class UnresolvableLink(Exception):
     """Raised when a link cannot be resolved."""
 

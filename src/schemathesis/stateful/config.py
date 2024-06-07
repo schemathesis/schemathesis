@@ -41,6 +41,8 @@ class StatefulTestRunnerConfig:
     exit_first: bool = False
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
+    # Timeout for each request in milliseconds
+    request_timeout: int | None = None
 
     def __post_init__(self) -> None:
         import hypothesis

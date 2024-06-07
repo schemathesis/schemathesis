@@ -28,9 +28,10 @@ class StatefulEvent:
 class RunStarted(StatefulEvent):
     """Before executing all scenarios."""
 
-    __slots__ = ("timestamp",)
+    __slots__ = ("timestamp", "started_at")
 
     def __init__(self) -> None:
+        self.started_at = time.time()
         self.timestamp = time.monotonic()
 
 
@@ -132,15 +133,44 @@ class StepStarted(StatefulEvent):
 
 
 @dataclass
+class TransitionId:
+    """Id of the the that was hit."""
+
+    name: str
+    # Status code as defined in the transition, i.e. may be `default`
+    status_code: str
+    source: str
+
+    __slots__ = ("name", "status_code", "source")
+
+
+@dataclass
+class ResponseData:
+    """Common data for responses."""
+
+    status_code: int
+    elapsed: float
+    __slots__ = ("status_code", "elapsed")
+
+
+@dataclass
 class StepFinished(StatefulEvent):
     """After a single state machine step."""
 
     status: StepStatus
+    transition_id: TransitionId | None
+    target: str
+    response: ResponseData | None
 
-    __slots__ = ("timestamp", "status")
+    __slots__ = ("timestamp", "status", "transition_id", "target", "response")
 
-    def __init__(self, status: StepStatus) -> None:
+    def __init__(
+        self, status: StepStatus, transition_id: TransitionId | None, target: str, response: ResponseData | None
+    ) -> None:
         self.status = status
+        self.transition_id = transition_id
+        self.target = target
+        self.response = response
         self.timestamp = time.monotonic()
 
 

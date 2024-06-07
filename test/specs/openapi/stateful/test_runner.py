@@ -8,11 +8,13 @@ import pytest
 from schemathesis.checks import not_a_server_error
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
 from schemathesis.stateful.runner import events
+from schemathesis.stateful.sink import StateMachineSink
 
 
 @dataclass
 class RunnerResult:
     events: List[events.StatefulEvent]
+    sink: StateMachineSink
 
     @property
     def event_names(self):
@@ -29,7 +31,12 @@ class RunnerResult:
 
 
 def collect_result(runner) -> RunnerResult:
-    return RunnerResult(events=list(runner.execute()))
+    sink = runner.state_machine.sink()
+    events_ = []
+    for event in runner.execute():
+        sink.consume(event)
+        events_.append(event)
+    return RunnerResult(events=events_, sink=sink)
 
 
 @pytest.mark.parametrize(
@@ -73,6 +80,8 @@ def test_stop_in_check(runner_factory, func):
 
     runner = runner_factory(config_kwargs={"checks": (stop_immediately,)})
     result = collect_result(runner)
+    assert result.sink.duration and result.sink.duration > 0
+    assert result.sink.suites[events.SuiteStatus.INTERRUPTED] == 1
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
     assert result.events[-1].status == events.RunStatus.INTERRUPTED
@@ -81,6 +90,8 @@ def test_stop_in_check(runner_factory, func):
 @pytest.mark.parametrize("event_cls", (events.ScenarioStarted, events.ScenarioFinished))
 def test_explicit_stop(runner_factory, event_cls):
     runner = runner_factory()
+    sink = runner.state_machine.sink()
+    assert sink.duration is None
     collected = []
     for event in runner.execute():
         collected.append(event)
@@ -258,6 +269,9 @@ def test_find_use_after_free(runner_factory):
         },
     )
     result = collect_result(runner)
+    assert len(result.sink.transitions.roots["POST /users"]) > 0
+    assert result.sink.suites[events.SuiteStatus.FAILURE] == 1
+    assert result.sink.suites[events.SuiteStatus.SUCCESS] == 1
     assert len(result.failures) == 1
     assert result.failures[0].message == "Use after free"
     assert result.events[-1].status == events.RunStatus.FAILURE
