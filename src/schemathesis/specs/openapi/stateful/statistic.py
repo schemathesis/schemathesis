@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator, Union
-
+from typing import TYPE_CHECKING, Iterator, List, Union
 
 from ....internal.copy import fast_deepcopy
 from ....stateful.statistic import TransitionStats
-from .types import LinkName, ResponseCounter, SourceName, StatusCode, TargetName
+from .types import AggregatedResponseCounter, LinkName, ResponseCounter, SourceName, StatusCode, TargetName
 
 if TYPE_CHECKING:
     from ....stateful import events
@@ -56,6 +55,7 @@ class OpenAPILinkStats(TransitionStats):
     """Statistics about link transitions for a state machine run."""
 
     transitions: dict[SourceName, dict[StatusCode, dict[TargetName, dict[LinkName, ResponseCounter]]]]
+
     roots: dict[TargetName, ResponseCounter] = field(default_factory=dict)
 
     __slots__ = ("transitions",)
@@ -132,3 +132,67 @@ class OpenAPILinkStats(TransitionStats):
                 else:
                     line += f"── {entry.name} -> {entry.target}"
                 yield FormattedStatisticEntry(line=line, entry=entry)
+
+    def to_formatted_table(self, width: int) -> str:
+        """Format the statistic as a table."""
+        entries = list(self.iter_with_format())
+        lines: List[str | list[str]] = [HEADER, ""]
+        column_widths = [len(column) for column in HEADER]
+        for entry in entries:
+            if isinstance(entry.entry, Link):
+                aggregated = _aggregate_responses(entry.entry.responses)
+                values = [
+                    entry.line,
+                    str(aggregated["2xx"]),
+                    str(aggregated["4xx"]),
+                    str(aggregated["5xx"]),
+                    str(aggregated["Total"]),
+                ]
+                column_widths = [max(column_widths[idx], len(column)) for idx, column in enumerate(values)]
+                lines.append(values)
+            else:
+                lines.append(entry.line)
+        used_width = sum(column_widths) + 4 * PADDING
+        max_space = width - used_width if used_width < width else 0
+        formatted_lines = []
+
+        for line in lines:
+            if isinstance(line, list):
+                formatted_line, *counters = line
+                formatted_line = formatted_line.ljust(column_widths[0] + max_space)
+
+                for column, max_width in zip(counters, column_widths[1:]):
+                    formatted_line += f"{column:>{max_width + PADDING}}"
+
+                formatted_lines.append(formatted_line)
+            else:
+                formatted_lines.append(line)
+
+        return "\n".join(formatted_lines)
+
+
+PADDING = 4
+HEADER = ["Links", "2xx", "4xx", "5xx", "Total"]
+
+
+def _aggregate_responses(responses: ResponseCounter) -> AggregatedResponseCounter:
+    """Aggregate responses by status code ranges."""
+    output: AggregatedResponseCounter = {
+        "2xx": 0,
+        # NOTE: 3xx responses are not counted
+        "4xx": 0,
+        "5xx": 0,
+        "Total": 0,
+    }
+    for status_code, count in responses.items():
+        if status_code is not None:
+            if 200 <= status_code < 300:
+                output["2xx"] += count
+                output["Total"] += count
+            elif 400 <= status_code < 500:
+                output["4xx"] += count
+                output["Total"] += count
+            elif 500 <= status_code < 600:
+                output["5xx"] += count
+                output["Total"] += count
+    return output

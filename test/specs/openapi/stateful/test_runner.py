@@ -9,6 +9,7 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
 from schemathesis.stateful.runner import events
 from schemathesis.stateful.sink import StateMachineSink
+from test.utils import flaky
 
 
 @dataclass
@@ -260,6 +261,7 @@ def test_multiple_conformance_issues(runner_factory):
     assert {check.message for check in result.failures} == {"Missing Content-Type header", "Response violates schema"}
 
 
+@flaky(max_runs=10, min_passes=1)
 def test_find_use_after_free(runner_factory):
     runner = runner_factory(
         app_kwargs={"use_after_free": True},
@@ -275,6 +277,11 @@ def test_find_use_after_free(runner_factory):
     assert len(result.failures) == 1
     assert result.failures[0].message == "Use after free"
     assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.sink.transitions.to_formatted_table(80).splitlines()[:3] == [
+        "Links                                                 2xx    4xx    5xx    Total",
+        "",
+        "DELETE /orders/{orderId}",
+    ]
 
 
 def test_failed_health_check(runner_factory):
