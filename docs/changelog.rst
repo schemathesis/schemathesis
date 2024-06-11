@@ -43,6 +43,7 @@ Changelog
 - Improper output when a JSON pointer can't be resolved during Open API link resolution.
 - Generating invalid examples created by wrapping a named example value into another object. :issue:`2238`
 - Distinguish more failures in stateful testing.
+- Generate different functions for state machine transitions to properly use swarm testing.
 
 **Performance**
 
