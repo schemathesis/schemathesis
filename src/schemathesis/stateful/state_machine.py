@@ -33,7 +33,7 @@ class StepResult:
     elapsed: float
 
 
-def _operation_name_to_identifier(name: str) -> str:
+def _normalize_name(name: str) -> str:
     return re.sub(r"\W|^(?=\d)", "_", name).replace("__", "_")
 
 
@@ -70,7 +70,7 @@ class APIStateMachine(RuleBasedStateMachine):
     if HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS:
 
         def _new_name(self, target: str) -> str:
-            target = _operation_name_to_identifier(target)
+            target = _normalize_name(target)
             return super()._new_name(target)  # type: ignore
 
     def _get_target_for_result(self, result: StepResult) -> str | None:
