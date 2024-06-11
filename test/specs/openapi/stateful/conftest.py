@@ -19,10 +19,41 @@ class AppConfig:
     multiple_conformance_issues: bool = False
     unsatisfiable: bool = False
     custom_headers: dict | None = None
+    multiple_source_links: bool = False
 
 
 @pytest.fixture
 def app_factory(empty_open_api_3_schema):
+    post_links = {
+        "GetUser": {
+            "operationId": "getUser",
+            "parameters": {"userId": "$response.body#/id"},
+        },
+        "DeleteUser": {
+            "operationId": "deleteUser",
+            "parameters": {"userId": "$response.body#/id"},
+        },
+        "UpdateUser": {
+            "operationId": "updateUser",
+            "parameters": {"userId": "$response.body#/id"},
+            "requestBody": {
+                "last_modified": "$response.body#/last_modified",
+            },
+        },
+        "DeleteOrder": {"operationId": "deleteOrder", "parameters": {"orderId": 42}},
+    }
+    get_links = {
+        "DeleteUser": {
+            "operationId": "deleteUser",
+            "parameters": {"userId": "$request.path.userId"},
+        },
+    }
+    delete_links = {
+        "GetUser": {
+            "operationId": "getUser",
+            "parameters": {"userId": "$request.path.userId"},
+        },
+    }
     empty_open_api_3_schema["paths"] = {
         "/users": {
             "post": {
@@ -35,24 +66,7 @@ def app_factory(empty_open_api_3_schema):
                     "201": {
                         "description": "Successful response",
                         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": {
-                            "GetUser": {
-                                "operationId": "getUser",
-                                "parameters": {"userId": "$response.body#/id"},
-                            },
-                            "DeleteUser": {
-                                "operationId": "deleteUser",
-                                "parameters": {"userId": "$response.body#/id"},
-                            },
-                            "UpdateUser": {
-                                "operationId": "updateUser",
-                                "parameters": {"userId": "$response.body#/id"},
-                                "requestBody": {
-                                    "last_modified": "$response.body#/last_modified",
-                                },
-                            },
-                            "DeleteOrder": {"operationId": "deleteOrder", "parameters": {"orderId": 42}},
-                        },
+                        "links": post_links,
                     },
                     "400": {"description": "Bad request"},
                     "default": {"description": "Default"},
@@ -68,12 +82,7 @@ def app_factory(empty_open_api_3_schema):
                     "200": {
                         "description": "Successful response",
                         "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": {
-                            "DeleteUser": {
-                                "operationId": "deleteUser",
-                                "parameters": {"userId": "$request.path.userId"},
-                            },
-                        },
+                        "links": get_links,
                     },
                     "404": {"description": "User not found"},
                     "default": {"description": "Default"},
@@ -83,14 +92,9 @@ def app_factory(empty_open_api_3_schema):
                 "summary": "Delete a user",
                 "operationId": "deleteUser",
                 "responses": {
-                    "200": {
+                    "204": {
                         "description": "Successful response",
-                        "links": {
-                            "GetUser": {
-                                "operationId": "getUser",
-                                "parameters": {"userId": "$request.path.userId"},
-                            },
-                        },
+                        "links": delete_links,
                     },
                     "404": {"description": "User not found"},
                     "default": {"description": "Default"},
@@ -241,7 +245,7 @@ def app_factory(empty_open_api_3_schema):
                     del users[user_id]
             else:
                 del users[user_id]
-            return jsonify({"message": "User deleted successfully"}), 200
+            return jsonify({"message": "User deleted successfully"}), 204
         else:
             return jsonify({"error": "User not found"}), 404
 
@@ -258,6 +262,7 @@ def app_factory(empty_open_api_3_schema):
         multiple_conformance_issues=False,
         unsatisfiable=False,
         custom_headers=None,
+        multiple_source_links=False,
     ):
         config.use_after_free = use_after_free
         config.merge_body = merge_body
@@ -273,6 +278,19 @@ def app_factory(empty_open_api_3_schema):
             empty_open_api_3_schema["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 100
         if custom_headers:
             config.custom_headers = custom_headers
+        config.multiple_source_links = multiple_source_links
+        if multiple_source_links:
+            empty_open_api_3_schema["paths"]["/users/{userId}"]["delete"]["responses"]["204"]["links"][
+                "DeleteUserAgain"
+            ] = {
+                "operationId": "deleteUser",
+                "parameters": {"userId": "$request.path.userId"},
+            }
+            link = post_links["DeleteUser"]
+            post_links.clear()
+            post_links["DeleteUser"] = link
+            get_links.clear()
+            get_links.clear()
         return app
 
     return _factory
