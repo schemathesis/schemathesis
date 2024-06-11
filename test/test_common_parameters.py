@@ -124,7 +124,8 @@ def test_common_parameters_with_references_stateful(empty_open_api_2_schema):
     schema = schemathesis.from_dict(empty_open_api_2_schema)
     # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
-    assert len(state_machine.bundles) == 3
+    assert len(state_machine.bundles) == 1
+    assert "POST /v1/bar -> 200" in state_machine.bundles
     # 1 operation that creates data for other operations + 2 links
     assert len(state_machine.rules()) == 3
 

@@ -34,10 +34,10 @@ def test_match_status_code(response_status, filter_value, matching, response_fac
 @pytest.mark.parametrize(
     "response_status, status_codes, matching",
     (
-        (202, [200, "default"], True),
-        (200, [200, "default"], False),
-        (200, ["20X", "default"], False),
-        (210, ["20X", "default"], True),
+        (202, (200, "default"), True),
+        (200, (200, "default"), False),
+        (200, ("20X", "default"), False),
+        (210, ("20X", "default"), True),
     ),
 )
 def test_default_status_code(response_status, status_codes, matching, response_factory):
@@ -327,7 +327,7 @@ def test_use_after_free(app_factory):
         str(exc.value)
         .strip()
         .startswith(
-            "1. Use after free\n\n    The API did not return a `HTTP 404 Not Found` response (got `HTTP 200 OK`) "
+            "1. Use after free\n\n    The API did not return a `HTTP 404 Not Found` response (got `HTTP 204 No Content`) "
             "for a resource that was previously deleted.\n\n    The resource was deleted with `DELETE /users/"
         )
     )

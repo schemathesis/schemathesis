@@ -348,3 +348,14 @@ def test_custom_headers(runner_factory):
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.SUCCESS
+
+
+def test_multiple_source_links(runner_factory):
+    # When there are multiple links coming to the same operation from different operations
+    # Then there should be no error during getting the previous step results
+    runner = runner_factory(
+        app_kwargs={"multiple_source_links": True},
+        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=10, database=None)},
+    )
+    result = collect_result(runner)
+    assert not result.errors, result.errors
