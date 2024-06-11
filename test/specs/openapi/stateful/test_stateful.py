@@ -1,3 +1,5 @@
+from textwrap import dedent
+
 import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.errors import InvalidDefinition
@@ -5,11 +7,11 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
+from schemathesis.models import CaseSource, Check, Status
+from schemathesis.runner.serialization import SerializedCheck
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.state_machine import StepResult
-from schemathesis.models import CaseSource, Check, Status
-from schemathesis.runner.serialization import SerializedCheck
 from test.utils import flaky
 
 
@@ -94,7 +96,7 @@ def find_reproduction_code(lines):
             continue
     else:
         raise ValueError("Failed to get reproduction code")
-    return "\n".join([removeprefix(line, "E   ") for line in lines[first:last]])
+    return dedent("\n".join([removeprefix(line, "E   ") for line in lines[first:last]]))
 
 
 @pytest.mark.operations("create_user", "get_user", "update_user")

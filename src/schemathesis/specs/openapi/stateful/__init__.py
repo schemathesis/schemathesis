@@ -7,8 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, rule
 
+from ....constants import NOT_SET
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
+from ....types import NotSet
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
@@ -49,6 +51,8 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
 
     This state machine won't make calls to (2) without having a proper response from (1) first.
     """
+    from ....stateful.state_machine import _normalize_name
+
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     incoming_transitions = defaultdict(list)
@@ -81,7 +85,9 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             for link in incoming:
                 source = link.operation
                 bundle_name = f"{source.verbose_name} -> {link.status_code}"
-                rules[f"{source.verbose_name} -> {link.status_code} -> {target.verbose_name}"] = transition(
+                name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
+                rules[name] = transition(
+                    name=name,
                     target=catch_all,
                     previous=bundles[bundle_name],
                     case=target.as_strategy(),
@@ -96,8 +102,12 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # For example, POST /users/ -> GET /users/{id}/
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
-            rules[f"* -> {target.verbose_name}"] = transition(
-                target=catch_all, previous=st.none(), case=target.as_strategy()
+            name = _normalize_name(f"{target.verbose_name} -> X")
+            rules[name] = transition(
+                name=name,
+                target=catch_all,
+                previous=st.none(),
+                case=target.as_strategy(),
             )
 
     return type(
@@ -113,8 +123,24 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     )
 
 
-def transition(*args: Any, **kwargs: Any) -> Callable[[Callable], Rule]:
-    return rule(*args, **kwargs)(APIStateMachine._step)
+def transition(
+    *,
+    name: str,
+    target: Bundle,
+    previous: Bundle | st.SearchStrategy,
+    case: st.SearchStrategy,
+    link: st.SearchStrategy | NotSet = NOT_SET,
+) -> Callable[[Callable], Rule]:
+    def step_function(*args_: Any, **kwargs_: Any) -> StepResult:
+        return APIStateMachine._step(*args_, **kwargs_)
+
+    step_function.__name__ = name
+
+    kwargs = {"target": target, "previous": previous, "case": case}
+    if not isinstance(link, NotSet):
+        kwargs["link"] = link
+
+    return rule(**kwargs)(step_function)
 
 
 def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepResult], str | None]:
