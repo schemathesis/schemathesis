@@ -116,5 +116,4 @@ def test_direct_access(schema):
 def test_state_machine(schema):
     # Then the generated state machine should include only valid operations
     machine = schema.as_state_machine()
-    assert len(machine.bundles) == 1
-    assert list(machine.bundles.keys()) == ["GET /bar"]
+    assert len(machine.bundles) == 0

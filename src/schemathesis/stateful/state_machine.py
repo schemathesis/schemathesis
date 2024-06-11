@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -12,8 +12,8 @@ from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
 from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
 from ..models import APIOperation, Case, CheckFunction
-from .sink import StateMachineSink
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
+from .sink import StateMachineSink
 from .statistic import TransitionStats
 
 if TYPE_CHECKING:
@@ -73,6 +73,14 @@ class APIStateMachine(RuleBasedStateMachine):
             target = _operation_name_to_identifier(target)
             return super()._new_name(target)  # type: ignore
 
+    def _get_target_for_result(self, result: StepResult) -> str | None:
+        raise NotImplementedError
+
+    def _add_result_to_targets(self, targets: tuple[str, ...], result: StepResult) -> None:
+        target = self._get_target_for_result(result)
+        if target is not None:
+            super()._add_result_to_targets((target,), result)
+
     @classmethod
     def format_rules(cls) -> str:
         raise NotImplementedError
@@ -101,12 +109,6 @@ class APIStateMachine(RuleBasedStateMachine):
 
         Does nothing by default.
         """
-
-    def _has_matching_response(self, predicate: Callable[["StepResult"], bool]) -> bool:
-        for value in self.names_to_values.values():
-            if predicate(value):
-                return True
-        return False
 
     def teardown(self) -> None:
         pass

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from collections import defaultdict
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
 
 from hypothesis import strategies as st
-from hypothesis.stateful import Bundle, Rule, precondition, rule
+from hypothesis.stateful import Bundle, Rule, rule
 
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
@@ -21,6 +22,13 @@ if TYPE_CHECKING:
 
 class OpenAPIStateMachine(APIStateMachine):
     _transition_stats_template: ClassVar[OpenAPILinkStats]
+    _response_matchers: dict[str, Callable[[StepResult], str | None]]
+
+    def _get_target_for_result(self, result: StepResult) -> str | None:
+        matcher = self._response_matchers.get(result.case.operation.verbose_name)
+        if matcher is None:
+            return None
+        return matcher(result)
 
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         context = expressions.ExpressionContext(case=result.case, response=result.response)
@@ -42,39 +50,42 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     This state machine won't make calls to (2) without having a proper response from (1) first.
     """
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
-    bundles = {operation.verbose_name: Bundle(operation.verbose_name) for operation in operations}
+    bundles = {}
     incoming_transitions = defaultdict(list)
+    _response_matchers: dict[str, Callable[[StepResult], str | None]] = {}
     # Statistic structure follows the links and count for each response status code
     transitions = {}
     for operation in operations:
         operation_links: dict[StatusCode, dict[TargetName, dict[LinkName, dict[int | None, int]]]] = {}
+        all_status_codes = tuple(operation.definition.raw["responses"])
+        bundle_matchers = []
         for _, link in get_all_links(operation):
+            bundle_name = f"{operation.verbose_name} -> {link.status_code}"
+            bundles[bundle_name] = Bundle(bundle_name)
             target_operation = link.get_target_operation()
             incoming_transitions[target_operation.verbose_name].append(link)
             response_targets = operation_links.setdefault(link.status_code, {})
             target_links = response_targets.setdefault(target_operation.verbose_name, {})
             target_links[link.name] = {}
+            bundle_matchers.append((bundle_name, make_response_filter(link.status_code, all_status_codes)))
         if operation_links:
             transitions[operation.verbose_name] = operation_links
+        if bundle_matchers:
+            _response_matchers[operation.verbose_name] = make_response_matcher(bundle_matchers)
     rules = {}
+    catch_all = Bundle("catch_all")
 
     for target in operations:
         incoming = incoming_transitions.get(target.verbose_name)
-        target_bundle = bundles[target.verbose_name]
         if incoming is not None:
             for link in incoming:
                 source = link.operation
-                all_status_codes = source.definition.raw["responses"].keys()
-                predicate = make_response_filter(link.status_code, all_status_codes)
-                rules[f"{source.verbose_name} -> {link.status_code} -> {target.verbose_name}"] = precondition(
-                    lambda self, _predicate=predicate: self._has_matching_response(_predicate),
-                )(
-                    transition(
-                        target=target_bundle,
-                        previous=bundles[source.verbose_name].filter(predicate),
-                        case=target.as_strategy(),
-                        link=st.just(link),
-                    )
+                bundle_name = f"{source.verbose_name} -> {link.status_code}"
+                rules[f"{source.verbose_name} -> {link.status_code} -> {target.verbose_name}"] = transition(
+                    target=catch_all,
+                    previous=bundles[bundle_name],
+                    case=target.as_strategy(),
+                    link=st.just(link),
                 )
         elif any(
             incoming.operation.verbose_name == target.verbose_name
@@ -86,7 +97,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
             rules[f"* -> {target.verbose_name}"] = transition(
-                target=target_bundle, previous=st.none(), case=target.as_strategy()
+                target=catch_all, previous=st.none(), case=target.as_strategy()
             )
 
     return type(
@@ -96,6 +107,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             "schema": schema,
             "bundles": bundles,
             "_transition_stats_template": OpenAPILinkStats(transitions=transitions),
+            "_response_matchers": _response_matchers,
             **rules,
         },
     )
@@ -105,6 +117,17 @@ def transition(*args: Any, **kwargs: Any) -> Callable[[Callable], Rule]:
     return rule(*args, **kwargs)(APIStateMachine._step)
 
 
+def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepResult], str | None]:
+    def compare(result: StepResult) -> str | None:
+        for bundle_name, response_filter in matchers:
+            if response_filter(result):
+                return bundle_name
+        return None
+
+    return compare
+
+
+@lru_cache()
 def make_response_filter(status_code: str, all_status_codes: Iterator[str]) -> FilterFunction:
     """Create a filter for stored responses.
 
@@ -126,9 +149,6 @@ def match_status_code(status_code: str) -> FilterFunction:
     def compare(result: StepResult) -> bool:
         return result.response.status_code in status_codes
 
-    # This name is displayed in the resulting strategy representation. For example, if you run your tests with
-    # `--hypothesis-show-statistics`, then you can see `Bundle(name='GET /users/{user_id}').filter(match_200_response)`
-    # which gives you information about the particularly used filter.
     compare.__name__ = f"match_{status_code}_response"
 
     return compare

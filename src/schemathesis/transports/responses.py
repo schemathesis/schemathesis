@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-import sys
 import json
+import sys
 from datetime import timedelta
-from typing import Union, TYPE_CHECKING, NoReturn, Any
-from .._compat import JSONMixin
+from typing import TYPE_CHECKING, Any, NoReturn, Union
+
 from werkzeug.wrappers import Response as BaseResponse
+
+from .._compat import JSONMixin
 
 if TYPE_CHECKING:
     from httpx import Response as httpxResponse
-    from requests import Response as requestsResponse
     from requests import PreparedRequest
+    from requests import Response as requestsResponse
 
 
 class WSGIResponse(BaseResponse, JSONMixin):

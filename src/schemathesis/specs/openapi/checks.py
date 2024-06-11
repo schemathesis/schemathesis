@@ -150,8 +150,8 @@ def negative_data_rejection(response: GenericResponse, case: Case) -> bool | Non
 
 
 def use_after_free(response: GenericResponse, original: Case) -> bool | None:
-    from .schemas import BaseOpenAPISchema
     from ...transports.responses import get_reason
+    from .schemas import BaseOpenAPISchema
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
         return True
