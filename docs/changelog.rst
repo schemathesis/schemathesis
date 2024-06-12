@@ -45,6 +45,7 @@ Changelog
 - Distinguish more failures in stateful testing.
 - Generate different functions for state machine transitions to properly use swarm testing.
 - ``RuntimeError`` caused by a race to initialize Hypothesis' PRNG when multiple workers are used.
+- Missing body in ``Case`` if it is mutated after the ``make_case`` call. :issue:`2208`
 
 **Performance**
 

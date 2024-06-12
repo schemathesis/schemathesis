@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import base64
 import time
-from inspect import iscoroutinefunction
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar, cast
+from inspect import iscoroutinefunction
+from typing import TYPE_CHECKING, Any, Generator, Optional, Protocol, TypeVar, cast
 from urllib.parse import urlparse
 
 from .. import failures
 from .._dependency_versions import IS_WERKZEUG_ABOVE_3
-from ..constants import DEFAULT_RESPONSE_TIMEOUT
+from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET
 from ..exceptions import get_timeout_error
 from ..serializers import SerializerContext
 from ..types import Cookies, NotSet
@@ -88,12 +88,17 @@ class RequestsTransport:
         cookies: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         final_headers = case._get_headers(headers)
-        if case.media_type and case.media_type != "multipart/form-data" and not isinstance(case.body, NotSet):
+        media_type: Optional[str]
+        if case.body is not NOT_SET and case.media_type is None:
+            media_type = case.operation._get_default_media_type()
+        else:
+            media_type = case.media_type
+        if media_type and media_type != "multipart/form-data" and not isinstance(case.body, NotSet):
             # `requests` will handle multipart form headers with the proper `boundary` value.
             if "content-type" not in final_headers:
-                final_headers["Content-Type"] = case.media_type
+                final_headers["Content-Type"] = media_type
         url = case._get_url(base_url)
-        serializer = case._get_serializer()
+        serializer = case._get_serializer(media_type)
         if serializer is not None and not isinstance(case.body, NotSet):
             context = SerializerContext(case=case)
             extra = serializer.as_requests(context, case._get_body())
@@ -248,11 +253,16 @@ class WSGITransport:
         cookies: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         final_headers = case._get_headers(headers)
-        if case.media_type and not isinstance(case.body, NotSet):
+        media_type: Optional[str]
+        if case.body is not NOT_SET and case.media_type is None:
+            media_type = case.operation._get_default_media_type()
+        else:
+            media_type = case.media_type
+        if media_type and not isinstance(case.body, NotSet):
             # If we need to send a payload, then the Content-Type header should be set
-            final_headers["Content-Type"] = case.media_type
+            final_headers["Content-Type"] = media_type
         extra: dict[str, Any]
-        serializer = case._get_serializer()
+        serializer = case._get_serializer(media_type)
         if serializer is not None and not isinstance(case.body, NotSet):
             context = SerializerContext(case=case)
             extra = serializer.as_werkzeug(context, case._get_body())
