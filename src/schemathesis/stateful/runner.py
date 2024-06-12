@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
-from hypothesis.errors import Flaky
 from hypothesis.control import current_build_context
+from hypothesis.errors import Flaky
 
 from ..exceptions import CheckFailed
 from . import events
@@ -109,7 +109,13 @@ def _execute_state_machine_loop(
     """Execute the state machine testing loop."""
     from hypothesis import reporting
 
+    from ..transports import RequestsTransport, prepare_timeout
+
     ctx = RunnerContext()
+
+    call_kwargs: dict[str, Any] = {"headers": config.headers}
+    if isinstance(state_machine.schema.transport, RequestsTransport):
+        call_kwargs["timeout"] = prepare_timeout(config.request_timeout)
 
     class InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -120,7 +126,7 @@ def _execute_state_machine_loop(
             super().setup()
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
-            return {"headers": config.headers}
+            return call_kwargs
 
         def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
