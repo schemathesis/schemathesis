@@ -44,6 +44,7 @@ Changelog
 - Generating invalid examples created by wrapping a named example value into another object. :issue:`2238`
 - Distinguish more failures in stateful testing.
 - Generate different functions for state machine transitions to properly use swarm testing.
+- ``RuntimeError`` caused by a race to initialize Hypothesis' PRNG when multiple workers are used.
 
 **Performance**
 
