@@ -53,6 +53,22 @@ def test_find_independent_5xx(runner_factory, kwargs):
         "PATCH /users/{userId}",
     }
     assert result.events[-1].status == events.RunStatus.FAILURE
+    # There should be 2 or 1 final scenarios to reproduce failures depending on the `exit_first` setting
+    scenarios = [
+        event for event in result.events if isinstance(event, (events.ScenarioStarted, events.ScenarioFinished))
+    ]
+    num_of_final_scenarios = 1 if kwargs.get("exit_first") else 2
+    assert len([s for s in scenarios if s.is_final and isinstance(s, events.ScenarioStarted)]) == num_of_final_scenarios
+    assert (
+        len(
+            [
+                s
+                for s in scenarios
+                if s.is_final and isinstance(s, events.ScenarioFinished) and s.status == events.ScenarioStatus.FAILURE
+            ]
+        )
+        == num_of_final_scenarios
+    )
     for event in result.events:
         assert event.timestamp is not None
     # If `exit_first` is set
