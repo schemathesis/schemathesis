@@ -11,6 +11,7 @@ from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.reflection import proxies
+from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
@@ -22,6 +23,11 @@ from .models import APIOperation, Case
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .utils import GivenInput, combine_strategies
+
+# Forcefully initializes Hypothesis' global PRNG to avoid races that initilize it
+# if e.g. Schemathesis CLI is used with multiple workers
+with deterministic_PRNG():
+    pass
 
 
 def create_test(
