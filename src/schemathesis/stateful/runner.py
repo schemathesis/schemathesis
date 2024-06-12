@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
 from hypothesis.errors import Flaky
+from hypothesis.control import current_build_context
 
 from ..exceptions import CheckFailed
 from . import events
@@ -114,7 +115,8 @@ def _execute_state_machine_loop(
         """State machine with additional hooks for emitting events."""
 
         def setup(self) -> None:
-            event_queue.put(events.ScenarioStarted())
+            build_ctx = current_build_context()
+            event_queue.put(events.ScenarioStarted(is_final=build_ctx.is_final))
             super().setup()
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
@@ -171,7 +173,13 @@ def _execute_state_machine_loop(
             validate_response(response, case, ctx, config.checks, additional_checks)
 
         def teardown(self) -> None:
-            event_queue.put(events.ScenarioFinished(ctx.current_scenario_status))
+            build_ctx = current_build_context()
+            event_queue.put(
+                events.ScenarioFinished(
+                    status=ctx.current_scenario_status,
+                    is_final=build_ctx.is_final,
+                )
+            )
             super().teardown()
 
     while True:
@@ -210,7 +218,7 @@ def _execute_state_machine_loop(
         except Exception as exc:
             # Any other exception is an inner error and the test run should be stopped
             suite_status = events.SuiteStatus.ERROR
-            event_queue.put(events.Errored(exc))
+            event_queue.put(events.Errored(exception=exc))
             break
         finally:
             event_queue.put(events.SuiteFinished(status=suite_status, failures=ctx.failures_for_suite))

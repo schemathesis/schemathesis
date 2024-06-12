@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from enum import Enum
 import time
 from dataclasses import dataclass
+from enum import Enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,7 +43,7 @@ class RunFinished(StatefulEvent):
 
     __slots__ = ("timestamp", "status")
 
-    def __init__(self, status: RunStatus) -> None:
+    def __init__(self, *, status: RunStatus) -> None:
         self.status = status
         self.timestamp = time.monotonic()
 
@@ -76,7 +76,7 @@ class SuiteFinished(StatefulEvent):
 
     __slots__ = ("timestamp", "status", "failures")
 
-    def __init__(self, status: SuiteStatus, failures: list[Check]) -> None:
+    def __init__(self, *, status: SuiteStatus, failures: list[Check]) -> None:
         self.status = status
         self.failures = failures
         self.timestamp = time.monotonic()
@@ -95,9 +95,13 @@ class ScenarioStatus(str, Enum):
 class ScenarioStarted(StatefulEvent):
     """Before a single state machine execution."""
 
-    __slots__ = ("timestamp",)
+    # Whether this is a scenario that tries to reproduce a failure
+    is_final: bool
 
-    def __init__(self) -> None:
+    __slots__ = ("timestamp", "is_final")
+
+    def __init__(self, *, is_final: bool) -> None:
+        self.is_final = is_final
         self.timestamp = time.monotonic()
 
 
@@ -106,11 +110,14 @@ class ScenarioFinished(StatefulEvent):
     """After a single state machine execution."""
 
     status: ScenarioStatus
+    # Whether this is a scenario that tries to reproduce a failure
+    is_final: bool
 
-    __slots__ = ("timestamp", "status")
+    __slots__ = ("timestamp", "status", "is_final")
 
-    def __init__(self, status: ScenarioStatus) -> None:
+    def __init__(self, *, status: ScenarioStatus, is_final: bool) -> None:
         self.status = status
+        self.is_final = is_final
         self.timestamp = time.monotonic()
 
 
@@ -165,7 +172,7 @@ class StepFinished(StatefulEvent):
     __slots__ = ("timestamp", "status", "transition_id", "target", "response")
 
     def __init__(
-        self, status: StepStatus, transition_id: TransitionId | None, target: str, response: ResponseData | None
+        self, *, status: StepStatus, transition_id: TransitionId | None, target: str, response: ResponseData | None
     ) -> None:
         self.status = status
         self.transition_id = transition_id
@@ -192,6 +199,6 @@ class Errored(StatefulEvent):
 
     __slots__ = ("timestamp", "exception")
 
-    def __init__(self, exception: Exception) -> None:
+    def __init__(self, *, exception: Exception) -> None:
         self.exception = exception
         self.timestamp = time.monotonic()
