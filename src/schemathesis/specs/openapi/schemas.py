@@ -40,7 +40,6 @@ from ...exceptions import (
     OperationSchemaError,
     SchemaError,
     SchemaErrorType,
-    UsageError,
     get_missing_content_type_error,
     get_response_parsing_error,
     get_schema_validation_error,
@@ -998,18 +997,7 @@ class SwaggerV20(BaseOpenAPISchema):
         media_type: str | None = None,
     ) -> C:
         if body is not NOT_SET and media_type is None:
-            # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
-            media_types = operation.get_request_payload_content_types()
-            if len(media_types) == 1:
-                # The only available option
-                media_type = media_types[0]
-            else:
-                media_types_repr = ", ".join(media_types)
-                raise UsageError(
-                    "Can not detect appropriate media type. "
-                    "You can either specify one of the defined media types "
-                    f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
-                )
+            media_type = operation._get_default_media_type()
         return case_cls(
             operation=operation,
             path_parameters=path_parameters,

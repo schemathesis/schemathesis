@@ -42,6 +42,7 @@ from .exceptions import (
     OperationSchemaError,
     SerializationNotPossible,
     SkipTest,
+    UsageError,
     deduplicate_failed_checks,
     get_grouped_exception,
     maybe_set_assertion_message,
@@ -54,7 +55,7 @@ from .internal.deprecation import deprecated_function, deprecated_property
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer
-from .transports import ASGITransport, RequestsTransport, WSGITransport, serialize_payload, deserialize_payload
+from .transports import ASGITransport, RequestsTransport, WSGITransport, deserialize_payload, serialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 
 if TYPE_CHECKING:
@@ -271,13 +272,14 @@ class Case:
         final_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, self.id)
         return final_headers
 
-    def _get_serializer(self) -> Serializer | None:
+    def _get_serializer(self, media_type: str | None = None) -> Serializer | None:
         """Get a serializer for the payload, if there is any."""
-        if self.media_type is not None:
-            media_type = serializers.get_first_matching_media_type(self.media_type)
+        input_media_type = media_type or self.media_type
+        if input_media_type is not None:
+            media_type = serializers.get_first_matching_media_type(input_media_type)
             if media_type is None:
                 # This media type is set manually. Otherwise, it should have been rejected during the data generation
-                raise SerializationNotPossible.for_media_type(self.media_type)
+                raise SerializationNotPossible.for_media_type(input_media_type)
             # SAFETY: It is safe to assume that serializer will be found, because `media_type` returned above
             # is registered. This intentionally ignores cases with concurrent serializers registry modification.
             cls = cast(Type[serializers.Serializer], serializers.get(media_type))
@@ -693,6 +695,19 @@ class APIOperation(Generic[P, C]):
 
     def get_request_payload_content_types(self) -> list[str]:
         return self.schema.get_request_payload_content_types(self)
+
+    def _get_default_media_type(self) -> str:
+        # If the user wants to send payload, then there should be a media type, otherwise the payload is ignored
+        media_types = self.get_request_payload_content_types()
+        if len(media_types) == 1:
+            # The only available option
+            return media_types[0]
+        media_types_repr = ", ".join(media_types)
+        raise UsageError(
+            "Can not detect appropriate media type. "
+            "You can either specify one of the defined media types "
+            f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
+        )
 
     def partial_deepcopy(self) -> APIOperation:
         return self.__class__(

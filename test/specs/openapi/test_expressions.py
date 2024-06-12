@@ -5,12 +5,11 @@ import requests
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from schemathesis.models import Case
-from schemathesis.models import APIOperation
+from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi.references import resolve_pointer, UNRESOLVABLE
+from schemathesis.specs.openapi.references import UNRESOLVABLE, resolve_pointer
 
 DOCUMENT = {
     "foo": ["bar", "baz"],
@@ -27,14 +26,23 @@ DOCUMENT = {
 }
 
 
-@pytest.fixture(scope="module")
-def operation():
+@pytest.fixture
+def operation(openapi_30):
     return APIOperation(
-        "/users/{user_id}", "GET", None, None, verbose_name="GET /users/{user_id}", base_url="http://127.0.0.1:8080/api"
+        "/users/{user_id}",
+        "PUT",
+        OperationDefinition(
+            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
+            {"requestBody": {"content": {"application/json": {"schema": {}}}}},
+            "",
+        ),
+        openapi_30,
+        verbose_name="PUT /users/{user_id}",
+        base_url="http://127.0.0.1:8080/api",
     )
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def case(operation):
     return Case(
         operation,
@@ -56,7 +64,7 @@ def response():
     return response
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def context(case, response):
     return expressions.ExpressionContext(response=response, case=case)
 
@@ -67,9 +75,9 @@ def context(case, response):
         ("", ""),
         ("foo", "foo"),
         ("$url", "http://127.0.0.1:8080/api/users/5?username=foo"),
-        ("$method", "GET"),
+        ("$method", "PUT"),
         ("$statusCode", "200"),
-        ("ID_{$method}", "ID_GET"),
+        ("ID_{$method}", "ID_PUT"),
         ("$request.query.username", "foo"),
         ("spam_{$request.query.username}_baz_{$request.query.username}", "spam_foo_baz_foo"),
         ("spam_{$request.query.unknown}", "spam_"),

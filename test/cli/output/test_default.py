@@ -14,6 +14,7 @@ from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.generation import DataGenerationMethod
+from schemathesis.models import OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
 from schemathesis.constants import NOT_SET
@@ -35,7 +36,13 @@ def execution_context():
 
 @pytest.fixture
 def operation(swagger_20):
-    return models.APIOperation("/success", "GET", definition={}, base_url="http://127.0.0.1:8080", schema=swagger_20)
+    return models.APIOperation(
+        "/success",
+        "GET",
+        definition=OperationDefinition({}, {}, ""),
+        base_url="http://127.0.0.1:8080",
+        schema=swagger_20,
+    )
 
 
 @pytest.fixture
@@ -238,11 +245,20 @@ def test_display_hypothesis_output(capsys):
 @pytest.mark.parametrize("body", ({}, {"foo": "bar"}, NOT_SET))
 def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
+    media_type = "application/json" if body is not NOT_SET else None
     success = models.Check(
-        "not_a_server_error", models.Status.success, response, 0, models.Case(operation, generation_time=0.0, body=body)
+        "not_a_server_error",
+        models.Status.success,
+        response,
+        0,
+        models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
     failure = models.Check(
-        "not_a_server_error", models.Status.failure, response, 0, models.Case(operation, generation_time=0.0, body=body)
+        "not_a_server_error",
+        models.Status.failure,
+        response,
+        0,
+        models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
     test_statistic = models.TestResult(
         method=operation.method,
@@ -260,7 +276,12 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
                 models.Status.success,
                 response,
                 0,
-                models.Case(operation, generation_time=0.0, body=body),
+                models.Case(
+                    operation,
+                    generation_time=0.0,
+                    body=body,
+                    media_type=media_type,
+                ),
             ),
         ],
     )
