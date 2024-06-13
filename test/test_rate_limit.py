@@ -1,11 +1,12 @@
 import threading
 
 import pytest
-from pyrate_limiter import BucketFullException
+from pyrate_limiter import BucketFullException, Duration
 
 import schemathesis.graphql
-from schemathesis._rate_limiter import Rate
 from schemathesis._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
+from schemathesis._rate_limiter import Rate
+from schemathesis.throttling import _get_max_delay
 
 
 @pytest.mark.parametrize(
@@ -51,3 +52,16 @@ def test_maximum_requests(request, loader, fixture, mocker):
     thread.start()
     thread.join()
     assert counter == 5
+
+
+@pytest.mark.parametrize(
+    "unit, expected",
+    (
+        (Duration.SECOND, 1100),
+        (Duration.MINUTE, 60100),
+        (Duration.HOUR, 3600100),
+        (Duration.DAY, 86400100),
+    ),
+)
+def test_get_max_delay(unit, expected):
+    assert _get_max_delay(1, unit) == expected
