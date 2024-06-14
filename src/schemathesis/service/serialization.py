@@ -8,7 +8,8 @@ from ..internal.result import Err, Ok
 from ..internal.transformation import merge_recursively
 from ..models import Response
 from ..runner import events
-from ..runner.serialization import SerializedCase
+from ..runner.serialization import SerializedCase, SerializedCheck
+from ..stateful import events as stateful_events
 from .models import AnalysisSuccess
 
 S = TypeVar("S", bound=events.ExecutionEvent)
@@ -81,6 +82,27 @@ def _serialize_response(response: Response) -> dict[str, Any]:
     }
 
 
+def _serialize_check(check: SerializedCheck) -> dict[str, Any]:
+    return {
+        "name": check.name,
+        "value": check.value,
+        "request": {
+            "method": check.request.method,
+            "uri": check.request.uri,
+            "body": check.request.body,
+            "headers": check.request.headers,
+        },
+        "response": _serialize_response(check.response) if check.response is not None else None,
+        "example": _serialize_case(check.example),
+        "message": check.message,
+        "context": asdict(check.context) if check.context is not None else None,  # type: ignore
+        "history": [
+            {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
+            for entry in check.history
+        ],
+    }
+
+
 def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:
     return {
         "correlation_id": event.correlation_id,
@@ -89,27 +111,7 @@ def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | 
         "elapsed_time": event.elapsed_time,
         "data_generation_method": event.data_generation_method,
         "result": {
-            "checks": [
-                {
-                    "name": check.name,
-                    "value": check.value,
-                    "request": {
-                        "method": check.request.method,
-                        "uri": check.request.uri,
-                        "body": check.request.body,
-                        "headers": check.request.headers,
-                    },
-                    "response": _serialize_response(check.response) if check.response is not None else None,
-                    "example": _serialize_case(check.example),
-                    "message": check.message,
-                    "context": asdict(check.context) if check.context is not None else None,  # type: ignore
-                    "history": [
-                        {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
-                        for entry in check.history
-                    ],
-                }
-                for check in event.result.checks
-            ],
+            "checks": [_serialize_check(check) for check in event.result.checks],
             "errors": [asdict(error) for error in event.result.errors],
             "skip_reason": event.result.skip_reason,
         },
@@ -147,6 +149,29 @@ def serialize_finished(event: events.Finished) -> dict[str, Any] | None:
     }
 
 
+def serialize_stateful_event(event: events.StatefulEvent) -> dict[str, Any] | None:
+    if isinstance(event.data, stateful_events.RunStarted):
+        return {
+            "data": {
+                "timestamp": event.data.timestamp,
+                "started_at": event.data.started_at,
+            }
+        }
+    elif isinstance(event.data, stateful_events.SuiteFinished):
+        return {
+            "data": {
+                "timestamp": event.data.timestamp,
+                "status": event.data.status,
+                "failures": [_serialize_check(SerializedCheck.from_check(failure)) for failure in event.data.failures],
+            }
+        }
+    return {"data": asdict(event.data)}
+
+
+def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> dict[str, Any] | None:
+    return {"result": asdict(event.result)}
+
+
 SERIALIZER_MAP = {
     events.Initialized: serialize_initialized,
     events.BeforeProbing: serialize_before_probing,
@@ -157,6 +182,8 @@ SERIALIZER_MAP = {
     events.AfterExecution: serialize_after_execution,
     events.Interrupted: serialize_interrupted,
     events.InternalError: serialize_internal_error,
+    events.StatefulEvent: serialize_stateful_event,
+    events.AfterStatefulExecution: serialize_after_stateful_execution,
     events.Finished: serialize_finished,
 }
 
@@ -173,6 +200,8 @@ def serialize_event(
     on_after_execution: SerializeFunc | None = None,
     on_interrupted: SerializeFunc | None = None,
     on_internal_error: SerializeFunc | None = None,
+    on_stateful_event: SerializeFunc | None = None,
+    on_after_stateful_execution: SerializeFunc | None = None,
     on_finished: SerializeFunc | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any] | None]:
@@ -188,6 +217,8 @@ def serialize_event(
         events.AfterExecution: on_after_execution,
         events.Interrupted: on_interrupted,
         events.InternalError: on_internal_error,
+        events.StatefulEvent: on_stateful_event,
+        events.AfterStatefulExecution: on_after_stateful_execution,
         events.Finished: on_finished,
     }.get(event.__class__)
     if serializer is None:

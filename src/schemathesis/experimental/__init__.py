@@ -81,7 +81,7 @@ SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
 )
 STATEFUL_TEST_RUNNER = GLOBAL_EXPERIMENTS.create_experiment(
     name="stateful-test-runner",
-    verbose_name="Stateful Test Runner in CLI",
+    verbose_name="New Stateful Test Runner",
     env_var="STATEFUL_TEST_RUNNER",
     description="State machine-based runner for stateful tests in CLI",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",

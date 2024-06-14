@@ -16,6 +16,8 @@ from ..service.models import AnalysisResult
 if TYPE_CHECKING:
     import hypothesis
 
+    from ..stateful.sink import StateMachineSink
+
 
 @dataclass
 class ServiceReportContext:
@@ -57,6 +59,7 @@ class ExecutionContext:
     analysis: Result[AnalysisResult, Exception] | None = None
     # Special flag to display a warning about Windows-specific encoding issue
     encountered_windows_encoding_issue: bool = False
+    state_machine_sink: StateMachineSink | None = None
 
     @deprecated_property(removed_in="4.0", replacement="show_trace")
     def show_errors_tracebacks(self) -> bool:

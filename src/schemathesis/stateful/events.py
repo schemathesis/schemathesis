@@ -3,10 +3,11 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
     from ..models import Check
+    from .state_machine import APIStateMachine
 
 
 class RunStatus(str, Enum):
@@ -18,6 +19,7 @@ class RunStatus(str, Enum):
     INTERRUPTED = "interrupted"
 
 
+@dataclass
 class StatefulEvent:
     """Basic stateful test event."""
 
@@ -28,9 +30,12 @@ class StatefulEvent:
 class RunStarted(StatefulEvent):
     """Before executing all scenarios."""
 
-    __slots__ = ("timestamp", "started_at")
+    state_machine: Type[APIStateMachine]
 
-    def __init__(self) -> None:
+    __slots__ = ("state_machine", "timestamp", "started_at")
+
+    def __init__(self, *, state_machine: Type[APIStateMachine]) -> None:
+        self.state_machine = state_machine
         self.started_at = time.time()
         self.timestamp = time.monotonic()
 

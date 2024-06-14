@@ -302,6 +302,8 @@ class CliSnapshotConfig:
     replace_uuid: bool = True
     replace_response_time: bool = True
     replace_seed: bool = True
+    replace_reproduce_with: bool = False
+    replace_stateful_progress: bool = True
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
@@ -348,6 +350,7 @@ class CliSnapshotConfig:
         data = data.replace(str(PACKAGE_ROOT), package_root)
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
+        data = re.sub(r"Compressed report size: \d+ [KMG]B", "Compressed report size: XX KB", data)
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) != {" ", "^"}]
             comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
@@ -369,6 +372,8 @@ class CliSnapshotConfig:
                     else:
                         lines[idx] = "".join(sorted(line))
             data = "\n".join(lines) + "\n"
+        if self.replace_stateful_progress:
+            data = re.sub(r"(?<=Stateful tests\n\n)([.FES]+)", "...", data)
         if self.replace_statistic:
             data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
             data = re.sub("N / N passed +PASSED", "N / N passed          PASSED", data)
@@ -412,6 +417,19 @@ class CliSnapshotConfig:
                     lines[idx] = "Headers: {'X-Foo': 'Bar'}"
                     break
             lines = [line for line in lines if not (line.startswith("Upload: ") and line.endswith(tuple("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")))]
+            data = "\n".join(lines) + "\n"
+        if self.replace_reproduce_with:
+            lines = []
+            replace_next_non_empty = False
+            for line in data.splitlines():
+                if replace_next_non_empty and line:
+                    lines.append("    <PLACEHOLDER>")
+                else:
+                    lines.append(line)
+                if line.startswith("Reproduce with:"):
+                    replace_next_non_empty = True
+                elif line:
+                    replace_next_non_empty = False
             data = "\n".join(lines) + "\n"
         return data
 

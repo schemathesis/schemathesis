@@ -44,7 +44,7 @@ class StatefulTestRunner:
         """Execute a test run for a state machine."""
         self.stop_event.clear()
 
-        yield events.RunStarted()
+        yield events.RunStarted(state_machine=self.state_machine)
 
         runner_thread = threading.Thread(
             target=_execute_state_machine_loop,
@@ -189,11 +189,11 @@ def _execute_state_machine_loop(
             super().teardown()
 
     while True:
+        # This loop is running until no new failures are found in a single iteration
+        event_queue.put(events.SuiteStarted())
         if stop_event.is_set():
             event_queue.put(events.SuiteFinished(status=events.SuiteStatus.INTERRUPTED, failures=[]))
             break
-        # This loop is running until no new failures are found in a single iteration
-        event_queue.put(events.SuiteStarted())
         suite_status = events.SuiteStatus.SUCCESS
         try:
             with reporting.with_reporter(lambda _: None):  # type: ignore

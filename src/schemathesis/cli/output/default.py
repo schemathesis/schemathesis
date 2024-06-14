@@ -7,7 +7,7 @@ import textwrap
 import time
 from importlib import metadata
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Generator, cast
+from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
@@ -36,6 +36,8 @@ from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedError, SerializedTestResult
 from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
+from ...stateful import events as stateful_events
+from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
 from ..reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
@@ -68,14 +70,14 @@ def get_percentage(position: int, length: int) -> str:
     return f"[{percentage_message}]"
 
 
-def display_execution_result(context: ExecutionContext, event: events.AfterExecution) -> None:
+def display_execution_result(context: ExecutionContext, status: Literal["success", "failure", "error", "skip"]) -> None:
     """Display an appropriate symbol for the given event's execution result."""
     symbol, color = {
-        Status.success: (".", "green"),
-        Status.failure: ("F", "red"),
-        Status.error: ("E", "red"),
-        Status.skip: ("S", "yellow"),
-    }[event.status]
+        "success": (".", "green"),
+        "failure": ("F", "red"),
+        "error": ("E", "red"),
+        "skip": ("S", "yellow"),
+    }[status]
     context.current_line_length += len(symbol)
     click.secho(symbol, nl=False, fg=color)
 
@@ -839,7 +841,7 @@ def handle_after_execution(context: ExecutionContext, event: events.AfterExecuti
     """Display the execution result + current progress at the same line with the method / path names."""
     context.operations_processed += 1
     context.results.append(event.result)
-    display_execution_result(context, event)
+    display_execution_result(context, event.status.value)
     display_percentage(context, event)
 
 
@@ -867,6 +869,23 @@ def handle_internal_error(context: ExecutionContext, event: events.InternalError
     raise click.Abort
 
 
+def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent) -> None:
+    if isinstance(event.data, stateful_events.RunStarted):
+        context.state_machine_sink = event.data.state_machine.sink()
+        click.secho("\nStateful tests\n", bold=True)
+    elif isinstance(event.data, stateful_events.ScenarioFinished) and not event.data.is_final:
+        display_execution_result(context, event.data.status.value)
+    elif isinstance(event.data, stateful_events.RunFinished):
+        click.echo()
+    # It is initialized in `RunStarted`
+    sink = cast(StateMachineSink, context.state_machine_sink)
+    sink.consume(event.data)
+
+
+def handle_after_stateful_execution(context: ExecutionContext, event: events.AfterStatefulExecution) -> None:
+    context.results.append(event.result)
+
+
 class DefaultOutputStyleHandler(EventHandler):
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         """Choose and execute a proper handler for the given event."""
@@ -891,3 +910,7 @@ class DefaultOutputStyleHandler(EventHandler):
             handle_interrupted(context, event)
         elif isinstance(event, events.InternalError):
             handle_internal_error(context, event)
+        elif isinstance(event, events.StatefulEvent):
+            handle_stateful_event(context, event)
+        elif isinstance(event, events.AfterStatefulExecution):
+            handle_after_stateful_execution(context, event)

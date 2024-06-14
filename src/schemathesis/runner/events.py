@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from ..models import APIOperation, Status, TestResult, TestResultSet
     from ..schemas import BaseSchema
     from ..service.models import AnalysisResult
+    from ..stateful import events
     from . import probes
 
 
@@ -285,6 +286,22 @@ class InternalError(ExecutionEvent):
             exception=exception,
             exception_with_traceback=exception_with_traceback,
         )
+
+
+@dataclass
+class StatefulEvent(ExecutionEvent):
+    """Represents an event originating from the state machine runner."""
+
+    data: events.StatefulEvent
+
+    __slots__ = ("data",)
+
+
+@dataclass
+class AfterStatefulExecution(ExecutionEvent):
+    """Happens after the stateful test run."""
+
+    result: SerializedTestResult
 
 
 @dataclass
