@@ -21,7 +21,7 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
 
-from ... import failures, hooks
+from ... import experimental, failures, hooks
 from ..._compat import MultipleFailures
 from ..._hypothesis import (
     get_invalid_example_headers_mark,
@@ -63,6 +63,8 @@ from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
 from ...stateful import Feedback, Stateful
+from ...stateful import events as stateful_events
+from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
 from ...transports import RequestsTransport, prepare_timeout
 from ...types import RawAuth, RequestCert
@@ -191,6 +193,7 @@ class BaseRunner:
 
         try:
             yield from self._execute(results, stop_event)
+            yield from self._run_stateful_tests(results)
         except KeyboardInterrupt:
             yield events.Interrupted()
 
@@ -209,6 +212,32 @@ class BaseRunner:
         self, results: TestResultSet, stop_event: threading.Event
     ) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
+
+    def _run_stateful_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+        # Run new-style stateful tests
+        if self.stateful is not None and experimental.STATEFUL_TEST_RUNNER.is_enabled:
+            result = TestResult(
+                method="",
+                path="",
+                verbose_name="Stateful tests",
+                data_generation_method=self.schema.data_generation_methods,
+            )
+            config = stateful_runner.StatefulTestRunnerConfig(
+                checks=tuple(self.checks),
+                headers=self.headers or {},
+                hypothesis_settings=self.hypothesis_settings,
+                exit_first=self.exit_first,
+                request_timeout=self.request_timeout,
+            )
+            state_machine = self.schema.as_state_machine()
+            runner = state_machine.runner(config=config)
+            for stateful_event in runner.execute():
+                if isinstance(stateful_event, stateful_events.SuiteFinished):
+                    for failure in stateful_event.failures:
+                        result.checks.append(failure)
+                yield events.StatefulEvent(data=stateful_event)
+            results.append(result)
+            yield events.AfterStatefulExecution(result=SerializedTestResult.from_test_result(result))
 
     def _run_tests(
         self,
@@ -245,7 +274,7 @@ class BaseRunner:
         ):
             if isinstance(result, Ok):
                 operation, test = result.ok()
-                if self.stateful is not None:
+                if self.stateful is not None and not experimental.STATEFUL_TEST_RUNNER.is_enabled:
                     feedback = Feedback(self.stateful, operation)
                 else:
                     feedback = None

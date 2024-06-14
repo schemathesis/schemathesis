@@ -53,7 +53,7 @@ Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from
 
 Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
-Compressed report size: 2 KB
+Compressed report size: XX KB
 Uploading reports to http://127.0.0.1 ...
 Upload: COMPLETED
 
