@@ -112,7 +112,7 @@ tomli-w==1.0.0
     # via schemathesis
 typing-extensions==4.8.0
     # via schemathesis
-urllib3==2.1.0
+urllib3==2.2.2
     # via requests
 werkzeug==3.0.3
     # via schemathesis
