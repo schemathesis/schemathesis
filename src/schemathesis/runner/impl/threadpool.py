@@ -1,13 +1,16 @@
 from __future__ import annotations
+
 import ctypes
 import queue
 import threading
 import time
+import warnings
 from dataclasses import dataclass
 from queue import Queue
 from typing import Any, Callable, Generator, Iterable, cast
 
 import hypothesis
+from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis import create_test
 from ...generation import DataGenerationMethod, GenerationConfig
@@ -39,6 +42,7 @@ def _run_task(
     headers: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> None:
+    warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
     as_strategy_kwargs = {}
     if headers is not None:
         as_strategy_kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
