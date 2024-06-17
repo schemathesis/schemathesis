@@ -15,7 +15,7 @@ jobs:
     name: Corpus tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4.1.6
+      - uses: actions/checkout@v4.1.7
         with:
           fetch-depth: 1
           submodules: true
