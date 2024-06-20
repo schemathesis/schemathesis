@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import string
 from itertools import product
 from typing import Any, Generator

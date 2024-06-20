@@ -1,9 +1,8 @@
 """Compatibility flags based on installed dependency versions."""
 
-from packaging import version
-
 from importlib import metadata
 
+from packaging import version
 
 WERKZEUG_VERSION = version.parse(metadata.version("werkzeug"))
 IS_WERKZEUG_ABOVE_3 = WERKZEUG_VERSION >= version.parse("3.0")

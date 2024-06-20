@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any
@@ -8,10 +9,10 @@ import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
+from ....generation import GenerationConfig
 from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 from .types import Draw, Schema
-from ....generation import GenerationConfig
 
 
 @dataclass

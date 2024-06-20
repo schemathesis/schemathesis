@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 
-from . import ci
 from ..exceptions import format_exception
+from . import ci
 
 
 class Event:

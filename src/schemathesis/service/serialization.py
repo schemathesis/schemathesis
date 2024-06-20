@@ -7,9 +7,9 @@ from ..exceptions import format_exception
 from ..internal.result import Err, Ok
 from ..internal.transformation import merge_recursively
 from ..models import Response
-from .models import AnalysisSuccess
 from ..runner import events
 from ..runner.serialization import SerializedCase
+from .models import AnalysisSuccess
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]

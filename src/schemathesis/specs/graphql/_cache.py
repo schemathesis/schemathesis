@@ -4,8 +4,8 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ...schemas import APIOperationMap
     from ...models import APIOperation
+    from ...schemas import APIOperationMap
 
 
 @dataclass

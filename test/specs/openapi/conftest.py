@@ -3,8 +3,8 @@ from dataclasses import fields
 import pytest
 
 import schemathesis
-from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 
 
 def make_object_schema(is_loose=False, **properties):

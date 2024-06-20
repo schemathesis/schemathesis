@@ -1,13 +1,13 @@
 from __future__ import annotations
+
 from typing import Any
 
-from . import auths, checks, experimental, contrib, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
+from . import auths, checks, contrib, experimental, fixups, graphql, hooks, runner, serializers, targets  # noqa: E402
 from ._lazy_import import lazy_import
-from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig  # noqa: E402
 from .constants import SCHEMATHESIS_VERSION  # noqa: E402
+from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig  # noqa: E402
 from .models import Case  # noqa: E402
 from .specs import openapi  # noqa: E402
-
 
 __version__ = SCHEMATHESIS_VERSION
 

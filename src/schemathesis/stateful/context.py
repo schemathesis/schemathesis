@@ -8,8 +8,8 @@ from ..exceptions import CheckFailed
 from . import events
 
 if TYPE_CHECKING:
-    from ..transports.responses import GenericResponse
     from ..models import Check
+    from ..transports.responses import GenericResponse
 
 FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
 

@@ -3,7 +3,7 @@ import threading
 import pytest
 from pytest import ExitCode
 
-from schemathesis.experimental import OPEN_API_3_1, ExperimentSet, ENV_PREFIX
+from schemathesis.experimental import ENV_PREFIX, OPEN_API_3_1, ExperimentSet
 
 
 def test_experiments():

@@ -3,17 +3,17 @@ from __future__ import annotations
 import base64
 import re
 from ipaddress import IPv4Network, IPv6Network
-from typing import TYPE_CHECKING, Callable, Optional, Any
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from ..graphql import nodes
-from ..internal.result import Result, Ok, Err
+from ..internal.result import Err, Ok, Result
 from .models import (
     Extension,
-    SchemaPatchesExtension,
-    StrategyDefinition,
-    OpenApiStringFormatsExtension,
     GraphQLScalarsExtension,
     MediaTypesExtension,
+    OpenApiStringFormatsExtension,
+    SchemaPatchesExtension,
+    StrategyDefinition,
     TransformFunctionDefinition,
 )
 

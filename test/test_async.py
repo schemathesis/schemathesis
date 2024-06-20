@@ -1,9 +1,9 @@
-from packaging import version
 from importlib import metadata
+
 import pytest
+from packaging import version
 
 from .utils import integer
-
 
 IS_OLD_PYTEST_ASYNCIO_VERSION = version.parse(metadata.version("pytest_asyncio")) < version.parse("0.11.0")
 ASYNCIO_PLUGIN_NAME = "pytest_asyncio" if IS_OLD_PYTEST_ASYNCIO_VERSION else "asyncio"

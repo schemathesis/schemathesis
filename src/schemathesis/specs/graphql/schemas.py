@@ -6,16 +6,16 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from enum import unique
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Generator,
+    Iterator,
+    Mapping,
+    NoReturn,
     Sequence,
     TypeVar,
     cast,
-    TYPE_CHECKING,
-    NoReturn,
-    Mapping,
-    Iterator,
 )
 from urllib.parse import urlsplit, urlunsplit
 
@@ -25,12 +25,11 @@ from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
-from ..openapi.constants import LOCATION_TO_CONTAINER
 from ... import auths
 from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import NOT_SET
-from ...exceptions import OperationSchemaError, OperationNotFound
+from ...exceptions import OperationNotFound, OperationSchemaError
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import (
     GLOBAL_HOOK_DISPATCHER,
@@ -41,9 +40,10 @@ from ...hooks import (
 )
 from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
-from ...schemas import BaseSchema, APIOperationMap
+from ...schemas import APIOperationMap, BaseSchema
 from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
+from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 

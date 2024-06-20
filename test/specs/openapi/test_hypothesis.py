@@ -1,7 +1,7 @@
 import json
 
 import pytest
-from hypothesis import assume, given, settings, Phase
+from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
 
 import schemathesis

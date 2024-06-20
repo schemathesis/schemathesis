@@ -26,23 +26,23 @@ class ShortOutputStyleHandler(EventHandler):
         """
         if isinstance(event, events.Initialized):
             default.handle_initialized(context, event)
-        if isinstance(event, events.BeforeProbing):
+        elif isinstance(event, events.BeforeProbing):
             default.handle_before_probing(context, event)
-        if isinstance(event, events.AfterProbing):
+        elif isinstance(event, events.AfterProbing):
             default.handle_after_probing(context, event)
-        if isinstance(event, events.BeforeAnalysis):
+        elif isinstance(event, events.BeforeAnalysis):
             default.handle_before_analysis(context, event)
-        if isinstance(event, events.AfterAnalysis):
+        elif isinstance(event, events.AfterAnalysis):
             default.handle_after_analysis(context, event)
-        if isinstance(event, events.BeforeExecution):
+        elif isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
-        if isinstance(event, events.AfterExecution):
+        elif isinstance(event, events.AfterExecution):
             handle_after_execution(context, event)
-        if isinstance(event, events.Finished):
+        elif isinstance(event, events.Finished):
             if context.operations_count == context.operations_processed:
                 click.echo()
             default.handle_finished(context, event)
-        if isinstance(event, events.Interrupted):
+        elif isinstance(event, events.Interrupted):
             default.handle_interrupted(context, event)
-        if isinstance(event, events.InternalError):
+        elif isinstance(event, events.InternalError):
             default.handle_internal_error(context, event)

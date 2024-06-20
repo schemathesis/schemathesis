@@ -1,6 +1,7 @@
 """Work with stored auth data."""
 
 from __future__ import annotations
+
 import enum
 import tempfile
 from dataclasses import dataclass

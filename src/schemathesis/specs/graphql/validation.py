@@ -1,5 +1,4 @@
-from typing import Any, cast, List
-
+from typing import Any, List, cast
 
 from ... import failures
 from ...exceptions import get_grouped_graphql_error, get_unexpected_graphql_response_error

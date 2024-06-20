@@ -4,6 +4,7 @@ These are basic entities that describe what data could be sent to the API.
 """
 
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar
 

@@ -1,10 +1,11 @@
-from hypothesis import given
-from hypothesis import strategies as st, settings, Phase
+import sys
 
 import pytest
+from hypothesis import Phase, given, settings
+from hypothesis import strategies as st
+
 import schemathesis
 import schemathesis.runner
-import sys
 from schemathesis.runner import events
 
 if sys.version_info < (3, 10):

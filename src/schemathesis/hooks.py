@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import inspect
 from collections import defaultdict
 from copy import deepcopy
@@ -7,11 +8,12 @@ from enum import Enum, unique
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, cast
 
-from .types import GenericTest
 from .internal.deprecation import deprecated_property
+from .types import GenericTest
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
+
     from .models import APIOperation, Case
     from .schemas import BaseSchema
     from .transports.responses import GenericResponse

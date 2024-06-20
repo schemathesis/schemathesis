@@ -1,20 +1,21 @@
 from __future__ import annotations
-from typing import TYPE_CHECKING
+
 import json
+from typing import TYPE_CHECKING
 
 from . import failures
-from .exceptions import get_server_error, get_response_parsing_error
+from .exceptions import get_response_parsing_error, get_server_error
 from .specs.openapi.checks import (
     content_type_conformance,
+    negative_data_rejection,
     response_headers_conformance,
     response_schema_conformance,
-    negative_data_rejection,
     status_code_conformance,
 )
 
 if TYPE_CHECKING:
-    from .transports.responses import GenericResponse
     from .models import Case, CheckFunction
+    from .transports.responses import GenericResponse
 
 
 def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import re
 from typing import Any
 
@@ -25,8 +26,8 @@ INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
 
 
 def has_invalid_characters(name: str, value: str) -> bool:
-    from requests.utils import check_header_validity
     from requests.exceptions import InvalidHeader
+    from requests.utils import check_header_validity
 
     try:
         check_header_validity((name, value))

@@ -1,26 +1,24 @@
 import platform
-
-from schemathesis.specs.openapi.checks import use_after_free
-from schemathesis.transports import WSGITransport
-import strawberry
-
-from test.apps._graphql.schema import Author
-from test.utils import assert_requests_call
 from unittest.mock import ANY
 
 import pytest
 import requests
-from hypothesis import HealthCheck, given, settings, find, Phase
+import strawberry
+from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, SchemaError
 from schemathesis.extra._flask import run_server as run_flask_server
-from schemathesis.specs.graphql.loaders import get_introspection_query, extract_schema_from_response
+from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
+from schemathesis.specs.openapi.checks import use_after_free
+from schemathesis.transports import WSGITransport
 from test.apps import _graphql as graphql
+from test.apps._graphql.schema import Author
+from test.utils import assert_requests_call
 
 
 def test_raw_schema(graphql_schema):

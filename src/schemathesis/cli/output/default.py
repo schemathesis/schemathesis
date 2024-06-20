@@ -7,7 +7,7 @@ import textwrap
 import time
 from importlib import metadata
 from queue import Queue
-from typing import Any, Generator, cast, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Generator, cast
 
 import click
 
@@ -24,9 +24,9 @@ from ...constants import (
 )
 from ...exceptions import (
     RuntimeErrorType,
+    extract_requests_exception_details,
     format_exception,
     prepare_response_payload,
-    extract_requests_exception_details,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...internal.result import Ok
@@ -35,10 +35,10 @@ from ...runner import events
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.probes import ProbeOutcome
 from ...runner.serialization import SerializedError, SerializedTestResult
-from ...service.models import AnalysisSuccess, UnknownExtension, ErrorState
+from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
-from ..reporting import group_by_case, TEST_CASE_ID_TITLE, split_traceback, get_runtime_error_suggestion
+from ..reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
 
 if TYPE_CHECKING:
     import requests
@@ -551,7 +551,7 @@ def display_report_metadata(meta: service.Metadata) -> None:
             if value is not None:
                 click.secho(f"  -> {key}: {value}")
         click.echo()
-    click.secho(f"Compressed report size: {meta.size / 1024.:,.0f} KB", bold=True)
+    click.secho(f"Compressed report size: {meta.size / 1024.0:,.0f} KB", bold=True)
 
 
 def display_service_unauthorized(hostname: str) -> None:
@@ -872,22 +872,22 @@ class DefaultOutputStyleHandler(EventHandler):
         """Choose and execute a proper handler for the given event."""
         if isinstance(event, events.Initialized):
             handle_initialized(context, event)
-        if isinstance(event, events.BeforeProbing):
+        elif isinstance(event, events.BeforeProbing):
             handle_before_probing(context, event)
-        if isinstance(event, events.AfterProbing):
+        elif isinstance(event, events.AfterProbing):
             handle_after_probing(context, event)
-        if isinstance(event, events.BeforeAnalysis):
+        elif isinstance(event, events.BeforeAnalysis):
             handle_before_analysis(context, event)
-        if isinstance(event, events.AfterAnalysis):
+        elif isinstance(event, events.AfterAnalysis):
             handle_after_analysis(context, event)
-        if isinstance(event, events.BeforeExecution):
+        elif isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
-        if isinstance(event, events.AfterExecution):
+        elif isinstance(event, events.AfterExecution):
             context.hypothesis_output.extend(event.hypothesis_output)
             handle_after_execution(context, event)
-        if isinstance(event, events.Finished):
+        elif isinstance(event, events.Finished):
             handle_finished(context, event)
-        if isinstance(event, events.Interrupted):
+        elif isinstance(event, events.Interrupted):
             handle_interrupted(context, event)
-        if isinstance(event, events.InternalError):
+        elif isinstance(event, events.InternalError):
             handle_internal_error(context, event)
