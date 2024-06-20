@@ -37,6 +37,7 @@ Changelog
 - Improve error messages on ``MaxRetryError``. :issue:`2234`
 - Migrate to new-style ``pytest`` hooks. :issue:`2181``
 - Filter out Hypothesis' warning about resetting the recursion limit in multi-worker tests.
+- Show sub-schema location in ``response_schema_conformance`` failure messages. :issue:`2270`
 
 **Fixed**
 

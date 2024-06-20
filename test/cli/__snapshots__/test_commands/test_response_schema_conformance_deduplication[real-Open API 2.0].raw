@@ -22,7 +22,7 @@ _____________________________ GET /api/conformance _____________________________
 
     'e32ab85ed4634c38a320eb0b22460da9' is not one of ['foo']
 
-    Schema:
+    Schema at /properties/value:
 
         {
             "enum": [
