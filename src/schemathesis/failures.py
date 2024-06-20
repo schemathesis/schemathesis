@@ -46,11 +46,19 @@ class ValidationErrorContext(FailureContext):
 
         schema = textwrap.indent(truncated_json(exc.schema, max_lines=20), prefix="    ")
         value = textwrap.indent(truncated_json(exc.instance, max_lines=20), prefix="    ")
-        message = f"{exc.message}\n\nSchema:\n\n{schema}\n\nValue:\n\n{value}"
+        schema_path = list(exc.absolute_schema_path)
+        if len(schema_path) > 1:
+            # Exclude the last segment, which is already in the schema
+            schema_title = "Schema at "
+            for segment in schema_path[:-1]:
+                schema_title += f"/{segment}"
+        else:
+            schema_title = "Schema"
+        message = f"{exc.message}\n\n{schema_title}:\n\n{schema}\n\nValue:\n\n{value}"
         return cls(
             message=message,
             validation_message=exc.message,
-            schema_path=list(exc.absolute_schema_path),
+            schema_path=schema_path,
             schema=exc.schema,
             instance_path=list(exc.absolute_path),
             instance=exc.instance,
