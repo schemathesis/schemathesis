@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import string
 import time
 from base64 import b64encode
@@ -9,28 +10,29 @@ from typing import Any, Callable, Dict, Iterable, Optional
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-from hypothesis import strategies as st, reject
+from hypothesis import reject
+from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.auth import _basic_auth_str
 from requests.structures import CaseInsensitiveDict
 from requests.utils import to_key_val_list
 
+from ... import auths, serializers
 from ..._hypothesis import prepare_urlencoded
 from ...constants import NOT_SET
-from .formats import STRING_FORMATS
-from ... import auths, serializers
+from ...exceptions import BodyInGetRequestError, SerializationNotPossible
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...internal.copy import fast_deepcopy
-from ...exceptions import SerializationNotPossible, BodyInGetRequestError
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from ...internal.copy import fast_deepcopy
 from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, cant_serialize
+from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
-from ...serializers import Binary
 from ...utils import compose, skip
 from .constants import LOCATION_TO_CONTAINER
+from .formats import STRING_FORMATS
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate

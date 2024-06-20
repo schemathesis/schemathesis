@@ -3,8 +3,9 @@ FORMAT_NAME = "uuid"
 
 
 def install() -> None:
-    from ....specs import openapi
     from hypothesis import strategies as st
+
+    from ....specs import openapi
 
     openapi.format(FORMAT_NAME, st.uuids().map(str))
 

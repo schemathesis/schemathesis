@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import json
 from typing import Any
 
@@ -7,6 +8,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import DataGenerationMethod, models
+from schemathesis._compat import MultipleFailures
 from schemathesis.checks import (
     content_type_conformance,
     not_a_server_error,
@@ -14,7 +16,6 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from schemathesis._compat import MultipleFailures
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.models import OperationDefinition, TestResult

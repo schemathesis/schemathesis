@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from enum import Enum
 from functools import lru_cache
 from shlex import quote

@@ -1,11 +1,12 @@
 """Filtering system that allows users to filter API operations based on certain criteria."""
 
 from __future__ import annotations
+
 import re
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, List, Union, Protocol
+from typing import TYPE_CHECKING, Callable, List, Protocol, Union
 
 from .exceptions import UsageError
 

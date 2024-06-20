@@ -2,12 +2,10 @@ import csv
 import string
 from contextlib import suppress
 from io import StringIO
-from schemathesis.transports import RequestsTransport, WSGITransport
-from test.utils import assert_requests_call
 from xml.etree import ElementTree
 
 import pytest
-from hypothesis import HealthCheck, given, settings, Phase
+from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
@@ -19,6 +17,8 @@ from schemathesis.exceptions import (
     UnboundPrefixError,
 )
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.transports import RequestsTransport, WSGITransport
+from test.utils import assert_requests_call
 
 
 def to_csv(data):

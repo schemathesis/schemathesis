@@ -1,6 +1,6 @@
-from typing import Any, Type, Callable
-from ._lazy_import import lazy_import
+from typing import Any, Callable, Type
 
+from ._lazy_import import lazy_import
 
 __all__ = [  # noqa: F822
     "JSONMixin",

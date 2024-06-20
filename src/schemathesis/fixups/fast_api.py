@@ -1,9 +1,9 @@
 from __future__ import annotations
+
 from typing import Any
 
-from ..hooks import HookContext
+from ..hooks import HookContext, register, unregister
 from ..hooks import is_installed as global_is_installed
-from ..hooks import register, unregister
 from ..internal.jsonschema import traverse_schema
 
 

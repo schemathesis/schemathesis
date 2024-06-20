@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import random
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Union, Iterable, TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable, Union
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy

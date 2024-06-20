@@ -1,5 +1,5 @@
 import warnings
-from typing import Callable, Any
+from typing import Any, Callable
 
 
 def _warn_deprecation(*, kind: str, thing: str, removed_in: str, replacement: str) -> None:

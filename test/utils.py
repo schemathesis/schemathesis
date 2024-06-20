@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import os
 import platform
 from functools import lru_cache, wraps
@@ -8,15 +9,15 @@ import click
 import pytest
 import requests
 import urllib3
+from syrupy import SnapshotAssertion
 
 import schemathesis
+from schemathesis.exceptions import CheckFailed
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.internal.transformation import merge_recursively
 from schemathesis.loaders import load_yaml
 from schemathesis.models import Case
-from schemathesis.exceptions import CheckFailed
 from schemathesis.schemas import BaseSchema
-from syrupy import SnapshotAssertion
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

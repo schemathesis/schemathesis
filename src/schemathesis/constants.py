@@ -1,4 +1,5 @@
 from importlib import metadata
+
 from .types import NotSet
 
 try:

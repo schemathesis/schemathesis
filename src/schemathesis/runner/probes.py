@@ -22,8 +22,8 @@ from ..transports.auth import get_requests_auth
 if TYPE_CHECKING:
     import requests
 
-    from ..types import RequestCert
     from ..schemas import BaseSchema
+    from ..types import RequestCert
 
 
 HEADER_NAME = "X-Schemathesis-Probe"

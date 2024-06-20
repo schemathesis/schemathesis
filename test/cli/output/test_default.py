@@ -13,11 +13,11 @@ import schemathesis.cli.context
 from schemathesis import models, runner, utils
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
+from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
-from schemathesis.constants import NOT_SET
 
 from ...utils import strip_style_win32
 

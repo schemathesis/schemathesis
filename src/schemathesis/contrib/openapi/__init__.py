@@ -1,4 +1,4 @@
-from . import formats, fill_missing_examples
+from . import fill_missing_examples, formats
 
 
 def install() -> None:

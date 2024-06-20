@@ -1,9 +1,10 @@
 from __future__ import annotations
+
 from itertools import chain
 from typing import Any, Callable
 
-from ...internal.jsonschema import traverse_schema
 from ...internal.copy import fast_deepcopy
+from ...internal.jsonschema import traverse_schema
 
 
 def to_json_schema(

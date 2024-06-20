@@ -3,8 +3,8 @@ from functools import wraps
 from typing import Callable, Tuple
 
 import yaml
-from aiohttp.web_exceptions import NotAppKeyWarning
 from aiohttp import web
+from aiohttp.web_exceptions import NotAppKeyWarning
 
 from ..schema import OpenAPIVersion, Operation, make_openapi_schema
 from . import handlers

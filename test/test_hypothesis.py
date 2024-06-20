@@ -7,10 +7,10 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.models import Case
-from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.constants import NOT_SET
 from schemathesis.exceptions import OperationSchemaError
-from schemathesis.models import APIOperation, OperationDefinition
+from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
@@ -24,7 +24,6 @@ from schemathesis.specs.openapi._hypothesis import (
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
-from schemathesis.constants import NOT_SET
 from test.utils import assert_requests_call
 
 

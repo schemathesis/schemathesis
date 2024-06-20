@@ -9,9 +9,9 @@ import pytest
 
 import schemathesis
 from schemathesis.cli import ExecutionContext
+from schemathesis.internal.datetime import current_datetime
 from schemathesis.runner import events
 from schemathesis.service import ci, metadata, report
-from schemathesis.internal.datetime import current_datetime
 
 
 def test_add_events(openapi3_schema_url, read_report):

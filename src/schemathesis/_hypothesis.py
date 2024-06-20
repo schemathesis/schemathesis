@@ -10,8 +10,8 @@ import hypothesis
 from hypothesis import Phase
 from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
-from hypothesis.internal.reflection import proxies
 from hypothesis.internal.entropy import deterministic_PRNG
+from hypothesis.internal.reflection import proxies
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test

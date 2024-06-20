@@ -1,5 +1,6 @@
 from __future__ import annotations
-from typing import overload, Dict, Union, Any, List, Callable
+
+from typing import Any, Callable, Dict, List, Union, overload
 
 JsonValue = Union[Dict[str, Any], List, str, float, int]
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import enum
 import json
 import os
@@ -9,7 +10,7 @@ from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from io import BytesIO
 from queue import Queue
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import click
 
@@ -22,11 +23,10 @@ from .metadata import Metadata
 from .models import UploadResponse
 from .serialization import serialize_event
 
-
 if TYPE_CHECKING:
-    from .client import ServiceClient
     from ..cli.context import ExecutionContext
     from ..runner.events import ExecutionEvent
+    from .client import ServiceClient
 
 
 @dataclass

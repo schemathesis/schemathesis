@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from typing import TYPE_CHECKING
+
 from ...hooks import HookContext, register, unregister
 
 if TYPE_CHECKING:

@@ -1,7 +1,5 @@
 import json
 from email.message import EmailMessage
-
-from test.utils import assert_requests_call
 from urllib.parse import quote, unquote
 
 import pytest
@@ -23,6 +21,7 @@ from schemathesis.specs.openapi.serialization import (
     matrix_object,
     matrix_primitive,
 )
+from test.utils import assert_requests_call
 
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
 NULLABLE_PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1], "nullable": True}

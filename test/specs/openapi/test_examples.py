@@ -1,8 +1,5 @@
 from __future__ import annotations
-from schemathesis.generation import GenerationConfig
 
-from schemathesis.transports import WSGITransport
-from test.utils import assert_requests_call
 from typing import Any
 from unittest.mock import ANY
 
@@ -10,10 +7,12 @@ import jsonschema
 import pytest
 import yaml
 from _pytest.main import ExitCode
-from hypothesis import find, settings, given, HealthCheck, strategies as st, Phase
+from hypothesis import HealthCheck, Phase, find, given, settings
+from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis._hypothesis import get_single_example
+from schemathesis.generation import GenerationConfig
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (
@@ -22,6 +21,8 @@ from schemathesis.specs.openapi.examples import (
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+from schemathesis.transports import WSGITransport
+from test.utils import assert_requests_call
 
 
 @pytest.fixture(scope="module")

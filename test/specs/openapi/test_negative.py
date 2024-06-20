@@ -1,4 +1,3 @@
-from test.utils import assert_requests_call
 from urllib.parse import urlparse
 
 import pytest
@@ -11,7 +10,8 @@ from jsonschema import Draft4Validator
 
 import schemathesis
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
-from schemathesis.specs.openapi._hypothesis import is_valid_header, get_default_format_strategies
+from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
 from schemathesis.specs.openapi.negative.mutations import (
@@ -25,7 +25,7 @@ from schemathesis.specs.openapi.negative.mutations import (
     remove_required_property,
 )
 from schemathesis.specs.openapi.utils import is_header_location
-from schemathesis.internal.copy import fast_deepcopy
+from test.utils import assert_requests_call
 
 MAX_EXAMPLES = 15
 SUPPRESSED_HEALTH_CHECKS = [HealthCheck.too_slow, HealthCheck.filter_too_much, HealthCheck.data_too_large]

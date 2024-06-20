@@ -1,5 +1,4 @@
 import sys
-
 from importlib import metadata
 
 

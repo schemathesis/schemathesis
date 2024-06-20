@@ -233,8 +233,8 @@ def from_dict(
     :param app: A WSGI app instance.
     :return: GraphQLSchema
     """
-    from .schemas import GraphQLSchema
     from ... import transports
+    from .schemas import GraphQLSchema
 
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()

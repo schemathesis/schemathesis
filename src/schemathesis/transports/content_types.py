@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Tuple, Generator
+from typing import Generator, Tuple
 
 
 def _parseparam(s: str) -> Generator[str, None, None]:

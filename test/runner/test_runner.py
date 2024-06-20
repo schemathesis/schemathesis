@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import base64
 import json
 import platform
@@ -18,15 +19,15 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.generation import DataGenerationMethod
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.transports.auth import get_requests_auth
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import get_wsgi_auth, has_too_many_responses_with_status, deduplicate_errors
+from schemathesis.runner.impl.core import deduplicate_errors, get_wsgi_auth, has_too_many_responses_with_status
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
+from schemathesis.transports.auth import get_requests_auth
 
 
 def execute(schema, **options) -> events.Finished:

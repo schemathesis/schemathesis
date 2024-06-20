@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Set, Tuple, Union
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
+
     from .hooks import HookContext
 
 PathLike = Union[Path, str]

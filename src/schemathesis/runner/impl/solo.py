@@ -1,11 +1,12 @@
 from __future__ import annotations
+
 import threading
 from dataclasses import dataclass
 from typing import Generator
 
 from ...models import TestResultSet
-from ...types import RequestCert
 from ...transports.auth import get_requests_auth
+from ...types import RequestCert
 from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 

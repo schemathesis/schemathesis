@@ -6,8 +6,9 @@ from typing import TYPE_CHECKING
 from ..hooks import HookContext, register, unregister
 
 if TYPE_CHECKING:
-    from ..models import Case
     from hypothesis import strategies as st
+
+    from ..models import Case
 
 
 def install() -> None:

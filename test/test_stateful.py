@@ -3,10 +3,10 @@ import re
 import pytest
 
 import schemathesis
+from schemathesis.constants import NOT_SET
 from schemathesis.exceptions import SchemaError
 from schemathesis.specs.openapi import expressions
 from schemathesis.stateful import ParsedData
-from schemathesis.constants import NOT_SET
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 

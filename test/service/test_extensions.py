@@ -6,15 +6,15 @@ import requests.exceptions
 from hypothesis import find
 
 import schemathesis
-from schemathesis.service.extensions import apply, strategy_from_definitions, _apply_schema_patches_extension
+from schemathesis.service.extensions import _apply_schema_patches_extension, apply, strategy_from_definitions
 from schemathesis.service.models import (
+    SchemaPatchesExtension,
     StrategyDefinition,
     UnknownExtension,
     extension_from_dict,
-    SchemaPatchesExtension,
 )
-from schemathesis.specs.openapi.formats import STRING_FORMATS, unregister_string_format
 from schemathesis.specs.openapi._hypothesis import Binary
+from schemathesis.specs.openapi.formats import STRING_FORMATS, unregister_string_format
 
 
 @pytest.fixture

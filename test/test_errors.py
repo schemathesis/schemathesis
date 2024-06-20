@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.exceptions import truncated_json, prepare_response_payload
+from schemathesis.exceptions import prepare_response_payload, truncated_json
 
 
 def test_truncate_simple_dict():

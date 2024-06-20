@@ -10,14 +10,13 @@ import requests
 from hypothesis.strategies import SearchStrategy
 from hypothesis_jsonschema import from_schema
 
+from ..._hypothesis import get_single_example
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...models import APIOperation, Case
-from ..._hypothesis import get_single_example
 from ._hypothesis import get_case_strategy, get_default_format_strategies
-from .formats import STRING_FORMATS
 from .constants import LOCATION_TO_CONTAINER
+from .formats import STRING_FORMATS
 from .parameters import OpenAPIBody, OpenAPIParameter
-
 
 if TYPE_CHECKING:
     from ...generation import GenerationConfig

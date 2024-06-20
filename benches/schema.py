@@ -12,7 +12,7 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
 
-from corpus.tools import read_corpus_file, load_from_corpus  # noqa: E402
+from corpus.tools import load_from_corpus, read_corpus_file  # noqa: E402
 
 CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
 CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")

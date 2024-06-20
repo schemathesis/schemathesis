@@ -1,37 +1,38 @@
 from __future__ import annotations
+
 import io
 import json
 import pathlib
 import re
-from typing import IO, Any, Callable, cast, TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, Any, Callable, cast
 from urllib.parse import urljoin
 
 from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
+from ...constants import NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
+from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
-    DataGenerationMethodInput,
     DataGenerationMethod,
+    DataGenerationMethodInput,
     GenerationConfig,
 )
-from ...constants import WAIT_FOR_SCHEMA_INTERVAL
-from ...exceptions import SchemaError, SchemaErrorType
 from ...hooks import HookContext, dispatch
+from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url, load_yaml
 from ...throttling import build_limiter
-from ...types import Filter, NotSet, PathLike
 from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
-from ...internal.validation import require_relative_url
-from ...constants import NOT_SET
+from ...types import Filter, NotSet, PathLike
 from . import definitions, validation
 
 if TYPE_CHECKING:
-    from .schemas import BaseOpenAPISchema
-    from ...transports.responses import GenericResponse
     import jsonschema
     from pyrate_limiter import Limiter
+
     from ...lazy import LazySchema
+    from ...transports.responses import GenericResponse
+    from .schemas import BaseOpenAPISchema
 
 
 def _is_json_response(response: GenericResponse) -> bool:
@@ -303,8 +304,8 @@ def from_dict(
 
     :param dict raw_schema: A schema to load.
     """
-    from .schemas import OpenApi30, SwaggerV20
     from ... import transports
+    from .schemas import OpenApi30, SwaggerV20
 
     if not isinstance(raw_schema, dict):
         raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
@@ -533,8 +534,9 @@ def from_wsgi(
     :param str schema_path: An in-app relative URL to the schema.
     :param app: A WSGI app instance.
     """
-    from ...transports.responses import WSGIResponse
     from werkzeug.test import Client
+
+    from ...transports.responses import WSGIResponse
 
     require_relative_url(schema_path)
     setup_default_headers(kwargs)

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
@@ -9,6 +10,7 @@ from .constants import NOT_SET
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
+
     from .models import Case, CaseSource, Request
     from .runner.serialization import SerializedCase, SerializedCheck, SerializedInteraction
     from .transports.responses import GenericResponse

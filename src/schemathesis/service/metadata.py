@@ -1,10 +1,11 @@
 """Useful info to collect from CLI usage."""
 
 from __future__ import annotations
+
 import os
 import platform
-from importlib import metadata
 from dataclasses import dataclass, field
+from importlib import metadata
 
 from ..constants import SCHEMATHESIS_VERSION
 from .constants import DOCKER_IMAGE_ENV_VAR

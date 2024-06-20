@@ -1,8 +1,9 @@
 from __future__ import annotations
+
 import textwrap
 from dataclasses import dataclass
 from json import JSONDecodeError
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from graphql.error import GraphQLFormattedError

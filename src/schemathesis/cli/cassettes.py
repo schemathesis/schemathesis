@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import base64
 import json
 import re
@@ -6,7 +7,7 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import IO, Any, Generator, Iterator, cast, TYPE_CHECKING
+from typing import IO, TYPE_CHECKING, Any, Generator, Iterator, cast
 
 from ..constants import SCHEMATHESIS_VERSION
 from ..runner import events
@@ -16,10 +17,11 @@ from .handlers import EventHandler
 if TYPE_CHECKING:
     import click
     import requests
+
+    from ..generation import DataGenerationMethod
     from ..models import Request, Response
     from ..runner.serialization import SerializedCheck, SerializedInteraction
     from .context import ExecutionContext
-    from ..generation import DataGenerationMethod
 
 # Wait until the worker terminates
 WRITER_WORKER_JOIN_TIMEOUT = 1
@@ -351,9 +353,9 @@ def filter_cassette(
 
 def get_prepared_request(data: dict[str, Any]) -> requests.PreparedRequest:
     """Create a `requests.PreparedRequest` from a serialized one."""
-    from requests.structures import CaseInsensitiveDict
-    from requests.cookies import RequestsCookieJar
     import requests
+    from requests.cookies import RequestsCookieJar
+    from requests.structures import CaseInsensitiveDict
 
     prepared = requests.PreparedRequest()
     prepared.method = data["method"]

@@ -1,4 +1,4 @@
-from typing import TypeVar, Generic, Union
+from typing import Generic, TypeVar, Union
 
 T = TypeVar("T")
 E = TypeVar("E", bound=Exception)
