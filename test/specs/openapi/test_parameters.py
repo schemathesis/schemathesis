@@ -8,7 +8,6 @@ from schemathesis.specs.openapi.parameters import (
     OpenAPI30Parameter,
 )
 
-
 DESCRIPTION = "Foo"
 
 

@@ -9,8 +9,8 @@ from hypothesis import given, settings
 import schemathesis
 from schemathesis._compat import MultipleFailures
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.generation import DataGenerationMethod
 from schemathesis.exceptions import CheckFailed, UsageError
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case, CaseSource, Request, Response, _merge_dict_to
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import WSGITransport

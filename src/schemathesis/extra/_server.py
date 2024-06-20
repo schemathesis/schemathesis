@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import threading
 from time import sleep
 from typing import Any, Callable

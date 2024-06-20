@@ -1,11 +1,10 @@
-from test.apps.openapi._fastapi import create_app
-from test.apps.openapi._fastapi.app import app
-
 import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.models import Case
+from test.apps.openapi._fastapi import create_app
+from test.apps.openapi._fastapi.app import app
 
 schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 

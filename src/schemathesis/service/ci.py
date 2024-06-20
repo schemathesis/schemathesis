@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import enum
 import os
 from dataclasses import asdict, dataclass

@@ -1,6 +1,7 @@
 # These schemas are copied from https://github.com/OAI/OpenAPI-Specification/tree/master/schemas
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+
+from typing import TYPE_CHECKING, Any
 
 from ..._lazy_import import lazy_import
 

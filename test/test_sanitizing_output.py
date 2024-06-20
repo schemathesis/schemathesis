@@ -4,10 +4,10 @@ import pytest
 import requests
 from requests import Request, Response
 
-from schemathesis.models import CaseSource, Check
+from schemathesis.constants import NOT_SET
+from schemathesis.models import CaseSource, Check, Status
 from schemathesis.models import Request as SerializedRequest
 from schemathesis.models import Response as SerializedResponse
-from schemathesis.models import Status
 from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
 from schemathesis.sanitization import (
     DEFAULT_KEYS_TO_SANITIZE,
@@ -23,7 +23,6 @@ from schemathesis.sanitization import (
     sanitize_serialized_interaction,
     sanitize_url,
 )
-from schemathesis.constants import NOT_SET
 
 
 @pytest.fixture

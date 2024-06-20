@@ -9,10 +9,10 @@ import click
 import pytest
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
 
+from schemathesis.internal.datetime import current_datetime
 from schemathesis.service import FileReportHandler, ServiceReportHandler
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.hosts import HostData
-from schemathesis.internal.datetime import current_datetime
 
 # A token for a testing Schemathesis.io instance
 DEFAULT_SERVICE_TOKEN = "25f8ee2357da497d8d0d07be62df62a1"

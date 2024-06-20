@@ -1,6 +1,7 @@
 """Support for custom API authentication mechanisms."""
 
 from __future__ import annotations
+
 import inspect
 import threading
 import time
@@ -11,10 +12,10 @@ from typing import (
     Any,
     Callable,
     Generic,
+    Protocol,
     TypeVar,
     overload,
     runtime_checkable,
-    Protocol,
 )
 
 from .exceptions import UsageError
@@ -22,8 +23,9 @@ from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 from .types import GenericTest
 
 if TYPE_CHECKING:
-    from .models import APIOperation, Case
     import requests.auth
+
+    from .models import APIOperation, Case
 
 DEFAULT_REFRESH_INTERVAL = 300
 AUTH_STORAGE_ATTRIBUTE_NAME = "_schemathesis_auth"

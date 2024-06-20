@@ -28,10 +28,10 @@ if TYPE_CHECKING:
 
     from ..models import CheckFunction
     from ..schemas import BaseSchema
+    from ..service.client import ServiceClient
     from ..stateful import Stateful
     from . import events
     from .impl import BaseRunner
-    from ..service.client import ServiceClient
 
 
 @deprecated_function(removed_in="4.0", replacement="schemathesis.runner.from_schema")

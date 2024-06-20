@@ -1,9 +1,10 @@
 from __future__ import annotations
-import json
+
 import hashlib
 import http
+import json
 from dataclasses import asdict
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urljoin
 
 import requests
@@ -14,18 +15,17 @@ from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata, collect_dependency_versions
 from .models import (
-    AnalysisSuccess,
     AnalysisError,
     AnalysisResult,
-    ProjectDetails,
+    AnalysisSuccess,
     AuthResponse,
     FailedUploadResponse,
-    UploadResponse,
-    UploadSource,
+    ProjectDetails,
     ProjectEnvironment,
     Specification,
+    UploadResponse,
+    UploadSource,
 )
-
 
 if TYPE_CHECKING:
     from ..runner import probes

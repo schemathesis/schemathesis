@@ -3,7 +3,6 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-
 from ...exceptions import UsageError
 
 if TYPE_CHECKING:
@@ -31,8 +30,9 @@ def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
 @lru_cache
 def get_extra_scalar_strategies() -> dict[str, st.SearchStrategy]:
     """Get all extra GraphQL strategies."""
-    from . import nodes
     from hypothesis import strategies as st
+
+    from . import nodes
 
     dates = st.dates().map(str)
     times = st.times().map("%sZ".__mod__)

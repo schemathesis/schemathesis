@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING
 
 from ..constants import BOM_MARK
-from ..hooks import HookContext
+from ..hooks import HookContext, register, unregister
 from ..hooks import is_installed as global_is_installed
-from ..hooks import register, unregister
 
 if TYPE_CHECKING:
     from ..models import Case

@@ -1,14 +1,16 @@
 from __future__ import annotations
+
 import re
 import sys
 from functools import lru_cache
-from typing import Callable, TypeVar, TYPE_CHECKING, TextIO, Any, BinaryIO
+from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO, TypeVar
 
 from .exceptions import SchemaError, SchemaErrorType, extract_requests_exception_details
 
 if TYPE_CHECKING:
-    from .transports.responses import GenericResponse
     import yaml
+
+    from .transports.responses import GenericResponse
 
 R = TypeVar("R", bound="GenericResponse")
 

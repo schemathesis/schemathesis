@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import Iterable
 
 from . import fast_api, utf8_bom

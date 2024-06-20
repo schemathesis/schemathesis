@@ -1,11 +1,11 @@
 from pathlib import Path
 
-from hypothesis import strategies as st, given
-
+import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 import schemathesis
-import pytest
-from schemathesis.transports import WSGITransport, RequestsTransport
+from schemathesis.transports import RequestsTransport, WSGITransport
 
 HERE = Path(__file__).absolute().parent
 

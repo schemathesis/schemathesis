@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-from flask import Response, Flask
+from flask import Flask, Response
 
 import schemathesis
 from schemathesis.exceptions import SchemaError

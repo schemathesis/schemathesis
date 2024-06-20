@@ -1,14 +1,14 @@
 """GraphQL specific loader behavior."""
 
-from io import StringIO
 import json
+from io import StringIO
 
 import graphql
 import pytest
 from hypothesis import given, settings
 
-from schemathesis.specs.graphql import loaders
 from schemathesis.exceptions import SchemaError
+from schemathesis.specs.graphql import loaders
 
 RAW_SCHEMA = """
 type Book {

@@ -21,8 +21,8 @@ from schemathesis.cli.cassettes import (
     get_prepared_request,
     write_double_quoted,
 )
-from schemathesis.generation import DataGenerationMethod
 from schemathesis.constants import USER_AGENT
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Request
 
 

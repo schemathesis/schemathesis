@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.specs.openapi.checks import _is_prefix_operation, ResourcePath
+from schemathesis.specs.openapi.checks import ResourcePath, _is_prefix_operation
 
 
 @pytest.mark.parametrize(

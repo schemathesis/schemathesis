@@ -5,9 +5,6 @@ import pathlib
 import platform
 import sys
 import time
-from test.apps._graphql._flask import create_app as create_graphql_app
-from test.apps.openapi._flask import create_app as create_openapi_app
-from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
 from unittest.mock import ANY
 from urllib.parse import urljoin
 
@@ -50,6 +47,9 @@ from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
 from schemathesis.transports import WSGITransport
+from test.apps._graphql._flask import create_app as create_graphql_app
+from test.apps.openapi._flask import create_app as create_openapi_app
+from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
 
 PHASES = ", ".join(x.name for x in Phase)
 HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)

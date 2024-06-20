@@ -1,6 +1,7 @@
 """XML serialization."""
 
 from __future__ import annotations
+
 from io import StringIO
 from typing import Any, Dict, List, Union
 from xml.etree import ElementTree

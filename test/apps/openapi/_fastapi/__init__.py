@@ -2,7 +2,7 @@ from typing import Optional
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Query
-from pydantic import ConfigDict, BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..schema import OpenAPIVersion
 

@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import enum
 import json
 import re
@@ -14,10 +15,12 @@ from .failures import FailureContext
 
 if TYPE_CHECKING:
     import hypothesis.errors
-    from jsonschema import RefResolutionError, ValidationError, SchemaError as JsonSchemaError
-    from .transports.responses import GenericResponse
     from graphql.error import GraphQLFormattedError
+    from jsonschema import RefResolutionError, ValidationError
+    from jsonschema import SchemaError as JsonSchemaError
     from requests import RequestException
+
+    from .transports.responses import GenericResponse
 
 
 class CheckFailed(AssertionError):
@@ -166,7 +169,7 @@ def get_grouped_graphql_error(errors: list[GraphQLFormattedError]) -> type[Check
         if "locations" in error:
             message += ";locations:"
             for location in sorted(error["locations"]):
-                message += f"({location['line'],location['column']})"
+                message += f"({location['line'], location['column']})"
         if "path" in error:
             message += ";path:"
             for chunk in error["path"]:
@@ -549,7 +552,7 @@ def remove_ssl_line_number(text: str) -> str:
 
 
 def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
-    from requests.exceptions import SSLError, ConnectionError, ChunkedEncodingError
+    from requests.exceptions import ChunkedEncodingError, ConnectionError, SSLError
     from urllib3.exceptions import MaxRetryError
 
     if isinstance(exc, SSLError):
