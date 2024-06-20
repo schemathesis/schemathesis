@@ -5,12 +5,11 @@ Changelog
 --------------------------------------------
 
 **Added**
-
-- Ability to extract values from headers, path and query parameters using regular expressions in OpenAPI links.
-- The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema. 
-- The ``use_after_free`` check. It ensures that the API returns 404 response after a successful DELETE operation on an object. 
-  At the moment it is only available in state-machine-based stateful testing.
-- Support building dynamic payloads via Open API links. This allows for building objects or arrays where nested items are not hardcoded but dynamically evaluated.
+- Ability to extract values from headers, path, and query parameters using regular expressions in OpenAPI links.
+- The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema.
+- The ``use_after_free`` check. It ensures that the API returns a 404 response after a successful DELETE operation on an object.
+  At the moment, it is only available in state-machine-based stateful testing.
+- Support for building dynamic payloads via OpenAPI links. This allows for building objects or arrays where nested items are not hardcoded but dynamically evaluated.
 - Basic state machine runner that allows for integrating state machines into the CLI later on.
 - ``APIStateMachine.format_rules`` method to format transition rules in a human-readable format.
 
@@ -31,22 +30,22 @@ Changelog
 
 **Changed**
 
-- Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on. 
+- Enforce the ``minLength`` keyword on string path parameters to avoid the rejection of empty values later on.
   This improves the performance of data generation.
 - Rework building state machines for stateful testing to improve performance.
 - Improve error messages on ``MaxRetryError``. :issue:`2234`
-- Migrate to new-style ``pytest`` hooks. :issue:`2181``
+- Migrate to new-style ``pytest`` hooks. :issue:`2181`
 - Filter out Hypothesis' warning about resetting the recursion limit in multi-worker tests.
 - Show sub-schema location in ``response_schema_conformance`` failure messages. :issue:`2270`
 
 **Fixed**
 
-- Internal error during Open API link resolution if the needed parameter is missing in the response.
-- Improper output when a JSON pointer can't be resolved during Open API link resolution.
+- Internal error during OpenAPI link resolution if the needed parameter is missing in the response.
+- Improper output when a JSON pointer can't be resolved during OpenAPI link resolution.
 - Generating invalid examples created by wrapping a named example value into another object. :issue:`2238`
 - Distinguish more failures in stateful testing.
 - Generate different functions for state machine transitions to properly use swarm testing.
-- ``RuntimeError`` caused by a race to initialize Hypothesis' PRNG when multiple workers are used.
+- ``RuntimeError`` caused by a race condition when initializing Hypothesis' PRNG in multiple workers.
 - Missing body in ``Case`` if it is mutated after the ``make_case`` call. :issue:`2208`
 - Internal error when a rate limiter hits its limit. :issue:`2254`
 
