@@ -102,7 +102,7 @@ For example, to override a query parameter and path:
 
 
     @schema.parametrize()
-    @schema.override(path_parameters={"user_id": "42"}, query={"apiKey": "secret"}}
+    @schema.override(path_parameters={"user_id": "42"}, query={"apiKey": "secret"})
     def test_api(case):
 
 This decorator overrides the ``apiKey`` query parameter and ``user_id`` path parameter, using ``secret`` and ``42`` as their respective values in all applicable test cases.
