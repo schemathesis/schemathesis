@@ -245,7 +245,10 @@ class BaseRunner:
         ):
             if isinstance(result, Ok):
                 operation, test = result.ok()
-                feedback = Feedback(self.stateful, operation)
+                if self.stateful is not None:
+                    feedback = Feedback(self.stateful, operation)
+                else:
+                    feedback = None
                 # Track whether `BeforeExecution` was already emitted.
                 # Schema error may happen before / after `BeforeExecution`, but it should be emitted only once
                 # and the `AfterExecution` event should have the same correlation id as previous `BeforeExecution`
@@ -267,17 +270,18 @@ class BaseRunner:
                         if isinstance(event, events.Interrupted):
                             return
                     # Additional tests, generated via the `feedback` instance
-                    yield from self._run_tests(
-                        feedback.get_stateful_tests,
-                        template,
-                        settings=settings,
-                        generation_config=generation_config,
-                        seed=seed,
-                        recursion_level=recursion_level + 1,
-                        results=results,
-                        headers=headers,
-                        **kwargs,
-                    )
+                    if feedback is not None:
+                        yield from self._run_tests(
+                            feedback.get_stateful_tests,
+                            template,
+                            settings=settings,
+                            generation_config=generation_config,
+                            seed=seed,
+                            recursion_level=recursion_level + 1,
+                            results=results,
+                            headers=headers,
+                            **kwargs,
+                        )
                 except OperationSchemaError as exc:
                     yield from handle_schema_error(
                         exc,
@@ -787,7 +791,7 @@ def network_test(
     request_cert: RequestCert | None,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback,
+    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -829,7 +833,7 @@ def _network_test(
     timeout: float | None,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback,
+    feedback: Feedback | None,
     request_tls_verify: bool,
     request_proxy: str | None,
     request_cert: RequestCert | None,
@@ -876,7 +880,8 @@ def _network_test(
         status = Status.failure
         raise
     finally:
-        feedback.add_test_case(case, response)
+        if feedback is not None:
+            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results)
     return response
@@ -899,7 +904,7 @@ def wsgi_test(
     auth_type: str | None,
     headers: dict[str, Any] | None,
     store_interactions: bool,
-    feedback: Feedback,
+    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -930,7 +935,7 @@ def _wsgi_test(
     result: TestResult,
     headers: dict[str, Any],
     store_interactions: bool,
-    feedback: Feedback,
+    feedback: Feedback | None,
     max_response_time: int | None,
 ) -> WSGIResponse:
     from ...transports.responses import WSGIResponse
@@ -959,7 +964,8 @@ def _wsgi_test(
         status = Status.failure
         raise
     finally:
-        feedback.add_test_case(case, response)
+        if feedback is not None:
+            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_wsgi_response(case, response, headers, response.elapsed.total_seconds(), status, check_results)
     return response
@@ -992,7 +998,7 @@ def asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback,
+    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -1025,7 +1031,7 @@ def _asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback,
+    feedback: Feedback | None,
     max_response_time: int | None,
 ) -> requests.Response:
     hook_context = HookContext(operation=case.operation)
@@ -1050,7 +1056,8 @@ def _asgi_test(
         status = Status.failure
         raise
     finally:
-        feedback.add_test_case(case, response)
+        if feedback is not None:
+            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results)
     return response
