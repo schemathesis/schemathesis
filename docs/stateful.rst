@@ -485,10 +485,16 @@ Each additional test will be indented and prefixed with ``->`` in the CLI output
 You can specify recursive links if you want. The default recursion depth limit is **5** and can be changed with the
 ``--stateful-recursion-limit=<N>`` CLI option.
 
-Schemathesis's CLI currently uses the old approach to stateful testing, not based on state machines.
-We plan to use the new approach in CLI in the future. It may include slight changes to the visual
-appearance and the way to configure it. It also means that using stateful testing in CLI is not yet as customizable
-as in the in-code approach.
+Schemathesis's CLI now supports the new approach to stateful testing based on state machines. 
+It is available as an experimental feature and can be enabled using the ``--experimental=stateful-test-runner`` CLI option or by setting the
+``SCHEMATHESIS_EXPERIMENTAL_STATEFUL_TEST_RUNNER=true`` environment variable. For more information, refer to the :ref:`stateful-test-runner` section.
+
+The old approach to stateful testing, not based on state machines, is still the default in the CLI. 
+However, we recommend using the new approach as it offers more effective testing. 
+In the future, the new approach will become the default in the CLI, and the old approach will be removed.
+
+Please note that the visual appearance and configuration options for stateful testing in the CLI may differ slightly from the in-code approach. 
+We are continuously working on improving the CLI experience and aligning it with the in-code approach.
 
 Extracting data from headers and query parameters
 -------------------------------------------------
