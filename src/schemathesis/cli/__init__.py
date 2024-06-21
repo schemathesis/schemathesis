@@ -683,7 +683,13 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     "--experimental",
     "experiments",
     help="Enable experimental support for specific features.",
-    type=click.Choice([experimental.OPEN_API_3_1.name, experimental.SCHEMA_ANALYSIS.name]),
+    type=click.Choice(
+        [
+            experimental.OPEN_API_3_1.name,
+            experimental.SCHEMA_ANALYSIS.name,
+            experimental.STATEFUL_TEST_RUNNER.name,
+        ]
+    ),
     callback=callbacks.convert_experimental,
     multiple=True,
 )

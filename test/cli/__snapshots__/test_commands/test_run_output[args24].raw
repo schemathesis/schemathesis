@@ -184,7 +184,7 @@ Generic:
   --no-color                      Disable ANSI color escape codes.
   --force-color                   Explicitly tells to enable ANSI color escape
                                   codes.
-  --experimental [openapi-3.1|schema-analysis]
+  --experimental [openapi-3.1|schema-analysis|stateful-test-runner]
                                   Enable experimental support for specific
                                   features.
   --generation-allow-x00 TEXT     Determines whether to allow the generation of
