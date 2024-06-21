@@ -7,8 +7,7 @@ Changelog
 **Added**
 - Ability to extract values from headers, path, and query parameters using regular expressions in OpenAPI links.
 - The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema.
-- The ``use_after_free`` check. It ensures that the API returns a 404 response after a successful DELETE operation on an object.
-  At the moment, it is only available in state-machine-based stateful testing.
+- The ``use_after_free`` check. It ensures that the API returns a 404 response after a successful DELETE operation on an object. At the moment, it is only available in state-machine-based stateful testing.
 - Support for building dynamic payloads via OpenAPI links. This allows for building objects or arrays where nested items are not hardcoded but dynamically evaluated.
 - Basic state machine runner that allows for integrating state machines into the CLI later on.
 - ``APIStateMachine.format_rules`` method to format transition rules in a human-readable format.
