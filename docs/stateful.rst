@@ -489,6 +489,20 @@ Schemathesis's CLI now supports the new approach to stateful testing based on st
 It is available as an experimental feature and can be enabled using the ``--experimental=stateful-test-runner`` CLI option or by setting the
 ``SCHEMATHESIS_EXPERIMENTAL_STATEFUL_TEST_RUNNER=true`` environment variable. For more information, refer to the :ref:`stateful-test-runner` section.
 
+.. code-block::
+
+    Links                                                  2xx    4xx    5xx    Total
+
+    POST /api/users/
+    └── 201
+        ├── GET /api/users/{user_id}                       765      0    101      866
+        └── PATCH /api/users/{user_id}                     765      0      0      765
+
+    GET /api/users/{user_id}
+    └── 200
+        └── PATCH /api/users/{user_id}                     513      0      0      513
+
+
 The old approach to stateful testing, not based on state machines, is still the default in the CLI. 
 However, we recommend using the new approach as it offers more effective testing. 
 In the future, the new approach will become the default in the CLI, and the old approach will be removed.
