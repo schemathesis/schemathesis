@@ -232,13 +232,21 @@ class BaseRunner:
             )
             state_machine = self.schema.as_state_machine()
             runner = state_machine.runner(config=config)
+            status = Status.success
             for stateful_event in runner.execute():
                 if isinstance(stateful_event, stateful_events.SuiteFinished):
+                    if stateful_event.failures and status != Status.error:
+                        status = Status.failure
                     for failure in stateful_event.failures:
                         result.checks.append(failure)
+                elif isinstance(stateful_event, stateful_events.Errored):
+                    status = Status.error
                 yield events.StatefulEvent(data=stateful_event)
             results.append(result)
-            yield events.AfterStatefulExecution(result=SerializedTestResult.from_test_result(result))
+            yield events.AfterStatefulExecution(
+                status=status,
+                result=SerializedTestResult.from_test_result(result),
+            )
 
     def _run_tests(
         self,

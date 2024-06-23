@@ -150,22 +150,30 @@ def serialize_finished(event: events.Finished) -> dict[str, Any] | None:
 
 
 def serialize_stateful_event(event: events.StatefulEvent) -> dict[str, Any] | None:
-    if isinstance(event.data, stateful_events.RunStarted):
-        return {
-            "data": {
-                "timestamp": event.data.timestamp,
-                "started_at": event.data.started_at,
-            }
+    return _serialize_stateful_event(event.data)
+
+
+def _serialize_stateful_event(event: stateful_events.StatefulEvent) -> dict[str, Any] | None:
+    data: dict[str, Any]
+    if isinstance(event, stateful_events.RunStarted):
+        data = {
+            "timestamp": event.timestamp,
+            "started_at": event.started_at,
         }
-    elif isinstance(event.data, stateful_events.SuiteFinished):
-        return {
-            "data": {
-                "timestamp": event.data.timestamp,
-                "status": event.data.status,
-                "failures": [_serialize_check(SerializedCheck.from_check(failure)) for failure in event.data.failures],
-            }
+    elif isinstance(event, stateful_events.SuiteFinished):
+        data = {
+            "timestamp": event.timestamp,
+            "status": event.status,
+            "failures": [_serialize_check(SerializedCheck.from_check(failure)) for failure in event.failures],
         }
-    return {"data": asdict(event.data)}
+    elif isinstance(event, stateful_events.Errored):
+        data = {
+            "timestamp": event.timestamp,
+            "exception": format_exception(event.exception, True),
+        }
+    else:
+        data = asdict(event)
+    return {"data": {event.__class__.__name__: data}}
 
 
 def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> dict[str, Any] | None:

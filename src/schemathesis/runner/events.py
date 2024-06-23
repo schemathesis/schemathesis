@@ -301,6 +301,7 @@ class StatefulEvent(ExecutionEvent):
 class AfterStatefulExecution(ExecutionEvent):
     """Happens after the stateful test run."""
 
+    status: Status
     result: SerializedTestResult
 
 
