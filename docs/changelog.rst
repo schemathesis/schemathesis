@@ -48,7 +48,7 @@ Changelog
 - ``RuntimeError`` caused by a race condition when initializing Hypothesis' PRNG in multiple workers.
 - Missing body in ``Case`` if it is mutated after the ``make_case`` call. :issue:`2208`
 - Internal error when a rate limiter hits its limit. :issue:`2254`
-- Internal error during $ref resolve when using relative file paths.
+- Internal error during reference resolving when using relative file paths.
 
 **Performance**
 
