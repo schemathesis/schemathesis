@@ -1,0 +1,35 @@
+preferReturnRep:
+  description: Return the entity in the response.
+  name: Prefer
+  in: header
+  required: true
+  schema:
+    type: string
+    enum: ["return=representation"]
+
+userIdParam:
+  description: >
+    This ID uniquely identifies a user account across devices.
+    It's actually a so-called UUID (universally unique ID).
+  name: user_id
+  in: query
+  schema:
+    description: >
+      This ID uniquely identifies a user account across devices.
+      It's actually a so-called UUID (universally unique ID).
+    type: string
+    format: eq.uuid
+
+userIdParamRequired:  # TODO: "Inherit" from `userIdParam`
+  description: >
+    This ID uniquely identifies a user account across devices.
+    It's actually a so-called UUID (universally unique ID).
+  name: user_id
+  in: query
+  required: true
+  schema:
+    description: >
+      This ID uniquely identifies a user account across devices.
+      It's actually a so-called UUID (universally unique ID).
+    type: string
+    format: eq.uuid

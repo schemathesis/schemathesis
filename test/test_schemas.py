@@ -105,6 +105,13 @@ def test_resolving_multiple_files():
     }
 
 
+def test_resolving_relative_files():
+    schema = schemathesis.from_path("test/data/relative_files/main.yaml")
+    operations = list(schema.get_all_operations())
+    errors = [op.err() for op in operations if isinstance(op, Err)]
+    assert not errors
+
+
 def test_schema_parsing_error(simple_schema):
     # When API operation contains unresolvable reference on its parameter level
     simple_schema["paths"]["/users"]["get"]["parameters"] = [{"$ref": "#/definitions/SimpleIntRef"}]

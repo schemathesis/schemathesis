@@ -285,27 +285,28 @@ class BaseOpenAPISchema(BaseSchema):
                     continue
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
-                shared_parameters = resolve_shared_parameters(path_item)
-                for method, entry in path_item.items():
-                    if method not in HTTP_METHODS:
-                        continue
-                    try:
-                        resolved = resolve_operation(entry)
-                        if should_skip(method, resolved):
+                with in_scope(self.resolver, scope):
+                    shared_parameters = resolve_shared_parameters(path_item)
+                    for method, entry in path_item.items():
+                        if method not in HTTP_METHODS:
                             continue
-                        parameters = resolved.get("parameters", ())
-                        parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                        operation = make_operation(path, method, parameters, entry, resolved, scope)
-                        context = HookContext(operation=operation)
-                        if (
-                            should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
-                            or should_skip_operation(hooks, context)
-                            or (hooks and should_skip_operation(hooks, context))
-                        ):
-                            continue
-                        yield Ok(operation)
-                    except SCHEMA_PARSING_ERRORS as exc:
-                        yield self._into_err(exc, path, method)
+                        try:
+                            resolved = resolve_operation(entry)
+                            if should_skip(method, resolved):
+                                continue
+                            parameters = resolved.get("parameters", ())
+                            parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
+                            operation = make_operation(path, method, parameters, entry, resolved, scope)
+                            context = HookContext(operation=operation)
+                            if (
+                                should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
+                                or should_skip_operation(hooks, context)
+                                or (hooks and should_skip_operation(hooks, context))
+                            ):
+                                continue
+                            yield Ok(operation)
+                        except SCHEMA_PARSING_ERRORS as exc:
+                            yield self._into_err(exc, path, method)
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
 

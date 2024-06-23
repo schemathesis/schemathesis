@@ -1,0 +1,21 @@
+status_code_401:
+  description:
+    Unauthorized.
+    You need to provide an authentication token with this request.
+    Get an authentication token and try again.
+  content:
+    application/json:
+      schema:
+        $ref: "schemas.yaml#/api_message"
+
+status_code_403:
+  description:
+    Forbidden.
+    Usually, this is due to an invalid authentication token.
+    Note that any change to your user account invalidates all
+    existing tokens. Also, tokens expire after a short while.
+    Get a new authentication token and try again.
+  content:
+    application/json:
+      schema:
+        $ref: "schemas.yaml#/api_message"

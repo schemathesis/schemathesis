@@ -1,0 +1,224 @@
+universal_tracking:
+  description:
+    Auto-generated properties used to track an entity (user, plan,
+    measurement, etc.).
+    These tracking properties are universal. Universal, in the sense
+    that we guarantee the integrity of said properties across devices.
+  type: object
+  properties:
+    id:
+      description: >
+        This ID uniquely identifies this entity across devices.
+        It's actually a so-called UUID (universally unique ID).
+      type: string
+      format: uuid
+internal_tracking:
+  description:
+    Auto-generated properties used to track an entity (user, plan,
+    measurement, etc.).
+    These tracking properties are internal. Internal, in the sense
+    that we guarantee the integrity of said properties within the
+    device. E.g., using the device clock and device user accounts.
+  type: object
+  required:
+    - system_begin
+    # At a later point, we can add `last_internal_update_by` to track
+    # the internal user that authored the update.
+  properties:
+    system_begin:
+      description:
+        The point in time of the most recent internal update
+        (including create/insert) of this entity.
+        E.g., when an external service synchronizes its data with
+        this device.
+        Note that we track `system_begin` using the
+        system clock of this device.
+      type: string
+      format: date-time
+
+external_tracking:
+  description:
+    User-provided properties used to track an entity (user, plan,
+    measurement, etc.).
+    These tracking properties are external. External, in the sense
+    that it's up the the user (of this API) to guarantee the
+    integrity of said properties. Think of these properties as
+    a user-provided "cookie" (like in the browser) that we store
+    with each entity. The device simply stores this "cookie" and
+    returns it along with the rest of the data on each request.
+    What you (the user of this API) use this "cookie" for is
+    completely up to you.
+  type: object
+  required:
+    - last_application_update_at
+    # At a later point, we can add `last_user_update_by` to track
+    # the external user that authored the update.
+  properties:
+    last_application_update_at:
+      description:
+        The point in time of the most recent external update
+        (including create/insert) of this entity.
+        E.g., when a user (of this API) changes a record meant for this
+        device. This is the point in time of the change to the record and
+        not the point in time of synchronization with this device
+        (see `system_begin` for the latter).
+        Note that the user (of this API) provides `last_application_update_at`.
+        Therefore, `last_application_update_at` follows the user's clock (e.g.,
+        the clock on the user's laptop).
+      type: string
+      format: date-time
+
+user_role:
+  description:
+    The user role defines the set of privileges that the corresponding
+    user has. E.g., whether the user can create measurements or not.
+  type: string
+  format: text
+  enum:
+    - 'gmdb_end_user__anon'
+    - 'gmdb_end_user__operator'
+    - 'gmdb_end_user__admin'
+
+plaintext_password_or_null:
+  description:
+    The device authenticates users via this password.
+    Internally, the device stores a cryptographically-secure hash
+    (Blowfish-based, variant 2a) of the password.
+  type: string
+  format: text
+  # Password may be unset
+  nullable: true
+  example:
+    P6ftFccr9AWnG2RjNCSteh$ncrXthCp@VN4hwa2!R7a2CBoR9pbQRkN5ysBVMUwU
+plaintext_pin_or_null:
+  description:
+    Personal identification number (PIN).
+    The device authenticates users via this PIN.
+    Internally, the device stores a cryptographically-secure hash
+    (Blowfish-based, variant 2a) of the PIN.
+  type: string
+  format: text
+  # PIN may be unset
+  nullable: true
+  pattern: ^\d{4}$
+hidden_secret_or_null:
+  description:
+    Constant value that shows the existence of a secret but does
+    not reveal its nature.
+  type: string
+  format: text
+  enum: ['*****']
+  nullable: true
+
+user_base:
+  description: Base properties of a user.
+  type: object
+  properties:
+    full_name:
+      description: E.g., first, middle, and last names.
+      type: string
+      format: text
+      example: 利蒼
+user_for_update:
+  description:
+    User of the device with optional properties for the purpose
+    of (partial) update.
+  type: object
+  additionalProperties: false
+  # All properties are optional (no `required` entry). Therefore, use
+  # `minProperties: 1` to avoid an empty object.
+  minProperties: 1  # [2]
+  properties:
+    last_application_update_at:
+      $ref: "#/external_tracking/properties/last_application_update_at"
+    full_name:
+      $ref: "#/user_base/properties/full_name"
+    user_role:
+      $ref: "#/user_role"
+    auth_password:
+      $ref: "#/plaintext_password_or_null"
+    auth_pin:
+      $ref: "#/plaintext_pin_or_null"
+user_for_create:
+  description:
+    User of the device with required properties for the purpose
+    of creation.
+  type: object
+  additionalProperties: false
+  required:
+    # `user_id` is optional
+    # `last_application_update_at` is optional
+    - full_name
+    # `user_role` is optional
+    # `auth_password` is optional
+    # `auth_pin` is optional
+  properties:
+    user_id:
+      $ref: "#/universal_tracking/properties/id"
+    last_application_update_at:
+      $ref: "#/external_tracking/properties/last_application_update_at"
+    full_name:
+      $ref: "#/user_base/properties/full_name"
+    user_role:
+      $ref: "#/user_role"
+    auth_password:
+      $ref: "#/plaintext_password_or_null"
+    auth_pin:
+      $ref: "#/plaintext_pin_or_null"
+user:
+  description: User of the device.
+  additionalProperties: false
+  required:
+    - user_id
+    - system_begin
+    - last_application_update_at
+    - full_name
+    - user_role
+    - auth_password
+    - auth_pin
+  properties:
+    user_id:
+      $ref: "#/universal_tracking/properties/id"
+    system_begin:
+      $ref: "#/internal_tracking/properties/system_begin"
+    last_application_update_at:
+      $ref: "#/external_tracking/properties/last_application_update_at"
+    full_name:
+      $ref: "#/user_base/properties/full_name"
+    user_role:
+      $ref: "#/user_role"
+    auth_password:
+      $ref: "#/hidden_secret_or_null"
+    auth_pin:
+      $ref: "#/hidden_secret_or_null"
+
+api_message:
+  description: Message returned from the API itself.
+  type: object
+  additionalProperties: false
+  required:
+    # `hint` is optional
+    # `details` is optional
+    # `code` is optional
+    - message
+  properties:
+    hint:
+      type: string
+      format: text
+      nullable: true
+    details:
+      type: string
+      format: text
+      nullable: true
+    code:
+      type: string
+      format: text
+      nullable: true
+    message:
+      type: string
+      format: text
+  example:
+    hint: null
+    details: "\u0000 cannot be converted to text."
+    code: 22P05
+    message: unsupported Unicode escape sequence
