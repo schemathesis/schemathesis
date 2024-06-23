@@ -973,3 +973,89 @@ def test_no_wrapped_examples():
             "value": {"email": "john.doe@email.com", "password": "password1", "username": "username1"},
         },
     ]
+
+
+def test_openapi_2_example():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"version": "0.1.0", "title": "Item List API", "license": {"name": "Test"}},
+        "schemes": ["http"],
+        "host": "localhost:8083",
+        "securityDefinitions": {"ApiKeyAuth": {"in": "header", "name": "Authorization", "type": "apiKey"}},
+        "paths": {
+            "/items": {
+                "post": {
+                    "summary": "Add a new item to the list",
+                    "operationId": "addItem",
+                    "tags": ["items"],
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "Item",
+                            "required": True,
+                            "description": "item object for POST body",
+                            "schema": {"$ref": "#/definitions/Item"},
+                        }
+                    ],
+                    "responses": {
+                        "201": {"description": "Item added successfully", "schema": {"$ref": "#/definitions/Item"}},
+                        "400": {"description": "Bad Request", "schema": {"$ref": "#/definitions/Error"}},
+                        "500": {"description": "Internal server error", "schema": {"$ref": "#/definitions/Error"}},
+                        "401": {"description": "Access token is missing or invalid"},
+                    },
+                    "consumes": ["application/json"],
+                    "produces": ["application/json"],
+                    "security": [{"ApiKeyAuth": []}],
+                }
+            }
+        },
+        "definitions": {
+            "Items": {"items": {"$ref": "#/definitions/Item"}, "type": "array"},
+            "Error": {
+                "type": "object",
+                "required": ["message"],
+                "properties": {"message": {"type": "string"}, "data": {"type": "object"}},
+            },
+            "Item": {
+                "type": "object",
+                "required": ["title", "description"],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "ID of the list item.",
+                        "format": "uuid",
+                        "example": "415feabd-9114-44af-bc78-479299dadc1e",
+                    },
+                    "title": {"type": "string", "description": "Title of the item.", "example": "Learn Music"},
+                    "description": {
+                        "type": "string",
+                        "description": "More detailed description of the item.",
+                        "example": "learn to play drums",
+                    },
+                    "year": {"type": "string", "description": "Target year", "pattern": "^\\d{4}", "example": "1987"},
+                },
+                "example": {"title": "Reading", "description": "Read a comic"},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema["/items"]["POST"]
+    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    assert extracted == [
+        {
+            "value": {
+                "id": "415feabd-9114-44af-bc78-479299dadc1e",
+                "title": "Learn Music",
+                "description": "learn to play drums",
+                "year": "1987",
+            },
+            "media_type": "application/json",
+        }
+    ]
+    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    assert extracted == [
+        {
+            "value": {"title": "Reading", "description": "Read a comic"},
+            "media_type": "application/json",
+        }
+    ]

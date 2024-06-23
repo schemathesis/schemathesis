@@ -42,9 +42,7 @@ class BodyExample:
 Example = Union[ParameterExample, BodyExample]
 
 
-def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter, Case], examples_field: str = "examples"
-) -> list[SearchStrategy[Case]]:
+def get_strategies_from_examples(operation: APIOperation[OpenAPIParameter, Case]) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
     for location, container in LOCATION_TO_CONTAINER.items():
@@ -213,8 +211,9 @@ def extract_from_schemas(operation: APIOperation[OpenAPIParameter, Case]) -> Gen
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
         schema = alternative.as_json_schema(operation)
-        for value in extract_from_schema(operation, schema, alternative.example_field, alternative.examples_field):
-            yield BodyExample(value=value, media_type=alternative.media_type)
+        for example_field, examples_field in (("example", "examples"), ("x-example", "x-examples")):
+            for value in extract_from_schema(operation, schema, example_field, examples_field):
+                yield BodyExample(value=value, media_type=alternative.media_type)
 
 
 def extract_from_schema(
