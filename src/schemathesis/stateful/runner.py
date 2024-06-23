@@ -4,7 +4,7 @@ import queue
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
+from typing import TYPE_CHECKING, Any, Generator, Iterator, Type, cast
 
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
@@ -134,14 +134,17 @@ def _execute_state_machine_loop(
             if stop_event.is_set():
                 raise KeyboardInterrupt
             event_queue.put(events.StepStarted())
-            ctx.reset_step()
             try:
                 result = super().step(case, previous)
+                ctx.step_succeeded()
             except CheckFailed:
                 ctx.step_failed()
                 raise
             except Exception:
                 ctx.step_errored()
+                raise
+            except KeyboardInterrupt:
+                ctx.step_interrupted()
                 raise
             finally:
                 transition_id: events.TransitionId | None
@@ -162,9 +165,10 @@ def _execute_state_machine_loop(
                     )
                 else:
                     response = None
+                status = cast(events.StepStatus, ctx.current_step_status)
                 event_queue.put(
                     events.StepFinished(
-                        status=ctx.current_step_status,
+                        status=status,
                         transition_id=transition_id,
                         target=case.operation.verbose_name,
                         response=response,
@@ -186,6 +190,7 @@ def _execute_state_machine_loop(
                     is_final=build_ctx.is_final,
                 )
             )
+            ctx.reset_step()
             super().teardown()
 
     while True:

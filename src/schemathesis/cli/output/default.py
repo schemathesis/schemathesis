@@ -878,7 +878,11 @@ def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent
         if not experimental.STATEFUL_ONLY.is_enabled:
             click.echo()
         click.secho("Stateful tests\n", bold=True)
-    elif isinstance(event.data, stateful_events.ScenarioFinished) and not event.data.is_final:
+    elif (
+        isinstance(event.data, stateful_events.ScenarioFinished)
+        and not event.data.is_final
+        and event.data.status != stateful_events.ScenarioStatus.REJECTED
+    ):
         display_execution_result(context, event.data.status.value)
     elif isinstance(event.data, stateful_events.RunFinished):
         click.echo()
