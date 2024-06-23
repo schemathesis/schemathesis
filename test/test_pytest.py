@@ -2,7 +2,6 @@ import platform
 
 import pytest
 
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_54
 from schemathesis.constants import DEFAULT_DEADLINE, RECURSIVE_REFERENCE_ERROR_MESSAGE
 
 
@@ -126,11 +125,7 @@ def test_b(case, a):
 """,
     )
     # When a test is run with treating warnings as errors
-    if IS_PYTEST_ABOVE_54:
-        args = ("-Werror", "--asyncio-mode=strict")
-    else:
-        args = ("-Werror",)
-    result = testdir.runpytest(*args)
+    result = testdir.runpytest("-Werror", "--asyncio-mode=strict")
     # There should be no errors. There are no warnings from Schemathesis pytest plugin.
     result.assert_outcomes(passed=3)
 
@@ -898,9 +893,5 @@ def test(case):
 """
     )
     result = testdir.runpytest()
-    if IS_PYTEST_ABOVE_54:
-        key = "errors"
-    else:
-        key = "error"
-    result.assert_outcomes(**{key: 1})
+    result.assert_outcomes(errors=1)
     assert "`test` has already been decorated with `override`" in result.stdout.str()

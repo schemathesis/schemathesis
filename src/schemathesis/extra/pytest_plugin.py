@@ -3,19 +3,18 @@ from __future__ import annotations
 import unittest
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Generator, Type, TypeVar, cast
+from typing import Any, Callable, Generator, Type, cast
 
 import pytest
 from _pytest import fixtures, nodes
 from _pytest.config import hookimpl
 from _pytest.fixtures import FuncFixtureInfo
-from _pytest.nodes import Node
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
-from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_8, IS_PYTEST_ABOVE_54
+from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_8
 from .._override import get_override_from_mark
 from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
@@ -42,14 +41,6 @@ from ..utils import (
     merge_given_args,
     validate_given_args,
 )
-
-T = TypeVar("T", bound=Node)
-
-
-def create(cls: type[T], *args: Any, **kwargs: Any) -> T:
-    if IS_PYTEST_ABOVE_54:
-        return cls.from_parent(*args, **kwargs)  # type: ignore
-    return cls(*args, **kwargs)
 
 
 class SchemathesisFunction(Function):
@@ -155,7 +146,9 @@ class SchemathesisCase(PyCollector):
                 name += f"[{error.full_path}]"
 
         cls = self._get_class_parent()
-        definition: FunctionDefinition = create(FunctionDefinition, name=self.name, parent=self.parent, callobj=funcobj)
+        definition: FunctionDefinition = FunctionDefinition.from_parent(
+            name=self.name, parent=self.parent, callobj=funcobj
+        )
         fixturemanager = self.session._fixturemanager
         fixtureinfo = fixturemanager.getfixtureinfo(definition, funcobj, cls)
 
@@ -166,8 +159,7 @@ class SchemathesisCase(PyCollector):
             funcobj = partial(funcobj, self.parent.obj)
 
         if not metafunc._calls:
-            yield create(
-                SchemathesisFunction,
+            yield SchemathesisFunction.from_parent(
                 name=name,
                 parent=self.parent,
                 callobj=funcobj,
@@ -181,10 +173,9 @@ class SchemathesisCase(PyCollector):
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
                 subname = f"{name}[{callspec.id}]"
-                yield create(
-                    SchemathesisFunction,
+                yield SchemathesisFunction.from_parent(
+                    self.parent,
                     name=subname,
-                    parent=self.parent,
                     callspec=callspec,
                     callobj=funcobj,
                     fixtureinfo=fixtureinfo,
@@ -236,7 +227,7 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
     if is_schemathesis_test(obj):
-        outcome.force_result(create(SchemathesisCase, parent=collector, test_function=obj, name=name))
+        outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name))
     else:
         outcome.get_result()
 
@@ -261,13 +252,7 @@ def skip_unnecessary_hypothesis_output() -> Generator:
         yield
 
 
-if IS_PYTEST_ABOVE_54:
-    kwargs = {"wrapper": True}
-else:
-    kwargs = {"hookwrapper": True}
-
-
-@hookimpl(**kwargs)
+@hookimpl(wrapper=True)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
 
@@ -286,11 +271,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     if isinstance(pyfuncitem, SchemathesisFunction):
         try:
             with skip_unnecessary_hypothesis_output():
-                if IS_PYTEST_ABOVE_54:
-                    yield
-                else:
-                    outcome = yield
-                    outcome.get_result()
+                yield
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
                 raise UsageError(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
@@ -325,8 +306,4 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         if invalid_headers is not None:
             raise InvalidHeadersExample.from_headers(invalid_headers) from None
     else:
-        if IS_PYTEST_ABOVE_54:
-            yield
-        else:
-            outcome = yield
-            outcome.get_result()
+        yield

@@ -18,7 +18,7 @@ from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_54
+from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import (
     DEPRECATED_PRE_RUN_OPTION_WARNING,
@@ -1022,9 +1022,8 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # way around
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
-    if IS_PYTEST_ABOVE_54:
-        ignored_exception = "Exception ignored in: " in lines[8]
-        assert lines[10] in expected or ignored_exception, lines
+    ignored_exception = "Exception ignored in: " in lines[8]
+    assert lines[10] in expected or ignored_exception, lines
     if not optional_interrupt:
         assert any("!! KeyboardInterrupt !!" in line for line in lines[10:]), lines
     assert any("=== SUMMARY ===" in line for line in lines[9:])
