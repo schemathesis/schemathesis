@@ -53,6 +53,10 @@ Changelog
 - Internal error during reference resolving when using relative file paths.
 - Ignoring property examples defined under the ``example`` key in Open API 2.0 schemas. :issue:`2277`
 
+**Removed**
+
+- Support for ``pytest<6.0``.
+
 **Performance**
 
 - Improve performance of copying schemas.
