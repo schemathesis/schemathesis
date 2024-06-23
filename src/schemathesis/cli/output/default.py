@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
-from ... import service
+from ... import experimental, service
 from ...constants import (
     DISCORD_LINK,
     FALSE_VALUES,
@@ -875,7 +875,9 @@ def handle_internal_error(context: ExecutionContext, event: events.InternalError
 def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent) -> None:
     if isinstance(event.data, stateful_events.RunStarted):
         context.state_machine_sink = event.data.state_machine.sink()
-        click.secho("\nStateful tests\n", bold=True)
+        if not experimental.STATEFUL_ONLY.is_enabled:
+            click.echo()
+        click.secho("Stateful tests\n", bold=True)
     elif isinstance(event.data, stateful_events.ScenarioFinished) and not event.data.is_final:
         display_execution_result(context, event.data.status.value)
     elif isinstance(event.data, stateful_events.RunFinished):

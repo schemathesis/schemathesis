@@ -192,7 +192,8 @@ class BaseRunner:
                 return
 
         try:
-            yield from self._execute(results, stop_event)
+            if not experimental.STATEFUL_ONLY.is_enabled:
+                yield from self._execute(results, stop_event)
             yield from self._run_stateful_tests(results)
         except KeyboardInterrupt:
             yield events.Interrupted()
