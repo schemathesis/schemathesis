@@ -926,7 +926,7 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, self.examples_field)
+        return get_strategies_from_examples(operation)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
         scopes, definition = self.resolver.resolve_in_scope(definition, scope)
@@ -1090,7 +1090,7 @@ class OpenApi30(SwaggerV20):
 
     def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, self.examples_field)
+        return get_strategies_from_examples(operation)
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         definitions = self._get_response_definitions(operation, response)
