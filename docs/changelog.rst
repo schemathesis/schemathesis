@@ -51,6 +51,7 @@ Changelog
 - Missing body in ``Case`` if it is mutated after the ``make_case`` call. :issue:`2208`
 - Internal error when a rate limiter hits its limit. :issue:`2254`
 - Internal error during reference resolving when using relative file paths.
+- Ignoring property examples defined under the ``example`` key in Open API 2.0 schemas. :issue:`2277`
 
 **Performance**
 
