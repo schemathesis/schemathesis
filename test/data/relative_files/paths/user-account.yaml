@@ -1,0 +1,208 @@
+get:
+  summary: List all user accounts
+  description: E.g., operators, administrators, service technicians, etc.
+  tags:
+    - User accounts
+  operationId: getUserAccounts
+  parameters:
+    - $ref: "../components/parameters.yaml#/userIdParam"
+  responses:
+    "200":
+      description:
+        OK.
+        Note that there is no 404 message. If you provide a query parameter, e.g.,
+        `user_id=eq.ba2cc4b9-0cd1-46e1-bb6a-b9b8cffd574f` and there is
+        no user for `ba2cc4b9-0cd1-46e1-bb6a-b9b8cffd574f`, then you still
+        get status code 200 and an empty array in the response body.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: "../components/schemas.yaml#/user"
+      links:
+        changeUserById:
+          operationId: changeUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+        deleteUserById:
+          operationId: deleteUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+    "400":
+      description:
+        Bad request.
+        Usually, this is due to a malformed query parameter. E.g.,
+        `user_id=eq.HelloThere` or `user_id=ba2cc4b9-0cd1-46e1-bb6a-b9b8cffd574f`
+        (note the missing `eq.` in the last example).
+        Fix the query parameter and retry the request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas.yaml#/api_message"
+    "401":
+      $ref: "../components/responses.yaml#/status_code_401"
+    "403":
+      $ref: "../components/responses.yaml#/status_code_403"
+
+
+post:
+  summary: Create new user accounts
+  tags:
+    - User accounts
+  operationId: createUserAccounts
+  parameters:
+    - $ref: "../components/parameters.yaml#/preferReturnRep"
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: array
+          # [1] For now, this single-object requirement directs schemathesis
+          # toward useful test cases. This is because schemathesis (rightfully)
+          # generates heterogeneous arrays (some objects in the array have
+          # different keys). Postgrest does not currently support this and
+          # fails with "All object keys must match".
+          #
+          # Later, we can lift this requirement.
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: "../components/schemas.yaml#/user_for_create"
+  responses:
+    "201":
+      description:
+        Created.
+        We return the user in the response body. Note that the response body
+        includes auto-generated fields such as `system_begin` and
+        `user_id` (we auto-generate `user_id` if you don't specify it in the
+        request body).
+      content:
+        application/json:
+          schema:
+            type: array
+            # See the comment at [1]
+            minItems: 1
+            maxItems: 1
+            items:
+              $ref: "../components/schemas.yaml#/user"
+      links:
+        getUserById:
+          operationId: getUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+        changeUserById:
+          operationId: changeUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+        deleteUserById:
+          operationId: deleteUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+    "400":
+      description:
+        Bad request.
+        Usually, this is due to a malformed request body. E.g., an
+        invalid UUID string for `user_id` or an invalid date for
+        `last_application_update_at`.
+        Fix the request body and retry the request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas.yaml#/api_message"
+    "401":
+      $ref: "../components/responses.yaml#/status_code_401"
+    "403":
+      $ref: "../components/responses.yaml#/status_code_403"
+
+delete:
+  summary: Delete existing user accounts
+  tags:
+    - User accounts
+  operationId: deleteUserAccounts
+  parameters:
+    # For now, we require this parameter to avoid accidental bulk
+    # deletes. Later, we can loosen this requirement.
+    - $ref: "../components/parameters.yaml#/userIdParamRequired"
+  responses:
+    "204":
+      description: No Content.
+    "400":
+      description:
+        Bad request.
+        Usually, this is due to a malformed query parameter. E.g.,
+        `user_id=eq.HelloThere` or `user_id=ba2cc4b9-0cd1-46e1-bb6a-b9b8cffd574f`
+        (note the missing `eq.` in the last example).
+        Fix the query parameter and retry the request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas.yaml#/api_message"
+    "401":
+      $ref: "../components/responses.yaml#/status_code_401"
+    "403":
+      $ref: "../components/responses.yaml#/status_code_403"
+
+patch:
+  summary: Change existing user accounts
+  tags:
+    - User accounts
+  operationId: changeUserAccounts
+  parameters:
+    - $ref: "../components/parameters.yaml#/preferReturnRep"
+    # For now, we require this parameter to avoid accidental bulk
+    # updates. Later, we can loosen this requirement.
+    - $ref: "../components/parameters.yaml#/userIdParamRequired"
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: array
+          # See the comment at [1]
+          minItems: 1
+          maxItems: 1
+          items:
+            $ref: "../components/schemas.yaml#/user_for_update"
+  responses:
+    "200":
+      description:
+        OK.
+        Note that if the request body is the empty object (signalling no changes),
+        you get status code 200 back even if the query parameters filter
+        out all user accounts.
+        This is why we require `minProperties=1` at [2].
+      content:
+        application/json:
+          schema:
+            type: array
+            # See the comment at [1]
+            minItems: 0
+            maxItems: 1
+            items:
+              $ref: "../components/schemas.yaml#/user"
+      links:
+        getUserById:
+          operationId: getUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+        deleteUserById:
+          operationId: deleteUserAccounts
+          parameters:
+            user_id: 'eq.{$response.body#/0/user_id}'
+    "400":
+      description:
+        Bad request.
+        Usually, this is due to a malformed request body. E.g., an
+        invalid UUID string for `user_id` or an invalid date for
+        `last_application_update_at`.
+        Fix the request body and retry the request.
+      content:
+        application/json:
+          schema:
+            $ref: "../components/schemas.yaml#/api_message"
+    "401":
+      $ref: "../components/responses.yaml#/status_code_401"
+    "403":
+      $ref: "../components/responses.yaml#/status_code_403"
