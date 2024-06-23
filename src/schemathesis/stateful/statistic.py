@@ -15,3 +15,6 @@ class TransitionStats:
     def copy(self) -> TransitionStats:
         """Create a copy of the statistic."""
         raise NotImplementedError
+
+    def to_formatted_table(self, width: int) -> str:
+        raise NotImplementedError

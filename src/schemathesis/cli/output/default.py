@@ -435,6 +435,9 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     display_section_name("SUMMARY")
     click.echo()
     total = event.total
+    if context.state_machine_sink is not None:
+        click.echo(context.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
+        click.echo()
     if event.is_empty or not total:
         click.secho("No checks were performed.", bold=True)
 

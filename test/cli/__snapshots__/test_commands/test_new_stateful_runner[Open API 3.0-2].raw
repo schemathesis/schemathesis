@@ -37,6 +37,17 @@ Reproduce with:
 
 =================================== SUMMARY ====================================
 
+Links                                                 2xx    4xx    5xx    Total
+
+POST /api/users/
+└── 201
+    ├── GET /api/users/{user_id}
+    └── PATCH /api/users/{user_id}
+
+GET /api/users/{user_id}
+└── 200
+    └── PATCH /api/users/{user_id}
+
 Performed checks:
     not_a_server_error                    120 / 121 passed          FAILED 
 
