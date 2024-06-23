@@ -285,6 +285,7 @@ def keep_cwd():
 FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
 PACKAGE_ROOT = Path(schemathesis.__file__).parent
 SITE_PACKAGES = requests.__file__.split("requests")[0]
+TRANSITIONS_PATTERN = re.compile(r"(\d+)(?:\s+(\d+)\s+(\d+)\s+(\d+))$")
 
 
 @dataclass()
@@ -431,6 +432,14 @@ class CliSnapshotConfig:
                 elif line:
                     replace_next_non_empty = False
             data = "\n".join(lines) + "\n"
+        lines = data.splitlines()
+        output = []
+        if any(line.startswith("Links ") for line in lines):
+            for line in lines:
+                if TRANSITIONS_PATTERN.search(line):
+                    line = TRANSITIONS_PATTERN.sub("", line).rstrip()
+                output.append(line)
+            data = "\n".join(output) + "\n"
         return data
 
 
