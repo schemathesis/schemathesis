@@ -1537,6 +1537,22 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
     )
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "--experimental=stateful-test-runner",
+            "--experimental=stateful-only",
+            "--hypothesis-max-examples=20",
+            "--exitfirst",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_statistic=True)
 def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapshot_cli):

@@ -86,3 +86,10 @@ STATEFUL_TEST_RUNNER = GLOBAL_EXPERIMENTS.create_experiment(
     description="State machine-based runner for stateful tests in CLI",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
 )
+STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
+    name="stateful-only",
+    verbose_name="Stateful Only",
+    env_var="STATEFUL_ONLY",
+    description="Run only stateful tests",
+    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
+)

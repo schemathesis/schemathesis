@@ -688,6 +688,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
             experimental.OPEN_API_3_1.name,
             experimental.SCHEMA_ANALYSIS.name,
             experimental.STATEFUL_TEST_RUNNER.name,
+            experimental.STATEFUL_ONLY.name,
         ]
     ),
     callback=callbacks.convert_experimental,

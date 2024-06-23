@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - **EXPERIMENTAL**: New stateful test runner in CLI. :issue:`864`
+- The ``--experimental=stateful-only`` CLI flag to run only stateful tests if the new test runner is enabled. Note that this feature is experimental and may change in future releases without notice.
 - Ability to extract values from headers, path, and query parameters using regular expressions in OpenAPI links.
 - The ``negative_data_rejection`` check. It ensures that the API rejects negative data as specified in the schema.
 - The ``use_after_free`` check. It ensures that the API returns a 404 response after a successful DELETE operation on an object. At the moment, it is only available in state-machine-based stateful testing.
