@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.0...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- More fine-grained events for stateful testing.
+
 .. _v3.30.0:
 
 :version:`3.30.0 <v3.29.2...v3.30.0>` - 2024-06-23

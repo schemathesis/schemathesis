@@ -23,6 +23,8 @@ class RunStatus(str, Enum):
 class StatefulEvent:
     """Basic stateful test event."""
 
+    timestamp: float
+
     __slots__ = ("timestamp",)
 
 
@@ -30,6 +32,7 @@ class StatefulEvent:
 class RunStarted(StatefulEvent):
     """Before executing all scenarios."""
 
+    started_at: float
     state_machine: Type[APIStateMachine]
 
     __slots__ = ("state_machine", "timestamp", "started_at")
@@ -92,8 +95,10 @@ class ScenarioStatus(str, Enum):
 
     SUCCESS = "success"
     FAILURE = "failure"
-    # TODO: Count for Hypothesis' rejected?
     ERROR = "error"
+    # Rejected by Hypothesis
+    REJECTED = "rejected"
+    INTERRUPTED = "interrupted"
 
 
 @dataclass
@@ -132,6 +137,7 @@ class StepStatus(str, Enum):
     SUCCESS = "success"
     FAILURE = "failure"
     ERROR = "error"
+    INTERRUPTED = "interrupted"
 
 
 @dataclass

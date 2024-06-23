@@ -1,3 +1,4 @@
+import json
 from dataclasses import dataclass
 from typing import List
 
@@ -6,6 +7,7 @@ import hypothesis.errors
 import pytest
 
 from schemathesis.checks import not_a_server_error
+from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
 from schemathesis.stateful.runner import events
 from schemathesis.stateful.sink import StateMachineSink
@@ -29,6 +31,11 @@ class RunnerResult:
     @property
     def errors(self):
         return [event for event in self.events if isinstance(event, events.Errored)]
+
+
+def serialize_all_events(events):
+    for event in events:
+        json.dumps(_serialize_stateful_event(event))
 
 
 def collect_result(runner) -> RunnerResult:
@@ -80,6 +87,7 @@ def test_find_independent_5xx(runner_factory, kwargs):
         # Else, all of them should be found
         assert len(result.failures) == 2
         assert {check.example.operation.verbose_name for check in result.failures} == all_affected_operations
+    serialize_all_events(result.events)
 
 
 def keyboard_interrupt(r):
@@ -102,6 +110,7 @@ def test_stop_in_check(runner_factory, func):
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
     assert result.events[-1].status == events.RunStatus.INTERRUPTED
+    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize("event_cls", (events.ScenarioStarted, events.ScenarioFinished))
@@ -129,13 +138,14 @@ def test_stop_outside_of_state_machine_execution(runner_factory, mocker):
     result = collect_result(runner)
     assert result.events[-2].status == events.SuiteStatus.INTERRUPTED
     assert result.events[-1].status == events.RunStatus.INTERRUPTED
+    serialize_all_events(result.events)
 
 
 def test_keyboard_interrupt(runner_factory, mocker):
     runner = runner_factory()
     mocker.patch.object(runner.event_queue, "get", side_effect=KeyboardInterrupt)
     result = collect_result(runner)
-    assert events.Interrupted() in result.events
+    assert "Interrupted" in result.event_names
 
 
 def test_internal_error_in_check(runner_factory):
@@ -146,6 +156,7 @@ def test_internal_error_in_check(runner_factory):
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, ZeroDivisionError)
+    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize("exception_args", ((), ("Oops!",)))
@@ -166,6 +177,7 @@ def test_custom_assertion_in_check(runner_factory, exception_args):
         assert failure.message == "Custom check failed: `custom_check`"
     else:
         assert failure.message == "Oops!"
+    serialize_all_events(result.events)
 
 
 def test_distinct_assertions(runner_factory):
@@ -314,6 +326,7 @@ def test_failed_health_check(runner_factory):
     assert result.errors
     assert isinstance(result.errors[0].exception, hypothesis.errors.FailedHealthCheck)
     assert result.events[-1].status == events.RunStatus.ERROR
+    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize(

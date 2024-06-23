@@ -40,7 +40,7 @@ class RunnerContext:
     # Unique failures collected in the current suite
     failures_for_suite: list[Check] = field(default_factory=list)
     # Status of the current step
-    current_step_status: events.StepStatus = events.StepStatus.SUCCESS
+    current_step_status: events.StepStatus | None = None
     current_response: GenericResponse | None = None
 
     @property
@@ -49,17 +49,27 @@ class RunnerContext:
             return events.ScenarioStatus.SUCCESS
         elif self.current_step_status == events.StepStatus.FAILURE:
             return events.ScenarioStatus.FAILURE
-        return events.ScenarioStatus.ERROR
+        elif self.current_step_status == events.StepStatus.ERROR:
+            return events.ScenarioStatus.ERROR
+        elif self.current_step_status == events.StepStatus.INTERRUPTED:
+            return events.ScenarioStatus.INTERRUPTED
+        return events.ScenarioStatus.REJECTED
 
     def reset_step(self) -> None:
-        self.current_step_status = events.StepStatus.SUCCESS
+        self.current_step_status = None
         self.current_response = None
+
+    def step_succeeded(self) -> None:
+        self.current_step_status = events.StepStatus.SUCCESS
 
     def step_failed(self) -> None:
         self.current_step_status = events.StepStatus.FAILURE
 
     def step_errored(self) -> None:
         self.current_step_status = events.StepStatus.ERROR
+
+    def step_interrupted(self) -> None:
+        self.current_step_status = events.StepStatus.INTERRUPTED
 
     def mark_as_seen_in_run(self, exc: CheckFailed) -> None:
         key = _failure_cache_key(exc)
