@@ -235,17 +235,25 @@ Note that it is not guaranteed to improve performance because it depends on your
 Code samples style
 ------------------
 
-To reproduce test failures Schemathesis generates code samples:
+To reproduce test failures Schemathesis generates cURL commands:
 
 .. code:: python
 
-    requests.get("http://127.0.0.1:8081/api/failure")
+    curl -X GET http://127.0.0.1:8081/api/failure
 
-You can control these samples via the ``--code-sample-style`` CLI option. For example, passing ``curl`` will generate a cURL command like this:
+You can control these samples via the ``--code-sample-style`` CLI option. For example, passing ``python`` will generate a Python snippet like this:
 
 .. code:: bash
 
-    curl -X GET http://127.0.0.1:8081/api/failure
+    requests.get("http://127.0.0.1:8081/api/failure")
+
+Output verbosity
+----------------
+
+Sometimes the output contains parts of your API schema or responses in order to provide more context.
+By default, Schemathesis truncates these parts to make the output more readable. However, you can control this behavior with:
+
+- ``--output-truncate=false``. Disables schema and response truncation in error messages.
 
 ASGI / WSGI support
 -------------------

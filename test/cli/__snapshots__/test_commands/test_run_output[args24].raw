@@ -187,6 +187,8 @@ Generic:
   --experimental [openapi-3.1|schema-analysis|stateful-test-runner|stateful-only]
                                   Enable experimental support for specific
                                   features.
+  --output-truncate TEXT          Specifies whether to truncate schemas and
+                                  responses in error messages.  [default: true]
   --generation-allow-x00 TEXT     Determines whether to allow the generation of
                                   ` ` bytes within strings.  [default: true]
   --generation-codec TEXT         Specifies the codec used for generating

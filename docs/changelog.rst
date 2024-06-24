@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- ``--output-truncate=false`` CLI option to disable schema and response payload truncation in error messages.
+
 **Changed**
 
 - More fine-grained events for stateful testing.

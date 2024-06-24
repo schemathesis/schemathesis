@@ -38,6 +38,7 @@ from schemathesis.constants import (
 from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.internal.datetime import current_datetime
+from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import CaseOverride, from_schema
 from schemathesis.runner.impl import threadpool
@@ -357,6 +358,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "tag": None,
                 "operation_id": None,
                 "validate_schema": False,
+                "output_config": OutputConfig(),
                 "skip_deprecated_operations": False,
                 "force_schema_version": None,
                 "request_tls_verify": True,
@@ -1984,6 +1986,7 @@ def assert_exit_code(event_stream, code):
             report=None,
             telemetry=False,
             sanitize_output=False,
+            output_config=None,
         )
     assert exc.value.code == code
 

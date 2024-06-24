@@ -46,12 +46,12 @@ from .exceptions import (
     deduplicate_failed_checks,
     get_grouped_exception,
     maybe_set_assertion_message,
-    prepare_response_payload,
 )
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.copy import fast_deepcopy
 from .internal.deprecation import deprecated_function, deprecated_property
+from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
 from .serializers import Serializer
@@ -420,7 +420,7 @@ class Case:
             if not payload:
                 formatted += "\n\n    <EMPTY>"
             else:
-                payload = prepare_response_payload(payload)
+                payload = prepare_response_payload(payload, config=self.operation.schema.output_config)
                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
                 formatted += f"\n{payload}"
             code_sample_style = (

@@ -21,6 +21,7 @@ from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .generation import DataGenerationMethodInput, GenerationConfig
 from .hooks import HookDispatcher, HookScope
+from .internal.output import OutputConfig
 from .internal.result import Ok
 from .models import APIOperation
 from .schemas import BaseSchema
@@ -52,6 +53,7 @@ class LazySchema:
     skip_deprecated_operations: bool = False
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET
     generation_config: GenerationConfig | NotSet = NOT_SET
+    output_config: OutputConfig | NotSet = NOT_SET
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
@@ -69,6 +71,7 @@ class LazySchema:
         skip_deprecated_operations: bool | NotSet = NOT_SET,
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
+        output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         if method is NOT_SET:
@@ -83,6 +86,8 @@ class LazySchema:
             data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
             generation_config = self.generation_config
+        if output_config is NOT_SET:
+            output_config = self.output_config
         if isinstance(code_sample_style, str):
             _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
         else:
@@ -122,6 +127,7 @@ class LazySchema:
                     skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                     generation_config=generation_config,
+                    output_config=output_config,
                     code_sample_style=_code_sample_style,
                     app=self.app,
                     rate_limiter=self.rate_limiter,
@@ -326,6 +332,7 @@ def get_schema(
     skip_deprecated_operations: bool | NotSet = NOT_SET,
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
+    output_config: OutputConfig | NotSet = NOT_SET,
     code_sample_style: CodeSampleStyle,
     rate_limiter: Limiter | None,
     sanitize_output: bool,
@@ -348,6 +355,7 @@ def get_schema(
         skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
+        output_config=output_config,
         code_sample_style=code_sample_style,
         rate_limiter=rate_limiter,
         sanitize_output=sanitize_output,

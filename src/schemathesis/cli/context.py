@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from ..code_samples import CodeSampleStyle
 from ..internal.deprecation import deprecated_property
+from ..internal.output import OutputConfig
 from ..internal.result import Result
 from ..runner.probes import ProbeRun
 from ..runner.serialization import SerializedTestResult
@@ -57,6 +58,7 @@ class ExecutionContext:
     report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
     analysis: Result[AnalysisResult, Exception] | None = None
+    output_config: OutputConfig = field(default_factory=OutputConfig)
     # Special flag to display a warning about Windows-specific encoding issue
     encountered_windows_encoding_issue: bool = False
     state_machine_sink: StateMachineSink | None = None

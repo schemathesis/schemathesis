@@ -44,6 +44,7 @@ from .generation import (
     GenerationConfig,
 )
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
+from .internal.output import OutputConfig
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
 from .stateful import Stateful, StatefulTest
@@ -94,6 +95,7 @@ class BaseSchema(Mapping):
         default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
     )
     generation_config: GenerationConfig = field(default_factory=GenerationConfig)
+    output_config: OutputConfig = field(default_factory=OutputConfig)
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
@@ -286,6 +288,7 @@ class BaseSchema(Mapping):
         skip_deprecated_operations: bool | NotSet = NOT_SET,
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
+        output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: CodeSampleStyle | NotSet = NOT_SET,
         rate_limiter: Limiter | None = NOT_SET,
         sanitize_output: bool | NotSet | None = NOT_SET,
@@ -314,6 +317,8 @@ class BaseSchema(Mapping):
             data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
             generation_config = self.generation_config
+        if output_config is NOT_SET:
+            output_config = self.output_config
         if code_sample_style is NOT_SET:
             code_sample_style = self.code_sample_style
         if rate_limiter is NOT_SET:
@@ -337,6 +342,7 @@ class BaseSchema(Mapping):
             skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
             generation_config=generation_config,  # type: ignore
+            output_config=output_config,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
             sanitize_output=sanitize_output,  # type: ignore

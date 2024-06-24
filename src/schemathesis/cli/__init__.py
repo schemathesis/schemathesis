@@ -38,6 +38,7 @@ from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..internal.datetime import current_datetime
+from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
 from ..models import Case, CheckFunction
@@ -695,6 +696,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     multiple=True,
 )
 @click.option(
+    "--output-truncate",
+    help="Specifies whether to truncate schemas and responses in error messages.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_boolean_string,
+)
+@click.option(
     "--generation-allow-x00",
     help="Determines whether to allow the generation of `\x00` bytes within strings.",
     type=str,
@@ -783,6 +792,7 @@ def run(
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: str | None = None,
     sanitize_output: bool = True,
+    output_truncate: bool = True,
     contrib_unique_data: bool = False,
     contrib_openapi_formats_uuid: bool = False,
     contrib_openapi_fill_missing_examples: bool = False,
@@ -862,6 +872,8 @@ def run(
     if store_network_log is not None:
         click.secho(DEPRECATED_CASSETTE_PATH_OPTION_WARNING, fg="yellow")
         cassette_path = store_network_log
+
+    output_config = OutputConfig(truncate=output_truncate)
 
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
     token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
@@ -982,6 +994,7 @@ def run(
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
+        output_config=output_config,
         service_client=client,
     )
     execute(
@@ -1008,6 +1021,7 @@ def run(
         location=schema,
         base_url=base_url,
         started_at=started_at,
+        output_config=output_config,
     )
 
 
@@ -1036,6 +1050,7 @@ class LoaderConfig:
     request_cert: RequestCert | None
     wait_for_schema: float | None
     rate_limit: str | None
+    output_config: OutputConfig
     # Network request parameters
     auth: tuple[str, str] | None
     auth_type: str | None
@@ -1079,6 +1094,7 @@ def into_event_stream(
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,
+    output_config: OutputConfig,
     seed: int | None,
     exit_first: bool,
     max_failures: int | None,
@@ -1112,6 +1128,7 @@ def into_event_stream(
             method=method or None,
             tag=tag or None,
             operation_id=operation_id or None,
+            output_config=output_config,
         )
         schema = load_schema(config)
         yield from runner.from_schema(
@@ -1257,6 +1274,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
         "force_schema_version": config.force_schema_version,
         "data_generation_methods": config.data_generation_methods,
         "rate_limit": config.rate_limit,
+        "output_config": config.output_config,
     }
     if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
         kwargs["headers"] = config.headers
@@ -1384,6 +1402,7 @@ def execute(
     location: str,
     base_url: str | None,
     started_at: str,
+    output_config: OutputConfig,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: list[EventHandler] = []
@@ -1447,6 +1466,7 @@ def execute(
         verbosity=verbosity,
         code_sample_style=code_sample_style,
         report=report_context,
+        output_config=output_config,
     )
 
     def shutdown() -> None:

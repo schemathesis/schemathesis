@@ -9,7 +9,7 @@ import jsonschema
 from aiohttp import web
 
 from schemathesis.constants import BOM_MARK
-from schemathesis.exceptions import MAX_PAYLOAD_SIZE
+from schemathesis.internal.output import MAX_PAYLOAD_SIZE
 from schemathesis.transports.content_types import parse_content_type
 
 try:

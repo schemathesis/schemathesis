@@ -26,9 +26,9 @@ from ...exceptions import (
     RuntimeErrorType,
     extract_requests_exception_details,
     format_exception,
-    prepare_response_payload,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
+from ...internal.output import prepare_response_payload
 from ...internal.result import Ok
 from ...models import Status
 from ...runner import events
@@ -314,7 +314,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                                 # Checked that is not None
                                 body = cast(bytes, check.response.deserialize_body())
                                 payload = body.decode(encoding)
-                                payload = prepare_response_payload(payload)
+                                payload = prepare_response_payload(payload, config=context.output_config)
                                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
                                 click.echo(payload)
                             except UnicodeDecodeError:
