@@ -125,6 +125,7 @@ There are four built-in checks you can use via the `--checks / -c` CLI option:
 - ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
 - ``negative_data_rejection``. The API accepts data that is invalid according to the schema;
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
+- ``use_after_free``. The API returned a non-404 response a successful DELETE operation on a resource. **NOTE**: Only enabled for new-style stateful testing.
 
 To make Schemathesis perform all built-in checks use ``--checks all`` CLI option:
 
@@ -648,8 +649,8 @@ If your API spec is stored in a file, you could use it too by specifying a Docke
 
 .. code-block:: bash
 
-    docker run -v $(pwd):/mnt schemathesis/schemathesis:stable \
-        run /mnt/spec.json
+    docker run -v $(pwd):/app schemathesis/schemathesis:stable \
+        run /app/spec.json
 
 In the example above, the ``spec.json`` file from the current working directory is shared with the Schemathesis container.
 Note, that ``$(pwd)`` is shell-specific and works in ``sh`` / ``bash`` / ``zsh``, but could be different in e.g. ``PowerShell``.

@@ -123,6 +123,16 @@ Also, depending on your setup, you might need to run this command with a custom 
 In the example above, the module is located at ``myproject/tests/hooks.py`` and the environment variable contains 
 a path that could be used as an import in Python.
 
+If you run Schemathesis in Docker, make sure you mount a volume to the ``/app`` directory, so Schemathesis can find it within the container.
+
+.. code:: bash
+
+    docker run -v $(pwd):/app -e SCHEMATHESIS_HOOKS=hooks --network=host 
+        schemathesis/schemathesis:stable run http://127.0.0.1:8081/schema.yaml
+
+In this example, the hooks file is called ``hooks.py`` and is located in the current directory. 
+The current directory is mounted to the ``/app`` directory in the container.
+
 .. note::
 
     The name of the module is arbitrary but make sure it is a valid Python module name. Usually it is sufficient to put all your extensions in the ``hooks.py`` file in the current directory.
