@@ -8,6 +8,10 @@ Changelog
 
 - More fine-grained events for stateful testing.
 
+**Fixed**
+
+- Internal error caused by an upstream race condition bug in Hypothesis. :issue:`2269`
+
 .. _v3.30.0:
 
 :version:`3.30.0 <v3.29.2...v3.30.0>` - 2024-06-23
