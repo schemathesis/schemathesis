@@ -15,6 +15,7 @@ Changelog
 **Fixed**
 
 - Internal error caused by an upstream race condition bug in Hypothesis. :issue:`2269`
+- Do not output stateful tests sub-section in CLI if there are no stateful tests due to applied filters.
 
 .. _v3.30.0:
 
