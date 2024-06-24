@@ -7,7 +7,8 @@ from typing import TYPE_CHECKING, cast
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
-from ..exceptions import RuntimeErrorType, prepare_response_payload
+from ..exceptions import RuntimeErrorType
+from ..internal.output import prepare_response_payload
 from ..models import Status
 from ..runner import events
 from ..runner.serialization import SerializedCheck, SerializedError
@@ -37,7 +38,7 @@ class JunitXMLHandler(EventHandler):
                     group_by_case(event.result.checks, context.code_sample_style), 1
                 ):
                     checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-                    test_case.add_failure_info(message=build_failure_message(idx, code_sample, checks))
+                    test_case.add_failure_info(message=build_failure_message(context, idx, code_sample, checks))
             elif event.status == Status.error:
                 test_case.add_error_info(message=build_error_message(context, event.result.errors[-1]))
             elif event.status == Status.skip:
@@ -48,7 +49,7 @@ class JunitXMLHandler(EventHandler):
             to_xml_report_file(file_descriptor=self.file_handle, test_suites=test_suites, prettyprint=True)
 
 
-def build_failure_message(idx: int, code_sample: str, checks: list[SerializedCheck]) -> str:
+def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[SerializedCheck]) -> str:
     from ..transports.responses import get_reason
 
     message = ""
@@ -73,7 +74,7 @@ def build_failure_message(idx: int, code_sample: str, checks: list[SerializedChe
                             # Checked that is not None
                             body = cast(bytes, check.response.deserialize_body())
                             payload = body.decode(encoding)
-                            payload = prepare_response_payload(payload)
+                            payload = prepare_response_payload(payload, config=context.output_config)
                             payload = textwrap.indent(f"\n`{payload}`\n", prefix="    ")
                             message += payload
                         except UnicodeDecodeError:

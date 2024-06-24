@@ -657,7 +657,7 @@ class BaseOpenAPISchema(BaseSchema):
                 jsonschema.validate(data, schema, cls=cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(operation.verbose_name, exc)
-                ctx = failures.ValidationErrorContext.from_exception(exc)
+                ctx = failures.ValidationErrorContext.from_exception(exc, output_config=operation.schema.output_config)
                 try:
                     raise exc_class(ctx.title, context=ctx) from exc
                 except Exception as exc:

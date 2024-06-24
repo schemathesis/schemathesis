@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import enum
-import json
 import re
 import traceback
 from dataclasses import dataclass, field
@@ -12,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .failures import FailureContext
+from .internal.output import truncate_json
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -207,7 +207,7 @@ class OperationSchemaError(Exception):
             message = "Invalid schema definition"
         error_path = " -> ".join(str(entry) for entry in error.path) or "[root]"
         message += f"\n\nLocation:\n    {error_path}"
-        instance = truncated_json(error.instance)
+        instance = truncate_json(error.instance)
         message += f"\n\nProblematic definition:\n{instance}"
         message += "\n\nError details:\n    "
         # This default message contains the instance which we already printed
@@ -298,39 +298,6 @@ class InvalidHeadersExample(OperationSchemaError):
             message += f"\n  - {key!r}={value!r}"
         message += "\n\nEnsure the header examples comply with RFC 7230, Section 3.2"
         return cls(message)
-
-
-def truncated_json(data: Any, max_lines: int = 10, max_width: int = 80) -> str:
-    # Convert JSON to string with indentation
-    indent = 4
-    serialized = json.dumps(data, indent=indent)
-
-    # Split string by lines
-
-    lines = [line[: max_width - 3] + "..." if len(line) > max_width else line for line in serialized.split("\n")]
-
-    if len(lines) <= max_lines:
-        return "\n".join(lines)
-
-    truncated_lines = lines[: max_lines - 1]
-    indentation = " " * indent
-    truncated_lines.append(f"{indentation}// Output truncated...")
-    truncated_lines.append(lines[-1])
-
-    return "\n".join(truncated_lines)
-
-
-MAX_PAYLOAD_SIZE = 512
-
-
-def prepare_response_payload(payload: str, max_size: int = MAX_PAYLOAD_SIZE) -> str:
-    if payload.endswith("\r\n"):
-        payload = payload[:-2]
-    elif payload.endswith("\n"):
-        payload = payload[:-1]
-    if len(payload) > max_size:
-        payload = payload[:max_size] + " // Output truncated..."
-    return payload
 
 
 class DeadlineExceeded(Exception):

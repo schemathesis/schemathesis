@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.internal.output import OutputConfig
+
 if TYPE_CHECKING:
     from graphql.error import GraphQLFormattedError
     from jsonschema import ValidationError
@@ -42,11 +44,14 @@ class ValidationErrorContext(FailureContext):
         return ("/".join(map(str, self.schema_path)),)
 
     @classmethod
-    def from_exception(cls, exc: ValidationError) -> ValidationErrorContext:
-        from .exceptions import truncated_json
+    def from_exception(
+        cls, exc: ValidationError, *, output_config: OutputConfig | None = None
+    ) -> ValidationErrorContext:
+        from .internal.output import truncate_json
 
-        schema = textwrap.indent(truncated_json(exc.schema, max_lines=20), prefix="    ")
-        value = textwrap.indent(truncated_json(exc.instance, max_lines=20), prefix="    ")
+        output_config = OutputConfig.from_parent(output_config, max_lines=20)
+        schema = textwrap.indent(truncate_json(exc.schema, config=output_config), prefix="    ")
+        value = textwrap.indent(truncate_json(exc.instance, config=output_config), prefix="    ")
         schema_path = list(exc.absolute_schema_path)
         if len(schema_path) > 1:
             # Exclude the last segment, which is already in the schema
