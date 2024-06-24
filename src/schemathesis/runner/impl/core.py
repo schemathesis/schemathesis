@@ -216,7 +216,7 @@ class BaseRunner:
 
     def _run_stateful_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
         # Run new-style stateful tests
-        if self.stateful is not None and experimental.STATEFUL_TEST_RUNNER.is_enabled:
+        if self.stateful is not None and experimental.STATEFUL_TEST_RUNNER.is_enabled and self.schema.links_count > 0:
             result = TestResult(
                 method="",
                 path="",
