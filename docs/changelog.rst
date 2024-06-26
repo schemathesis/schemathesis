@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Excessive ``urllib3`` warnings during testing ``localhost`` via ``https``.
+
 .. _v3.30.1:
 
 :version:`3.30.1 <v3.30.0...v3.30.1>` - 2024-06-24

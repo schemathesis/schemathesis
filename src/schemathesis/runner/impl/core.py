@@ -6,6 +6,7 @@ import threading
 import time
 import unittest
 import uuid
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from types import TracebackType
@@ -20,6 +21,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.auth import HTTPDigestAuth, _basic_auth_str
+from urllib3.exceptions import InsecureRequestWarning
 
 from ... import experimental, failures, hooks
 from ..._compat import MultipleFailures
@@ -192,6 +194,7 @@ class BaseRunner:
                 return
 
         try:
+            warnings.simplefilter("ignore", InsecureRequestWarning)
             if not experimental.STATEFUL_ONLY.is_enabled:
                 yield from self._execute(results, stop_event)
             yield from self._run_stateful_tests(results)
