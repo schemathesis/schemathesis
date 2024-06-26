@@ -8,6 +8,7 @@ Changelog
 
 - Excessive ``urllib3`` warnings during testing ``localhost`` via ``https``.
 - Misreporting of undocumented ``Content-Type`` when documented content types contain wildcards.
+- Incorrect test case reporting when code samples contain a single sanitized parameter. :issue:`2294`
 
 .. _v3.30.1:
 

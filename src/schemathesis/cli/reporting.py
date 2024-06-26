@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from itertools import groupby
-from typing import Callable, Generator
+from typing import Callable, Generator, Iterator
 
 import click
 
@@ -14,20 +14,25 @@ TEST_CASE_ID_TITLE = "Test Case ID"
 
 def group_by_case(
     checks: list[SerializedCheck], code_sample_style: CodeSampleStyle
-) -> Generator[tuple[str, Generator[SerializedCheck, None, None]], None, None]:
+) -> Generator[tuple[str, Iterator[SerializedCheck]], None, None]:
     checks = deduplicate_failures(checks)
-    checks = sorted(checks, key=lambda c: _by_unique_code_sample(c, code_sample_style))
-    yield from groupby(checks, lambda c: _by_unique_code_sample(c, code_sample_style))
+    checks = sorted(checks, key=lambda c: _by_unique_key(c, code_sample_style))
+    for (sample, _, _), gen in groupby(checks, lambda c: _by_unique_key(c, code_sample_style)):
+        yield (sample, gen)
 
 
-def _by_unique_code_sample(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> str:
-    return code_sample_style.generate(
-        method=check.example.method,
-        url=check.example.url,
-        body=check.example.deserialize_body(),
-        headers=check.example.headers,
-        verify=check.example.verify,
-        extra_headers=check.example.extra_headers,
+def _by_unique_key(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> tuple[str, int | None, str | None]:
+    return (
+        code_sample_style.generate(
+            method=check.example.method,
+            url=check.example.url,
+            body=check.example.deserialize_body(),
+            headers=check.example.headers,
+            verify=check.example.verify,
+            extra_headers=check.example.extra_headers,
+        ),
+        None if not check.response else check.response.status_code,
+        None if not check.response else check.response.body,
     )
 
 
