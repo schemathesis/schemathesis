@@ -185,6 +185,30 @@ def test_content_type_conformance_another_status_code(response_factory):
     assert_content_type_conformance(response_factory, raw_schema, "application/xml", False)
 
 
+@pytest.mark.parametrize(
+    "content_type, is_error",
+    (
+        ("application/*", False),
+        ("*/xml", False),
+        ("*/*", False),
+        ("application/json", True),
+    ),
+)
+def test_content_type_wildcards(content_type, is_error, response_factory):
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/users": {
+                "get": {
+                    "responses": {"200": {"description": "Error", "content": {content_type: {"schema": {}}}}},
+                }
+            }
+        },
+    }
+    assert_content_type_conformance(response_factory, raw_schema, "application/xml", is_error)
+
+
 def assert_content_type_conformance(response_factory, raw_schema, content_type, is_error, match=None):
     schema = schemathesis.from_dict(raw_schema)
     operation = schema["/users"]["get"]

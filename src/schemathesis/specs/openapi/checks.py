@@ -79,7 +79,12 @@ def content_type_conformance(response: GenericResponse, case: Case) -> bool | No
             received_main, received_sub = parse_content_type(content_type)
         except ValueError as exc:
             _reraise_malformed_media_type(case, exc, "Response", content_type, option)
-        if (expected_main, expected_sub) == (received_main, received_sub):
+        if (
+            (expected_main == "*" and expected_sub == "*")
+            or (expected_main == received_main and expected_sub == "*")
+            or (expected_main == "*" and expected_sub == received_sub)
+            or (expected_main == received_main and expected_sub == received_sub)
+        ):
             return None
     exc_class = get_response_type_error(
         case.operation.verbose_name, f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}"

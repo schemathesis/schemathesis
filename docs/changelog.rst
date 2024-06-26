@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Excessive ``urllib3`` warnings during testing ``localhost`` via ``https``.
+- Misreporting of undocumented ``Content-Type`` when documented content types contain wildcards.
 
 .. _v3.30.1:
 
