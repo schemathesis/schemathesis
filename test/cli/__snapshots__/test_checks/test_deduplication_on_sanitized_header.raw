@@ -1,0 +1,63 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: /openapi.json
+Base URL: /
+Specification version: Open API 3.1.0
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SKIP
+Schema analysis: SKIP
+
+GET /users F                                                              [100%]
+
+=================================== FAILURES ===================================
+__________________________________ GET /users __________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Undocumented HTTP status code
+
+    Received: 400
+    Documented: 200, 422
+
+[400] Bad Request:
+
+    `{"detail":"Bad header"}`
+
+Reproduce with: 
+
+    curl -X GET -H 'x-token: [Filtered]' http://localhost/users
+
+2. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `{"detail":"Internal server error"}`
+
+Reproduce with: 
+
+    curl -X GET -H 'x-token: [Filtered]' http://localhost/users
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                              N / N passed          FAILED 
+    status_code_conformance                         N / N passed          FAILED 
+    content_type_conformance                        N / N passed          PASSED 
+    response_headers_conformance                    N / N passed          PASSED 
+    response_schema_conformance                     N / N passed          PASSED 
+    negative_data_rejection                         N / N passed          PASSED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================
