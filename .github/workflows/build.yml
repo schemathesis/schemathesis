@@ -83,3 +83,36 @@ jobs:
         uses: codecov/codecov-action@v4.5.0
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  # On windows redirecting output to a file could lead to an error due to the default IO encoding being CP-1252
+  tests-pipe-with-encoding:
+    strategy:
+      matrix:
+        os: [ubuntu-22.04, windows-2019]
+      fail-fast: false
+    name: Test piping output to a file with CP1252 encoding on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install ".[dev]"
+
+      - run: st run /openapi.json --app=cp1252_app:app -c custom_check > out.txt || true
+        working-directory: ./test/apps
+        env:
+          SCHEMATHESIS_HOOKS: hooks
+          PYTHONIOENCODING: cp1252
+
+      - run: |
+          if grep -Fq "UnicodeEncodeError" "out.txt"; then
+            echo "Failed!"
+            exit 1
+          fi
+        working-directory: ./test/apps
+        shell: bash
