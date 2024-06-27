@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.2...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error when piping stdout to a file in CLI on Windows.
+
 .. _v3.30.2:
 
 :version:`3.30.2 <v3.30.1...v3.30.2>` - 2024-06-27

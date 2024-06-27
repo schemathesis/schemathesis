@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     import requests
 
 SPINNER_REPETITION_NUMBER = 10
+IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 
 
 def get_terminal_width() -> int:
@@ -280,6 +281,18 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
         display_failures_for_single_test(context, result)
 
 
+if IO_ENCODING != "utf-8":
+
+    def _secho(text: str, **kwargs: Any) -> None:
+        text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
+        click.secho(text, **kwargs)
+
+else:
+
+    def _secho(text: str, **kwargs: Any) -> None:
+        click.secho(text, **kwargs)
+
+
 def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
     """Display a failure for a single method / path."""
     from ...transports.responses import get_reason
@@ -298,7 +311,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
             click.secho(f"\n- {check.title}", fg="red", bold=True)
             message = check.formatted_message
             if message:
-                click.secho(f"\n{message}", fg="red")
+                _secho(f"\n{message}", fg="red")
             if check_idx + 1 == len(checks):
                 if check.response is not None:
                     status_code = check.response.status_code
@@ -319,24 +332,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                                 click.echo(payload)
                             except UnicodeDecodeError:
                                 click.echo("\n    <BINARY>")
-
-        try:
-            click.echo(
-                f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n",
-            )
-        except UnicodeEncodeError:
-            # On Windows it may fail when redirecting the output to a file
-            # because it uses a different encoding than the console encoding and the default
-            # is cp1252, which doesn't support some Unicode characters.
-            # In this case, display a stub message and set a flag to display a warning at the end
-            if platform.system() != "Windows":
-                raise
-            click.echo(
-                f"\n{bold('Reproduce with')}: \n\n"
-                "    CAN NOT DISPLAY THIS CODE SAMPLE DUE TO TERMINAL LIMITATIONS.\n"
-                "    SEE DETAILS AT THE END OF THE OUTPUT\n",
-            )
-            context.encountered_windows_encoding_issue = True
+        _secho(f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n")
 
 
 def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
@@ -484,17 +480,6 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         if context.seed is not None:
             seed_option = f"`--hypothesis-seed={context.seed}`"
             click.secho(f"\n{bold('Note')}: To replicate these test failures, rerun with {bold(seed_option)}")
-
-    if context.encountered_windows_encoding_issue:
-        click.echo()
-        title = click.style("WARNING:", bold=True, fg="yellow")
-        name = click.style("PYTHONIOENCODING", bold=True)
-        value = click.style("utf8", bold=True)
-        warning = (
-            "Some code samples could not be displayed due to terminal limitations on Windows.\n"
-            f"To resolve this set the '{name}' environment variable to '{value}' and rerun your command."
-        )
-        click.secho(f"{title} {warning}")
 
     if context.report is not None and not context.is_interrupted:
         if isinstance(context.report, FileReportContext):
