@@ -173,7 +173,9 @@ class BaseSchema(Mapping):
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 

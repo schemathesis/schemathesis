@@ -675,9 +675,11 @@ class APIOperation(Generic[P, C]):
     def get_security_requirements(self) -> list[str]:
         return self.schema.get_security_requirements(self)
 
-    def get_strategies_from_examples(self) -> list[st.SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[st.SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return self.schema.get_strategies_from_examples(self)
+        return self.schema.get_strategies_from_examples(self, as_strategy_kwargs=as_strategy_kwargs)
 
     def get_stateful_tests(self, response: GenericResponse, stateful: Stateful | None) -> Sequence[StatefulTest]:
         return self.schema.get_stateful_tests(response, self, stateful)

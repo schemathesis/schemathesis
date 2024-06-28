@@ -98,7 +98,9 @@ def create_test(
         existing_settings = remove_explain_phase(existing_settings)
         wrapped_test._hypothesis_internal_use_settings = existing_settings  # type: ignore
         if Phase.explicit in existing_settings.phases:
-            wrapped_test = add_examples(wrapped_test, operation, hook_dispatcher=hook_dispatcher)
+            wrapped_test = add_examples(
+                wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
+            )
     return wrapped_test
 
 
@@ -138,12 +140,20 @@ def make_async_test(test: Callable) -> Callable:
     return async_run
 
 
-def add_examples(test: Callable, operation: APIOperation, hook_dispatcher: HookDispatcher | None = None) -> Callable:
+def add_examples(
+    test: Callable,
+    operation: APIOperation,
+    hook_dispatcher: HookDispatcher | None = None,
+    as_strategy_kwargs: dict[str, Any] | None = None,
+) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
     try:
-        examples: list[Case] = [get_single_example(strategy) for strategy in operation.get_strategies_from_examples()]
+        examples: list[Case] = [
+            get_single_example(strategy)
+            for strategy in operation.get_strategies_from_examples(as_strategy_kwargs=as_strategy_kwargs)
+        ]
     except (
         OperationSchemaError,
         HypothesisRefResolutionError,
