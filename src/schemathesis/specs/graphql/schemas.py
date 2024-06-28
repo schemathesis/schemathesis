@@ -249,7 +249,9 @@ class GraphQLSchema(BaseSchema):
             **kwargs,
         )
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[SearchStrategy[Case]]:
         return []
 
     def get_stateful_tests(

@@ -399,7 +399,9 @@ class BaseOpenAPISchema(BaseSchema):
         """Content types available for this API operation."""
         raise NotImplementedError
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
@@ -924,9 +926,11 @@ class SwaggerV20(BaseOpenAPISchema):
                 )
         return collected
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation)
+        return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
         scopes, definition = self.resolver.resolve_in_scope(definition, scope)
@@ -1088,9 +1092,11 @@ class OpenApi30(SwaggerV20):
             return scopes, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
         return scopes, None
 
-    def get_strategies_from_examples(self, operation: APIOperation) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(
+        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
+    ) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation)
+        return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         definitions = self._get_response_definitions(operation, response)
