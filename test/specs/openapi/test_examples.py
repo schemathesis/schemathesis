@@ -371,6 +371,63 @@ def before_generate_case(context, strategy):
     )
 
 
+def test_parameter_override(testdir, cli, openapi3_base_url, snapshot_cli):
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+
+@schemathesis.check
+def explicit_header(response, case):
+    assert case.headers["anyKey"] == "OVERRIDE"
+    assert case.query["id"] == "OVERRIDE"
+"""
+    )
+    raw_schema = {
+        "openapi": "3.0.2",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
+        "paths": {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "anyKey",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "header0",
+                        },
+                        {
+                            "name": "id",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "query0",
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        },
+    }
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--hypothesis-seed=23",
+            "--hypothesis-phases=explicit",
+            f"--base-url={openapi3_base_url}",
+            "--checks=explicit_header",
+            "--set-header=anyKey=OVERRIDE",
+            "--set-query=id=OVERRIDE",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
 def test_extract_from_schemas(operation_with_property_examples):
     extracted = [
         example_to_dict(example) for example in examples.extract_from_schemas(operation_with_property_examples)
