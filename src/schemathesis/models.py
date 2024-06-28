@@ -492,6 +492,7 @@ class Case:
             query=fast_deepcopy(self.query),
             body=fast_deepcopy(self.body),
             generation_time=self.generation_time,
+            id=self.id,
         )
 
 
