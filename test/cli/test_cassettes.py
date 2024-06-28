@@ -1,6 +1,7 @@
 import base64
 import io
 import platform
+import re
 import threading
 from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
@@ -21,7 +22,8 @@ from schemathesis.cli.cassettes import (
     get_prepared_request,
     write_double_quoted,
 )
-from schemathesis.constants import USER_AGENT
+from schemathesis.cli.reporting import TEST_CASE_ID_TITLE
+from schemathesis.constants import USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Request
 
@@ -221,6 +223,7 @@ async def test_replay(
         *args,
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    case_ids = re.findall(f"{TEST_CASE_ID_TITLE}: (\\w+)", result.stdout)
     # these requests are not needed
     reset_app(openapi_version)
     assert not app["incoming_requests"]
@@ -235,6 +238,19 @@ async def test_replay(
         assert "New payload : {" in result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
+    for case_id in case_ids:
+        found = False
+        existing_ids = []
+        for interaction in interactions:
+            current_case_id = interaction["request"]["headers"][SCHEMATHESIS_TEST_CASE_HEADER][0]
+            existing_ids.append(current_case_id)
+            if current_case_id == case_id:
+                found = True
+                break
+        if not found:
+            raise AssertionError(
+                f"Test case with ID `{case_id}` is not found in the cassette. Existing IDs: {existing_ids}"
+            )
     # Then there should be the same number or fewer of requests made to the app as there are in the cassette
     # Note. Some requests that Schemathesis can send aren't parsed by aiohttp, because of e.g. invalid characters in
     # headers

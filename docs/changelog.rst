@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.4...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Incorrect test case ids stored in VCR cassettes. :issue:`2302`
+
 .. _v3.30.4:
 
 :version:`3.30.4 <v3.30.3...v3.30.4>` - 2024-06-28
