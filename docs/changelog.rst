@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.3...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Missing overrides from ``--set-*`` CLI options in tests for explicit examples.
+
 .. _v3.30.3:
 
 :version:`3.30.3 <v3.30.2...v3.30.3>` - 2024-06-27

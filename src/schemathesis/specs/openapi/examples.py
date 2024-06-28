@@ -42,7 +42,9 @@ class BodyExample:
 Example = Union[ParameterExample, BodyExample]
 
 
-def get_strategies_from_examples(operation: APIOperation[OpenAPIParameter, Case]) -> list[SearchStrategy[Case]]:
+def get_strategies_from_examples(
+    operation: APIOperation[OpenAPIParameter, Case], as_strategy_kwargs: dict[str, Any] | None = None
+) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
     for location, container in LOCATION_TO_CONTAINER.items():
@@ -65,7 +67,7 @@ def get_strategies_from_examples(operation: APIOperation[OpenAPIParameter, Case]
     # Add examples from parameter's schemas
     examples.extend(extract_from_schemas(operation))
     return [
-        get_case_strategy(operation=operation, **parameters).map(serialize_components)
+        get_case_strategy(operation=operation, **{**parameters, **(as_strategy_kwargs or {})}).map(serialize_components)
         for parameters in produce_combinations(examples)
     ]
 
