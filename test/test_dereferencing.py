@@ -790,3 +790,39 @@ def test_uncommon_type_in_generation(empty_open_api_3_schema, testdir, key, expe
 
     with pytest.raises(Exception, match=expected):
         test()
+
+
+def test_global_security_schemes_with_custom_scope(testdir, empty_open_api_3_schema, cli, snapshot_cli):
+    # See GH-2300
+    empty_open_api_3_schema["components"] = {
+        "securitySchemes": {
+            "bearerAuth": {
+                "$ref": "components/securitySchemes/bearerAuth.json",
+            }
+        }
+    }
+    empty_open_api_3_schema["security"] = [{"bearerAuth": []}]
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "$ref": "paths/tests/test.json",
+        }
+    }
+    bearer = {"type": "http", "scheme": "bearer"}
+    operation = {
+        "get": {
+            "description": "Test",
+            "operationId": "test",
+            "responses": {"200": {"description": "OK"}},
+        }
+    }
+    root = testdir.mkdir("root")
+    raw_schema_path = root / "openapi.json"
+    raw_schema_path.write_text(json.dumps(empty_open_api_3_schema), "utf8")
+    components = (root / "components").mkdir()
+    paths = (root / "paths").mkdir()
+    tests = (paths / "tests").mkdir()
+    security_schemes = (components / "securitySchemes").mkdir()
+    (security_schemes / "bearerAuth.json").write_text(json.dumps(bearer), "utf8")
+    (tests / "test.json").write_text(json.dumps(operation), "utf8")
+
+    assert cli.run(str(raw_schema_path), "--dry-run", "--show-trace") == snapshot_cli
