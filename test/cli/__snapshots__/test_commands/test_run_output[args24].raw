@@ -159,6 +159,7 @@ Generic:
                                   failures.
   --cassette-path FILENAME        Saves the test outcomes in a VCR-compatible
                                   format.
+  --cassette-format [vcr|har]     Format of the saved cassettes.
   --cassette-preserve-exact-body-bytes
                                   Retains exact byte sequence of payloads in
                                   cassettes, encoded as base64.

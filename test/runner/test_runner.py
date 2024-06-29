@@ -131,6 +131,7 @@ def test_interactions(request, any_app_schema, workers):
         "uri": f"{base_url}/failure",
         "method": "GET",
         "body": None,
+        "body_size": None,
         "headers": {
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],
@@ -159,6 +160,7 @@ def test_interactions(request, any_app_schema, workers):
         "uri": f"{base_url}/success",
         "method": "GET",
         "body": None,
+        "body_size": None,
         "headers": {
             "Accept": ["*/*"],
             "Accept-Encoding": ["gzip, deflate"],

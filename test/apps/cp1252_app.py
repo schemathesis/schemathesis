@@ -1,6 +1,5 @@
 from flask import Flask, jsonify
 
-
 app = Flask("cp1252")
 
 VALUE = "\uc445"

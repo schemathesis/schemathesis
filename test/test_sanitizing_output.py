@@ -144,7 +144,9 @@ def test_sanitize_request_url(request_factory):
 
 
 def test_sanitize_serialized_request():
-    request = SerializedRequest(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={})
+    request = SerializedRequest(
+        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}
+    )
     sanitize_request(request)
     assert request.uri == "http://[Filtered]@127.0.0.1/path"
 
@@ -245,12 +247,13 @@ def test_sanitize_serialized_check(serialized_check):
 
 def test_sanitize_serialized_interaction(serialized_check):
     request = SerializedRequest(
-        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, headers={"X-Token": "Secret"}
+        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={"X-Token": "Secret"}
     )
     response = SerializedResponse(
         status_code=500,
         message="Internal Server Error",
         body=None,
+        body_size=None,
         headers={"X-Token": ["Secret"]},
         encoding=None,
         http_version="1.1",
