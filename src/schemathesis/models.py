@@ -832,6 +832,7 @@ class Request:
     method: str
     uri: str
     body: str | None
+    body_size: int | None
     headers: Headers
 
     @classmethod
@@ -862,6 +863,7 @@ class Request:
             method=method,
             headers={key: [value] for (key, value) in prepared.headers.items()},
             body=serialize_payload(body) if body is not None else body,
+            body_size=len(body) if body is not None else None,
         )
 
     def deserialize_body(self) -> bytes | None:
@@ -881,6 +883,7 @@ class Response:
     message: str
     headers: dict[str, list[str]]
     body: str | None
+    body_size: int | None
     encoding: str | None
     http_version: str
     elapsed: float
@@ -907,6 +910,7 @@ class Response:
             status_code=response.status_code,
             message=response.reason,
             body=body,
+            body_size=len(response.content) if body is not None else None,
             encoding=response.encoding,
             headers=headers,
             http_version=http_version,
@@ -934,6 +938,7 @@ class Response:
             status_code=response.status_code,
             message=message,
             body=body,
+            body_size=len(data) if body is not None else None,
             encoding=encoding,
             headers=headers,
             http_version="1.1",
@@ -950,6 +955,9 @@ class Response:
         return deserialize_payload(self.body)
 
 
+TIMEZONE = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
+
+
 @dataclass
 class Interaction:
     """A single interaction with the target app."""
@@ -959,7 +967,7 @@ class Interaction:
     checks: list[Check]
     status: Status
     data_generation_method: DataGenerationMethod
-    recorded_at: str = field(default_factory=lambda: datetime.datetime.now().isoformat())
+    recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
     def from_requests(cls, case: Case, response: requests.Response, status: Status, checks: list[Check]) -> Interaction:

@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import base64
+import enum
 import json
 import re
 import sys
 import threading
 from dataclasses import dataclass, field
+from http.cookies import SimpleCookie
 from queue import Queue
-from typing import IO, TYPE_CHECKING, Any, Generator, Iterator, cast
+from typing import IO, TYPE_CHECKING, Any, Callable, Generator, Iterator, cast
+from urllib.parse import parse_qsl, urlparse
+
+import harfile
 
 from ..constants import SCHEMATHESIS_VERSION
 from ..runner import events
@@ -27,6 +32,23 @@ if TYPE_CHECKING:
 WRITER_WORKER_JOIN_TIMEOUT = 1
 
 
+class CassetteFormat(str, enum.Enum):
+    """Type of the cassette."""
+
+    VCR = "vcr"
+    HAR = "har"
+
+    @classmethod
+    def from_str(cls, value: str) -> CassetteFormat:
+        try:
+            return cls[value.upper()]
+        except KeyError:
+            available_formats = ", ".join(cls)
+            raise ValueError(
+                f"Invalid value for cassette format: {value}. Available formats: {available_formats}"
+            ) from None
+
+
 @dataclass
 class CassetteWriter(EventHandler):
     """Write interactions in a YAML cassette.
@@ -36,19 +58,23 @@ class CassetteWriter(EventHandler):
     """
 
     file_handle: click.utils.LazyFile
+    format: CassetteFormat
     preserve_exact_body_bytes: bool
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
     def __post_init__(self) -> None:
-        self.worker = threading.Thread(
-            target=worker,
-            kwargs={
-                "file_handle": self.file_handle,
-                "preserve_exact_body_bytes": self.preserve_exact_body_bytes,
-                "queue": self.queue,
-            },
-        )
+        kwargs = {
+            "file_handle": self.file_handle,
+            "queue": self.queue,
+            "preserve_exact_body_bytes": self.preserve_exact_body_bytes,
+        }
+        writer: Callable
+        if self.format == CassetteFormat.HAR:
+            writer = har_writer
+        else:
+            writer = vcr_writer
+        self.worker = threading.Thread(name="SchemathesisCassetteWriter", target=writer, kwargs=kwargs)
         self.worker.start()
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
@@ -112,7 +138,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def worker(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, queue: Queue) -> None:
+def vcr_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -276,6 +302,106 @@ def write_double_quoted(stream: IO, text: str) -> None:
                 start = end + 1
         end += 1
     stream.write('"')
+
+
+def har_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, queue: Queue) -> None:
+    if preserve_exact_body_bytes:
+
+        def get_body(body: str) -> str:
+            return body
+    else:
+
+        def get_body(body: str) -> str:
+            return base64.b64decode(body).decode("utf-8", errors="replace")
+
+    with harfile.open(file_handle) as har:
+        while True:
+            item = queue.get()
+            if isinstance(item, Process):
+                for interaction in item.interactions:
+                    time = round(interaction.response.elapsed * 1000, 2)
+                    content_type = interaction.response.headers.get("Content-Type", [""])[0]
+                    content = harfile.Content(
+                        size=interaction.response.body_size or 0,
+                        mimeType=content_type,
+                        text=get_body(interaction.response.body) if interaction.response.body is not None else None,
+                        encoding="base64"
+                        if interaction.response.body is not None and preserve_exact_body_bytes
+                        else None,
+                    )
+                    http_version = f"HTTP/{interaction.response.http_version}"
+                    query_params = urlparse(interaction.request.uri).query
+                    if interaction.request.body is not None:
+                        post_data = harfile.PostData(
+                            mimeType=content_type,
+                            text=get_body(interaction.request.body),
+                        )
+                    else:
+                        post_data = None
+                    har.add_entry(
+                        startedDateTime=interaction.recorded_at,
+                        time=time,
+                        request=harfile.Request(
+                            method=interaction.request.method.upper(),
+                            url=interaction.request.uri,
+                            httpVersion=http_version,
+                            headers=[
+                                harfile.Record(name=name, value=values[0])
+                                for name, values in interaction.request.headers.items()
+                            ],
+                            queryString=[
+                                harfile.Record(name=name, value=value)
+                                for name, value in parse_qsl(query_params, keep_blank_values=True)
+                            ],
+                            cookies=_extract_cookies(interaction.request.headers.get("Cookie", [])),
+                            headersSize=_headers_size(interaction.request.headers),
+                            bodySize=interaction.request.body_size or 0,
+                            postData=post_data,
+                        ),
+                        response=harfile.Response(
+                            status=interaction.response.status_code,
+                            httpVersion=http_version,
+                            statusText=interaction.response.message,
+                            headers=[
+                                harfile.Record(name=name, value=values[0])
+                                for name, values in interaction.response.headers.items()
+                            ],
+                            cookies=_extract_cookies(interaction.response.headers.get("Set-Cookie", [])),
+                            content=content,
+                            headersSize=_headers_size(interaction.response.headers),
+                            bodySize=interaction.response.body_size or 0,
+                            redirectURL=interaction.response.headers.get("Location", [""])[0],
+                        ),
+                        timings=harfile.Timings(send=0, wait=0, receive=time, blocked=0, dns=0, connect=0, ssl=0),
+                    )
+            elif isinstance(item, Finalize):
+                break
+
+
+def _headers_size(headers: dict[str, list[str]]) -> int:
+    size = 0
+    for name, values in headers.items():
+        # 4 is for ": " and "\r\n"
+        size += len(name) + 4 + len(values[0])
+    return size
+
+
+def _extract_cookies(headers: list[str]) -> list[harfile.Cookie]:
+    return [cookie for items in headers for item in items for cookie in _cookie_to_har(item)]
+
+
+def _cookie_to_har(cookie: str) -> Iterator[harfile.Cookie]:
+    parsed = SimpleCookie(cookie)
+    for name, data in parsed.items():
+        yield harfile.Cookie(
+            name=name,
+            value=data.value,
+            path=data["path"] or None,
+            domain=data["domain"] or None,
+            expires=data["expires"] or None,
+            httpOnly=data["httponly"] or None,
+            secure=data["secure"] or None,
+        )
 
 
 @dataclass

@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.30.4...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Storing cassettes in the HAR format via the ``--cassette-format=har`` CLI option. :issue:`2299`
+
 **Fixed**
 
 - Incorrect test case ids stored in VCR cassettes. :issue:`2302`

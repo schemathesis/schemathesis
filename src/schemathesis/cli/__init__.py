@@ -523,6 +523,13 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     is_eager=True,
 )
 @click.option(
+    "--cassette-format",
+    help="Format of the saved cassettes.",
+    type=click.Choice([item.name.lower() for item in cassettes.CassetteFormat]),
+    default=cassettes.CassetteFormat.VCR.name.lower(),
+    callback=callbacks.convert_cassette_format,
+)
+@click.option(
     "--cassette-preserve-exact-body-bytes",
     help="Retains exact byte sequence of payloads in cassettes, encoded as base64.",
     is_flag=True,
@@ -783,6 +790,7 @@ def run(
     show_trace: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     cassette_path: click.utils.LazyFile | None = None,
+    cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
     store_network_log: click.utils.LazyFile | None = None,
     wait_for_schema: float | None = None,
@@ -1006,6 +1014,7 @@ def run(
         wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
         cassette_path=cassette_path,
+        cassette_format=cassette_format,
         cassette_preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
         junit_xml=junit_xml,
         verbosity=verbosity,
@@ -1387,6 +1396,7 @@ def execute(
     wait_for_schema: float | None,
     validate_schema: bool,
     cassette_path: click.utils.LazyFile | None,
+    cassette_format: cassettes.CassetteFormat,
     cassette_preserve_exact_body_bytes: bool,
     junit_xml: click.utils.LazyFile | None,
     verbosity: int,
@@ -1449,7 +1459,9 @@ def execute(
         # This handler should be first to have logs writing completed when the output handler will display statistic
         _open_file(cassette_path)
         handlers.append(
-            cassettes.CassetteWriter(cassette_path, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes)
+            cassettes.CassetteWriter(
+                cassette_path, format=cassette_format, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes
+            )
         )
     handlers.append(get_output_handler(workers_num))
     if sanitize_output:
