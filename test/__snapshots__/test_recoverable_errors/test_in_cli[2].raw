@@ -21,7 +21,7 @@ Schema Error
 Unresolvable JSON pointer in the schema
 
 Error details:
-    JSON pointer: 'components/UnknownParameter'
+    JSON pointer: '#/components/UnknownParameter'
     This typically means that the schema is referencing a component that doesn't exist.
 
 Ensure that the definition complies with the OpenAPI specification
@@ -31,7 +31,7 @@ Schema Error
 Unresolvable JSON pointer in the schema
 
 Error details:
-    JSON pointer: 'components/UnknownMethods'
+    JSON pointer: '#/components/UnknownMethods'
     This typically means that the schema is referencing a component that doesn't exist.
 
 Ensure that the definition complies with the OpenAPI specification

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Callable, Dict, Union, overload
@@ -7,6 +8,7 @@ from urllib.request import urlopen
 
 import jsonschema
 import requests
+from jsonschema.exceptions import RefResolutionError
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
@@ -54,6 +56,23 @@ class InliningResolver(jsonschema.RefResolver):
             "handlers", {"file": load_file_uri, "": load_file, "http": load_remote_uri, "https": load_remote_uri}
         )
         super().__init__(*args, **kwargs)
+
+    if sys.version_info >= (3, 11):
+
+        def resolve(self, ref: str) -> tuple[str, Any]:
+            try:
+                return super().resolve(ref)
+            except RefResolutionError as exc:
+                exc.add_note(ref)
+                raise
+    else:
+
+        def resolve(self, ref: str) -> tuple[str, Any]:
+            try:
+                return super().resolve(ref)
+            except RefResolutionError as exc:
+                exc.__notes__ = [ref]
+                raise
 
     @overload
     def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]:

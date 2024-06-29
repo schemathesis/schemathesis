@@ -222,9 +222,11 @@ class OperationSchemaError(Exception):
     def from_reference_resolution_error(
         cls, error: RefResolutionError, path: str | None, method: str | None, full_path: str | None
     ) -> OperationSchemaError:
+        notes = getattr(error, "__notes__", [])
+        # Some exceptions don't have the actual reference in them, hence we add it manually via notes
+        pointer = f"'{notes[0]}'"
         message = "Unresolvable JSON pointer in the schema"
         # Get the pointer value from "Unresolvable JSON pointer: 'components/UnknownParameter'"
-        pointer = str(error).split(": ", 1)[-1]
         message += f"\n\nError details:\n    JSON pointer: {pointer}"
         message += "\n    This typically means that the schema is referencing a component that doesn't exist."
         message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"

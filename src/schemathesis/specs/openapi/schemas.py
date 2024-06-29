@@ -77,7 +77,13 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import RECURSION_DEPTH_LIMIT, UNRESOLVABLE, ConvertingResolver, InliningResolver, resolve_pointer
+from .references import (
+    RECURSION_DEPTH_LIMIT,
+    UNRESOLVABLE,
+    ConvertingResolver,
+    InliningResolver,
+    resolve_pointer,
+)
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
