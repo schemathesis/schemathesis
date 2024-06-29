@@ -1,0 +1,24 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/root/openapi.json
+Base URL: file:///
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SKIP
+Schema analysis: SKIP
+
+GET /test .                                                               [100%]
+
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 passed in 1.00s ===============================

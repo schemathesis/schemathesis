@@ -126,10 +126,23 @@ class OpenAPISecurityProcessor(BaseSecurityProcessor):
         """In Open API 3 security definitions are located in ``components`` and may have references inside."""
         components = schema.get("components", {})
         security_schemes = components.get("securitySchemes", {})
+        # At this point, the resolution scope could differ from the root scope, that's why we need to restore it
+        # as now we resolve root-level references
+        if len(resolver._scopes_stack) > 1:
+            scope = resolver.resolution_scope
+            resolver.pop_scope()
+        else:
+            scope = None
         resolve = resolver.resolve
-        if "$ref" in security_schemes:
-            return resolve(security_schemes["$ref"])[1]
-        return {key: resolve(value["$ref"])[1] if "$ref" in value else value for key, value in security_schemes.items()}
+        try:
+            if "$ref" in security_schemes:
+                return resolve(security_schemes["$ref"])[1]
+            return {
+                key: resolve(value["$ref"])[1] if "$ref" in value else value for key, value in security_schemes.items()
+            }
+        finally:
+            if scope is not None:
+                resolver._scopes_stack.append(scope)
 
     def _make_http_auth_parameter(self, definition: dict[str, Any]) -> dict[str, Any]:
         schema = make_auth_header_schema(definition)

@@ -11,6 +11,7 @@ Changelog
 **Fixed**
 
 - Incorrect test case ids stored in VCR cassettes. :issue:`2302`
+- Incorrect reference resolution scope for security schemes if the API operation has a different scope than the global security schemes. :issue:`2300`
 
 .. _v3.30.4:
 
