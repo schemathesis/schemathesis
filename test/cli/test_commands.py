@@ -27,6 +27,7 @@ from schemathesis.cli import (
     get_exit_code,
     reset_checks,
 )
+from schemathesis.cli.cassettes import CassetteFormat
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.constants import (
@@ -112,6 +113,7 @@ def test_run_as_module(testdir):
         ("http://127.0.0.1", "--set-header", "Authorization=value", "-H", "Authorization: value"),
         ("http://127.0.0.1", "--hypothesis-no-phases=unknown"),
         ("http://127.0.0.1", "--hypothesis-no-phases=explicit", "--hypothesis-phases=explicit"),
+        ("http://127.0.0.1", "--cassette-format=unknown"),
     ),
 )
 def test_run_output(cli, args, snapshot_cli):
@@ -1987,6 +1989,7 @@ def assert_exit_code(event_stream, code):
             wait_for_schema=None,
             validate_schema=False,
             cassette_path=None,
+            cassette_format=CassetteFormat.VCR,
             cassette_preserve_exact_body_bytes=False,
             junit_xml=None,
             verbosity=0,

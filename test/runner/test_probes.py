@@ -56,6 +56,7 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
         "name": "NULL_BYTE_IN_HEADER",
         "request": {
             "body": None,
+            "body_size": None,
             "headers": {
                 "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
                 "X-Schemathesis-Probe-Null": ["\x00"],
@@ -79,6 +80,7 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
         "name": "NULL_BYTE_IN_HEADER",
         "request": {
             "body": None,
+            "body_size": None,
             "headers": {
                 "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
                 "X-Schemathesis-Probe-Null": ["\x00"],
@@ -89,6 +91,7 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
         },
         "response": {
             "body": "eyJzdWNjZXNzIjogdHJ1ZX0=",
+            "body_size": 17,
             "elapsed": 0.0,
             "encoding": None,
             "headers": {
@@ -134,6 +137,7 @@ def test_detect_null_byte_error(openapi_30, config_factory):
         "name": "NULL_BYTE_IN_HEADER",
         "request": {
             "body": None,
+            "body_size": None,
             "headers": {
                 "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
                 "X-Schemathesis-Probe-Null": ["\x00"],

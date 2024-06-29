@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import platform
 import re
 import threading
@@ -7,6 +8,7 @@ from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 from uuid import UUID
 
+import harfile
 import pytest
 import requests
 import yaml
@@ -17,13 +19,15 @@ from urllib3._collections import HTTPHeaderDict
 
 from schemathesis.cli import DEPRECATED_CASSETTE_PATH_OPTION_WARNING
 from schemathesis.cli.cassettes import (
+    CassetteFormat,
+    _cookie_to_har,
     filter_cassette,
     get_command_representation,
     get_prepared_request,
     write_double_quoted,
 )
 from schemathesis.cli.reporting import TEST_CASE_ID_TITLE
-from schemathesis.constants import USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Request
 
@@ -276,6 +280,64 @@ async def test_replay(
                     stored_content = serialized["body"]["string"].encode()
                     assert content == stored_content or content == stored_content.strip()
                 compare_headers(request, serialized["headers"])
+
+
+@pytest.mark.operations("__all__")
+@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
+def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args):
+    cassette_path = cassette_path.with_suffix(".har")
+    result = cli.run(
+        schema_url,
+        f"--cassette-path={cassette_path}",
+        "--cassette-format=har",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+        "--checks=all",
+        *args,
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert str(cassette_path) in result.stdout
+    assert cassette_path.exists()
+    with cassette_path.open(encoding="utf-8") as fd:
+        data = json.load(fd)
+    assert "log" in data
+    assert "entries" in data["log"]
+    assert len(data["log"]["entries"]) > 1
+
+
+def test_invalid_format():
+    with pytest.raises(ValueError, match="Invalid value for cassette format: invalid. Available formats: vcr, har"):
+        CassetteFormat.from_str("invalid")
+
+
+@pytest.mark.parametrize(
+    "value, expected",
+    (
+        (
+            "has_recent_activity=1; path=/; expires=Sat, 29 Jun 2024 18:22:49 GMT; secure; HttpOnly; SameSite=Lax",
+            [
+                harfile.Cookie(
+                    name="has_recent_activity",
+                    value="1",
+                    path="/",
+                    expires="Sat, 29 Jun 2024 18:22:49 GMT",
+                    secure=True,
+                    httpOnly=True,
+                ),
+            ],
+        ),
+        (
+            "foo=bar; spam=baz;",
+            [
+                harfile.Cookie(name="foo", value="bar"),
+                harfile.Cookie(name="spam", value="baz"),
+            ],
+        ),
+    ),
+)
+def test_cookie_to_har(value, expected):
+    assert list(_cookie_to_har(value)) == expected
 
 
 @pytest.fixture(params=["tls-verify", "cert", "cert-and-key", "proxies"])

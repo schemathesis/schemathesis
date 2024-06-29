@@ -24,6 +24,7 @@ from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..transports.headers import has_invalid_characters, is_latin_1_encodable
 from ..types import PathLike
+from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
 
 if TYPE_CHECKING:
@@ -342,6 +343,10 @@ def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: 
 
 def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
     return CodeSampleStyle.from_str(value)
+
+
+def convert_cassette_format(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CassetteFormat:
+    return CassetteFormat.from_str(value)
 
 
 def convert_data_generation_method(

@@ -291,8 +291,43 @@ Schemathesis allows you to do this with the ``--cassette-path`` command-line opt
 
     $ st run --cassette-path cassette.yaml http://127.0.0.1/schema.yaml
 
-This command will create a new YAML file that will network interactions in `VCR format <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_.
-It might look like this:
+Schemathesis supports `VCR <https://relishapp.com/vcr/vcr/v/5-1-0/docs/cassettes/cassette-format>`_ and `HAR <http://www.softwareishard.com/blog/har-12-spec/>`_ formats and stores all network interactions in a YAML file.
+
+HAR format
+~~~~~~~~~~
+
+HTTP Archive (HAR) is a JSON-based format used for tracking HTTP requests and responses. Schemathesis uses a simplified version of this format that does not include page-related information:
+
+.. code:: json
+
+    {
+        "log": {
+            "version": "1.2",
+            "creator": {
+                "name": "harfile",
+                "version": "0.2.0"
+            },
+            "browser": {
+                "name": "",
+                "version": ""
+            },
+            "entries": [
+                {
+                    "startedDateTime": "2024-06-29T20:10:29.254107+02:00",
+                    "time": 0.88,
+                    "request": {"method": "GET", "url": "http://127.0.0.1:8081/api/basic", "httpVersion": "HTTP/1.1", "cookies": [], "headers": [{"name": "User-Agent", "value": "schemathesis/3.30.4"}, {"name": "Accept-Encoding", "value": "gzip, deflate"}, {"name": "Accept", "value": "*/*"}, {"name": "Connection", "value": "keep-alive"}, {"name": "Authorization", "value": "[Filtered]"}, {"name": "X-Schemathesis-TestCaseId", "value": "ScU88H"}], "queryString": [], "headersSize": 164, "bodySize": 0},
+                    "response": {"status": 401, "statusText": "Unauthorized", "httpVersion": "HTTP/1.1", "cookies": [], "headers": [{"name": "Content-Type", "value": "application/json; charset=utf-8"}, {"name": "Content-Length", "value": "26"}, {"name": "Date", "value": "Sat, 29 Jun 2024 18:10:29 GMT"}, {"name": "Server", "value": "Python/3.11 aiohttp/3.9.3"}], "content": {"size": 26, "mimeType": "application/json; charset=utf-8", "text": "{\"detail\": \"Unauthorized\"}"}, "redirectURL": "", "headersSize": 139, "bodySize": 26},
+                    "timings": {"send": 0, "wait": 0, "receive": 0.88, "blocked": 0, "dns": 0, "connect": 0, "ssl": 0},
+                    "cache": {}
+                },
+                {
+
+To view the content of a HAR file, you can use this `HAR viewer <http://www.softwareishard.com/har/viewer/>`_.
+
+VCR format
+~~~~~~~~~~
+
+The content of a VCR cassette looks like this:
 
 .. code:: yaml
 
