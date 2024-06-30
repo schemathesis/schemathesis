@@ -7,7 +7,7 @@ from .context import RunnerContext
 
 if TYPE_CHECKING:
     from ..failures import FailureContext
-    from ..models import Case, CheckFunction
+    from ..models import Case, CheckFunction, Check
     from ..transports.responses import GenericResponse
 
 
@@ -16,6 +16,7 @@ def validate_response(
     case: Case,
     failures: RunnerContext,
     checks: tuple[CheckFunction, ...],
+    check_results: list[Check],
     additional_checks: tuple[CheckFunction, ...] = (),
 ) -> None:
     """Validate the response against the provided checks."""
@@ -28,18 +29,18 @@ def validate_response(
         exceptions.append(exc)
         if failures.is_seen_in_suite(exc):
             return
-        failures.add_failed_check(
-            Check(
-                name=name,
-                value=Status.failure,
-                response=response,
-                elapsed=response.elapsed.total_seconds(),
-                example=copied_case,
-                message=message,
-                context=context,
-                request=None,
-            )
+        failed_check = Check(
+            name=name,
+            value=Status.failure,
+            response=response,
+            elapsed=response.elapsed.total_seconds(),
+            example=copied_case,
+            message=message,
+            context=context,
+            request=None,
         )
+        failures.add_failed_check(failed_check)
+        check_results.append(failed_check)
         failures.mark_as_seen_in_suite(exc)
 
     for check in checks + additional_checks:
@@ -47,6 +48,17 @@ def validate_response(
         copied_case = case.partial_deepcopy()
         try:
             check(response, copied_case)
+            skip_check = check(response, copied_case)
+            if not skip_check:
+                passed_check = Check(
+                    name=name,
+                    value=Status.success,
+                    response=response,
+                    elapsed=response.elapsed.total_seconds(),
+                    example=copied_case,
+                    request=None,
+                )
+                check_results.append(passed_check)
         except CheckFailed as exc:
             if failures.is_seen_in_run(exc):
                 continue

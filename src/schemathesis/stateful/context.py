@@ -39,6 +39,8 @@ class RunnerContext:
     seen_in_suite: set[FailureKey] = field(default_factory=set)
     # Unique failures collected in the current suite
     failures_for_suite: list[Check] = field(default_factory=list)
+    # All checks executed in the current run
+    checks_for_step: list[Check] = field(default_factory=list)
     # Status of the current step
     current_step_status: events.StepStatus | None = None
     current_response: GenericResponse | None = None
@@ -55,9 +57,12 @@ class RunnerContext:
             return events.ScenarioStatus.INTERRUPTED
         return events.ScenarioStatus.REJECTED
 
-    def reset_step(self) -> None:
+    def reset_scenario(self) -> None:
         self.current_step_status = None
         self.current_response = None
+
+    def reset_step(self) -> None:
+        self.checks_for_step = []
 
     def step_succeeded(self) -> None:
         self.current_step_status = events.StepStatus.SUCCESS
@@ -100,4 +105,4 @@ class RunnerContext:
     def reset(self) -> None:
         self.failures_for_suite = []
         self.seen_in_suite.clear()
-        self.reset_step()
+        self.reset_scenario()

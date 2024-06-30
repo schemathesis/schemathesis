@@ -157,30 +157,25 @@ def _execute_state_machine_loop(
                     )
                 else:
                     transition_id = None
-                response: events.ResponseData | None
-                if ctx.current_response is not None:
-                    response = events.ResponseData(
-                        status_code=ctx.current_response.status_code,
-                        elapsed=ctx.current_response.elapsed.total_seconds(),
-                    )
-                else:
-                    response = None
                 status = cast(events.StepStatus, ctx.current_step_status)
                 event_queue.put(
                     events.StepFinished(
                         status=status,
                         transition_id=transition_id,
                         target=case.operation.verbose_name,
-                        response=response,
+                        case=case,
+                        response=ctx.current_response,
+                        checks=ctx.checks_for_step,
                     )
                 )
+                ctx.reset_step()
             return result
 
         def validate_response(
             self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
             ctx.current_response = response
-            validate_response(response, case, ctx, config.checks, additional_checks)
+            validate_response(response, case, ctx, config.checks, ctx.checks_for_step, additional_checks)
 
         def teardown(self) -> None:
             build_ctx = current_build_context()
@@ -190,7 +185,7 @@ def _execute_state_machine_loop(
                     is_final=build_ctx.is_final,
                 )
             )
-            ctx.reset_step()
+            ctx.reset_scenario()
             super().teardown()
 
     while True:

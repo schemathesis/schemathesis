@@ -81,7 +81,7 @@ class CassetteWriter(EventHandler):
         if isinstance(event, events.Initialized):
             # In the beginning we write metadata and start `http_interactions` list
             self.queue.put(Initialize())
-        if isinstance(event, events.AfterExecution):
+        elif isinstance(event, events.AfterExecution):
             # Seed is always present at this point, the original Optional[int] type is there because `TestResult`
             # instance is created before `seed` is generated on the hypothesis side
             seed = cast(int, event.result.seed)
@@ -97,7 +97,19 @@ class CassetteWriter(EventHandler):
                     interactions=event.result.interactions,
                 )
             )
-        if isinstance(event, events.Finished):
+        elif isinstance(event, events.AfterStatefulExecution):
+            seed = cast(int, event.result.seed)
+            self.queue.put(
+                Process(
+                    seed=seed,
+                    # Correlation ID is not used in stateful testing
+                    correlation_id="",
+                    thread_id=event.thread_id,
+                    data_generation_method=event.data_generation_method[0],
+                    interactions=event.result.interactions,
+                )
+            )
+        elif isinstance(event, events.Finished):
             self.shutdown()
 
     def shutdown(self) -> None:

@@ -1542,6 +1542,24 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
+def test_new_stateful_runner_with_cassette(tmp_path, cli, schema_url):
+    cassette_path = tmp_path / "output.yaml"
+    cli.run(
+        schema_url,
+        "--experimental=stateful-test-runner",
+        "--hypothesis-max-examples=20",
+        "--report=file.tar.gz",
+        "--exitfirst",
+        f"--cassette-path={cassette_path}",
+    )
+    assert cassette_path.exists()
+    with cassette_path.open(encoding="utf-8") as fd:
+        cassette = yaml.safe_load(fd)
+    assert len(cassette["http_interactions"]) >= 20
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
 def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
     assert (

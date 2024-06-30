@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Storing cassettes in the HAR format via the ``--cassette-format=har`` CLI option. :issue:`2299`
+- Support for cassettes in the new-style stateful test runner.
 
 **Fixed**
 
