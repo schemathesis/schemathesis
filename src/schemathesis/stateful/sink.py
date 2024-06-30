@@ -51,7 +51,7 @@ class StateMachineSink:
             responses = self.response_times.setdefault(event.target, {})
             if event.response is not None:
                 average = responses.setdefault(event.response.status_code, AverageResponseTime())
-                average.total += event.response.elapsed
+                average.total += event.response.elapsed.total_seconds()
                 average.count += 1
         elif isinstance(event, events.ScenarioFinished):
             self.scenarios[event.status] += 1

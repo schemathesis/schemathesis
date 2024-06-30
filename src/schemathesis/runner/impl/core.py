@@ -236,12 +236,54 @@ class BaseRunner:
             state_machine = self.schema.as_state_machine()
             runner = state_machine.runner(config=config)
             status = Status.success
+
+            def from_step_status(step_status: stateful_events.StepStatus) -> Status:
+                return {
+                    stateful_events.StepStatus.SUCCESS: Status.success,
+                    stateful_events.StepStatus.FAILURE: Status.failure,
+                    stateful_events.StepStatus.ERROR: Status.error,
+                    stateful_events.StepStatus.INTERRUPTED: Status.error,
+                }[step_status]
+
+            if self.store_interactions:
+                if isinstance(state_machine.schema.transport, RequestsTransport):
+
+                    def on_step_finished(event: stateful_events.StepFinished) -> None:
+                        if event.response is not None:
+                            response = cast(requests.Response, event.response)
+                            result.store_requests_response(
+                                status=from_step_status(event.status),
+                                case=event.case,
+                                response=response,
+                                checks=event.checks,
+                            )
+
+                else:
+
+                    def on_step_finished(event: stateful_events.StepFinished) -> None:
+                        if event.response is not None:
+                            response = cast(WSGIResponse, event.response)
+                            result.store_wsgi_response(
+                                status=from_step_status(event.status),
+                                case=event.case,
+                                response=response,
+                                headers=self.headers or {},
+                                elapsed=response.elapsed.total_seconds(),
+                                checks=event.checks,
+                            )
+            else:
+
+                def on_step_finished(event: stateful_events.StepFinished) -> None:
+                    return None
+
             for stateful_event in runner.execute():
                 if isinstance(stateful_event, stateful_events.SuiteFinished):
                     if stateful_event.failures and status != Status.error:
                         status = Status.failure
                     for failure in stateful_event.failures:
                         result.checks.append(failure)
+                elif isinstance(stateful_event, stateful_events.StepFinished):
+                    on_step_finished(stateful_event)
                 elif isinstance(stateful_event, stateful_events.Errored):
                     status = Status.error
                 yield events.StatefulEvent(data=stateful_event)
@@ -249,6 +291,7 @@ class BaseRunner:
             yield events.AfterStatefulExecution(
                 status=status,
                 result=SerializedTestResult.from_test_result(result),
+                data_generation_method=self.schema.data_generation_methods,
             )
 
     def _run_tests(

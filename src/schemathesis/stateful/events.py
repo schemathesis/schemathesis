@@ -6,7 +6,8 @@ from enum import Enum
 from typing import TYPE_CHECKING, Type
 
 if TYPE_CHECKING:
-    from ..models import Check
+    from ..models import Case, Check
+    from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine
 
 
@@ -178,17 +179,28 @@ class StepFinished(StatefulEvent):
     status: StepStatus
     transition_id: TransitionId | None
     target: str
-    response: ResponseData | None
+    case: Case
+    response: GenericResponse | None
+    checks: list[Check]
 
-    __slots__ = ("timestamp", "status", "transition_id", "target", "response")
+    __slots__ = ("timestamp", "status", "transition_id", "target", "case", "response", "checks")
 
     def __init__(
-        self, *, status: StepStatus, transition_id: TransitionId | None, target: str, response: ResponseData | None
+        self,
+        *,
+        status: StepStatus,
+        transition_id: TransitionId | None,
+        target: str,
+        case: Case,
+        response: GenericResponse | None,
+        checks: list[Check],
     ) -> None:
         self.status = status
         self.transition_id = transition_id
         self.target = target
+        self.case = case
         self.response = response
+        self.checks = checks
         self.timestamp = time.monotonic()
 
 
