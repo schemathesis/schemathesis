@@ -79,3 +79,44 @@ Different API operations may need different timeouts during testing. You could a
         case.call_and_validate(timeout=timeout)
 
 In the example above, the default timeout is 10 seconds, but for `GET /users` it will be 5 seconds.
+
+Generating only required parameters
+-----------------------------------
+
+Sometimes you don't need to generate all parameters for your API, and want to limit Schemathesis to only required ones.
+You can do it with the following hook:
+
+.. code-block:: python
+
+    import schemathesis
+
+
+    @schemathesis.hook
+    def before_init_operation(context, operation):
+        for parameter in operation.iter_parameters():
+            schema = parameter.definition.get("schema", {})
+            traverse_schema(schema, drop_optional_properties)
+        for alternative in operation.body:
+            schema = alternative.definition.get("schema", {})
+            traverse_schema(schema, drop_optional_properties)
+
+
+    def traverse_schema(schema, callback):
+        if isinstance(schema, dict):
+            schema = callback(schema)
+            for key, sub_item in schema.items():
+                schema[key] = traverse_schema(sub_item, callback)
+        elif isinstance(schema, list):
+            schema = [traverse_schema(sub_item, callback) for sub_item in schema]
+        return schema
+
+
+    def drop_optional_properties(schema):
+        required = schema.get("required", [])
+        properties = schema.get("properties", {})
+        for name in list(properties):
+            if name not in required:
+                del properties[name]
+        return schema
+
+This hook will remove all optional properties from the parsed API operations.
