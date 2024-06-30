@@ -8,6 +8,7 @@ Changelog
 
 - Storing cassettes in the HAR format via the ``--cassette-format=har`` CLI option. :issue:`2299`
 - Support for cassettes in the new-style stateful test runner.
+- ``--generation-with-security-parameters=false`` CLI option to disable generation of security parameters (like tokens) in test cases.
 
 **Fixed**
 

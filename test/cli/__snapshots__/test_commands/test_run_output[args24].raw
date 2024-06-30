@@ -194,6 +194,9 @@ Generic:
                                   ` ` bytes within strings.  [default: true]
   --generation-codec TEXT         Specifies the codec used for generating
                                   strings.
+  --generation-with-security-parameters TEXT
+                                  Whether to generate security parameters.
+                                  [default: true]
   --schemathesis-io-token TEXT    Schemathesis.io authentication token.
   --schemathesis-io-url TEXT      Schemathesis.io base URL.
   --schemathesis-io-telemetry TEXT

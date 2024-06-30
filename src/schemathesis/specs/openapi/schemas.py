@@ -391,7 +391,8 @@ class BaseOpenAPISchema(BaseSchema):
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
-        self.security.process_definitions(self.raw_schema, operation, self.resolver)
+        if self.generation_config.with_security_parameters:
+            self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
 
@@ -513,12 +514,13 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
-        security_parameters = self.security.get_security_definitions_as_parameters(
-            self.raw_schema, operation, self.resolver, location
-        )
-        security_parameters = [item for item in security_parameters if item["in"] == location]
-        if security_parameters:
-            definitions.extend(security_parameters)
+        if self.generation_config.with_security_parameters:
+            security_parameters = self.security.get_security_definitions_as_parameters(
+                self.raw_schema, operation, self.resolver, location
+            )
+            security_parameters = [item for item in security_parameters if item["in"] == location]
+            if security_parameters:
+                definitions.extend(security_parameters)
         if definitions:
             return self._get_parameter_serializer(definitions)
         return None
