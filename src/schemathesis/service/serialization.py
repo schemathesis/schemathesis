@@ -171,13 +171,36 @@ def _serialize_stateful_event(event: stateful_events.StatefulEvent) -> dict[str,
             "timestamp": event.timestamp,
             "exception": format_exception(event.exception, True),
         }
+    elif isinstance(event, stateful_events.StepFinished):
+        data = {
+            "timestamp": event.timestamp,
+            "status": event.status,
+            "transition_id": {
+                "name": event.transition_id.name,
+                "status_code": event.transition_id.status_code,
+                "source": event.transition_id.source,
+            }
+            if event.transition_id is not None
+            else None,
+            "target": event.target,
+            "response": {
+                "status_code": event.response.status_code,
+                "elapsed": event.response.elapsed.total_seconds(),
+            }
+            if event.response is not None
+            else None,
+        }
     else:
         data = asdict(event)
     return {"data": {event.__class__.__name__: data}}
 
 
 def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> dict[str, Any] | None:
-    return {"result": asdict(event.result)}
+    return {
+        "status": event.status,
+        "data_generation_method": event.data_generation_method,
+        "result": asdict(event.result),
+    }
 
 
 SERIALIZER_MAP = {

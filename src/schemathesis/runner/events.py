@@ -303,6 +303,8 @@ class AfterStatefulExecution(ExecutionEvent):
 
     status: Status
     result: SerializedTestResult
+    data_generation_method: list[DataGenerationMethod]
+    thread_id: int = field(default_factory=threading.get_ident)
 
 
 @dataclass
