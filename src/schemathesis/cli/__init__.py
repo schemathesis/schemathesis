@@ -726,6 +726,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     callback=callbacks.validate_generation_codec,
 )
 @click.option(
+    "--generation-with-security-parameters",
+    help="Whether to generate security parameters.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_boolean_string,
+)
+@click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
     type=str,
@@ -818,6 +826,7 @@ def run(
     no_color: bool = False,
     report_value: str | None = None,
     generation_allow_x00: bool = True,
+    generation_with_security_parameters: bool = True,
     generation_codec: str = "utf-8",
     schemathesis_io_token: str | None = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
@@ -857,7 +866,11 @@ def run(
 
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
 
-    generation_config = generation.GenerationConfig(allow_x00=generation_allow_x00, codec=generation_codec)
+    generation_config = generation.GenerationConfig(
+        allow_x00=generation_allow_x00,
+        codec=generation_codec,
+        with_security_parameters=generation_with_security_parameters,
+    )
 
     report: ReportToService | click.utils.LazyFile | None
     if report_value is None:

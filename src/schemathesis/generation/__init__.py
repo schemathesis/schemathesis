@@ -77,5 +77,7 @@ class GenerationConfig:
     allow_x00: bool = True
     # Generate strings using the given codec
     codec: str | None = "utf-8"
+    # Whether to generate security parameters
+    with_security_parameters: bool = True
     # Header generation configuration
     headers: HeaderConfig = field(default_factory=HeaderConfig)
