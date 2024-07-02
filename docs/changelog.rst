@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.31.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Generating negative test cases for path and query parameters. :issue:`2312`
+
 .. _v3.31.0:
 
 :version:`3.31.0 <v3.30.4...v3.31.0>` - 2024-06-30

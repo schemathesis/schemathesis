@@ -81,6 +81,10 @@ class MutationContext:
     def is_path_location(self) -> bool:
         return self.location == "path"
 
+    @property
+    def is_query_location(self) -> bool:
+        return self.location == "query"
+
     def mutate(self, draw: Draw) -> Schema:
         # On the top level, Schemathesis creates "object" schemas for all parameter "in" values except "body", which is
         # taken as-is. Therefore, we can only apply mutations that won't change the Open API semantics of the schema.
@@ -203,8 +207,11 @@ def change_type(context: MutationContext, draw: Draw, schema: Schema) -> Mutatio
     if context.media_type == "application/x-www-form-urlencoded":
         # Form data should be an object, do not change it
         return MutationResult.FAILURE
-    # Headers are always strings, can't negate this
-    if context.is_header_location:
+    # For headers, query and path parameters, if the current type is string, then it already
+    # includes all possible values as those parameters will be stringified before sending,
+    # therefore it can't be negated.
+    types = get_type(schema)
+    if "string" in types and (context.is_header_location or context.is_path_location or context.is_query_location):
         return MutationResult.FAILURE
     candidates = _get_type_candidates(context, schema)
     if not candidates:
