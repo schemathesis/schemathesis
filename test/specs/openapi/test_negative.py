@@ -92,43 +92,46 @@ def test_top_level_strategy(data, location, schema):
 
 
 @pytest.mark.parametrize(
-    "mutation, schema, validate",
+    "mutation, schema, location, validate",
     (
         # No constraints besides `type`
-        (negate_constraints, {"type": "integer"}, True),
+        (negate_constraints, {"type": "integer"}, "body", True),
         # Missing type (i.e. all types are possible)
-        (change_type, {}, True),
+        (change_type, {}, "body", True),
         # All types explicitly
-        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}, True),
+        (change_type, {"type": ["string", "integer", "number", "object", "array", "boolean", "null"]}, "body", True),
         # No properties to remove
-        (remove_required_property, {}, True),
+        (remove_required_property, {}, "body", True),
         # Non-"object" type
-        (remove_required_property, {"type": "array"}, True),
+        (remove_required_property, {"type": "array"}, "body", True),
         # No properties at all
-        (change_properties, {}, True),
+        (change_properties, {}, "body", True),
         # No properties that can be mutated
-        (change_properties, {"properties": {"foo": {}}}, True),
+        (change_properties, {"properties": {"foo": {}}}, "body", True),
         # No items
-        (change_items, {"type": "array"}, True),
+        (change_items, {"type": "array"}, "body", True),
         # `items` accept everything
-        (change_items, {"type": "array", "items": {}}, True),
-        (change_items, {"type": "array", "items": True}, False),
+        (change_items, {"type": "array", "items": {}}, "body", True),
+        (change_items, {"type": "array", "items": True}, "body", False),
         # `items` is equivalent to accept-everything schema
-        (change_items, {"type": "array", "items": {"uniqueItems": False}}, True),
+        (change_items, {"type": "array", "items": {"uniqueItems": False}}, "body", True),
         # The first element could be anything
-        (change_items, {"type": "array", "items": [{}]}, True),
+        (change_items, {"type": "array", "items": [{}]}, "body", True),
+        # Query and path parameters are always strings
+        (change_type, {"type": "string"}, "path", True),
+        (change_type, {"type": "string"}, "query", True),
     ),
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
-def test_failing_mutations(data, mutation, schema, validate):
+def test_failing_mutations(data, mutation, schema, location, validate):
     if validate:
         validate_schema(schema)
     original_schema = fast_deepcopy(schema)
     # When mutation can't be applied
     # Then it returns "failure"
     assert (
-        mutation(MutationContext(schema, {}, "body", "application/json"), data.draw, schema) == MutationResult.FAILURE
+        mutation(MutationContext(schema, {}, location, "application/json"), data.draw, schema) == MutationResult.FAILURE
     )
     # And doesn't mutate the input schema
     assert schema == original_schema
@@ -203,7 +206,7 @@ def test_successful_mutations(data, mutation, schema):
         {
             "type": "object",
             "properties": {
-                "foo": {"type": "string"},
+                "foo": {"type": "integer"},
             },
             "required": [
                 "foo",
