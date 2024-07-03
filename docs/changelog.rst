@@ -8,6 +8,10 @@ Changelog
 
 - Generating negative test cases for path and query parameters. :issue:`2312`
 
+**Changed**
+
+- Do not consider ignoring additional parameters as a failure in ``negative_data_rejection``.
+
 .. _v3.31.0:
 
 :version:`3.31.0 <v3.30.4...v3.31.0>` - 2024-06-30

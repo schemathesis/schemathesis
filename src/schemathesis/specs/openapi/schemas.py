@@ -19,6 +19,7 @@ from typing import (
     Mapping,
     NoReturn,
     Sequence,
+    Type,
     TypeVar,
     cast,
 )
@@ -615,6 +616,12 @@ class BaseOpenAPISchema(BaseSchema):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         return operation.definition.raw.get("tags")
 
+    @property
+    def validator_cls(self) -> Type[jsonschema.Validator]:
+        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+            return jsonschema.Draft202012Validator
+        return jsonschema.Draft4Validator
+
     def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
@@ -658,13 +665,9 @@ class BaseOpenAPISchema(BaseSchema):
         resolver = ConvertingResolver(
             self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
         )
-        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
-            cls = jsonschema.Draft202012Validator
-        else:
-            cls = jsonschema.Draft4Validator
         with in_scopes(resolver, scopes):
             try:
-                jsonschema.validate(data, schema, cls=cls, resolver=resolver)
+                jsonschema.validate(data, schema, cls=self.validator_cls, resolver=resolver)
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(operation.verbose_name, exc)
                 ctx = failures.ValidationErrorContext.from_exception(exc, output_config=operation.schema.output_config)
