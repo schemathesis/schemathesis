@@ -119,6 +119,19 @@ def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
     )
 
 
+@dataclass
+class GenerationMetadata:
+    """Stores various information about how data is generated."""
+
+    query: DataGenerationMethod | None
+    path_parameters: DataGenerationMethod | None
+    headers: DataGenerationMethod | None
+    cookies: DataGenerationMethod | None
+    body: DataGenerationMethod | None
+
+    __slots__ = ("query", "path_parameters", "headers", "cookies", "body")
+
+
 @dataclass(repr=False)
 class Case:
     """A single test case parameters."""
@@ -138,6 +151,8 @@ class Case:
     # The media type for cases with a payload. For example, "application/json"
     media_type: str | None = None
     source: CaseSource | None = None
+
+    meta: GenerationMetadata | None = None
 
     # The way the case was generated (None for manually crafted ones)
     data_generation_method: DataGenerationMethod | None = None

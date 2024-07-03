@@ -145,13 +145,46 @@ def negative_data_rejection(response: GenericResponse, case: Case) -> bool | Non
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
-    if case.data_generation_method and case.data_generation_method.is_negative and 200 <= response.status_code < 300:
+    if (
+        case.data_generation_method
+        and case.data_generation_method.is_negative
+        and 200 <= response.status_code < 300
+        and not has_only_additional_properties_in_non_body_parameters(case)
+    ):
         exc_class = get_negative_rejection_error(case.operation.verbose_name, response.status_code)
         raise exc_class(
             failures.AcceptedNegativeData.title,
             context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),
         )
     return None
+
+
+def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
+    # Check if the case contains only additional properties in query, headers, or cookies.
+    # This function is used to determine if negation is solely in the form of extra properties,
+    # which are often ignored for backward-compatibility by the tested apps
+    from ._hypothesis import get_schema_for_location
+
+    meta = case.meta
+    if meta is None:
+        # Ignore manually created cases
+        return False
+    if (meta.body and meta.body.is_negative) or (meta.path_parameters and meta.path_parameters.is_negative):
+        # Body or path negations always imply other negations
+        return False
+    validator_cls = case.operation.schema.validator_cls  # type: ignore[attr-defined]
+    for container in ("query", "headers", "cookies"):
+        meta_for_location = getattr(meta, container)
+        value = getattr(case, container)
+        if value is not None and meta_for_location is not None and meta_for_location.is_negative:
+            parameters = getattr(case.operation, container)
+            value_without_additional_properties = {k: v for k, v in value.items() if k in parameters}
+            schema = get_schema_for_location(case.operation, container, parameters)
+            if not validator_cls(schema).is_valid(value_without_additional_properties):
+                # Other types of negation found
+                return False
+    # Only additional properties are added
+    return True
 
 
 def use_after_free(response: GenericResponse, original: Case) -> bool | None:

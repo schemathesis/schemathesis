@@ -75,6 +75,7 @@ def test_get_examples(location, swagger_20):
         generation_time=ANY,
         data_generation_method=DataGenerationMethod.positive,
         media_type=media_type,
+        meta=ANY,
         **{container: expected},
     )
 

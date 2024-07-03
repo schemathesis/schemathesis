@@ -1,6 +1,14 @@
 import pytest
 
-from schemathesis.specs.openapi.checks import ResourcePath, _is_prefix_operation
+import schemathesis
+from schemathesis.generation import DataGenerationMethod
+from schemathesis.models import Case, GenerationMetadata
+from schemathesis.specs.openapi.checks import (
+    ResourcePath,
+    _is_prefix_operation,
+    has_only_additional_properties_in_non_body_parameters,
+    negative_data_rejection,
+)
 
 
 @pytest.mark.parametrize(
@@ -64,3 +72,92 @@ from schemathesis.specs.openapi.checks import ResourcePath, _is_prefix_operation
 )
 def test_is_prefix_operation(lhs, lhs_vars, rhs, rhs_vars, expected):
     assert _is_prefix_operation(ResourcePath(lhs, lhs_vars), ResourcePath(rhs, rhs_vars)) == expected
+
+
+def build_metadata(path_parameters=None, query=None, headers=None, cookies=None, body=None):
+    return GenerationMetadata(path_parameters=path_parameters, query=query, headers=headers, cookies=cookies, body=body)
+
+
+@pytest.fixture
+def sample_schema(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "key",
+                        "schema": {"type": "integer", "minimum": 5},
+                    },
+                    {
+                        "in": "headers",
+                        "name": "X-Key",
+                        "schema": {"type": "integer", "minimum": 5},
+                    },
+                ]
+            }
+        }
+    }
+    return empty_open_api_3_schema
+
+
+@pytest.mark.parametrize(
+    "kwargs, expected",
+    (
+        ({}, False),
+        (
+            {"meta": build_metadata(body=DataGenerationMethod.negative)},
+            False,
+        ),
+        (
+            {
+                "query": {"key": 1},
+                "meta": build_metadata(query=DataGenerationMethod.negative),
+            },
+            False,
+        ),
+        (
+            {
+                "query": {"key": 1},
+                "headers": {"X-Key": 42},
+                "meta": build_metadata(query=DataGenerationMethod.negative),
+            },
+            False,
+        ),
+        (
+            {
+                "query": {"key": 5, "unknown": 3},
+                "meta": build_metadata(query=DataGenerationMethod.negative),
+            },
+            True,
+        ),
+        (
+            {
+                "query": {"key": 5, "unknown": 3},
+                "headers": {"X-Key": 42},
+                "meta": build_metadata(query=DataGenerationMethod.negative),
+            },
+            True,
+        ),
+    ),
+)
+def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
+    schema = schemathesis.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    case = Case(operation=operation, generation_time=0.0, **kwargs)
+    assert has_only_additional_properties_in_non_body_parameters(case) is expected
+
+
+def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
+    # See GH-2312
+    response = response_factory.requests()
+    schema = schemathesis.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    case = Case(
+        operation=operation,
+        generation_time=0.0,
+        meta=build_metadata(query=DataGenerationMethod.negative),
+        data_generation_method=DataGenerationMethod.negative,
+        query={"key": 5, "unknown": 3},
+    )
+    assert negative_data_rejection(response, case) is None
