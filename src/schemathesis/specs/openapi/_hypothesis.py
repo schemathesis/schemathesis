@@ -287,6 +287,8 @@ class ValueContainer:
     location: str
     generator: DataGenerationMethod | None
 
+    __slots__ = ("value", "location", "generator")
+
     @property
     def is_generated(self) -> bool:
         """If value was generated."""
