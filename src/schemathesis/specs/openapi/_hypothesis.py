@@ -25,7 +25,7 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
 from ...internal.validation import is_illegal_surrogate
-from ...models import APIOperation, Case, cant_serialize
+from ...models import APIOperation, Case, GenerationMetadata, cant_serialize
 from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
@@ -36,7 +36,7 @@ from .formats import STRING_FORMATS
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
-from .parameters import OpenAPIBody, parameters_to_json_schema
+from .parameters import OpenAPIBody, OpenAPIParameter, parameters_to_json_schema
 from .utils import is_header_location
 
 HEADER_FORMAT = "_header_value"
@@ -207,6 +207,13 @@ def get_case_strategy(
         query=query_.value,
         body=body_.value,
         data_generation_method=generator,
+        meta=GenerationMetadata(
+            query=query_.generator,
+            path_parameters=path_parameters_.generator,
+            headers=headers_.generator,
+            cookies=cookies_.generator,
+            body=body_.generator,
+        ),
     )
     auth_context = auths.AuthContext(
         operation=operation,
@@ -347,6 +354,22 @@ def can_negate_headers(operation: APIOperation, location: str) -> bool:
     return any(header != {"type": "string"} for header in headers.values())
 
 
+def get_schema_for_location(
+    operation: APIOperation, location: str, parameters: Iterable[OpenAPIParameter]
+) -> dict[str, Any]:
+    schema = parameters_to_json_schema(operation, parameters)
+    if location == "path":
+        if not operation.schema.validate_schema:
+            # If schema validation is disabled, we try to generate data even if the parameter definition
+            # contains errors.
+            # In this case, we know that the `required` keyword should always be `True`.
+            schema["required"] = list(schema["properties"])
+        for prop in schema.get("properties", {}).values():
+            if prop.get("type") == "string":
+                prop.setdefault("minLength", 1)
+    return operation.schema.prepare_schema(schema)
+
+
 def get_parameters_strategy(
     operation: APIOperation,
     strategy_factory: StrategyFactory,
@@ -361,17 +384,7 @@ def get_parameters_strategy(
         nested_cache_key = (strategy_factory, location, tuple(sorted(exclude)))
         if operation in _PARAMETER_STRATEGIES_CACHE and nested_cache_key in _PARAMETER_STRATEGIES_CACHE[operation]:
             return _PARAMETER_STRATEGIES_CACHE[operation][nested_cache_key]
-        schema = parameters_to_json_schema(operation, parameters)
-        if location == "path":
-            if not operation.schema.validate_schema:
-                # If schema validation is disabled, we try to generate data even if the parameter definition
-                # contains errors.
-                # In this case, we know that the `required` keyword should always be `True`.
-                schema["required"] = list(schema["properties"])
-            for prop in schema.get("properties", {}).values():
-                if prop.get("type") == "string":
-                    prop.setdefault("minLength", 1)
-        schema = operation.schema.prepare_schema(schema)
+        schema = get_schema_for_location(operation, location, parameters)
         for name in exclude:
             # Values from `exclude` are not necessarily valid for the schema - they come from user-defined examples
             # that may be invalid
