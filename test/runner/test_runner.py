@@ -17,6 +17,7 @@ from hypothesis import Phase
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
+from schemathesis import experimental
 from schemathesis._hypothesis import add_examples
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
@@ -24,10 +25,11 @@ from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
-from schemathesis.runner.impl.core import deduplicate_errors, get_wsgi_auth, has_too_many_responses_with_status
+from schemathesis.runner.impl.core import deduplicate_errors, has_too_many_responses_with_status
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
-from schemathesis.transports.auth import get_requests_auth
+from schemathesis.stateful import Stateful
+from schemathesis.transports.auth import get_requests_auth, get_wsgi_auth
 
 
 def execute(schema, **options) -> events.Finished:
@@ -1308,3 +1310,21 @@ def test_deduplicate_errors():
         ),
     ]
     assert len(list(deduplicate_errors(errors))) == 1
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("get_user", "create_user", "update_user")
+def test_stateful_auth(any_app_schema):
+    experimental.STATEFUL_TEST_RUNNER.enable()
+    experimental.STATEFUL_ONLY.enable()
+    _, *_, after_execution, _ = from_schema(
+        any_app_schema,
+        store_interactions=True,
+        stateful=Stateful.links,
+        auth=("admin", "password"),
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
+    ).execute()
+    interactions = after_execution.result.interactions
+    assert len(interactions) > 0
+    for interaction in interactions:
+        assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
