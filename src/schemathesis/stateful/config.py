@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import hypothesis
+    from requests.auth import HTTPDigestAuth
 
     from ..models import CheckFunction
+    from ..types import RawAuth
 
 
 def _default_checks_factory() -> tuple[CheckFunction, ...]:
@@ -43,6 +45,7 @@ class StatefulTestRunnerConfig:
     headers: dict[str, str] = field(default_factory=dict)
     # Timeout for each request in milliseconds
     request_timeout: int | None = None
+    auth: HTTPDigestAuth | RawAuth | None = None
 
     def __post_init__(self) -> None:
         import hypothesis

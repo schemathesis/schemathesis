@@ -7,7 +7,7 @@ from .context import RunnerContext
 
 if TYPE_CHECKING:
     from ..failures import FailureContext
-    from ..models import Case, CheckFunction, Check
+    from ..models import Case, Check, CheckFunction
     from ..transports.responses import GenericResponse
 
 
