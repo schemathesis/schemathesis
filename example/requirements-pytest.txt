@@ -15,7 +15,7 @@ attrs==23.1.0
     #   referencing
 backoff==2.2.1
     # via schemathesis
-certifi==2023.11.17
+certifi==2024.7.4
     # via
     #   httpcore
     #   httpx
