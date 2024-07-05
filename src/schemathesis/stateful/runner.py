@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type, cast
 
+import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
 
@@ -116,6 +117,10 @@ def _execute_state_machine_loop(
     call_kwargs: dict[str, Any] = {"headers": config.headers}
     if isinstance(state_machine.schema.transport, RequestsTransport):
         call_kwargs["timeout"] = prepare_timeout(config.request_timeout)
+        session = requests.Session()
+        if config.auth is not None:
+            session.auth = config.auth
+        call_kwargs["session"] = session
 
     class InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""

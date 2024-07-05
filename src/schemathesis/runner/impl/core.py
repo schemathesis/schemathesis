@@ -20,7 +20,7 @@ from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
-from requests.auth import HTTPDigestAuth, _basic_auth_str
+from requests.auth import HTTPDigestAuth
 from urllib3.exceptions import InsecureRequestWarning
 
 from ... import experimental, failures, hooks
@@ -69,6 +69,7 @@ from ...stateful import events as stateful_events
 from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
 from ...transports import RequestsTransport, prepare_timeout
+from ...transports.auth import get_requests_auth, prepare_wsgi_headers
 from ...types import RawAuth, RequestCert
 from ...utils import capture_hypothesis_output
 from .. import probes
@@ -226,12 +227,19 @@ class BaseRunner:
                 verbose_name="Stateful tests",
                 data_generation_method=self.schema.data_generation_methods,
             )
+            headers = self.headers or {}
+            if isinstance(self.schema.transport, RequestsTransport):
+                auth = get_requests_auth(self.auth, self.auth_type)
+            else:
+                auth = None
+                headers = prepare_wsgi_headers(headers, self.auth, self.auth_type)
             config = stateful_runner.StatefulTestRunnerConfig(
                 checks=tuple(self.checks),
-                headers=self.headers or {},
+                headers=headers,
                 hypothesis_settings=self.hypothesis_settings,
                 exit_first=self.exit_first,
                 request_timeout=self.request_timeout,
+                auth=auth,
             )
             state_machine = self.schema.as_state_machine()
             runner = state_machine.runner(config=config)
@@ -261,13 +269,15 @@ class BaseRunner:
                 else:
 
                     def on_step_finished(event: stateful_events.StepFinished) -> None:
+                        from ...transports.responses import WSGIResponse
+
                         if event.response is not None:
                             response = cast(WSGIResponse, event.response)
                             result.store_wsgi_response(
                                 status=from_step_status(event.status),
                                 case=event.case,
                                 response=response,
-                                headers=self.headers or {},
+                                headers=headers,
                                 elapsed=response.elapsed.total_seconds(),
                                 checks=event.checks,
                             )
@@ -997,7 +1007,7 @@ def wsgi_test(
     with ErrorCollector(errors):
         _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
-        headers = _prepare_wsgi_headers(headers, auth, auth_type)
+        headers = prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
             args = (
                 checks,
@@ -1053,26 +1063,6 @@ def _wsgi_test(
         if store_interactions:
             result.store_wsgi_response(case, response, headers, response.elapsed.total_seconds(), status, check_results)
     return response
-
-
-def _prepare_wsgi_headers(
-    headers: dict[str, Any] | None, auth: RawAuth | None, auth_type: str | None
-) -> dict[str, Any]:
-    headers = headers or {}
-    if "user-agent" not in {header.lower() for header in headers}:
-        headers["User-Agent"] = USER_AGENT
-    wsgi_auth = get_wsgi_auth(auth, auth_type)
-    if wsgi_auth:
-        headers["Authorization"] = wsgi_auth
-    return headers
-
-
-def get_wsgi_auth(auth: RawAuth | None, auth_type: str | None) -> str | None:
-    if auth:
-        if auth_type == "digest":
-            raise ValueError("Digest auth is not supported for WSGI apps")
-        return _basic_auth_str(*auth)
-    return None
 
 
 def asgi_test(

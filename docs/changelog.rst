@@ -4,6 +4,14 @@ Changelog
 :version:`Unreleased <v3.31.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support for authentication via CLI arguments in new-style stateful tests.
+
+**Fixed**
+
+- WSGI support for new-style stateful tests.
+
 .. _v3.31.1:
 
 :version:`3.31.1 <v3.31.0...v3.31.1>` - 2024-07-03
