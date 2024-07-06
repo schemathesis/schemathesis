@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
@@ -30,6 +30,37 @@ Target = Callable[[TargetContext], float]
 DEFAULT_TARGETS = ()
 OPTIONAL_TARGETS = (response_time,)
 ALL_TARGETS: tuple[Target, ...] = DEFAULT_TARGETS + OPTIONAL_TARGETS
+
+
+@dataclass
+class TargetMetricCollector:
+    """Collect multiple observations for target metrics."""
+
+    targets: list[Target]
+    observations: dict[str, list[int | float]] = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.observations = {target.__name__: [] for target in self.targets}
+
+    def reset(self) -> None:
+        """Reset all collected observations."""
+        for target in self.targets:
+            self.observations[target.__name__].clear()
+
+    def store(self, case: Case, response: GenericResponse) -> None:
+        """Calculate target metrics & store them."""
+        context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
+        for target in self.targets:
+            self.observations[target.__name__].append(target(context))
+
+    def maximize(self) -> None:
+        """Give feedback to the Hypothesis engine, so it maximizes the aggregated metrics."""
+        import hypothesis
+
+        for target in self.targets:
+            # Currently aggregation is just a sum
+            metric = sum(self.observations[target.__name__])
+            hypothesis.target(metric, label=target.__name__)
 
 
 def register(target: Target) -> Target:

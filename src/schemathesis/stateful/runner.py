@@ -12,6 +12,7 @@ from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
 
 from ..exceptions import CheckFailed
+from ..targets import TargetMetricCollector
 from . import events
 from .config import StatefulTestRunnerConfig
 from .context import RunnerContext
@@ -113,7 +114,7 @@ def _execute_state_machine_loop(
 
     from ..transports import RequestsTransport, prepare_timeout
 
-    ctx = RunnerContext()
+    ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.targets))
 
     call_kwargs: dict[str, Any] = {"headers": config.headers}
     if isinstance(state_machine.schema.transport, RequestsTransport):
@@ -190,6 +191,7 @@ def _execute_state_machine_loop(
         def validate_response(
             self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
+            ctx.collect_metric(case, response)
             ctx.current_response = response
             validate_response(
                 response=response,
@@ -208,6 +210,7 @@ def _execute_state_machine_loop(
                     is_final=build_ctx.is_final,
                 )
             )
+            ctx.maximize_metrics()
             ctx.reset_scenario()
             super().teardown()
 

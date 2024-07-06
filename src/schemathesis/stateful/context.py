@@ -5,10 +5,11 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Tuple, Type, Union
 
 from ..exceptions import CheckFailed
+from ..targets import TargetMetricCollector
 from . import events
 
 if TYPE_CHECKING:
-    from ..models import Check
+    from ..models import Case, Check
     from ..transports.responses import GenericResponse
 
 FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
@@ -44,6 +45,7 @@ class RunnerContext:
     # Status of the current step
     current_step_status: events.StepStatus | None = None
     current_response: GenericResponse | None = None
+    metric_collector: TargetMetricCollector = field(default_factory=lambda: TargetMetricCollector(targets=[]))
 
     @property
     def current_scenario_status(self) -> events.ScenarioStatus:
@@ -102,7 +104,14 @@ class RunnerContext:
     def add_failed_check(self, check: Check) -> None:
         self.failures_for_suite.append(check)
 
+    def collect_metric(self, case: Case, response: GenericResponse) -> None:
+        self.metric_collector.store(case, response)
+
+    def maximize_metrics(self) -> None:
+        self.metric_collector.maximize()
+
     def reset(self) -> None:
         self.failures_for_suite = []
         self.seen_in_suite.clear()
         self.reset_scenario()
+        self.metric_collector.reset()
