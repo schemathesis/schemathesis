@@ -39,6 +39,10 @@ def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
     return None
 
 
+def _make_max_response_time_failure_message(elapsed_time: float, max_response_time: int) -> str:
+    return f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
+
+
 DEFAULT_CHECKS: tuple[CheckFunction, ...] = (not_a_server_error,)
 OPTIONAL_CHECKS = (
     status_code_conformance,
