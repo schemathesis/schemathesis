@@ -388,3 +388,33 @@ def test_multiple_source_links(runner_factory):
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
+
+
+def test_max_response_time_valid(runner_factory):
+    runner = runner_factory(
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+            "max_response_time": 10000,
+        },
+    )
+    result = collect_result(runner)
+    assert not result.errors, result.errors
+    assert result.events[-4].checks[-1].name == "max_response_time"
+
+
+def test_max_response_time_invalid(runner_factory):
+    runner = runner_factory(
+        app_kwargs={"slowdown": 0.005},
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
+            "max_response_time": 5,
+        },
+    )
+    failures = []
+    for event in runner.execute():
+        assert not isinstance(event, events.Errored)
+        if isinstance(event, events.SuiteFinished):
+            failures.extend(event.failures)
+    assert len(failures) == 1
+    assert failures[0].message.startswith("Actual")
+    assert failures[0].message.endswith("Limit: 5.00ms")

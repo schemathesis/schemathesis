@@ -191,7 +191,14 @@ def _execute_state_machine_loop(
             self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
             ctx.current_response = response
-            validate_response(response, case, ctx, config.checks, ctx.checks_for_step, additional_checks)
+            validate_response(
+                response=response,
+                case=case,
+                ctx=ctx,
+                checks=config.checks,
+                additional_checks=additional_checks,
+                max_response_time=config.max_response_time,
+            )
 
         def teardown(self) -> None:
             build_ctx = current_build_context()
