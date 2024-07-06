@@ -6,8 +6,8 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type, cast
 
-import requests
 import hypothesis
+import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
 
@@ -133,6 +133,16 @@ def _execute_state_machine_loop(
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return call_kwargs
+
+        if config.override is not None:
+
+            def before_call(self, case: Case) -> None:
+                for location, entry in config.override.for_operation(case.operation).items():  # type: ignore[union-attr]
+                    if entry:
+                        container = getattr(case, location) or {}
+                        container.update(entry)
+                        setattr(case, location, container)
+                return super().before_call(case)
 
         def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
             # Checking the stop event once inside `step` is sufficient as it is called frequently

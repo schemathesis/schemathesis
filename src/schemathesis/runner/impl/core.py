@@ -241,6 +241,7 @@ class BaseRunner:
                 request_timeout=self.request_timeout,
                 auth=auth,
                 seed=self.seed,
+                override=self.override,
             )
             state_machine = self.schema.as_state_machine()
             runner = state_machine.runner(config=config)

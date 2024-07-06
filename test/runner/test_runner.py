@@ -19,6 +19,7 @@ from requests.auth import HTTPDigestAuth
 import schemathesis
 from schemathesis import experimental
 from schemathesis._hypothesis import add_examples
+from schemathesis._override import CaseOverride
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
@@ -1312,18 +1313,19 @@ def test_deduplicate_errors():
     assert len(list(deduplicate_errors(errors))) == 1
 
 
+STATEFUL_KWARGS = {
+    "store_interactions": True,
+    "stateful": Stateful.links,
+    "hypothesis_settings": hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
+}
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_auth(any_app_schema):
     experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()
-    _, *_, after_execution, _ = from_schema(
-        any_app_schema,
-        store_interactions=True,
-        stateful=Stateful.links,
-        auth=("admin", "password"),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
-    ).execute()
+    _, *_, after_execution, _ = from_schema(any_app_schema, auth=("admin", "password"), **STATEFUL_KWARGS).execute()
     interactions = after_execution.result.interactions
     assert len(interactions) > 0
     for interaction in interactions:
@@ -1337,13 +1339,7 @@ def test_stateful_seed(real_app_schema):
     experimental.STATEFUL_ONLY.enable()
     requests = []
     for _ in range(3):
-        _, *_, after_execution, _ = from_schema(
-            real_app_schema,
-            store_interactions=True,
-            stateful=Stateful.links,
-            hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
-            seed=42,
-        ).execute()
+        _, *_, after_execution, _ = from_schema(real_app_schema, seed=42, **STATEFUL_KWARGS).execute()
         current = []
         for interaction in after_execution.result.interactions:
             data = interaction.request.__dict__
@@ -1351,3 +1347,23 @@ def test_stateful_seed(real_app_schema):
             current.append(data)
         requests.append(current)
     assert requests[0] == requests[1] == requests[2]
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("get_user", "create_user", "update_user")
+def test_stateful_override(real_app_schema):
+    experimental.STATEFUL_TEST_RUNNER.enable()
+    experimental.STATEFUL_ONLY.enable()
+    _, *_, after_execution, _ = from_schema(
+        real_app_schema,
+        override=CaseOverride(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
+        hypothesis_settings=hypothesis.settings(max_examples=30, deadline=None, stateful_step_count=2),
+        store_interactions=True,
+        stateful=Stateful.links,
+    ).execute()
+    interactions = after_execution.result.interactions
+    assert len(interactions) > 0
+    get_requests = [i.request for i in interactions if i.request.method == "GET"]
+    assert len(get_requests) > 0
+    for request in get_requests:
+        assert "/api/users/42?" in request.uri

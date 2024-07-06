@@ -106,7 +106,6 @@ class BaseOpenAPISchema(BaseSchema):
     # Inline references cache can be populated from multiple threads, therefore we need some synchronisation to avoid
     # excessive resolving
     _inline_reference_cache_lock: RLock = field(default_factory=RLock)
-    _override: CaseOverride | None = field(default=None)
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
 
     @property
