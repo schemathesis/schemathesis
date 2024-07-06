@@ -46,6 +46,7 @@ class StatefulTestRunnerConfig:
     # Timeout for each request in milliseconds
     request_timeout: int | None = None
     auth: HTTPDigestAuth | RawAuth | None = None
+    seed: int | None = None
 
     def __post_init__(self) -> None:
         import hypothesis

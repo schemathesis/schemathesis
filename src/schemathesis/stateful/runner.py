@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type, cast
 
 import requests
+import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
 
@@ -122,7 +123,7 @@ def _execute_state_machine_loop(
             session.auth = config.auth
         call_kwargs["session"] = session
 
-    class InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
+    class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
 
         def setup(self) -> None:
@@ -192,6 +193,11 @@ def _execute_state_machine_loop(
             )
             ctx.reset_scenario()
             super().teardown()
+
+    if config.seed is not None:
+        InstrumentedStateMachine = hypothesis.seed(config.seed)(_InstrumentedStateMachine)
+    else:
+        InstrumentedStateMachine = _InstrumentedStateMachine
 
     while True:
         # This loop is running until no new failures are found in a single iteration

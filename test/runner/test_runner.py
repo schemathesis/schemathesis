@@ -1328,3 +1328,26 @@ def test_stateful_auth(any_app_schema):
     assert len(interactions) > 0
     for interaction in interactions:
         assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("get_user", "create_user", "update_user")
+def test_stateful_seed(real_app_schema):
+    experimental.STATEFUL_TEST_RUNNER.enable()
+    experimental.STATEFUL_ONLY.enable()
+    requests = []
+    for _ in range(3):
+        _, *_, after_execution, _ = from_schema(
+            real_app_schema,
+            store_interactions=True,
+            stateful=Stateful.links,
+            hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
+            seed=42,
+        ).execute()
+        current = []
+        for interaction in after_execution.result.interactions:
+            data = interaction.request.__dict__
+            del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
+            current.append(data)
+        requests.append(current)
+    assert requests[0] == requests[1] == requests[2]

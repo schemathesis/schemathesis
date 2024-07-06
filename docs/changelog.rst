@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for authentication via CLI arguments in new-style stateful tests.
+- Support for ``--hypothesis-seed`` in new-style stateful tests.
 
 **Fixed**
 
