@@ -418,3 +418,23 @@ def test_max_response_time_invalid(runner_factory):
     assert len(failures) == 1
     assert failures[0].message.startswith("Actual")
     assert failures[0].message.endswith("Limit: 5.00ms")
+
+
+def test_targeted(runner_factory):
+    calls = 0
+
+    def custom_target(ctx):
+        nonlocal calls
+        calls += 1
+        return 1.0
+
+    runner = runner_factory(
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=5),
+            "checks": (not_a_server_error,),
+            "targets": [custom_target],
+        },
+    )
+    result = collect_result(runner)
+    assert not result.errors, result.errors
+    assert calls > 0

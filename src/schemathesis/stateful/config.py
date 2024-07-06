@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
     from .._override import CaseOverride
     from ..models import CheckFunction
+    from ..targets import Target
     from ..types import RawAuth
 
 
@@ -50,6 +51,7 @@ class StatefulTestRunnerConfig:
     seed: int | None = None
     override: CaseOverride | None = None
     max_response_time: int | None = None
+    targets: list[Target] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         import hypothesis
