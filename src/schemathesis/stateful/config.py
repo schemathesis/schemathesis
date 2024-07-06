@@ -7,6 +7,7 @@ if TYPE_CHECKING:
     import hypothesis
     from requests.auth import HTTPDigestAuth
 
+    from .._override import CaseOverride
     from ..models import CheckFunction
     from ..types import RawAuth
 
@@ -47,6 +48,7 @@ class StatefulTestRunnerConfig:
     request_timeout: int | None = None
     auth: HTTPDigestAuth | RawAuth | None = None
     seed: int | None = None
+    override: CaseOverride | None = None
 
     def __post_init__(self) -> None:
         import hypothesis
