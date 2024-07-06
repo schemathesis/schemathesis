@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 
 import hypothesis
@@ -20,6 +21,7 @@ class AppConfig:
     unsatisfiable: bool = False
     custom_headers: dict | None = None
     multiple_source_links: bool = False
+    slowdown: float | int | None = None
 
 
 @pytest.fixture
@@ -179,6 +181,8 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
+        if config.slowdown:
+            time.sleep(config.slowdown)
         user = users.get(user_id)
         if user:
             return jsonify(user)
@@ -192,6 +196,8 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/users", methods=["POST"])
     def create_user():
+        if config.slowdown:
+            time.sleep(config.slowdown)
         data = request.get_json()
         name = data.get("name")
         expect_custom_headers()
@@ -218,6 +224,8 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/users/<int:user_id>", methods=["PATCH"])
     def update_user(user_id):
+        if config.slowdown:
+            time.sleep(config.slowdown)
         user = users.get(user_id)
         if config.independent_500:
             return jsonify({"error": "Something went wrong - PATCH"}), 500
@@ -235,6 +243,8 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/users/<int:user_id>", methods=["DELETE"])
     def delete_user(user_id):
+        if config.slowdown:
+            time.sleep(config.slowdown)
         user = users.get(user_id)
         if config.independent_500:
             return jsonify({"error": "Something went wrong - DELETE"}), 500
@@ -251,6 +261,8 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/orders/<order_id>", methods=["DELETE"])
     def delete_order(order_id):
+        if config.slowdown:
+            time.sleep(config.slowdown)
         return jsonify({"message": "Nothing happened"}), 200
 
     def _factory(
@@ -263,6 +275,7 @@ def app_factory(empty_open_api_3_schema):
         unsatisfiable=False,
         custom_headers=None,
         multiple_source_links=False,
+        slowdown=None,
     ):
         config.use_after_free = use_after_free
         config.merge_body = merge_body
@@ -291,6 +304,8 @@ def app_factory(empty_open_api_3_schema):
             post_links["DeleteUser"] = link
             get_links.clear()
             get_links.clear()
+        if slowdown:
+            config.slowdown = slowdown
         return app
 
     return _factory

@@ -33,6 +33,7 @@ from ..._hypothesis import (
 )
 from ..._override import CaseOverride
 from ...auths import unregister as unregister_auth
+from ...checks import _make_max_response_time_failure_message
 from ...constants import (
     DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -801,7 +802,7 @@ def run_checks(
 
     if max_response_time:
         if elapsed_time > max_response_time:
-            message = f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
+            message = _make_max_response_time_failure_message(elapsed_time, max_response_time)
             errors.append(AssertionError(message))
             result.add_failure(
                 "max_response_time",

@@ -49,6 +49,7 @@ class StatefulTestRunnerConfig:
     auth: HTTPDigestAuth | RawAuth | None = None
     seed: int | None = None
     override: CaseOverride | None = None
+    max_response_time: int | None = None
 
     def __post_init__(self) -> None:
         import hypothesis
