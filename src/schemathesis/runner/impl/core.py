@@ -240,6 +240,7 @@ class BaseRunner:
                 exit_first=self.exit_first,
                 request_timeout=self.request_timeout,
                 auth=auth,
+                seed=self.seed,
             )
             state_machine = self.schema.as_state_machine()
             runner = state_machine.runner(config=config)
