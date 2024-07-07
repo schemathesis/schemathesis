@@ -1367,3 +1367,11 @@ def test_stateful_override(real_app_schema):
     assert len(get_requests) > 0
     for request in get_requests:
         assert "/api/users/42?" in request.uri
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("failure", "get_user", "create_user", "update_user")
+def test_stateful_exit_first(real_app_schema):
+    experimental.STATEFUL_TEST_RUNNER.enable()
+    _, *ev, _ = from_schema(real_app_schema, exit_first=True, **STATEFUL_KWARGS).execute()
+    assert not any(isinstance(event, events.StatefulEvent) for event in ev)

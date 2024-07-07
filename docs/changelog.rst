@@ -16,6 +16,10 @@ Changelog
 
 - WSGI support for new-style stateful tests.
 
+**Changed**
+
+- Do not run new-style stateful tests if unit tests exited due to ``--exitfirst``.
+
 .. _v3.31.1:
 
 :version:`3.31.1 <v3.31.0...v3.31.1>` - 2024-07-03
