@@ -111,6 +111,7 @@ class BaseRunner:
     count_links: bool = True
     service_client: ServiceClient | None = None
     _failures_counter: int = 0
+    _is_stopping_due_to_failure_limit: bool = False
 
     def execute(self) -> EventStream:
         """Common logic for all runners."""
@@ -199,13 +200,20 @@ class BaseRunner:
             warnings.simplefilter("ignore", InsecureRequestWarning)
             if not experimental.STATEFUL_ONLY.is_enabled:
                 yield from self._execute(results, stop_event)
-            yield from self._run_stateful_tests(results)
+            if not self._is_stopping_due_to_failure_limit:
+                yield from self._run_stateful_tests(results)
         except KeyboardInterrupt:
             yield events.Interrupted()
 
         yield _finish()
 
     def _should_stop(self, event: events.ExecutionEvent) -> bool:
+        result = self.__should_stop(event)
+        if result:
+            self._is_stopping_due_to_failure_limit = True
+        return result
+
+    def __should_stop(self, event: events.ExecutionEvent) -> bool:
         if _should_count_towards_stop(event):
             if self.exit_first:
                 return True
