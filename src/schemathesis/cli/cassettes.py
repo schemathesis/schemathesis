@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     import click
     import requests
 
-    from ..generation import DataGenerationMethod
     from ..models import Request, Response
     from ..runner.serialization import SerializedCheck, SerializedInteraction
     from .context import ExecutionContext
@@ -90,10 +89,6 @@ class CassetteWriter(EventHandler):
                     seed=seed,
                     correlation_id=event.correlation_id,
                     thread_id=event.thread_id,
-                    # NOTE: For backward compatibility reasons AfterExecution stores a list of data generation methods
-                    # The list always contains one element - the method that was actually used for generation
-                    # This will change in the future
-                    data_generation_method=event.data_generation_method[0],
                     interactions=event.result.interactions,
                 )
             )
@@ -105,7 +100,6 @@ class CassetteWriter(EventHandler):
                     # Correlation ID is not used in stateful testing
                     correlation_id="",
                     thread_id=event.thread_id,
-                    data_generation_method=event.data_generation_method[0],
                     interactions=event.result.interactions,
                 )
             )
@@ -132,7 +126,6 @@ class Process:
     seed: int
     correlation_id: str
     thread_id: int
-    data_generation_method: DataGenerationMethod
     interactions: list[SerializedInteraction]
 
 
@@ -239,7 +232,7 @@ http_interactions:"""
   seed: '{item.seed}'
   thread_id: {item.thread_id}
   correlation_id: '{item.correlation_id}'
-  data_generation_method: '{item.data_generation_method.value}'
+  data_generation_method: '{interaction.data_generation_method.value}'
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
   checks:
