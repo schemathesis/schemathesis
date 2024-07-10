@@ -15,6 +15,7 @@ Changelog
 **Fixed**
 
 - WSGI support for new-style stateful tests.
+- Ignoring configured data generation methods in new-style stateful tests.
 
 **Changed**
 

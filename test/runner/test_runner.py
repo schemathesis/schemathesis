@@ -1334,6 +1334,21 @@ def test_stateful_auth(any_app_schema):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
+def test_stateful_all_generation_methods(real_app_schema):
+    experimental.STATEFUL_TEST_RUNNER.enable()
+    experimental.STATEFUL_ONLY.enable()
+    method = DataGenerationMethod.negative
+    real_app_schema.data_generation_methods = [method]
+    _, *_, after_execution, _ = from_schema(real_app_schema, **STATEFUL_KWARGS).execute()
+    interactions = after_execution.result.interactions
+    assert len(interactions) > 0
+    for interaction in interactions:
+        for check in interaction.checks:
+            assert check.example.data_generation_method == method.as_short_name()
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_seed(real_app_schema):
     experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()

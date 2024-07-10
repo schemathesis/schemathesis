@@ -11,6 +11,7 @@ from ....constants import NOT_SET
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from ....types import NotSet
+from ....utils import combine_strategies
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
@@ -86,11 +87,17 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 source = link.operation
                 bundle_name = f"{source.verbose_name} -> {link.status_code}"
                 name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
+                case_strategy = combine_strategies(
+                    [
+                        target.as_strategy(data_generation_method=data_generation_method)
+                        for data_generation_method in schema.data_generation_methods
+                    ]
+                )
                 rules[name] = transition(
                     name=name,
                     target=catch_all,
                     previous=bundles[bundle_name],
-                    case=target.as_strategy(),
+                    case=case_strategy,
                     link=st.just(link),
                 )
         elif any(
@@ -103,11 +110,17 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
             name = _normalize_name(f"{target.verbose_name} -> X")
+            case_strategy = combine_strategies(
+                [
+                    target.as_strategy(data_generation_method=data_generation_method)
+                    for data_generation_method in schema.data_generation_methods
+                ]
+            )
             rules[name] = transition(
                 name=name,
                 target=catch_all,
                 previous=st.none(),
-                case=target.as_strategy(),
+                case=case_strategy,
             )
 
     return type(
