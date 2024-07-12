@@ -361,6 +361,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "operation_id": None,
                 "validate_schema": False,
                 "output_config": OutputConfig(),
+                "generation_config": GenerationConfig(),
                 "skip_deprecated_operations": False,
                 "force_schema_version": None,
                 "request_tls_verify": True,
@@ -1619,6 +1620,30 @@ def test_new_stateful_runner_proxy_error(cli, schema_url, snapshot_cli):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("get_user", "create_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+def test_new_stateful_runner_generation_config(cli, mocker, schema_url, snapshot_cli):
+    from schemathesis.specs.openapi import _hypothesis
+
+    mocked = mocker.spy(_hypothesis, "from_schema")
+    assert (
+        cli.run(
+            schema_url,
+            "--experimental=stateful-test-runner",
+            "--experimental=stateful-only",
+            "--hypothesis-max-examples=1",
+            "--generation-allow-x00=false",
+            "--generation-codec=ascii",
+            "--generation-with-security-parameters=false",
+        )
+        == snapshot_cli
+    )
+    from_schema_kwargs = mocked.call_args_list[0].kwargs
+    assert from_schema_kwargs["allow_x00"] is False
+    assert from_schema_kwargs["codec"] == "ascii"
 
 
 @pytest.mark.openapi_version("3.0")
