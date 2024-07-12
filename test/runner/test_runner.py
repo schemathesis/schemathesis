@@ -1372,7 +1372,7 @@ def test_stateful_override(real_app_schema):
     _, *_, after_execution, _ = from_schema(
         real_app_schema,
         override=CaseOverride(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
-        hypothesis_settings=hypothesis.settings(max_examples=30, deadline=None, stateful_step_count=2),
+        hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
         store_interactions=True,
         stateful=Stateful.links,
     ).execute()
