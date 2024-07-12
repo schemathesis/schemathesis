@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from .._override import CaseOverride
     from ..models import CheckFunction
     from ..targets import Target
+    from ..transports import RequestConfig
     from ..types import RawAuth
 
 
@@ -33,6 +34,12 @@ def _default_hypothesis_settings_factory() -> hypothesis.settings:
     return hypothesis.settings(**_get_default_hypothesis_settings_kwargs())
 
 
+def _default_request_config_factory() -> RequestConfig:
+    from ..transports import RequestConfig
+
+    return RequestConfig()
+
+
 @dataclass
 class StatefulTestRunnerConfig:
     """Configuration for the stateful test runner."""
@@ -41,12 +48,12 @@ class StatefulTestRunnerConfig:
     checks: tuple[CheckFunction, ...] = field(default_factory=_default_checks_factory)
     # Hypothesis settings for state machine execution
     hypothesis_settings: hypothesis.settings = field(default_factory=_default_hypothesis_settings_factory)
+    # Request-level configuration
+    request: RequestConfig = field(default_factory=_default_request_config_factory)
     # Whether to stop the execution after the first failure
     exit_first: bool = False
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
-    # Timeout for each request in milliseconds
-    request_timeout: int | None = None
     auth: HTTPDigestAuth | RawAuth | None = None
     seed: int | None = None
     override: CaseOverride | None = None
