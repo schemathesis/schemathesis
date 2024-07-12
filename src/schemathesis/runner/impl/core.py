@@ -247,6 +247,7 @@ class BaseRunner:
                 headers=headers,
                 hypothesis_settings=self.hypothesis_settings,
                 exit_first=self.exit_first,
+                max_failures=None if self.max_failures is None else self.max_failures - self._failures_counter,
                 request=self.request_config,
                 auth=auth,
                 seed=self.seed,
