@@ -49,7 +49,12 @@ def collect_result(runner) -> RunnerResult:
 
 @pytest.mark.parametrize(
     "kwargs",
-    ({"exit_first": False}, {"exit_first": True}),
+    (
+        {"exit_first": False},
+        {"exit_first": True},
+        {"max_failures": 1},
+        {"max_failures": 2},
+    ),
 )
 def test_find_independent_5xx(runner_factory, kwargs):
     # When the app contains multiple endpoints with 5xx responses
@@ -64,7 +69,7 @@ def test_find_independent_5xx(runner_factory, kwargs):
     scenarios = [
         event for event in result.events if isinstance(event, (events.ScenarioStarted, events.ScenarioFinished))
     ]
-    num_of_final_scenarios = 1 if kwargs.get("exit_first") else 2
+    num_of_final_scenarios = 1 if kwargs.get("exit_first") or kwargs.get("max_failures") == 1 else 2
     assert len([s for s in scenarios if s.is_final and isinstance(s, events.ScenarioStarted)]) == num_of_final_scenarios
     assert (
         len(
@@ -79,11 +84,11 @@ def test_find_independent_5xx(runner_factory, kwargs):
     for event in result.events:
         assert event.timestamp is not None
     # If `exit_first` is set
-    if kwargs.get("exit_first"):
+    if kwargs.get("exit_first") or kwargs.get("max_failures") == 1:
         # Then only the first one should be found
         assert len(result.failures) == 1
         assert result.failures[0].example.operation.verbose_name in all_affected_operations
-    else:
+    elif kwargs.get("exit_first") is False or kwargs.get("max_failures") == 2:
         # Else, all of them should be found
         assert len(result.failures) == 2
         assert {check.example.operation.verbose_name for check in result.failures} == all_affected_operations

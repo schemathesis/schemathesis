@@ -13,6 +13,7 @@ Changelog
 - Support for targeted property-based testing in new-style stateful tests.
 - Support for ``--request-*`` CLI options in new-style stateful tests.
 - Support for ``--generation-*`` CLI options in new-style stateful tests.
+- Support for ``--max-failures`` in new-style stateful tests.
 
 **Fixed**
 

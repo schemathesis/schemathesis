@@ -1542,6 +1542,21 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("failure", "create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
+def test_new_stateful_runner_max_failures(cli, schema_url, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "--experimental=stateful-test-runner",
+            "--hypothesis-max-examples=40",
+            "--max-failures=2",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_new_stateful_runner_with_cassette(tmp_path, cli, schema_url):
     cassette_path = tmp_path / "output.yaml"

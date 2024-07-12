@@ -223,6 +223,9 @@ def _execute_state_machine_loop(
     else:
         InstrumentedStateMachine = _InstrumentedStateMachine
 
+    def should_stop() -> bool:
+        return config.exit_first or (config.max_failures is not None and ctx.failures_count >= config.max_failures)
+
     while True:
         # This loop is running until no new failures are found in a single iteration
         event_queue.put(events.SuiteStarted())
@@ -245,13 +248,13 @@ def _execute_state_machine_loop(
             # The failure is already sent to the queue by the state machine
             # Here we need to either exit or re-run the state machine with this failure marked as known
             suite_status = events.SuiteStatus.FAILURE
-            if config.exit_first:
+            if should_stop():
                 break
             ctx.mark_as_seen_in_run(exc)
             continue
         except Flaky:
             suite_status = events.SuiteStatus.FAILURE
-            if config.exit_first:
+            if should_stop():
                 break
             # Mark all failures in this suite as seen to prevent them being re-discovered
             ctx.mark_current_suite_as_seen_in_run()

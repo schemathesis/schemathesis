@@ -44,7 +44,11 @@ class RunnerContext:
     checks_for_step: list[Check] = field(default_factory=list)
     # Status of the current step
     current_step_status: events.StepStatus | None = None
+    # The currently processed response
     current_response: GenericResponse | None = None
+    # Total number of failures
+    failures_count: int = 0
+    # Metrics collector for targeted testing
     metric_collector: TargetMetricCollector = field(default_factory=lambda: TargetMetricCollector(targets=[]))
 
     @property
@@ -103,6 +107,7 @@ class RunnerContext:
 
     def add_failed_check(self, check: Check) -> None:
         self.failures_for_suite.append(check)
+        self.failures_count += 1
 
     def collect_metric(self, case: Case, response: GenericResponse) -> None:
         self.metric_collector.store(case, response)
