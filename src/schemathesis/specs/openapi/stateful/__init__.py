@@ -144,7 +144,7 @@ def transition(
     case: st.SearchStrategy,
     link: st.SearchStrategy | NotSet = NOT_SET,
 ) -> Callable[[Callable], Rule]:
-    def step_function(*args_: Any, **kwargs_: Any) -> StepResult:
+    def step_function(*args_: Any, **kwargs_: Any) -> StepResult | None:
         return APIStateMachine._step(*args_, **kwargs_)
 
     step_function.__name__ = name

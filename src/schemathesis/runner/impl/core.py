@@ -269,7 +269,7 @@ class BaseRunner:
                 if isinstance(state_machine.schema.transport, RequestsTransport):
 
                     def on_step_finished(event: stateful_events.StepFinished) -> None:
-                        if event.response is not None:
+                        if event.response is not None and event.status is not None:
                             response = cast(requests.Response, event.response)
                             result.store_requests_response(
                                 status=from_step_status(event.status),
@@ -283,7 +283,7 @@ class BaseRunner:
                     def on_step_finished(event: stateful_events.StepFinished) -> None:
                         from ...transports.responses import WSGIResponse
 
-                        if event.response is not None:
+                        if event.response is not None and event.status is not None:
                             response = cast(WSGIResponse, event.response)
                             result.store_wsgi_response(
                                 status=from_step_status(event.status),

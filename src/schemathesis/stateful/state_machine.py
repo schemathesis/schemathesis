@@ -76,7 +76,9 @@ class APIStateMachine(RuleBasedStateMachine):
     def _get_target_for_result(self, result: StepResult) -> str | None:
         raise NotImplementedError
 
-    def _add_result_to_targets(self, targets: tuple[str, ...], result: StepResult) -> None:
+    def _add_result_to_targets(self, targets: tuple[str, ...], result: StepResult | None) -> None:
+        if result is None:
+            return None
         target = self._get_target_for_result(result)
         if target is not None:
             super()._add_result_to_targets((target,), result)
@@ -119,7 +121,7 @@ class APIStateMachine(RuleBasedStateMachine):
     def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
-    def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult:
+    def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult | None:
         # This method is a proxy that is used under the hood during the state machine initialization.
         # The whole point of having it is to make it possible to override `step`; otherwise, custom "step" is ignored.
         # It happens because, at the point of initialization, the final class is not yet created.
@@ -128,7 +130,7 @@ class APIStateMachine(RuleBasedStateMachine):
             return self.step(case, (previous, link))
         return self.step(case, None)
 
-    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
+    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
         """A single state machine step.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.

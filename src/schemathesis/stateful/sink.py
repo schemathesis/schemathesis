@@ -46,7 +46,7 @@ class StateMachineSink:
         self.transitions.consume(event)
         if isinstance(event, events.RunStarted):
             self.start_time = event.timestamp
-        elif isinstance(event, events.StepFinished):
+        elif isinstance(event, events.StepFinished) and event.status is not None:
             self.steps[event.status] += 1
             responses = self.response_times.setdefault(event.target, {})
             if event.response is not None:
