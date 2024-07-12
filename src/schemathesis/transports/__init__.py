@@ -14,7 +14,7 @@ from .._dependency_versions import IS_WERKZEUG_ABOVE_3
 from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET
 from ..exceptions import get_timeout_error
 from ..serializers import SerializerContext
-from ..types import Cookies, NotSet
+from ..types import Cookies, NotSet, RequestCert
 
 if TYPE_CHECKING:
     import requests
@@ -24,6 +24,18 @@ if TYPE_CHECKING:
 
     from ..models import Case
     from .responses import WSGIResponse
+
+
+@dataclass
+class RequestConfig:
+    timeout: int | None = None
+    tls_verify: bool | str = True
+    proxy: str | None = None
+    cert: RequestCert | None = None
+
+    @property
+    def prepared_timeout(self) -> float | None:
+        return prepare_timeout(self.timeout)
 
 
 def serialize_payload(payload: bytes) -> str:

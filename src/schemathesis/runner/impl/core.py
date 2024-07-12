@@ -69,9 +69,9 @@ from ...stateful import Feedback, Stateful
 from ...stateful import events as stateful_events
 from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
-from ...transports import RequestsTransport, prepare_timeout
+from ...transports import RequestConfig, RequestsTransport
 from ...transports.auth import get_requests_auth, prepare_wsgi_headers
-from ...types import RawAuth, RequestCert
+from ...types import RawAuth
 from ...utils import capture_hypothesis_output
 from .. import probes
 from ..serialization import SerializedTestResult
@@ -94,11 +94,11 @@ class BaseRunner:
     hypothesis_settings: hypothesis.settings
     generation_config: GenerationConfig
     probe_config: probes.ProbeConfig
+    request_config: RequestConfig = field(default_factory=RequestConfig)
     override: CaseOverride | None = None
     auth: RawAuth | None = None
     auth_type: str | None = None
     headers: dict[str, Any] | None = None
-    request_timeout: int | None = None
     store_interactions: bool = False
     seed: int | None = None
     exit_first: bool = False
@@ -247,7 +247,7 @@ class BaseRunner:
                 headers=headers,
                 hypothesis_settings=self.hypothesis_settings,
                 exit_first=self.exit_first,
-                request_timeout=self.request_timeout,
+                request=self.request_config,
                 auth=auth,
                 seed=self.seed,
                 override=self.override,
@@ -891,10 +891,7 @@ def network_test(
     targets: Iterable[Target],
     result: TestResult,
     session: requests.Session,
-    request_timeout: int | None,
-    request_tls_verify: bool,
-    request_proxy: str | None,
-    request_cert: RequestCert | None,
+    request_config: RequestConfig,
     store_interactions: bool,
     headers: dict[str, Any] | None,
     feedback: Feedback | None,
@@ -910,20 +907,16 @@ def network_test(
         headers = headers or {}
         if "user-agent" not in {header.lower() for header in headers}:
             headers["User-Agent"] = USER_AGENT
-        timeout = prepare_timeout(request_timeout)
         if not dry_run:
             args = (
                 checks,
                 targets,
                 result,
                 session,
-                timeout,
+                request_config,
                 store_interactions,
                 headers,
                 feedback,
-                request_tls_verify,
-                request_proxy,
-                request_cert,
                 max_response_time,
             )
             response = _network_test(case, *args)
@@ -936,13 +929,10 @@ def _network_test(
     targets: Iterable[Target],
     result: TestResult,
     session: requests.Session,
-    timeout: float | None,
+    request_config: RequestConfig,
     store_interactions: bool,
     headers: dict[str, Any] | None,
     feedback: Feedback | None,
-    request_tls_verify: bool,
-    request_proxy: str | None,
-    request_cert: RequestCert | None,
     max_response_time: int | None,
 ) -> requests.Response:
     check_results: list[Check] = []
@@ -951,19 +941,21 @@ def _network_test(
         kwargs: dict[str, Any] = {
             "session": session,
             "headers": headers,
-            "timeout": timeout,
-            "verify": request_tls_verify,
-            "cert": request_cert,
+            "timeout": request_config.prepared_timeout,
+            "verify": request_config.tls_verify,
+            "cert": request_config.cert,
         }
-        if request_proxy is not None:
-            kwargs["proxies"] = {"all": request_proxy}
+        if request_config.proxy is not None:
+            kwargs["proxies"] = {"all": request_config.proxy}
         hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)
     except CheckFailed as exc:
         check_name = "request_timeout"
         requests_kwargs = RequestsTransport().serialize_case(case, base_url=case.get_full_base_url(), headers=headers)
         request = requests.Request(**requests_kwargs).prepare()
-        elapsed = cast(float, timeout)  # It is defined and not empty, since the exception happened
+        elapsed = cast(
+            float, request_config.prepared_timeout
+        )  # It is defined and not empty, since the exception happened
         check_result = result.add_failure(
             check_name, case, None, elapsed, f"Response timed out after {1000 * elapsed:.2f}ms", exc.context, request
         )

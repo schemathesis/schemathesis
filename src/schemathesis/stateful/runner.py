@@ -112,13 +112,17 @@ def _execute_state_machine_loop(
     """Execute the state machine testing loop."""
     from hypothesis import reporting
 
-    from ..transports import RequestsTransport, prepare_timeout
+    from ..transports import RequestsTransport
 
     ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.targets))
 
     call_kwargs: dict[str, Any] = {"headers": config.headers}
     if isinstance(state_machine.schema.transport, RequestsTransport):
-        call_kwargs["timeout"] = prepare_timeout(config.request_timeout)
+        call_kwargs["timeout"] = config.request.prepared_timeout
+        call_kwargs["verify"] = config.request.tls_verify
+        call_kwargs["cert"] = config.request.cert
+        if config.request.proxy is not None:
+            call_kwargs["proxies"] = {"all": config.request.proxy}
         session = requests.Session()
         if config.auth is not None:
             session.auth = config.auth

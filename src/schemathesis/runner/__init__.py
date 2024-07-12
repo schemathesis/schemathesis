@@ -19,6 +19,7 @@ from ..loaders import load_app
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..targets import DEFAULT_TARGETS, Target
+from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
 from ..types import Filter, NotSet, RawAuth, RequestCert
 from .probes import ProbeConfig
@@ -373,6 +374,12 @@ def from_schema(
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
     generation_config = generation_config or GenerationConfig()
+    request_config = RequestConfig(
+        timeout=request_timeout,
+        tls_verify=request_tls_verify,
+        proxy=request_proxy,
+        cert=request_cert,
+    )
 
     # Use the same seed for all tests unless `derandomize=True` is used
     if seed is None and not hypothesis_settings.derandomize:
@@ -394,10 +401,7 @@ def from_schema(
                 headers=headers,
                 seed=seed,
                 workers_num=workers_num,
-                request_timeout=request_timeout,
-                request_tls_verify=request_tls_verify,
-                request_proxy=request_proxy,
-                request_cert=request_cert,
+                request_config=request_config,
                 exit_first=exit_first,
                 max_failures=max_failures,
                 started_at=started_at,
@@ -473,10 +477,7 @@ def from_schema(
             override=override,
             headers=headers,
             seed=seed,
-            request_timeout=request_timeout,
-            request_tls_verify=request_tls_verify,
-            request_proxy=request_proxy,
-            request_cert=request_cert,
+            request_config=request_config,
             exit_first=exit_first,
             max_failures=max_failures,
             started_at=started_at,

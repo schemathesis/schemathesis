@@ -11,6 +11,7 @@ Changelog
 - Support for ``--set-*`` CLI options in new-style stateful tests.
 - Support for ``--max-response-time`` in new-style stateful tests.
 - Support for targeted property-based testing in new-style stateful tests.
+- Support for ``--request-*`` CLI options in new-style stateful tests.
 
 **Fixed**
 
