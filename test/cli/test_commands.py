@@ -1575,6 +1575,21 @@ def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+def test_new_stateful_runner_stateful_only_with_error(cli, schema_url, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "--base-url=http://127.0.0.1:1/api",
+            "--experimental=stateful-test-runner",
+            "--experimental=stateful-only",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
 def test_new_stateful_runner_filtered_out(cli, schema_url, snapshot_cli):
