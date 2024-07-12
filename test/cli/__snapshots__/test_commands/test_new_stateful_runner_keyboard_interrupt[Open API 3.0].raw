@@ -1,0 +1,46 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 4
+Collected API links: 3
+API probing: SUCCESS
+Schema analysis: SKIP
+
+Stateful tests
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+=================================== SUMMARY ====================================
+
+Links                                                 2xx    4xx    5xx    Total
+
+POST /api/users/
+└── 201
+    ├── GET /api/users/{user_id}
+    └── PATCH /api/users/{user_id}
+
+GET /api/users/{user_id}
+└── 200
+    └── PATCH /api/users/{user_id}
+
+No checks were performed.
+
+Experimental Features:
+  - Stateful Only: Run only stateful tests
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+  - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 passed in 1.00s ===============================
