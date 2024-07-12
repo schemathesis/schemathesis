@@ -18,6 +18,7 @@ Changelog
 - Ignoring configured data generation methods in new-style stateful tests.
 - Using constant ``data_generation_method`` value for HTTP interactions in VCR cassettes.
 - Not reporting errors with ``--experimental=stateful-only``. :issue:`2326`
+- Internal error on CRTL-C during new-style stateful tests.
 
 **Changed**
 

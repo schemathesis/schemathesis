@@ -1605,6 +1605,17 @@ def test_new_stateful_runner_filtered_out(cli, schema_url, snapshot_cli):
     )
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user", "success")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+def test_new_stateful_runner_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
+    def mocked(*args, **kwargs):
+        raise KeyboardInterrupt
+
+    mocker.patch("schemathesis.Case.call", wraps=mocked)
+    assert cli.run(schema_url, "--experimental=stateful-test-runner", "--experimental=stateful-only") == snapshot_cli
+
+
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_statistic=True)
 def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapshot_cli):

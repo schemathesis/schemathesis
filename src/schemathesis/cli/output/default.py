@@ -848,6 +848,10 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
 
 def handle_interrupted(context: ExecutionContext, event: events.Interrupted) -> None:
     click.echo()
+    _handle_interrupted(context)
+
+
+def _handle_interrupted(context: ExecutionContext) -> None:
     context.is_interrupted = True
     display_section_name("KeyboardInterrupt", "!", bold=False)
 
@@ -863,12 +867,11 @@ def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent
         if not experimental.STATEFUL_ONLY.is_enabled:
             click.echo()
         click.secho("Stateful tests\n", bold=True)
-    elif (
-        isinstance(event.data, stateful_events.ScenarioFinished)
-        and not event.data.is_final
-        and event.data.status != stateful_events.ScenarioStatus.REJECTED
-    ):
-        display_execution_result(context, event.data.status.value)
+    elif isinstance(event.data, stateful_events.ScenarioFinished) and not event.data.is_final:
+        if event.data.status == stateful_events.ScenarioStatus.INTERRUPTED:
+            _handle_interrupted(context)
+        elif event.data.status != stateful_events.ScenarioStatus.REJECTED:
+            display_execution_result(context, event.data.status.value)
     elif isinstance(event.data, stateful_events.RunFinished):
         click.echo()
     # It is initialized in `RunStarted`
