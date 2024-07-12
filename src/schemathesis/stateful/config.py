@@ -59,6 +59,7 @@ class StatefulTestRunnerConfig:
     seed: int | None = None
     override: CaseOverride | None = None
     max_response_time: int | None = None
+    dry_run: bool = False
     targets: list[Target] = field(default_factory=list)
 
     def __post_init__(self) -> None:

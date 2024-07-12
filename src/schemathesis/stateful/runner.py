@@ -4,7 +4,7 @@ import queue
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generator, Iterator, Type, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
 import hypothesis
 import requests
@@ -149,13 +149,15 @@ def _execute_state_machine_loop(
                         setattr(case, location, container)
                 return super().before_call(case)
 
-        def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
+        def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
             if stop_event.is_set():
                 raise KeyboardInterrupt
             event_queue.put(events.StepStarted())
             try:
+                if config.dry_run:
+                    return None
                 result = super().step(case, previous)
                 ctx.step_succeeded()
             except CheckFailed:
@@ -178,10 +180,9 @@ def _execute_state_machine_loop(
                     )
                 else:
                     transition_id = None
-                status = cast(events.StepStatus, ctx.current_step_status)
                 event_queue.put(
                     events.StepFinished(
-                        status=status,
+                        status=ctx.current_step_status,
                         transition_id=transition_id,
                         target=case.operation.verbose_name,
                         case=case,
