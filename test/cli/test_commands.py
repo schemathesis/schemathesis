@@ -1531,7 +1531,7 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
         cli.run(
             schema_url,
             "--experimental=stateful-test-runner",
-            "--hypothesis-max-examples=30",
+            "--hypothesis-max-examples=40",
             "--report=file.tar.gz",
             "--exitfirst",
             f"--workers={workers}",
@@ -1567,7 +1567,7 @@ def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
             schema_url,
             "--experimental=stateful-test-runner",
             "--experimental=stateful-only",
-            "--hypothesis-max-examples=30",
+            "--hypothesis-max-examples=40",
             "--exitfirst",
         )
         == snapshot_cli
