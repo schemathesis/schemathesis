@@ -1608,6 +1608,22 @@ def test_new_stateful_runner_filtered_out(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
+def test_new_stateful_runner_proxy_error(cli, schema_url, snapshot_cli):
+    assert (
+        cli.run(
+            schema_url,
+            "--request-proxy=http://127.0.0.1",
+            "--experimental=stateful-test-runner",
+            "--experimental=stateful-only",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user", "success")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
 def test_new_stateful_runner_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
     def mocked(*args, **kwargs):
         raise KeyboardInterrupt
