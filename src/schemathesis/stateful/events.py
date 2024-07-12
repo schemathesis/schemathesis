@@ -176,7 +176,7 @@ class ResponseData:
 class StepFinished(StatefulEvent):
     """After a single state machine step."""
 
-    status: StepStatus
+    status: StepStatus | None
     transition_id: TransitionId | None
     target: str
     case: Case
@@ -188,7 +188,7 @@ class StepFinished(StatefulEvent):
     def __init__(
         self,
         *,
-        status: StepStatus,
+        status: StepStatus | None,
         transition_id: TransitionId | None,
         target: str,
         case: Case,
