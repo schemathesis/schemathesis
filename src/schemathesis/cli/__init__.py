@@ -1073,6 +1073,7 @@ class LoaderConfig:
     wait_for_schema: float | None
     rate_limit: str | None
     output_config: OutputConfig
+    generation_config: generation.GenerationConfig
     # Network request parameters
     auth: tuple[str, str] | None
     auth_type: str | None
@@ -1151,6 +1152,7 @@ def into_event_stream(
             tag=tag or None,
             operation_id=operation_id or None,
             output_config=output_config,
+            generation_config=generation_config,
         )
         schema = load_schema(config)
         yield from runner.from_schema(
@@ -1297,6 +1299,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
         "data_generation_methods": config.data_generation_methods,
         "rate_limit": config.rate_limit,
         "output_config": config.output_config,
+        "generation_config": config.generation_config,
     }
     if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
         kwargs["headers"] = config.headers
