@@ -1524,14 +1524,14 @@ def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
 @pytest.mark.parametrize("workers", (1, 2))
 def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
     assert (
         cli.run(
             schema_url,
             "--experimental=stateful-test-runner",
-            "--hypothesis-max-examples=20",
+            "--hypothesis-max-examples=30",
             "--report=file.tar.gz",
             "--exitfirst",
             f"--workers={workers}",
@@ -1567,7 +1567,7 @@ def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
             schema_url,
             "--experimental=stateful-test-runner",
             "--experimental=stateful-only",
-            "--hypothesis-max-examples=20",
+            "--hypothesis-max-examples=30",
             "--exitfirst",
         )
         == snapshot_cli
