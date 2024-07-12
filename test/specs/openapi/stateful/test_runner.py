@@ -404,7 +404,7 @@ def test_max_response_time_valid(runner_factory):
 
 def test_max_response_time_invalid(runner_factory):
     runner = runner_factory(
-        app_kwargs={"slowdown": 0.005},
+        app_kwargs={"slowdown": 0.010},
         config_kwargs={
             "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
             "max_response_time": 5,

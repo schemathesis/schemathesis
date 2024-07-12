@@ -49,7 +49,7 @@ GET /api/users/{user_id}
     └── PATCH /api/users/{user_id}
 
 Performed checks:
-    not_a_server_error                    120 / 121 passed          FAILED 
+    not_a_server_error                    N / N passed          FAILED 
 
 Experimental Features:
   - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
@@ -64,4 +64,4 @@ Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 Compressed report size: XX KB
 Report is saved to file.tar.gz
 
-========================= 6 passed, 1 failed in 1.00s ==========================
+========================= 1 failed in 1.00s ====================================
