@@ -52,6 +52,7 @@ class StatefulTestRunnerConfig:
     request: RequestConfig = field(default_factory=_default_request_config_factory)
     # Whether to stop the execution after the first failure
     exit_first: bool = False
+    max_failures: int | None = None
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
     auth: HTTPDigestAuth | RawAuth | None = None
