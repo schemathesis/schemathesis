@@ -307,6 +307,7 @@ class BaseRunner:
                     on_step_finished(stateful_event)
                 elif isinstance(stateful_event, stateful_events.Errored):
                     status = Status.error
+                    result.add_error(stateful_event.exception)
                 yield events.StatefulEvent(data=stateful_event)
             results.append(result)
             yield events.AfterStatefulExecution(
