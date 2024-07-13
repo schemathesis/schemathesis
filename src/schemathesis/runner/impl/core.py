@@ -234,6 +234,7 @@ class BaseRunner:
                 method="",
                 path="",
                 verbose_name="Stateful tests",
+                seed=self.seed,
                 data_generation_method=self.schema.data_generation_methods,
             )
             headers = self.headers or {}

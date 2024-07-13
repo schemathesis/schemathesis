@@ -1572,6 +1572,8 @@ def test_new_stateful_runner_with_cassette(tmp_path, cli, schema_url):
     with cassette_path.open(encoding="utf-8") as fd:
         cassette = yaml.safe_load(fd)
     assert len(cassette["http_interactions"]) >= 20
+    for interaction in cassette["http_interactions"]:
+        assert interaction["seed"] not in (None, "None")
 
 
 @pytest.mark.openapi_version("3.0")
