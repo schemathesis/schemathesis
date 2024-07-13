@@ -850,7 +850,7 @@ def run(
     _hypothesis_suppress_health_check: list[hypothesis.HealthCheck] | None = None
     if hypothesis_suppress_health_check is not None:
         _hypothesis_suppress_health_check = [
-            health_check.as_hypothesis() for health_check in hypothesis_suppress_health_check
+            entry for health_check in hypothesis_suppress_health_check for entry in health_check.as_hypothesis()
         ]
 
     if contrib_unique_data:
