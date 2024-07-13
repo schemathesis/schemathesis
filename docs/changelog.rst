@@ -29,7 +29,7 @@ Changelog
 - Ignoring configured data generation methods in new-style stateful tests.
 - Using constant ``data_generation_method`` value for HTTP interactions in VCR cassettes.
 - Not reporting errors with ``--experimental=stateful-only``. :issue:`2326`
-- Internal error on CRTL-C during new-style stateful tests.
+- Internal error on CTRL-C during new-style stateful tests.
 - Use ``--request-proxy`` for API probing.
 - Fill the ``seed`` field in cassettes for new-style stateful tests.
 - Ignoring remote scope when getting API operation by reference.
