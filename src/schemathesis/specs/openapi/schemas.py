@@ -486,7 +486,8 @@ class BaseOpenAPISchema(BaseSchema):
         cached = cache.get_operation_by_traversal_key(traversal_key)
         if cached is not None:
             return cached
-        resolved = self._resolve_operation(operation)
+        with in_scope(self.resolver, scope):
+            resolved = self._resolve_operation(operation)
         parent_ref, _ = reference.rsplit("/", maxsplit=1)
         _, path_item = self.resolver.resolve(parent_ref)
         parameters = self._collect_operation_parameters(path_item, resolved)

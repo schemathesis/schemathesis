@@ -27,6 +27,7 @@ Changelog
 - Internal error on CRTL-C during new-style stateful tests.
 - Use ``--request-proxy`` for API probing.
 - Fill the ``seed`` field in cassettes for new-style stateful tests.
+- Ignoring remote scope when getting API operation by reference.
 
 **Changed**
 
