@@ -6,9 +6,13 @@ import hypothesis
 import hypothesis.errors
 import pytest
 
+import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.extra._flask import run_server
+from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
+from schemathesis.stateful.config import StatefulTestRunnerConfig
 from schemathesis.stateful.runner import events
 from schemathesis.stateful.sink import StateMachineSink
 from test.utils import flaky
@@ -458,3 +462,130 @@ def test_targeted(runner_factory):
     result = collect_result(runner)
     assert not result.errors, result.errors
     assert calls > 0
+
+
+def test_external_link(empty_open_api_3_schema, app_factory):
+    empty_open_api_3_schema = fast_deepcopy(empty_open_api_3_schema)
+    remote_app = app_factory(independent_500=True)
+    remote_app_port = run_server(remote_app)
+    base_ref = f"http://127.0.0.1:{remote_app_port}/openapi.json#/paths/~1users~1{{userId}}"
+    post_links = {
+        "GetUser": {
+            "operationRef": f"{base_ref}/get",
+            "parameters": {"userId": "$response.body#/id"},
+        },
+        "DeleteUser": {
+            "operationRef": f"{base_ref}/delete",
+            "parameters": {"userId": "$response.body#/id"},
+        },
+        "UpdateUser": {
+            "operationRef": f"{base_ref}/patch",
+            "parameters": {"userId": "$response.body#/id"},
+            "requestBody": {
+                "last_modified": "$response.body#/last_modified",
+            },
+        },
+    }
+    get_links = {
+        "DeleteUser": {
+            "operationId": "deleteUser",
+            "parameters": {"userId": "$request.path.userId"},
+        },
+    }
+    delete_links = {
+        "GetUser": {
+            "operationId": "getUser",
+            "parameters": {"userId": "$request.path.userId"},
+        },
+    }
+    empty_open_api_3_schema["paths"] = {
+        "/users": {
+            "post": {
+                "operationId": "createUser",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
+                },
+                "responses": {
+                    "201": {
+                        "description": "Successful response",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        "links": post_links,
+                    },
+                    "400": {"description": "Bad request"},
+                    "default": {"description": "Default"},
+                },
+            },
+        },
+        "/users/{userId}": {
+            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+            "get": {
+                "summary": "Get a user",
+                "operationId": "getUser",
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        "links": get_links,
+                    },
+                    "404": {"description": "User not found"},
+                    "default": {"description": "Default"},
+                },
+            },
+            "delete": {
+                "summary": "Delete a user",
+                "operationId": "deleteUser",
+                "responses": {
+                    "204": {
+                        "description": "Successful response",
+                        "links": delete_links,
+                    },
+                    "404": {"description": "User not found"},
+                    "default": {"description": "Default"},
+                },
+            },
+            "patch": {
+                "summary": "Update a user",
+                "operationId": "updateUser",
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
+                },
+                "responses": {
+                    "200": {
+                        "description": "Successful response",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                    },
+                    "404": {"description": "User not found"},
+                    "default": {"description": "Default"},
+                },
+            },
+        },
+    }
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "User": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "name": {"type": "string"},
+                    "last_modified": {"type": "string"},
+                },
+                "required": ["id", "name", "last_modified"],
+            },
+            "NewUser": {
+                "type": "object",
+                "required": ["name"],
+                "properties": {"name": {"type": "string", "maxLength": 50}},
+                "additionalProperties": False,
+            },
+        }
+    }
+    root_app = app_factory(independent_500=True)
+    schema = schemathesis.from_dict(empty_open_api_3_schema, app=root_app)
+    state_machine = schema.as_state_machine()
+    runner = state_machine.runner(
+        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=45, database=None))
+    )
+    result = collect_result(runner)
+    assert result.events[-1].status == events.RunStatus.FAILURE
