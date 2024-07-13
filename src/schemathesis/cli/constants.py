@@ -42,11 +42,15 @@ class HealthCheck(IntEnum):
     filter_too_much = 2
     too_slow = 3
     large_base_example = 7
+    all = 8
 
-    def as_hypothesis(self) -> hypothesis.HealthCheck:
+    def as_hypothesis(self) -> list[hypothesis.HealthCheck]:
         from hypothesis import HealthCheck
 
-        return HealthCheck[self.name]
+        if self.name == "all":
+            return list(HealthCheck)
+
+        return [HealthCheck[self.name]]
 
 
 @unique

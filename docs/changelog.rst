@@ -15,6 +15,7 @@ Changelog
 - Support for ``--generation-*`` CLI options in new-style stateful tests.
 - Support for ``--max-failures`` in new-style stateful tests.
 - Support for ``--dry-run`` in new-style stateful tests.
+- ``all`` variant for the ``--hypothesis-suppress-health-check`` CLI option.
 
 **Fixed**
 
