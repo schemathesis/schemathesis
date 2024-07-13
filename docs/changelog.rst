@@ -29,6 +29,7 @@ Changelog
 **Changed**
 
 - Do not run new-style stateful tests if unit tests exited due to ``--exitfirst``.
+- Display error details if API probing fails.
 
 .. _v3.31.1:
 

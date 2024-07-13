@@ -143,7 +143,9 @@ def display_hypothesis_output(hypothesis_output: list[str]) -> None:
 
 def display_errors(context: ExecutionContext, event: events.Finished) -> None:
     """Display all errors in the test run."""
-    if not event.has_errors:
+    probes = context.probes or []
+    has_probe_errors = any(probe.outcome == ProbeOutcome.ERROR for probe in probes)
+    if not event.has_errors and not has_probe_errors:
         return
 
     display_section_name("ERRORS")
@@ -160,6 +162,12 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         should_display_full_traceback_message |= display_single_error(context, result)
     if event.generic_errors:
         display_generic_errors(context, event.generic_errors)
+    if has_probe_errors:
+        display_section_name("API Probe errors", "_", fg="red")
+        for probe in probes:
+            if probe.error is not None:
+                error = SerializedError.from_exception(probe.error)
+                _display_error(context, error)
     if should_display_full_traceback_message and not context.show_trace:
         click.secho(
             "\nAdd this option to your command line parameters to see full tracebacks: --show-trace",

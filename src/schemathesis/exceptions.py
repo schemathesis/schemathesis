@@ -520,6 +520,12 @@ def remove_ssl_line_number(text: str) -> str:
     return re.sub(r"\(_ssl\.c:\d+\)", "", text)
 
 
+def _clean_inner_request_message(message: Any) -> str:
+    if isinstance(message, str) and message.startswith("HTTPConnectionPool"):
+        return re.sub(r"HTTPConnectionPool\(.+?\): ", "", message).rstrip(".")
+    return str(message)
+
+
 def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
     from requests.exceptions import ChunkedEncodingError, ConnectionError, SSLError
     from urllib3.exceptions import MaxRetryError
@@ -542,7 +548,7 @@ def extract_requests_exception_details(exc: RequestException) -> tuple[str, list
                 reason = f"Max retries exceeded with url: {inner.url}"
             extra = [reason.strip()]
         else:
-            extra = [" ".join(map(str, inner.args))]
+            extra = [" ".join(map(_clean_inner_request_message, inner.args))]
     elif isinstance(exc, ChunkedEncodingError):
         message = "Connection broken. The server declared chunked encoding but sent an invalid chunk"
         extra = [str(exc.args[0].args[1])]
