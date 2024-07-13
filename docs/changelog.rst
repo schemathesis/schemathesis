@@ -25,6 +25,7 @@ Changelog
 - Not reporting errors with ``--experimental=stateful-only``. :issue:`2326`
 - Internal error on CRTL-C during new-style stateful tests.
 - Use ``--request-proxy`` for API probing.
+- Fill the ``seed`` field in cassettes for new-style stateful tests.
 
 **Changed**
 
