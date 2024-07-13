@@ -7,6 +7,7 @@ import pytest
 from schemathesis.constants import USER_AGENT
 from schemathesis.runner import probes
 from schemathesis.runner.impl.core import canonicalize_error_message
+from schemathesis.transports import RequestConfig
 
 
 @pytest.fixture
@@ -14,9 +15,11 @@ def config_factory():
     def inner(base_url, request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
         return probes.ProbeConfig(
             base_url=base_url,
-            request_proxy=request_proxy,
-            request_tls_verify=request_tls_verify,
-            request_cert=request_cert,
+            request=RequestConfig(
+                proxy=request_proxy,
+                tls_verify=request_tls_verify,
+                cert=request_cert,
+            ),
             auth=auth,
             auth_type=None,
             headers=headers,

@@ -24,6 +24,7 @@ Changelog
 - Using constant ``data_generation_method`` value for HTTP interactions in VCR cassettes.
 - Not reporting errors with ``--experimental=stateful-only``. :issue:`2326`
 - Internal error on CRTL-C during new-style stateful tests.
+- Use ``--request-proxy`` for API probing.
 
 **Changed**
 
