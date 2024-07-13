@@ -76,7 +76,7 @@ Hypothesis engine:
                                   issues are found.
   --hypothesis-seed INTEGER       Sets a seed value for Hypothesis, ensuring
                                   reproducibility across test runs.
-  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|large_base_example]
+  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|large_base_example|all]
                                   Disables specified health checks from
                                   Hypothesis like 'data_too_large',
                                   'filter_too_much', etc. Provide a comma-

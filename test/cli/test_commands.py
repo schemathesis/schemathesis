@@ -468,7 +468,7 @@ def test_hypothesis_parameters(cli, schema_url):
         "--hypothesis-max-examples=1000",
         "--hypothesis-phases=explicit,generate",
         "--hypothesis-report-multiple-bugs=0",
-        "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+        "--hypothesis-suppress-health-check=all",
         "--hypothesis-verbosity=normal",
     )
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
@@ -1513,7 +1513,7 @@ def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
         cli.run(
             *cli_args,
             f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
-            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+            "--hypothesis-suppress-health-check=all",
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
@@ -1683,7 +1683,7 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
-            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+            "--hypothesis-suppress-health-check=all",
             "--show-trace",
             "--stateful=none",
         )
@@ -1790,7 +1790,7 @@ def test_openapi_links_multiple_threads(cli, cli_args, recursion_limit, hypothes
             "--hypothesis-seed=1",
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
-            "--hypothesis-suppress-health-check=too_slow,filter_too_much",
+            "--hypothesis-suppress-health-check=all",
             "--show-trace",
             f"--stateful-recursion-limit={recursion_limit}",
             "--workers=2",
@@ -2249,7 +2249,7 @@ def data_generation_check(response, case):
         "not_a_server_error",
         openapi3_schema_url,
         "--hypothesis-max-examples=25",
-        "--hypothesis-suppress-health-check=data_too_large,filter_too_much,too_slow",
+        "--hypothesis-suppress-health-check=all",
         "-D",
         "all",
         hooks=module.purebasename,
