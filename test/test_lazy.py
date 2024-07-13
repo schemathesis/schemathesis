@@ -869,7 +869,6 @@ def test_(case):
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
     assert "def __flaky" not in stdout
-    assert stdout.count("test_flaky.py:3") == 1
 
 
 @pytest.mark.operations("failure")

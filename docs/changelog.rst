@@ -16,6 +16,7 @@ Changelog
 - Support for ``--max-failures`` in new-style stateful tests.
 - Support for ``--dry-run`` in new-style stateful tests.
 - ``all`` variant for the ``--hypothesis-suppress-health-check`` CLI option.
+- Support for Hypothesis >= ``6.108.0``.
 
 **Fixed**
 

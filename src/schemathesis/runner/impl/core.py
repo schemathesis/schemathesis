@@ -530,6 +530,26 @@ def run_test(
     errors: list[Exception] = []
     test_start_time = time.monotonic()
     setup_hypothesis_database_key(test, operation)
+
+    def _on_flaky(exc: Exception) -> Status:
+        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
+            status = Status.error
+            result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
+        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
+            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
+        ):
+            for sub_exc in exc.exceptions:
+                if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
+                    result.add_error(DeadlineExceeded.from_exc(sub_exc))
+            status = Status.error
+        elif errors:
+            status = Status.error
+            add_errors(result, errors)
+        else:
+            status = Status.failure
+            result.mark_flaky()
+        return status
+
     try:
         with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
             test(
@@ -559,6 +579,9 @@ def run_test(
         result.mark_errored()
         for error in deduplicate_errors(errors):
             result.add_error(error)
+    except hypothesis.errors.FlakyFailure as exc:
+        # Hypothesis >= 6.108.0
+        status = _on_flaky(exc)
     except MultipleFailures:
         # Schemathesis may detect multiple errors that come from different check results
         # They raise different "grouped" exceptions
@@ -568,15 +591,7 @@ def run_test(
         else:
             status = Status.failure
     except hypothesis.errors.Flaky as exc:
-        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
-            status = Status.error
-            result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
-        elif errors:
-            status = Status.error
-            add_errors(result, errors)
-        else:
-            status = Status.failure
-            result.mark_flaky()
+        status = _on_flaky(exc)
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
