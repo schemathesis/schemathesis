@@ -47,6 +47,7 @@ from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
 from ..targets import Target
+from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
 from ..types import Filter, PathLike, RequestCert
 from . import callbacks, cassettes, output
@@ -1181,9 +1182,12 @@ def into_event_stream(
             generation_config=generation_config,
             probe_config=probes.ProbeConfig(
                 base_url=config.base_url,
-                request_tls_verify=config.request_tls_verify,
-                request_proxy=config.request_proxy,
-                request_cert=config.request_cert,
+                request=RequestConfig(
+                    timeout=request_timeout,
+                    tls_verify=config.request_tls_verify,
+                    proxy=config.request_proxy,
+                    cert=config.request_cert,
+                ),
                 auth=config.auth,
                 auth_type=config.auth_type,
                 headers=config.headers,

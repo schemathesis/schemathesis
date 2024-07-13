@@ -48,7 +48,7 @@ from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
-from schemathesis.transports import WSGITransport
+from schemathesis.transports import RequestConfig, WSGITransport
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
@@ -309,7 +309,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "seed": None,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
-        "probe_config": ProbeConfig(auth_type="basic", headers={}),
+        "probe_config": ProbeConfig(auth_type="basic", headers={}, request=RequestConfig(timeout=10000)),
         "service_client": None,
         **expected,
     }

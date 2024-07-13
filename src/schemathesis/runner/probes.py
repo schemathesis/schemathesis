@@ -10,20 +10,20 @@ from __future__ import annotations
 
 import enum
 import warnings
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..constants import USER_AGENT
 from ..exceptions import format_exception
 from ..models import Request, Response
 from ..sanitization import sanitize_request, sanitize_response
+from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
 
 if TYPE_CHECKING:
     import requests
 
     from ..schemas import BaseSchema
-    from ..types import RequestCert
 
 
 HEADER_NAME = "X-Schemathesis-Probe"
@@ -32,9 +32,7 @@ HEADER_NAME = "X-Schemathesis-Probe"
 @dataclass
 class ProbeConfig:
     base_url: str | None = None
-    request_tls_verify: bool | str = True
-    request_proxy: str | None = None
-    request_cert: RequestCert | None = None
+    request: RequestConfig = field(default_factory=RequestConfig)
     auth: tuple[str, str] | None = None
     auth_type: str | None = None
     headers: dict[str, str] | None = None
@@ -137,9 +135,12 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Pr
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
+        kwargs: dict[str, Any] = {"timeout": config.request.prepared_timeout or 2}
+        if config.request.proxy is not None:
+            kwargs["proxies"] = {"all": config.request.proxy}
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = session.send(request, timeout=2)
+            response = session.send(request, **kwargs)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
@@ -157,9 +158,9 @@ def run(schema: BaseSchema, config: ProbeConfig) -> list[ProbeRun]:
 
     session = Session()
     session.headers.update(config.headers or {})
-    session.verify = config.request_tls_verify
-    if config.request_cert is not None:
-        session.cert = config.request_cert
+    session.verify = config.request.tls_verify
+    if config.request.cert is not None:
+        session.cert = config.request.cert
     if config.auth is not None:
         session.auth = get_requests_auth(config.auth, config.auth_type)
 
