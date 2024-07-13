@@ -28,6 +28,12 @@ Network Error
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
+_______________________________ API Probe errors _______________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
