@@ -1,6 +1,9 @@
 from typing import Any
 
+from .extensions import extensible
 
+
+@extensible("SCHEMATHESIS_EXTENSION_FAST_DEEP_COPY")
 def fast_deepcopy(value: Any) -> Any:
     """A specialized version of `deepcopy` that copies only `dict` and `list` and does unrolling.
 

@@ -7,6 +7,7 @@ from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
 from schemathesis.runner import from_schema
+from schemathesis.internal.copy import fast_deepcopy
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -222,3 +223,23 @@ def test_links_count(raw_schema):
     schema = schemathesis.from_dict(raw_schema)
 
     _ = schema.links_count
+
+
+@pytest.mark.benchmark
+@pytest.mark.parametrize(
+    "schema",
+    [
+        BBCI,
+        VMWARE,
+        STRIPE,
+        UNIVERSE,
+        APPVEYOR,
+        EVETECH,
+        OSISOFT,
+        ML_WEBSERVICES,
+        AZURE_NETWORK,
+    ],
+    ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
+)
+def test_deepcopy(schema):
+    fast_deepcopy(schema)
