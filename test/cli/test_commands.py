@@ -330,11 +330,10 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         (["--auth=test:test", "--auth-type=DIGEST"], {"auth": ("test", "test"), "auth_type": "digest"}),
         (["--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
         (["--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
-        (["--method=POST", "--method", "GET"], {"method": ("POST", "GET")}),
-        (["--method=POST", "--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic", "method": ("POST",)}),
-        (["--endpoint=users"], {"endpoint": ("users",)}),
-        (["--tag=foo"], {"tag": ("foo",)}),
-        (["--operation-id=getUser"], {"operation_id": ("getUser",)}),
+        (
+            ["--method=POST", "--auth=test:test"],
+            {"auth": ("test", "test"), "auth_type": "basic"},
+        ),
         (["--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
     ),
 )
@@ -353,16 +352,11 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "rate_limit": None,
                 "auth": None,
                 "auth_type": "basic",
-                "endpoint": None,
                 "headers": {},
                 "data_generation_methods": [DataGenerationMethod.default()],
-                "method": None,
-                "tag": None,
-                "operation_id": None,
                 "validate_schema": False,
                 "output_config": OutputConfig(),
                 "generation_config": GenerationConfig(),
-                "skip_deprecated_operations": False,
                 "force_schema_version": None,
                 "request_tls_verify": True,
                 "request_proxy": None,
@@ -1441,7 +1435,7 @@ def test_targeted(mocker, cli, cli_args, workers):
     "options, expected",
     (
         (
-            ("--skip-deprecated-operations",),
+            ("--exclude-deprecated",),
             "Collected API operations: 1",
         ),
         (
@@ -1450,7 +1444,7 @@ def test_targeted(mocker, cli, cli_args, workers):
         ),
     ),
 )
-def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, expected):
+def test_exclude_deprecated(testdir, cli, openapi3_base_url, options, expected):
     # When there are some deprecated API operations
     definition = {
         "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -1473,6 +1467,16 @@ def test_skip_deprecated_operations(testdir, cli, openapi3_base_url, options, ex
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout.splitlines()
+
+
+@pytest.mark.openapi_version("3.0")
+def test_deprecated_filters(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--endpoint=success") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+def test_duplicated_filters(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--include-path=success", "--include-path=success") == snapshot_cli
 
 
 @pytest.mark.parametrize("fixup", ("all", "fast_api"))
@@ -1618,7 +1622,7 @@ def test_new_stateful_runner_filtered_out(cli, schema_url, snapshot_cli):
             schema_url,
             "--experimental=stateful-test-runner",
             "--hypothesis-max-examples=20",
-            "--endpoint=success",
+            "--include-path=/api/success",
             "--exitfirst",
         )
         == snapshot_cli

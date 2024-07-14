@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, NoReturn, cast
+from typing import TYPE_CHECKING, Any, Callable, Collection, Generator, Iterable, Literal, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 
 import click
@@ -34,6 +34,7 @@ from ..constants import (
     WAIT_FOR_SCHEMA_ENV_VAR,
 )
 from ..exceptions import SchemaError, SchemaErrorType, extract_nth_traceback
+from ..filters import FilterSet, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
@@ -41,7 +42,7 @@ from ..internal.datetime import current_datetime
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
-from ..models import Case, CheckFunction
+from ..models import APIOperation, Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings, probes
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
@@ -216,6 +217,39 @@ with_hosts_file = click.option(
 )
 
 
+def _with_filter(*, by: str, mode: Literal["include", "exclude"], modifier: Literal["regex"] | None = None) -> Callable:
+    """Generate a CLI option for filtering API operations."""
+    param = f"--{mode}-{by}"
+    action = "include in" if mode == "include" else "exclude from"
+    prop = {
+        "operation-id": "ID",
+        "name": "Operation name",
+    }.get(by, by.capitalize())
+    if modifier:
+        param += f"-{modifier}"
+        prop += " pattern"
+    help_text = f"{prop} to {action} testing."
+    return click.option(
+        param,
+        help=help_text,
+        type=str,
+        multiple=modifier is None,
+        cls=GroupedOption,
+        group=ParameterGroup.filtering,
+    )
+
+
+_BY_VALUES = ("operation-id", "tag", "name", "method", "path")
+
+
+def with_filters(command: Callable) -> Callable:
+    for by in _BY_VALUES:
+        for mode in ("exclude", "include"):
+            for modifier in ("regex", None):
+                command = _with_filter(by=by, mode=mode, modifier=modifier)(command)  # type: ignore[arg-type]
+    return command
+
+
 class ReportToService:
     pass
 
@@ -361,6 +395,17 @@ REPORT_TO_SERVICE = ReportToService()
     multiple=True,
     type=str,
     callback=callbacks.validate_headers,
+)
+@with_filters
+@click.option(
+    "--exclude-deprecated",
+    help="Exclude deprecated API operations from testing.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    show_default=True,
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
 )
 @click.option(
     "--endpoint",
@@ -779,10 +824,31 @@ def run(
     exit_first: bool = False,
     max_failures: int | None = None,
     dry_run: bool = False,
-    endpoints: Filter | None = None,
-    methods: Filter | None = None,
-    tags: Filter | None = None,
-    operation_ids: Filter | None = None,
+    include_path: Sequence[str] = (),
+    include_path_regex: str | None = None,
+    include_method: Sequence[str] = (),
+    include_method_regex: str | None = None,
+    include_name: Sequence[str] = (),
+    include_name_regex: str | None = None,
+    include_tag: Sequence[str] = (),
+    include_tag_regex: str | None = None,
+    include_operation_id: Sequence[str] = (),
+    include_operation_id_regex: str | None = None,
+    exclude_path: Sequence[str] = (),
+    exclude_path_regex: str | None = None,
+    exclude_method: Sequence[str] = (),
+    exclude_method_regex: str | None = None,
+    exclude_name: Sequence[str] = (),
+    exclude_name_regex: str | None = None,
+    exclude_tag: Sequence[str] = (),
+    exclude_tag_regex: str | None = None,
+    exclude_operation_id: Sequence[str] = (),
+    exclude_operation_id_regex: str | None = None,
+    exclude_deprecated: bool = False,
+    endpoints: tuple[str, ...] = (),
+    methods: tuple[str, ...] = (),
+    tags: tuple[str, ...] = (),
+    operation_ids: tuple[str, ...] = (),
     workers_num: int = DEFAULT_WORKERS,
     base_url: str | None = None,
     app: str | None = None,
@@ -897,6 +963,101 @@ def run(
 
     output_config = OutputConfig(truncate=output_truncate)
 
+    deprecated_filters = {
+        "--method": "--include-method",
+        "--endpoint": "--include-path",
+        "--tag": "--include-tag",
+        "--operation-id": "--include-operation-id",
+    }
+    for values, arg_name in (
+        (include_path, "--include-path"),
+        (include_method, "--include-method"),
+        (include_name, "--include-name"),
+        (include_tag, "--include-tag"),
+        (include_operation_id, "--include-operation-id"),
+        (exclude_path, "--exclude-path"),
+        (exclude_method, "--exclude-method"),
+        (exclude_name, "--exclude-name"),
+        (exclude_tag, "--exclude-tag"),
+        (exclude_operation_id, "--exclude-operation-id"),
+        (methods, "--method"),
+        (endpoints, "--endpoint"),
+        (tags, "--tag"),
+        (operation_ids, "--operation-id"),
+    ):
+        if values and arg_name in deprecated_filters:
+            replacement = deprecated_filters[arg_name]
+            click.secho(
+                f"Warning: Option `{arg_name}` is deprecated and will be removed in Schemathesis 4.0. "
+                f"Use `{replacement}` instead.",
+                fg="yellow",
+            )
+        _ensure_unique_filter(values, arg_name)
+
+    filter_set = FilterSet()
+    for name_ in include_name:
+        filter_set.include(name=name_)
+    for method in include_method:
+        filter_set.include(method=method)
+    if methods:
+        for method in methods:
+            filter_set.include(method_regex=method)
+    for path in include_path:
+        filter_set.include(path=path)
+    if endpoints:
+        for endpoint in endpoints:
+            filter_set.include(path_regex=endpoint)
+    for tag in include_tag:
+        filter_set.include(tag=tag)
+    if tags:
+        for tag in tags:
+            filter_set.include(tag_regex=tag)
+    for operation_id in include_operation_id:
+        filter_set.include(operation_id=operation_id)
+    if operation_ids:
+        for operation_id in operation_ids:
+            filter_set.include(operation_id_regex=operation_id)
+    if (
+        include_name_regex
+        or include_method_regex
+        or include_path_regex
+        or include_tag_regex
+        or include_operation_id_regex
+    ):
+        filter_set.include(
+            name_regex=include_name_regex,
+            method_regex=include_method_regex,
+            path_regex=include_path_regex,
+            tag_regex=include_tag_regex,
+            operation_id_regex=include_operation_id_regex,
+        )
+    for name_ in exclude_name:
+        filter_set.exclude(name=name_)
+    for method in exclude_method:
+        filter_set.exclude(method=method)
+    for path in exclude_path:
+        filter_set.exclude(path=path)
+    for tag in exclude_tag:
+        filter_set.exclude(tag=tag)
+    for operation_id in exclude_operation_id:
+        filter_set.exclude(operation_id=operation_id)
+    if (
+        exclude_name_regex
+        or exclude_method_regex
+        or exclude_path_regex
+        or exclude_tag_regex
+        or exclude_operation_id_regex
+    ):
+        filter_set.exclude(
+            name_regex=exclude_name_regex,
+            method_regex=exclude_method_regex,
+            path_regex=exclude_path_regex,
+            tag_regex=exclude_tag_regex,
+            operation_id_regex=exclude_operation_id_regex,
+        )
+    if exclude_deprecated or skip_deprecated_operations:
+        filter_set.exclude(is_deprecated)
+
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
     token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
     schema_kind = callbacks.parse_schema_kind(schema, app)
@@ -986,7 +1147,6 @@ def run(
         base_url=base_url,
         started_at=started_at,
         validate_schema=validate_schema,
-        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
         request_tls_verify=request_tls_verify,
@@ -997,10 +1157,6 @@ def run(
         auth_type=auth_type,
         override=override,
         headers=headers,
-        endpoint=endpoints or None,
-        method=methods or None,
-        tag=tags or None,
-        operation_id=operation_ids or None,
         request_timeout=request_timeout,
         seed=hypothesis_seed,
         exit_first=exit_first,
@@ -1018,6 +1174,7 @@ def run(
         generation_config=generation_config,
         output_config=output_config,
         service_client=client,
+        filter_set=filter_set,
     )
     execute(
         event_stream,
@@ -1048,6 +1205,12 @@ def run(
     )
 
 
+def _ensure_unique_filter(values: Sequence[str], arg_name: str) -> None:
+    if len(values) != len(set(values)):
+        duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
+        raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
+
+
 def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | None:
     if cert is not None and key is not None:
         return cert, key
@@ -1065,7 +1228,6 @@ class LoaderConfig:
     app: Any
     base_url: str | None
     validate_schema: bool
-    skip_deprecated_operations: bool
     data_generation_methods: tuple[DataGenerationMethod, ...]
     force_schema_version: str | None
     request_tls_verify: bool | str
@@ -1079,11 +1241,6 @@ class LoaderConfig:
     auth: tuple[str, str] | None
     auth_type: str | None
     headers: dict[str, str] | None
-    # Schema filters
-    endpoint: Filter | None
-    method: Filter | None
-    tag: Filter | None
-    operation_id: Filter | None
 
 
 def into_event_stream(
@@ -1093,7 +1250,6 @@ def into_event_stream(
     base_url: str | None,
     started_at: str,
     validate_schema: bool,
-    skip_deprecated_operations: bool,
     data_generation_methods: tuple[DataGenerationMethod, ...],
     force_schema_version: str | None,
     request_tls_verify: bool | str,
@@ -1106,11 +1262,7 @@ def into_event_stream(
     headers: dict[str, str] | None,
     request_timeout: int | None,
     wait_for_schema: float | None,
-    # Schema filters
-    endpoint: Filter | None,
-    method: Filter | None,
-    tag: Filter | None,
-    operation_id: Filter | None,
+    filter_set: FilterSet,
     # Runtime behavior
     checks: Iterable[CheckFunction],
     max_response_time: int | None,
@@ -1137,7 +1289,6 @@ def into_event_stream(
             app=app,
             base_url=base_url,
             validate_schema=validate_schema,
-            skip_deprecated_operations=skip_deprecated_operations,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
             request_proxy=request_proxy,
@@ -1148,14 +1299,11 @@ def into_event_stream(
             auth=auth,
             auth_type=auth_type,
             headers=headers,
-            endpoint=endpoint or None,
-            method=method or None,
-            tag=tag or None,
-            operation_id=operation_id or None,
             output_config=output_config,
             generation_config=generation_config,
         )
         schema = load_schema(config)
+        schema.filter_set = filter_set
         yield from runner.from_schema(
             schema,
             auth=auth,
@@ -1293,11 +1441,6 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
     kwargs = {
         "app": config.app,
         "base_url": config.base_url,
-        "method": config.method,
-        "endpoint": config.endpoint,
-        "tag": config.tag,
-        "operation_id": config.operation_id,
-        "skip_deprecated_operations": config.skip_deprecated_operations,
         "validate_schema": config.validate_schema,
         "force_schema_version": config.force_schema_version,
         "data_generation_methods": config.data_generation_methods,
