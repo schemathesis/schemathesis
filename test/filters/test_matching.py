@@ -15,11 +15,13 @@ RAW_SCHEMA = {
             "get": {
                 "responses": {"200": {"description": "OK"}},
                 "tags": ["Users"],
+                "operationId": "getUsers",
             },
             "post": {"deprecated": True, "responses": {"200": {"description": "OK"}}, "tags": ["Users"]},
         },
         "/users/{user_id}/": {
             "patch": {
+                "operationId": "patchUser",
                 "responses": {"200": {"description": "OK"}},
             },
         },
@@ -51,6 +53,9 @@ SINGLE_INCLUDE_CASES = (
     ({"name": ["GET /users/", "POST /orders/"]}, [USERS_GET, ORDERS_POST]),
     ({"name_regex": "^P.+ /(users|orders)/"}, [USERS_POST, USER_ID_PATCH, ORDERS_POST]),
     ({"name_regex": re.compile("^p.+ /(USERS|orders)/", re.IGNORECASE)}, [USERS_POST, USER_ID_PATCH, ORDERS_POST]),
+    ({"operation_id": "getUsers"}, [USERS_GET]),
+    ({"operation_id": ["getUsers", "patchUser"]}, [USERS_GET, USER_ID_PATCH]),
+    ({"operation_id_regex": ".+Use.+"}, [USERS_GET, USER_ID_PATCH]),
 )
 MULTI_INCLUDE_CASES = [
     (({"path": "/users/"}, {"path": "/orders/"}), NO_PATCH),
