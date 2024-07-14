@@ -6,6 +6,15 @@ Changelog
 
 .. _v3.32.2:
 
+**Added**
+
+- A set of CLI options for including and excluding what API operations to test.
+
+**Deprecated**
+
+- ``--method``, ``--endpoint``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations`` CLI options in favor of the new ``--include-*`` and ``--exclude-*`` options. 
+  See more details in the CLI documentation.
+
 :version:`3.32.2 <v3.32.1...v3.32.2>` - 2024-07-17
 --------------------------------------------------
 

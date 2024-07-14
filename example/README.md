@@ -54,12 +54,12 @@ schemathesis-docker run $SCHEMA_URL
 schemathesis-docker run --checks all $SCHEMA_URL
 ```
 
-### Selecting what to test
+### Narrowing the testing scope
 
 Only `POST` operations with paths starting with `/internal`:
 
 ```shell
-schemathesis-docker run --method POST --endpoint '^/internal' $SCHEMA_URL
+schemathesis-docker run --include-method POST --include-path-regex '^/internal' $SCHEMA_URL
 ```
 
 ### Verifying responses with a custom check

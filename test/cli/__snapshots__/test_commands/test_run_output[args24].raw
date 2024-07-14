@@ -14,11 +14,37 @@ Testing scope:
 
   Customize the scope of the API testing.
 
-  -E, --endpoint TEXT           API operation path pattern (e.g., users/\d+).
-  -M, --method TEXT             HTTP method (e.g., GET, POST).
-  -T, --tag TEXT                Schema tag pattern.
-  -O, --operation-id TEXT       OpenAPI operationId pattern.
-  --skip-deprecated-operations  Exclude deprecated API operations from testing.
+  --include-path TEXT             Path to include in testing.
+  --include-path-regex TEXT       Path pattern to include in testing.
+  --exclude-path TEXT             Path to exclude from testing.
+  --exclude-path-regex TEXT       Path pattern to exclude from testing.
+  --include-method TEXT           Method to include in testing.
+  --include-method-regex TEXT     Method pattern to include in testing.
+  --exclude-method TEXT           Method to exclude from testing.
+  --exclude-method-regex TEXT     Method pattern to exclude from testing.
+  --include-name TEXT             Operation name to include in testing.
+  --include-name-regex TEXT       Operation name pattern to include in testing.
+  --exclude-name TEXT             Operation name to exclude from testing.
+  --exclude-name-regex TEXT       Operation name pattern to exclude from
+                                  testing.
+  --include-tag TEXT              Tag to include in testing.
+  --include-tag-regex TEXT        Tag pattern to include in testing.
+  --exclude-tag TEXT              Tag to exclude from testing.
+  --exclude-tag-regex TEXT        Tag pattern to exclude from testing.
+  --include-operation-id TEXT     ID to include in testing.
+  --include-operation-id-regex TEXT
+                                  ID pattern to include in testing.
+  --exclude-operation-id TEXT     ID to exclude from testing.
+  --exclude-operation-id-regex TEXT
+                                  ID pattern to exclude from testing.
+  --exclude-deprecated            Exclude deprecated API operations from
+                                  testing.
+  -E, --endpoint TEXT             API operation path pattern (e.g., users/\d+).
+  -M, --method TEXT               HTTP method (e.g., GET, POST).
+  -T, --tag TEXT                  Schema tag pattern.
+  -O, --operation-id TEXT         OpenAPI operationId pattern.
+  --skip-deprecated-operations    Exclude deprecated API operations from
+                                  testing.
 
 Response & Schema validation:
 
