@@ -325,6 +325,10 @@ def attach_filter_chain(
     setattr(target, attribute, proxy)
 
 
+def is_deprecated(ctx: HasAPIOperation) -> bool:
+    return ctx.operation.definition.raw.get("deprecated") is True
+
+
 def filter_set_from_components(
     *,
     include: bool,
@@ -337,9 +341,6 @@ def filter_set_from_components(
 ) -> FilterSet:
     def _is_defined(x: FilterType | None) -> bool:
         return x is not None and not isinstance(x, NotSet)
-
-    def _is_deprecated(ctx: HasAPIOperation) -> bool:
-        return ctx.operation.definition.raw.get("deprecated") is True
 
     def _prepare_filter(filter_: FilterType | None) -> RegexValue | None:
         if filter_ is None or isinstance(filter_, NotSet):
@@ -359,9 +360,9 @@ def filter_set_from_components(
             operation_id_regex=_prepare_filter(operation_id),
         )
     if skip_deprecated_operations is True and not any(
-        matcher.label == _is_deprecated.__name__ for exclude_ in new._excludes for matcher in exclude_.matchers
+        matcher.label == is_deprecated.__name__ for exclude_ in new._excludes for matcher in exclude_.matchers
     ):
-        new.exclude(func=_is_deprecated)
+        new.exclude(func=is_deprecated)
     # Merge with the parent filter set
     if parent is not None:
         for include_ in parent._includes:
@@ -387,7 +388,7 @@ def filter_set_from_components(
             matchers = exclude_.matchers
             ids = []
             for idx, matcher in enumerate(exclude_.matchers):
-                if skip_deprecated_operations is False and matcher.label == _is_deprecated.__name__:
+                if skip_deprecated_operations is False and matcher.label == is_deprecated.__name__:
                     ids.append(idx)
             if ids:
                 matchers = tuple(matcher for idx, matcher in enumerate(matchers) if idx not in ids)

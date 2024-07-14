@@ -48,34 +48,70 @@ By default, Schemathesis works with schemas that do not conform to the Open API 
 
 .. note:: Schemathesis supports colorless output via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option.
 
-Testing specific operations
+Narrowing the testing scope
 ---------------------------
 
-By default, Schemathesis runs tests for all operations, but you can select specific operations with the following CLI options:
+By default, Schemathesis tests all operations in your API. However, you can fine-tune your test scope with various CLI options to include or exclude specific operations based on paths, methods, names, tags, and operation IDs.
 
-- ``--endpoint / -E``. Operation path;
-- ``--method / -M``. HTTP method;
-- ``--tag / -T``. Open API tag;
-- ``--operation-id / -O``. ``operationId`` field value;
+Include and Exclude Options
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each option accepts a case-insensitive regex string and could be used multiple times in a single command.
-For example, the following command will select all operations which paths start with ``/api/users``:
+Use the following format to include or exclude specific operations in your tests:
+
+- ``--{include,exclude}-{path,method,name,tag,operation-id} TEXT``
+- ``--{include,exclude}-{path,method,name,tag,operation-id}-regex TEXT``
+
+The ``-regex`` suffix enables regular expression matching for the specified criteria. 
+For example, ``--include-path-regex '^/users'`` matches any path starting with ``/users``. 
+Without this suffix (e.g., ``--include-path '/users'``), the option performs an exact match. 
+Use regex for flexible pattern matching and the non-regex version for precise, literal matching.
+
+Additionally, you can exclude deprecated operations with:
+
+- ``--exclude-deprecated``
+
+.. note::
+
+   The ``name`` property in Schemathesis refers to the full operation name. 
+   For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
+   For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
+
+Examples
+~~~~~~~~
+
+Include operations with paths starting with ``/api/users``:
 
 .. code:: text
 
-    $ st run -E ^/api/users https://example.schemathesis.io/openapi.json
+  $ st run --include-path-regex '^/api/users' https://example.schemathesis.io/openapi.json
 
-.. important::
+Exclude POST method operations:
 
-    As filters are treated as regular expressions, ensure that they contain proper anchors.
-    For example, `/users/` will match `/v1/users/orders/`, but `^/users/$` will match only `/users/`.
+.. code:: text
 
-If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
-then you can skip them by passing ``--skip-deprecated-operations``:
+  $ st run --exclude-method 'POST' https://example.schemathesis.io/openapi.json
 
-.. code:: bash
+Include operations with the ``admin`` tag:
 
-    $ st run --skip-deprecated-operations ...
+.. code:: text
+
+  $ st run --include-tag 'admin' https://example.schemathesis.io/openapi.json
+
+Exclude deprecated operations:
+
+.. code:: text
+
+  $ st run --exclude-deprecated https://example.schemathesis.io/openapi.json
+
+Include ``GET /users`` and ``POST /orders``:
+
+.. code:: text
+
+  $ st run \
+    --include-name 'GET /users' \
+    --include-name 'POST /orders' \
+    https://example.schemathesis.io/openapi.json
+
 
 Overriding test data
 --------------------
