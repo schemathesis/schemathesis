@@ -6,6 +6,10 @@ Changelog
 
 .. _v3.32.0:
 
+**Added**
+
+- Filtering by ``operation_id`` in conditional auth implementation.
+
 :version:`3.32.0 <v3.31.1...v3.32.0>` - 2024-07-14
 --------------------------------------------------
 

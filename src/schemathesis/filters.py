@@ -71,6 +71,8 @@ class Matcher:
 def get_operation_attribute(operation: APIOperation, attribute: str) -> str | list[str] | None:
     if attribute == "tag":
         return operation.tags
+    if attribute == "operation_id":
+        return operation.definition.raw.get("operationId")
     # Just uppercase `method`
     value = getattr(operation, attribute)
     if attribute == "method":
@@ -168,6 +170,8 @@ class FilterSet:
         path_regex: RegexValue | None = None,
         tag: FilterValue | None = None,
         tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
     ) -> None:
         """Add a new INCLUDE filter."""
         self._add_filter(
@@ -181,6 +185,8 @@ class FilterSet:
             path_regex=path_regex,
             tag=tag,
             tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
         )
 
     def exclude(
@@ -195,6 +201,8 @@ class FilterSet:
         path_regex: RegexValue | None = None,
         tag: FilterValue | None = None,
         tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
     ) -> None:
         """Add a new EXCLUDE filter."""
         self._add_filter(
@@ -208,6 +216,8 @@ class FilterSet:
             path_regex=path_regex,
             tag=tag,
             tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
         )
 
     def _add_filter(
@@ -223,6 +233,8 @@ class FilterSet:
         path_regex: RegexValue | None = None,
         tag: FilterValue | None = None,
         tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
     ) -> None:
         matchers = []
         if func is not None:
@@ -232,6 +244,7 @@ class FilterSet:
             ("method", method, method_regex),
             ("path", path, path_regex),
             ("tag", tag, tag_regex),
+            ("operation_id", operation_id, operation_id_regex),
         ):
             if expected is not None and regex is not None:
                 # To match anything the regex should match the expected value, hence passing them together is useless
