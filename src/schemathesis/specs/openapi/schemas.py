@@ -8,6 +8,7 @@ from difflib import get_close_matches
 from hashlib import sha1
 from json import JSONDecodeError
 from threading import RLock
+from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -63,13 +64,6 @@ from ._hypothesis import get_case_strategy
 from .converter import to_json_schema, to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
-from .filters import (
-    should_skip_by_operation_id,
-    should_skip_by_tag,
-    should_skip_deprecated,
-    should_skip_endpoint,
-    should_skip_method,
-)
 from .parameters import (
     OpenAPI20Body,
     OpenAPI20CompositeBody,
@@ -149,14 +143,32 @@ class BaseOpenAPISchema(BaseSchema):
             message += f". Did you mean `{matches[0]}`?"
         raise OperationNotFound(message=message, item=item) from exc
 
-    def _should_skip(self, method: str, definition: dict[str, Any]) -> bool:
-        return (
-            method not in HTTP_METHODS
-            or should_skip_method(method, self.method)
-            or should_skip_deprecated(definition.get("deprecated", False), self.skip_deprecated_operations)
-            or should_skip_by_tag(definition.get("tags"), self.tag)
-            or should_skip_by_operation_id(definition.get("operationId"), self.operation_id)
-        )
+    def _should_skip(
+        self,
+        path: str,
+        method: str,
+        definition: dict[str, Any],
+        _ctx_cache: SimpleNamespace = SimpleNamespace(
+            operation=APIOperation(
+                method="",
+                path="",
+                verbose_name="",
+                definition=OperationDefinition(raw=None, resolved=None, scope=""),
+                schema=None,  # type: ignore
+            )
+        ),
+    ) -> bool:
+        if method not in HTTP_METHODS:
+            return True
+        # Attribute assignment is way faster than creating a new namespace every time
+        operation = _ctx_cache.operation
+        operation.method = method
+        operation.path = path
+        operation.verbose_name = f"{method.upper()} {path}"
+        operation.definition.raw = definition
+        operation.definition.resolved = definition
+        operation.schema = self
+        return not self.filter_set.match(_ctx_cache)
 
     def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
         try:
@@ -164,19 +176,16 @@ class BaseOpenAPISchema(BaseSchema):
         except KeyError:
             return
         get_full_path = self.get_full_path
-        endpoint = self.endpoint
         resolve = self.resolver.resolve
         should_skip = self._should_skip
         for path, path_item in paths.items():
             full_path = get_full_path(path)
-            if should_skip_endpoint(full_path, endpoint):
-                continue
             try:
                 if "$ref" in path_item:
                     _, path_item = resolve(path_item["$ref"])
                 # Straightforward iteration is faster than converting to a set & calculating length.
                 for method, definition in path_item.items():
-                    if should_skip(method, definition):
+                    if should_skip(full_path, method, definition):
                         continue
                     yield definition
             except SCHEMA_PARSING_ERRORS:
@@ -274,7 +283,6 @@ class BaseOpenAPISchema(BaseSchema):
         context = HookContext()
         # Optimization: local variables are faster than attribute access
         get_full_path = self.get_full_path
-        endpoint = self.endpoint
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
         resolve_shared_parameters = self._resolve_shared_parameters
@@ -287,8 +295,6 @@ class BaseOpenAPISchema(BaseSchema):
             method = None
             try:
                 full_path = get_full_path(path)  # Should be available for later use
-                if should_skip_endpoint(full_path, endpoint):
-                    continue
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
                 with in_scope(self.resolver, scope):
@@ -298,7 +304,7 @@ class BaseOpenAPISchema(BaseSchema):
                             continue
                         try:
                             resolved = resolve_operation(entry)
-                            if should_skip(method, resolved):
+                            if should_skip(full_path, method, resolved):
                                 continue
                             parameters = resolved.get("parameters", ())
                             parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
