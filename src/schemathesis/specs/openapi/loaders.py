@@ -11,6 +11,7 @@ from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
 from ...constants import NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
+from ...filters import filter_set_from_components
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -330,17 +331,22 @@ def from_dict(
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
 
+    filter_set = filter_set_from_components(
+        include=True,
+        method=method,
+        endpoint=endpoint,
+        tag=tag,
+        operation_id=operation_id,
+        skip_deprecated_operations=skip_deprecated_operations,
+    )
+
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         instance = SwaggerV20(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
+            filter_set=filter_set,
             validate_schema=validate_schema,
             data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             generation_config=generation_config or GenerationConfig(),
@@ -379,11 +385,7 @@ def from_dict(
             raw_schema,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
+            filter_set=filter_set,
             validate_schema=validate_schema,
             data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             generation_config=generation_config or GenerationConfig(),

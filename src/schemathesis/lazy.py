@@ -19,6 +19,7 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
+from .filters import filter_set_from_components
 from .generation import DataGenerationMethodInput, GenerationConfig
 from .hooks import HookDispatcher, HookScope
 from .internal.output import OutputConfig
@@ -341,18 +342,24 @@ def get_schema(
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
-    return schema.clone(
-        base_url=base_url,
+
+    filter_set = filter_set_from_components(
+        include=True,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
+        skip_deprecated_operations=skip_deprecated_operations,
+        parent=schema.filter_set,
+    )
+    return schema.clone(
+        base_url=base_url,
+        filter_set=filter_set,
         app=app,
         test_function=test_function,
         hooks=schema.hooks.merge(hooks),
         auth=auth,
         validate_schema=validate_schema,
-        skip_deprecated_operations=skip_deprecated_operations,
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,

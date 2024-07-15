@@ -37,6 +37,7 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import NOT_SET
 from .exceptions import OperationSchemaError, UsageError
+from .filters import FilterSet, filter_set_from_components
 from .generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -81,16 +82,12 @@ class BaseSchema(Mapping):
     transport: Transport
     location: str | None = None
     base_url: str | None = None
-    method: Filter | None = None
-    endpoint: Filter | None = None
-    tag: Filter | None = None
-    operation_id: Filter | None = None
+    filter_set: FilterSet = field(default_factory=FilterSet)
     app: Any = None
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     test_function: GenericTest | None = None
     validate_schema: bool = True
-    skip_deprecated_operations: bool = False
     data_generation_methods: list[DataGenerationMethod] = field(
         default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
     )
@@ -242,6 +239,16 @@ class BaseSchema(Mapping):
             CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
         )
 
+        filter_set = filter_set_from_components(
+            include=True,
+            method=method,
+            endpoint=endpoint,
+            tag=tag,
+            operation_id=operation_id,
+            skip_deprecated_operations=skip_deprecated_operations,
+            parent=self.filter_set,
+        )
+
         def wrapper(func: GenericTest) -> GenericTest:
             if hasattr(func, PARAMETRIZE_MARKER):
 
@@ -256,13 +263,9 @@ class BaseSchema(Mapping):
             HookDispatcher.add_dispatcher(func)
             cloned = self.clone(
                 test_function=func,
-                method=method,
-                endpoint=endpoint,
-                tag=tag,
-                operation_id=operation_id,
                 validate_schema=validate_schema,
-                skip_deprecated_operations=skip_deprecated_operations,
                 data_generation_methods=data_generation_methods,
+                filter_set=filter_set,
                 code_sample_style=_code_sample_style,  # type: ignore
             )
             setattr(func, PARAMETRIZE_MARKER, cloned)
@@ -279,38 +282,26 @@ class BaseSchema(Mapping):
         *,
         base_url: str | None | NotSet = NOT_SET,
         test_function: GenericTest | None = None,
-        method: Filter | None = NOT_SET,
-        endpoint: Filter | None = NOT_SET,
-        tag: Filter | None = NOT_SET,
-        operation_id: Filter | None = NOT_SET,
         app: Any = NOT_SET,
         hooks: HookDispatcher | NotSet = NOT_SET,
         auth: AuthStorage | NotSet = NOT_SET,
         validate_schema: bool | NotSet = NOT_SET,
-        skip_deprecated_operations: bool | NotSet = NOT_SET,
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: CodeSampleStyle | NotSet = NOT_SET,
         rate_limiter: Limiter | None = NOT_SET,
         sanitize_output: bool | NotSet | None = NOT_SET,
+        filter_set: FilterSet | None = None,
     ) -> BaseSchema:
         if base_url is NOT_SET:
             base_url = self.base_url
-        if method is NOT_SET:
-            method = self.method
-        if endpoint is NOT_SET:
-            endpoint = self.endpoint
-        if tag is NOT_SET:
-            tag = self.tag
-        if operation_id is NOT_SET:
-            operation_id = self.operation_id
         if app is NOT_SET:
             app = self.app
         if validate_schema is NOT_SET:
             validate_schema = self.validate_schema
-        if skip_deprecated_operations is NOT_SET:
-            skip_deprecated_operations = self.skip_deprecated_operations
+        if filter_set is None:
+            filter_set = self.filter_set
         if hooks is NOT_SET:
             hooks = self.hooks
         if auth is NOT_SET:
@@ -332,22 +323,18 @@ class BaseSchema(Mapping):
             self.raw_schema,
             location=self.location,
             base_url=base_url,  # type: ignore
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
             app=app,
             hooks=hooks,  # type: ignore
             auth=auth,  # type: ignore
             test_function=test_function,
             validate_schema=validate_schema,  # type: ignore
-            skip_deprecated_operations=skip_deprecated_operations,  # type: ignore
             data_generation_methods=data_generation_methods,  # type: ignore
             generation_config=generation_config,  # type: ignore
             output_config=output_config,  # type: ignore
             code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
             sanitize_output=sanitize_output,  # type: ignore
+            filter_set=filter_set,  # type: ignore
             transport=self.transport,
         )
 
