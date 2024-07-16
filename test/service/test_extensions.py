@@ -194,13 +194,14 @@ def test_oversize_text(cli_args, cli, service, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.skipif(platform.system() == "Windows", reason="Only verify on non-Windows platforms for simplicity")
-def test_connection_error(mocker, cli_args, cli, snapshot_cli):
+def test_connection_error(mocker, cli_args, cli, snapshot_cli, tmp_path):
+    debug = tmp_path / "debug.log"
     try:
         requests.get("http://127.0.0.1:1", timeout=0.00001)
     except requests.exceptions.RequestException as exc:
         e = exc
     mocker.patch("schemathesis.service.client.ServiceClient.analyze_schema", side_effect=e)
-    assert cli.run(*cli_args) == snapshot_cli
+    assert cli.run(*cli_args, f"--debug-output-file={debug}") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -208,9 +209,10 @@ def test_connection_error(mocker, cli_args, cli, snapshot_cli):
     payload="Json deserialize error: invalid type: integer `42`, expected a sequence at line 1 column 13",
     status=400,
 )
-def test_invalid_payload(cli_args, cli, snapshot_cli):
+def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
     # Analysis payload is invalid
-    assert cli.run(*cli_args) == snapshot_cli
+    debug = tmp_path / "debug.log"
+    assert cli.run(*cli_args, f"--debug-output-file={debug}") == snapshot_cli
 
 
 @pytest.mark.analyze_schema(

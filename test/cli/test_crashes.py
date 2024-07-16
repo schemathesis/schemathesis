@@ -9,6 +9,7 @@ from requests import Response
 from schemathesis import DataGenerationMethod
 from schemathesis.cli import ALL_CHECKS_NAMES, ALL_TARGETS_NAMES
 from schemathesis.code_samples import CodeSampleStyle
+from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.fixups import ALL_FIXUPS
 from schemathesis.runner.events import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.stateful import Stateful
@@ -92,6 +93,7 @@ def csv_strategy(enum):
             "hypothesis-report-multiple-bugs": st.booleans(),
             "hypothesis-seed": st.integers(),
             "hypothesis-verbosity": st.sampled_from([item.name for item in Verbosity]),
+            "experimental": st.sampled_from([experiment.name for experiment in GLOBAL_EXPERIMENTS.available]),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -99,7 +101,7 @@ def csv_strategy(enum):
         optional={
             key: st.booleans()
             for key in (
-                "show-errors-tracebacks",
+                "show-trace",
                 "exitfirst",
                 "hypothesis-derandomize",
                 "dry-run",
@@ -134,7 +136,17 @@ def csv_strategy(enum):
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params, tmp_path):
     report = tmp_path / "temp.tar.gz"
-    result = cli.run(schema_url, *params, *multiple_params, *flags, *csv_params, f"--report={report}", "--show-trace")
+    debug = tmp_path / "debug.log"
+    result = cli.run(
+        schema_url,
+        *params,
+        *multiple_params,
+        *flags,
+        *csv_params,
+        f"--report={report}",
+        "--show-trace",
+        f"--debug-output-file={debug}",
+    )
     check_result(result)
 
 
