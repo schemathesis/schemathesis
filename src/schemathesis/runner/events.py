@@ -10,7 +10,6 @@ from ..exceptions import RuntimeErrorType, SchemaError, SchemaErrorType, format_
 from ..generation import DataGenerationMethod
 from ..internal.datetime import current_datetime
 from ..internal.result import Err, Ok, Result
-from ..service.models import AnalysisSuccess
 from .serialization import SerializedError, SerializedTestResult
 
 if TYPE_CHECKING:
@@ -107,6 +106,8 @@ class AfterAnalysis(ExecutionEvent):
     analysis: Result[AnalysisResult, Exception] | None
 
     def _serialize(self) -> dict[str, Any]:
+        from ..service.models import AnalysisSuccess
+
         data = {}
         if isinstance(self.analysis, Ok):
             result = self.analysis.ok()

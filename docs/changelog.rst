@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.32.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Circular import in ``schemathesis.runner.events``.
+
 .. _v3.32.1:
 
 :version:`3.32.1 <v3.32.0...v3.32.1>` - 2024-07-17
