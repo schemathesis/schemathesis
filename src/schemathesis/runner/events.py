@@ -9,7 +9,8 @@ from typing import TYPE_CHECKING, Any
 from ..exceptions import RuntimeErrorType, SchemaError, SchemaErrorType, format_exception
 from ..generation import DataGenerationMethod
 from ..internal.datetime import current_datetime
-from ..internal.result import Result
+from ..internal.result import Err, Ok, Result
+from ..service.models import AnalysisSuccess
 from .serialization import SerializedError, SerializedTestResult
 
 if TYPE_CHECKING:
@@ -104,6 +105,23 @@ class BeforeAnalysis(ExecutionEvent):
 @dataclass
 class AfterAnalysis(ExecutionEvent):
     analysis: Result[AnalysisResult, Exception] | None
+
+    def _serialize(self) -> dict[str, Any]:
+        data = {}
+        if isinstance(self.analysis, Ok):
+            result = self.analysis.ok()
+            if isinstance(result, AnalysisSuccess):
+                data["analysis_id"] = result.id
+            else:
+                data["error"] = result.message
+        elif isinstance(self.analysis, Err):
+            data["error"] = format_exception(self.analysis.err())
+        return data
+
+    def asdict(self, **kwargs: Any) -> dict[str, Any]:
+        data = self._serialize()
+        data["event_type"] = self.__class__.__name__
+        return data
 
 
 class CurrentOperationMixin:
@@ -295,6 +313,9 @@ class StatefulEvent(ExecutionEvent):
     data: events.StatefulEvent
 
     __slots__ = ("data",)
+
+    def asdict(self, **kwargs: Any) -> dict[str, Any]:
+        return {"data": self.data.asdict(**kwargs), "event_type": self.__class__.__name__}
 
 
 @dataclass

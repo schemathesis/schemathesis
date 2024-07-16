@@ -1527,11 +1527,13 @@ def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
 @pytest.mark.parametrize("workers", (1, 2))
-def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers):
+def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers, tmp_path):
+    debug = tmp_path / "debug.log"
     assert (
         cli.run(
             schema_url,
             "--experimental=stateful-test-runner",
+            f"--debug-output-file={debug}",
             "--hypothesis-max-examples=40",
             "--report=file.tar.gz",
             "--exitfirst",

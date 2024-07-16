@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import textwrap
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any, cast
 
 from ..code_samples import get_excluded_headers
@@ -453,3 +453,72 @@ def deduplicate_failures(checks: list[SerializedCheck]) -> list[SerializedCheck]
                 unique_checks.append(check)
                 seen.add(key)
     return unique_checks
+
+
+def _serialize_case(case: SerializedCase) -> dict[str, Any]:
+    return {
+        "id": case.id,
+        "generation_time": case.generation_time,
+        "verbose_name": case.verbose_name,
+        "path_template": case.path_template,
+        "path_parameters": stringify_path_parameters(case.path_parameters),
+        "query": prepare_query(case.query),
+        "cookies": case.cookies,
+        "media_type": case.media_type,
+    }
+
+
+def _serialize_response(response: Response) -> dict[str, Any]:
+    return {
+        "status_code": response.status_code,
+        "headers": response.headers,
+        "body": response.body,
+        "encoding": response.encoding,
+        "elapsed": response.elapsed,
+    }
+
+
+def _serialize_check(check: SerializedCheck) -> dict[str, Any]:
+    return {
+        "name": check.name,
+        "value": check.value,
+        "request": {
+            "method": check.request.method,
+            "uri": check.request.uri,
+            "body": check.request.body,
+            "headers": check.request.headers,
+        },
+        "response": _serialize_response(check.response) if check.response is not None else None,
+        "example": _serialize_case(check.example),
+        "message": check.message,
+        "context": asdict(check.context) if check.context is not None else None,  # type: ignore
+        "history": [
+            {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
+            for entry in check.history
+        ],
+    }
+
+
+def stringify_path_parameters(path_parameters: dict[str, Any] | None) -> dict[str, str]:
+    """Cast all path parameter values to strings.
+
+    Path parameter values may be of arbitrary type, but to display them properly they should be casted to strings.
+    """
+    return {key: str(value) for key, value in (path_parameters or {}).items()}
+
+
+def prepare_query(query: dict[str, Any] | None) -> dict[str, list[str]]:
+    """Convert all query values to list of strings.
+
+    Query parameters may be generated in different shapes, including integers, strings, list of strings, etc.
+    It can also be an object, if the schema contains an object, but `style` and `explode` combo is not applicable.
+    """
+
+    def to_list_of_strings(value: Any) -> list[str]:
+        if isinstance(value, list):
+            return list(map(str, value))
+        if isinstance(value, str):
+            return [value]
+        return [str(value)]
+
+    return {key: to_list_of_strings(value) for key, value in (query or {}).items()}

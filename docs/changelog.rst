@@ -4,11 +4,15 @@ Changelog
 :version:`Unreleased <v3.32.0...HEAD>` - TBD
 --------------------------------------------
 
-.. _v3.32.0:
-
 **Added**
 
 - Filtering by ``operation_id`` in conditional auth implementation.
+
+**Fixed**
+
+- Internal error when saving debug logs with ``--experimental=stateful-test-runner`` or ``--experimental=schema-analysis`` enabled. :issue:`2353`
+
+.. _v3.32.0:
 
 :version:`3.32.0 <v3.31.1...v3.32.0>` - 2024-07-14
 --------------------------------------------------

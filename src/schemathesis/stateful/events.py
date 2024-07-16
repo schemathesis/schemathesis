@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import asdict as _asdict, dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Type
+from typing import TYPE_CHECKING, Type, Any
+
+from ..exceptions import format_exception
 
 if TYPE_CHECKING:
     from ..models import Case, Check
@@ -28,6 +30,9 @@ class StatefulEvent:
 
     __slots__ = ("timestamp",)
 
+    def asdict(self) -> dict[str, Any]:
+        return _asdict(self)
+
 
 @dataclass
 class RunStarted(StatefulEvent):
@@ -42,6 +47,12 @@ class RunStarted(StatefulEvent):
         self.state_machine = state_machine
         self.started_at = time.time()
         self.timestamp = time.monotonic()
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "started_at": self.started_at,
+        }
 
 
 @dataclass
@@ -89,6 +100,15 @@ class SuiteFinished(StatefulEvent):
         self.status = status
         self.failures = failures
         self.timestamp = time.monotonic()
+
+    def asdict(self) -> dict[str, Any]:
+        from ..runner.serialization import SerializedCheck, _serialize_check
+
+        return {
+            "timestamp": self.timestamp,
+            "status": self.status,
+            "failures": [_serialize_check(SerializedCheck.from_check(failure)) for failure in self.failures],
+        }
 
 
 class ScenarioStatus(str, Enum):
@@ -203,6 +223,26 @@ class StepFinished(StatefulEvent):
         self.checks = checks
         self.timestamp = time.monotonic()
 
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "status": self.status,
+            "transition_id": {
+                "name": self.transition_id.name,
+                "status_code": self.transition_id.status_code,
+                "source": self.transition_id.source,
+            }
+            if self.transition_id is not None
+            else None,
+            "target": self.target,
+            "response": {
+                "status_code": self.response.status_code,
+                "elapsed": self.response.elapsed.total_seconds(),
+            }
+            if self.response is not None
+            else None,
+        }
+
 
 @dataclass
 class Interrupted(StatefulEvent):
@@ -225,3 +265,9 @@ class Errored(StatefulEvent):
     def __init__(self, *, exception: Exception) -> None:
         self.exception = exception
         self.timestamp = time.monotonic()
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "timestamp": self.timestamp,
+            "exception": format_exception(self.exception, True),
+        }
