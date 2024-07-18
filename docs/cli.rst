@@ -112,7 +112,6 @@ Include ``GET /users`` and ``POST /orders``:
     --include-name 'POST /orders' \
     https://example.schemathesis.io/openapi.json
 
-
 Overriding test data
 --------------------
 

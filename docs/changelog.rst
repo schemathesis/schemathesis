@@ -10,6 +10,10 @@ Changelog
 
 - A set of CLI options for including and excluding what API operations to test.
 
+**Fixed**
+
+- Missed ``operation_id`` filter in some cases.
+
 **Deprecated**
 
 - ``--method``, ``--endpoint``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations`` CLI options in favor of the new ``--include-*`` and ``--exclude-*`` options. 
