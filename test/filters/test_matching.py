@@ -138,9 +138,12 @@ def case_id(case):
 )
 def test_matchers(chain, expected):
     filter_set = filters.FilterSet()
+    schema = SCHEMA
     for method, kwargs in chain:
         getattr(filter_set, method)(**kwargs)
+        schema = getattr(schema, method)(**kwargs)
     assert filter_set.apply_to(OPERATIONS) == expected
+    assert schema.filter_set.apply_to(OPERATIONS) == expected
 
 
 def matcher_func(ctx):
@@ -170,6 +173,36 @@ def test_filter_repr(matchers, expected):
 
 def test_matcher_repr():
     assert repr(filters.Matcher.for_value("method", "POST")) == "<Matcher: method='POST'>"
+
+
+@pytest.mark.parametrize(
+    "args, kwargs, expected",
+    (
+        (
+            (matcher_func,),
+            {},
+            "[<Filter: [matcher_func]>]",
+        ),
+        (
+            (matcher_func,),
+            {"deprecated": True},
+            "[<Filter: [is_deprecated]>, <Filter: [matcher_func]>]",
+        ),
+        (
+            (),
+            {"deprecated": True},
+            "[<Filter: [is_deprecated]>]",
+        ),
+    ),
+)
+def test_exclude_custom(args, kwargs, expected):
+    lazy_schema = schemathesis.from_pytest_fixture("name")
+    schemas = [SCHEMA, lazy_schema]
+    for schema in schemas:
+        assert (
+            repr(sorted(schema.exclude(*args, **kwargs).filter_set._excludes, key=lambda x: x.matchers[0].label))
+            == expected
+        )
 
 
 def test_sanity_checks():

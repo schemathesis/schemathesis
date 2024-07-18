@@ -8,11 +8,11 @@ Changelog
 
 **Added**
 
-- A set of CLI options for including and excluding what API operations to test.
+- A set of CLI options and a Python API for including and excluding what API operations to test. :issue:`703`, :issue:`819`, :issue:`1398`
 
 **Fixed**
 
-- Missed ``operation_id`` filter in some cases.
+- Missed ``operation_id`` & ``tag`` filter in some cases.
 
 **Deprecated**
 

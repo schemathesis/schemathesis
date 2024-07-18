@@ -505,15 +505,19 @@ def from_pytest_fixture(
     rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
-    return LazySchema(
-        fixture_name,
-        app=app,
-        base_url=base_url,
+    filter_set = filter_set_from_components(
+        include=True,
         method=method,
         endpoint=endpoint,
         tag=tag,
         operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
+    )
+    return LazySchema(
+        fixture_name,
+        app=app,
+        base_url=base_url,
+        filter_set=filter_set,
         validate_schema=validate_schema,
         data_generation_methods=_data_generation_methods,
         generation_config=generation_config,

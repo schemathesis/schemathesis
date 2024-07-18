@@ -143,9 +143,29 @@ class FilterSet:
 
     __slots__ = ("_includes", "_excludes")
 
-    def __init__(self) -> None:
-        self._includes = set()
-        self._excludes = set()
+    def __init__(self, _includes: set[Filter] | None = None, _excludes: set[Filter] | None = None) -> None:
+        self._includes = _includes or set()
+        self._excludes = _excludes or set()
+
+    def clone(self) -> FilterSet:
+        return FilterSet(_includes=self._includes.copy(), _excludes=self._excludes.copy())
+
+    def merge(self, other: FilterSet) -> FilterSet:
+        def _merge(lhs: set[Filter], rhs: set[Filter]) -> set[Filter]:
+            result = lhs.copy()
+            for new in rhs:
+                for old in lhs:
+                    for new_matcher in new.matchers:
+                        for old_matcher in old.matchers:
+                            if "=" in new_matcher.label and "=" in old_matcher.label:
+                                if new_matcher.label.split("=")[0] == old_matcher.label.split("=")[0]:
+                                    result.remove(old)
+                result.add(new)
+            return result
+
+        return FilterSet(
+            _includes=_merge(self._includes, other._includes), _excludes=_merge(self._excludes, other._excludes)
+        )
 
     def apply_to(self, operations: list[APIOperation]) -> list[APIOperation]:
         """Get a filtered list of the given operations that match the filters."""
@@ -304,6 +324,8 @@ def attach_filter_chain(
         name_regex: str | None = None,
         method: FilterValue | None = None,
         method_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
         operation_id: FilterValue | None = None,
@@ -316,6 +338,8 @@ def attach_filter_chain(
             name_regex=name_regex,
             method=method,
             method_regex=method_regex,
+            tag=tag,
+            tag_regex=tag_regex,
             path=path,
             path_regex=path_regex,
             operation_id=operation_id,

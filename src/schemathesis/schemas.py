@@ -37,7 +37,7 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import NOT_SET
 from .exceptions import OperationSchemaError, UsageError
-from .filters import FilterSet, filter_set_from_components
+from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
 from .generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -96,6 +96,76 @@ class BaseSchema(Mapping):
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
+
+    def include(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+    ) -> BaseSchema:
+        """Include only operations that match the given filters."""
+        filter_set = self.filter_set.clone()
+        filter_set.include(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return self.clone(filter_set=filter_set)
+
+    def exclude(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+        deprecated: bool = False,
+    ) -> BaseSchema:
+        """Include only operations that match the given filters."""
+        filter_set = self.filter_set.clone()
+        if deprecated:
+            if func is None:
+                func = is_deprecated
+            else:
+                filter_set.exclude(is_deprecated)
+        filter_set.exclude(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return self.clone(filter_set=filter_set)
 
     def __iter__(self) -> Iterator[str]:
         raise NotImplementedError

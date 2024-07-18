@@ -19,7 +19,7 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
-from .filters import filter_set_from_components
+from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
 from .generation import DataGenerationMethodInput, GenerationConfig
 from .hooks import HookDispatcher, HookScope
 from .internal.output import OutputConfig
@@ -43,21 +43,115 @@ from .utils import (
 class LazySchema:
     fixture_name: str
     base_url: str | None | NotSet = NOT_SET
-    method: Filter | None = NOT_SET
-    endpoint: Filter | None = NOT_SET
-    tag: Filter | None = NOT_SET
-    operation_id: Filter | None = NOT_SET
     app: Any = NOT_SET
+    filter_set: FilterSet = field(default_factory=FilterSet)
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     validate_schema: bool = True
-    skip_deprecated_operations: bool = False
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET
     generation_config: GenerationConfig | NotSet = NOT_SET
     output_config: OutputConfig | NotSet = NOT_SET
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
+
+    def include(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+    ) -> LazySchema:
+        """Include only operations that match the given filters."""
+        filter_set = self.filter_set.clone()
+        filter_set.include(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return self.__class__(
+            fixture_name=self.fixture_name,
+            base_url=self.base_url,
+            app=self.app,
+            hooks=self.hooks,
+            auth=self.auth,
+            validate_schema=self.validate_schema,
+            data_generation_methods=self.data_generation_methods,
+            generation_config=self.generation_config,
+            output_config=self.output_config,
+            code_sample_style=self.code_sample_style,
+            rate_limiter=self.rate_limiter,
+            sanitize_output=self.sanitize_output,
+            filter_set=filter_set,
+        )
+
+    def exclude(
+        self,
+        func: MatcherFunc | None = None,
+        *,
+        name: FilterValue | None = None,
+        name_regex: str | None = None,
+        method: FilterValue | None = None,
+        method_regex: str | None = None,
+        path: FilterValue | None = None,
+        path_regex: str | None = None,
+        tag: FilterValue | None = None,
+        tag_regex: RegexValue | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
+        deprecated: bool = False,
+    ) -> LazySchema:
+        """Exclude operations that match the given filters."""
+        filter_set = self.filter_set.clone()
+        if deprecated:
+            if func is None:
+                func = is_deprecated
+            else:
+                filter_set.exclude(is_deprecated)
+        filter_set.exclude(
+            func,
+            name=name,
+            name_regex=name_regex,
+            method=method,
+            method_regex=method_regex,
+            path=path,
+            path_regex=path_regex,
+            tag=tag,
+            tag_regex=tag_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
+        )
+        return self.__class__(
+            fixture_name=self.fixture_name,
+            base_url=self.base_url,
+            app=self.app,
+            hooks=self.hooks,
+            auth=self.auth,
+            validate_schema=self.validate_schema,
+            data_generation_methods=self.data_generation_methods,
+            generation_config=self.generation_config,
+            output_config=self.output_config,
+            code_sample_style=self.code_sample_style,
+            rate_limiter=self.rate_limiter,
+            sanitize_output=self.sanitize_output,
+            filter_set=filter_set,
+        )
 
     def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
@@ -75,14 +169,6 @@ class LazySchema:
         output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
-        if method is NOT_SET:
-            method = self.method
-        if endpoint is NOT_SET:
-            endpoint = self.endpoint
-        if tag is NOT_SET:
-            tag = self.tag
-        if operation_id is NOT_SET:
-            operation_id = self.operation_id
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
@@ -133,6 +219,7 @@ class LazySchema:
                     app=self.app,
                     rate_limiter=self.rate_limiter,
                     sanitize_output=self.sanitize_output,
+                    filter_set=self.filter_set,
                 )
                 fixtures = get_fixtures(test, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
@@ -325,6 +412,7 @@ def get_schema(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
+    filter_set: FilterSet,
     app: Any = None,
     test_function: GenericTest,
     hooks: HookDispatcher,
@@ -350,7 +438,7 @@ def get_schema(
         tag=tag,
         operation_id=operation_id,
         skip_deprecated_operations=skip_deprecated_operations,
-        parent=schema.filter_set,
+        parent=schema.filter_set.merge(filter_set),
     )
     return schema.clone(
         base_url=base_url,
