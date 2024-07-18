@@ -45,43 +45,90 @@ Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a 
 
 By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior by passing the ``validate_schema=False`` argument to the ``from_uri`` function.
 
-Testing specific operations
+Narrowing the testing scope
 ---------------------------
 
-By default, Schemathesis runs tests for all operations, but you can select specific operations by passing the following arguments to the ``parametrize`` function:
+By default, Schemathesis tests all operations in your API. However, you can fine-tune your test scope to include or exclude specific operations based on paths, methods, names, tags, and operation IDs.
 
-- ``endpoint``. Operation path;
-- ``method``. HTTP method;
-- ``tag``. Open API tag;
-- ``operation_id``. ``operationId`` field value;
+Include and Exclude Options
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Each argument expects a case-insensitive regex string or a list of such strings.
-Each regex will be matched with its corresponding value via Python's ``re.search`` function.
-
-.. important::
-
-    As filters are treated as regular expressions, ensure that they contain proper anchors.
-    For example, `/users/` will match `/v1/users/orders/`, but `^/users/$` will match only `/users/`.
-
-For example, the following test selects all operations which paths start with ``/api/users``:
+Use ``include`` and ``exclude`` methods on the schema to select specific operations in your tests:
 
 .. code:: python
 
-    schema = ...  # Load the API schema here
-
-
-    @schema.parametrize(endpoint="^/api/users")
+    @schema.include(tag="admin").exclude(method="POST").parametrize()
     def test_api(case):
-        case.call_and_validate()
+        ...
 
-If your API contains deprecated operations (that have ``deprecated: true`` in their definition),
-then you can skip them by passing ``skip_deprecated_operations=True`` to loaders or to the `schema.parametrize` call:
+Each method accepts the following arguments:
+
+- ``path``. Path of the operation.
+- ``method``. HTTP method.
+- ``name``. Full operation name.
+- ``tag``. Open API tag.
+- ``operation_id``. ``operationId`` field value.
+
+Each argument is either a single string or a list of strings. Note that all conditions within the same method call are combined with the logical AND operator.
+Additionally, if you pass a list of strings, it means that the operation should match at least one of the provided values.
+
+Every argument is accompanied with its version with the ``_regex`` suffix that enables regular expression matching for the specified criteria. 
+For example, ``include(path_regex="^/users")`` matches any path starting with ``/users``. 
+Without this suffix (e.g., ``include(path="/users")``), the option performs an exact match. 
+Use regex for flexible pattern matching and the non-regex version for precise, literal matching.
+
+Additionally, you can exclude deprecated operations with:
+
+- ``exclude(deprecated=True)``
+
+.. note::
+
+   The ``name`` property in Schemathesis refers to the full operation name. 
+   For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
+   For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
+
+Examples
+~~~~~~~~
+
+Include operations with paths starting with ``/api/users``:
 
 .. code:: python
 
-    schema = schemathesis.from_uri(
-        "https://example.schemathesis.io/openapi.json", skip_deprecated_operations=True
-    )
+  @schema.include(path_regex="^/api/users").parametrize()
+  def test_api(case):
+      ...
+
+Exclude POST method operations:
+
+.. code:: python
+
+  @schema.exclude(method="POST").parametrize()
+  def test_api(case):
+      ...
+
+Include operations with the ``admin`` tag:
+
+.. code:: python
+
+  @schema.include(tag="admin").parametrize()
+  def test_api(case):
+      ...
+
+Exclude deprecated operations:
+
+.. code:: python
+
+  @schema.exclude(deprecated=True).parametrize()
+  def test_api(case):
+      ...
+
+Include ``GET /users`` and ``POST /orders``:
+
+.. code:: python
+
+  @schema.include(name=["GET /users", "POST /orders"]).parametrize()
+  def test_api(case):
+      ...
 
 Overriding test data
 --------------------

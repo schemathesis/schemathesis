@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 from schemathesis._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
@@ -31,7 +33,6 @@ lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 @lazy_schema.parametrize()
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-
 """
     )
     result = testdir.runpytest("-v", "-s")
@@ -172,6 +173,7 @@ def test_d(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_with_parametrize_filters_override(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
@@ -183,13 +185,17 @@ def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.method == "GET"
 
-@lazy_schema.parametrize(endpoint="/second", method=None)
+@lazy_schema.include(path_regex="/second", method=None).parametrize()
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.full_path == "/v1/second"
 
 @lazy_schema.parametrize()
 def test_c(request, case):
+    request.config.HYPOTHESIS_CASES += 1
+
+@lazy_schema.exclude(method=["post"]).parametrize()
+def test_d(request, case):
     request.config.HYPOTHESIS_CASES += 1
 """,
         paths={
@@ -212,19 +218,21 @@ def test_c(request, case):
     )
     result = testdir.runpytest("-v", "-s")
     # Then the filters should be applied to the generated tests
-    result.assert_outcomes(passed=3)
+    result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
             r"test_with_parametrize_filters_override.py::test_a PASSED",
             r"test_with_parametrize_filters_override.py::test_b PASSED",
             r"test_with_parametrize_filters_override.py::test_c PASSED",
-            r".*3 passed",
+            r"test_with_parametrize_filters_override.py::test_d PASSED",
+            r".*4 passed",
         ]
     )
     # test_a: 2 = 2 GET to /first, /second
     # test_b: 2 = 1 GET + 1 POST to /second
     # test_c: 1 = 1 POST to /first
-    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
+    # test_d: 1 = 1 POST to /first
+    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
 
 
 def test_with_schema_filters(testdir):
