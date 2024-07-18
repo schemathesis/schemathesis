@@ -535,8 +535,10 @@ def run_test(
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.error
             result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
-        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
-            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
+        elif (
+            hasattr(hypothesis.errors, "FlakyFailure")
+            and isinstance(exc, hypothesis.errors.FlakyFailure)
+            and any(isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions)
         ):
             for sub_exc in exc.exceptions:
                 if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
@@ -579,8 +581,7 @@ def run_test(
         result.mark_errored()
         for error in deduplicate_errors(errors):
             result.add_error(error)
-    except hypothesis.errors.FlakyFailure as exc:
-        # Hypothesis >= 6.108.0
+    except hypothesis.errors.Flaky as exc:
         status = _on_flaky(exc)
     except MultipleFailures:
         # Schemathesis may detect multiple errors that come from different check results
@@ -590,8 +591,6 @@ def run_test(
             add_errors(result, errors)
         else:
             status = Status.failure
-    except hypothesis.errors.Flaky as exc:
-        status = _on_flaky(exc)
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.error
