@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Collection, Generator, Iterable, Literal, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 
 import click
@@ -34,7 +34,7 @@ from ..constants import (
     WAIT_FOR_SCHEMA_ENV_VAR,
 )
 from ..exceptions import SchemaError, SchemaErrorType, extract_nth_traceback
-from ..filters import FilterSet, is_deprecated
+from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
@@ -397,6 +397,22 @@ REPORT_TO_SERVICE = ReportToService()
     callback=callbacks.validate_headers,
 )
 @with_filters
+@click.option(
+    "--include-by",
+    "include_by",
+    type=str,
+    help="Include API operations by expression",
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
+)
+@click.option(
+    "--exclude-by",
+    "exclude_by",
+    type=str,
+    help="Exclude API operations by expression",
+    cls=GroupedOption,
+    group=ParameterGroup.filtering,
+)
 @click.option(
     "--exclude-deprecated",
     help="Exclude deprecated API operations from testing.",
@@ -844,6 +860,8 @@ def run(
     exclude_tag_regex: str | None = None,
     exclude_operation_id: Sequence[str] = (),
     exclude_operation_id_regex: str | None = None,
+    include_by: str | None = None,
+    exclude_by: str | None = None,
     exclude_deprecated: bool = False,
     endpoints: tuple[str, ...] = (),
     methods: tuple[str, ...] = (),
@@ -993,8 +1011,12 @@ def run(
                 fg="yellow",
             )
         _ensure_unique_filter(values, arg_name)
+    include_by_function = _filter_by_expression_to_func(include_by, "--include-by")
+    exclude_by_function = _filter_by_expression_to_func(exclude_by, "--exclude-by")
 
     filter_set = FilterSet()
+    if include_by_function:
+        filter_set.include(include_by_function)
     for name_ in include_name:
         filter_set.include(name=name_)
     for method in include_method:
@@ -1031,6 +1053,8 @@ def run(
             tag_regex=include_tag_regex,
             operation_id_regex=include_operation_id_regex,
         )
+    if exclude_by_function:
+        filter_set.exclude(exclude_by_function)
     for name_ in exclude_name:
         filter_set.exclude(name=name_)
     for method in exclude_method:
@@ -1209,6 +1233,15 @@ def _ensure_unique_filter(values: Sequence[str], arg_name: str) -> None:
     if len(values) != len(set(values)):
         duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
         raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
+
+
+def _filter_by_expression_to_func(value: str | None, arg_name: str) -> Callable | None:
+    if value:
+        try:
+            return expression_to_filter_function(value)
+        except ValueError:
+            raise click.UsageError(f"Invalid expression for {arg_name}: {value}") from None
+    return None
 
 
 def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | None:

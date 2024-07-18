@@ -202,6 +202,7 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
             }
         elif name == "upload_file":
             schema = {
+                "x-property": 42,
                 "parameters": [
                     {"name": "note", "in": "formData", "required": True, "type": "string"},
                     {"name": "data", "in": "formData", "required": True, "type": "file"},
@@ -553,6 +554,7 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
             }
         elif name == "upload_file":
             schema = {
+                "x-property": 42,
                 "requestBody": {
                     "required": True,
                     "content": {

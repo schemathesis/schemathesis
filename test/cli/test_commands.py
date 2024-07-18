@@ -1479,6 +1479,18 @@ def test_duplicated_filters(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--include-path=success", "--include-path=success") == snapshot_cli
 
 
+@pytest.mark.openapi_version("3.0")
+def test_invalid_filter(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--include-by=fooo") == snapshot_cli
+
+
+@pytest.mark.parametrize("value", ("--include-by=/x-property == 42", "--exclude-by=/x-property != 42"))
+@pytest.mark.operations("upload_file", "custom_format")
+@pytest.mark.openapi_version("3.0")
+def test_filter_by(cli, schema_url, snapshot_cli, value):
+    assert cli.run(schema_url, "--dry-run", "--hypothesis-max-examples=1", value) == snapshot_cli
+
+
 @pytest.mark.parametrize("fixup", ("all", "fast_api"))
 def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_examples, fixup):
     # When schema contains Draft 7 definitions as ones from FastAPI may contain

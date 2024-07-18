@@ -87,6 +87,17 @@ Additionally, you can exclude deprecated operations with:
    For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
    For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
 
+You also can filter API operations by a custom function:
+
+.. code:: python
+
+  def my_custom_filter(ctx):
+      return ctx.operation.definition.resolved.get("x-property") == 42
+
+  @schema.include(my_custom_filter).parametrize()
+  def test_api(case):
+      ...
+
 Examples
 ~~~~~~~~
 
