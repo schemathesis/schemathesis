@@ -95,7 +95,7 @@ def test_(request, case):
             },
         },
         method="POST",
-        endpoint="/v1/foo",
+        path="/v1/foo",
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -129,7 +129,7 @@ def test_b(request, case):
             }
         },
         method="POST",
-        endpoint="/v1/foo",
+        path="/v1/foo",
         tag="foo",
     )
     result = testdir.runpytest("-v", "-s")

@@ -1,4 +1,5 @@
 import platform
+import sys
 
 import pytest
 
@@ -286,13 +287,14 @@ def test(case):
 
 
 @pytest.mark.parametrize("style", ("python", "curl"))
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_failure_reproduction_message(testdir, openapi3_base_url, style):
     # When a test fails
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="failure")
+@schema.include(path_regex="failure").parametrize()
 def test(case):
     case.call_and_validate(code_sample_style="{style}")
     """,
@@ -358,6 +360,7 @@ def test(case):
     assert "CHECKING!" in result.stdout.str()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_excluded_checks(testdir, openapi3_base_url):
     # When the user would like to exclude a check
     testdir.make_test(
@@ -366,7 +369,7 @@ from schemathesis.checks import status_code_conformance, not_a_server_error
 
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="failure")
+@schema.include(path_regex="failure").parametrize()
 def test(case):
     response = case.call()
     case.validate_response(response, excluded_checks=(status_code_conformance, not_a_server_error))
@@ -651,6 +654,7 @@ def test(value):
 
 
 @pytest.mark.parametrize("value", (True, False))
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_output_sanitization(testdir, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
@@ -658,7 +662,7 @@ def test_output_sanitization(testdir, openapi3_base_url, value):
 
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="failure")
+@schema.include(path_regex="failure").parametrize()
 def test(case):
     case.call_and_validate(headers={{'Authorization': '{auth}'}})
 """,
@@ -675,12 +679,13 @@ def test(case):
     assert expected in result.stdout.lines
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="success")
+@schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])
 def test(case):
     pass
@@ -724,6 +729,7 @@ def test(case):
     )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
     "phases, expected",
     (
@@ -745,7 +751,7 @@ def test_invalid_regex_example(testdir, openapi3_base_url, phases, expected):
 
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="success")
+@schema.include(path_regex="success").parametrize()
 @settings(phases=[{phases}])
 def test(case):
     pass
@@ -785,6 +791,7 @@ def test(case):
     assert expected in result.stdout.str()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
     "phases",
     ("Phase.explicit", "Phase.explicit, Phase.generate"),
@@ -794,7 +801,7 @@ def test_invalid_header_in_example(testdir, openapi3_base_url, phases):
         f"""
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="success")
+@schema.include(path_regex="success").parametrize()
 @settings(phases=[{phases}])
 def test(case):
     pass
@@ -822,13 +829,14 @@ def test(case):
     assert "Failed to generate test cases from examples for this API" in result.stdout.str()
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_non_serializable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
 
 schema.base_url = "{openapi3_base_url}"
 
-@schema.parametrize(endpoint="success")
+@schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])
 def test(case):
     pass
@@ -861,13 +869,14 @@ def test(case):
     )
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.operations("path_variable", "custom_format")
 def test_override(testdir, openapi3_base_url, openapi3_schema_url):
     testdir.make_test(
         f"""
 schema = schemathesis.from_uri('{openapi3_schema_url}')
 
-@schema.parametrize(endpoint=["path_variable", "custom_format"])
+@schema.include(path_regex="path_variable|custom_format").parametrize()
 @schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
     if "key" in case.operation.path_parameters:

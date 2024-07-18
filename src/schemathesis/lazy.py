@@ -22,6 +22,7 @@ from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
 from .generation import DataGenerationMethodInput, GenerationConfig
 from .hooks import HookDispatcher, HookScope
+from .internal.deprecation import warn_filtration_arguments
 from .internal.output import OutputConfig
 from .internal.result import Ok
 from .models import APIOperation
@@ -169,6 +170,10 @@ class LazySchema:
         output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
+        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+            value = locals()[name]
+            if value is not NOT_SET:
+                warn_filtration_arguments(name)
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:

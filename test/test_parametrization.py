@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
 from packaging import version
@@ -423,6 +425,7 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_deselecting(testdir):
     # When pytest selecting is applied via "-k" option
     testdir.make_test(
@@ -432,7 +435,7 @@ def test_deselecting(testdir):
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
 
-@schema.parametrize(endpoint="pets")
+@schema.include(path_regex="pets").parametrize()
 @settings(max_examples=1)
 def test_b(request, case):
     request.config.HYPOTHESIS_CASES += 1

@@ -42,7 +42,7 @@ class HookContext:
 
     operation: APIOperation | None = None
 
-    @deprecated_property(removed_in="4.0", replacement="operation")
+    @deprecated_property(removed_in="4.0", replacement="`operation`")
     def endpoint(self) -> APIOperation | None:
         return self.operation
 
