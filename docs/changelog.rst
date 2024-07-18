@@ -18,6 +18,7 @@ Changelog
 
 - ``--method``, ``--endpoint``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations`` CLI options in favor of the new ``--include-*`` and ``--exclude-*`` options. 
   See more details in the CLI documentation.
+- ``method``, ``endpoint``, ``tag``, ``operation_id`` and ``skip_deprecated_operations`` arguments in ``schemathesis.from_*`` loaders and the ``parametrize`` function in favor of the new ``include`` and ``exclude`` methods on ``schema`` instances.
 
 :version:`3.32.2 <v3.32.1...v3.32.2>` - 2024-07-17
 --------------------------------------------------

@@ -437,7 +437,7 @@ In the following example we test a hypothetical ``/api/auth/password/reset/`` op
     schema = ...  # Load the API schema here
 
 
-    @schema.parametrize(endpoint="/api/auth/password/reset/")
+    @schema.include(path="/api/auth/password/reset/").parametrize()
     @schema.given(data=st.data())
     def test_password_reset(data, case, user):
         if data.draw(st.booleans()):

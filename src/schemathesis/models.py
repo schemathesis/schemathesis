@@ -174,7 +174,7 @@ class Case:
     def __hash__(self) -> int:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
-    @deprecated_property(removed_in="4.0", replacement="operation")
+    @deprecated_property(removed_in="4.0", replacement="`operation`")
     def endpoint(self) -> APIOperation:
         return self.operation
 

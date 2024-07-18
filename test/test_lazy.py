@@ -213,7 +213,7 @@ def test_d(request, case):
             },
         },
         method="POST",
-        endpoint="/first",
+        path="/first",
         tag="foo",
     )
     result = testdir.runpytest("-v", "-s")
@@ -284,7 +284,7 @@ def test_b(request, case):
             },
         },
         method="GET",
-        endpoint="/first",
+        path="/first",
     )
     result = testdir.runpytest("-v", "-s")
     # Then the filters should be applied to the generated tests

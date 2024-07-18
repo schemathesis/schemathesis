@@ -961,7 +961,7 @@ def testdir(testdir):
     def maker(
         content,
         method=None,
-        endpoint=None,
+        path=None,
         tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
@@ -991,7 +991,7 @@ def testdir(testdir):
         schema = schemathesis.from_dict(
             raw_schema,
             method={method},
-            endpoint={endpoint},
+            endpoint={path},
             tag={tag},
             validate_schema={validate_schema},
             sanitize_output={sanitize_output}
@@ -999,7 +999,7 @@ def testdir(testdir):
         """.format(
                 schema=schema,
                 method=repr(method),
-                endpoint=repr(endpoint),
+                path=repr(path),
                 tag=repr(tag),
                 validate_schema=repr(validate_schema),
                 sanitize_output=repr(sanitize_output),

@@ -45,6 +45,7 @@ from .generation import (
     GenerationConfig,
 )
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch
+from .internal.deprecation import warn_filtration_arguments
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
@@ -308,6 +309,11 @@ class BaseSchema(Mapping):
         _code_sample_style = (
             CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
         )
+
+        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+            value = locals()[name]
+            if value is not NOT_SET:
+                warn_filtration_arguments(name)
 
         filter_set = filter_set_from_components(
             include=True,

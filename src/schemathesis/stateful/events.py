@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict as _asdict, dataclass
+from dataclasses import asdict as _asdict
+from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Type, Any
+from typing import TYPE_CHECKING, Any, Type
 
 from ..exceptions import format_exception
 
