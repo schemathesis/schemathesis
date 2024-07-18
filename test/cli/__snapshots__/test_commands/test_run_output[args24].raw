@@ -37,6 +37,8 @@ Testing scope:
   --exclude-operation-id TEXT     ID to exclude from testing.
   --exclude-operation-id-regex TEXT
                                   ID pattern to exclude from testing.
+  --include-by TEXT               Include API operations by expression
+  --exclude-by TEXT               Exclude API operations by expression
   --exclude-deprecated            Exclude deprecated API operations from
                                   testing.
   -E, --endpoint TEXT             API operation path pattern (e.g., users/\d+).

@@ -76,6 +76,23 @@ Additionally, you can exclude deprecated operations with:
    For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
    For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
 
+You also can filter API operations by an expression over operation's definition:
+
+.. code:: text
+
+    st run --include-by="/x-property == 42" https://example.schemathesis.io/openapi.json
+
+The expression above will select only operations with the ``x-property`` field equal to ``42``.
+Expressions have the following form:
+
+.. code:: text
+
+    "<pointer> <operator> <value>"
+
+- ``<pointer>`` is a JSON Pointer to the value in the operation definition.
+- ``<operator>`` is one of the following: ``==``, ``!=``.
+- ``<value>`` is a JSON value to compare with. If it is not a valid JSON value, it is treated as a string.
+
 Examples
 ~~~~~~~~
 
