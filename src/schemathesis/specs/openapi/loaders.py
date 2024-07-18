@@ -19,6 +19,7 @@ from ...generation import (
     GenerationConfig,
 )
 from ...hooks import HookContext, dispatch
+from ...internal.deprecation import warn_filtration_arguments
 from ...internal.output import OutputConfig
 from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url, load_yaml
@@ -76,7 +77,7 @@ def from_path(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -126,7 +127,7 @@ def from_uri(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -222,7 +223,7 @@ def from_file(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -298,7 +299,7 @@ def from_dict(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -331,6 +332,10 @@ def from_dict(
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
 
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
     filter_set = filter_set_from_components(
         include=True,
         method=method,
@@ -475,7 +480,7 @@ def from_pytest_fixture(
     endpoint: Filter | None = NOT_SET,
     tag: Filter | None = NOT_SET,
     operation_id: Filter | None = NOT_SET,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
@@ -505,6 +510,10 @@ def from_pytest_fixture(
     rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
+    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
+        value = locals()[name]
+        if value is not None:
+            warn_filtration_arguments(name)
     filter_set = filter_set_from_components(
         include=True,
         method=method,
@@ -537,7 +546,7 @@ def from_wsgi(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -602,7 +611,7 @@ def from_aiohttp(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -652,7 +661,7 @@ def from_asgi(
     endpoint: Filter | None = None,
     tag: Filter | None = None,
     operation_id: Filter | None = None,
-    skip_deprecated_operations: bool = False,
+    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,

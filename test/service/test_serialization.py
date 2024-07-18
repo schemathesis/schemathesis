@@ -3,8 +3,8 @@ import pytest
 import schemathesis
 from schemathesis.runner import from_schema
 from schemathesis.runner.events import InternalError, Interrupted
-from schemathesis.service.serialization import serialize_event
 from schemathesis.runner.serialization import prepare_query, stringify_path_parameters
+from schemathesis.service.serialization import serialize_event
 
 
 @pytest.mark.operations("success", "multiple_failures")

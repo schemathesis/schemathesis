@@ -8,9 +8,9 @@ from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Callable, List, Protocol, Union
 
-from .types import NotSet, Filter as FilterType
-
 from .exceptions import UsageError
+from .types import Filter as FilterType
+from .types import NotSet
 
 if TYPE_CHECKING:
     from .models import APIOperation
