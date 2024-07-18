@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
 from functools import partial
 from types import SimpleNamespace
-from typing import TYPE_CHECKING, Callable, List, Protocol, Union
+from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
 
 from .exceptions import UsageError
 from .types import Filter as FilterType
@@ -423,3 +424,49 @@ def filter_set_from_components(
             if matchers:
                 new._excludes.add(exclude_)
     return new
+
+
+def parse_expression(expression: str) -> tuple[str, str, Any]:
+    expression = expression.strip()
+
+    # Find the operator
+    for op in ("==", "!="):
+        try:
+            pointer, value = expression.split(op, 1)
+            break
+        except ValueError:
+            continue
+    else:
+        raise ValueError(f"Invalid expression: {expression}")
+
+    pointer = pointer.strip()
+    value = value.strip()
+    if not pointer or not value:
+        raise ValueError(f"Invalid expression: {expression}")
+    # Parse the JSON value
+    try:
+        return pointer, op, json.loads(value)
+    except json.JSONDecodeError:
+        # If it's not valid JSON, treat it as a string
+        return pointer, op, value
+
+
+def expression_to_filter_function(expression: str) -> Callable[[HasAPIOperation], bool]:
+    from .specs.openapi.references import resolve_pointer
+
+    pointer, op, value = parse_expression(expression)
+
+    if op == "==":
+
+        def filter_function(ctx: HasAPIOperation) -> bool:
+            definition = ctx.operation.definition.resolved
+            resolved = resolve_pointer(definition, pointer)
+            return resolved == value
+    else:
+
+        def filter_function(ctx: HasAPIOperation) -> bool:
+            definition = ctx.operation.definition.resolved
+            resolved = resolve_pointer(definition, pointer)
+            return resolved != value
+
+    return filter_function
