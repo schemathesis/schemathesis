@@ -306,6 +306,8 @@ def attach_filter_chain(
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
+        operation_id: FilterValue | None = None,
+        operation_id_regex: RegexValue | None = None,
     ) -> Callable:
         __tracebackhide__ = True
         filter_func(
@@ -316,6 +318,8 @@ def attach_filter_chain(
             method_regex=method_regex,
             path=path,
             path_regex=path_regex,
+            operation_id=operation_id,
+            operation_id_regex=operation_id_regex,
         )
         return target
 
