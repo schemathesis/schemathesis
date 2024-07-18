@@ -13,6 +13,7 @@ Changelog
 **Fixed**
 
 - Missed ``operation_id`` & ``tag`` filter in some cases.
+- Broken compatibility with ``Hypothesis<6.108``. :issue:`2357`
 
 **Deprecated**
 
