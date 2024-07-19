@@ -1,10 +1,13 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.32.2...HEAD>` - TBD
+:version:`Unreleased <v3.33.0...HEAD>` - TBD
 --------------------------------------------
 
-.. _v3.32.2:
+.. _v3.33.0:
+
+:version:`3.33.0 <v3.32.2...v3.33.0>` - 2024-07-19
+--------------------------------------------------
 
 **Added**
 
@@ -22,6 +25,8 @@ Changelog
 - ``--method``, ``--endpoint``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations`` CLI options in favor of the new ``--include-*`` and ``--exclude-*`` options. 
   See more details in the CLI documentation.
 - ``method``, ``endpoint``, ``tag``, ``operation_id`` and ``skip_deprecated_operations`` arguments in ``schemathesis.from_*`` loaders and the ``parametrize`` function in favor of the new ``include`` and ``exclude`` methods on ``schema`` instances.
+
+.. _v3.32.2:
 
 :version:`3.32.2 <v3.32.1...v3.32.2>` - 2024-07-17
 --------------------------------------------------
