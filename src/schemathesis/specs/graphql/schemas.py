@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from enum import unique
+from types import SimpleNamespace
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -184,7 +185,8 @@ class GraphQLSchema(BaseSchema):
         return 0
 
     def get_all_operations(
-        self, hooks: HookDispatcher | None = None
+        self,
+        hooks: HookDispatcher | None = None,
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
@@ -195,6 +197,8 @@ class GraphQLSchema(BaseSchema):
                 continue
             for field_name, field_ in operation_type.fields.items():
                 operation = self._build_operation(root_type, operation_type, field_name, field_)
+                if self._should_skip(operation):
+                    continue
                 context = HookContext(operation=operation)
                 if (
                     should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -203,6 +207,14 @@ class GraphQLSchema(BaseSchema):
                 ):
                     continue
                 yield Ok(operation)
+
+    def _should_skip(
+        self,
+        operation: APIOperation,
+        _ctx_cache: SimpleNamespace = SimpleNamespace(operation=None),
+    ) -> bool:
+        _ctx_cache.operation = operation
+        return not self.filter_set.match(_ctx_cache)
 
     def _build_operation(
         self,

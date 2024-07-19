@@ -76,6 +76,10 @@ Additionally, you can exclude deprecated operations with:
    For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
    For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
 
+.. important::
+
+   For GraphQL schemas, Schemathesis only supports filtration by the ``name`` property.
+
 You also can filter API operations by an expression over operation's definition:
 
 .. code:: text
@@ -128,6 +132,15 @@ Include ``GET /users`` and ``POST /orders``:
     --include-name 'GET /users' \
     --include-name 'POST /orders' \
     https://example.schemathesis.io/openapi.json
+
+Include queries for ``getBook`` and ``updateBook`` operations in GraphQL:
+
+.. code:: text
+
+  $ st run \
+    --include-name 'Query.getBook' \
+    --include-name 'Mutation.updateBook' \
+    https://example.schemathesis.io/graphql
 
 Overriding test data
 --------------------

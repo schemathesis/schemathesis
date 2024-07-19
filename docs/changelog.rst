@@ -10,6 +10,7 @@ Changelog
 
 - A set of CLI options and a Python API for including and excluding what API operations to test. :issue:`703`, :issue:`819`, :issue:`1398`
 - A way to filter API operations by an expression in CLI. :issue:`1006`
+- Support for filtering GraphQL operations by ``name``.
 
 **Fixed**
 

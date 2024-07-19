@@ -248,6 +248,11 @@ def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
     assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
 
 
+@pytest.mark.parametrize("arg", ("--include-name=Query.getBooks", "--exclude-name=Query.getBooks"))
+def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
+    assert cli.run(graphql_url, "--hypothesis-max-examples=1", "--dry-run", arg) == snapshot_cli
+
+
 def test_unknown_type_name(graphql_schema):
     with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
         graphql_schema["Qwery"]["getBooks"]
