@@ -16,22 +16,39 @@ send them to the server, and verify that responses are not 5xx.
 
 .. code:: text
 
-    st run --hypothesis-deadline=None https://bahnql.herokuapp.com/graphql
+    st run https://bahnql.herokuapp.com/graphql
 
 Or in Python tests:
 
 .. code:: python
 
     import schemathesis
-    from hypothesis import settings
 
     schema = schemathesis.graphql.from_url("https://bahnql.herokuapp.com/graphql")
 
 
     @schema.parametrize()
-    @settings(deadline=None)
     def test(case):
         case.call_and_validate()
+
+If you want to narrow the testing scope, you can use ``--include-name`` and ``--exclude-name`` options in CLI and the ``name`` argument for ``include`` and ``exclude`` methods in Python tests:
+
+.. code:: text
+
+    st run --include-name Query.getBookings https://bahnql.herokuapp.com/graphql
+
+.. code:: python
+
+    import schemathesis
+
+    schema = schemathesis.graphql.from_url("https://bahnql.herokuapp.com/graphql")
+
+
+    @schema.include(name="Query.getBookings").parametrize()
+    def test(case):
+        case.call_and_validate()
+
+For GraphQL, the ``name`` attribute is a combination of the type and the field name, for example, ``Query.getBookings`` or ``Mutation.updateUser``.
 
 Custom scalars
 ~~~~~~~~~~~~~~
@@ -69,4 +86,4 @@ They exist because classes like ``graphql.StringValueNode`` can't be directly us
 Limitations
 ~~~~~~~~~~~
 
-At the moment, in CLI it is only possible to select API operations to test via hooks.
+Schemathesis does not generate negative data for GraphQL schemas.
