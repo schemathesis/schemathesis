@@ -1116,3 +1116,132 @@ def test_openapi_2_example():
             "media_type": "application/json",
         }
     ]
+
+
+def test_property_examples_behind_ref():
+    raw_schema = {
+        "swagger": "2.0",
+        "info": {"version": "0.1.0", "title": "Item List API"},
+        "schemes": ["http"],
+        "host": "localhost:8083",
+        "securityDefinitions": {"ApiKeyAuth": {"in": "header", "name": "Authorization", "type": "apiKey"}},
+        "paths": {
+            "/trees": {
+                "post": {
+                    "responses": {"200": {"description": "Ok"}},
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "Tree",
+                            "schema": {"$ref": "#/definitions/Tree"},
+                            "description": "tree to create",
+                            "required": True,
+                        }
+                    ],
+                }
+            },
+        },
+        "definitions": {
+            "Tree": {
+                "properties": {
+                    "id": {
+                        "format": "uuid",
+                        "type": "string",
+                        "example": "415feabd-9114-44af-bc78-479299dadc1e",
+                    },
+                    "year": {"pattern": "^\\d{4}", "type": "string", "example": "2020"},
+                    "branches": {"items": {"$ref": "#/definitions/Branch"}, "type": "array"},
+                    "description": {"type": "string", "example": "white birch tree"},
+                    "name": {"type": "string", "example": "Birch"},
+                    "bird": {"$ref": "#/definitions/Bird", "type": "object"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+                "example": {"description": "Pine tree", "name": "Pine"},
+            },
+            "Nest": {
+                "properties": {
+                    "eggs": {"items": {"$ref": "#/definitions/Egg"}, "type": "array"},
+                    "description": {"type": "string", "example": "first nest"},
+                    "name": {"type": "string", "example": "nest1"},
+                },
+                "required": ["name"],
+                "type": "object",
+            },
+            "Bark": {
+                "properties": {
+                    "description": {"type": "string", "example": "brown bark"},
+                    "name": {"type": "string", "example": "bark1"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+            },
+            "Leaf": {
+                "properties": {
+                    "description": {"type": "string", "example": "main leaf"},
+                    "name": {"type": "string", "example": "leaf1"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+            },
+            "Branch": {
+                "properties": {
+                    "leaves": {"items": {"$ref": "#/definitions/Leaf"}, "type": "array"},
+                    "bark": {"$ref": "#/definitions/Bark", "type": "object"},
+                    "description": {"type": "string", "example": "main branch"},
+                    "name": {"type": "string", "example": "branch1"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+            },
+            "Bird": {
+                "properties": {
+                    "nest": {"$ref": "#/definitions/Nest", "type": "object"},
+                    "description": {"type": "string", "example": "brown sparrow"},
+                    "name": {"type": "string", "example": "sparrow"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+            },
+            "Trees": {"items": {"$ref": "#/definitions/Tree"}, "type": "array"},
+            "Egg": {
+                "properties": {
+                    "description": {"type": "string", "example": "first egg"},
+                    "name": {"type": "string", "example": "egg1"},
+                },
+                "required": ["name", "description"],
+                "type": "object",
+            },
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema["/trees"]["POST"]
+    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    assert extracted == [
+        {
+            "value": {
+                "id": "415feabd-9114-44af-bc78-479299dadc1e",
+                "year": "2020",
+                "branches": [
+                    {
+                        "leaves": [{"description": "main leaf", "name": "leaf1"}],
+                        "bark": {"description": "brown bark", "name": "bark1"},
+                        "description": "main branch",
+                        "name": "branch1",
+                    }
+                ],
+                "description": "white birch tree",
+                "name": "Birch",
+                "bird": {
+                    "nest": {
+                        "eggs": [{"description": "first egg", "name": "egg1"}],
+                        "description": "first nest",
+                        "name": "nest1",
+                    },
+                    "description": "brown sparrow",
+                    "name": "sparrow",
+                },
+            },
+            "media_type": "application/json",
+        }
+    ]
