@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.33.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Ignoring nested examples. :issue:`2358`
+
 .. _v3.33.0:
 
 :version:`3.33.0 <v3.32.2...v3.33.0>` - 2024-07-19

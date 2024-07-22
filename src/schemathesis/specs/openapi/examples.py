@@ -241,6 +241,8 @@ def extract_from_schema(
                 if examples_field_name in subsubschema and isinstance(subsubschema[examples_field_name], list):
                     # These are JSON Schema examples, which is an array of values
                     values.extend(subsubschema[examples_field_name])
+                # Check nested examples as well
+                values.extend(extract_from_schema(operation, subsubschema, example_field_name, examples_field_name))
                 if not values:
                     if name in required:
                         # Defer generation to only generate these variants if at least one property has examples
