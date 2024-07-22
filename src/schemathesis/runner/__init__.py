@@ -279,7 +279,7 @@ def load_schema(
     operation_id: Filter | None = None,
 ) -> BaseSchema:
     """Load schema via specified loader and parameters."""
-    loader_options = {
+    loader_options: dict[str, Any] = {
         key: value
         for key, value in (
             ("base_url", base_url),

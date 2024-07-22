@@ -136,7 +136,7 @@ def make_openapi_3_schema(empty_open_api_3_schema):
 @pytest.fixture
 def assert_parameters():
     def _compare(left, right):
-        assert type(left) == type(right)
+        assert type(left) is type(right)
         for field in fields(left):
             left_attr = getattr(left, field.name)
             right_attr = getattr(right, field.name)
