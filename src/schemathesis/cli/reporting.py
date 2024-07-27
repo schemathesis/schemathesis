@@ -21,7 +21,7 @@ def group_by_case(
         yield (sample, gen)
 
 
-def _by_unique_key(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> tuple[str, int | None, str | None]:
+def _by_unique_key(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> tuple[str, int, str]:
     return (
         code_sample_style.generate(
             method=check.example.method,
@@ -31,8 +31,10 @@ def _by_unique_key(check: SerializedCheck, code_sample_style: CodeSampleStyle) -
             verify=check.example.verify,
             extra_headers=check.example.extra_headers,
         ),
-        None if not check.response else check.response.status_code,
-        None if not check.response else check.response.body,
+        0 if not check.response else check.response.status_code,
+        "SCHEMATHESIS-INTERNAL-NO-RESPONSE"
+        if not check.response
+        else check.response.body or "SCHEMATHESIS-INTERNAL-EMPTY-BODY",
     )
 
 
