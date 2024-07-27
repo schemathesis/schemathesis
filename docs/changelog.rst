@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error in stateful testing.
+- Internal error in CLI output when some of test cases has no responses due to timeout. :issue:`2373`
 
 .. _v3.33.1:
 
