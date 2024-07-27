@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.33.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error in stateful testing.
+
 .. _v3.33.1:
 
 :version:`3.33.1 <v3.33.0...v3.33.1>` - 2024-07-22
