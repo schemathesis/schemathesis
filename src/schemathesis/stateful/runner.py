@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
 import hypothesis
+from hypothesis.stateful import Rule
 import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
@@ -138,6 +139,9 @@ def _execute_state_machine_loop(
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return call_kwargs
+
+        def _repr_step(self, rule: Rule, data: dict, result: StepResult) -> str:
+            return ""
 
         if config.override is not None:
 
