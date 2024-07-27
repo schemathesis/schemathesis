@@ -58,7 +58,7 @@ def validate_response(
         )
         check_results.append(passed_check)
 
-    for check in checks + additional_checks:
+    for check in tuple(checks) + tuple(additional_checks):
         name = check.__name__
         copied_case = case.partial_deepcopy()
         try:
