@@ -1550,7 +1550,7 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers, tmp_path):
             schema_url,
             "--experimental=stateful-test-runner",
             f"--debug-output-file={debug}",
-            "--hypothesis-max-examples=40",
+            "--hypothesis-max-examples=80",
             "--report=file.tar.gz",
             "--exitfirst",
             f"--workers={workers}",
@@ -1567,7 +1567,7 @@ def test_new_stateful_runner_max_failures(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--experimental=stateful-test-runner",
-            "--hypothesis-max-examples=40",
+            "--hypothesis-max-examples=80",
             "--max-failures=2",
         )
         == snapshot_cli
@@ -1581,7 +1581,7 @@ def test_new_stateful_runner_with_cassette(tmp_path, cli, schema_url):
     cli.run(
         schema_url,
         "--experimental=stateful-test-runner",
-        "--hypothesis-max-examples=20",
+        "--hypothesis-max-examples=40",
         "--report=file.tar.gz",
         "--exitfirst",
         f"--cassette-path={cassette_path}",
@@ -1603,7 +1603,7 @@ def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
             schema_url,
             "--experimental=stateful-test-runner",
             "--experimental=stateful-only",
-            "--hypothesis-max-examples=40",
+            "--hypothesis-max-examples=80",
             "--exitfirst",
         )
         == snapshot_cli
@@ -1633,7 +1633,7 @@ def test_new_stateful_runner_filtered_out(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--experimental=stateful-test-runner",
-            "--hypothesis-max-examples=20",
+            "--hypothesis-max-examples=40",
             "--include-path=/api/success",
             "--exitfirst",
         )

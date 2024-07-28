@@ -27,7 +27,7 @@ def _default_checks_factory() -> tuple[CheckFunction, ...]:
 def _get_default_hypothesis_settings_kwargs() -> dict[str, Any]:
     import hypothesis
 
-    return {"phases": (hypothesis.Phase.generate,), "deadline": None}
+    return {"phases": (hypothesis.Phase.generate,), "deadline": None, "stateful_step_count": 10}
 
 
 def _default_hypothesis_settings_factory() -> hypothesis.settings:
@@ -82,6 +82,8 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     state_machine_default = _default_hypothesis_settings_factory()
     if settings.phases == hypothesis_default.phases:
         kwargs["phases"] = state_machine_default.phases
+    if settings.stateful_step_count == hypothesis_default.stateful_step_count:
+        kwargs["stateful_step_count"] = state_machine_default.stateful_step_count
     if settings.deadline in (hypothesis_default.deadline, timedelta(milliseconds=DEFAULT_DEADLINE)):
         kwargs["deadline"] = state_machine_default.deadline
     return kwargs

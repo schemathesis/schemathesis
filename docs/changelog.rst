@@ -8,6 +8,10 @@ Changelog
 
 - Incorrect default deadline for stateful tests in CLI.
 
+**Changed**
+
+- Reduce the default stateful step count from 50 to 10. It increases the variety of the generated API call sequences.
+
 .. _v3.33.2:
 
 :version:`3.33.2 <v3.33.1...v3.33.2>` - 2024-07-27
