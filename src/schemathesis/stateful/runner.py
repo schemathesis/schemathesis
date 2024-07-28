@@ -7,10 +7,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 
 import hypothesis
-from hypothesis.stateful import Rule
 import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky
+from hypothesis.stateful import Rule
 
 from ..exceptions import CheckFailed
 from ..targets import TargetMetricCollector

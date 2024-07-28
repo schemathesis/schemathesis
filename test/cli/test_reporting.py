@@ -1,9 +1,10 @@
-from hypothesis import given, strategies as st
+from hypothesis import given
+from hypothesis import strategies as st
 
 from schemathesis.cli.reporting import group_by_case
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.models import Request, Response
-from schemathesis.runner.serialization import SerializedCheck, Status, SerializedCase
+from schemathesis.runner.serialization import SerializedCase, SerializedCheck, Status
 
 
 @given(
