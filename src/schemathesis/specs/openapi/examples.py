@@ -12,6 +12,7 @@ from hypothesis_jsonschema import from_schema
 
 from ..._hypothesis import get_single_example
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
+from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies
 from .constants import LOCATION_TO_CONTAINER
@@ -130,10 +131,26 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
 def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any] | bool, None, None]:
     yield schema
     if isinstance(schema, dict):
-        for key in ("anyOf", "oneOf", "allOf"):
+        for key in ("anyOf", "oneOf"):
             if key in schema:
                 for subschema in schema[key]:
                     yield subschema
+        if "allOf" in schema:
+            subschema = fast_deepcopy(schema["allOf"][0])
+            for sub in schema["allOf"][1:]:
+                if isinstance(sub, dict):
+                    for key, value in sub.items():
+                        if key == "properties":
+                            subschema.setdefault("properties", {}).update(value)
+                        elif key == "required":
+                            subschema.setdefault("required", []).extend(value)
+                        elif key == "examples":
+                            subschema.setdefault("examples", []).extend(value)
+                        elif key == "example":
+                            subschema.setdefault("examples", []).append(value)
+                        else:
+                            subschema[key] = value
+            yield subschema
 
 
 def _find_parameter_examples_definition(

@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Incorrect default deadline for stateful tests in CLI.
+- Incorrect handling of ``allOf`` subschemas in testing explicit examples. :issue:`2375`
 
 **Changed**
 
