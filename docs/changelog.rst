@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.33.2...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Incorrect default deadline for stateful tests in CLI.
+
 .. _v3.33.2:
 
 :version:`3.33.2 <v3.33.1...v3.33.2>` - 2024-07-27
