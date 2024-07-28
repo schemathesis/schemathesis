@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
+
+from ..constants import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
     import hypothesis
@@ -79,6 +82,6 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     state_machine_default = _default_hypothesis_settings_factory()
     if settings.phases == hypothesis_default.phases:
         kwargs["phases"] = state_machine_default.phases
-    if settings.deadline == hypothesis_default.deadline:
+    if settings.deadline in (hypothesis_default.deadline, timedelta(milliseconds=DEFAULT_DEADLINE)):
         kwargs["deadline"] = state_machine_default.deadline
     return kwargs
