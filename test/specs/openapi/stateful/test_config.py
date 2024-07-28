@@ -16,7 +16,7 @@ from schemathesis.stateful.config import (
         ),
         (
             {"phases": [hypothesis.Phase.explicit]},
-            {"deadline": None},
+            {"deadline": None, "stateful_step_count": 10},
         ),
         (_get_default_hypothesis_settings_kwargs(), {}),
     ),

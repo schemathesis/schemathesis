@@ -318,7 +318,7 @@ def runner_factory(app_factory):
         schema = schemathesis.from_wsgi("/openapi.json", app=app)
         state_machine = schema.as_state_machine()
         config_kwargs = config_kwargs or {}
-        config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=15, database=None))
+        config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))
         return state_machine.runner(config=StatefulTestRunnerConfig(**config_kwargs))
 
     return _runner_factory
