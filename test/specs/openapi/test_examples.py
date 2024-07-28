@@ -641,7 +641,7 @@ def test_examples_ref_missing_components(empty_open_api_3_schema):
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
 
 
-@pytest.mark.parametrize("key", ("anyOf", "oneOf", "allOf"))
+@pytest.mark.parametrize("key", ("anyOf", "oneOf"))
 def test_examples_in_any_of_top_level(empty_open_api_3_schema, key):
     empty_open_api_3_schema["paths"] = {
         "/test": {
@@ -706,7 +706,71 @@ def test_examples_in_any_of_top_level(empty_open_api_3_schema, key):
     ]
 
 
-@pytest.mark.parametrize("key", ("anyOf", "oneOf", "allOf"))
+def test_examples_in_all_of_top_level(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "post": {
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "example": "foo-1-1",
+                                    "examples": ["foo-1-2"],
+                                    "type": "string",
+                                },
+                                {
+                                    "example": "foo-2-1",
+                                    "examples": ["foo-2-2"],
+                                    "type": "string",
+                                },
+                                True,
+                            ]
+                        },
+                    }
+                ],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "allOf": [
+                                    {
+                                        "example": "body-1-1",
+                                        "examples": ["body-1-2"],
+                                        "type": "string",
+                                    },
+                                    {
+                                        "example": "body-2-1",
+                                        "examples": ["body-2-2"],
+                                        "type": "string",
+                                    },
+                                    True,
+                                ]
+                            }
+                        },
+                    }
+                },
+                "responses": {"default": {"description": "OK"}},
+            },
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
+    assert extracted == [
+        {"container": "query", "name": "q", "value": "foo-1-1"},
+        {"container": "query", "name": "q", "value": "foo-1-2"},
+        {"container": "query", "name": "q", "value": "foo-2-1"},
+        {"container": "query", "name": "q", "value": "foo-2-2"},
+        {"media_type": "application/json", "value": "body-1-1"},
+        {"media_type": "application/json", "value": "body-1-2"},
+        {"media_type": "application/json", "value": "body-2-1"},
+        {"media_type": "application/json", "value": "body-2-2"},
+    ]
+
+
+@pytest.mark.parametrize("key", ("anyOf", "oneOf"))
 def test_examples_in_any_of_in_schemas(empty_open_api_3_schema, key):
     empty_open_api_3_schema["paths"] = {
         "/test": {
@@ -1242,6 +1306,61 @@ def test_property_examples_behind_ref():
                     "name": "sparrow",
                 },
             },
+            "media_type": "application/json",
+        }
+    ]
+
+
+def test_property_examples_with_all_of():
+    # See GH-2375
+    raw_schema = {
+        "openapi": "3.0.3",
+        "info": {"title": "Test API", "version": "1.0.0"},
+        "paths": {
+            "/peers": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/peer"},
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "Successful operation"}},
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "peer": {
+                    "type": "object",
+                    "properties": {"outbound_proxy": {"$ref": "#/components/schemas/outbound_proxy_with_port"}},
+                    "required": ["outbound_proxy"],
+                },
+                "outbound_proxy_common": {
+                    "type": "object",
+                    "properties": {"host": {"type": "string", "format": "ipv4", "example": "10.22.22.191"}},
+                    "required": ["host"],
+                },
+                "outbound_proxy_with_port": {
+                    "allOf": [
+                        {"$ref": "#/components/schemas/outbound_proxy_common"},
+                        {
+                            "type": "object",
+                            "properties": {"port": {"type": "integer", "example": 8080}},
+                            "required": ["port"],
+                        },
+                    ]
+                },
+            }
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema)
+    operation = schema["/peers"]["POST"]
+    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    assert extracted == [
+        {
+            "value": {"outbound_proxy": {"host": "10.22.22.191", "port": 8080}},
             "media_type": "application/json",
         }
     ]
