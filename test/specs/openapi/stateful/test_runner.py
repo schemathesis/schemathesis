@@ -304,7 +304,7 @@ def test_find_use_after_free(runner_factory):
         app_kwargs={"use_after_free": True},
         config_kwargs={
             "checks": (use_after_free,),
-            "hypothesis_settings": hypothesis.settings(max_examples=20, database=None),
+            "hypothesis_settings": hypothesis.settings(max_examples=60, database=None),
         },
     )
     result = collect_result(runner)
@@ -585,7 +585,7 @@ def test_external_link(empty_open_api_3_schema, app_factory):
     schema = schemathesis.from_dict(empty_open_api_3_schema, app=root_app)
     state_machine = schema.as_state_machine()
     runner = state_machine.runner(
-        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=45, database=None))
+        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None))
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE
