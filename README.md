@@ -289,6 +289,10 @@ Schemathesis is used by a number of project and companies, including direct usag
 
 ### Videos
 
+- [API Testing With Unittest Mock, Pytest & Schemathesis](https://youtu.be/56whiv57T9I) by **
+Ssali Jonathan**
+  - **Description**: Describes various API testing techniques and features Schemathesis for automatic test generation.
+  - **Date**: 29 Jul 2024
 - [API Fuzzing: What it is and why you should use it](https://youtu.be/wX3GMJY9B6A) by **José Haro Peralta**
   - **Description**: A comprehensive overview and demo of Schemathesis.
   - **Date**: 14 Feb 2023
