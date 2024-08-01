@@ -14,7 +14,7 @@ from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
-from schemathesis.specs.openapi.checks import use_after_free
+from schemathesis.specs.openapi.checks import ensure_resource_availability, use_after_free
 from schemathesis.transports import WSGITransport
 from test.apps import _graphql as graphql
 from test.apps._graphql.schema import Author
@@ -296,7 +296,8 @@ def test_schema_as_strategy(graphql_schema):
             find(strategy, lambda x, op=operation: op.definition.field_name in x.body)
 
 
-def test_use_after_free_ignored(graphql_schema):
+@pytest.mark.parametrize("check", (use_after_free, ensure_resource_availability))
+def test_ignored_checks(graphql_schema, check):
     # Just in case
     case = graphql_schema["Query"]["getBooks"].make_case()
-    assert use_after_free(None, case)
+    assert check(None, case)

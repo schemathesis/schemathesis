@@ -191,6 +191,7 @@ There are four built-in checks you can use via the `--checks / -c` CLI option:
 - ``negative_data_rejection``. The API accepts data that is invalid according to the schema;
 - ``response_headers_conformance``. The response headers does not contain all defined headers.
 - ``use_after_free``. The API returned a non-404 response a successful DELETE operation on a resource. **NOTE**: Only enabled for new-style stateful testing.
+- ``ensure_resource_availability``. Freshly created resource is not available in related API operations. **NOTE**: Only enabled for new-style stateful testing.
 
 To make Schemathesis perform all built-in checks use ``--checks all`` CLI option:
 

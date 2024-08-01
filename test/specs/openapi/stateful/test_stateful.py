@@ -276,10 +276,10 @@ def test_history(app_schema, response_factory, method):
         path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
     )
     second_response = factory(status_code=200)
-    second.source = CaseSource(case=first, response=first_response, elapsed=10)
+    second.source = CaseSource(case=first, response=first_response, elapsed=10, overrides_all_parameters=True)
     third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
     third_response = factory(status_code=200)
-    third.source = CaseSource(case=second, response=second_response, elapsed=10)
+    third.source = CaseSource(case=second, response=second_response, elapsed=10, overrides_all_parameters=True)
     check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
     serialized = SerializedCheck.from_check(check)
     # Then they should store all history
