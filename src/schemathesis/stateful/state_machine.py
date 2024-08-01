@@ -3,7 +3,8 @@ from __future__ import annotations
 import re
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, ClassVar, Type
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -13,6 +14,7 @@ from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
 from ..models import APIOperation, Case, CheckFunction
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
+from .config import _default_hypothesis_settings_factory
 from .sink import StateMachineSink
 from .statistic import TransitionStats
 
@@ -59,6 +61,23 @@ class APIStateMachine(RuleBasedStateMachine):
                 raise UsageError(NO_LINKS_ERROR_MESSAGE) from None
             raise
         self.setup()
+
+    @classmethod
+    @lru_cache
+    def _to_test_case(cls) -> Type:
+        from . import run_state_machine_as_test
+
+        class StateMachineTestCase(RuleBasedStateMachine.TestCase):
+            settings = _default_hypothesis_settings_factory()
+
+            def runTest(self) -> None:
+                run_state_machine_as_test(cls, settings=self.settings)
+
+            runTest.is_hypothesis_test = True  # type: ignore[attr-defined]
+
+        StateMachineTestCase.__name__ = cls.__name__ + ".TestCase"
+        StateMachineTestCase.__qualname__ = cls.__qualname__ + ".TestCase"
+        return StateMachineTestCase
 
     def _pretty_print(self, value: Any) -> str:
         if isinstance(value, Case):
