@@ -14,6 +14,7 @@ from schemathesis.stateful.runner import StatefulTestRunnerConfig
 @dataclass
 class AppConfig:
     use_after_free: bool = False
+    ensure_resource_availability: bool = False
     merge_body: bool = True
     independent_500: bool = False
     failure_behind_failure: bool = False
@@ -217,7 +218,9 @@ def app_factory(empty_open_api_3_schema):
 
         nonlocal next_user_id
         new_user = {"id": next_user_id, "name": name, "last_modified": last_modified}
-        users[next_user_id] = new_user
+        if not config.ensure_resource_availability:
+            # Do not always save the user
+            users[next_user_id] = new_user
         next_user_id += 1
 
         return jsonify(new_user), 201
@@ -268,6 +271,7 @@ def app_factory(empty_open_api_3_schema):
     def _factory(
         *,
         use_after_free=False,
+        ensure_resource_availability=False,
         merge_body=True,
         independent_500=False,
         failure_behind_failure=False,
@@ -278,6 +282,7 @@ def app_factory(empty_open_api_3_schema):
         slowdown=None,
     ):
         config.use_after_free = use_after_free
+        config.ensure_resource_availability = ensure_resource_availability
         config.merge_body = merge_body
         if not merge_body:
             empty_open_api_3_schema["paths"]["/users"]["post"]["responses"]["201"]["links"]["UpdateUser"][

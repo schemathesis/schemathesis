@@ -151,6 +151,10 @@ def get_use_after_free_error(free: str) -> type[CheckFailed]:
     return _get_hashed_exception("UseAfterFreeError", free)
 
 
+def get_ensure_resource_availability_error(operation: str) -> type[CheckFailed]:
+    return _get_hashed_exception("EnsureResourceAvailabilityError", operation)
+
+
 def get_timeout_error(prefix: str, deadline: float | int) -> type[CheckFailed]:
     """Request took too long."""
     return _get_hashed_exception(f"TimeoutError{prefix}", str(deadline))

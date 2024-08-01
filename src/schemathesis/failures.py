@@ -152,6 +152,17 @@ class UseAfterFree(FailureContext):
 
 
 @dataclass(repr=False)
+class EnsureResourceAvailability(FailureContext):
+    """Resource is not available immediately after creation."""
+
+    message: str
+    created_with: str
+    not_available_with: str
+    title: str = "Resource is not available after creation"
+    type: str = "ensure_resource_availability"
+
+
+@dataclass(repr=False)
 class UndefinedStatusCode(FailureContext):
     """Response has a status code that is not defined in the schema."""
 

@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.33.3...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- The ``ensure_resource_availability`` check. It verifies that a freshly created resource is available in related API operations.
+
 .. _v3.33.3:
 
 :version:`3.33.3 <v3.33.2...v3.33.3>` - 2024-07-29

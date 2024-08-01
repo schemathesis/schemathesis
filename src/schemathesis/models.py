@@ -78,9 +78,15 @@ class CaseSource:
     case: Case
     response: GenericResponse
     elapsed: float
+    overrides_all_parameters: bool
 
     def partial_deepcopy(self) -> CaseSource:
-        return self.__class__(case=self.case.partial_deepcopy(), response=self.response, elapsed=self.elapsed)
+        return self.__class__(
+            case=self.case.partial_deepcopy(),
+            response=self.response,
+            elapsed=self.elapsed,
+            overrides_all_parameters=self.overrides_all_parameters,
+        )
 
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
@@ -198,8 +204,10 @@ class Case:
     def app(self) -> Any:
         return self.operation.app
 
-    def set_source(self, response: GenericResponse, case: Case, elapsed: float) -> None:
-        self.source = CaseSource(case=case, response=response, elapsed=elapsed)
+    def set_source(self, response: GenericResponse, case: Case, elapsed: float, overrides_all_parameters: bool) -> None:
+        self.source = CaseSource(
+            case=case, response=response, elapsed=elapsed, overrides_all_parameters=overrides_all_parameters
+        )
 
     @property
     def formatted_path(self) -> str:

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from typing import TYPE_CHECKING, Any, Generator, NoReturn, Sequence, TypedDict, Union
+from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
 
 from jsonschema import RefResolver
 
@@ -190,7 +190,7 @@ class OpenAPILink(Direction):
     status_code: str
     definition: dict[str, Any]
     operation: APIOperation
-    parameters: list[tuple[str | None, str, str]] = field(init=False)
+    parameters: list[tuple[Literal["path", "query", "header", "cookie", "body"] | None, str, str]] = field(init=False)
     body: dict[str, Any] | NotSet = field(init=False)
     merge_body: bool = True
 
@@ -212,13 +212,24 @@ class OpenAPILink(Direction):
     def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
         """Assign all linked definitions to the new case instance."""
         context = kwargs["context"]
-        self.set_parameters(case, context)
-        self.set_body(case, context)
-        case.set_source(context.response, context.case, elapsed)
+        overrides = self.set_parameters(case, context)
+        self.set_body(case, context, overrides)
+        overrides_all_parameters = True
+        if case.operation.body and "body" not in overrides.get("body", []):
+            overrides_all_parameters = False
+        if overrides_all_parameters:
+            for parameter in case.operation.iter_parameters():
+                if parameter.name not in overrides.get(parameter.location, []):
+                    overrides_all_parameters = False
+                    break
+        case.set_source(context.response, context.case, elapsed, overrides_all_parameters)
 
-    def set_parameters(self, case: Case, context: expressions.ExpressionContext) -> None:
+    def set_parameters(
+        self, case: Case, context: expressions.ExpressionContext
+    ) -> dict[Literal["path", "query", "header", "cookie", "body"], list[str]]:
+        overrides: dict[Literal["path", "query", "header", "cookie", "body"], list[str]] = {}
         for location, name, expression in self.parameters:
-            container = get_container(case, location, name)
+            location, container = get_container(case, location, name)
             # Might happen if there is directly specified container,
             # but the schema has no parameters of such type at all.
             # Therefore the container is empty, otherwise it will be at least an empty object
@@ -229,11 +240,21 @@ class OpenAPILink(Direction):
                 if matches:
                     message += f" Did you mean `{matches[0]}`?"
                 raise ValueError(message)
-            container[name] = expressions.evaluate(expression, context)
+            value = expressions.evaluate(expression, context)
+            if value is not None:
+                container[name] = value
+                overrides.setdefault(location, []).append(name)
+        return overrides
 
-    def set_body(self, case: Case, context: expressions.ExpressionContext) -> None:
+    def set_body(
+        self,
+        case: Case,
+        context: expressions.ExpressionContext,
+        overrides: dict[Literal["path", "query", "header", "cookie", "body"], list[str]],
+    ) -> None:
         if self.body is not NOT_SET:
             evaluated = expressions.evaluate(self.body, context, evaluate_nested=True)
+            overrides["body"] = ["body"]
             if self.merge_body:
                 case.body = merge_body(case.body, evaluated)
             else:
@@ -251,21 +272,26 @@ def merge_body(old: Any, new: Any) -> Any:
     return new
 
 
-def get_container(case: Case, location: str | None, name: str) -> dict[str, Any] | None:
+def get_container(
+    case: Case, location: Literal["path", "query", "header", "cookie", "body"] | None, name: str
+) -> tuple[Literal["path", "query", "header", "cookie", "body"], dict[str, Any] | None]:
     """Get a container that suppose to store the given parameter."""
     if location:
         container_name = LOCATION_TO_CONTAINER[location]
     else:
         for param in case.operation.iter_parameters():
             if param.name == name:
+                location = param.location
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
             raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.verbose_name}`")
-    return getattr(case, container_name)
+    return location, getattr(case, container_name)
 
 
-def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, str, str]:
+def normalize_parameter(
+    parameter: str, expression: str
+) -> tuple[Literal["path", "query", "header", "cookie", "body"] | None, str, str]:
     """Normalize runtime expressions.
 
     Runtime expressions may have parameter names prefixed with their location - `path.id`.
@@ -275,7 +301,8 @@ def normalize_parameter(parameter: str, expression: str) -> tuple[str | None, st
     try:
         # The parameter name is prefixed with its location. Example: `path.id`
         location, name = tuple(parameter.split("."))
-        return location, name, expression
+        _location = cast(Literal["path", "query", "header", "cookie", "body"], location)
+        return _location, name, expression
     except ValueError:
         return None, parameter, expression
 

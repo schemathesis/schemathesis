@@ -589,3 +589,17 @@ def test_external_link(empty_open_api_3_schema, app_factory):
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE
+
+
+def test_new_resource_is_not_available(runner_factory):
+    # When a resource is not available after creation
+    runner = runner_factory(
+        app_kwargs={"ensure_resource_availability": True},
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
+        },
+    )
+    result = collect_result(runner)
+    # Then it is a failure
+    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.failures[0].message == "Resource is not available after creation"

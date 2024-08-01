@@ -100,13 +100,28 @@ def test_sanitize_case_body_variants(sanitized_case_factory_factory, body, expec
 
 def test_sanitize_history(case_factory):
     case3 = case_factory(headers={"Authorization": "Bearer token"})
-    source3 = CaseSource(case=case3, response=requests.Response(), elapsed=0.3)
+    source3 = CaseSource(
+        case=case3,
+        response=requests.Response(),
+        elapsed=0.3,
+        overrides_all_parameters=True,
+    )
 
     case2 = case_factory(headers={"X-API-Key": "12345"}, source=source3)
-    source2 = CaseSource(case=case2, response=requests.Response(), elapsed=0.2)
+    source2 = CaseSource(
+        case=case2,
+        response=requests.Response(),
+        elapsed=0.2,
+        overrides_all_parameters=True,
+    )
 
     case1 = case_factory(headers={"Password": "password"}, source=source2)
-    source1 = CaseSource(case=case1, response=requests.Response(), elapsed=0.1)
+    source1 = CaseSource(
+        case=case1,
+        response=requests.Response(),
+        elapsed=0.1,
+        overrides_all_parameters=True,
+    )
 
     sanitize_history(source1)
 
@@ -117,7 +132,12 @@ def test_sanitize_history(case_factory):
 
 def test_sanitize_history_empty(case_factory):
     case = case_factory(headers={"Password": "password"})
-    source = CaseSource(case=case, response=requests.Response(), elapsed=0.1)
+    source = CaseSource(
+        case=case,
+        response=requests.Response(),
+        elapsed=0.1,
+        overrides_all_parameters=True,
+    )
 
     sanitize_history(source)
 
@@ -228,7 +248,10 @@ def serialized_check(case_factory, response_factory):
     root_case = case_factory()
     value = "secret"
     root_case.source = CaseSource(
-        case=case_factory(), response=response_factory.requests(headers={"X-Token": value}), elapsed=1.0
+        case=case_factory(),
+        response=response_factory.requests(headers={"X-Token": value}),
+        elapsed=1.0,
+        overrides_all_parameters=True,
     )
     check = Check(
         name="test",
