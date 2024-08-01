@@ -11,6 +11,7 @@ from schemathesis.models import CaseSource, Check, Status
 from schemathesis.runner.serialization import SerializedCheck
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
+from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
 from schemathesis.stateful.state_machine import StepResult
 from test.utils import flaky
 
@@ -350,6 +351,15 @@ def test_dynamic_body(merge_body, app_factory):
             stateful_step_count=2,
         )
     )
+
+
+def test_custom_config_in_test_case(app_factory):
+    app = app_factory()
+    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+    kwargs = _get_default_hypothesis_settings_kwargs()
+    settings = schema.as_state_machine().TestCase.settings
+    for key, value in kwargs.items():
+        assert getattr(settings, key) == value
 
 
 @pytest.mark.openapi_version("3.0")
