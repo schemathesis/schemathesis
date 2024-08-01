@@ -327,7 +327,7 @@ def test_failed_health_check(runner_factory):
 
     runner = runner_factory(
         config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
+            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, suppress_health_check=[]),
             "checks": (rejected_check,),
         },
     )
