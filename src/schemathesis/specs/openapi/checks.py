@@ -12,6 +12,7 @@ from ...exceptions import (
     get_response_type_error,
     get_status_code_error,
     get_use_after_free_error,
+    get_ensure_resource_availability_error,
 )
 from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
@@ -224,6 +225,40 @@ def use_after_free(response: GenericResponse, original: Case) -> bool | None:
             break
         response = case.source.response
         case = case.source.case
+    return None
+
+
+def ensure_resource_availability(response: GenericResponse, original: Case) -> bool | None:
+    from ...transports.responses import get_reason
+    from .schemas import BaseOpenAPISchema
+
+    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+        return True
+    if (
+        # Response indicates a client error, even though all available parameters were taken from links
+        # and comes from a POST request. This case likely means that the POST request actually did not
+        # save the resource and it is not available for subsequent operations
+        400 <= response.status_code < 500
+        and original.source
+        and original.source.case.operation.method.upper() == "POST"
+        and 200 <= original.source.response.status_code < 400
+        and original.source.overrides_all_parameters
+    ):
+        created_with = original.source.case.operation.verbose_name
+        not_available_with = original.operation.verbose_name
+        exc_class = get_ensure_resource_availability_error(created_with)
+        reason = get_reason(response.status_code)
+        message = (
+            f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
+            f"Created with      : `{created_with}`\n"
+            f"Not available with: `{not_available_with}`"
+        )
+        raise exc_class(
+            failures.EnsureResourceAvailability.title,
+            context=failures.EnsureResourceAvailability(
+                message=message, created_with=created_with, not_available_with=not_available_with
+            ),
+        )
     return None
 
 

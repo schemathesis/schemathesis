@@ -19,7 +19,9 @@ def test_serialize_history(case_factory, response_factory, factory_name):
     factory = getattr(response_factory, factory_name)
     root_case = case_factory()
     value = "A"
-    root_case.source = CaseSource(case=case_factory(), response=factory(headers={"X-Example": value}), elapsed=1.0)
+    root_case.source = CaseSource(
+        case=case_factory(), response=factory(headers={"X-Example": value}), elapsed=1.0, overrides_all_parameters=True
+    )
     check = Check(
         name="test", value=Status.failure, response=factory(headers={"X-Example": "B"}), elapsed=1.0, example=root_case
     )
