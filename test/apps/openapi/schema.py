@@ -41,6 +41,7 @@ class Operation(Enum):
     reserved = ("GET", "/api/foo:bar")
     read_only = ("GET", "/api/read_only")
     write_only = ("POST", "/api/write_only")
+    ignored_auth = ("GET", "/api/ignored_auth")
 
     create_user = ("POST", "/api/users/")
     get_user = ("GET", "/api/users/{user_id}")
@@ -127,6 +128,7 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
         "securityDefinitions": {
             "api_key": {"type": "apiKey", "name": "X-Token", "in": "header"},
             "basicAuth": {"type": "basic"},
+            "heisenAuth": {"type": "basic"},
         },
     }
 
@@ -436,6 +438,11 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
                 },
             }
             add_read_write_only()
+        elif name == "ignored_auth":
+            schema = {
+                "security": [{"heisenAuth": []}],
+                "responses": {"200": {"description": "OK"}},
+            }
         else:
             schema = {
                 "responses": {
@@ -466,6 +473,7 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
             "securitySchemes": {
                 "api_key": {"type": "apiKey", "name": "X-Token", "in": "header"},
                 "basicAuth": {"type": "http", "scheme": "basic"},
+                "heisenAuth": {"type": "http", "scheme": "basic"},
             }
         },
     }
@@ -833,6 +841,11 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
                 },
             }
             add_read_write_only()
+        elif name == "ignored_auth":
+            schema = {
+                "security": [{"heisenAuth": []}],
+                "responses": {"200": {"description": "OK"}},
+            }
         else:
             schema = {
                 "responses": {
