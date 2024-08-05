@@ -264,6 +264,10 @@ Schemathesis is used by a number of project and companies, including direct usag
 
 ### Articles
 
+- [Boost Your FastAPI Reliability with Schemathesis Automated Testing](https://medium.com/@jeremy3/boost-your-fastapi-reliability-with-schemathesis-automated-testing-e8b70ff704f6) by **Jeremy**
+  - **Description**: Showcases how easy Schemathesis covers API testing in FastAPI projects.
+  - **Date**: 17 Jul 2024
+
 - [Implementing Schemathesis at PayLead](https://medium.com/paylead/implementing-schemathesis-at-paylead-a469a5d43626) by **Jérémy Pelletier** at **PayLead**
   - **Description**: In-depth walkthrough including custom hooks, stateful testing and CI/CD integration.
   - **Date**: 29 May 2024
