@@ -1001,7 +1001,7 @@ def new_check(request, testdir, cli):
     lines = result.stdout.splitlines()
     assert (
         "  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|"
-        "response_headers_conformance|response_schema_conformance|negative_data_rejection|all]" in lines
+        "response_headers_conformance|response_schema_conformance|negative_data_rejection|ignored_auth|all]" in lines
     )
 
 

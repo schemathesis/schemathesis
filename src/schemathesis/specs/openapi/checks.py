@@ -1,24 +1,28 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generator, NoReturn
+from http.cookies import SimpleCookie
+from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
+from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from ... import failures
 from ...exceptions import (
+    get_ensure_resource_availability_error,
     get_headers_error,
+    get_ignored_auth_error,
     get_malformed_media_type_error,
     get_missing_content_type_error,
     get_negative_rejection_error,
     get_response_type_error,
     get_status_code_error,
     get_use_after_free_error,
-    get_ensure_resource_availability_error,
 )
 from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
 
 if TYPE_CHECKING:
-    from ...models import Case
+    from requests import PreparedRequest
+    from ...models import APIOperation, Case
     from ...transports.responses import GenericResponse
 
 
@@ -260,6 +264,139 @@ def ensure_resource_availability(response: GenericResponse, original: Case) -> b
             ),
         )
     return None
+
+
+def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
+    """Check if an operation declares authentication as a requirement but does not actually enforce it."""
+    from .schemas import BaseOpenAPISchema
+    from requests import Session
+
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+        return True
+    security_parameters = _get_security_parameters(case.operation)
+    # Authentication is required for this API operation and response is successful
+    # Will it still be successful if there is no auth?
+    if security_parameters and 200 <= response.status_code < 300:
+        if _contains_auth(response.request, security_parameters):
+            # If there is auth in the request, then drop it and retry the call
+            request = _remove_auth_from_request(response.request, security_parameters)
+            response.request = request
+            new_response = Session().send(request)
+            if new_response.ok:
+                # Mutate the response object in place on the best effort basis
+                for attribute in new_response.__attrs__:
+                    setattr(response, attribute, getattr(new_response, attribute))
+                _remove_auth_from_case(case, security_parameters)
+                _raise_auth_error(new_response, case.operation.verbose_name)
+        else:
+            # Successful response when there is no auth
+            _raise_auth_error(response, case.operation.verbose_name)
+    return None
+
+
+def _raise_auth_error(response: GenericResponse, operation: str) -> NoReturn:
+    from ...transports.responses import get_reason
+
+    exc_class = get_ignored_auth_error(operation)
+    reason = get_reason(response.status_code)
+    message = f"The API returned `{response.status_code} {reason}` for `{operation}` that requires authentication."
+    raise exc_class(
+        failures.IgnoredAuth.title,
+        context=failures.IgnoredAuth(message=message),
+    )
+
+
+SecurityParameter = Dict[str, Any]
+
+
+def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]:
+    """Extract security definitions that are active for the given operation and convert them into parameters."""
+    from .schemas import BaseOpenAPISchema
+
+    schema = cast(BaseOpenAPISchema, operation.schema)
+    return [
+        schema.security._to_parameter(parameter)
+        for parameter in schema.security._get_active_definitions(schema.raw_schema, operation, schema.resolver)
+        if parameter["type"] in ("apiKey", "basic", "http")
+    ]
+
+
+def _contains_auth(request: PreparedRequest, security_parameters: list[SecurityParameter]) -> bool:
+    """Whether a request has authentication declared in the schema."""
+    from requests.cookies import RequestsCookieJar
+
+    parsed = urlparse(request.url)
+    query = parse_qs(parsed.query)  # type: ignore
+    # Load the `Cookie` header separately, because it is possible that `request._cookies` and the header are out of sync
+    header_cookies: SimpleCookie = SimpleCookie()
+    raw_cookie = request.headers.get("Cookie")
+    if raw_cookie is not None:
+        header_cookies.load(raw_cookie)
+
+    def has_header(p: dict[str, Any]) -> bool:
+        return p["in"] == "header" and p["name"] in request.headers
+
+    def has_query(p: dict[str, Any]) -> bool:
+        return p["in"] == "query" and p["name"] in query
+
+    def has_cookie(p: dict[str, Any]) -> bool:
+        cookies = cast(RequestsCookieJar, request._cookies)  # type: ignore
+        return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
+
+    for parameter in security_parameters:
+        if has_header(parameter) or has_query(parameter) or has_cookie(parameter):
+            return True
+
+    return False
+
+
+def _remove_auth_from_request(
+    request: PreparedRequest, security_parameters: list[SecurityParameter]
+) -> PreparedRequest:
+    """Remove security parameters from a request."""
+    from requests.cookies import get_cookie_header
+
+    request = request.copy()
+    parsed = urlparse(request.url)
+    query = parse_qs(parsed.query)  # type: ignore
+    should_replace_url = False
+
+    for parameter in security_parameters:
+        name = parameter["name"]
+        if parameter["in"] == "header":
+            request.headers.pop(name, None)
+        if parameter["in"] == "query":
+            query.pop(name, None)
+            should_replace_url = True
+        if parameter["in"] == "cookie":
+            del request._cookies[name]  # type: ignore
+
+    if should_replace_url:
+        components = [parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(query), parsed.fragment]
+        url = cast(str, urlunparse(components))  # type: ignore
+        request.url = url
+    # Re-generate the `Cookie` header if needed
+    raw_cookie = request.headers.pop("Cookie", None)
+    if raw_cookie is not None:
+        new_cookie_header = get_cookie_header(request._cookies, request)  # type: ignore
+        if new_cookie_header:
+            request.headers["Cookie"] = new_cookie_header
+    return request
+
+
+def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParameter]) -> None:
+    """Remove security parameters from a generated case.
+
+    It mutates `case` in place.
+    """
+    for parameter in security_parameters:
+        name = parameter["name"]
+        if parameter["in"] == "header" and case.headers:
+            case.headers.pop(name, None)
+        if parameter["in"] == "query" and case.query:
+            case.query.pop(name, None)
+        if parameter["in"] == "cookie" and case.cookies:
+            case.cookies.pop(name, None)
 
 
 @dataclass

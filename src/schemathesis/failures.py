@@ -163,6 +163,15 @@ class EnsureResourceAvailability(FailureContext):
 
 
 @dataclass(repr=False)
+class IgnoredAuth(FailureContext):
+    """The API operation does not check the specified authentication."""
+
+    message: str
+    title: str = "Authentication declared but not enforced for this operation"
+    type: str = "ignored_auth"
+
+
+@dataclass(repr=False)
 class UndefinedStatusCode(FailureContext):
     """Response has a status code that is not defined in the schema."""
 

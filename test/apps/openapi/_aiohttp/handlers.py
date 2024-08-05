@@ -122,6 +122,10 @@ async def headers(request: web.Request) -> web.Response:
     return web.json_response(values, headers=values)
 
 
+async def ignored_auth(request: web.Request) -> web.Response:
+    return web.json_response({"has_auth": "Authorization" in request.headers})
+
+
 async def malformed_json(request: web.Request) -> web.Response:
     return web.Response(body="{malformed}", content_type="application/json")
 

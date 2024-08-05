@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - The ``ensure_resource_availability`` check. It verifies that a freshly created resource is available in related API operations.
+- The ``ignored_auth`` check. It verifies that the API operation requires the specified authentication.
 
 **Changed**
 

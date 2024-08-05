@@ -7,6 +7,7 @@ from . import failures
 from .exceptions import get_response_parsing_error, get_server_error
 from .specs.openapi.checks import (
     content_type_conformance,
+    ignored_auth,
     negative_data_rejection,
     response_headers_conformance,
     response_schema_conformance,
@@ -50,6 +51,7 @@ OPTIONAL_CHECKS = (
     response_headers_conformance,
     response_schema_conformance,
     negative_data_rejection,
+    ignored_auth,
 )
 ALL_CHECKS: tuple[CheckFunction, ...] = DEFAULT_CHECKS + OPTIONAL_CHECKS
 

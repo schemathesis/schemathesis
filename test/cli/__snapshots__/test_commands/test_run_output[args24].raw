@@ -52,14 +52,14 @@ Response & Schema validation:
 
   These options specify how API responses and schemas are validated.
 
-  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection|all]
+  -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection|ignored_auth|all]
                                   Specifies the validation checks to apply to
                                   API responses. Provide a comma-separated list
                                   of checks such as
                                   'not_a_server_error,status_code_conformance',
                                   etc. Default is 'not_a_server_error'.
                                   [default: not_a_server_error]
-  --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection]
+  --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection|ignored_auth]
                                   Specifies the validation checks to skip during
                                   testing. Provide a comma-separated list of
                                   checks you wish to bypass.
