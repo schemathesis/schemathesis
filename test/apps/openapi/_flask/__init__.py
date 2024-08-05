@@ -242,6 +242,10 @@ def create_app(
             return jsonify({"detail": "Invalid `id`"}), 400
         return jsonify({"value": request.args["id"]})
 
+    @app.route("/api/ignored_auth", methods=["GET"])
+    def ignored_auth():
+        return jsonify({"has_auth": "Authorization" in request.headers})
+
     @app.route("/api/invalid_path_parameter/<id>", methods=["GET"])
     def invalid_path_parameter(id):
         return jsonify({"success": True})
