@@ -1,7 +1,11 @@
+from __future__ import annotations
+
 import warnings
 
 import pytest
 
+import schemathesis
+from schemathesis.runner import from_schema
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.exceptions import UsageError
 from schemathesis.models import Case
@@ -124,3 +128,113 @@ def test_set_noop(auth_storage, mocker):
     with pytest.raises(UsageError, match="No auth provider is defined."):
         auth_storage.set(mocker.create_autospec(Case), mocker.create_autospec(AuthContext))
     # This normally should not happen, as it is checked before.
+
+
+MULTI_SCOPE_SCHEMA = {
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Cats Schema",
+        "description": "Cats Schema",
+        "version": "1.0.0",
+        "contact": {"email": "info@cats.cat"},
+    },
+    "servers": [{"url": "https://cats.cat"}],
+    "tags": [{"name": "cat"}],
+    "paths": {
+        "/v1/cats": {
+            "get": {
+                "description": "List cats",
+                "operationId": "listCats",
+                "tags": ["cat"],
+                "responses": {
+                    "200": {
+                        "description": "List of cats",
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"name": {"type": "string"}}}
+                            }
+                        },
+                    }
+                },
+                "security": [{"oAuthBearer": ["list"]}],
+            },
+            "post": {
+                "description": "Create a cat",
+                "operationId": "createCat",
+                "tags": ["cat"],
+                "requestBody": {
+                    "required": True,
+                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Cat"}}},
+                },
+                "responses": {
+                    "200": {
+                        "description": "Newly created cat",
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Cat"}}},
+                    }
+                },
+                "security": [{"oAuthBearer": ["create"]}],
+            },
+        }
+    },
+    "components": {
+        "schemas": {
+            "Cat": {
+                "required": ["name"],
+                "type": "object",
+                "properties": {"name": {"type": "string", "example": "Macavity"}},
+                "additionalProperties": False,
+            }
+        },
+        "securitySchemes": {
+            "oAuthBearer": {
+                "type": "oauth2",
+                "flows": {
+                    "clientCredentials": {
+                        "tokenUrl": "/oauth/token",
+                        "scopes": {"list": "List cats", "create": "Create cats"},
+                    }
+                },
+            }
+        },
+    },
+}
+
+
+def test_auth_cache_with_scopes():
+    # See GH-1775
+    schema = schemathesis.from_dict(MULTI_SCOPE_SCHEMA)
+
+    counts = {}
+
+    def get_scopes(context):
+        security = context.operation.definition.raw.get("security", [])
+        if not security:
+            return None
+        scopes = security[0][context.operation.get_security_requirements()[0]]
+        if not scopes:
+            return None
+        return frozenset(scopes)
+
+    def cache_by_key(case: Case, context: AuthContext) -> str:
+        scopes = get_scopes(context) or []
+        return ",".join(scopes)
+
+    @schema.auth(cache_by_key=cache_by_key)
+    class OAuth2Bearer:
+        def get(self, context: AuthContext) -> str | None:
+            if not (scopes := get_scopes(context)):
+                return None
+            key = ",".join(sorted(scopes))
+            counts.setdefault(key, 0)
+            counts[key] += 1
+            return f"Token -> {key}"
+
+        def set(self, case: Case, data: str, context: AuthContext) -> None:
+            case.headers = case.headers or {}
+            if not data:
+                return
+            case.headers["Authorization"] = f"Bearer {data}"
+
+    _, *ev_ = from_schema(schema, dry_run=True).execute()
+    assert counts["list"] == 1
+    assert counts["create"] == 1
