@@ -20,6 +20,7 @@ Changelog
 
 - Missing sanitization in new-style stateful tests.
 - Missing new-style stateful testing results in JUnit output.
+- Internal error when handling an exception inside a hook for a GraphQL schema.
 
 .. _v3.33.3:
 

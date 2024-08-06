@@ -613,8 +613,12 @@ def run_test(
         status = Status.error
         try:
             operation.schema.validate()
+            msg = "Unexpected error during testing of this API operation"
+            exc_msg = str(exc)
+            if exc_msg:
+                msg += f": {exc_msg}"
             try:
-                raise InternalError(f"Unexpected error during testing of this API operation: {exc}") from exc
+                raise InternalError(msg) from exc
             except InternalError as exc:
                 error = exc
         except ValidationError as exc:

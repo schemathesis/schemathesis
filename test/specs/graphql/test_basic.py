@@ -4,6 +4,7 @@ from unittest.mock import ANY
 import pytest
 import requests
 import strawberry
+from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
@@ -286,6 +287,28 @@ def filter_body(context, body):
 def test_unknown_type_name(graphql_schema):
     with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
         graphql_schema["Qwery"]["getBooks"]
+
+
+def test_internal_error_in_hook(cli, testdir, graphql_url):
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+@schemathesis.hook
+def filter_body(context, body):
+    assert 0
+"""
+    )
+    result = cli.main(
+        "run",
+        graphql_url,
+        "--dry-run",
+        "--show-trace",
+        "--include-name=Query.getBooks",
+        hooks=module.purebasename,
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert "Unexpected error during testing of this API operation" in result.stdout
 
 
 @pytest.mark.parametrize(
