@@ -367,6 +367,7 @@ def get_case_strategy(
         custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
         allow_x00=generation_config.allow_x00,
+        allow_null=generation_config.graphql_allow_null,
         codec=generation_config.codec,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)

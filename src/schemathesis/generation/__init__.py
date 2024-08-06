@@ -75,6 +75,8 @@ class GenerationConfig:
 
     # Allow generating `\x00` bytes in strings
     allow_x00: bool = True
+    # Allowing using `null` for optional arguments in GraphQL queries
+    graphql_allow_null: bool = True
     # Generate strings using the given codec
     codec: str | None = "utf-8"
     # Whether to generate security parameters

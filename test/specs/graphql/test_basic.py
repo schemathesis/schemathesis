@@ -253,6 +253,36 @@ def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
     assert cli.run(graphql_url, "--hypothesis-max-examples=1", "--dry-run", arg) == snapshot_cli
 
 
+def test_disallow_null(cli, testdir, snapshot_cli):
+    schema = """type Query {
+    getValue(value: Int): Int
+}
+"""
+    schema_file = testdir.make_graphql_schema_file(schema, extension=".gql")
+    module = testdir.make_importable_pyfile(
+        hook="""
+import schemathesis
+
+@schemathesis.hook
+def filter_body(context, body):
+    node = body.definitions[0].selection_set.selections[0]
+    assert node.arguments[0].value.__class__.__name__ != "NullValueNode"
+    return True
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            str(schema_file),
+            "--dry-run",
+            "--generation-graphql-allow-null=false",
+            "--show-trace",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
 def test_unknown_type_name(graphql_schema):
     with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
         graphql_schema["Qwery"]["getBooks"]

@@ -10,6 +10,7 @@ Changelog
 - The ``ignored_auth`` check. It verifies that the API operation requires the specified authentication.
 - Enable string format verification in response conformance checks. :issue:`787`
 - Control over cache key in custom auth implementation. :issue:`1775`
+- The ``--generation-graphql-allow-null`` CLI option that controls whether ``null`` should be used for optional arguments in GraphQL queries. Enabled by default. :issue:`1994`
 
 **Changed**
 

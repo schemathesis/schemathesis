@@ -50,6 +50,8 @@ If you want to narrow the testing scope, you can use ``--include-name`` and ``--
 
 For GraphQL, the ``name`` attribute is a combination of the type and the field name, for example, ``Query.getBookings`` or ``Mutation.updateUser``.
 
+Additionally, you can disable using ``null`` values for optional arguments via the ``--generation-graphql-allow-null=false`` CLI option.
+
 Custom scalars
 ~~~~~~~~~~~~~~
 
