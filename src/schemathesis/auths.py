@@ -14,6 +14,7 @@ from typing import (
     Generic,
     Protocol,
     TypeVar,
+    Union,
     overload,
     runtime_checkable,
 )
@@ -42,6 +43,9 @@ class AuthContext:
 
     operation: APIOperation
     app: Any | None
+
+
+CacheKeyFunction = Callable[["Case", "AuthContext"], Union[str, int]]
 
 
 @runtime_checkable
@@ -99,16 +103,24 @@ class CachingAuthProvider(Generic[Auth]):
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
         """Get cached auth value."""
-        if self.cache_entry is None or self.timer() >= self.cache_entry.expires:
+        cache_entry = self._get_cache_entry(case, context)
+        if cache_entry is None or self.timer() >= cache_entry.expires:
             with self._refresh_lock:
-                if not (self.cache_entry is None or self.timer() >= self.cache_entry.expires):
+                cache_entry = self._get_cache_entry(case, context)
+                if not (cache_entry is None or self.timer() >= cache_entry.expires):
                     # Another thread updated the cache
-                    return self.cache_entry.data
+                    return cache_entry.data
                 # We know that optional auth is possible only inside a higher-level wrapper
                 data: Auth = _provider_get(self.provider, case, context)  # type: ignore[assignment]
-                self.cache_entry = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
+                self._set_cache_entry(data, case, context)
                 return data
-        return self.cache_entry.data
+        return cache_entry.data
+
+    def _get_cache_entry(self, case: Case, context: AuthContext) -> CacheEntry[Auth] | None:
+        return self.cache_entry
+
+    def _set_cache_entry(self, data: Auth, case: Case, context: AuthContext) -> None:
+        self.cache_entry = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
 
     def set(self, case: Case, data: Auth, context: AuthContext) -> None:
         """Set auth data on the `Case` instance.
@@ -116,6 +128,25 @@ class CachingAuthProvider(Generic[Auth]):
         This implementation delegates this to the actual provider.
         """
         self.provider.set(case, data, context)
+
+
+def _noop_key_function(case: Case, context: AuthContext) -> str:
+    # Never used
+    raise NotImplementedError
+
+
+@dataclass
+class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
+    cache_by_key: CacheKeyFunction = _noop_key_function
+    cache_entries: dict[str | int, CacheEntry[Auth] | None] = field(default_factory=dict)
+
+    def _get_cache_entry(self, case: Case, context: AuthContext) -> CacheEntry[Auth] | None:
+        key = self.cache_by_key(case, context)
+        return self.cache_entries.get(key)
+
+    def _set_cache_entry(self, data: Auth, case: Case, context: AuthContext) -> None:
+        key = self.cache_by_key(case, context)
+        self.cache_entries[key] = CacheEntry(data=data, expires=self.timer() + self.refresh_interval)
 
 
 class FilterableRegisterAuth(Protocol):
@@ -246,6 +277,7 @@ class AuthStorage(Generic[Auth]):
         self,
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableRegisterAuth:
         pass
 
@@ -255,6 +287,7 @@ class AuthStorage(Generic[Auth]):
         provider_class: type[AuthProvider],
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableApplyAuth:
         pass
 
@@ -263,10 +296,11 @@ class AuthStorage(Generic[Auth]):
         provider_class: type[AuthProvider] | None = None,
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableRegisterAuth | FilterableApplyAuth:
         if provider_class is not None:
-            return self.apply(provider_class, refresh_interval=refresh_interval)
-        return self.register(refresh_interval=refresh_interval)
+            return self.apply(provider_class, refresh_interval=refresh_interval, cache_by_key=cache_by_key)
+        return self.register(refresh_interval=refresh_interval, cache_by_key=cache_by_key)
 
     def set_from_requests(self, auth: requests.auth.AuthBase) -> FilterableRequestsAuth:
         """Use `requests` auth instance as an auth provider."""
@@ -286,6 +320,7 @@ class AuthStorage(Generic[Auth]):
         *,
         provider_class: type[AuthProvider],
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
         filter_set: FilterSet,
     ) -> None:
         if not issubclass(provider_class, AuthProvider):
@@ -295,16 +330,27 @@ class AuthStorage(Generic[Auth]):
             )
         provider: AuthProvider
         # Apply caching if desired
+        instance = provider_class()
         if refresh_interval is not None:
-            provider = CachingAuthProvider(provider_class(), refresh_interval=refresh_interval)
+            if cache_by_key is None:
+                provider = CachingAuthProvider(instance, refresh_interval=refresh_interval)
+            else:
+                provider = KeyedCachingAuthProvider(
+                    instance, refresh_interval=refresh_interval, cache_by_key=cache_by_key
+                )
         else:
-            provider = provider_class()
+            provider = instance
         # Store filters if any
         if not filter_set.is_empty():
             provider = SelectiveAuthProvider(provider, filter_set)
         self.providers.append(provider)
 
-    def register(self, *, refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL) -> FilterableRegisterAuth:
+    def register(
+        self,
+        *,
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
+    ) -> FilterableRegisterAuth:
         """Register a new auth provider.
 
         .. code-block:: python
@@ -326,7 +372,12 @@ class AuthStorage(Generic[Auth]):
         filter_set = FilterSet()
 
         def wrapper(provider_class: type[AuthProvider]) -> type[AuthProvider]:
-            self._set_provider(provider_class=provider_class, refresh_interval=refresh_interval, filter_set=filter_set)
+            self._set_provider(
+                provider_class=provider_class,
+                refresh_interval=refresh_interval,
+                filter_set=filter_set,
+                cache_by_key=cache_by_key,
+            )
             return provider_class
 
         attach_filter_chain(wrapper, "apply_to", filter_set.include)
@@ -342,7 +393,11 @@ class AuthStorage(Generic[Auth]):
         self.providers = []
 
     def apply(
-        self, provider_class: type[AuthProvider], *, refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL
+        self,
+        provider_class: type[AuthProvider],
+        *,
+        refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
+        cache_by_key: CacheKeyFunction | None = None,
     ) -> FilterableApplyAuth:
         """Register auth provider only on one test function.
 
@@ -366,7 +421,10 @@ class AuthStorage(Generic[Auth]):
         def wrapper(test: GenericTest) -> GenericTest:
             auth_storage = self.add_auth_storage(test)
             auth_storage._set_provider(
-                provider_class=provider_class, refresh_interval=refresh_interval, filter_set=filter_set
+                provider_class=provider_class,
+                refresh_interval=refresh_interval,
+                filter_set=filter_set,
+                cache_by_key=cache_by_key,
             )
             return test
 

@@ -311,6 +311,27 @@ To disable caching completely, set ``refresh_interval`` to None. For example, th
         # Here goes your implementation
         ...
 
+The default implementation does not use a cache key, but you can provide one to distinguish tokens based on specific criteria.
+For instance, you may want separate cache entries for tokens with different OAuth scopes.
+
+.. code:: python
+
+    def get_scopes(context):
+        security = context.operation.definition.raw.get("security", [])
+        if not security:
+            return None
+        scopes = security[0][context.operation.get_security_requirements()[0]]
+        if not scopes:
+            return None
+        return frozenset(scopes)
+
+    def cache_by_key(case: Case, context: AuthContext) -> str:
+        scopes = get_scopes(context) or []
+        return ",".join(scopes)
+
+    @schema.auth(cache_by_key=cache_by_key)
+    class OAuth2Bearer:
+        ...
 
 WSGI / ASGI support
 ~~~~~~~~~~~~~~~~~~~
