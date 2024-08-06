@@ -796,6 +796,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     callback=callbacks.convert_boolean_string,
 )
 @click.option(
+    "--generation-graphql-allow-null",
+    help="Whether `null` values should be used for optional arguments in GraphQL queries.",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=callbacks.convert_boolean_string,
+)
+@click.option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
     type=str,
@@ -911,6 +919,7 @@ def run(
     no_color: bool = False,
     report_value: str | None = None,
     generation_allow_x00: bool = True,
+    generation_graphql_allow_null: bool = True,
     generation_with_security_parameters: bool = True,
     generation_codec: str = "utf-8",
     schemathesis_io_token: str | None = None,
@@ -953,6 +962,7 @@ def run(
 
     generation_config = generation.GenerationConfig(
         allow_x00=generation_allow_x00,
+        graphql_allow_null=generation_graphql_allow_null,
         codec=generation_codec,
         with_security_parameters=generation_with_security_parameters,
     )
