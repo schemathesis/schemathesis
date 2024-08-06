@@ -9,6 +9,7 @@ Changelog
 - The ``ensure_resource_availability`` check. It verifies that a freshly created resource is available in related API operations.
 - The ``ignored_auth`` check. It verifies that the API operation requires the specified authentication.
 - Enable string format verification in response conformance checks. :issue:`787`
+- Control over cache key in custom auth implementation. :issue:`1775`
 
 **Changed**
 
