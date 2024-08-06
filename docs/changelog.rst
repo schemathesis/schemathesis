@@ -15,7 +15,8 @@ Changelog
 
 **Fixed**
 
-- Missing sanitization in stateful tests.
+- Missing sanitization in new-style stateful tests.
+- Missing new-style stateful testing results in JUnit output.
 
 .. _v3.33.3:
 

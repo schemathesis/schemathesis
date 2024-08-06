@@ -299,12 +299,19 @@ class BaseRunner:
                 def on_step_finished(event: stateful_events.StepFinished) -> None:
                     return None
 
+            test_start_time: float | None = None
+            test_elapsed_time: float | None = None
+
             for stateful_event in runner.execute():
                 if isinstance(stateful_event, stateful_events.SuiteFinished):
                     if stateful_event.failures and status != Status.error:
                         status = Status.failure
                     for failure in stateful_event.failures:
                         result.checks.append(failure)
+                elif isinstance(stateful_event, stateful_events.RunStarted):
+                    test_start_time = stateful_event.timestamp
+                elif isinstance(stateful_event, stateful_events.RunFinished):
+                    test_elapsed_time = stateful_event.timestamp - cast(float, test_start_time)
                 elif isinstance(stateful_event, stateful_events.StepFinished):
                     on_step_finished(stateful_event)
                 elif isinstance(stateful_event, stateful_events.Errored):
@@ -315,6 +322,7 @@ class BaseRunner:
             yield events.AfterStatefulExecution(
                 status=status,
                 result=SerializedTestResult.from_test_result(result),
+                elapsed_time=cast(float, test_elapsed_time),
                 data_generation_method=self.schema.data_generation_methods,
             )
 
