@@ -1560,6 +1560,25 @@ def test_new_stateful_runner(cli, schema_url, snapshot_cli, workers, tmp_path):
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
+def test_new_stateful_runner_sanitization(cli, schema_url, tmp_path):
+    cassette_path = tmp_path / "output.yaml"
+    token = "secret"
+    result = cli.run(
+        schema_url,
+        "--experimental=stateful-test-runner",
+        "--experimental=stateful-only",
+        "--hypothesis-max-examples=80",
+        f"--header=Authorization: Bearer {token}",
+        f"--cassette-path={cassette_path}",
+        "--exitfirst",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert token not in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
 def test_new_stateful_runner_max_failures(cli, schema_url, snapshot_cli):
