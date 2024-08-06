@@ -19,3 +19,8 @@ class SanitizationHandler(EventHandler):
                 sanitize_serialized_check(check)
             for interaction in event.result.interactions:
                 sanitize_serialized_interaction(interaction)
+        elif isinstance(event, events.AfterStatefulExecution):
+            for check in event.result.checks:
+                sanitize_serialized_check(check)
+            for interaction in event.result.interactions:
+                sanitize_serialized_interaction(interaction)

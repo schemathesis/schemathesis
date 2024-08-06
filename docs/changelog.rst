@@ -13,6 +13,10 @@ Changelog
 
 - Pass default stateful test runner config to ``TestCase`` used by ``pytest`` & ``unittest`` integration.
 
+**Fixed**
+
+- Missing sanitization in stateful tests.
+
 .. _v3.33.3:
 
 :version:`3.33.3 <v3.33.2...v3.33.3>` - 2024-07-29
