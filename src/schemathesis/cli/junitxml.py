@@ -27,26 +27,29 @@ class JunitXMLHandler(EventHandler):
     test_cases: list = field(default_factory=list)
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
-        if isinstance(event, events.AfterExecution):
-            test_case = TestCase(
-                f"{event.result.method} {event.result.path}",
-                elapsed_sec=event.elapsed_time,
-                allow_multiple_subelements=True,
-            )
-            if event.status == Status.failure:
-                for idx, (code_sample, group) in enumerate(
-                    group_by_case(event.result.checks, context.code_sample_style), 1
-                ):
-                    checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-                    test_case.add_failure_info(message=build_failure_message(context, idx, code_sample, checks))
-            elif event.status == Status.error:
-                test_case.add_error_info(message=build_error_message(context, event.result.errors[-1]))
-            elif event.status == Status.skip:
-                test_case.add_skipped_info(message=event.result.skip_reason)
+        if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
+            event_: events.AfterExecution | events.AfterStatefulExecution = event
+            if isinstance(event_, events.AfterExecution):
+                name = f"{event_.result.method} {event_.result.path}"
+            else:
+                name = event_.result.verbose_name
+            test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
+            if event_.status == Status.failure:
+                _add_failure(test_case, event_.result.checks, context)
+            elif event_.status == Status.error:
+                test_case.add_error_info(message=build_error_message(context, event_.result.errors[-1]))
+            elif event_.status == Status.skip:
+                test_case.add_skipped_info(message=event_.result.skip_reason)
             self.test_cases.append(test_case)
-        if isinstance(event, events.Finished):
+        elif isinstance(event, events.Finished):
             test_suites = [TestSuite("schemathesis", test_cases=self.test_cases, hostname=platform.node())]
             to_xml_report_file(file_descriptor=self.file_handle, test_suites=test_suites, prettyprint=True)
+
+
+def _add_failure(test_case: TestCase, checks: list[SerializedCheck], context: ExecutionContext) -> None:
+    for idx, (code_sample, group) in enumerate(group_by_case(checks, context.code_sample_style), 1):
+        checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
+        test_case.add_failure_info(message=build_failure_message(context, idx, code_sample, checks))
 
 
 def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[SerializedCheck]) -> str:
