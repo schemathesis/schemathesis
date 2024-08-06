@@ -318,6 +318,7 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
+        print(data)
         lines = data.splitlines()
         lines = [
             line

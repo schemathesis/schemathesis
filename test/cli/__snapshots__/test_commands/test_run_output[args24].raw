@@ -225,6 +225,10 @@ Generic:
   --generation-with-security-parameters TEXT
                                   Whether to generate security parameters.
                                   [default: true]
+  --generation-graphql-allow-null TEXT
+                                  Whether `null` values should be used for
+                                  optional arguments in GraphQL queries.
+                                  [default: true]
   --schemathesis-io-token TEXT    Schemathesis.io authentication token.
   --schemathesis-io-url TEXT      Schemathesis.io base URL.
   --schemathesis-io-telemetry TEXT
