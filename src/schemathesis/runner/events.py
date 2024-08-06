@@ -325,6 +325,7 @@ class AfterStatefulExecution(ExecutionEvent):
 
     status: Status
     result: SerializedTestResult
+    elapsed_time: float
     data_generation_method: list[DataGenerationMethod]
     thread_id: int = field(default_factory=threading.get_ident)
 

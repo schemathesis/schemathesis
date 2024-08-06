@@ -104,6 +104,7 @@ def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> 
         "status": event.status,
         "data_generation_method": event.data_generation_method,
         "result": asdict(event.result),
+        "elapsed_time": event.elapsed_time,
     }
 
 

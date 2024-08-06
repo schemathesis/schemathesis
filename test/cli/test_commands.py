@@ -5,6 +5,7 @@ import pathlib
 import platform
 import sys
 import time
+from xml.etree import ElementTree
 from unittest.mock import ANY
 from urllib.parse import urljoin
 
@@ -1611,6 +1612,29 @@ def test_new_stateful_runner_with_cassette(tmp_path, cli, schema_url):
     assert len(cassette["http_interactions"]) >= 20
     for interaction in cassette["http_interactions"]:
         assert interaction["seed"] not in (None, "None")
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_new_stateful_runner_junit(tmp_path, cli, schema_url):
+    junit_path = tmp_path / "junit.xml"
+    cli.run(
+        schema_url,
+        "--experimental=stateful-test-runner",
+        "--experimental=stateful-only",
+        "--hypothesis-max-examples=80",
+        "--exitfirst",
+        f"--junit-xml={junit_path}",
+    )
+    assert junit_path.exists()
+    tree = ElementTree.parse(junit_path)
+    root = tree.getroot()
+    assert root.tag == "testsuites"
+    assert len(root) == 1
+    assert len(root[0]) == 1
+    assert root[0][0].attrib["name"] == "Stateful tests"
+    assert len(root[0][0]) == 1
+    assert root[0][0][0].tag == "failure"
 
 
 @pytest.mark.openapi_version("3.0")
