@@ -673,7 +673,14 @@ class BaseOpenAPISchema(BaseSchema):
         )
         with in_scopes(resolver, scopes):
             try:
-                jsonschema.validate(data, schema, cls=self.validator_cls, resolver=resolver)
+                jsonschema.validate(
+                    data,
+                    schema,
+                    cls=self.validator_cls,
+                    resolver=resolver,
+                    # Use a recent JSON Schema format checker to get most of formats checked for older drafts as well
+                    format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+                )
             except jsonschema.ValidationError as exc:
                 exc_class = get_schema_validation_error(operation.verbose_name, exc)
                 ctx = failures.ValidationErrorContext.from_exception(exc, output_config=operation.schema.output_config)

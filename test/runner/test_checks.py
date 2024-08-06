@@ -291,6 +291,11 @@ def test_missing_content_type_header(case, response_factory):
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
+STRING_FORMAT_SCHEMA = {
+    "type": "object",
+    "properties": {"value": {"type": "string", "format": "date"}},
+    "required": ["value"],
+}
 
 
 @pytest.mark.parametrize(
@@ -301,6 +306,10 @@ SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"
         (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
         (b'{"success": true}', {"responses": {"200": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"success": true}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
+        (
+            b'{"value": "2017-07-21"}',
+            {"responses": {"default": {"description": "text", "schema": STRING_FORMAT_SCHEMA}}},
+        ),
     ),
 )
 def test_response_schema_conformance_swagger(swagger_20, content, definition, response_factory):
@@ -348,6 +357,17 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
             {
                 "responses": {
                     "default": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            b'{"value": "2017-07-21"}',
+            {
+                "responses": {
+                    "default": {
+                        "description": "text",
+                        "content": {"application/json": {"schema": STRING_FORMAT_SCHEMA}},
+                    }
                 }
             },
         ),
@@ -440,6 +460,7 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
     (
         (b'{"random": "text"}', {"responses": {"200": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"random": "text"}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
+        (b'{"value": "text"}', {"responses": {"default": {"description": "text", "schema": STRING_FORMAT_SCHEMA}}}),
     ),
 )
 def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition, response_factory):
@@ -469,6 +490,18 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
             {
                 "responses": {
                     "default": {"description": "text", "content": {"application/json": {"schema": SUCCESS_SCHEMA}}}
+                }
+            },
+        ),
+        (
+            "application/json",
+            b'{"value": "text"}',
+            {
+                "responses": {
+                    "default": {
+                        "description": "text",
+                        "content": {"application/json": {"schema": STRING_FORMAT_SCHEMA}},
+                    }
                 }
             },
         ),
