@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from inspect import signature
 from typing import Any, Callable, Generator
+from contextlib import nullcontext
 
 import pytest
 from _pytest.fixtures import FixtureRequest
@@ -11,7 +12,7 @@ from hypothesis.errors import Flaky
 from hypothesis.internal.escalation import format_exception, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
 from pyrate_limiter import Limiter
-from pytest_subtests import SubTests, nullcontext
+from pytest_subtests import SubTests
 
 from ._compat import MultipleFailures, get_interesting_origin
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
