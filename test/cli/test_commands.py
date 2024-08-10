@@ -5,9 +5,9 @@ import pathlib
 import platform
 import sys
 import time
-from xml.etree import ElementTree
 from unittest.mock import ANY
 from urllib.parse import urljoin
+from xml.etree import ElementTree
 
 import hypothesis
 import pytest
@@ -1535,6 +1535,24 @@ def test_openapi_links(cli, cli_args, hypothesis_max_examples, snapshot_cli):
             "--hypothesis-derandomize",
             "--hypothesis-deadline=None",
             "--show-trace",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_stateful_explicit_examples_with_filters(cli, schema_url, snapshot_cli):
+    # See GH-2376
+    assert (
+        cli.run(
+            schema_url,
+            "--hypothesis-phases=explicit",
+            # Should include only a single link from `create_user` to `get_user`
+            # And the link from `create_user` to `update_user` should be excluded
+            "--include-name=POST /api/users/",
+            "--include-name=GET /api/users/{user_id}",
         )
         == snapshot_cli
     )

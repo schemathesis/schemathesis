@@ -13,8 +13,8 @@ from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
 from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
 from ..models import APIOperation, Case, CheckFunction
-from .runner import StatefulTestRunner, StatefulTestRunnerConfig
 from .config import _default_hypothesis_settings_factory
+from .runner import StatefulTestRunner, StatefulTestRunnerConfig
 from .sink import StateMachineSink
 from .statistic import TransitionStats
 
