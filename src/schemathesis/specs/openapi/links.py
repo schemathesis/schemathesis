@@ -7,8 +7,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
 from types import SimpleNamespace
+from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
 
 from jsonschema import RefResolver
 
