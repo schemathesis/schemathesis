@@ -5,10 +5,10 @@ import warnings
 import pytest
 
 import schemathesis
-from schemathesis.runner import from_schema
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.exceptions import UsageError
 from schemathesis.models import Case
+from schemathesis.runner import from_schema
 
 TOKEN = "EXAMPLE-TOKEN"
 

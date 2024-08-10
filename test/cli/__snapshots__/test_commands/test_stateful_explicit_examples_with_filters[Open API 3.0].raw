@@ -1,0 +1,27 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 2
+Collected API links: 3
+API probing: SUCCESS
+Schema analysis: SKIP
+
+POST /api/users/ .                                                        [ 50%]
+    -> GET /api/users/{user_id} .                                         [ 66%]
+GET /api/users/{user_id} .                                                [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    N / N passed          PASSED 
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== in 1.00s ========================================

@@ -8,6 +8,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
+from types import SimpleNamespace
 
 from jsonschema import RefResolver
 
@@ -76,6 +77,9 @@ class Link(StatefulTest):
         if self.merge_body:
             body = merge_body(case.body, body)
         return ParsedData(parameters=parameters, body=body)
+
+    def is_match(self) -> bool:
+        return self.operation.schema.filter_set.match(SimpleNamespace(operation=self.operation))
 
     def make_operation(self, collected: list[ParsedData]) -> APIOperation:
         """Create a modified version of the original API operation with additional data merged in."""
