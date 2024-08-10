@@ -296,21 +296,51 @@ Remember to return the modified ``body`` or ``case`` object from your hook funct
 Applying Hooks to Specific API Operations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-To fine-tune data generation for specific API operations, you can incorporate conditional logic within the hook function. 
-This ensures the hook applies only to relevant scenarios.
+Schemathesis offers a way to apply hooks to only a specific set of API operations during testing.
+This is helpful when you need to run different hooks for different API operations.
+
+Multiple filters can be combined and applied to include or exclude API operations based on exact values, regular expressions, or custom functions.
+Here is how you can apply a hook to all API operations with the ``/users/`` path, but exclude the ``POST`` method.
 
 .. code:: python
 
     import schemathesis
 
 
-    @schemathesis.hook
+    @schemathesis.hook.apply_to(path="/users/").skip_for(method="POST")
+    def filter_body(context, body):
+        ...
+
+.. note::
+
+    This decorator syntax is supported only on Python 3.9+. For older Python versions you need to bind separate variables for each term.
+
+Basic rules:
+
+- ``apply_to`` applies the given hook to all API operations that match the filter term
+- ``skip_for`` skips the given hook for all API operations that match the filter term
+- All conditions within a filter term are combined with the ``AND`` logic
+- Each ``apply_to`` and ``skip_for`` term is combined with the ``OR`` logic
+- Both ``apply_to`` and ``skip_for`` use the same set of conditions as arguments
+
+Conditions:
+
+- ``path``: the path of the API operation without its ``basePath``.
+- ``method``: the upper-cased HTTP method of the API operation
+- ``name``: the name of the API operation, such as ``GET /users/`` or ``Query.getUsers``
+- ``tag``: the tag assigned to the API operation. For Open API it comes from the ``tags`` field.
+- ``operation_id``: the ID of an API operation. For Open API it comes from the ``operationId`` field.
+- Each condition can take either a single string or a list of options as input
+- You can also use a regular expression to match the conditions by adding ``_regex`` to the end of the condition and passing a string or a compiled regex.
+
+.. code:: python
+
+    import schemathesis
+
+
+    @schemathesis.hook.apply_to(name="PATCH /items/{item_id}/")
     def map_case(context, case):
-        op = context.operation
-        # If the operation is `PATCH /items/{item_id}/`,
-        # set `item_id` path parameter to match the body `id`.
-        if op.method == "PATCH" and op.path == "/items/{item_id}/":
-            case.path_parameters["item_id"] = case.body["data"]["id"]
+        case.path_parameters["item_id"] = case.body["data"]["id"]
         return case
 
 In this example, the ``item_id`` path parameter is synchronized with the ``id`` value from the request body, but only for test cases targeting ``PATCH /items/{item_id}/``.

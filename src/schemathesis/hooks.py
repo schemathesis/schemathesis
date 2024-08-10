@@ -8,6 +8,7 @@ from enum import Enum, unique
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, cast
 
+from .filters import FilterSet, attach_filter_chain
 from .internal.deprecation import deprecated_property
 from .types import GenericTest
 
@@ -47,6 +48,58 @@ class HookContext:
         return self.operation
 
 
+def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:
+    filter_used = False
+    filter_set = FilterSet()
+
+    def register(hook: str | Callable) -> Callable:
+        nonlocal filter_set
+
+        if filter_used:
+            validate_filterable_hook(hook)
+
+        if isinstance(hook, str):
+
+            def decorator(func: Callable) -> Callable:
+                hook_name = cast(str, hook)
+                if filter_used:
+                    validate_filterable_hook(hook)
+                func.filter_set = filter_set  # type: ignore[attr-defined]
+                return dispatcher.register_hook_with_name(func, hook_name)
+
+            init_filter_set(decorator)
+            return decorator
+
+        hook.filter_set = filter_set  # type: ignore[attr-defined]
+        init_filter_set(register)
+        return dispatcher.register_hook_with_name(hook, hook.__name__)
+
+    def init_filter_set(target: Callable) -> FilterSet:
+        nonlocal filter_used
+
+        filter_used = False
+        filter_set = FilterSet()
+
+        def include(*args: Any, **kwargs: Any) -> None:
+            nonlocal filter_used
+
+            filter_used = True
+            filter_set.include(*args, **kwargs)
+
+        def exclude(*args: Any, **kwargs: Any) -> None:
+            nonlocal filter_used
+
+            filter_used = True
+            filter_set.exclude(*args, **kwargs)
+
+        attach_filter_chain(target, "apply_to", include)
+        attach_filter_chain(target, "skip_for", exclude)
+        return filter_set
+
+    filter_set = init_filter_set(register)
+    return register
+
+
 @dataclass
 class HookDispatcher:
     """Generic hook dispatcher.
@@ -57,6 +110,9 @@ class HookDispatcher:
     scope: HookScope
     _hooks: DefaultDict[str, list[Callable]] = field(default_factory=lambda: defaultdict(list))
     _specs: ClassVar[dict[str, RegisteredHook]] = {}
+
+    def __post_init__(self) -> None:
+        self.register = to_filterable_hook(self)  # type: ignore[method-assign]
 
     def register(self, hook: str | Callable) -> Callable:
         """Register a new hook.
@@ -80,14 +136,7 @@ class HookDispatcher:
             def hook(context, strategy):
                 ...
         """
-        if isinstance(hook, str):
-
-            def decorator(func: Callable) -> Callable:
-                hook_name = cast(str, hook)
-                return self.register_hook_with_name(func, hook_name)
-
-            return decorator
-        return self.register_hook_with_name(hook, hook.__name__)
+        raise NotImplementedError
 
     def merge(self, other: HookDispatcher) -> HookDispatcher:
         """Merge two dispatches together.
@@ -192,14 +241,22 @@ class HookDispatcher:
         self, strategy: st.SearchStrategy, container: str, context: HookContext
     ) -> st.SearchStrategy:
         for hook in self.get_all_by_name(f"before_generate_{container}"):
+            if _should_skip_hook(hook, context):
+                continue
             strategy = hook(context, strategy)
         for hook in self.get_all_by_name(f"filter_{container}"):
+            if _should_skip_hook(hook, context):
+                continue
             hook = partial(hook, context)
             strategy = strategy.filter(hook)
         for hook in self.get_all_by_name(f"map_{container}"):
+            if _should_skip_hook(hook, context):
+                continue
             hook = partial(hook, context)
             strategy = strategy.map(hook)
         for hook in self.get_all_by_name(f"flatmap_{container}"):
+            if _should_skip_hook(hook, context):
+                continue
             hook = partial(hook, context)
             strategy = strategy.flatmap(hook)
         return strategy
@@ -207,6 +264,8 @@ class HookDispatcher:
     def dispatch(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:
         """Run all hooks for the given name."""
         for hook in self.get_all_by_name(name):
+            if _should_skip_hook(hook, context):
+                continue
             hook(context, *args, **kwargs)
 
     def unregister(self, hook: Callable) -> None:
@@ -224,6 +283,11 @@ class HookDispatcher:
         Useful in tests.
         """
         self._hooks = defaultdict(list)
+
+
+def _should_skip_hook(hook: Callable, context: HookContext) -> bool:
+    filter_set = getattr(hook, "filter_set", None)
+    return filter_set is not None and not filter_set.match(context)
 
 
 def apply_to_all_dispatchers(
@@ -246,6 +310,15 @@ def should_skip_operation(dispatcher: HookDispatcher, context: HookContext) -> b
         if not hook(context):
             return True
     return False
+
+
+def validate_filterable_hook(hook: str | Callable) -> None:
+    if callable(hook):
+        name = hook.__name__
+    else:
+        name = hook
+    if name in ("before_process_path", "before_load_schema", "after_load_schema", "after_init_cli_run_handlers"):
+        raise ValueError(f"Filters are not applicable to this hook: `{name}`")
 
 
 all_scopes = HookDispatcher.register_spec(list(HookScope))

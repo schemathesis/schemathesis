@@ -11,6 +11,7 @@ Changelog
 - Enable string format verification in response conformance checks. :issue:`787`
 - Control over cache key in custom auth implementation. :issue:`1775`
 - The ``--generation-graphql-allow-null`` CLI option that controls whether ``null`` should be used for optional arguments in GraphQL queries. Enabled by default. :issue:`1994`
+- Filters for hooks. :issue:`1852`
 
 **Changed**
 
