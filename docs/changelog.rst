@@ -21,6 +21,7 @@ Changelog
 - Missing sanitization in new-style stateful tests.
 - Missing new-style stateful testing results in JUnit output.
 - Internal error when handling an exception inside a hook for a GraphQL schema.
+- Filters being ignored in the old-style stateful test runner. :issue:`2376`
 
 .. _v3.33.3:
 

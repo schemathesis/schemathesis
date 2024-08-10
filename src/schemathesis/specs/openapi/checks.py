@@ -22,6 +22,7 @@ from .utils import expand_status_code
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
+
     from ...models import APIOperation, Case
     from ...transports.responses import GenericResponse
 
@@ -268,8 +269,9 @@ def ensure_resource_availability(response: GenericResponse, original: Case) -> b
 
 def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
-    from .schemas import BaseOpenAPISchema
     from requests import Session
+
+    from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True

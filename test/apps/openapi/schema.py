@@ -310,6 +310,7 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
                             "required": ["first_name", "last_name"],
                             "additionalProperties": False,
                         },
+                        "x-example": {"first_name": "John", "last_name": "Doe"},
                     }
                 ],
                 "responses": {"201": {"$ref": "#/x-components/responses/ResponseWithLinks"}},
@@ -343,7 +344,7 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
                 "operationId": "getUser",
                 "parameters": [
                     {"in": "query", "name": "code", "required": True, "type": "integer"},
-                    {"in": "query", "name": "user_id", "required": True, "type": "string"},
+                    {"in": "query", "name": "user_id", "required": True, "type": "string", "x-example": "test-id"},
                 ],
                 "responses": {
                     "200": {
@@ -715,7 +716,8 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
                                 },
                                 "required": ["first_name", "last_name"],
                                 "additionalProperties": False,
-                            }
+                            },
+                            "example": {"first_name": "John", "last_name": "Doe"},
                         }
                     },
                     "required": True,
@@ -751,7 +753,13 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
                 "operationId": "getUser",
                 "parameters": [
                     {"in": "query", "name": "code", "required": True, "schema": {"type": "integer"}},
-                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                    {
+                        "in": "query",
+                        "name": "user_id",
+                        "required": True,
+                        "schema": {"type": "string"},
+                        "example": "test-id",
+                    },
                 ],
                 "responses": {
                     "200": {

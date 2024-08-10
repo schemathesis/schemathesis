@@ -60,6 +60,9 @@ class StatefulTest:
     def parse(self, case: Case, response: GenericResponse) -> ParsedData:
         raise NotImplementedError
 
+    def is_match(self) -> bool:
+        raise NotImplementedError
+
     def make_operation(self, collected: list[ParsedData]) -> APIOperation:
         raise NotImplementedError
 
@@ -113,22 +116,23 @@ class Feedback:
         from .._hypothesis import create_test
 
         for data in self.stateful_tests.values():
-            operation = data.make_operation()
-            _as_strategy_kwargs: dict[str, Any] | None
-            if callable(as_strategy_kwargs):
-                _as_strategy_kwargs = as_strategy_kwargs(operation)
-            else:
-                _as_strategy_kwargs = as_strategy_kwargs
-            test_function = create_test(
-                operation=operation,
-                test=test,
-                settings=settings,
-                seed=seed,
-                data_generation_methods=operation.schema.data_generation_methods,
-                generation_config=generation_config,
-                as_strategy_kwargs=_as_strategy_kwargs,
-            )
-            yield Ok((operation, test_function))
+            if data.stateful_test.is_match():
+                operation = data.make_operation()
+                _as_strategy_kwargs: dict[str, Any] | None
+                if callable(as_strategy_kwargs):
+                    _as_strategy_kwargs = as_strategy_kwargs(operation)
+                else:
+                    _as_strategy_kwargs = as_strategy_kwargs
+                test_function = create_test(
+                    operation=operation,
+                    test=test,
+                    settings=settings,
+                    seed=seed,
+                    data_generation_methods=operation.schema.data_generation_methods,
+                    generation_config=generation_config,
+                    as_strategy_kwargs=_as_strategy_kwargs,
+                )
+                yield Ok((operation, test_function))
 
 
 def run_state_machine_as_test(
