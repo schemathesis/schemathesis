@@ -37,14 +37,21 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import NOT_SET
 from .exceptions import OperationSchemaError, UsageError
-from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
+from .filters import (
+    FilterSet,
+    FilterValue,
+    MatcherFunc,
+    RegexValue,
+    filter_set_from_components,
+    is_deprecated,
+)
 from .generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
     DataGenerationMethodInput,
     GenerationConfig,
 )
-from .hooks import HookContext, HookDispatcher, HookScope, dispatch
+from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .internal.deprecation import warn_filtration_arguments
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
@@ -97,6 +104,9 @@ class BaseSchema(Mapping):
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
+
+    def __post_init__(self) -> None:
+        self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
 
     def include(
         self,
