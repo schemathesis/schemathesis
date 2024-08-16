@@ -1,0 +1,43 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+GET /api/failure F                                                        [100%]
+
+=================================== FAILURES ===================================
+_______________________________ GET /api/failure _______________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500: Internal Server Error`
+
+Reproduce with: 
+
+    curl -X GET 'http://127.0.0.1/api/failure?token=%5BFiltered%5D'
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    0 / 2 passed          FAILED 
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================
