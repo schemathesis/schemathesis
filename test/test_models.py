@@ -11,9 +11,9 @@ from schemathesis._compat import MultipleFailures
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import APIOperation, Case, CaseSource, Request, Response, _merge_dict_to
+from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
-from schemathesis.transports import WSGITransport
+from schemathesis.transports import WSGITransport, _merge_dict_to
 
 
 @pytest.fixture
@@ -243,7 +243,7 @@ def test_call_and_validate_for_asgi(fastapi_app):
     @given(case=api_schema["/users"]["GET"].as_strategy())
     @settings(max_examples=1)
     def test(case):
-        with pytest.raises(RuntimeError, match="The URL should be absolute"):
+        with pytest.raises(RuntimeError, match="If you use the ASGI integration"):
             case.call_and_validate()
 
     test()
