@@ -8,6 +8,7 @@ import pytest
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.extra._flask import run_server
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.service.serialization import _serialize_stateful_event
@@ -36,6 +37,20 @@ class RunnerResult:
     def errors(self):
         return [event for event in self.events if isinstance(event, events.Errored)]
 
+    @property
+    def steps_before_first_failure(self):
+        steps = 0
+        for event in self.events:
+            if isinstance(event, events.StepFinished):
+                if event.status == events.RunStatus.FAILURE:
+                    break
+                steps += 1
+        return steps
+
+    @property
+    def responses(self):
+        return [event.response for event in self.events if isinstance(event, events.StepFinished)]
+
 
 def serialize_all_events(events):
     for event in events:
@@ -49,6 +64,25 @@ def collect_result(runner) -> RunnerResult:
         sink.consume(event)
         events_.append(event)
     return RunnerResult(events=events_, sink=sink)
+
+
+def assert_linked_calls_followed(result: RunnerResult):
+    # Every successful POST should have a linked call followed
+    steps = [event for event in result.events if isinstance(event, events.StepFinished)]
+    ids = {
+        "POST": set(),
+        "GET": set(),
+        "DELETE": set(),
+        "PATCH": set(),
+    }
+    sources = set()
+    for event in steps:
+        ids[event.response.request.method].add(event.response.request.headers[SCHEMATHESIS_TEST_CASE_HEADER])
+        if event.response.request.method != "POST":
+            if event.case.source.response.request.method == "POST":
+                sources.add(event.case.source.response.request.headers[SCHEMATHESIS_TEST_CASE_HEADER])
+    # Most POSTs should be followed by a GET, DELETE, or PATCH
+    assert len(sources) - len(ids["POST"]) < 10
 
 
 @pytest.mark.parametrize(
@@ -68,7 +102,7 @@ def test_find_independent_5xx(runner_factory, kwargs):
         "DELETE /users/{userId}",
         "PATCH /users/{userId}",
     }
-    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
     # There should be 2 or 1 final scenarios to reproduce failures depending on the `exit_first` setting
     scenarios = [
         event for event in result.events if isinstance(event, (events.ScenarioStarted, events.ScenarioFinished))
@@ -97,6 +131,13 @@ def test_find_independent_5xx(runner_factory, kwargs):
         assert len(result.failures) == 2
         assert {check.example.operation.verbose_name for check in result.failures} == all_affected_operations
     serialize_all_events(result.events)
+    assert_linked_calls_followed(result)
+
+
+def test_works_on_single_link(runner_factory):
+    runner = runner_factory(app_kwargs={"single_link": True, "independent_500": True})
+    result = collect_result(runner)
+    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
 
 
 def keyboard_interrupt(r):

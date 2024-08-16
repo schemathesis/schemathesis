@@ -30,7 +30,7 @@ def _get_default_hypothesis_settings_kwargs() -> dict[str, Any]:
     return {
         "phases": (hypothesis.Phase.generate,),
         "deadline": None,
-        "stateful_step_count": 10,
+        "stateful_step_count": 6,
         "suppress_health_check": list(hypothesis.HealthCheck),
     }
 
