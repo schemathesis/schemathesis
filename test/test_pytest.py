@@ -50,6 +50,25 @@ def test_(request, param, case):
     )
 
 
+def test_missing_base_url_error_message(testdir):
+    testdir.make_test(
+        """
+
+schema = schemathesis.from_dict(raw_schema)
+
+@schema.parametrize()
+def test_a(case):
+    case.call()
+
+@schema.parametrize()
+def test_b(case):
+    case.call_and_validate()
+"""
+    )
+    result = testdir.runpytest("-v", "-s")
+    assert "The `base_url` argument is required when specifying a schema via a file" in result.stdout.str()
+
+
 def test_pytest_parametrize_class_fixture(testdir):
     # When `pytest_generate_tests` is used on a class level for fixture parametrization
     testdir.make_test(

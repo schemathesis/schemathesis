@@ -17,6 +17,7 @@ Changelog
 
 - Pass default stateful test runner config to ``TestCase`` used by ``pytest`` & ``unittest`` integration.
 - Rework transitions in stateful tests in order to reduce the number of unhelpful API calls.
+- Improve error message when ``base_url`` is missing for a schema loaded from a file.
 
 **Fixed**
 
