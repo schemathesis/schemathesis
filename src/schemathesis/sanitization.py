@@ -238,6 +238,7 @@ def sanitize_serialized_check(check: SerializedCheck, *, config: Config | None =
 
 
 def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = None) -> None:
+    case.url = sanitize_url(case.url, config=config)
     for value in (case.path_parameters, case.headers, case.cookies, case.query, case.extra_headers):
         if value is not None:
             sanitize_value(value, config=config)

@@ -2236,6 +2236,33 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("failure")
+def test_explicit_query_token_sanitization(empty_open_api_3_schema, testdir, cli, snapshot_cli, base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/failure": {
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            }
+        }
+    }
+    empty_open_api_3_schema["security"] = [{"api_key": []}]
+    empty_open_api_3_schema["components"] = {
+        "securitySchemes": {
+            "api_key": {
+                "type": "apiKey",
+                "name": "token",
+                "in": "query",
+            },
+        }
+    }
+    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    token = "token=secret"
+    result = cli.run(str(schema_file), "--set-query", token, f"--base-url={base_url}")
+    assert result == snapshot_cli
+    assert token not in result.stdout
+
+
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_skip_not_negated_tests(cli, schema_url):
     # See GH-1463
