@@ -57,6 +57,12 @@ def app_factory(empty_open_api_3_schema):
             "parameters": {"userId": "$request.path.userId"},
         },
     }
+    order_links = {
+        "GetUser": {
+            "operationId": "getUser",
+            "parameters": {"userId": 42},
+        },
+    }
     empty_open_api_3_schema["paths"] = {
         "/users": {
             "post": {
@@ -128,12 +134,7 @@ def app_factory(empty_open_api_3_schema):
                 "responses": {
                     "200": {
                         "description": "Successful response",
-                        "links": {
-                            "GetUser": {
-                                "operationId": "getUser",
-                                "parameters": {"userId": 42},
-                            },
-                        },
+                        "links": order_links,
                     },
                     "default": {"description": "Default"},
                 },
@@ -279,6 +280,7 @@ def app_factory(empty_open_api_3_schema):
         unsatisfiable=False,
         custom_headers=None,
         multiple_source_links=False,
+        single_link=False,
         slowdown=None,
     ):
         config.use_after_free = use_after_free
@@ -308,7 +310,12 @@ def app_factory(empty_open_api_3_schema):
             post_links.clear()
             post_links["DeleteUser"] = link
             get_links.clear()
+        if single_link:
+            link = post_links["DeleteUser"]
+            post_links.clear()
+            post_links["DeleteUser"] = link
             get_links.clear()
+            order_links.clear()
         if slowdown:
             config.slowdown = slowdown
         return app

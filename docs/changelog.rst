@@ -16,6 +16,7 @@ Changelog
 **Changed**
 
 - Pass default stateful test runner config to ``TestCase`` used by ``pytest`` & ``unittest`` integration.
+- Rework transitions in stateful tests in order to reduce the number of unhelpful API calls.
 
 **Fixed**
 

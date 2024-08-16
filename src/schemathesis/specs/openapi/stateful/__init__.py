@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
 
 from hypothesis import strategies as st
-from hypothesis.stateful import Bundle, Rule, rule
+from hypothesis.stateful import Bundle, Rule, rule, precondition
 
 from ....constants import NOT_SET
 from ....internal.result import Ok
@@ -93,10 +93,11 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                         for data_generation_method in schema.data_generation_methods
                     ]
                 )
+                bundle = bundles[bundle_name]
                 rules[name] = transition(
                     name=name,
                     target=catch_all,
-                    previous=bundles[bundle_name],
+                    previous=bundle,
                     case=case_strategy,
                     link=st.just(link),
                 )
@@ -116,11 +117,13 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                     for data_generation_method in schema.data_generation_methods
                 ]
             )
-            rules[name] = transition(
-                name=name,
-                target=catch_all,
-                previous=st.none(),
-                case=case_strategy,
+            rules[name] = precondition(ensure_links_followed)(
+                transition(
+                    name=name,
+                    target=catch_all,
+                    previous=st.none(),
+                    case=case_strategy,
+                )
             )
 
     return type(
@@ -134,6 +137,14 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             **rules,
         },
     )
+
+
+def ensure_links_followed(machine: APIStateMachine) -> bool:
+    # If there are responses that have links to follow, reject any rule without incoming transitions
+    for bundle in machine.bundles.values():
+        if bundle:
+            return False
+    return True
 
 
 def transition(

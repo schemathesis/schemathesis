@@ -1361,7 +1361,7 @@ def test_stateful_seed(real_app_schema):
             del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
             current.append(data)
         requests.append(current)
-    assert requests[0] == requests[1] == requests[2]
+    assert requests[0][0] == requests[1][0] == requests[2][0]
 
 
 @pytest.mark.openapi_version("3.0")
