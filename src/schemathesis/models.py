@@ -24,7 +24,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
@@ -516,28 +516,6 @@ class Case:
             body=fast_deepcopy(self.body),
             generation_time=self.generation_time,
             id=self.id,
-        )
-
-
-def _merge_dict_to(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
-    original = data[data_key] or {}
-    for key, value in new.items():
-        original[key] = value
-    data[data_key] = original
-
-
-def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
-    """Check arguments for `requests.Session.request`.
-
-    Some arguments can be valid for cases like ASGI integration, but at the same time they won't work for the regular
-    `requests` calls. In such cases we need to avoid an obscure error message, that comes from `requests`.
-    """
-    url = data["url"]
-    if not urlparse(url).netloc:
-        raise RuntimeError(
-            "The URL should be absolute, so Schemathesis knows where to send the data. \n"
-            f"If you use the ASGI integration, please supply your test client "
-            f"as the `session` argument to `call`.\nURL: {url}"
         )
 
 
