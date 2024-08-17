@@ -15,9 +15,10 @@ from click.types import LazyFile  # type: ignore
 
 from .. import exceptions, experimental, throttling
 from ..code_samples import CodeSampleStyle
-from ..constants import FALSE_VALUES, TRUE_VALUES
+from ..constants import TRUE_VALUES
 from ..exceptions import extract_nth_traceback
 from ..generation import DataGenerationMethod
+from ..internal.transformation import convert_boolean_string as _convert_boolean_string
 from ..internal.validation import file_exists, is_filename, is_illegal_surrogate
 from ..loaders import load_app
 from ..service.hosts import get_temporary_hosts_file
@@ -378,11 +379,7 @@ def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, val
 
 
 def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str | bool:
-    if value.lower() in TRUE_VALUES:
-        return True
-    if value.lower() in FALSE_VALUES:
-        return False
-    return value
+    return _convert_boolean_string(value)
 
 
 def convert_report(ctx: click.core.Context, param: click.core.Option, value: LazyFile) -> LazyFile:

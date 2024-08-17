@@ -14,9 +14,11 @@ from ...exceptions import (
     get_missing_content_type_error,
     get_negative_rejection_error,
     get_response_type_error,
+    get_schema_validation_error,
     get_status_code_error,
     get_use_after_free_error,
 )
+from ...internal.transformation import convert_boolean_string
 from ...transports.content_types import parse_content_type
 from .utils import expand_status_code
 
@@ -114,11 +116,17 @@ def _reraise_malformed_media_type(case: Case, exc: ValueError, location: str, ac
 
 
 def response_headers_conformance(response: GenericResponse, case: Case) -> bool | None:
-    from .schemas import BaseOpenAPISchema
+    import jsonschema
+
+    from .parameters import OpenAPI20Parameter, OpenAPI30Parameter
+    from .schemas import BaseOpenAPISchema, OpenApi30, _maybe_raise_one_or_more
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
-    defined_headers = case.operation.schema.get_headers(case.operation, response)
+    resolved = case.operation.schema.get_headers(case.operation, response)
+    if not resolved:
+        return None
+    scopes, defined_headers = resolved
     if not defined_headers:
         return None
 
@@ -127,15 +135,70 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
         for header, definition in defined_headers.items()
         if header not in response.headers and definition.get(case.operation.schema.header_required_field, False)
     ]
-    if not missing_headers:
+    errors = []
+    if missing_headers:
+        formatted_headers = [f"\n- `{header}`" for header in missing_headers]
+        message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
+        exc_class = get_headers_error(case.operation.verbose_name, message)
+        try:
+            raise exc_class(
+                failures.MissingHeaders.title,
+                context=failures.MissingHeaders(message=message, missing_headers=missing_headers),
+            )
+        except Exception as exc:
+            errors.append(exc)
+    for name, definition in defined_headers.items():
+        value = response.headers.get(name)
+        if value is not None:
+            parameter_definition = {"in": "header", **definition}
+            parameter: OpenAPI20Parameter | OpenAPI30Parameter
+            if isinstance(case.operation.schema, OpenApi30):
+                parameter = OpenAPI30Parameter(parameter_definition)
+            else:
+                parameter = OpenAPI20Parameter(parameter_definition)
+            schema = parameter.as_json_schema(case.operation)
+            coerced = _coerce_header_value(value, schema)
+            with case.operation.schema._validating_response(scopes) as resolver:
+                try:
+                    jsonschema.validate(
+                        coerced,
+                        schema,
+                        cls=case.operation.schema.validator_cls,
+                        resolver=resolver,
+                        format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
+                    )
+                except jsonschema.ValidationError as exc:
+                    exc_class = get_schema_validation_error(case.operation.verbose_name, exc)
+                    ctx = failures.ValidationErrorContext.from_exception(
+                        exc, output_config=case.operation.schema.output_config
+                    )
+                    try:
+                        raise exc_class("Response header does not conform to the schema", context=ctx) from exc
+                    except Exception as exc:
+                        errors.append(exc)
+    return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
+
+
+def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | float | None | bool:
+    schema_type = schema.get("type")
+
+    if schema_type == "string":
+        return value
+    if schema_type == "integer":
+        try:
+            return int(value)
+        except ValueError:
+            return value
+    if schema_type == "number":
+        try:
+            return float(value)
+        except ValueError:
+            return value
+    if schema_type == "null" and value.lower() == "null":
         return None
-    formatted_headers = [f"\n- `{header}`" for header in missing_headers]
-    message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
-    exc_class = get_headers_error(case.operation.verbose_name, message)
-    raise exc_class(
-        failures.MissingHeaders.title,
-        context=failures.MissingHeaders(message=message, missing_headers=missing_headers),
-    )
+    if schema_type == "boolean":
+        return convert_boolean_string(value)
+    return value
 
 
 def response_schema_conformance(response: GenericResponse, case: Case) -> bool | None:

@@ -189,7 +189,7 @@ There are four built-in checks you can use via the `--checks / -c` CLI option:
 - ``content_type_conformance``. The response content type is not defined in the API schema;
 - ``response_schema_conformance``. The response content does not conform to the schema defined for this specific response;
 - ``negative_data_rejection``. The API accepts data that is invalid according to the schema;
-- ``response_headers_conformance``. The response headers does not contain all defined headers.
+- ``response_headers_conformance``. The response headers do not contain all defined headers or do not conform to their respective schemas.
 - ``use_after_free``. The API returned a non-404 response a successful DELETE operation on a resource. **NOTE**: Only enabled for new-style stateful testing.
 - ``ensure_resource_availability``. Freshly created resource is not available in related API operations. **NOTE**: Only enabled for new-style stateful testing.
 - ``ignored_auth``. The API operation does not check the specified authentication.

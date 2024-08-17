@@ -22,6 +22,7 @@ from schemathesis.models import OperationDefinition, TestResult
 from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.serialization import deduplicate_failures
 from schemathesis.schemas import BaseSchema
+from schemathesis.specs.openapi.checks import _coerce_header_value
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
@@ -668,3 +669,118 @@ def test_optional_headers_missing(schema_with_optional_headers, response_factory
     response = response_factory.requests()
     # Then it should not be reported as missing
     assert response_headers_conformance(response, case) is None
+
+
+INTEGER_HEADER = {"type": "integer", "maximum": 100}
+DATETIME_HEADER = {"type": "string", "format": "date-time"}
+
+
+@pytest.mark.parametrize("base", ("empty_open_api_2_schema", "empty_open_api_3_schema"))
+@pytest.mark.parametrize(
+    "header, schema, value, expected",
+    (
+        ("X-RateLimit-Limit", INTEGER_HEADER, "42", True),
+        ("X-RateLimit-Limit", INTEGER_HEADER, "150", False),
+        ("X-RateLimit-Reset", DATETIME_HEADER, "2021-01-01T00:00:00Z", True),
+        ("X-RateLimit-Reset", DATETIME_HEADER, "Invalid", False),
+    ),
+)
+def test_header_conformance(request, response_factory, base, header, schema, value, expected):
+    base_schema = request.getfixturevalue(base)
+    base_schema["paths"] = {
+        "/data": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "headers": {
+                            header: {
+                                "description": "Header",
+                                **({"schema": schema} if base == "empty_open_api_3_schema" else schema),
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+    schema = schemathesis.from_dict(base_schema, validate_schema=True)
+    case = make_case(schema, base_schema["paths"]["/data"]["get"])
+    response = response_factory.requests(headers={header: value})
+    if expected is True:
+        assert response_headers_conformance(response, case) is None
+    else:
+        with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+            response_headers_conformance(response, case)
+
+
+MULTIPLE_HEADERS = {
+    "/data": {
+        "get": {
+            "responses": {
+                "200": {
+                    "description": "OK",
+                    "headers": {
+                        "X-RateLimit-Limit": {"description": "Header", "schema": INTEGER_HEADER, "required": True},
+                        "X-RateLimit-Reset": {"description": "Header", "schema": DATETIME_HEADER, "required": True},
+                    },
+                }
+            },
+        }
+    },
+}
+
+
+def test_header_conformance_multiple_invalid_headers(empty_open_api_3_schema, response_factory):
+    empty_open_api_3_schema["paths"] = MULTIPLE_HEADERS
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+    response = response_factory.requests(headers={"X-RateLimit-Limit": "150", "X-RateLimit-Reset": "Invalid"})
+    with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
+        response_headers_conformance(response, case)
+
+
+def test_header_conformance_missing_and_invalid(empty_open_api_3_schema, response_factory):
+    empty_open_api_3_schema["paths"] = MULTIPLE_HEADERS
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+    response = response_factory.requests(headers={"X-RateLimit-Limit": "150"})
+    with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
+        response_headers_conformance(response, case)
+
+
+@pytest.mark.parametrize(
+    "value, schema, expected",
+    [
+        # String type
+        ("test", {"type": "string"}, "test"),
+        ("123", {"type": "string"}, "123"),
+        # Integer type
+        ("123", {"type": "integer"}, 123),
+        ("-456", {"type": "integer"}, -456),
+        ("12.34", {"type": "integer"}, "12.34"),  # Non-integer string
+        ("abc", {"type": "integer"}, "abc"),  # Non-numeric string
+        # Number type
+        ("123.45", {"type": "number"}, 123.45),
+        ("-67.89", {"type": "number"}, -67.89),
+        ("123", {"type": "number"}, 123.0),
+        ("abc", {"type": "number"}, "abc"),  # Non-numeric string
+        # Null type
+        ("null", {"type": "null"}, None),
+        ("NULL", {"type": "null"}, None),
+        ("Null", {"type": "null"}, None),
+        ("not null", {"type": "null"}, "not null"),
+        # Boolean type
+        ("true", {"type": "boolean"}, True),
+        ("false", {"type": "boolean"}, False),
+        ("1", {"type": "boolean"}, True),
+        ("0", {"type": "boolean"}, False),
+        # Unsupported type
+        ("test", {"type": "array"}, "test"),
+        ("test", {"type": "object"}, "test"),
+        # No type specified
+        ("test", {}, "test"),
+    ],
+)
+def test_coerce_header_value(value, schema, expected):
+    assert _coerce_header_value(value, schema) == expected
