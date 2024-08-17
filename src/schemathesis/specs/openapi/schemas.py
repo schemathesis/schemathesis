@@ -535,7 +535,9 @@ class BaseOpenAPISchema(BaseSchema):
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:
         raise NotImplementedError
 
-    def _get_response_definitions(self, operation: APIOperation, response: GenericResponse) -> dict[str, Any] | None:
+    def _get_response_definitions(
+        self, operation: APIOperation, response: GenericResponse
+    ) -> tuple[list[str], dict[str, Any]] | None:
         try:
             responses = operation.definition.raw["responses"]
         except KeyError as exc:
@@ -545,18 +547,19 @@ class BaseOpenAPISchema(BaseSchema):
             self._raise_invalid_schema(exc, full_path, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
-            _, response = self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
-            return response
+            return self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)
         if "default" in responses:
-            _, response = self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
-            return response
+            return self.resolver.resolve_in_scope(responses["default"], operation.definition.scope)
         return None
 
-    def get_headers(self, operation: APIOperation, response: GenericResponse) -> dict[str, dict[str, Any]] | None:
-        definitions = self._get_response_definitions(operation, response)
-        if not definitions:
+    def get_headers(
+        self, operation: APIOperation, response: GenericResponse
+    ) -> tuple[list[str], dict[str, dict[str, Any]] | None] | None:
+        resolved = self._get_response_definitions(operation, response)
+        if not resolved:
             return None
-        return definitions.get("headers")
+        scopes, definitions = resolved
+        return scopes, definitions.get("headers")
 
     def as_state_machine(self) -> type[APIStateMachine]:
         try:
@@ -668,10 +671,7 @@ class BaseOpenAPISchema(BaseSchema):
             except Exception as exc:
                 errors.append(exc)
                 _maybe_raise_one_or_more(errors)
-        resolver = ConvertingResolver(
-            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
-        )
-        with in_scopes(resolver, scopes):
+        with self._validating_response(scopes) as resolver:
             try:
                 jsonschema.validate(
                     data,
@@ -690,6 +690,14 @@ class BaseOpenAPISchema(BaseSchema):
                     errors.append(exc)
         _maybe_raise_one_or_more(errors)
         return None  # explicitly return None for mypy
+
+    @contextmanager
+    def _validating_response(self, scopes: list[str]) -> Generator[ConvertingResolver, None, None]:
+        resolver = ConvertingResolver(
+            self.location or "", self.raw_schema, nullable_name=self.nullable_name, is_response_schema=True
+        )
+        with in_scopes(resolver, scopes):
+            yield resolver
 
     @property
     def rewritten_components(self) -> dict[str, Any]:
@@ -783,7 +791,7 @@ class BaseOpenAPISchema(BaseSchema):
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
     if not errors:
-        return
+        return None
     elif len(errors) == 1:
         raise errors[0]
     else:
@@ -1123,9 +1131,10 @@ class OpenApi30(SwaggerV20):
         return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
-        definitions = self._get_response_definitions(operation, response)
-        if not definitions:
+        resolved = self._get_response_definitions(operation, response)
+        if not resolved:
             return []
+        _, definitions = resolved
         return list(definitions.get("content", {}).keys())
 
     def _get_parameter_serializer(self, definitions: list[dict[str, Any]]) -> Callable | None:

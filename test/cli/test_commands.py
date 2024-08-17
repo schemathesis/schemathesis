@@ -677,7 +677,7 @@ def test_status_code_conformance(cli, cli_args, workers, snapshot_cli):
 
 @pytest.mark.operations("headers")
 def test_headers_conformance_valid(cli, cli_args):
-    result = cli.run(*cli_args, "-c", "response_headers_conformance", "-H", "X-Custom-Header: bla")
+    result = cli.run(*cli_args, "-c", "response_headers_conformance", "-H", "X-Custom-Header: 42")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines

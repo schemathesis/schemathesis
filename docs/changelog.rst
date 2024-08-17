@@ -12,6 +12,7 @@ Changelog
 - Control over cache key in custom auth implementation. :issue:`1775`
 - The ``--generation-graphql-allow-null`` CLI option that controls whether ``null`` should be used for optional arguments in GraphQL queries. Enabled by default. :issue:`1994`
 - Filters for hooks. :issue:`1852`
+- Verify header schema conformance. :issue:`796`
 
 **Changed**
 
