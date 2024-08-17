@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
 
 from hypothesis import strategies as st
-from hypothesis.stateful import Bundle, Rule, rule, precondition
+from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from ....constants import NOT_SET
 from ....internal.result import Ok
