@@ -93,3 +93,10 @@ STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
     description="Run only stateful tests",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
 )
+COVERAGE_PHASE = GLOBAL_EXPERIMENTS.create_experiment(
+    name="coverage-phase",
+    verbose_name="Coverage phase",
+    env_var="COVERAGE_PHASE",
+    description="Generate covering test cases",
+    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2418",
+)

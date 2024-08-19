@@ -42,7 +42,7 @@ from ..internal.datetime import current_datetime
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
-from ..models import APIOperation, Case, CheckFunction
+from ..models import Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings, probes
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
@@ -50,7 +50,7 @@ from ..stateful import Stateful
 from ..targets import Target
 from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
-from ..types import Filter, PathLike, RequestCert
+from ..types import PathLike, RequestCert
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
@@ -759,6 +759,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
             experimental.SCHEMA_ANALYSIS.name,
             experimental.STATEFUL_TEST_RUNNER.name,
             experimental.STATEFUL_ONLY.name,
+            experimental.COVERAGE_PHASE.name,
         ]
     ),
     callback=callbacks.convert_experimental,

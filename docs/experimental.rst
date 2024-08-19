@@ -112,6 +112,31 @@ To enable OpenAPI 3.1 support via environment variables, you can set:
 
 For more details, join the `GitHub Discussion #1822 <https://github.com/schemathesis/schemathesis/discussions/1822>`_.
 
+.. _coverage-phase:
+
+Coverage phase
+~~~~~~~~~~~~~~
+
+Schemathesis primarily generates randomized tests; therefore, the outcomes can vary between test runs.
+This feature enables a new test phase that aims to generate a set of examples that cover common testing patterns for each parameter or property.
+Such tests include checking boundary values, omitting required properties, etc.
+
+In CLI
+~~~~~~
+
+.. code-block:: bash
+
+    st run https://example.schemathesis.io/openapi.json --experimental=coverage-phase
+
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_COVERAGE_PHASE=true
+
+For more details, join the `GitHub Discussion #2418 <https://github.com/schemathesis/schemathesis/discussions/2418>`_.
+
 .. _stateful-test-runner:
 
 New Stateful Test Runner

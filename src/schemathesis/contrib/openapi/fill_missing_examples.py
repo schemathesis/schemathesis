@@ -18,7 +18,7 @@ def uninstall() -> None:
 
 def before_add_examples(context: HookContext, examples: list[Case]) -> None:
     if not examples and context.operation is not None:
-        from ..._hypothesis import add_single_example
+        from ...generation import add_single_example
 
         strategy = context.operation.as_strategy()
         add_single_example(strategy, examples)

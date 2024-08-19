@@ -10,8 +10,8 @@ import requests
 from hypothesis.strategies import SearchStrategy
 from hypothesis_jsonschema import from_schema
 
-from ..._hypothesis import get_single_example
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
+from ...generation import get_single_example
 from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies

@@ -1032,6 +1032,7 @@ class SwaggerV20(BaseOpenAPISchema):
         query: Query | None = None,
         body: Body | NotSet = NOT_SET,
         media_type: str | None = None,
+        generation_time: float = 0.0,
     ) -> C:
         if body is not NOT_SET and media_type is None:
             media_type = operation._get_default_media_type()
@@ -1043,7 +1044,7 @@ class SwaggerV20(BaseOpenAPISchema):
             query=query,
             body=body,
             media_type=media_type,
-            generation_time=0.0,
+            generation_time=generation_time,
         )
 
     def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:
