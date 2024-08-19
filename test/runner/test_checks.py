@@ -27,7 +27,7 @@ from schemathesis.specs.openapi.checks import _coerce_header_value
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
     operation = models.APIOperation(
-        "/path", "GET", definition=OperationDefinition(definition, definition, None), schema=schema
+        "/path", "GET", definition=OperationDefinition(definition, definition, ""), schema=schema
     )
     return models.Case(operation, generation_time=0.0)
 
@@ -712,6 +712,37 @@ def test_header_conformance(request, response_factory, base, header, schema, val
     else:
         with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
             response_headers_conformance(response, case)
+
+
+def test_header_conformance_definition_behind_ref(empty_open_api_3_schema, response_factory):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "get": {
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "headers": {
+                            "Link": {
+                                "$ref": "#/components/headers/Link",
+                            }
+                        },
+                    }
+                },
+            }
+        },
+    }
+    empty_open_api_3_schema["components"] = {
+        "headers": {
+            "Link": {
+                "schema": {"type": "integer"},
+            },
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+    response = response_factory.requests(headers={"Link": "Test"})
+    with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
+        response_headers_conformance(response, case)
 
 
 MULTIPLE_HEADERS = {
