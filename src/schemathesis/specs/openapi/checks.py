@@ -150,15 +150,17 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
     for name, definition in defined_headers.items():
         value = response.headers.get(name)
         if value is not None:
-            parameter_definition = {"in": "header", **definition}
-            parameter: OpenAPI20Parameter | OpenAPI30Parameter
-            if isinstance(case.operation.schema, OpenApi30):
-                parameter = OpenAPI30Parameter(parameter_definition)
-            else:
-                parameter = OpenAPI20Parameter(parameter_definition)
-            schema = parameter.as_json_schema(case.operation)
-            coerced = _coerce_header_value(value, schema)
             with case.operation.schema._validating_response(scopes) as resolver:
+                if "$ref" in definition:
+                    _, definition = resolver.resolve(definition["$ref"])
+                parameter_definition = {"in": "header", **definition}
+                parameter: OpenAPI20Parameter | OpenAPI30Parameter
+                if isinstance(case.operation.schema, OpenApi30):
+                    parameter = OpenAPI30Parameter(parameter_definition)
+                else:
+                    parameter = OpenAPI20Parameter(parameter_definition)
+                schema = parameter.as_json_schema(case.operation)
+                coerced = _coerce_header_value(value, schema)
                 try:
                     jsonschema.validate(
                         coerced,

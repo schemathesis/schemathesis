@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.34.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Error in ``response_header_conformance`` if the header definition is behind ``$ref``. :issue:`2407`
+
 .. _v3.34.0:
 
 :version:`3.34.0 <v3.33.3...v3.34.0>` - 2024-08-17
