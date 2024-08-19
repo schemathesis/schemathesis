@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.34.3...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- **EXPERIMENTAL**: New "coverage" phase in the test runner. It aims to explicitly cover common test scenarios like missing required properties, incorrect types, etc. Enable it with ``--experimental=coverage-phase``
+
 .. _v3.34.3:
 
 :version:`3.34.3 <v3.34.2...v3.34.3>` - 2024-08-24

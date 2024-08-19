@@ -2,47 +2,14 @@ from __future__ import annotations
 
 import random
 from dataclasses import dataclass, field
-from enum import Enum
-from typing import TYPE_CHECKING, Iterable, Union
+from typing import TYPE_CHECKING
+
+from ._hypothesis import add_single_example, combine_strategies, get_single_example  # noqa: E402
+from ._methods import DataGenerationMethod, DataGenerationMethodInput  # noqa: E402
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-
-class DataGenerationMethod(str, Enum):
-    """Defines what data Schemathesis generates for tests."""
-
-    # Generate data, that fits the API schema
-    positive = "positive"
-    # Doesn't fit the API schema
-    negative = "negative"
-
-    @classmethod
-    def default(cls) -> DataGenerationMethod:
-        return cls.positive
-
-    @classmethod
-    def all(cls) -> list[DataGenerationMethod]:
-        return list(DataGenerationMethod)
-
-    def as_short_name(self) -> str:
-        return {
-            DataGenerationMethod.positive: "P",
-            DataGenerationMethod.negative: "N",
-        }[self]
-
-    @property
-    def is_negative(self) -> bool:
-        return self == DataGenerationMethod.negative
-
-    @classmethod
-    def ensure_list(cls, value: DataGenerationMethodInput) -> list[DataGenerationMethod]:
-        if isinstance(value, DataGenerationMethod):
-            return [value]
-        return list(value)
-
-
-DataGenerationMethodInput = Union[DataGenerationMethod, Iterable[DataGenerationMethod]]
 
 DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
 

@@ -128,7 +128,7 @@ def _apply_schema_patches_extension(extension: SchemaPatchesExtension, schema: B
 
 
 def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[st.SearchStrategy, Exception]:
-    from ..utils import combine_strategies
+    from ..generation import combine_strategies
 
     strategies = []
     for definition in definitions:

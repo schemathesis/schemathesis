@@ -50,6 +50,7 @@ from .generation import (
     DataGenerationMethod,
     DataGenerationMethodInput,
     GenerationConfig,
+    combine_strategies,
 )
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .internal.deprecation import warn_filtration_arguments
@@ -69,7 +70,7 @@ from .types import (
     PathParameters,
     Query,
 )
-from .utils import PARAMETRIZE_MARKER, GivenInput, combine_strategies, given_proxy
+from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
 if TYPE_CHECKING:
     from .transports import Transport

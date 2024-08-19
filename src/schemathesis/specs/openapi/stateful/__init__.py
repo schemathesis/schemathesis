@@ -8,11 +8,10 @@ from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from ....constants import NOT_SET
-from ....generation import DataGenerationMethod
+from ....generation import DataGenerationMethod, combine_strategies
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from ....types import NotSet
-from ....utils import combine_strategies
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
