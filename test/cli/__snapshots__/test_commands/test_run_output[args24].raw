@@ -213,7 +213,7 @@ Generic:
   --no-color                      Disable ANSI color escape codes.
   --force-color                   Explicitly tells to enable ANSI color escape
                                   codes.
-  --experimental [openapi-3.1|schema-analysis|stateful-test-runner|stateful-only]
+  --experimental [openapi-3.1|schema-analysis|stateful-test-runner|stateful-only|coverage-phase]
                                   Enable experimental support for specific
                                   features.
   --output-truncate TEXT          Specifies whether to truncate schemas and

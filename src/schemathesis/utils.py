@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import functools
-import operator
 from contextlib import contextmanager
 from inspect import getfullargspec
 from pathlib import Path
@@ -14,7 +13,6 @@ from typing import (
 )
 
 import pytest
-from hypothesis import strategies as st
 from hypothesis.core import is_invalid_test
 from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
@@ -147,14 +145,6 @@ def compose(*functions: Callable) -> Callable:
         return x
 
     return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
-
-
-def combine_strategies(strategies: list[st.SearchStrategy]) -> st.SearchStrategy:
-    """Combine a list of strategies into a single one.
-
-    If the input is `[a, b, c]`, then the result is equivalent to `a | b | c`.
-    """
-    return functools.reduce(operator.or_, strategies[1:], strategies[0])
 
 
 def skip(operation_name: str) -> NoReturn:

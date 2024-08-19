@@ -11,8 +11,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis._hypothesis import get_single_example
-from schemathesis.generation import GenerationConfig
+from schemathesis.generation import GenerationConfig, get_single_example
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (

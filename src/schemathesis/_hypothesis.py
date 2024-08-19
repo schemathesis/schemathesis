@@ -8,21 +8,21 @@ from typing import Any, Callable, Generator, Mapping, Optional, Tuple
 
 import hypothesis
 from hypothesis import Phase
-from hypothesis import strategies as st
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from hypothesis.internal.reflection import proxies
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
-from .constants import DEFAULT_DEADLINE
+from .constants import DEFAULT_DEADLINE, NOT_SET
 from .exceptions import OperationSchemaError, SerializationNotPossible
-from .generation import DataGenerationMethod, GenerationConfig
+from .experimental import COVERAGE_PHASE
+from .generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
-from .utils import GivenInput, combine_strategies
+from .utils import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initilize it
 # if e.g. Schemathesis CLI is used with multiple workers
@@ -101,6 +101,8 @@ def create_test(
             wrapped_test = add_examples(
                 wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
             )
+            if COVERAGE_PHASE.is_enabled:
+                wrapped_test = add_coverage(wrapped_test, operation, data_generation_methods)
     return wrapped_test
 
 
@@ -199,6 +201,55 @@ def add_examples(
     return test
 
 
+def add_coverage(
+    test: Callable, operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
+) -> Callable:
+    for example in _iter_coverage_cases(operation, data_generation_methods):
+        test = hypothesis.example(case=example)(test)
+    return test
+
+
+def _iter_coverage_cases(
+    operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
+) -> Generator[Case, None, None]:
+    from .specs.openapi.constants import LOCATION_TO_CONTAINER
+
+    ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
+    generators: dict[tuple[str, str], Generator] = {}
+    template: dict[str, Any] = {}
+    for parameter in operation.iter_parameters():
+        schema = parameter.as_json_schema(operation)
+        gen = coverage.cover_schema_iter(ctx, schema)
+        value = next(gen, NOT_SET)
+        if value is NOT_SET:
+            continue
+        location = parameter.location
+        name = parameter.name
+        container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
+        container[name] = value
+        generators[(location, name)] = gen
+    if operation.body:
+        for body in operation.body:
+            schema = body.as_json_schema(operation)
+            gen = coverage.cover_schema_iter(ctx, schema)
+            value = next(gen, NOT_SET)
+            if value is NOT_SET:
+                continue
+            if "body" not in template:
+                template["body"] = value
+                template["media_type"] = body.media_type
+            yield operation.make_case(**{**template, "body": value, "media_type": body.media_type})
+            for next_value in gen:
+                yield operation.make_case(**{**template, "body": next_value, "media_type": body.media_type})
+    else:
+        yield operation.make_case(**template)
+    for (location, name), gen in generators.items():
+        container_name = LOCATION_TO_CONTAINER[location]
+        container = template[container_name]
+        for value in gen:
+            yield operation.make_case(**{**template, container_name: {**container, name: value}})
+
+
 def find_invalid_headers(headers: Mapping) -> Generator[Tuple[str, str], None, None]:
     for name, value in headers.items():
         if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
@@ -248,25 +299,3 @@ def get_invalid_example_headers_mark(test: Callable) -> Optional[dict[str, str]]
 
 def add_invalid_example_header_mark(test: Callable, headers: dict[str, str]) -> None:
     test._schemathesis_invalid_example_headers = headers  # type: ignore
-
-
-def get_single_example(strategy: st.SearchStrategy[Case]) -> Case:
-    examples: list[Case] = []
-    add_single_example(strategy, examples)
-    return examples[0]
-
-
-def add_single_example(strategy: st.SearchStrategy[Case], examples: list[Case]) -> None:
-    @hypothesis.given(strategy)  # type: ignore
-    @hypothesis.settings(  # type: ignore
-        database=None,
-        max_examples=1,
-        deadline=None,
-        verbosity=hypothesis.Verbosity.quiet,
-        phases=(hypothesis.Phase.generate,),
-        suppress_health_check=list(hypothesis.HealthCheck),
-    )
-    def example_generating_inner_function(ex: Case) -> None:
-        examples.append(ex)
-
-    example_generating_inner_function()

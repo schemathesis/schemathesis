@@ -10,11 +10,13 @@ from hypothesis import HealthCheck, Phase, Verbosity
 from jsonschema import RefResolutionError
 
 import schemathesis
+from schemathesis._hypothesis import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, SchemaError, UsageError, format_exception
 from schemathesis.extra._flask import run_server
-from schemathesis.internal.result import Err
+from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.internal.result import Err, Ok
 from schemathesis.models import Status
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.serialization import SerializedError
@@ -142,6 +144,11 @@ def test_corpus(corpus, filename, app_port):
         assert SCHEMATHESIS_IO_URL, "SCHEMATHESIS_IO_URL is not set"
         assert SCHEMATHESIS_IO_TOKEN, "SCHEMATHESIS_IO_TOKEN is not set"
         service_client = ServiceClient(base_url=SCHEMATHESIS_IO_URL, token=SCHEMATHESIS_IO_TOKEN)
+    methods = DataGenerationMethod.all()
+    for operation in schema.get_all_operations():
+        if isinstance(operation, Ok):
+            for _ in _iter_coverage_cases(operation.ok(), methods):
+                pass
     runner = from_schema(
         schema,
         checks=(combined_check,),
