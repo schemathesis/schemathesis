@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.34.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Not using the proper session in the ``ignored_auth`` check. :issue:`2409`
+
 .. _v3.34.1:
 
 :version:`3.34.1 <v3.34.0...v3.34.1>` - 2024-08-20
