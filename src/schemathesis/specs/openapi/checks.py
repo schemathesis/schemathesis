@@ -348,7 +348,8 @@ def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
             # If there is auth in the request, then drop it and retry the call
             request = _remove_auth_from_request(response.request, security_parameters)
             response.request = request
-            new_response = Session().send(request)
+            session = getattr(response, "_session", None) or Session()
+            new_response = session.send(request)
             if new_response.ok:
                 # Mutate the response object in place on the best effort basis
                 for attribute in new_response.__attrs__:

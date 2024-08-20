@@ -1,9 +1,13 @@
 import json
+import sys
 from base64 import b64decode
 
 import pytest
 import requests
-from hypothesis import settings
+from fastapi import FastAPI, Security
+from fastapi.security import APIKeyHeader
+from hypothesis import given, settings
+from starlette_testclient import TestClient
 
 import schemathesis
 from schemathesis.generation import GenerationConfig
@@ -107,3 +111,26 @@ def test_remove_auth_from_case(schema_url, key, parameters):
     case = schema["/success"]["GET"].make_case(**{key: {"A": "V"}})
     _remove_auth_from_case(case, parameters)
     assert not getattr(case, key)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
+def test_proper_session():
+    from typing import Annotated
+
+    app = FastAPI()
+
+    @app.get("/", responses={200: {"model": {}}, 403: {"model": {}}})
+    def root(api_key: Annotated[str, Security(APIKeyHeader(name="x-api-key"))]):
+        return {"message": "Hello world"}
+
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    schema = schemathesis.from_asgi("/openapi.json", app)
+
+    @given(case=schema["/"]["GET"].as_strategy())
+    @settings(max_examples=10)
+    def test(case):
+        client = TestClient(app)
+        case.call_and_validate(session=client)
+
+    test()
