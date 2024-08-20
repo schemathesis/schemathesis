@@ -192,6 +192,7 @@ class RequestsTransport:
                 context=failures.RequestTimeout(message=message, timeout=timeout),
             ) from None
         response.verify = verify  # type: ignore[attr-defined]
+        response._session = session  # type: ignore[attr-defined]
         if close_session:
             session.close()
         return response
