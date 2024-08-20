@@ -13,12 +13,7 @@ import schemathesis
 from schemathesis.generation import GenerationConfig
 from schemathesis.models import Status
 from schemathesis.runner import from_schema
-from schemathesis.specs.openapi.checks import (
-    _contains_auth,
-    _remove_auth_from_case,
-    _remove_auth_from_request,
-    ignored_auth,
-)
+from schemathesis.specs.openapi.checks import _contains_auth, _remove_auth_from_case, ignored_auth
 
 
 def run(schema_url, headers=None, **loader_kwargs):
@@ -79,25 +74,6 @@ def test_contains_auth(request_kwargs, parameters, expected):
 
 
 @pytest.mark.parametrize(
-    "request_kwargs, parameters",
-    (
-        ({"url": "https://example.com", "headers": {"A": "V"}}, [{"name": "A", "in": "header"}]),
-        ({"url": "https://example.com?A=V"}, [{"name": "A", "in": "query"}]),
-        ({"url": "https://example.com", "cookies": {"A": "V"}}, [{"name": "A", "in": "cookie"}]),
-        ({"url": "https://example.com", "cookies": {"A": "V", "B": "C"}}, [{"name": "A", "in": "cookie"}]),
-    ),
-)
-def test_remove_auth_from_request(request_kwargs, parameters):
-    request = requests.Request("GET", **request_kwargs).prepare()
-    new_request = _remove_auth_from_request(request, parameters)
-    assert not _contains_auth(new_request, parameters)
-    if "cookies" in request_kwargs:
-        for name, value in request_kwargs["cookies"].items():
-            if name != "A":
-                assert new_request._cookies[name] == value
-
-
-@pytest.mark.parametrize(
     "key, parameters",
     (
         ("headers", [{"name": "A", "in": "header"}]),
@@ -134,3 +110,18 @@ def test_proper_session():
         case.call_and_validate(session=client)
 
     test()
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("ignored_auth")
+def test_wsgi(wsgi_app_schema):
+    _, _, _, _, _, _, event, *_ = from_schema(
+        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1)
+    ).execute()
+    check = event.result.checks[-1]
+    assert check.value == Status.failure
+    assert check.name == "ignored_auth"
+    # And the corresponding serialized case has no auth
+    assert "Authorization" not in check.request.headers
+    # And the reported response is the last one from the app
+    assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
