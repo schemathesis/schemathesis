@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Not using the proper session in the ``ignored_auth`` check. :issue:`2409`
+- WSGI support for ``ignored_auth``.
 
 .. _v3.34.1:
 

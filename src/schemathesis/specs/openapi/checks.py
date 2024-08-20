@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
-from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
+from urllib.parse import parse_qs, urlparse
 
 from ... import failures
 from ...exceptions import (
@@ -334,8 +334,6 @@ def ensure_resource_availability(response: GenericResponse, original: Case) -> b
 
 def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
-    from requests import Session
-
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -346,15 +344,15 @@ def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
     if security_parameters and 200 <= response.status_code < 300:
         if _contains_auth(response.request, security_parameters):
             # If there is auth in the request, then drop it and retry the call
-            request = _remove_auth_from_request(response.request, security_parameters)
-            response.request = request
-            session = getattr(response, "_session", None) or Session()
-            new_response = session.send(request)
-            if new_response.ok:
+            _remove_auth_from_case(case, security_parameters)
+            new_response = case.operation.schema.transport.send(case)
+            if 200 <= new_response.status_code < 300:
                 # Mutate the response object in place on the best effort basis
-                for attribute in new_response.__attrs__:
-                    setattr(response, attribute, getattr(new_response, attribute))
-                _remove_auth_from_case(case, security_parameters)
+                if hasattr(response, "__attrs__"):
+                    for attribute in new_response.__attrs__:
+                        setattr(response, attribute, getattr(new_response, attribute))
+                else:
+                    response.__dict__.update(new_response.__dict__)
                 _raise_auth_error(new_response, case.operation.verbose_name)
         else:
             # Successful response when there is no auth
@@ -416,40 +414,6 @@ def _contains_auth(request: PreparedRequest, security_parameters: list[SecurityP
             return True
 
     return False
-
-
-def _remove_auth_from_request(
-    request: PreparedRequest, security_parameters: list[SecurityParameter]
-) -> PreparedRequest:
-    """Remove security parameters from a request."""
-    from requests.cookies import get_cookie_header
-
-    request = request.copy()
-    parsed = urlparse(request.url)
-    query = parse_qs(parsed.query)  # type: ignore
-    should_replace_url = False
-
-    for parameter in security_parameters:
-        name = parameter["name"]
-        if parameter["in"] == "header":
-            request.headers.pop(name, None)
-        if parameter["in"] == "query":
-            query.pop(name, None)
-            should_replace_url = True
-        if parameter["in"] == "cookie":
-            del request._cookies[name]  # type: ignore
-
-    if should_replace_url:
-        components = [parsed.scheme, parsed.netloc, parsed.path, parsed.params, urlencode(query), parsed.fragment]
-        url = cast(str, urlunparse(components))  # type: ignore
-        request.url = url
-    # Re-generate the `Cookie` header if needed
-    raw_cookie = request.headers.pop("Cookie", None)
-    if raw_cookie is not None:
-        new_cookie_header = get_cookie_header(request._cookies, request)  # type: ignore
-        if new_cookie_header:
-            request.headers["Cookie"] = new_cookie_header
-    return request
 
 
 def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParameter]) -> None:
