@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.34.2...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Adjust the distribution of negative test cases in stateful tests so they are less likely to occur for starting transitions.
+
 .. _v3.34.2:
 
 :version:`3.34.2 <v3.34.1...v3.34.2>` - 2024-08-20

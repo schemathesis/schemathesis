@@ -8,6 +8,7 @@ from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from ....constants import NOT_SET
+from ....generation import DataGenerationMethod
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from ....types import NotSet
@@ -41,6 +42,10 @@ class OpenAPIStateMachine(APIStateMachine):
     @classmethod
     def format_rules(cls) -> str:
         return "\n".join(item.line for item in cls._transition_stats_template.iter_with_format())
+
+
+# The proportion of negative tests generated for "root" transitions
+NEGATIVE_TEST_CASES_THRESHOLD = 20
 
 
 def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
@@ -111,12 +116,24 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
             name = _normalize_name(f"{target.verbose_name} -> X")
-            case_strategy = combine_strategies(
-                [
-                    target.as_strategy(data_generation_method=data_generation_method)
-                    for data_generation_method in schema.data_generation_methods
-                ]
-            )
+            if len(schema.data_generation_methods) == 1:
+                case_strategy = target.as_strategy(data_generation_method=schema.data_generation_methods[0])
+            else:
+                strategies = {
+                    method: target.as_strategy(data_generation_method=method)
+                    for method in schema.data_generation_methods
+                }
+
+                @st.composite  # type: ignore[misc]
+                def case_strategy_factory(
+                    draw: st.DrawFn, strategies: dict[DataGenerationMethod, st.SearchStrategy] = strategies
+                ) -> Case:
+                    if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
+                        return draw(strategies[DataGenerationMethod.negative])
+                    return draw(strategies[DataGenerationMethod.positive])
+
+                case_strategy = case_strategy_factory()
+
             rules[name] = precondition(ensure_links_followed)(
                 transition(
                     name=name,
