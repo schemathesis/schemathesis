@@ -201,6 +201,8 @@ def app_factory(empty_open_api_3_schema):
         if config.slowdown:
             time.sleep(config.slowdown)
         data = request.get_json()
+        if not isinstance(data, dict):
+            return jsonify({"error": "Invalid input"}), 400
         name = data.get("name")
         expect_custom_headers()
         if name is None:
@@ -325,9 +327,9 @@ def app_factory(empty_open_api_3_schema):
 
 @pytest.fixture
 def runner_factory(app_factory):
-    def _runner_factory(app_kwargs=None, config_kwargs=None):
+    def _runner_factory(*, app_kwargs=None, config_kwargs=None, loader_kwargs=None):
         app = app_factory(**(app_kwargs or {}))
-        schema = schemathesis.from_wsgi("/openapi.json", app=app)
+        schema = schemathesis.from_wsgi("/openapi.json", app=app, **(loader_kwargs or {}))
         state_machine = schema.as_state_machine()
         config_kwargs = config_kwargs or {}
         config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))

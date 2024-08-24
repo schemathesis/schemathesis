@@ -10,6 +10,7 @@ import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.extra._flask import run_server
+from schemathesis.generation import DataGenerationMethod
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
@@ -644,3 +645,15 @@ def test_new_resource_is_not_available(runner_factory):
     # Then it is a failure
     assert result.events[-1].status == events.RunStatus.FAILURE
     assert result.failures[0].message == "Resource is not available after creation"
+
+
+def test_negative_tests(runner_factory):
+    runner = runner_factory(
+        app_kwargs={"independent_500": True},
+        config_kwargs={
+            "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
+        },
+        loader_kwargs={"data_generation_methods": DataGenerationMethod.all()},
+    )
+    result = collect_result(runner)
+    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
