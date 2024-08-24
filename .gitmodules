@@ -1,3 +1,0 @@
-[submodule "test-corpus/openapi-directory"]
-	path = test-corpus/openapi-directory
-	url = https://github.com/APIs-guru/openapi-directory.git
