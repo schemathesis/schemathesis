@@ -1,8 +1,4 @@
 <p align="center">
-    <em>Schemathesis: Supercharge your API testing, catch bugs, and ensure compliance</em>
-</p>
-
-<p align="center">
     <a href="https://github.com/schemathesis/schemathesis/actions" target="_blank">
         <img src="https://github.com/schemathesis/schemathesis/actions/workflows/build.yml/badge.svg" alt="Build">
     </a>
@@ -18,22 +14,17 @@
     <a href="https://discord.gg/R9ASRAmHnA" target="_blank">
         <img src="https://img.shields.io/discord/938139740912369755" alt="Discord">
     </a>
+    <a href="[https://discord.gg/R9ASRAmHnA](https://schemathesis.readthedocs.io/en/stable/)" target="_blank">
+        <img src="https://readthedocs.org/projects/schemathesis/badge/?version=stable" alt="Documentation">
+    </a>
     <a href="https://opensource.org/licenses/MIT" target="_blank">
         <img src="https://img.shields.io/pypi/l/schemathesis.svg" alt="License">
     </a>
 </p>
 
----
+## Schemathesis
 
-**Documentation**: <a href="https://schemathesis.readthedocs.io/en/stable/" target="_blank">https://schemathesis.readthedocs.io/en/stable/ </a>
-
-**Chat**: <a href="https://discord.gg/R9ASRAmHnA" target="_blank">https://discord.gg/R9ASRAmHnA </a>
-
----
-
-## What is Schemathesis?
-
-Schemathesis is a tool that levels-up your API testing by automating the process of finding crashes, uncovering bugs, and validating spec compliance. With Schemathesis, you can:
+Schemathesis is a tool that levels up your API testing by automating the process of finding crashes, uncovering bugs, and validating spec compliance. With Schemathesis, you can:
 
 🎯 **Catch Hard-to-Find Bugs**
 
@@ -242,11 +233,12 @@ Schemathesis is built on top of <a href="https://hypothesis.works/" target="_bla
 
 ## Who's Using Schemathesis?
 
-Schemathesis is used by a number of project and companies, including direct usage or integration into other tools:
+Schemathesis is used by a number of projects and companies, including direct usage or integration into other tools:
 
 - Abstract Machines ([Magistrala](https://github.com/absmach/magistrala))
 - Bundesstelle für Open Data ([smard-api](https://github.com/bundesAPI/smard-api))
 - [CheckMK](https://github.com/Checkmk/checkmk)
+- [Chronosphere.io](https://github.com/chronosphereio/calyptia-api)
 - HXSecurity ([DongTai](https://github.com/HXSecurity/DongTai))
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Pixie](https://github.com/pixie-io/pixie)
