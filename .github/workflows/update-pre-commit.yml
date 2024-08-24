@@ -15,8 +15,9 @@ jobs:
           fetch-depth: 1
           submodules: true
 
-      - run: pip install pre-commit
-      - run: pre-commit autoupdate
+      - uses: hynek/setup-cached-uv@v2
+
+      - run: uvx pre-commit autoupdate
 
       - name: Open pull request
         uses: peter-evans/create-pull-request@v6

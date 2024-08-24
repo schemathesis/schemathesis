@@ -34,8 +34,9 @@ jobs:
         with:
           python-version: 3.11
 
-      - run: pip install pre-commit
-      - run: pre-commit run --all-files
+      - uses: hynek/setup-cached-uv@v2
+
+      - run: uvx pre-commit run --all-files
 
   docs:
     name: Documentation
@@ -71,13 +72,13 @@ jobs:
         with:
           python-version: ${{ matrix.python }}
 
-      - run: pip install tox tox-gh-actions
+      - uses: hynek/setup-cached-uv@v2
 
       - if: ${{ matrix.tox_env }}
-        run: python -m tox -e ${{ matrix.tox_env }}
+        run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox -e ${{ matrix.tox_env }}
 
       - if: ${{ !matrix.tox_env }}
-        run: python -m tox
+        run: uvx --with="tox" --with="tox-gh-actions" --with="tox-uv" tox
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4.5.0
@@ -101,9 +102,11 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install ".[dev]"
+      - uses: hynek/setup-cached-uv@v2
 
-      - run: st run /openapi.json --app=cp1252_app:app -c custom_check > out.txt || true
+      - run: uv tool install ".[dev]"
+
+      - run: uv tool run schemathesis run /openapi.json --app=cp1252_app:app -c custom_check > out.txt || true
         working-directory: ./test/apps
         env:
           SCHEMATHESIS_HOOKS: hooks

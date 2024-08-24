@@ -17,11 +17,10 @@ jobs:
           # Python 3.12 for flamegraph support
           python-version: "3.12"
 
-      - name: Install dependencies
-        run: pip install ".[bench]"
+      - uses: hynek/setup-cached-uv@v2
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
-          run: pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
+          run: uvx --from=".[bench]" pytest benches/* --codspeed -p no:schemathesis -p no:hypothesispytest -p no:subtests -p no:anyio
