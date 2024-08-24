@@ -19,5 +19,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - run: pip install ".[tests]"
-      - run: pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
+      - uses: hynek/setup-cached-uv@v2
+
+      - run: uvx --from=".[tests]" pytest -m hypothesis -m hypothesis_nested --hypothesis-profile CI test
