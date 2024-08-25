@@ -374,6 +374,34 @@ Here's a GraphQL example that includes all queries:
 In these examples, the ``filter_operations`` hook skips all ``POST`` methods in Open API and all mutations in GraphQL.
 You can implement any custom logic within the ``filter_operations`` function to include or exclude specific API operations.
 
+Extending CLI
+~~~~~~~~~~~~~
+
+This example demonstrates how to add a custom CLI option and an event handler that uses it:
+
+.. code:: python
+
+    from schemathesis import cli, runner
+
+
+    cli.add_option("--custom-counter", type=int)
+
+
+    @cli.handler()
+    class EventCounter(cli.EventHandler):
+        def __init__(self, *args, **params):
+            self.counter = params["custom_counter"] or 0
+
+        def handle_event(self, context, event) -> None:
+            self.counter += 1
+            if isinstance(event, runner.events.Finished):
+                context.add_summary_line(
+                    f"Counter: {self.counter}",
+                )
+
+The ``--custom-counter`` CLI option sets the initial value for the ``EventCounter`` handler. 
+The handler increments the counter for each event and adds a summary line with the final count when the test run finishes.
+
 ``before_process_path``
 ~~~~~~~~~~~~~~~~~~~~~~~
 

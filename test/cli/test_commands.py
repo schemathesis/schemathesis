@@ -2163,6 +2163,7 @@ def assert_exit_code(event_stream, code):
     with pytest.raises(SystemExit) as exc:
         execute(
             event_stream,
+            ctx=None,
             hypothesis_settings=hypothesis.settings(),
             workers_num=1,
             rate_limit=None,
@@ -2775,3 +2776,40 @@ def test_unknown_schema_error(mocker, schema_url, cli, snapshot_cli):
     # schema issue
     mocker.patch("hypothesis_jsonschema._from_schema.canonicalish", side_effect=AssertionError("Something bad happen"))
     assert cli.run(schema_url) == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("success")
+def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
+    module = testdir.make_importable_pyfile(
+        hook=r"""
+    from schemathesis import cli, runner
+
+
+    cli.add_option("--custom-counter", type=int)
+
+
+    @cli.handler()
+    class EventCounter(cli.EventHandler):
+        def __init__(self, *args, **params):
+            self.counter = params["custom_counter"] or 0
+
+        def handle_event(self, context, event) -> None:
+            self.counter += 1
+            if isinstance(event, runner.events.Finished):
+                context.add_summary_line(
+                    f"Counter: {self.counter}",
+                )
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            schema_url,
+            "--custom-counter=42",
+            "--dry-run",
+            "--hypothesis-max-examples=1",
+            hooks=module.purebasename,
+        )
+        == snapshot_cli
+    )
