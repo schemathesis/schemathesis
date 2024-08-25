@@ -28,7 +28,7 @@ from syrupy.types import PropertyFilter, PropertyMatcher
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
-from schemathesis.cli import reset_checks
+from schemathesis.cli import reset_checks, CUSTOM_HANDLERS
 from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
@@ -66,12 +66,14 @@ def setup(tmp_path_factory):
 @pytest.fixture(autouse=True)
 def reset_hooks():
     GLOBAL_EXPERIMENTS.disable_all()
+    CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()
     media_types.unregister_all()
     yield
     GLOBAL_EXPERIMENTS.disable_all()
+    CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     reset_checks()

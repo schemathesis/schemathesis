@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..runner import events
@@ -8,6 +8,9 @@ if TYPE_CHECKING:
 
 
 class EventHandler:
+    def __init__(self, *args: Any, **params: Any) -> None:
+        pass
+
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         raise NotImplementedError
 

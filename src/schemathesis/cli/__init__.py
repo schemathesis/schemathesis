@@ -11,7 +11,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, Type, cast
 from urllib.parse import urlparse
 
 import click
@@ -55,6 +55,7 @@ from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
+from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, OptionalInt
 from .sanitization import SanitizationHandler
@@ -66,13 +67,13 @@ if TYPE_CHECKING:
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..specs.graphql.schemas import GraphQLSchema
-    from .handlers import EventHandler
 
 
 def _get_callable_names(items: tuple[Callable, ...]) -> tuple[str, ...]:
     return tuple(item.__name__ for item in items)
 
 
+CUSTOM_HANDLERS: list[Type[EventHandler]] = []
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
@@ -928,6 +929,7 @@ def run(
     schemathesis_io_telemetry: bool = True,
     hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
     force_color: bool = False,
+    **__kwargs,
 ) -> None:
     """Run tests against an API using a specified SCHEMA.
 
@@ -1213,6 +1215,7 @@ def run(
     )
     execute(
         event_stream,
+        ctx=ctx,
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
@@ -1596,6 +1599,7 @@ class OutputStyle(Enum):
 def execute(
     event_stream: Generator[events.ExecutionEvent, None, None],
     *,
+    ctx: click.Context,
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
     rate_limit: str | None,
@@ -1670,6 +1674,8 @@ def execute(
                 cassette_path, format=cassette_format, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes
             )
         )
+    for custom_handler in CUSTOM_HANDLERS:
+        handlers.append(custom_handler(*ctx.args, **ctx.params))
     handlers.append(get_output_handler(workers_num))
     if sanitize_output:
         handlers.insert(0, SanitizationHandler())
@@ -1999,6 +2005,20 @@ def decide_color_output(ctx: click.Context, no_color: bool, force_color: bool) -
         ctx.color = True
     elif no_color or "NO_COLOR" in os.environ:
         ctx.color = False
+
+
+def add_option(*args: Any, cls: Type = click.Option, **kwargs: Any) -> None:
+    """Add a new CLI option to `st run`."""
+    run.params.append(cls(args, **kwargs))
+
+
+def handler() -> Callable[[Type], None]:
+    """Register a new CLI event handler."""
+
+    def _wrapper(cls: Type) -> None:
+        CUSTOM_HANDLERS.append(cls)
+
+    return _wrapper
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])

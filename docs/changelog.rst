@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - **EXPERIMENTAL**: New "coverage" phase in the test runner. It aims to explicitly cover common test scenarios like missing required properties, incorrect types, etc. Enable it with ``--experimental=coverage-phase``
+- Extending CLI with custom options and CLI handlers via hooks.
 
 .. _v3.34.3:
 
