@@ -850,6 +850,10 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_application_logs(context, event)
     display_analysis(context)
     display_statistic(context, event)
+    if context.summary_lines:
+        click.echo()
+        for line in context.summary_lines:
+            click.echo(line)
     click.echo()
     display_summary(event)
 
