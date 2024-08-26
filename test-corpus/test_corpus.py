@@ -125,15 +125,8 @@ def combined_check(response, case):
             pass
 
 
-def test_corpus(corpus, filename, app_port):
-    if filename in SLOW:
-        pytest.skip("Data generation is extremely slow for this schema")
-    raw_content = CORPUS_FILES[corpus].extractfile(filename)
-    raw_schema = json_loads(raw_content.read())
-    try:
-        schema = loaders.from_dict(raw_schema, validate_schema=False, base_url=f"http://127.0.0.1:{app_port}/")
-    except SchemaError as exc:
-        assert_invalid_schema(exc)
+def test_default(corpus, filename, app_port):
+    schema = _load_schema(corpus, filename, app_port)
     try:
         schema.as_state_machine()()
     except (RefResolutionError, UsageError, SchemaError):
@@ -144,11 +137,6 @@ def test_corpus(corpus, filename, app_port):
         assert SCHEMATHESIS_IO_URL, "SCHEMATHESIS_IO_URL is not set"
         assert SCHEMATHESIS_IO_TOKEN, "SCHEMATHESIS_IO_TOKEN is not set"
         service_client = ServiceClient(base_url=SCHEMATHESIS_IO_URL, token=SCHEMATHESIS_IO_TOKEN)
-    methods = DataGenerationMethod.all()
-    for operation in schema.get_all_operations():
-        if isinstance(operation, Ok):
-            for _ in _iter_coverage_cases(operation.ok(), methods):
-                pass
     runner = from_schema(
         schema,
         checks=(combined_check,),
@@ -168,6 +156,30 @@ def test_corpus(corpus, filename, app_port):
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
         assert_event(filename, event)
+
+
+def test_coverage_phase(corpus, filename):
+    schema = _load_schema(corpus, filename)
+    methods = DataGenerationMethod.all()
+    for operation in schema.get_all_operations():
+        if isinstance(operation, Ok):
+            for _ in _iter_coverage_cases(operation.ok(), methods):
+                pass
+
+
+def _load_schema(corpus, filename, app_port=None):
+    if filename in SLOW:
+        pytest.skip("Data generation is extremely slow for this schema")
+    raw_content = CORPUS_FILES[corpus].extractfile(filename)
+    raw_schema = json_loads(raw_content.read())
+    try:
+        return loaders.from_dict(
+            raw_schema,
+            validate_schema=False,
+            base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None,
+        )
+    except SchemaError as exc:
+        assert_invalid_schema(exc)
 
 
 def assert_invalid_schema(exc: SchemaError) -> NoReturn:
