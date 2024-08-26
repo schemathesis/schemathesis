@@ -122,16 +122,16 @@ def _cover_positive_for_type(
         elif ty is not None:
             if ty == "null":
                 yield PositiveValue(None)
-            if ty == "boolean":
+            elif ty == "boolean":
                 yield PositiveValue(True)
                 yield PositiveValue(False)
-            if ty == "string":
+            elif ty == "string":
                 yield from _positive_string(ctx, schema)
-            if ty == "integer" or ty == "number":
+            elif ty == "integer" or ty == "number":
                 yield from _positive_number(ctx, schema)
-            if ty == "array":
+            elif ty == "array":
                 yield from _positive_array(ctx, schema, cast(list, template))
-            if ty == "object":
+            elif ty == "object":
                 yield from _positive_object(ctx, schema, cast(dict, template))
 
 
