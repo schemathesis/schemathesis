@@ -1,5 +1,6 @@
 import json
 import re
+from unittest.mock import ANY
 
 import jsonschema
 import pytest
@@ -45,7 +46,7 @@ def assert_not_conform(values: list, schema: dict):
                 format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
             )
             raise ValueError(f"Value {entry} conforms to {schema}")
-        except jsonschema.ValidationError:
+        except (jsonschema.ValidationError, ValueError):
             pass
 
 
@@ -145,6 +146,7 @@ class NotNumber:
         ({"const": 42}, None),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
         ({"format": "date-time"}, AnyString()),
+        ({"format": "hostname"}, AnyString()),
         ({"format": "unknown"}, AnyString()),
         ({"uniqueItems": True}, [None, None]),
         ({"maximum": 5}, 6),
@@ -192,6 +194,7 @@ def test_positive_string(ctx, schema, lengths):
         ({"type": "string", "maxLength": 10}, [0, "00000000000"]),
         ({"type": "string", "minLength": 5, "maxLength": 10}, [0, "0000", "00000000000"]),
         ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, ""]),
+        ({"type": "string", "pattern": "^[0-9]"}, [0, ""]),
         ({"type": "string", "format": "date-time"}, [0, ""]),
     ),
 )
@@ -236,6 +239,50 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     "schema, expected",
     (
         ({"type": "object"}, [{}]),
+        (
+            {
+                "type": "object",
+                "properties": {"foo": True},
+                "required": ["foo"],
+            },
+            [
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+                {"foo": ANY},
+            ],
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["foo"],
+                "properties": {
+                    "foo": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "required": ["bar"],
+                            "properties": {
+                                "bar": {
+                                    "allOf": [
+                                        {
+                                            "type": "string",
+                                            "pattern": "^[-._\\p{L}\\p{N}]+$",
+                                        },
+                                        {
+                                            "minLength": 1,
+                                            "maxLength": 100,
+                                        },
+                                    ]
+                                },
+                            },
+                        },
+                    }
+                },
+            },
+            [],
+        ),
         (
             {
                 "type": "object",
@@ -398,7 +445,8 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 ]
             },
             [5, 6, 10, 9],
-        ),  # Single allOf subschema
+        ),
+        # Single allOf subschema
         ({"allOf": [{"type": "integer"}]}, [0]),
         ({"allOf": [{"type": "boolean"}]}, [True, False]),
         # Multiple allOf subschemas
@@ -470,6 +518,25 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 "exclusiveMinimum": 5,
             },
             [6, 7, 10, 9],
+        ),
+        # Unsatisfiable allOf
+        (
+            {
+                "allOf": [
+                    {"type": "string", "pattern": "^\\p{Alnum}$"},
+                    {"maxLength": 160},
+                ]
+            },
+            [],
+        ),
+        (
+            {
+                "allOf": [
+                    {"type": "string", "pattern": 0.0},
+                    {"maxLength": 160},
+                ]
+            },
+            [],
         ),
     ),
 )
@@ -580,6 +647,34 @@ def test_negative_objects(nctx, schema, expected):
                 ],
             },
             [4, 0],
+        ),
+        (
+            {
+                "allOf": [
+                    {
+                        "maxLength": 10,
+                        "type": "string",
+                    },
+                    {
+                        "anyOf": [
+                            {
+                                "maxLength": 10,
+                            },
+                            {"type": "null"},
+                        ]
+                    },
+                ]
+            },
+            [ANY, None, 0],
+        ),
+        (
+            {
+                "allOf": [
+                    {"type": "string", "pattern": 0.0},
+                    {"maxLength": 160},
+                ]
+            },
+            [],
         ),
     ),
 )

@@ -4,15 +4,12 @@ on:
   schedule:
     # Every day at 00:00
     - cron: "0 0 * * *"
-  push:
-    paths:
-      - "test-corpus/openapi-directory"
   workflow_dispatch:
 
 jobs:
 
-  test-corpus:
-    name: Corpus tests
+  corpus-default:
+    name: Default corpus tests
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4.1.7
@@ -26,4 +23,21 @@ jobs:
 
       - uses: hynek/setup-cached-uv@v2
 
-      - run: uvx --from=".[tests]" pytest test-corpus -n auto
+      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_default
+
+  corpus-coverage:
+    name: Corpus tests for the coverage phase
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4.1.7
+        with:
+          fetch-depth: 1
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: hynek/setup-cached-uv@v2
+
+      - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_coverage_phase

@@ -28,7 +28,7 @@ from syrupy.types import PropertyFilter, PropertyMatcher
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
-from schemathesis.cli import reset_checks, CUSTOM_HANDLERS
+from schemathesis.cli import CUSTOM_HANDLERS, reset_checks
 from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
