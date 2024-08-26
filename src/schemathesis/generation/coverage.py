@@ -12,6 +12,8 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
 
+from schemathesis.constants import NOT_SET
+
 from ._hypothesis import combine_strategies, get_single_example
 from ._methods import DataGenerationMethod
 
@@ -27,6 +29,26 @@ OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
 
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
 UNKNOWN_PROPERTY_VALUE = 42
+
+
+@dataclass
+class GeneratedValue:
+    value: Any
+    data_generation_method: DataGenerationMethod
+
+    __slots__ = ("value", "data_generation_method")
+
+    @classmethod
+    def with_positive(cls, value: Any) -> GeneratedValue:
+        return cls(value, DataGenerationMethod.positive)
+
+    @classmethod
+    def with_negative(cls, value: Any) -> GeneratedValue:
+        return cls(value, DataGenerationMethod.negative)
+
+
+PositiveValue = GeneratedValue.with_positive
+NegativeValue = GeneratedValue.with_negative
 
 
 @lru_cache(maxsize=128)
@@ -67,11 +89,9 @@ def _to_hashable_key(value: T) -> T | tuple[type, str]:
     return value
 
 
-def cover_schema(ctx: CoverageContext, schema: dict) -> list:
-    return list(cover_schema_iter(ctx, schema))
-
-
-def _cover_positive_for_type(ctx: CoverageContext, schema: dict, ty: str | None) -> Generator:
+def _cover_positive_for_type(
+    ctx: CoverageContext, schema: dict, ty: str | None
+) -> Generator[GeneratedValue, None, None]:
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty)
         template = ctx.generate_from_schema(template_schema)
@@ -79,8 +99,8 @@ def _cover_positive_for_type(ctx: CoverageContext, schema: dict, ty: str | None)
         template = None
     if DataGenerationMethod.positive in ctx.data_generation_methods:
         ctx = ctx.with_positive()
-        enum = schema.get("enum")
-        const = schema.get("const")
+        enum = schema.get("enum", NOT_SET)
+        const = schema.get("const", NOT_SET)
         for key in ("anyOf", "oneOf"):
             sub_schemas = schema.get(key)
             if sub_schemas is not None:
@@ -94,16 +114,17 @@ def _cover_positive_for_type(ctx: CoverageContext, schema: dict, ty: str | None)
                 with suppress(jsonschema.SchemaError):
                     canonical = canonicalish(schema)
                     yield from cover_schema_iter(ctx, canonical)
-        if enum is not None:
-            yield from enum
-        elif const is not None:
-            yield const
+        if enum is not NOT_SET:
+            for value in enum:
+                yield PositiveValue(value)
+        elif const is not NOT_SET:
+            yield PositiveValue(const)
         elif ty is not None:
             if ty == "null":
-                yield None
+                yield PositiveValue(None)
             if ty == "boolean":
-                yield True
-                yield False
+                yield PositiveValue(True)
+                yield PositiveValue(False)
             if ty == "string":
                 yield from _positive_string(ctx, schema)
             if ty == "integer" or ty == "number":
@@ -135,7 +156,7 @@ def _ignore_unfixable(
             raise
 
 
-def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator:
+def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[GeneratedValue, None, None]:
     if isinstance(schema, bool):
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
@@ -169,23 +190,27 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator:
                     yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
                     next = value + 1
-                    yield next
+                    yield NegativeValue(next)
                     seen.add(next)
                 elif key == "minimum":
                     next = value - 1
-                    yield next
+                    yield NegativeValue(next)
                     seen.add(next)
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and value not in seen:
-                    yield value
+                    yield NegativeValue(value)
                     seen.add(value)
                 elif key == "multipleOf":
                     yield from _negative_multiple_of(ctx, schema, value)
                 elif key == "minLength" and 0 < value < BUFFER_SIZE and "pattern" not in schema:
                     with suppress(InvalidArgument):
-                        yield ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
+                        yield NegativeValue(
+                            ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
+                        )
                 elif key == "maxLength" and value < BUFFER_SIZE and "pattern" not in schema:
                     with suppress(InvalidArgument):
-                        yield ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
+                        yield NegativeValue(
+                            ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
+                        )
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
@@ -193,7 +218,7 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator:
                     yield from _negative_required(ctx, template, value)
                 elif key == "additionalProperties" and not value:
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
-                    yield {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE}
+                    yield NegativeValue({**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE})
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
@@ -225,7 +250,7 @@ def _get_template_schema(schema: dict, ty: str) -> dict:
     return {**schema, "type": ty}
 
 
-def _positive_string(ctx: CoverageContext, schema: dict) -> Generator:
+def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Boundary and near boundary values
     min_length = schema.get("minLength")
@@ -233,25 +258,25 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator:
 
     if not min_length and not max_length:
         # Default positive value
-        yield ctx.generate_from_schema(schema)
+        yield PositiveValue(ctx.generate_from_schema(schema))
 
     seen = set()
 
     if min_length is not None and min_length < BUFFER_SIZE and "pattern" not in schema:
         # Exactly the minimum length
-        yield ctx.generate_from_schema({**schema, "maxLength": min_length})
+        yield PositiveValue(ctx.generate_from_schema({**schema, "maxLength": min_length}))
         seen.add(min_length)
 
         # One character more than minimum if possible
         larger = min_length + 1
         if larger < BUFFER_SIZE and larger not in seen and (not max_length or larger <= max_length):
-            yield ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger}))
             seen.add(larger)
 
     if max_length is not None and "pattern" not in schema:
         # Exactly the maximum length
         if max_length < BUFFER_SIZE and max_length not in seen:
-            yield ctx.generate_from_schema({**schema, "minLength": max_length})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": max_length}))
             seen.add(max_length)
 
         # One character less than maximum if possible
@@ -261,7 +286,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator:
             and smaller not in seen
             and (smaller > 0 and (min_length is None or smaller >= min_length))
         ):
-            yield ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller}))
             seen.add(smaller)
 
 
@@ -273,7 +298,7 @@ def closest_multiple_greater_than(y: int, x: int) -> int:
     return x * (quotient + 1)
 
 
-def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
+def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive integer values."""
     # Boundary and near boundary values
     minimum = schema.get("minimum")
@@ -288,7 +313,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
 
     if not minimum and not maximum:
         # Default positive value
-        yield ctx.generate_from_schema(schema)
+        yield PositiveValue(ctx.generate_from_schema(schema))
 
     seen = set()
 
@@ -299,7 +324,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
         else:
             smallest = minimum
         seen.add(smallest)
-        yield smallest
+        yield PositiveValue(smallest)
 
         # One more than minimum if possible
         if multiple_of is not None:
@@ -308,7 +333,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
             larger = minimum + 1
         if larger not in seen and (not maximum or larger <= maximum):
             seen.add(larger)
-            yield larger
+            yield PositiveValue(larger)
 
     if maximum is not None:
         # Exactly the maximum
@@ -318,7 +343,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
             largest = maximum
         if largest not in seen:
             seen.add(largest)
-            yield largest
+            yield PositiveValue(largest)
 
         # One less than maximum if possible
         if multiple_of is not None:
@@ -327,12 +352,12 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator:
             smaller = maximum - 1
         if smaller not in seen and (smaller > 0 and (minimum is None or smaller >= minimum)):
             seen.add(smaller)
-            yield smaller
+            yield PositiveValue(smaller)
 
 
-def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator:
+def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
     seen = set()
-    yield template
+    yield PositiveValue(template)
     seen.add(len(template))
 
     # Boundary and near-boundary sizes
@@ -344,12 +369,12 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         # One item more than minimum if possible
         larger = min_items + 1
         if larger not in seen and (max_items is None or larger <= max_items):
-            yield ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger}))
             seen.add(larger)
 
     if max_items is not None:
         if max_items < BUFFER_SIZE and max_items not in seen:
-            yield ctx.generate_from_schema({**schema, "minItems": max_items})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": max_items}))
             seen.add(max_items)
 
         # One item smaller than maximum if possible
@@ -360,64 +385,70 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             and smaller not in seen
             and (min_items is None or smaller >= min_items)
         ):
-            yield ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
+            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller}))
             seen.add(smaller)
 
 
-def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator:
-    yield template
+def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
+    yield PositiveValue(template)
     # Only required properties
     properties = schema.get("properties", {})
     if set(properties) != set(schema.get("required", {})):
         only_required = {k: v for k, v in template.items() if k in schema.get("required", [])}
-        yield only_required
+        yield PositiveValue(only_required)
     seen = set()
     for name, sub_schema in properties.items():
         seen.add(_to_hashable_key(template.get(name)))
         for new in cover_schema_iter(ctx, sub_schema):
-            key = _to_hashable_key(new)
+            key = _to_hashable_key(new.value)
             if key not in seen:
-                yield {**template, name: new}
+                yield PositiveValue({**template, name: new.value})
                 seen.add(key)
         seen.clear()
 
 
-def _negative_enum(ctx: CoverageContext, value: list) -> Generator:
+def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
     strategy = JSON_STRATEGY.filter(lambda x: x not in value)
     # The exact negative value is not important here
-    yield ctx.generate_from(strategy, cached=True)
+    yield NegativeValue(ctx.generate_from(strategy, cached=True))
 
 
-def _negative_properties(ctx: CoverageContext, template: dict, properties: dict) -> Generator:
+def _negative_properties(
+    ctx: CoverageContext, template: dict, properties: dict
+) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
     for key, sub_schema in properties.items():
         for value in cover_schema_iter(nctx, sub_schema):
-            yield {**template, key: value}
+            yield NegativeValue({**template, key: value.value})
 
 
-def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator:
-    yield ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True)
+def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
+    yield NegativeValue(ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True))
 
 
 def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
     return {"allOf": [{k: v for k, v in schema.items() if k != key}, {"not": {key: value}}]}
 
 
-def _negative_multiple_of(ctx: CoverageContext, schema: dict, multiple_of: int | float) -> Generator:
-    yield ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of))
+def _negative_multiple_of(
+    ctx: CoverageContext, schema: dict, multiple_of: int | float
+) -> Generator[GeneratedValue, None, None]:
+    yield NegativeValue(ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)))
 
 
-def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator:
+def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     unique = ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})
-    yield unique + unique
+    yield NegativeValue(unique + unique)
 
 
-def _negative_required(ctx: CoverageContext, template: dict, required: list[str]) -> Generator:
+def _negative_required(
+    ctx: CoverageContext, template: dict, required: list[str]
+) -> Generator[GeneratedValue, None, None]:
     for key in required:
-        yield {k: v for k, v in template.items() if k != key}
+        yield NegativeValue({k: v for k, v in template.items() if k != key})
 
 
-def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generator:
+def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generator[GeneratedValue, None, None]:
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format.setdefault("type", "string")
@@ -427,10 +458,10 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
             lambda v: (format == "hostname" and v == "")
             or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
         )
-    yield ctx.generate_from(strategy)
+    yield NegativeValue(ctx.generate_from(strategy))
 
 
-def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator:
+def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator[GeneratedValue, None, None]:
     strategies = {
         "integer": st.integers(),
         "number": NUMERIC_STRATEGY,
@@ -452,5 +483,5 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         strategies["number"] = FLOAT_STRATEGY.filter(lambda x: x != int(x))
     negative_strategy = combine_strategies(tuple(strategies.values())).filter(lambda x: _to_hashable_key(x) not in seen)
     value = ctx.generate_from(negative_strategy, cached=True)
-    yield value
+    yield NegativeValue(value)
     seen.add(_to_hashable_key(value))

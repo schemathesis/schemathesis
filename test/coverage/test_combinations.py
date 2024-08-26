@@ -6,14 +6,27 @@ import jsonschema
 import pytest
 
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.generation.coverage import CoverageContext, _positive_number, _positive_string, cover_schema
+from schemathesis.generation.coverage import (
+    CoverageContext,
+    GeneratedValue,
+    _positive_number,
+    _positive_string,
+    cover_schema_iter,
+)
 
 PATTERN = "^\\d+$"
+
+
+def cover_schema(ctx: CoverageContext, schema: dict) -> list:
+    return [value.value for value in cover_schema_iter(ctx, schema)]
 
 
 def assert_unique(values: list):
     seen = set()
     for value in values:
+        print(value)
+        if isinstance(value, GeneratedValue):
+            value = value.value
         if isinstance(value, (dict, list)):
             serialized = json.dumps(value, sort_keys=True)
             key = (type(value), serialized)
@@ -24,9 +37,11 @@ def assert_unique(values: list):
 
 
 def assert_conform(values: list, schema: dict):
-    for entry in values:
+    for value in values:
+        if isinstance(value, GeneratedValue):
+            value = value.value
         jsonschema.validate(
-            entry,
+            value,
             schema,
             cls=jsonschema.Draft7Validator,
             format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
@@ -182,7 +197,7 @@ def test_positive_string(ctx, schema, lengths):
     covered = list(_positive_string(ctx, schema))
     assert_unique(covered)
     for length in lengths:
-        assert len([x for x in covered if len(x) == length]) == 1
+        assert len([x for x in covered if len(x.value) == length]) == 1
     assert_conform(covered, schema)
 
 
@@ -229,7 +244,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     if multiple_of is not None:
         schema["multipleOf"] = multiple_of
         values = with_multiple_of
-    covered = list(_positive_number(ctx, schema))
+    covered = [value.value for value in _positive_number(ctx, schema)]
     assert_unique(covered)
     assert covered == values
     assert_conform(covered, schema)

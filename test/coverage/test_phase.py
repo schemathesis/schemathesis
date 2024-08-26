@@ -169,6 +169,8 @@ def assert_coverage(schema, methods, expected):
     operation = schema["/foo"]["post"]
 
     def test(case):
+        if len(methods) == 1:
+            assert case.data_generation_method == methods[0]
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
             value = getattr(case, container)
