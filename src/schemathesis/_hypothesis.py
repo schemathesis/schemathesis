@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import warnings
 from typing import Any, Callable, Generator, Mapping, Optional, Tuple
 
@@ -228,7 +229,10 @@ def _iter_coverage_cases(
         location = parameter.location
         name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        container[name] = value.value
+        if location in ("header", "cookie") and not isinstance(value.value, str):
+            container[name] = json.dumps(value.value)
+        else:
+            container[name] = value.value
         template_generation_method = value.data_generation_method
         generators[(location, name)] = gen
     if operation.body:
@@ -256,7 +260,11 @@ def _iter_coverage_cases(
         container_name = LOCATION_TO_CONTAINER[location]
         container = template[container_name]
         for value in gen:
-            case = operation.make_case(**{**template, container_name: {**container, name: value.value}})
+            if location in ("header", "cookie") and not isinstance(value.value, str):
+                generated = json.dumps(value.value)
+            else:
+                generated = value.value
+            case = operation.make_case(**{**template, container_name: {**container, name: generated}})
             case.data_generation_method = value.data_generation_method
             yield case
 

@@ -10,6 +10,8 @@ from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
+from test.utils import assert_requests_call
+
 
 @pytest.fixture(autouse=True)
 def with_phase():
@@ -17,54 +19,54 @@ def with_phase():
 
 
 POSITIVE_CASES = [
-    {"headers": {"h1": 5, "h2": "000"}, "query": {"q1": 5, "q2": "0000"}, "body": {"j-prop": 0}},
-    {"headers": {"h1": 5, "h2": "000"}, "query": {"q1": 6, "q2": "000"}, "body": {"j-prop": 0}},
-    {"headers": {"h1": 5, "h2": "00"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
-    {"headers": {"h1": 4, "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
-    {"headers": {"h1": 5, "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"x-prop": ""}},
-    {"headers": {"h1": 5, "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": 5, "q2": "0000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": 6, "q2": "000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "5", "h2": "00"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "4", "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"x-prop": ""}},
+    {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
-    {"body": 0, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": ANY, "q2": "00"}},
-    {"body": 0, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": 4, "q2": 0}},
+    {"body": 0, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": ANY, "q2": "00"}},
+    {"body": 0, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": 4, "q2": 0}},
     {"body": 0, "headers": {"h1": ANY, "h2": "0000"}, "query": {"q1": ANY, "q2": 0}},
-    {"body": 0, "headers": {"h1": 6, "h2": 0}, "query": {"q1": ANY, "q2": 0}},
-    {"body": {}, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": ANY, "q2": 0}},
+    {"body": 0, "headers": {"h1": "6", "h2": "0"}, "query": {"q1": ANY, "q2": 0}},
+    {"body": {}, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": ANY, "q2": 0}},
     {
         "body": {"x-prop": 0},
-        "headers": {"h1": ANY, "h2": 0},
+        "headers": {"h1": ANY, "h2": "0"},
         "query": {"q1": ANY, "q2": 0},
     },
-    {"body": 0, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": ANY, "q2": 0}},
-    {"body": {}, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": ANY, "q2": 0}},
+    {"body": 0, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": ANY, "q2": 0}},
+    {"body": {}, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": ANY, "q2": 0}},
     {
         "body": {"j-prop": ANY},
-        "headers": {"h1": ANY, "h2": 0},
+        "headers": {"h1": ANY, "h2": "0"},
         "query": {"q1": ANY, "q2": 0},
     },
-    {"body": 0, "headers": {"h1": ANY, "h2": 0}, "query": {"q1": ANY, "q2": 0}},
+    {"body": 0, "headers": {"h1": ANY, "h2": "0"}, "query": {"q1": ANY, "q2": 0}},
 ]
 MIXED_CASES = [
-    {"query": {"q1": 5, "q2": "00"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": 0}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "0000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 4, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": ANY, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 6, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "0000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": 0}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "00"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 6, "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": 0}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 4, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ANY, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 6, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "0000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "0"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "00"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "6", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": ANY, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 4, "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"x-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": 0},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"x-prop": ""}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": ANY}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": 0},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": 5, "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "4", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": ""}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": ANY}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
 ]
 
 
@@ -169,6 +171,7 @@ def assert_coverage(schema, methods, expected):
     operation = schema["/foo"]["post"]
 
     def test(case):
+        assert_requests_call(case)
         if len(methods) == 1:
             assert case.data_generation_method == methods[0]
         output = {}

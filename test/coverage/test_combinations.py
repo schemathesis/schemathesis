@@ -24,7 +24,6 @@ def cover_schema(ctx: CoverageContext, schema: dict) -> list:
 def assert_unique(values: list):
     seen = set()
     for value in values:
-        print(value)
         if isinstance(value, GeneratedValue):
             value = value.value
         if isinstance(value, (dict, list)):
