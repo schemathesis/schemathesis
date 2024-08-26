@@ -22,6 +22,7 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
+from .types import NotSet
 from .utils import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initilize it
@@ -215,39 +216,49 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
 
     ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
-    generators: dict[tuple[str, str], Generator] = {}
+    generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
+    template_generation_method = DataGenerationMethod.positive
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
         gen = coverage.cover_schema_iter(ctx, schema)
         value = next(gen, NOT_SET)
-        if value is NOT_SET:
+        if isinstance(value, NotSet):
             continue
         location = parameter.location
         name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        container[name] = value
+        container[name] = value.value
+        template_generation_method = value.data_generation_method
         generators[(location, name)] = gen
     if operation.body:
         for body in operation.body:
             schema = body.as_json_schema(operation)
             gen = coverage.cover_schema_iter(ctx, schema)
             value = next(gen, NOT_SET)
-            if value is NOT_SET:
+            if isinstance(value, NotSet):
                 continue
             if "body" not in template:
-                template["body"] = value
+                template["body"] = value.value
                 template["media_type"] = body.media_type
-            yield operation.make_case(**{**template, "body": value, "media_type": body.media_type})
+            case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
+            case.data_generation_method = value.data_generation_method
+            yield case
             for next_value in gen:
-                yield operation.make_case(**{**template, "body": next_value, "media_type": body.media_type})
+                case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
+                case.data_generation_method = next_value.data_generation_method
+                yield case
     else:
-        yield operation.make_case(**template)
+        case = operation.make_case(**template)
+        case.data_generation_method = template_generation_method
+        yield case
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
         container = template[container_name]
         for value in gen:
-            yield operation.make_case(**{**template, container_name: {**container, name: value}})
+            case = operation.make_case(**{**template, container_name: {**container, name: value.value}})
+            case.data_generation_method = value.data_generation_method
+            yield case
 
 
 def find_invalid_headers(headers: Mapping) -> Generator[Tuple[str, str], None, None]:

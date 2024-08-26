@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal errors in the experimental "coverage" phase.
+- Missing ``Case.data_generation_method`` in test cases generated during the coverage phase.
 
 .. _v3.35.0:
 
