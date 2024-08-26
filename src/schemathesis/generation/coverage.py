@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 import json
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Generator, Set, TypeVar, cast
+from typing import Any, Generator, Set, Type, TypeVar, cast
 
 import jsonschema
 from hypothesis import strategies as st
-from hypothesis.errors import Unsatisfiable
+from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
 
@@ -91,8 +91,9 @@ def _cover_positive_for_type(ctx: CoverageContext, schema: dict, ty: str | None)
             if len(all_of) == 1:
                 yield from cover_schema_iter(ctx, all_of[0])
             else:
-                canonical = canonicalish(schema)
-                yield from cover_schema_iter(ctx, canonical)
+                with suppress(jsonschema.SchemaError):
+                    canonical = canonicalish(schema)
+                    yield from cover_schema_iter(ctx, canonical)
         if enum is not None:
             yield from enum
         elif const is not None:
@@ -113,21 +114,46 @@ def _cover_positive_for_type(ctx: CoverageContext, schema: dict, ty: str | None)
                 yield from _positive_object(ctx, schema, cast(dict, template))
 
 
-def cover_schema_iter(ctx: CoverageContext, schema: dict) -> Generator:
-    types = schema.get("type", [])
+@contextmanager
+def _ignore_unfixable(
+    *,
+    # Cache exception types here as `jsonschema` uses a custom `__getattr__` on the module level
+    # and it may cause errors during the interpreter shutdown
+    ref_error: Type[Exception] = jsonschema.RefResolutionError,
+    schema_error: Type[Exception] = jsonschema.SchemaError,
+) -> Generator:
+    try:
+        yield
+    except (Unsatisfiable, ref_error, schema_error):
+        pass
+    except InvalidArgument as exc:
+        message = str(exc)
+        if "Cannot create non-empty" not in message and "is not in the specified alphabet" not in message:
+            raise
+    except TypeError as exc:
+        if "first argument must be string or compiled pattern" not in str(exc):
+            raise
+
+
+def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator:
+    if isinstance(schema, bool):
+        types = ["null", "boolean", "string", "number", "array", "object"]
+        schema = {}
+    else:
+        types = schema.get("type", [])
     if not isinstance(types, list):
-        types = [types]
+        types = [types]  # type: ignore[unreachable]
     if not types:
-        with suppress(Unsatisfiable, jsonschema.RefResolutionError):
+        with _ignore_unfixable():
             yield from _cover_positive_for_type(ctx, schema, None)
     for ty in types:
-        with suppress(Unsatisfiable, jsonschema.RefResolutionError):
+        with _ignore_unfixable():
             yield from _cover_positive_for_type(ctx, schema, ty)
     if DataGenerationMethod.negative in ctx.data_generation_methods:
         template = None
         seen: Set[Any | tuple[type, str]] = set()
         for key, value in schema.items():
-            with suppress(Unsatisfiable, jsonschema.RefResolutionError):
+            with _ignore_unfixable():
                 if key == "enum":
                     yield from _negative_enum(ctx, value)
                 elif key == "const":
@@ -155,9 +181,11 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict) -> Generator:
                 elif key == "multipleOf":
                     yield from _negative_multiple_of(ctx, schema, value)
                 elif key == "minLength" and 0 < value < BUFFER_SIZE and "pattern" not in schema:
-                    yield ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
+                    with suppress(InvalidArgument):
+                        yield ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
                 elif key == "maxLength" and value < BUFFER_SIZE and "pattern" not in schema:
-                    yield ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
+                    with suppress(InvalidArgument):
+                        yield ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
@@ -171,8 +199,9 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict) -> Generator:
                     if len(value) == 1:
                         yield from cover_schema_iter(nctx, value[0])
                     else:
-                        canonical = canonicalish(schema)
-                        yield from cover_schema_iter(nctx, canonical)
+                        with _ignore_unfixable():
+                            canonical = canonicalish(schema)
+                            yield from cover_schema_iter(nctx, canonical)
                 elif key == "anyOf" or key == "oneOf":
                     nctx = ctx.with_negative()
                     # NOTE: Other sub-schemas are not filtered out
@@ -189,7 +218,7 @@ def _get_template_schema(schema: dict, ty: str) -> dict:
                 "required": list(properties),
                 "type": ty,
                 "properties": {
-                    k: _get_template_schema(v, "object") if v.get("type") == "object" else v
+                    k: _get_template_schema(v, "object") if isinstance(v, dict) and v.get("type") == "object" else v
                     for k, v in properties.items()
                 },
             }
@@ -319,13 +348,18 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             seen.add(larger)
 
     if max_items is not None:
-        if max_items not in seen:
+        if max_items < BUFFER_SIZE and max_items not in seen:
             yield ctx.generate_from_schema({**schema, "minItems": max_items})
             seen.add(max_items)
 
         # One item smaller than maximum if possible
         smaller = max_items - 1
-        if smaller > 0 and smaller not in seen and (min_items is None or smaller >= min_items):
+        if (
+            smaller < BUFFER_SIZE
+            and smaller > 0
+            and smaller not in seen
+            and (min_items is None or smaller >= min_items)
+        ):
             yield ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
             seen.add(smaller)
 
@@ -348,17 +382,8 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
         seen.clear()
 
 
-@lru_cache(maxsize=128)
-def _get_negative_enum_strategy(value: tuple) -> st.SearchStrategy:
-    return JSON_STRATEGY.filter(lambda x: x not in value)
-
-
 def _negative_enum(ctx: CoverageContext, value: list) -> Generator:
-    try:
-        strategy = _get_negative_enum_strategy(tuple(value))
-    except TypeError:
-        # The value is not hashable
-        strategy = JSON_STRATEGY.filter(lambda x: x not in value)
+    strategy = JSON_STRATEGY.filter(lambda x: x not in value)
     # The exact negative value is not important here
     yield ctx.generate_from(strategy, cached=True)
 
@@ -370,13 +395,8 @@ def _negative_properties(ctx: CoverageContext, template: dict, properties: dict)
             yield {**template, key: value}
 
 
-@lru_cache(maxsize=128)
-def _get_negative_pattern_strategy(value: str) -> st.SearchStrategy:
-    return st.text().filter(lambda x: x != value)
-
-
 def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator:
-    yield ctx.generate_from(_get_negative_pattern_strategy(pattern), cached=True)
+    yield ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True)
 
 
 def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
@@ -403,7 +423,10 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
     without_format.setdefault("type", "string")
     strategy = from_schema(without_format)
     if format in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
-        strategy = strategy.filter(lambda v: not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format))
+        strategy = strategy.filter(
+            lambda v: (format == "hostname" and v == "")
+            or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
+        )
     yield ctx.generate_from(strategy)
 
 

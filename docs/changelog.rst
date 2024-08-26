@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal errors in the experimental "coverage" phase.
+
 .. _v3.35.0:
 
 :version:`3.35.0 <v3.34.3...v3.35.0>` - 2024-08-25
