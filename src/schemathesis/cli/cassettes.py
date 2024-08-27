@@ -226,6 +226,7 @@ http_interactions:"""
             for interaction in item.interactions:
                 status = interaction.status.name.upper()
                 # Body payloads are handled via separate `stream.write` calls to avoid some allocations
+                phase = f"'{interaction.phase.value}'" if interaction.phase is not None else "null"
                 stream.write(
                     f"""\n- id: '{current_id}'
   status: '{status}'
@@ -233,6 +234,7 @@ http_interactions:"""
   thread_id: {item.thread_id}
   correlation_id: '{item.correlation_id}'
   data_generation_method: '{interaction.data_generation_method.value}'
+  phase: {phase}
   elapsed: '{interaction.response.elapsed}'
   recorded_at: '{interaction.recorded_at}'
   checks:

@@ -28,7 +28,7 @@ from ..exceptions import (
     make_unique_by_key,
 )
 from ..generation import DataGenerationMethod
-from ..models import Case, Check, Interaction, Request, Response, Status, TestResult
+from ..models import Case, Check, Interaction, Request, Response, Status, TestPhase, TestResult
 from ..transports import deserialize_payload, serialize_payload
 
 if TYPE_CHECKING:
@@ -385,6 +385,7 @@ class SerializedInteraction:
     checks: list[SerializedCheck]
     status: Status
     data_generation_method: DataGenerationMethod
+    phase: TestPhase | None
     recorded_at: str
 
     @classmethod
@@ -395,6 +396,7 @@ class SerializedInteraction:
             checks=[SerializedCheck.from_check(check) for check in interaction.checks],
             status=interaction.status,
             data_generation_method=interaction.data_generation_method,
+            phase=interaction.phase,
             recorded_at=interaction.recorded_at,
         )
 

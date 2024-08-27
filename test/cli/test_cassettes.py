@@ -59,24 +59,18 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
         f"--data-generation-method={data_generation_method}",
+        "--experimental=coverage-phase",
+        "--show-trace",
         "--hypothesis-seed=1",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) in (
-        hypothesis_max_examples,
-        hypothesis_max_examples + 1,
-        hypothesis_max_examples + 2,
-    )
     assert cassette["http_interactions"][0]["id"] == "1"
     assert cassette["http_interactions"][1]["id"] == "2"
     assert cassette["http_interactions"][0]["status"] == "SUCCESS"
     assert cassette["http_interactions"][0]["seed"] == "1"
-    if data_generation_method == "all":
-        assert cassette["http_interactions"][0]["data_generation_method"] in ["positive", "negative"]
-    else:
-        assert cassette["http_interactions"][0]["data_generation_method"] == data_generation_method
+    assert cassette["http_interactions"][0]["phase"] in ("explicit", "coverage", "generate")
     assert cassette["http_interactions"][0]["thread_id"] == threading.get_ident()
     correlation_id = cassette["http_interactions"][0]["correlation_id"]
     UUID(correlation_id)

@@ -25,7 +25,7 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
 from ...internal.validation import is_illegal_surrogate
-from ...models import APIOperation, Case, GenerationMetadata, cant_serialize
+from ...models import APIOperation, Case, GenerationMetadata, TestPhase, cant_serialize
 from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
@@ -123,6 +123,7 @@ def get_case_strategy(
     body: Any = NOT_SET,
     media_type: str | None = None,
     skip_on_not_negated: bool = True,
+    phase: TestPhase = TestPhase.GENERATE,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -213,6 +214,7 @@ def get_case_strategy(
             headers=headers_.generator,
             cookies=cookies_.generator,
             body=body_.generator,
+            phase=phase,
         ),
     )
     auth_context = auths.AuthContext(
