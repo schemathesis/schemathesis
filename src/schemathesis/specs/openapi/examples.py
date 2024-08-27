@@ -13,7 +13,7 @@ from hypothesis_jsonschema import from_schema
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...generation import get_single_example
 from ...internal.copy import fast_deepcopy
-from ...models import APIOperation, Case
+from ...models import APIOperation, Case, TestPhase
 from ._hypothesis import get_case_strategy, get_default_format_strategies
 from .constants import LOCATION_TO_CONTAINER
 from .formats import STRING_FORMATS
@@ -67,6 +67,8 @@ def get_strategies_from_examples(
     examples = list(extract_top_level(operation))
     # Add examples from parameter's schemas
     examples.extend(extract_from_schemas(operation))
+    as_strategy_kwargs = as_strategy_kwargs or {}
+    as_strategy_kwargs["phase"] = TestPhase.EXPLICIT
     return [
         get_case_strategy(operation=operation, **{**parameters, **(as_strategy_kwargs or {})}).map(serialize_components)
         for parameters in produce_combinations(examples)

@@ -2,7 +2,7 @@ import pytest
 
 import schemathesis
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import Case, GenerationMetadata
+from schemathesis.models import Case, GenerationMetadata, TestPhase
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
@@ -75,7 +75,14 @@ def test_is_prefix_operation(lhs, lhs_vars, rhs, rhs_vars, expected):
 
 
 def build_metadata(path_parameters=None, query=None, headers=None, cookies=None, body=None):
-    return GenerationMetadata(path_parameters=path_parameters, query=query, headers=headers, cookies=cookies, body=body)
+    return GenerationMetadata(
+        path_parameters=path_parameters,
+        query=query,
+        headers=headers,
+        cookies=cookies,
+        body=body,
+        phase=TestPhase.GENERATE,
+    )
 
 
 @pytest.fixture

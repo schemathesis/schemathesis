@@ -6,7 +6,7 @@ from requests import Request, Response
 
 from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import CaseSource, Check, Status
+from schemathesis.models import CaseSource, Check, Status, TestPhase
 from schemathesis.models import Request as SerializedRequest
 from schemathesis.models import Response as SerializedResponse
 from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
@@ -291,6 +291,7 @@ def test_sanitize_serialized_interaction(serialized_check):
         status=Status.failure,
         recorded_at="",
         data_generation_method=DataGenerationMethod.positive,
+        phase=TestPhase.GENERATE,
     )
     sanitize_serialized_interaction(interaction)
 
