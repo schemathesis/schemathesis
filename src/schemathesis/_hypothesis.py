@@ -20,7 +20,7 @@ from .exceptions import OperationSchemaError, SerializationNotPossible
 from .experimental import COVERAGE_PHASE
 from .generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from .models import APIOperation, Case
+from .models import APIOperation, Case, GenerationMetadata, TestPhase
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .types import NotSet
@@ -217,6 +217,9 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
 
     ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
+    meta = GenerationMetadata(
+        query=None, path_parameters=None, headers=None, cookies=None, body=None, phase=TestPhase.COVERAGE
+    )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
     template_generation_method = DataGenerationMethod.positive
@@ -247,14 +250,17 @@ def _iter_coverage_cases(
                 template["media_type"] = body.media_type
             case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
             case.data_generation_method = value.data_generation_method
+            case.meta = meta
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
                 case.data_generation_method = next_value.data_generation_method
+                case.meta = meta
                 yield case
     else:
         case = operation.make_case(**template)
         case.data_generation_method = template_generation_method
+        case.meta = meta
         yield case
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
@@ -266,6 +272,7 @@ def _iter_coverage_cases(
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
             case.data_generation_method = value.data_generation_method
+            case.meta = meta
             yield case
 
 

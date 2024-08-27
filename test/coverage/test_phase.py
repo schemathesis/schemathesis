@@ -9,7 +9,6 @@ from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
-
 from test.utils import assert_requests_call
 
 

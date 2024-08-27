@@ -126,6 +126,15 @@ def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
 
 
 @dataclass
+class TestPhase(Enum):
+    __test__ = False
+
+    EXPLICIT = "explicit"
+    COVERAGE = "coverage"
+    GENERATE = "generate"
+
+
+@dataclass
 class GenerationMetadata:
     """Stores various information about how data is generated."""
 
@@ -134,8 +143,9 @@ class GenerationMetadata:
     headers: DataGenerationMethod | None
     cookies: DataGenerationMethod | None
     body: DataGenerationMethod | None
+    phase: TestPhase
 
-    __slots__ = ("query", "path_parameters", "headers", "cookies", "body")
+    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase")
 
 
 @dataclass(repr=False)
@@ -968,6 +978,7 @@ class Interaction:
     checks: list[Check]
     status: Status
     data_generation_method: DataGenerationMethod
+    phase: TestPhase | None
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
@@ -978,6 +989,7 @@ class Interaction:
             status=status,
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
+            phase=case.meta.phase if case.meta is not None else None,
         )
 
     @classmethod
@@ -1000,6 +1012,7 @@ class Interaction:
             status=status,
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
+            phase=case.meta.phase if case.meta is not None else None,
         )
 
 

@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- New ``phase`` field to VCR cassettes to indicate the testing phase of each recorded test case.
+
 **Fixed**
 
 - Internal errors in the experimental "coverage" phase.
