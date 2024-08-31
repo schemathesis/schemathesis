@@ -316,6 +316,7 @@ def from_dict(
     """
     from ... import transports
     from .schemas import OpenApi30, SwaggerV20
+    from ...schemas import Specification
 
     if not isinstance(raw_schema, dict):
         raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
@@ -349,6 +350,7 @@ def from_dict(
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         instance = SwaggerV20(
             raw_schema,
+            specification=Specification.OPENAPI,
             app=app,
             base_url=base_url,
             filter_set=filter_set,
@@ -388,6 +390,7 @@ def from_dict(
         _maybe_validate_schema(raw_schema, validator, validate_schema)
         instance = OpenApi30(
             raw_schema,
+            specification=Specification.OPENAPI,
             app=app,
             base_url=base_url,
             filter_set=filter_set,
