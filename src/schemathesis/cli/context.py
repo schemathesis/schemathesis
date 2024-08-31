@@ -4,7 +4,7 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from queue import Queue
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generator
 
 from ..code_samples import CodeSampleStyle
 from ..internal.deprecation import deprecated_property
@@ -60,11 +60,15 @@ class ExecutionContext:
     analysis: Result[AnalysisResult, Exception] | None = None
     output_config: OutputConfig = field(default_factory=OutputConfig)
     state_machine_sink: StateMachineSink | None = None
-    summary_lines: list[str] = field(default_factory=list)
+    initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
+    summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
 
     @deprecated_property(removed_in="4.0", replacement="show_trace")
     def show_errors_tracebacks(self) -> bool:
         return self.show_trace
 
-    def add_summary_line(self, line: str) -> None:
+    def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
+        self.initialization_lines.append(line)
+
+    def add_summary_line(self, line: str | Generator[str, None, None]) -> None:
         self.summary_lines.append(line)

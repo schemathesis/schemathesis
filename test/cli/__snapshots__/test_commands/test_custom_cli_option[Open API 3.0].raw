@@ -9,6 +9,9 @@ Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
+Counter initialized!
+first
+second
 API probing: SKIP
 Schema analysis: SKIP
 
@@ -22,5 +25,7 @@ Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io
 We run additional conformance checks on reports from public repos.
 
 Counter: 50
+first
+second
 
 ============================== 1 passed in 1.00s ===============================
