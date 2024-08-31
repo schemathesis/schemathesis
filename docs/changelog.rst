@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.1...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**:
+
+- Restructure the ``st run --help`` output.
+
 .. _v3.35.1:
 
 :version:`3.35.1 <v3.35.0...v3.35.1>` - 2024-08-27

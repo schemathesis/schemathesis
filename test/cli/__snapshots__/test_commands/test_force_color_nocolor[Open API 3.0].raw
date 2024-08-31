@@ -2,6 +2,6 @@ Exit code: 2
 ---
 Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
-Try 'run --help' for help.
+Try 'run -h' for help.
 
 Error: Can't use `--no-color` and `--force-color` simultaneously

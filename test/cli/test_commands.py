@@ -2786,7 +2786,11 @@ def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
     from schemathesis import cli, runner
 
 
-    cli.add_option("--custom-counter", type=int)
+    group = cli.add_group("My custom group")
+    group.add_option("--custom-counter", type=int)
+
+    group = cli.add_group("Another group", index=-1)
+    group.add_option("--custom-counter-2", type=int)
 
     def gen():
         yield "first"
