@@ -7,6 +7,7 @@ import textwrap
 import time
 from importlib import metadata
 from queue import Queue
+from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
@@ -776,6 +777,8 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     click.secho(f"Collected API links: {links_count}", bold=True)
     if isinstance(context.report, ServiceReportContext):
         click.secho("Report to Schemathesis.io: ENABLED", bold=True)
+    if context.initialization_lines:
+        _print_lines(context.initialization_lines)
 
 
 def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing) -> None:
@@ -852,10 +855,18 @@ def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     display_statistic(context, event)
     if context.summary_lines:
         click.echo()
-        for line in context.summary_lines:
-            click.echo(line)
+        _print_lines(context.summary_lines)
     click.echo()
     display_summary(event)
+
+
+def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
+    for entry in lines:
+        if isinstance(entry, str):
+            click.echo(entry)
+        elif isinstance(entry, GeneratorType):
+            for line in entry:
+                click.echo(line)
 
 
 def handle_interrupted(context: ExecutionContext, event: events.Interrupted) -> None:
