@@ -2,6 +2,6 @@ Exit code: 2
 ---
 Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
-Try 'run --help' for help.
+Try 'run -h' for help.
 
 Error: Invalid value: The `--header` and `--set-header` options were both used to set the 'Authorization' header, which is not permitted.

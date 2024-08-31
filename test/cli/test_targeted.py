@@ -24,7 +24,7 @@ def new_target(testdir, cli):
     # To verify that "new_target" is unregistered
     result = cli.run("--help")
     lines = result.stdout.splitlines()
-    assert "  -t, --target [response_time|all]" in lines
+    assert "  -t, --target [response_time|all]          Guides input generation to values" in lines
 
 
 @pytest.mark.usefixtures("new_target")
