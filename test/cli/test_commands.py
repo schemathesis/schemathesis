@@ -2788,6 +2788,10 @@ def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
 
     cli.add_option("--custom-counter", type=int)
 
+    def gen():
+        yield "first"
+        yield "second"
+
 
     @cli.handler()
     class EventCounter(cli.EventHandler):
@@ -2796,10 +2800,14 @@ def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
 
         def handle_event(self, context, event) -> None:
             self.counter += 1
-            if isinstance(event, runner.events.Finished):
+            if isinstance(event, runner.events.Initialized):
+                context.add_initialization_line("Counter initialized!")
+                context.add_initialization_line(gen())
+            elif isinstance(event, runner.events.Finished):
                 context.add_summary_line(
                     f"Counter: {self.counter}",
                 )
+                context.add_summary_line(gen())
 """
     )
     assert (
