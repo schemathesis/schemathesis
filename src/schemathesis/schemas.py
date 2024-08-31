@@ -9,6 +9,7 @@ They give only static definitions of paths.
 
 from __future__ import annotations
 
+import enum
 from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -85,10 +86,18 @@ def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
 
 
+class Specification(str, enum.Enum):
+    """Specification of the given schema."""
+
+    OPENAPI = "openapi"
+    GRAPHQL = "graphql"
+
+
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
     transport: Transport
+    specification: Specification
     location: str | None = None
     base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
@@ -408,6 +417,7 @@ class BaseSchema(Mapping):
 
         return self.__class__(
             self.raw_schema,
+            specification=self.specification,
             location=self.location,
             base_url=base_url,  # type: ignore
             app=app,
