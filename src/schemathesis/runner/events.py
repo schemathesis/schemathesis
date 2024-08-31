@@ -14,7 +14,7 @@ from .serialization import SerializedError, SerializedTestResult
 
 if TYPE_CHECKING:
     from ..models import APIOperation, Status, TestResult, TestResultSet
-    from ..schemas import BaseSchema
+    from ..schemas import BaseSchema, Specification
     from ..service.models import AnalysisResult
     from ..stateful import events
     from . import probes
@@ -39,6 +39,7 @@ class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
     schema: dict[str, Any]
+    specification: Specification
     # Total number of operations in the schema
     operations_count: int | None
     # Total number of links in the schema
@@ -71,6 +72,7 @@ class Initialized(ExecutionEvent):
         """Computes all needed data from a schema instance."""
         return cls(
             schema=schema.raw_schema,
+            specification=schema.specification,
             operations_count=schema.operations_count if count_operations else None,
             links_count=schema.links_count if count_links else None,
             location=schema.location,

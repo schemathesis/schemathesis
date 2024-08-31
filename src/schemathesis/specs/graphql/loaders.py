@@ -242,6 +242,7 @@ def from_dict(
     :return: GraphQLSchema
     """
     from ... import transports
+    from ...schemas import Specification
     from .schemas import GraphQLSchema
 
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
@@ -254,6 +255,7 @@ def from_dict(
         rate_limiter = build_limiter(rate_limit)
     instance = GraphQLSchema(
         raw_schema,
+        specification=Specification.GRAPHQL,
         location=location,
         base_url=base_url,
         app=app,
