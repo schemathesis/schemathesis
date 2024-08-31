@@ -2,6 +2,6 @@ Exit code: 2
 ---
 Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
-Try 'run --help' for help.
+Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-deadline': 0 is not in the range 1<=x<=86399999913600000.
+Error: Invalid value for '--hypothesis-deadline': 0 is not in the range 1<=x<=300000.

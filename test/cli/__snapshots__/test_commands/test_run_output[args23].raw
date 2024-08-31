@@ -2,6 +2,6 @@ Exit code: 2
 ---
 Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
-Try 'run --help' for help.
+Try 'run -h' for help.
 
 Error: The specified file does not exist. Please provide a valid path to an existing file.

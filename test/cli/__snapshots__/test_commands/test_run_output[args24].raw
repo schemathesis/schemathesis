@@ -10,132 +10,164 @@ Usage: run [OPTIONS] SCHEMA [API_NAME]
 
   [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io.
 
-Testing scope:
+Options:
+  -w, --workers [auto|1-64]                 Sets the number of concurrent
+                                            workers for testing. Auto-adjusts if
+                                            'auto' is specified.  [default: 1]
+  --dry-run                                 Simulates test execution without
+                                            making any actual requests, useful
+                                            for validating data generation.
+  --experimental [openapi-3.1|schema-analysis|stateful-test-runner|stateful-only|coverage-phase]
+                                            Enable experimental features.
+  --fixups [fast_api|utf8_bom|all]          Applies compatibility adjustments
+                                            like 'fast_api', 'utf8_bom'.
 
-  Customize the scope of the API testing.
-
-  --include-path TEXT             Path to include in testing.
-  --include-path-regex TEXT       Path pattern to include in testing.
-  --exclude-path TEXT             Path to exclude from testing.
-  --exclude-path-regex TEXT       Path pattern to exclude from testing.
-  --include-method TEXT           Method to include in testing.
-  --include-method-regex TEXT     Method pattern to include in testing.
-  --exclude-method TEXT           Method to exclude from testing.
-  --exclude-method-regex TEXT     Method pattern to exclude from testing.
-  --include-name TEXT             Operation name to include in testing.
-  --include-name-regex TEXT       Operation name pattern to include in testing.
-  --exclude-name TEXT             Operation name to exclude from testing.
-  --exclude-name-regex TEXT       Operation name pattern to exclude from
-                                  testing.
-  --include-tag TEXT              Tag to include in testing.
-  --include-tag-regex TEXT        Tag pattern to include in testing.
-  --exclude-tag TEXT              Tag to exclude from testing.
-  --exclude-tag-regex TEXT        Tag pattern to exclude from testing.
-  --include-operation-id TEXT     ID to include in testing.
-  --include-operation-id-regex TEXT
-                                  ID pattern to include in testing.
-  --exclude-operation-id TEXT     ID to exclude from testing.
-  --exclude-operation-id-regex TEXT
-                                  ID pattern to exclude from testing.
-  --include-by TEXT               Include API operations by expression
-  --exclude-by TEXT               Exclude API operations by expression
-  --exclude-deprecated            Exclude deprecated API operations from
-                                  testing.
-  -E, --endpoint TEXT             API operation path pattern (e.g., users/\d+).
-  -M, --method TEXT               HTTP method (e.g., GET, POST).
-  -T, --tag TEXT                  Schema tag pattern.
-  -O, --operation-id TEXT         OpenAPI operationId pattern.
-  --skip-deprecated-operations    Exclude deprecated API operations from
-                                  testing.
-
-Response & Schema validation:
-
-  These options specify how API responses and schemas are validated.
-
+API validation options:
   -c, --checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection|ignored_auth|all]
-                                  Specifies the validation checks to apply to
-                                  API responses. Provide a comma-separated list
-                                  of checks such as
-                                  'not_a_server_error,status_code_conformance',
-                                  etc. Default is 'not_a_server_error'.
-                                  [default: not_a_server_error]
+                                            Specifies the validation checks to
+                                            apply to API responses. Provide a
+                                            comma-separated list of checks such
+                                            as 'not_a_server_error,status_code_c
+                                            onformance', etc. Default is
+                                            'not_a_server_error'.  [default:
+                                            not_a_server_error]
   --exclude-checks [not_a_server_error|status_code_conformance|content_type_conformance|response_headers_conformance|response_schema_conformance|negative_data_rejection|ignored_auth]
-                                  Specifies the validation checks to skip during
-                                  testing. Provide a comma-separated list of
-                                  checks you wish to bypass.
-  --max-response-time INTEGER RANGE
-                                  Sets a custom time limit for API response
-                                  times. The test will fail if a response time
-                                  exceeds this limit. Provide the time in
-                                  milliseconds.  [x>=1]
-  --validate-schema BOOLEAN       Toggles validation of incoming payloads
-                                  against the defined API schema. Set to 'True'
-                                  to enable or 'False' to disable. Default is
-                                  'False'.  [default: False]
+                                            Specifies the validation checks to
+                                            skip during testing. Provide a
+                                            comma-separated list of checks you
+                                            wish to bypass.
+  --max-response-time INTEGER RANGE         Sets a custom time limit for API
+                                            response times. The test will fail
+                                            if a response time exceeds this
+                                            limit. Provide the time in
+                                            milliseconds.  [x>=1]
+  -x, --exitfirst                           Terminates the test suite
+                                            immediately upon the first failure
+                                            or error encountered.
+  --max-failures INTEGER RANGE              Terminates the test suite after
+                                            reaching a specified number of
+                                            failures or errors.  [x>=1]
 
-Hypothesis engine:
+Loader options:
+  --app TEXT                     Specifies the WSGI/ASGI application under test,
+                                 provided as an importable Python path.
+  --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
+                                 API schema to become available. Disabled by
+                                 default.  [x>=1.0]
+  --validate-schema BOOLEAN      Validates the input API schema. Set to 'true'
+                                 to enable or 'false' to disable.  [default:
+                                 False]
 
-  Configuration of the underlying Hypothesis engine.
+Network requests options:
+  -b, --base-url TEXT              Provides the base URL of the API, required
+                                   when schema is provided as a file.
+  --request-timeout INTEGER RANGE  Sets a timeout limit, in milliseconds, for
+                                   each network request during tests.  [x>=1]
+  --request-proxy TEXT             Set the proxy for all network requests.
+  --request-tls-verify TEXT        Configures TLS certificate verification for
+                                   server requests. Can specify path to
+                                   CA_BUNDLE for custom certs.  [default: true]
+  --request-cert PATH              File path of unencrypted client certificate
+                                   for authentication. The certificate can be
+                                   bundled with a private key (e.g. PEM) or the
+                                   private key can be provided with the
+                                   --request-cert-key argument.
+  --request-cert-key PATH          Specifies the file path of the private key
+                                   for the client certificate.
+  --rate-limit TEXT                Specifies a rate limit for test requests in
+                                   '<limit>/<duration>' format. Example -
+                                   `100/m` for 100 requests per minute.
+  -H, --header TEXT                Adds a custom HTTP header to all API
+                                   requests. Format: 'Header-Name: Value'.
+  -a, --auth TEXT                  Provides the server authentication details in
+                                   the 'USER:PASSWORD' format.
+  -A, --auth-type [basic|digest]   Specifies the authentication method. Default
+                                   is 'basic'.  [default: basic]
 
-  --hypothesis-database TEXT      Configures storage for examples discovered by
-                                  Hypothesis. Use 'none' to disable, ':memory:'
-                                  for temporary storage, or specify a file path
-                                  for persistent storage.
-  --hypothesis-deadline INTEGER RANGE
-                                  Sets a time limit for each test case generated
-                                  by Hypothesis, in milliseconds. Exceeding this
-                                  limit will cause the test to fail.
-                                  [1<=x<=86399999913600000]
-  --hypothesis-derandomize        Enables deterministic mode in Hypothesis,
-                                  which eliminates random variation between test
-                                  runs.
-  --hypothesis-max-examples INTEGER RANGE
-                                  Sets the cap on the number of examples
-                                  generated by Hypothesis for each API
-                                  method/path pair.  [x>=1]
-  --hypothesis-phases [explicit|reuse|generate|target|shrink]
-                                  Specifies which testing phases to execute.
-  --hypothesis-no-phases [explicit|reuse|generate|target|shrink]
-                                  Specifies which testing phases to exclude from
-                                  execution.
-  --hypothesis-report-multiple-bugs BOOLEAN
-                                  If set, only the most easily reproducible
-                                  exception will be reported when multiple
-                                  issues are found.
-  --hypothesis-seed INTEGER       Sets a seed value for Hypothesis, ensuring
-                                  reproducibility across test runs.
-  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|large_base_example|all]
-                                  Disables specified health checks from
-                                  Hypothesis like 'data_too_large',
-                                  'filter_too_much', etc. Provide a comma-
-                                  separated list
-  --hypothesis-verbosity [quiet|normal|verbose|debug]
-                                  Controls the verbosity level of Hypothesis
-                                  output.
+Filtering options:
+  --include-path TEXT                Path to include in testing.
+  --include-path-regex TEXT          Path pattern to include in testing.
+  --exclude-path TEXT                Path to exclude from testing.
+  --exclude-path-regex TEXT          Path pattern to exclude from testing.
+  --include-method TEXT              Method to include in testing.
+  --include-method-regex TEXT        Method pattern to include in testing.
+  --exclude-method TEXT              Method to exclude from testing.
+  --exclude-method-regex TEXT        Method pattern to exclude from testing.
+  --include-name TEXT                Operation name to include in testing.
+  --include-name-regex TEXT          Operation name pattern to include in
+                                     testing.
+  --exclude-name TEXT                Operation name to exclude from testing.
+  --exclude-name-regex TEXT          Operation name pattern to exclude from
+                                     testing.
+  --include-tag TEXT                 Tag to include in testing.
+  --include-tag-regex TEXT           Tag pattern to include in testing.
+  --exclude-tag TEXT                 Tag to exclude from testing.
+  --exclude-tag-regex TEXT           Tag pattern to exclude from testing.
+  --include-operation-id TEXT        ID to include in testing.
+  --include-operation-id-regex TEXT  ID pattern to include in testing.
+  --exclude-operation-id TEXT        ID to exclude from testing.
+  --exclude-operation-id-regex TEXT  ID pattern to exclude from testing.
+  --include-by TEXT                  Include API operations by expression
+  --exclude-by TEXT                  Exclude API operations by expression
+  --exclude-deprecated               Exclude deprecated API operations from
+                                     testing.
 
-Generic:
+Output options:
+  --junit-xml FILENAME                  Outputs a JUnit-XML style report at the
+                                        specified file path.
+  --cassette-path FILENAME              Saves the test outcomes in a VCR-
+                                        compatible format.
+  --cassette-format [vcr|har]           Format of the saved cassettes.
+  --cassette-preserve-exact-body-bytes  Retains exact byte sequence of payloads
+                                        in cassettes, encoded as base64.
+  --code-sample-style [python|curl]     Selects the code sample style for
+                                        reproducing failures.
+  --sanitize-output BOOLEAN             Enable or disable automatic output
+                                        sanitization to obscure sensitive data.
+                                        [default: True]
+  --output-truncate TEXT                Specifies whether to truncate schemas
+                                        and responses in error messages.
+                                        [default: true]
+  --show-trace                          Displays complete traceback information
+                                        for internal errors.
+  --debug-output-file FILENAME          Saves debugging information in a JSONL
+                                        format at the specified file path.
+
+Data generation options:
   -D, --data-generation-method [positive|negative|all]
-                                  Specifies the approach Schemathesis uses to
-                                  generate test data. Use 'positive' for valid
-                                  data, 'negative' for invalid data, or 'all'
-                                  for both. Default is 'positive'.  [default:
-                                  positive]
-  -t, --target [response_time|all]
-                                  Guides input generation to values more likely
-                                  to expose bugs via targeted property-based
-                                  testing.
-  -x, --exitfirst                 Terminates the test suite immediately upon the
-                                  first failure or error encountered.
-  --max-failures INTEGER RANGE    Terminates the test suite after reaching a
-                                  specified number of failures or errors.
-                                  [x>=1]
-  --dry-run                       Simulates test execution without making any
-                                  actual requests, useful for validating data
-                                  generation.
-  -a, --auth TEXT                 Provides the server authentication details in
-                                  the 'USER:PASSWORD' format.
-  -A, --auth-type [basic|digest]  Specifies the authentication method. Default
-                                  is 'basic'.  [default: basic]
+                                            Specifies the approach Schemathesis
+                                            uses to generate test data. Use
+                                            'positive' for valid data,
+                                            'negative' for invalid data, or
+                                            'all' for both. Default is
+                                            'positive'.  [default: positive]
+  --stateful [none|links]                   Enables or disables stateful
+                                            testing.
+  --generation-allow-x00 TEXT               Determines whether to allow the
+                                            generation of ` ` bytes within
+                                            strings.  [default: true]
+  --generation-codec TEXT                   Specifies the codec used for
+                                            generating strings.
+  --generation-with-security-parameters TEXT
+                                            Whether to generate security
+                                            parameters.  [default: true]
+  --generation-graphql-allow-null TEXT      Whether `null` values should be used
+                                            for optional arguments in GraphQL
+                                            queries.  [default: true]
+  --contrib-unique-data                     Forces the generation of unique test
+                                            cases.
+  --contrib-openapi-formats-uuid            Enables support for the 'uuid'
+                                            string format in OpenAPI.
+  --contrib-openapi-fill-missing-examples   Enables generation of random
+                                            examples for API operations that do
+                                            not have explicit examples defined.
+  -t, --target [response_time|all]          Guides input generation to values
+                                            more likely to expose bugs via
+                                            targeted property-based testing.
+
+Open API options:
+  --force-schema-version [20|30]  Forces the schema to be interpreted as a
+                                  particular OpenAPI version.
   --set-query TEXT                OpenAPI: Override a specific query parameter
                                   by specifying 'parameter=value'
   --set-header TEXT               OpenAPI: Override a specific header parameter
@@ -144,98 +176,66 @@ Generic:
                                   by specifying 'parameter=value'
   --set-path TEXT                 OpenAPI: Override a specific path parameter by
                                   specifying 'parameter=value'
-  -H, --header TEXT               Adds a custom HTTP header to all API requests.
-                                  Format: 'Header-Name: Value'.
-  -w, --workers [auto|1-64]       Sets the number of concurrent workers for
-                                  testing. Auto-adjusts if 'auto' is specified.
-                                  [default: 1]
-  -b, --base-url TEXT             Provides the base URL of the API, required
-                                  when schema is provided as a file.
-  --app TEXT                      Specifies the WSGI/ASGI application under
-                                  test, provided as an importable Python path.
-  --wait-for-schema FLOAT RANGE   Maximum duration, in seconds, to wait for the
-                                  API schema to become available.  [x>=1.0]
-  --request-timeout INTEGER RANGE
-                                  Sets a timeout limit, in milliseconds, for
-                                  each network request during tests.  [x>=1]
-  --request-proxy TEXT            Set the proxy for all network requests.
-  --request-tls-verify TEXT       Configures TLS certificate verification for
-                                  server requests. Can specify path to CA_BUNDLE
-                                  for custom certs.  [default: true]
-  --request-cert PATH             File path of unencrypted client certificate
-                                  for authentication. The certificate can be
-                                  bundled with a private key (e.g. PEM) or the
-                                  private key can be provided with the
-                                  --request-cert-key argument.
-  --request-cert-key PATH         Specifies the file path of the private key for
-                                  the client certificate.
-  --junit-xml FILENAME            Outputs a JUnit-XML style report at the
-                                  specified file path.
-  --report TEXT                   Specifies how the generated report should be
-                                  handled. If used without an argument, the
-                                  report data will automatically be uploaded to
-                                  Schemathesis.io. If a file name is provided,
-                                  the report will be stored in that file. The
-                                  report data, consisting of a tar gz file with
-                                  multiple JSON files, is subject to change.
-  --debug-output-file FILENAME    Saves debugging information in a JSONL format
-                                  at the specified file path.
-  --show-trace                    Displays complete traceback information for
-                                  internal errors.
-  --code-sample-style [python|curl]
-                                  Selects the code sample style for reproducing
-                                  failures.
-  --cassette-path FILENAME        Saves the test outcomes in a VCR-compatible
-                                  format.
-  --cassette-format [vcr|har]     Format of the saved cassettes.
-  --cassette-preserve-exact-body-bytes
-                                  Retains exact byte sequence of payloads in
-                                  cassettes, encoded as base64.
-  --fixups [fast_api|utf8_bom|all]
-                                  Applies compatibility adjustments like
-                                  'fast_api', 'utf8_bom'.
-  --rate-limit TEXT               Specifies a rate limit for test requests in
-                                  '<limit>/<duration>' format. Example - `100/m`
-                                  for 100 requests per minute.
-  --stateful [none|links]         Enables or disables stateful testing features.
-  --force-schema-version [20|30]  Forces the schema to be interpreted as a
-                                  particular OpenAPI version.
-  --sanitize-output BOOLEAN       Enable or disable automatic output
-                                  sanitization to obscure sensitive data.
-                                  [default: True]
-  --contrib-unique-data           Forces the generation of unique test cases.
-  --contrib-openapi-formats-uuid  Enables support for the 'uuid' string format
-                                  in OpenAPI.
-  --contrib-openapi-fill-missing-examples
-                                  Enables generation of random examples for API
-                                  operations that do not have explicit examples
-                                  defined.
-  --no-color                      Disable ANSI color escape codes.
-  --force-color                   Explicitly tells to enable ANSI color escape
-                                  codes.
-  --experimental [openapi-3.1|schema-analysis|stateful-test-runner|stateful-only|coverage-phase]
-                                  Enable experimental support for specific
-                                  features.
-  --output-truncate TEXT          Specifies whether to truncate schemas and
-                                  responses in error messages.  [default: true]
-  --generation-allow-x00 TEXT     Determines whether to allow the generation of
-                                  ` ` bytes within strings.  [default: true]
-  --generation-codec TEXT         Specifies the codec used for generating
-                                  strings.
-  --generation-with-security-parameters TEXT
-                                  Whether to generate security parameters.
-                                  [default: true]
-  --generation-graphql-allow-null TEXT
-                                  Whether `null` values should be used for
-                                  optional arguments in GraphQL queries.
-                                  [default: true]
-  --schemathesis-io-token TEXT    Schemathesis.io authentication token.
-  --schemathesis-io-url TEXT      Schemathesis.io base URL.
-  --schemathesis-io-telemetry TEXT
-                                  Controls whether you send anonymized CLI usage
-                                  data to Schemathesis.io along with your
-                                  report.  [default: true]
-  --hosts-file FILE               Path to a file to store the Schemathesis.io
-                                  auth configuration.
-  -v, --verbosity                 Increase verbosity of the output.
-  --help                          Show this message and exit.
+
+Hypothesis engine options:
+  --hypothesis-database TEXT                Configures storage for examples
+                                            discovered by Hypothesis. Use 'none'
+                                            to disable, ':memory:' for temporary
+                                            storage, or specify a file path for
+                                            persistent storage.
+  --hypothesis-deadline INTEGER RANGE       Sets a time limit for each test case
+                                            generated by Hypothesis, in
+                                            milliseconds. Exceeding this limit
+                                            will cause the test to fail.
+                                            [1<=x<=300000]
+  --hypothesis-derandomize                  Enables deterministic mode in
+                                            Hypothesis, which eliminates random
+                                            variation between test runs.
+  --hypothesis-max-examples INTEGER RANGE   Sets the cap on the number of
+                                            examples generated by Hypothesis for
+                                            each API method/path pair.  [x>=1]
+  --hypothesis-phases [explicit|reuse|generate|target|shrink]
+                                            Specifies which testing phases to
+                                            execute.
+  --hypothesis-no-phases [explicit|reuse|generate|target|shrink]
+                                            Specifies which testing phases to
+                                            exclude from execution.
+  --hypothesis-report-multiple-bugs BOOLEAN
+                                            If set, only the most easily
+                                            reproducible exception will be
+                                            reported when multiple issues are
+                                            found.
+  --hypothesis-seed INTEGER                 Sets a seed value for Hypothesis,
+                                            ensuring reproducibility across test
+                                            runs.
+  --hypothesis-suppress-health-check [data_too_large|filter_too_much|too_slow|large_base_example|all]
+                                            Disables specified health checks
+                                            from Hypothesis like
+                                            'data_too_large', 'filter_too_much',
+                                            etc. Provide a comma-separated list
+  --hypothesis-verbosity [quiet|normal|verbose|debug]
+                                            Controls the verbosity level of
+                                            Hypothesis output.
+
+Schemathesis.io options:
+  --report TEXT                     Specifies how the generated report should be
+                                    handled. If used without an argument, the
+                                    report data will automatically be uploaded
+                                    to Schemathesis.io. If a file name is
+                                    provided, the report will be stored in that
+                                    file. The report data, consisting of a tar
+                                    gz file with multiple JSON files, is subject
+                                    to change.
+  --schemathesis-io-token TEXT      Schemathesis.io authentication token.
+  --schemathesis-io-url TEXT        Schemathesis.io base URL.
+  --schemathesis-io-telemetry TEXT  Controls whether you send anonymized CLI
+                                    usage data to Schemathesis.io along with
+                                    your report.  [default: true]
+  --hosts-file FILE                 Path to a file to store the Schemathesis.io
+                                    auth configuration.
+
+Global options:
+  -v, --verbosity  Increase verbosity of the output.
+  --no-color       Disable ANSI color escape codes.
+  --force-color    Explicitly tells to enable ANSI color escape codes.
+  -h, --help       Show this message and exit.

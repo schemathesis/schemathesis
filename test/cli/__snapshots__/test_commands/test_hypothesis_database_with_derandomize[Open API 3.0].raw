@@ -2,6 +2,6 @@ Exit code: 2
 ---
 Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
-Try 'run --help' for help.
+Try 'run -h' for help.
 
 Error: `--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid.

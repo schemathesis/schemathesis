@@ -1,15 +1,5 @@
-"""Schema objects provide a convenient interface to raw schemas.
-
-Their responsibilities:
-  - Provide a unified way to work with different types of schemas
-  - Give all paths / methods combinations that are available directly from the schema;
-
-They give only static definitions of paths.
-"""
-
 from __future__ import annotations
 
-import enum
 from collections.abc import Mapping
 from contextlib import nullcontext
 from dataclasses import dataclass, field
@@ -70,6 +60,7 @@ from .types import (
     NotSet,
     PathParameters,
     Query,
+    Specification,
 )
 from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
@@ -84,13 +75,6 @@ C = TypeVar("C", bound=Case)
 @lru_cache
 def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
-
-
-class Specification(str, enum.Enum):
-    """Specification of the given schema."""
-
-    OPENAPI = "openapi"
-    GRAPHQL = "graphql"
 
 
 @dataclass(eq=False)

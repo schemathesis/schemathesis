@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import enum
 import io
 import os
 import sys
@@ -141,16 +140,11 @@ def schemathesis(pre_run: str | None = None) -> None:
         load_hook(hooks)
 
 
-class ParameterGroup(enum.Enum):
-    filtering = "Testing scope", "Customize the scope of the API testing."
-    validation = "Response & Schema validation", "These options specify how API responses and schemas are validated."
-    hypothesis = "Hypothesis engine", "Configuration of the underlying Hypothesis engine."
-    generic = "Generic", None
+GROUPS: list[str] = []
 
 
-class CommandWithCustomHelp(click.Command):
+class CommandWithGroupedOptions(click.Command):
     def format_options(self, ctx: click.Context, formatter: click.HelpFormatter) -> None:
-        # Group options first
         groups = defaultdict(list)
         for param in self.get_params(ctx):
             rv = param.get_help_record(ctx)
@@ -158,32 +152,43 @@ class CommandWithCustomHelp(click.Command):
                 if isinstance(param, GroupedOption):
                     group = param.group
                 else:
-                    group = ParameterGroup.generic
+                    group = "Global options"
                 groups[group].append(rv)
-        # Then display groups separately with optional description
-        for group in ParameterGroup:
-            opts = groups[group]
-            title, description = group.value
-            with formatter.section(title):
-                if description:
-                    formatter.write_paragraph()
-                    formatter.write_text(description)
-                    formatter.write_paragraph()
-                formatter.write_dl(opts)
+        for group in GROUPS:
+            with formatter.section(group or "Options"):
+                formatter.write_dl(groups[group], col_max=40)
 
 
 class GroupedOption(click.Option):
-    def __init__(self, *args: Any, group: ParameterGroup, **kwargs: Any):
+    def __init__(self, *args: Any, group: str | None = None, **kwargs: Any):
         super().__init__(*args, **kwargs)
         self.group = group
 
 
-with_request_proxy = click.option(
+def group(name: str) -> Callable:
+    GROUPS.append(name)
+
+    def _inner(cmd: Callable) -> Callable:
+        for param in reversed(cmd.__click_params__):  # type: ignore[attr-defined]
+            if not isinstance(param, GroupedOption) or param.group is not None:
+                break
+            param.group = name
+        return cmd
+
+    return _inner
+
+
+def grouped_option(*args: Any, **kwargs: Any) -> Callable:
+    kwargs.setdefault("cls", GroupedOption)
+    return click.option(*args, **kwargs)
+
+
+with_request_proxy = grouped_option(
     "--request-proxy",
     help="Set the proxy for all network requests.",
     type=str,
 )
-with_request_tls_verify = click.option(
+with_request_tls_verify = grouped_option(
     "--request-tls-verify",
     help="Configures TLS certificate verification for server requests. Can specify path to CA_BUNDLE for custom certs.",
     type=str,
@@ -191,7 +196,7 @@ with_request_tls_verify = click.option(
     show_default=True,
     callback=callbacks.convert_boolean_string,
 )
-with_request_cert = click.option(
+with_request_cert = grouped_option(
     "--request-cert",
     help="File path of unencrypted client certificate for authentication. "
     "The certificate can be bundled with a private key (e.g. PEM) or the private "
@@ -200,7 +205,7 @@ with_request_cert = click.option(
     default=None,
     show_default=False,
 )
-with_request_cert_key = click.option(
+with_request_cert_key = grouped_option(
     "--request-cert-key",
     help="Specifies the file path of the private key for the client certificate.",
     type=click.Path(exists=True),
@@ -208,7 +213,7 @@ with_request_cert_key = click.option(
     show_default=False,
     callback=callbacks.validate_request_cert_key,
 )
-with_hosts_file = click.option(
+with_hosts_file = grouped_option(
     "--hosts-file",
     help="Path to a file to store the Schemathesis.io auth configuration.",
     type=click.Path(dir_okay=False, writable=True),
@@ -230,13 +235,11 @@ def _with_filter(*, by: str, mode: Literal["include", "exclude"], modifier: Lite
         param += f"-{modifier}"
         prop += " pattern"
     help_text = f"{prop} to {action} testing."
-    return click.option(
+    return grouped_option(
         param,
         help=help_text,
         type=str,
         multiple=modifier is None,
-        cls=GroupedOption,
-        group=ParameterGroup.filtering,
     )
 
 
@@ -258,217 +261,15 @@ class ReportToService:
 REPORT_TO_SERVICE = ReportToService()
 
 
-@schemathesis.command(short_help="Execute automated tests based on API specifications.", cls=CommandWithCustomHelp)
+@schemathesis.command(
+    short_help="Execute automated tests based on API specifications.",
+    cls=CommandWithGroupedOptions,
+    context_settings={"terminal_width": output.default.get_terminal_width(), **CONTEXT_SETTINGS},
+)
 @click.argument("schema", type=str)
 @click.argument("api_name", type=str, required=False, envvar=API_NAME_ENV_VAR)
-@click.option(
-    "--checks",
-    "-c",
-    multiple=True,
-    help="Specifies the validation checks to apply to API responses. "
-    "Provide a comma-separated list of checks such as 'not_a_server_error,status_code_conformance', etc. "
-    f"Default is '{','.join(DEFAULT_CHECKS_NAMES)}'.",
-    type=CHECKS_TYPE,
-    default=DEFAULT_CHECKS_NAMES,
-    cls=GroupedOption,
-    group=ParameterGroup.validation,
-    callback=callbacks.convert_checks,
-    show_default=True,
-)
-@click.option(
-    "--exclude-checks",
-    multiple=True,
-    help="Specifies the validation checks to skip during testing. "
-    "Provide a comma-separated list of checks you wish to bypass.",
-    type=EXCLUDE_CHECKS_TYPE,
-    default=[],
-    cls=GroupedOption,
-    group=ParameterGroup.validation,
-    callback=callbacks.convert_checks,
-    show_default=True,
-)
-@click.option(
-    "--data-generation-method",
-    "-D",
-    "data_generation_methods",
-    help="Specifies the approach Schemathesis uses to generate test data. "
-    "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both. "
-    "Default is 'positive'.",
-    type=DATA_GENERATION_METHOD_TYPE,
-    default=DataGenerationMethod.default().name,
-    callback=callbacks.convert_data_generation_method,
-    show_default=True,
-)
-@click.option(
-    "--max-response-time",
-    help="Sets a custom time limit for API response times. "
-    "The test will fail if a response time exceeds this limit. "
-    "Provide the time in milliseconds.",
-    type=click.IntRange(min=1),
-    cls=GroupedOption,
-    group=ParameterGroup.validation,
-)
-@click.option(
-    "--target",
-    "-t",
-    "targets",
-    multiple=True,
-    help="Guides input generation to values more likely to expose bugs via targeted property-based testing.",
-    type=TARGETS_TYPE,
-    default=DEFAULT_TARGETS_NAMES,
-    show_default=True,
-)
-@click.option(
-    "-x",
-    "--exitfirst",
-    "exit_first",
-    is_flag=True,
-    default=False,
-    help="Terminates the test suite immediately upon the first failure or error encountered.",
-    show_default=True,
-)
-@click.option(
-    "--max-failures",
-    "max_failures",
-    type=click.IntRange(min=1),
-    help="Terminates the test suite after reaching a specified number of failures or errors.",
-    show_default=True,
-)
-@click.option(
-    "--dry-run",
-    "dry_run",
-    is_flag=True,
-    default=False,
-    help="Simulates test execution without making any actual requests, useful for validating data generation.",
-)
-@click.option(
-    "--auth",
-    "-a",
-    help="Provides the server authentication details in the 'USER:PASSWORD' format.",
-    type=str,
-    callback=callbacks.validate_auth,
-)
-@click.option(
-    "--auth-type",
-    "-A",
-    type=click.Choice(["basic", "digest"], case_sensitive=False),
-    default="basic",
-    help="Specifies the authentication method. Default is 'basic'.",
-    show_default=True,
-)
-@click.option(
-    "--set-query",
-    "set_query",
-    help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=callbacks.validate_set_query,
-)
-@click.option(
-    "--set-header",
-    "set_header",
-    help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=callbacks.validate_set_header,
-)
-@click.option(
-    "--set-cookie",
-    "set_cookie",
-    help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=callbacks.validate_set_cookie,
-)
-@click.option(
-    "--set-path",
-    "set_path",
-    help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=callbacks.validate_set_path,
-)
-@click.option(
-    "--header",
-    "-H",
-    "headers",
-    help=r"Adds a custom HTTP header to all API requests. Format: 'Header-Name: Value'.",
-    multiple=True,
-    type=str,
-    callback=callbacks.validate_headers,
-)
-@with_filters
-@click.option(
-    "--include-by",
-    "include_by",
-    type=str,
-    help="Include API operations by expression",
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--exclude-by",
-    "exclude_by",
-    type=str,
-    help="Exclude API operations by expression",
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--exclude-deprecated",
-    help="Exclude deprecated API operations from testing.",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--endpoint",
-    "-E",
-    "endpoints",
-    type=str,
-    multiple=True,
-    help=r"API operation path pattern (e.g., users/\d+).",
-    callback=callbacks.validate_regex,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--method",
-    "-M",
-    "methods",
-    type=str,
-    multiple=True,
-    help="HTTP method (e.g., GET, POST).",
-    callback=callbacks.validate_regex,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--tag",
-    "-T",
-    "tags",
-    type=str,
-    multiple=True,
-    help="Schema tag pattern.",
-    callback=callbacks.validate_regex,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--operation-id",
-    "-O",
-    "operation_ids",
-    type=str,
-    multiple=True,
-    help="OpenAPI operationId pattern.",
-    callback=callbacks.validate_regex,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
+@group("Options")
+@grouped_option(
     "--workers",
     "-w",
     "workers_num",
@@ -481,279 +282,17 @@ REPORT_TO_SERVICE = ReportToService()
     show_default=True,
     callback=callbacks.convert_workers,
 )
-@click.option(
-    "--base-url",
-    "-b",
-    help="Provides the base URL of the API, required when schema is provided as a file.",
-    type=str,
-    callback=callbacks.validate_base_url,
-    envvar=BASE_URL_ENV_VAR,
-)
-@click.option(
-    "--app",
-    help="Specifies the WSGI/ASGI application under test, provided as an importable Python path.",
-    type=str,
-    callback=callbacks.validate_app,
-)
-@click.option(
-    "--wait-for-schema",
-    help="Maximum duration, in seconds, to wait for the API schema to become available.",
-    type=click.FloatRange(1.0),
-    default=None,
-    envvar=WAIT_FOR_SCHEMA_ENV_VAR,
-)
-@click.option(
-    "--request-timeout",
-    help="Sets a timeout limit, in milliseconds, for each network request during tests.",
-    type=click.IntRange(1),
-    default=DEFAULT_RESPONSE_TIMEOUT,
-)
-@with_request_proxy
-@with_request_tls_verify
-@with_request_cert
-@with_request_cert_key
-@click.option(
-    "--validate-schema",
-    help="Toggles validation of incoming payloads against the defined API schema. "
-    "Set to 'True' to enable or 'False' to disable. "
-    "Default is 'False'.",
-    type=bool,
-    default=False,
-    show_default=True,
-    cls=GroupedOption,
-    group=ParameterGroup.validation,
-)
-@click.option(
-    "--skip-deprecated-operations",
-    help="Exclude deprecated API operations from testing.",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
-    cls=GroupedOption,
-    group=ParameterGroup.filtering,
-)
-@click.option(
-    "--junit-xml",
-    help="Outputs a JUnit-XML style report at the specified file path.",
-    type=click.File("w", encoding="utf-8"),
-)
-@click.option(
-    "--report",
-    "report_value",
-    help="""Specifies how the generated report should be handled.
-If used without an argument, the report data will automatically be uploaded to Schemathesis.io.
-If a file name is provided, the report will be stored in that file.
-The report data, consisting of a tar gz file with multiple JSON files, is subject to change.""",
-    is_flag=False,
-    flag_value="",
-    envvar=service.REPORT_ENV_VAR,
-    callback=callbacks.convert_report,  # type: ignore
-)
-@click.option(
-    "--debug-output-file",
-    help="Saves debugging information in a JSONL format at the specified file path.",
-    type=click.File("w", encoding="utf-8"),
-)
-@click.option(
-    "--show-errors-tracebacks",
-    help="Displays complete traceback information for internal errors.",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    hidden=True,
-    show_default=True,
-)
-@click.option(
-    "--show-trace",
-    help="Displays complete traceback information for internal errors.",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
-)
-@click.option(
-    "--code-sample-style",
-    help="Selects the code sample style for reproducing failures.",
-    type=click.Choice([item.name for item in CodeSampleStyle]),
-    default=CodeSampleStyle.default().name,
-    callback=callbacks.convert_code_sample_style,
-)
-@click.option(
-    "--cassette-path",
-    help="Saves the test outcomes in a VCR-compatible format.",
-    type=click.File("w", encoding="utf-8"),
-    is_eager=True,
-)
-@click.option(
-    "--cassette-format",
-    help="Format of the saved cassettes.",
-    type=click.Choice([item.name.lower() for item in cassettes.CassetteFormat]),
-    default=cassettes.CassetteFormat.VCR.name.lower(),
-    callback=callbacks.convert_cassette_format,
-)
-@click.option(
-    "--cassette-preserve-exact-body-bytes",
-    help="Retains exact byte sequence of payloads in cassettes, encoded as base64.",
-    is_flag=True,
-    callback=callbacks.validate_preserve_exact_body_bytes,
-)
-@click.option(
-    "--store-network-log",
-    help="Saves the test outcomes in a VCR-compatible format.",
-    type=click.File("w", encoding="utf-8"),
-    hidden=True,
-)
-@click.option(
-    "--fixups",
-    help="Applies compatibility adjustments like 'fast_api', 'utf8_bom'.",
-    multiple=True,
-    type=click.Choice(list(ALL_FIXUPS) + ["all"]),
-)
-@click.option(
-    "--rate-limit",
-    help="Specifies a rate limit for test requests in '<limit>/<duration>' format. "
-    "Example - `100/m` for 100 requests per minute.",
-    type=str,
-    callback=callbacks.validate_rate_limit,
-)
-@click.option(
-    "--stateful",
-    help="Enables or disables stateful testing features.",
-    type=click.Choice([item.name for item in Stateful]),
-    default=Stateful.links.name,
-    callback=callbacks.convert_stateful,
-)
-@click.option(
-    "--stateful-recursion-limit",
-    help="Sets the recursion depth limit for stateful testing.",
-    default=DEFAULT_STATEFUL_RECURSION_LIMIT,
-    show_default=True,
-    type=click.IntRange(1, 100),
-    hidden=True,
-)
-@click.option(
-    "--force-schema-version",
-    help="Forces the schema to be interpreted as a particular OpenAPI version.",
-    type=click.Choice(["20", "30"]),
-)
-@click.option(
-    "--sanitize-output",
-    type=bool,
-    default=True,
-    show_default=True,
-    help="Enable or disable automatic output sanitization to obscure sensitive data.",
-)
-@click.option(
-    "--contrib-unique-data",
-    "contrib_unique_data",
-    help="Forces the generation of unique test cases.",
+@grouped_option(
+    "--dry-run",
+    "dry_run",
     is_flag=True,
     default=False,
-    show_default=True,
+    help="Simulates test execution without making any actual requests, useful for validating data generation.",
 )
-@click.option(
-    "--contrib-openapi-formats-uuid",
-    "contrib_openapi_formats_uuid",
-    help="Enables support for the 'uuid' string format in OpenAPI.",
-    is_flag=True,
-    default=False,
-    show_default=True,
-)
-@click.option(
-    "--contrib-openapi-fill-missing-examples",
-    "contrib_openapi_fill_missing_examples",
-    help="Enables generation of random examples for API operations that do not have explicit examples defined.",
-    is_flag=True,
-    default=False,
-    show_default=True,
-)
-@click.option(
-    "--hypothesis-database",
-    help="Configures storage for examples discovered by Hypothesis. "
-    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
-    f"or specify a file path for persistent storage.",
-    type=str,
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-    callback=callbacks.validate_hypothesis_database,
-)
-@click.option(
-    "--hypothesis-deadline",
-    help="Sets a time limit for each test case generated by Hypothesis, in milliseconds. "
-    "Exceeding this limit will cause the test to fail.",
-    # max value to avoid overflow. It is the maximum amount of days in milliseconds
-    type=OptionalInt(1, 999999999 * 24 * 3600 * 1000),
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-derandomize",
-    help="Enables deterministic mode in Hypothesis, which eliminates random variation between test runs.",
-    is_flag=True,
-    is_eager=True,
-    default=None,
-    show_default=True,
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-max-examples",
-    help="Sets the cap on the number of examples generated by Hypothesis for each API method/path pair.",
-    type=click.IntRange(1),
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-phases",
-    help="Specifies which testing phases to execute.",
-    type=CsvEnumChoice(Phase),
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-no-phases",
-    help="Specifies which testing phases to exclude from execution.",
-    type=CsvEnumChoice(Phase),
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-report-multiple-bugs",
-    help="If set, only the most easily reproducible exception will be reported when multiple issues are found.",
-    type=bool,
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-seed",
-    help="Sets a seed value for Hypothesis, ensuring reproducibility across test runs.",
-    type=int,
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-suppress-health-check",
-    help="Disables specified health checks from Hypothesis like 'data_too_large', 'filter_too_much', etc. "
-    "Provide a comma-separated list",
-    type=CsvEnumChoice(HealthCheck),
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option(
-    "--hypothesis-verbosity",
-    help="Controls the verbosity level of Hypothesis output.",
-    type=click.Choice([item.name for item in Verbosity]),
-    callback=callbacks.convert_verbosity,
-    cls=GroupedOption,
-    group=ParameterGroup.hypothesis,
-)
-@click.option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
-@click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
-@click.option(
+@grouped_option(
     "--experimental",
     "experiments",
-    help="Enable experimental support for specific features.",
+    help="Enable experimental features.",
     type=click.Choice(
         [
             experimental.OPEN_API_3_1.name,
@@ -766,7 +305,240 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     callback=callbacks.convert_experimental,
     multiple=True,
 )
-@click.option(
+@grouped_option(
+    "--fixups",
+    help="Applies compatibility adjustments like 'fast_api', 'utf8_bom'.",
+    multiple=True,
+    type=click.Choice(list(ALL_FIXUPS) + ["all"]),
+)
+@group("API validation options")
+@grouped_option(
+    "--checks",
+    "-c",
+    multiple=True,
+    help="Specifies the validation checks to apply to API responses. "
+    "Provide a comma-separated list of checks such as 'not_a_server_error,status_code_conformance', etc. "
+    f"Default is '{','.join(DEFAULT_CHECKS_NAMES)}'.",
+    type=CHECKS_TYPE,
+    default=DEFAULT_CHECKS_NAMES,
+    callback=callbacks.convert_checks,
+    show_default=True,
+)
+@grouped_option(
+    "--exclude-checks",
+    multiple=True,
+    help="Specifies the validation checks to skip during testing. "
+    "Provide a comma-separated list of checks you wish to bypass.",
+    type=EXCLUDE_CHECKS_TYPE,
+    default=[],
+    callback=callbacks.convert_checks,
+    show_default=True,
+)
+@grouped_option(
+    "--max-response-time",
+    help="Sets a custom time limit for API response times. "
+    "The test will fail if a response time exceeds this limit. "
+    "Provide the time in milliseconds.",
+    type=click.IntRange(min=1),
+)
+@grouped_option(
+    "-x",
+    "--exitfirst",
+    "exit_first",
+    is_flag=True,
+    default=False,
+    help="Terminates the test suite immediately upon the first failure or error encountered.",
+    show_default=True,
+)
+@grouped_option(
+    "--max-failures",
+    "max_failures",
+    type=click.IntRange(min=1),
+    help="Terminates the test suite after reaching a specified number of failures or errors.",
+    show_default=True,
+)
+@group("Loader options")
+@grouped_option(
+    "--app",
+    help="Specifies the WSGI/ASGI application under test, provided as an importable Python path.",
+    type=str,
+    callback=callbacks.validate_app,
+)
+@grouped_option(
+    "--wait-for-schema",
+    help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default.",
+    type=click.FloatRange(1.0),
+    default=None,
+    envvar=WAIT_FOR_SCHEMA_ENV_VAR,
+)
+@grouped_option(
+    "--validate-schema",
+    help="Validates the input API schema. Set to 'true' to enable or 'false' to disable.",
+    type=bool,
+    default=False,
+    show_default=True,
+)
+@group("Network requests options")
+@grouped_option(
+    "--base-url",
+    "-b",
+    help="Provides the base URL of the API, required when schema is provided as a file.",
+    type=str,
+    callback=callbacks.validate_base_url,
+    envvar=BASE_URL_ENV_VAR,
+)
+@grouped_option(
+    "--request-timeout",
+    help="Sets a timeout limit, in milliseconds, for each network request during tests.",
+    type=click.IntRange(1),
+    default=DEFAULT_RESPONSE_TIMEOUT,
+)
+@with_request_proxy
+@with_request_tls_verify
+@with_request_cert
+@with_request_cert_key
+@grouped_option(
+    "--rate-limit",
+    help="Specifies a rate limit for test requests in '<limit>/<duration>' format. "
+    "Example - `100/m` for 100 requests per minute.",
+    type=str,
+    callback=callbacks.validate_rate_limit,
+)
+@grouped_option(
+    "--header",
+    "-H",
+    "headers",
+    help=r"Adds a custom HTTP header to all API requests. Format: 'Header-Name: Value'.",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_headers,
+)
+@grouped_option(
+    "--auth",
+    "-a",
+    help="Provides the server authentication details in the 'USER:PASSWORD' format.",
+    type=str,
+    callback=callbacks.validate_auth,
+)
+@grouped_option(
+    "--auth-type",
+    "-A",
+    type=click.Choice(["basic", "digest"], case_sensitive=False),
+    default="basic",
+    help="Specifies the authentication method. Default is 'basic'.",
+    show_default=True,
+)
+@group("Filtering options")
+@with_filters
+@grouped_option(
+    "--include-by",
+    "include_by",
+    type=str,
+    help="Include API operations by expression",
+)
+@grouped_option(
+    "--exclude-by",
+    "exclude_by",
+    type=str,
+    help="Exclude API operations by expression",
+)
+@grouped_option(
+    "--exclude-deprecated",
+    help="Exclude deprecated API operations from testing.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    show_default=True,
+)
+@grouped_option(
+    "--endpoint",
+    "-E",
+    "endpoints",
+    type=str,
+    multiple=True,
+    help=r"[DEPRECATED] API operation path pattern (e.g., users/\d+).",
+    callback=callbacks.validate_regex,
+    hidden=True,
+)
+@grouped_option(
+    "--method",
+    "-M",
+    "methods",
+    type=str,
+    multiple=True,
+    help="[DEPRECATED] HTTP method (e.g., GET, POST).",
+    callback=callbacks.validate_regex,
+    hidden=True,
+)
+@grouped_option(
+    "--tag",
+    "-T",
+    "tags",
+    type=str,
+    multiple=True,
+    help="[DEPRECATED] Schema tag pattern.",
+    callback=callbacks.validate_regex,
+    hidden=True,
+)
+@grouped_option(
+    "--operation-id",
+    "-O",
+    "operation_ids",
+    type=str,
+    multiple=True,
+    help="[DEPRECATED] OpenAPI operationId pattern.",
+    callback=callbacks.validate_regex,
+    hidden=True,
+)
+@grouped_option(
+    "--skip-deprecated-operations",
+    help="[DEPRECATED] Exclude deprecated API operations from testing.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    show_default=True,
+    hidden=True,
+)
+@group("Output options")
+@grouped_option(
+    "--junit-xml",
+    help="Outputs a JUnit-XML style report at the specified file path.",
+    type=click.File("w", encoding="utf-8"),
+)
+@grouped_option(
+    "--cassette-path",
+    help="Saves the test outcomes in a VCR-compatible format.",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
+)
+@grouped_option(
+    "--cassette-format",
+    help="Format of the saved cassettes.",
+    type=click.Choice([item.name.lower() for item in cassettes.CassetteFormat]),
+    default=cassettes.CassetteFormat.VCR.name.lower(),
+    callback=callbacks.convert_cassette_format,
+)
+@grouped_option(
+    "--cassette-preserve-exact-body-bytes",
+    help="Retains exact byte sequence of payloads in cassettes, encoded as base64.",
+    is_flag=True,
+    callback=callbacks.validate_preserve_exact_body_bytes,
+)
+@grouped_option(
+    "--code-sample-style",
+    help="Selects the code sample style for reproducing failures.",
+    type=click.Choice([item.name for item in CodeSampleStyle]),
+    default=CodeSampleStyle.default().name,
+    callback=callbacks.convert_code_sample_style,
+)
+@grouped_option(
+    "--sanitize-output",
+    type=bool,
+    default=True,
+    show_default=True,
+    help="Enable or disable automatic output sanitization to obscure sensitive data.",
+)
+@grouped_option(
     "--output-truncate",
     help="Specifies whether to truncate schemas and responses in error messages.",
     type=str,
@@ -774,7 +546,63 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     show_default=True,
     callback=callbacks.convert_boolean_string,
 )
-@click.option(
+@grouped_option(
+    "--show-trace",
+    help="Displays complete traceback information for internal errors.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    show_default=True,
+)
+@grouped_option(
+    "--debug-output-file",
+    help="Saves debugging information in a JSONL format at the specified file path.",
+    type=click.File("w", encoding="utf-8"),
+)
+@grouped_option(
+    "--store-network-log",
+    help="[DEPRECATED] Saves the test outcomes in a VCR-compatible format.",
+    type=click.File("w", encoding="utf-8"),
+    hidden=True,
+)
+@grouped_option(
+    "--show-errors-tracebacks",
+    help="[DEPRECATED] Displays complete traceback information for internal errors.",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    hidden=True,
+    show_default=True,
+)
+@group("Data generation options")
+@grouped_option(
+    "--data-generation-method",
+    "-D",
+    "data_generation_methods",
+    help="Specifies the approach Schemathesis uses to generate test data. "
+    "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both. "
+    "Default is 'positive'.",
+    type=DATA_GENERATION_METHOD_TYPE,
+    default=DataGenerationMethod.default().name,
+    callback=callbacks.convert_data_generation_method,
+    show_default=True,
+)
+@grouped_option(
+    "--stateful",
+    help="Enables or disables stateful testing.",
+    type=click.Choice([item.name for item in Stateful]),
+    default=Stateful.links.name,
+    callback=callbacks.convert_stateful,
+)
+@grouped_option(
+    "--stateful-recursion-limit",
+    help="Sets the recursion depth limit for stateful testing.",
+    default=DEFAULT_STATEFUL_RECURSION_LIMIT,
+    show_default=True,
+    type=click.IntRange(1, 100),
+    hidden=True,
+)
+@grouped_option(
     "--generation-allow-x00",
     help="Determines whether to allow the generation of `\x00` bytes within strings.",
     type=str,
@@ -782,14 +610,14 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     show_default=True,
     callback=callbacks.convert_boolean_string,
 )
-@click.option(
+@grouped_option(
     "--generation-codec",
     help="Specifies the codec used for generating strings.",
     type=str,
     default="utf-8",
     callback=callbacks.validate_generation_codec,
 )
-@click.option(
+@grouped_option(
     "--generation-with-security-parameters",
     help="Whether to generate security parameters.",
     type=str,
@@ -797,7 +625,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     show_default=True,
     callback=callbacks.convert_boolean_string,
 )
-@click.option(
+@grouped_option(
     "--generation-graphql-allow-null",
     help="Whether `null` values should be used for optional arguments in GraphQL queries.",
     type=str,
@@ -805,20 +633,165 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     show_default=True,
     callback=callbacks.convert_boolean_string,
 )
-@click.option(
+@grouped_option(
+    "--contrib-unique-data",
+    "contrib_unique_data",
+    help="Forces the generation of unique test cases.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@grouped_option(
+    "--contrib-openapi-formats-uuid",
+    "contrib_openapi_formats_uuid",
+    help="Enables support for the 'uuid' string format in OpenAPI.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@grouped_option(
+    "--contrib-openapi-fill-missing-examples",
+    "contrib_openapi_fill_missing_examples",
+    help="Enables generation of random examples for API operations that do not have explicit examples defined.",
+    is_flag=True,
+    default=False,
+    show_default=True,
+)
+@grouped_option(
+    "--target",
+    "-t",
+    "targets",
+    multiple=True,
+    help="Guides input generation to values more likely to expose bugs via targeted property-based testing.",
+    type=TARGETS_TYPE,
+    default=DEFAULT_TARGETS_NAMES,
+    show_default=True,
+)
+@group("Open API options")
+@grouped_option(
+    "--force-schema-version",
+    help="Forces the schema to be interpreted as a particular OpenAPI version.",
+    type=click.Choice(["20", "30"]),
+)
+@grouped_option(
+    "--set-query",
+    "set_query",
+    help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_query,
+)
+@grouped_option(
+    "--set-header",
+    "set_header",
+    help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_header,
+)
+@grouped_option(
+    "--set-cookie",
+    "set_cookie",
+    help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_cookie,
+)
+@grouped_option(
+    "--set-path",
+    "set_path",
+    help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
+    multiple=True,
+    type=str,
+    callback=callbacks.validate_set_path,
+)
+@group("Hypothesis engine options")
+@grouped_option(
+    "--hypothesis-database",
+    help="Configures storage for examples discovered by Hypothesis. "
+    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
+    f"or specify a file path for persistent storage.",
+    type=str,
+    callback=callbacks.validate_hypothesis_database,
+)
+@grouped_option(
+    "--hypothesis-deadline",
+    help="Sets a time limit for each test case generated by Hypothesis, in milliseconds. "
+    "Exceeding this limit will cause the test to fail.",
+    type=OptionalInt(1, 5 * 60 * 1000),
+)
+@grouped_option(
+    "--hypothesis-derandomize",
+    help="Enables deterministic mode in Hypothesis, which eliminates random variation between test runs.",
+    is_flag=True,
+    is_eager=True,
+    default=None,
+    show_default=True,
+)
+@grouped_option(
+    "--hypothesis-max-examples",
+    help="Sets the cap on the number of examples generated by Hypothesis for each API method/path pair.",
+    type=click.IntRange(1),
+)
+@grouped_option(
+    "--hypothesis-phases",
+    help="Specifies which testing phases to execute.",
+    type=CsvEnumChoice(Phase),
+)
+@grouped_option(
+    "--hypothesis-no-phases",
+    help="Specifies which testing phases to exclude from execution.",
+    type=CsvEnumChoice(Phase),
+)
+@grouped_option(
+    "--hypothesis-report-multiple-bugs",
+    help="If set, only the most easily reproducible exception will be reported when multiple issues are found.",
+    type=bool,
+)
+@grouped_option(
+    "--hypothesis-seed",
+    help="Sets a seed value for Hypothesis, ensuring reproducibility across test runs.",
+    type=int,
+)
+@grouped_option(
+    "--hypothesis-suppress-health-check",
+    help="Disables specified health checks from Hypothesis like 'data_too_large', 'filter_too_much', etc. "
+    "Provide a comma-separated list",
+    type=CsvEnumChoice(HealthCheck),
+)
+@grouped_option(
+    "--hypothesis-verbosity",
+    help="Controls the verbosity level of Hypothesis output.",
+    type=click.Choice([item.name for item in Verbosity]),
+    callback=callbacks.convert_verbosity,
+)
+@group("Schemathesis.io options")
+@grouped_option(
+    "--report",
+    "report_value",
+    help="""Specifies how the generated report should be handled.
+If used without an argument, the report data will automatically be uploaded to Schemathesis.io.
+If a file name is provided, the report will be stored in that file.
+The report data, consisting of a tar gz file with multiple JSON files, is subject to change.""",
+    is_flag=False,
+    flag_value="",
+    envvar=service.REPORT_ENV_VAR,
+    callback=callbacks.convert_report,  # type: ignore
+)
+@grouped_option(
     "--schemathesis-io-token",
     help="Schemathesis.io authentication token.",
     type=str,
     envvar=service.TOKEN_ENV_VAR,
 )
-@click.option(
+@grouped_option(
     "--schemathesis-io-url",
     help="Schemathesis.io base URL.",
     default=service.DEFAULT_URL,
     type=str,
     envvar=service.URL_ENV_VAR,
 )
-@click.option(
+@grouped_option(
     "--schemathesis-io-telemetry",
     help="Controls whether you send anonymized CLI usage data to Schemathesis.io along with your report.",
     type=str,
@@ -828,7 +801,10 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     envvar=service.TELEMETRY_ENV_VAR,
 )
 @with_hosts_file
-@click.option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
+@group("Global options")
+@grouped_option("--verbosity", "-v", help="Increase verbosity of the output.", count=True)
+@grouped_option("--no-color", help="Disable ANSI color escape codes.", type=bool, is_flag=True)
+@grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes.", type=bool, is_flag=True)
 @click.pass_context
 def run(
     ctx: click.Context,
@@ -2010,6 +1986,25 @@ def decide_color_output(ctx: click.Context, no_color: bool, force_color: bool) -
 def add_option(*args: Any, cls: Type = click.Option, **kwargs: Any) -> None:
     """Add a new CLI option to `st run`."""
     run.params.append(cls(args, **kwargs))
+
+
+@dataclass
+class Group:
+    name: str
+
+    def add_option(self, *args: Any, **kwargs: Any) -> None:
+        kwargs["cls"] = GroupedOption
+        kwargs["group"] = self.name
+        add_option(*args, **kwargs)
+
+
+def add_group(name: str, *, index: int | None = None) -> Group:
+    """Add a custom options group to `st run`."""
+    if index is not None:
+        GROUPS.insert(index, name)
+    else:
+        GROUPS.append(name)
+    return Group(name)
 
 
 def handler() -> Callable[[Type], None]:

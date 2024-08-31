@@ -26,7 +26,7 @@ from ...loaders import load_schema_from_url, load_yaml
 from ...throttling import build_limiter
 from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
-from ...types import Filter, NotSet, PathLike
+from ...types import Filter, NotSet, PathLike, Specification
 from . import definitions, validation
 
 if TYPE_CHECKING:
@@ -316,7 +316,6 @@ def from_dict(
     """
     from ... import transports
     from .schemas import OpenApi30, SwaggerV20
-    from ...schemas import Specification
 
     if not isinstance(raw_schema, dict):
         raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)

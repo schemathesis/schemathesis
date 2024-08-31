@@ -21,7 +21,7 @@ from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...transports.headers import setup_default_headers
-from ...types import PathLike
+from ...types import PathLike, Specification
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
@@ -242,7 +242,6 @@ def from_dict(
     :return: GraphQLSchema
     """
     from ... import transports
-    from ...schemas import Specification
     from .schemas import GraphQLSchema
 
     _code_sample_style = CodeSampleStyle.from_str(code_sample_style)

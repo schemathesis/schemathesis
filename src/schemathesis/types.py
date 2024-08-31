@@ -1,3 +1,4 @@
+import enum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Set, Tuple, Union
 
@@ -34,3 +35,10 @@ Hook = Union[
 RawAuth = Tuple[str, str]
 # Generic test with any arguments and no return
 GenericTest = Callable[..., None]
+
+
+class Specification(str, enum.Enum):
+    """Specification of the given schema."""
+
+    OPENAPI = "openapi"
+    GRAPHQL = "graphql"
