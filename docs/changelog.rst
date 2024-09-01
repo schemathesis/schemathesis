@@ -12,6 +12,7 @@ Changelog
 **Fixed**
 
 - Ensure that the ``-D`` CLI option is respected in the coverage phase.
+- Prevent stateful tests failing with ``Unsatisfiable`` if it they previously had successfully generated test cases.
 
 .. _v3.35.1:
 
