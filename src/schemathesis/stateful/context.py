@@ -48,6 +48,8 @@ class RunnerContext:
     current_response: GenericResponse | None = None
     # Total number of failures
     failures_count: int = 0
+    # The total number of completed test scenario
+    completed_scenarios: int = 0
     # Metrics collector for targeted testing
     metric_collector: TargetMetricCollector = field(default_factory=lambda: TargetMetricCollector(targets=[]))
 
@@ -64,6 +66,7 @@ class RunnerContext:
         return events.ScenarioStatus.REJECTED
 
     def reset_scenario(self) -> None:
+        self.completed_scenarios += 1
         self.current_step_status = None
         self.current_response = None
 

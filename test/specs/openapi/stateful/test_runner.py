@@ -420,6 +420,21 @@ def test_unsatisfiable(runner_factory):
     assert result.events[-1].status == events.RunStatus.ERROR
 
 
+def test_random_unsatisfiable(runner_factory):
+    runner = runner_factory(
+        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=25, database=None)},
+    )
+
+    @runner.state_machine.schema.hook
+    def map_body(ctx, body):
+        if len(body["name"]) % 3 == 2:
+            raise hypothesis.errors.Unsatisfiable("Occurs randomly")
+        return body
+
+    result = collect_result(runner)
+    assert not result.errors, result.errors
+
+
 def test_custom_headers(runner_factory):
     headers = {"X-Foo": "Bar"}
     runner = runner_factory(

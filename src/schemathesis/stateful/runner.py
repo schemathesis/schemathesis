@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
 import hypothesis
 import requests
 from hypothesis.control import current_build_context
-from hypothesis.errors import Flaky
+from hypothesis.errors import Flaky, Unsatisfiable
 from hypothesis.stateful import Rule
 
 from ..exceptions import CheckFailed
@@ -265,6 +265,13 @@ def _execute_state_machine_loop(
             ctx.mark_current_suite_as_seen_in_run()
             continue
         except Exception as exc:
+            if isinstance(exc, Unsatisfiable) and ctx.completed_scenarios > 0:
+                # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
+                # values are possible to generate based on the previous observations, we retry the generation
+                if ctx.completed_scenarios >= config.hypothesis_settings.max_examples:
+                    # Avoid infinite restarts
+                    break
+                continue
             # Any other exception is an inner error and the test run should be stopped
             suite_status = events.SuiteStatus.ERROR
             event_queue.put(events.Errored(exception=exc))
