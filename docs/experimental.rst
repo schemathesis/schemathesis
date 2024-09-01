@@ -118,8 +118,13 @@ Coverage phase
 ~~~~~~~~~~~~~~
 
 Schemathesis primarily generates randomized tests; therefore, the outcomes can vary between test runs.
-This feature enables a new test phase that aims to generate a set of examples that cover common testing patterns for each parameter or property.
-Such tests include checking boundary values, omitting required properties, etc.
+
+During the coverage phase, Schemathesis deterministically generates test cases to cover common "positive" and "negative" testing scenarios depending on the configuration. 
+It covers common testing patterns such as:
+
+- Boundary values: Minimum, maximum, and near-boundary values for numeric types and string lengths.
+- Data types: Generating values for different data types specified in the schema.
+- Constraints: Testing against schema constraints like `required` fields, `pattern`, `format`, and `uniqueItems`.
 
 In CLI
 ~~~~~~
