@@ -8,6 +8,10 @@ Changelog
 
 - Restructure the ``st run --help`` output.
 
+**Fixed**
+
+- Ensure that the ``-D`` CLI option is respected in the coverage phase.
+
 .. _v3.35.1:
 
 :version:`3.35.1 <v3.35.0...v3.35.1>` - 2024-08-27

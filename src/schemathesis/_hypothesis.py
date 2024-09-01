@@ -222,7 +222,6 @@ def _iter_coverage_cases(
     )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
-    template_generation_method = DataGenerationMethod.positive
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
         gen = coverage.cover_schema_iter(ctx, schema)
@@ -236,7 +235,6 @@ def _iter_coverage_cases(
             container[name] = json.dumps(value.value)
         else:
             container[name] = value.value
-        template_generation_method = value.data_generation_method
         generators[(location, name)] = gen
     if operation.body:
         for body in operation.body:
@@ -257,9 +255,9 @@ def _iter_coverage_cases(
                 case.data_generation_method = next_value.data_generation_method
                 case.meta = meta
                 yield case
-    else:
+    elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
-        case.data_generation_method = template_generation_method
+        case.data_generation_method = DataGenerationMethod.positive
         case.meta = meta
         yield case
     for (location, name), gen in generators.items():
