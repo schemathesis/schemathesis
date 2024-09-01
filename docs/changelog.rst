@@ -7,6 +7,7 @@ Changelog
 **Changed**:
 
 - Restructure the ``st run --help`` output.
+- Use explicit examples in the coverage phase.
 
 **Fixed**
 
