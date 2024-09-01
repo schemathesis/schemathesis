@@ -10,6 +10,12 @@ Papers
 
   - **Date**: 20 Dec 2021
 
+- `Testing RESTFul APIs: A Survey <https://dl.acm.org/doi/10.1145/3617175>`_ by Golmohammadi, at al
+
+  - **Description**: Review of the current state-of-the-art testing tools including Schemathesis.
+
+  - **Date**: 24 Nov 2023
+
 Articles
 --------
 
