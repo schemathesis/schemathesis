@@ -1,5 +1,4 @@
-name: Build jobs
-# Triggered by changes in code-specific or job-specific files
+name: CI
 
 on:
   pull_request:

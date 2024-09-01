@@ -6,42 +6,46 @@ It focuses on testing for general properties — such as ensuring no input leads
 
 This approach broadens your testing suite's capability to detect a wide range of potential issues, from trivial bugs to critical vulnerabilities.
 
-With Schemathesis, you can:
-
 🎯 **Catch Hard-to-Find Bugs**
 
 - Uncover hidden crashes and edge cases that manual testing might miss
-- Identify spec violations and ensure your API adheres to its defined contract
+- Identify spec violations and ensure your API adheres to its contract
 
 ⚡ **Accelerate Testing Cycles**
 
 - Automatically generate a wide range of test cases based on your API schema
-- Save time and effort by eliminating the need for manual test case creation
+- Save time by reducing the need for manual test case creation
 
 🧩 **Integrate Seamlessly**
 
 - Works with popular API formats such as OpenAPI, GraphQL.
-- Easily integrate into your existing testing pipeline and CI/CD workflows
+- Easily integrate into your existing CI/CD workflows.
 
 🔧 **Customize and Extend**
 
-- Tune the testing process to your specific requirements using Python extensions
-- Modify and enhance various aspects of the testing flow to suit your needs with rich configuration options
+- Tune the testing process using Python extensions.
+- Adjust the testing flow to suit your needs with rich configuration options.
 
-📊 **Gain Valuable Insights**
+🐞 **Simplifies Debugging**
 
-- Get detailed reports and actionable insights to help you identify and fix issues quickly
-- Reproduce failing test cases effortlessly with generated code samples and cURL commands
+- Get detailed reports to identify and fix issues quickly.
+- Reproduce failing test cases with cURL commands.
+
+🔬 **Proven by Research**
+
+- Validated through academic studies on API testing automation
+- Featured in `ICSE 2022 paper <https://ieeexplore.ieee.org/document/9793781>`_ on semantics-aware fuzzing
+- Recognized in `ACM survey <https://dl.acm.org/doi/10.1145/3617175>`_ as state-of-the-art RESTful API testing tool
 
 How it works?
 -------------
 
-Here’s a simplified overview of how Schemathesis works:
+Here’s an overview of how Schemathesis works:
 
-1. **Test Generation**: Using the API schema to create a test generator that you can fine-tune to your testing requirements.
-2. **Execution and Adaptation**: Sending tests to the API and adapting through statistical models and heuristics to optimize subsequent cases based on responses.
-3. **Analysis and Minimization**: Checking responses to identify issues. Minimizing means simplifying failing test cases for easier debugging.
-4. **Stateful Testing**: Running multistep tests to assess API operations in both isolated and integrated scenarios.
+1. **Test Generation**: Using the API schema to create a test generator that you can fine-tune to your requirements.
+2. **Execution and Adaptation**: Sending tests to the API and adapting through statistical models and heuristics to optimize test cases based on responses.
+3. **Analysis and Minimization**: Checking responses for issues and simplifying failing test cases for easier debugging.
+4. **Stateful Testing**: Running multi-step tests to assess API operations in both isolated and integrated scenarios.
 5. **Reporting**: Generating detailed reports with insights and cURL commands for easy issue reproduction.
 
 Research Findings on Open-Source API Testing Tools
