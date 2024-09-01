@@ -126,6 +126,8 @@ It covers common testing patterns such as:
 - Data types: Generating values for different data types specified in the schema.
 - Constraints: Testing against schema constraints like `required` fields, `pattern`, `format`, and `uniqueItems`.
 
+Additionally, it uses examples in the API schema as the source of "positive" values.
+
 In CLI
 ~~~~~~
 

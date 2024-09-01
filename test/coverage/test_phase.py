@@ -163,6 +163,29 @@ def test_phase_no_body(empty_open_api_3_schema):
     )
 
 
+def test_with_example(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "q1",
+                        "schema": {"type": "string", "example": "secret"},
+                        "required": True,
+                    },
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        [{"query": {"q1": "secret"}}, {"query": {"q1": "secret"}}],
+    )
+
+
 def assert_coverage(schema, methods, expected):
     schema = schemathesis.from_dict(schema)
 
