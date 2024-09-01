@@ -234,6 +234,15 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
                         yield from cover_schema_iter(nctx, sub_schema)
 
 
+def _get_properties(schema: dict | bool) -> dict | bool:
+    if isinstance(schema, dict):
+        if "example" in schema:
+            return {"const": schema["example"]}
+        if schema.get("type") == "object":
+            return _get_template_schema(schema, "object")
+    return schema
+
+
 def _get_template_schema(schema: dict, ty: str) -> dict:
     if ty == "object":
         properties = schema.get("properties")
@@ -242,10 +251,7 @@ def _get_template_schema(schema: dict, ty: str) -> dict:
                 **schema,
                 "required": list(properties),
                 "type": ty,
-                "properties": {
-                    k: _get_template_schema(v, "object") if isinstance(v, dict) and v.get("type") == "object" else v
-                    for k, v in properties.items()
-                },
+                "properties": {k: _get_properties(v) for k, v in properties.items()},
             }
     return {**schema, "type": ty}
 
@@ -256,7 +262,9 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     min_length = schema.get("minLength")
     max_length = schema.get("maxLength")
 
-    if not min_length and not max_length:
+    if "example" in schema:
+        yield PositiveValue(schema["example"])
+    elif not min_length and not max_length:
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema))
 
@@ -311,7 +319,9 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         maximum = exclusive_maximum - 1
     multiple_of = schema.get("multipleOf")
 
-    if not minimum and not maximum:
+    if "example" in schema:
+        yield PositiveValue(schema["example"])
+    elif not minimum and not maximum:
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema))
 
@@ -357,7 +367,10 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
 
 def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
     seen = set()
-    yield PositiveValue(template)
+    if "example" in schema:
+        yield PositiveValue(schema["example"])
+    else:
+        yield PositiveValue(template)
     seen.add(len(template))
 
     # Boundary and near-boundary sizes
@@ -390,7 +403,10 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
 
 
 def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
-    yield PositiveValue(template)
+    if "example" in schema:
+        yield PositiveValue(schema["example"])
+    else:
+        yield PositiveValue(template)
     # Only required properties
     properties = schema.get("properties", {})
     if set(properties) != set(schema.get("required", {})):

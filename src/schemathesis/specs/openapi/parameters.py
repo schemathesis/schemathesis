@@ -117,6 +117,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
         "uniqueItems",
         "enum",
         "multipleOf",
+        "example",
     )
 
     @property
@@ -163,6 +164,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
         "properties",
         "additionalProperties",
         "format",
+        "example",
     )
 
     @property
