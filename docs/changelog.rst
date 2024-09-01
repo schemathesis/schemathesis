@@ -9,7 +9,7 @@ Changelog
 :version:`3.35.2 <v3.35.1...v3.35.2>` - 2024-09-01
 --------------------------------------------------
 
-**Changed**:
+**Changed**
 
 - Restructure the ``st run --help`` output.
 - Use explicit examples in the coverage phase.
