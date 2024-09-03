@@ -50,17 +50,17 @@ def create_test(
     auth_storage = get_auth_storage_from_test(test)
     strategies = []
     skip_on_not_negated = len(data_generation_methods) == 1 and DataGenerationMethod.negative in data_generation_methods
+    as_strategy_kwargs = as_strategy_kwargs or {}
+    as_strategy_kwargs.update(
+        {
+            "hooks": hook_dispatcher,
+            "auth_storage": auth_storage,
+            "generation_config": generation_config,
+            "skip_on_not_negated": skip_on_not_negated,
+        }
+    )
     for data_generation_method in data_generation_methods:
-        strategies.append(
-            operation.as_strategy(
-                hooks=hook_dispatcher,
-                auth_storage=auth_storage,
-                data_generation_method=data_generation_method,
-                generation_config=generation_config,
-                skip_on_not_negated=skip_on_not_negated,
-                **(as_strategy_kwargs or {}),
-            )
-        )
+        strategies.append(operation.as_strategy(data_generation_method=data_generation_method, **as_strategy_kwargs))
     strategy = combine_strategies(strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
