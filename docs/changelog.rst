@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.2...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Use more explicit examples in the coverage phase.
+
 **Fixed**
 
 - Ignored ``generation_config`` in explicit example tests when it is explicitly passed to the test runner.
