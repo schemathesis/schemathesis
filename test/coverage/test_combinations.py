@@ -186,6 +186,7 @@ def test_negative_primitive_schemas(nctx, schema, expected):
     (
         ({"type": "string"}, {0}),
         ({"type": "string", "example": "test"}, {4}),
+        ({"type": "string", "examples": ["A", "BB"]}, {1, 2}),
         ({"type": "string", "minLength": 5}, {5, 6}),
         ({"type": "string", "maxLength": 10}, {9, 10}),
         ({"type": "string", "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
@@ -226,6 +227,7 @@ def test_negative_string(nctx, schema, expected):
     (
         ({"type": "integer"}, [0], [0]),
         ({"type": "integer", "example": 2}, [2], [2]),
+        ({"type": "integer", "examples": [42, 44]}, [42, 44], [42, 44]),
         ({"type": "number"}, [0], [0]),
         ({"type": "integer", "minimum": 5}, [5, 6], [6, 8]),
         ({"type": "number", "minimum": 5.5}, [5.5, 6.5], [6, 8]),
@@ -256,6 +258,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     (
         ({"type": "object"}, [{}]),
         ({"type": "object", "example": {"A": 42}}, [{"A": 42}]),
+        ({"type": "object", "examples": [{"A": 42}, {"B": 43}]}, [{"A": 42}, {"B": 43}]),
         (
             {
                 "type": "object",
@@ -278,6 +281,17 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             },
             [
                 {"foo": 42},
+            ],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"foo": {"type": "integer", "examples": [42, 43]}},
+                "required": ["foo"],
+            },
+            [
+                {"foo": 42},
+                {"foo": 43},
             ],
         ),
         (
@@ -389,6 +403,13 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3]},
             [
                 [1, 2, 3],
+            ],
+        ),
+        (
+            {"type": "array", "items": {"type": "integer"}, "examples": [[1, 2, 3], [4, 5, 6]]},
+            [
+                [1, 2, 3],
+                [4, 5, 6],
             ],
         ),
         (

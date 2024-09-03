@@ -48,11 +48,20 @@ class OpenAPIParameter(Parameter):
 
     @property
     def is_header(self) -> bool:
-        raise NotImplementedError
+        return self.location in ("header", "cookie")
 
     def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
         """Convert parameter's definition to JSON Schema."""
+        # JSON Schema allows `examples` as an array
+        if self.examples_field in self.definition:
+            examples = [
+                example["value"] for example in self.definition[self.examples_field].values() if "value" in example
+            ]
+        else:
+            examples = None
         schema = self.from_open_api_to_json_schema(operation, self.definition)
+        if examples is not None:
+            schema["examples"] = examples
         return self.transform_keywords(schema)
 
     def transform_keywords(self, schema: dict[str, Any]) -> dict[str, Any]:
@@ -118,11 +127,8 @@ class OpenAPI20Parameter(OpenAPIParameter):
         "enum",
         "multipleOf",
         "example",
+        "examples",
     )
-
-    @property
-    def is_header(self) -> bool:
-        return self.location == "header"
 
 
 @dataclass(eq=False)
@@ -165,11 +171,8 @@ class OpenAPI30Parameter(OpenAPIParameter):
         "additionalProperties",
         "format",
         "example",
+        "examples",
     )
-
-    @property
-    def is_header(self) -> bool:
-        return self.location in ("header", "cookie")
 
     def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
         open_api_schema = get_parameter_schema(operation, open_api_schema)
@@ -219,6 +222,8 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
         "allOf",
         "properties",
         "additionalProperties",
+        "example",
+        "examples",
     )
     # NOTE. For Open API 2.0 bodies, we still give `x-example` precedence over the schema-level `example` field to keep
     # the precedence rules consistent.

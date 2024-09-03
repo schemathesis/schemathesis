@@ -238,6 +238,8 @@ def _get_properties(schema: dict | bool) -> dict | bool:
     if isinstance(schema, dict):
         if "example" in schema:
             return {"const": schema["example"]}
+        if "examples" in schema and schema["examples"]:
+            return {"enum": schema["examples"]}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object")
     return schema
@@ -261,9 +263,14 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     # Boundary and near boundary values
     min_length = schema.get("minLength")
     max_length = schema.get("maxLength")
-
-    if "example" in schema:
-        yield PositiveValue(schema["example"])
+    example = schema.get("example")
+    examples = schema.get("examples")
+    if example or examples:
+        if example:
+            yield PositiveValue(example)
+        if examples:
+            for example in examples:
+                yield PositiveValue(example)
     elif not min_length and not max_length:
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema))
@@ -318,9 +325,15 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     if exclusive_maximum is not None:
         maximum = exclusive_maximum - 1
     multiple_of = schema.get("multipleOf")
+    example = schema.get("example")
+    examples = schema.get("examples")
 
-    if "example" in schema:
-        yield PositiveValue(schema["example"])
+    if example or examples:
+        if example:
+            yield PositiveValue(example)
+        if examples:
+            for example in examples:
+                yield PositiveValue(example)
     elif not minimum and not maximum:
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema))
@@ -367,8 +380,15 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
 
 def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
     seen = set()
-    if "example" in schema:
-        yield PositiveValue(schema["example"])
+    example = schema.get("example")
+    examples = schema.get("examples")
+
+    if example or examples:
+        if example:
+            yield PositiveValue(example)
+        if examples:
+            for example in examples:
+                yield PositiveValue(example)
     else:
         yield PositiveValue(template)
     seen.add(len(template))
@@ -403,8 +423,15 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
 
 
 def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
-    if "example" in schema:
-        yield PositiveValue(schema["example"])
+    example = schema.get("example")
+    examples = schema.get("examples")
+
+    if example or examples:
+        if example:
+            yield PositiveValue(example)
+        if examples:
+            for example in examples:
+                yield PositiveValue(example)
     else:
         yield PositiveValue(template)
     # Only required properties

@@ -186,8 +186,198 @@ def test_with_example(empty_open_api_3_schema):
     )
 
 
+EXPECTED_EXAMPLES = [
+    {"query": {"q1": "A1", "q2": 20}},
+    {"query": {"q1": "B2", "q2": 10}},
+    {"query": {"q1": "A1", "q2": 10}},
+    {"query": {"q1": "B2", "q2": 20}},
+    {"query": {"q1": "A1", "q2": 10}},
+]
+
+
+def test_with_examples_openapi_3(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "q1",
+                        "schema": {"type": "string"},
+                        "required": True,
+                        "examples": {
+                            "first": {"value": "A1"},
+                            "second": {"value": "B2"},
+                        },
+                    },
+                    {
+                        "in": "query",
+                        "name": "q2",
+                        "schema": {"type": "integer"},
+                        "required": True,
+                        "examples": {
+                            "first": {"value": 10},
+                            "second": {"value": 20},
+                        },
+                    },
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        EXPECTED_EXAMPLES,
+    )
+
+
+def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {"type": "string"},
+                                    "age": {"type": "integer"},
+                                    "tags": {"type": "array", "items": {"type": "string"}},
+                                    "address": {
+                                        "type": "object",
+                                        "properties": {"street": {"type": "string"}, "city": {"type": "string"}},
+                                    },
+                                },
+                                "required": ["name", "age"],
+                            },
+                            "examples": {
+                                "example1": {
+                                    "value": {
+                                        "name": "John Doe",
+                                        "age": 30,
+                                        "tags": ["developer", "python"],
+                                        "address": {"street": "123 Main St", "city": "Anytown"},
+                                    }
+                                },
+                                "example2": {
+                                    "value": {
+                                        "name": "Jane Smith",
+                                        "age": 25,
+                                        "tags": ["designer", "ui/ux"],
+                                        "address": {"street": "456 Elm St", "city": "Somewhere"},
+                                    }
+                                },
+                            },
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        [
+            {
+                "body": {
+                    "address": {},
+                    "age": 0,
+                    "name": "",
+                    "tags": [],
+                },
+            },
+            {
+                "body": {
+                    "age": 0,
+                    "name": "",
+                },
+            },
+            {
+                "body": {
+                    "address": {
+                        "city": "",
+                        "street": "",
+                    },
+                    "age": 0,
+                    "name": "",
+                    "tags": [],
+                },
+            },
+            {
+                "body": {
+                    "address": {
+                        "city": "Somewhere",
+                        "street": "456 Elm St",
+                    },
+                    "age": 25,
+                    "name": "Jane Smith",
+                    "tags": [
+                        "designer",
+                        "ui/ux",
+                    ],
+                },
+            },
+            {
+                "body": {
+                    "address": {
+                        "city": "Anytown",
+                        "street": "123 Main St",
+                    },
+                    "age": 30,
+                    "name": "John Doe",
+                    "tags": [
+                        "developer",
+                        "python",
+                    ],
+                },
+            },
+        ],
+    )
+
+
+def test_with_examples_openapi_2(empty_open_api_2_schema):
+    empty_open_api_2_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "q1",
+                        "type": "string",
+                        "required": True,
+                        "x-examples": {
+                            "first": {"value": "A1"},
+                            "second": {"value": "B2"},
+                        },
+                    },
+                    {
+                        "in": "query",
+                        "name": "q2",
+                        "type": "integer",
+                        "required": True,
+                        "x-examples": {
+                            "first": {"value": 10},
+                            "second": {"value": 20},
+                        },
+                    },
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_2_schema,
+        [DataGenerationMethod.positive],
+        EXPECTED_EXAMPLES,
+    )
+
+
 def assert_coverage(schema, methods, expected):
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.from_dict(schema, validate_schema=True)
 
     cases = []
     operation = schema["/foo"]["post"]
