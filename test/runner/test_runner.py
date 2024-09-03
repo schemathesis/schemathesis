@@ -13,7 +13,8 @@ from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
 from flask import Flask
-from hypothesis import Phase
+from hypothesis import Phase, settings
+from hypothesis import strategies as st
 from requests.auth import HTTPDigestAuth
 
 import schemathesis
@@ -22,7 +23,7 @@ from schemathesis._hypothesis import add_examples
 from schemathesis._override import CaseOverride
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
@@ -1390,3 +1391,51 @@ def test_stateful_exit_first(real_app_schema):
     experimental.STATEFUL_TEST_RUNNER.enable()
     _, *ev, _ = from_schema(real_app_schema, exit_first=True, **STATEFUL_KWARGS).execute()
     assert not any(isinstance(event, events.StatefulEvent) for event in ev)
+
+
+def test_generation_config_in_explicit_examples(empty_open_api_2_schema, openapi2_base_url):
+    empty_open_api_2_schema["paths"] = {
+        "/what": {
+            "post": {
+                "parameters": [
+                    {
+                        "in": "header",
+                        "name": "X-VO-Api-Id",
+                        "required": True,
+                        "type": "string",
+                    },
+                    {
+                        "in": "body",
+                        "name": "body",
+                        "required": True,
+                        "schema": {
+                            "properties": {
+                                "type": {
+                                    "example": "email",
+                                    "type": "string",
+                                },
+                            },
+                            "type": "object",
+                        },
+                    },
+                ],
+                "responses": {"200": {"description": "Ok"}},
+            }
+        },
+    }
+    schema = schemathesis.from_dict(empty_open_api_2_schema, base_url=openapi2_base_url)
+    runner = schemathesis.runner.from_schema(
+        schema,
+        hypothesis_settings=settings(max_examples=10),
+        generation_config=GenerationConfig(
+            with_security_parameters=False,
+            headers=HeaderConfig(strategy=st.text(alphabet=st.characters(whitelist_characters="a", categories=()))),
+        ),
+    )
+    for event in runner.execute():
+        if isinstance(event, events.AfterExecution):
+            for check in event.result.checks:
+                for header in check.example.headers.values():
+                    if header:
+                        assert set(header) == {"a"}
+            break

@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.2...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Ignored ``generation_config`` in explicit example tests when it is explicitly passed to the test runner.
+
 .. _v3.35.2:
 
 :version:`3.35.2 <v3.35.1...v3.35.2>` - 2024-09-01
