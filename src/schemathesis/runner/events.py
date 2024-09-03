@@ -49,6 +49,8 @@ class Initialized(ExecutionEvent):
     seed: int | None
     # The base URL against which the tests are running
     base_url: str
+    # The base path part of every operation
+    base_path: str
     # API schema specification name
     specification_name: str
     # Monotonic clock value when the test run started. Used to properly calculate run duration, since this clock
@@ -77,6 +79,7 @@ class Initialized(ExecutionEvent):
             links_count=schema.links_count if count_links else None,
             location=schema.location,
             base_url=schema.get_base_url(),
+            base_path=schema.base_path,
             start_time=start_time or time.monotonic(),
             started_at=started_at or current_datetime(),
             specification_name=schema.verbose_name,
