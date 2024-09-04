@@ -11,6 +11,7 @@ Changelog
 **Fixed**
 
 - Ignored ``generation_config`` in explicit example tests when it is explicitly passed to the test runner.
+- Incomplete header values in some serialization cases.
 
 .. _v3.35.2:
 

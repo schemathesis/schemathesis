@@ -178,7 +178,11 @@ class SerializedCheck:
 
 
 def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str]:
-    return {key: value[0] for key, value in headers.items() if key not in get_excluded_headers()}
+    return {
+        key: value[0] if isinstance(value, list) else value
+        for key, value in headers.items()
+        if key not in get_excluded_headers()
+    }
 
 
 @dataclass
