@@ -4,6 +4,7 @@ import pytest
 from hypothesis import Phase, settings
 
 import schemathesis
+from schemathesis import experimental
 from schemathesis._hypothesis import create_test
 from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
@@ -227,6 +228,40 @@ def test_with_examples_openapi_3(empty_open_api_3_schema):
     }
     assert_coverage(
         empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        EXPECTED_EXAMPLES,
+    )
+
+
+def test_with_examples_openapi_3_1():
+    experimental.OPEN_API_3_1.enable()
+    schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
+        "paths": {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {"type": "string", "examples": ["A1", "B2"]},
+                            "required": True,
+                        },
+                        {
+                            "in": "query",
+                            "name": "q2",
+                            "schema": {"type": "integer", "examples": [10, 20]},
+                            "required": True,
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+    }
+    assert_coverage(
+        schema,
         [DataGenerationMethod.positive],
         EXPECTED_EXAMPLES,
     )
