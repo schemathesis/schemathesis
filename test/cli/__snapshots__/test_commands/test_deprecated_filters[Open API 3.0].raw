@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-Warning: Option `--endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `--include-path` instead.
+Warning: Option `--endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `--include-path` instead
 ======================= Schemathesis test session starts =======================
 Schema location: http://127.0.0.1/schema.yaml
 Base URL: http://127.0.0.1/api

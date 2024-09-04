@@ -22,9 +22,7 @@ def new_target(testdir, cli):
     yield module
     reset_targets()
     # To verify that "new_target" is unregistered
-    result = cli.run("--help")
-    lines = result.stdout.splitlines()
-    assert "  -t, --target [response_time|all]          Guides input generation to values" in lines
+    assert "new_target" not in cli.run("--help").stdout
 
 
 @pytest.mark.usefixtures("new_target")
