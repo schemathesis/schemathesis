@@ -28,7 +28,7 @@ from ..exceptions import (
     make_unique_by_key,
 )
 from ..generation import DataGenerationMethod
-from ..models import Case, Check, Interaction, Request, Response, Status, TestPhase, TestResult
+from ..models import Case, Check, Interaction, Request, Response, Status, TestPhase, TestResult, TransitionId
 from ..transports import deserialize_payload, serialize_payload
 
 if TYPE_CHECKING:
@@ -54,6 +54,7 @@ class SerializedCase:
     path_template: str
     full_path: str
     verbose_name: str
+    transition_id: TransitionId | None
     # Transport info
     verify: bool
     # Headers coming from sources outside data generation
@@ -81,6 +82,7 @@ class SerializedCase:
             path_template=case.path,
             full_path=case.full_path,
             verbose_name=case.operation.verbose_name,
+            transition_id=case.source.transition_id if case.source is not None else None,
             verify=verify,
             extra_headers=request_data.headers,
         )

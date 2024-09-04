@@ -14,7 +14,7 @@ from jsonschema import RefResolver
 
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
-from ...models import APIOperation, Case
+from ...models import APIOperation, Case, TransitionId
 from ...parameters import ParameterSet
 from ...stateful import ParsedData, StatefulTest, UnresolvableLink
 from ...stateful.state_machine import Direction
@@ -226,7 +226,16 @@ class OpenAPILink(Direction):
                 if parameter.name not in overrides.get(parameter.location, []):
                     overrides_all_parameters = False
                     break
-        case.set_source(context.response, context.case, elapsed, overrides_all_parameters)
+        case.set_source(
+            context.response,
+            context.case,
+            elapsed,
+            overrides_all_parameters,
+            transition_id=TransitionId(
+                name=self.name,
+                status_code=self.status_code,
+            ),
+        )
 
     def set_parameters(
         self, case: Case, context: expressions.ExpressionContext

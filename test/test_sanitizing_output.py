@@ -6,7 +6,7 @@ from requests import Request, Response
 
 from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import CaseSource, Check, Status, TestPhase
+from schemathesis.models import CaseSource, Check, Status, TestPhase, TransitionId
 from schemathesis.models import Request as SerializedRequest
 from schemathesis.models import Response as SerializedResponse
 from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
@@ -105,6 +105,7 @@ def test_sanitize_history(case_factory):
         response=requests.Response(),
         elapsed=0.3,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
 
     case2 = case_factory(headers={"X-API-Key": "12345"}, source=source3)
@@ -113,6 +114,7 @@ def test_sanitize_history(case_factory):
         response=requests.Response(),
         elapsed=0.2,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
 
     case1 = case_factory(headers={"Password": "password"}, source=source2)
@@ -121,6 +123,7 @@ def test_sanitize_history(case_factory):
         response=requests.Response(),
         elapsed=0.1,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
 
     sanitize_history(source1)
@@ -137,6 +140,7 @@ def test_sanitize_history_empty(case_factory):
         response=requests.Response(),
         elapsed=0.1,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
 
     sanitize_history(source)
@@ -252,6 +256,7 @@ def serialized_check(case_factory, response_factory):
         response=response_factory.requests(headers={"X-Token": value}),
         elapsed=1.0,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
     check = Check(
         name="test",

@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.models import CaseSource, Check, Status
+from schemathesis.models import CaseSource, Check, Status, TransitionId
 from schemathesis.runner import events
 from schemathesis.runner.serialization import SerializedCheck
 
@@ -20,7 +20,11 @@ def test_serialize_history(case_factory, response_factory, factory_name):
     root_case = case_factory()
     value = "A"
     root_case.source = CaseSource(
-        case=case_factory(), response=factory(headers={"X-Example": value}), elapsed=1.0, overrides_all_parameters=True
+        case=case_factory(),
+        response=factory(headers={"X-Example": value}),
+        elapsed=1.0,
+        overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
     check = Check(
         name="test", value=Status.failure, response=factory(headers={"X-Example": "B"}), elapsed=1.0, example=root_case

@@ -11,7 +11,7 @@ from schemathesis._compat import MultipleFailures
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import APIOperation, Case, CaseSource, Request, Response
+from schemathesis.models import APIOperation, Case, CaseSource, Request, Response, TransitionId
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import WSGITransport, _merge_dict_to
 
@@ -308,6 +308,7 @@ def test_case_partial_deepcopy_source(swagger_20):
         response=response,
         elapsed=1.0,
         overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
     )
     copied_case = original_case.partial_deepcopy()
     assert copied_case.source.case.query == original_case.source.case.query
