@@ -3,7 +3,7 @@ Exit code: 0
 Stdout:
 Usage: schemathesis [OPTIONS] COMMAND [ARGS]...
 
-  Automated API testing employing fuzzing techniques for OpenAPI and GraphQL.
+  Property-based API testing for OpenAPI and GraphQL.
 
 Options:
   --version   Show the version and exit.
@@ -12,5 +12,5 @@ Options:
 Commands:
   auth    Authenticate with Schemathesis.io.
   replay  Replay requests from a saved cassette.
-  run     Execute automated tests based on API specifications.
+  run     Execute automated tests based on API specifications
   upload  Upload report to Schemathesis.io.

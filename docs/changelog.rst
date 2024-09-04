@@ -7,6 +7,7 @@ Changelog
 **Changed**
 
 - Use more explicit examples in the coverage phase.
+- Make CLI options help more readable.
 
 **Fixed**
 
