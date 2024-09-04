@@ -52,6 +52,7 @@ class SerializedCase:
     method: str
     url: str
     path_template: str
+    full_path: str
     verbose_name: str
     # Transport info
     verify: bool
@@ -78,6 +79,7 @@ class SerializedCase:
             method=case.method,
             url=request_data.url,
             path_template=case.path,
+            full_path=case.full_path,
             verbose_name=case.operation.verbose_name,
             verify=verify,
             extra_headers=request_data.headers,
