@@ -7,7 +7,7 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import CaseSource, Check, Status
+from schemathesis.models import CaseSource, Check, Status, TransitionId
 from schemathesis.runner.serialization import SerializedCheck
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
@@ -277,10 +277,22 @@ def test_history(app_schema, response_factory, method):
         path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
     )
     second_response = factory(status_code=200)
-    second.source = CaseSource(case=first, response=first_response, elapsed=10, overrides_all_parameters=True)
+    second.source = CaseSource(
+        case=first,
+        response=first_response,
+        elapsed=10,
+        overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
+    )
     third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
     third_response = factory(status_code=200)
-    third.source = CaseSource(case=second, response=second_response, elapsed=10, overrides_all_parameters=True)
+    third.source = CaseSource(
+        case=second,
+        response=second_response,
+        elapsed=10,
+        overrides_all_parameters=True,
+        transition_id=TransitionId(name="CustomLink", status_code="201"),
+    )
     check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
     serialized = SerializedCheck.from_check(check)
     # Then they should store all history

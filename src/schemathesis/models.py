@@ -72,6 +72,14 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class TransitionId:
+    name: str
+    status_code: str
+
+    __slots__ = ("name", "status_code")
+
+
+@dataclass
 class CaseSource:
     """Data sources, used to generate a test case."""
 
@@ -79,6 +87,7 @@ class CaseSource:
     response: GenericResponse
     elapsed: float
     overrides_all_parameters: bool
+    transition_id: TransitionId
 
     def partial_deepcopy(self) -> CaseSource:
         return self.__class__(
@@ -86,6 +95,7 @@ class CaseSource:
             response=self.response,
             elapsed=self.elapsed,
             overrides_all_parameters=self.overrides_all_parameters,
+            transition_id=self.transition_id,
         )
 
 
@@ -214,9 +224,20 @@ class Case:
     def app(self) -> Any:
         return self.operation.app
 
-    def set_source(self, response: GenericResponse, case: Case, elapsed: float, overrides_all_parameters: bool) -> None:
+    def set_source(
+        self,
+        response: GenericResponse,
+        case: Case,
+        elapsed: float,
+        overrides_all_parameters: bool,
+        transition_id: TransitionId,
+    ) -> None:
         self.source = CaseSource(
-            case=case, response=response, elapsed=elapsed, overrides_all_parameters=overrides_all_parameters
+            case=case,
+            response=response,
+            elapsed=elapsed,
+            overrides_all_parameters=overrides_all_parameters,
+            transition_id=transition_id,
         )
 
     @property
