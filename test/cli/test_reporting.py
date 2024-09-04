@@ -48,6 +48,7 @@ from schemathesis.runner.serialization import SerializedCase, SerializedCheck, S
                     method="GET",
                     url="http://127.0.0.1/",
                     path_template="/",
+                    full_path="/",
                     verbose_name="GET /",
                     verify=True,
                     extra_headers={},

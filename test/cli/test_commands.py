@@ -1657,7 +1657,7 @@ def test_new_stateful_runner_junit(tmp_path, cli, schema_url):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
 def test_new_stateful_runner_stateful_only(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -1720,7 +1720,7 @@ def test_new_stateful_runner_proxy_error(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True, replace_statistic=True)
 def test_new_stateful_runner_generation_config(cli, mocker, schema_url, snapshot_cli):
     from schemathesis.specs.openapi import _hypothesis
 
