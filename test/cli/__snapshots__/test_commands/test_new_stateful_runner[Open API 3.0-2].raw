@@ -50,6 +50,7 @@ GET /api/users/{user_id}
 
 Performed checks:
     not_a_server_error                    N / N passed          FAILED 
+    use_after_free                        N / N passed          PASSED 
 
 Experimental Features:
   - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
