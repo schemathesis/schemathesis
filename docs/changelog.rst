@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.3...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Missed ``example`` field in the coverage phase.
+
 .. _v3.35.3:
 
 :version:`3.35.3 <v3.35.2...v3.35.3>` - 2024-09-05

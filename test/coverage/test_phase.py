@@ -233,6 +233,38 @@ def test_with_examples_openapi_3(empty_open_api_3_schema):
     )
 
 
+def test_with_example_openapi_3(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "parameters": [
+                    {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
+                    {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": True, "example": 10},
+                ],
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        [
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                },
+            },
+        ],
+    )
+
+
 def test_with_examples_openapi_3_1():
     experimental.OPEN_API_3_1.enable()
     schema = {

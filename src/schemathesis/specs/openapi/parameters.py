@@ -53,14 +53,15 @@ class OpenAPIParameter(Parameter):
     def as_json_schema(self, operation: APIOperation) -> dict[str, Any]:
         """Convert parameter's definition to JSON Schema."""
         # JSON Schema allows `examples` as an array
+        examples = []
         if self.examples_field in self.definition:
-            examples = [
-                example["value"] for example in self.definition[self.examples_field].values() if "value" in example
-            ]
-        else:
-            examples = None
+            examples.extend(
+                [example["value"] for example in self.definition[self.examples_field].values() if "value" in example]
+            )
+        if self.example_field in self.definition:
+            examples.append(self.definition[self.example_field])
         schema = self.from_open_api_to_json_schema(operation, self.definition)
-        if examples is not None:
+        if examples:
             schema["examples"] = examples
         return self.transform_keywords(schema)
 
