@@ -201,12 +201,12 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
                     seen.add(value)
                 elif key == "multipleOf":
                     yield from _negative_multiple_of(ctx, schema, value)
-                elif key == "minLength" and 0 < value < BUFFER_SIZE and "pattern" not in schema:
+                elif key == "minLength" and 0 < value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
                         yield NegativeValue(
                             ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
                         )
-                elif key == "maxLength" and value < BUFFER_SIZE and "pattern" not in schema:
+                elif key == "maxLength" and value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
                         yield NegativeValue(
                             ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
@@ -277,7 +277,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
 
     seen = set()
 
-    if min_length is not None and min_length < BUFFER_SIZE and "pattern" not in schema:
+    if min_length is not None and min_length < BUFFER_SIZE:
         # Exactly the minimum length
         yield PositiveValue(ctx.generate_from_schema({**schema, "maxLength": min_length}))
         seen.add(min_length)
@@ -288,7 +288,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger}))
             seen.add(larger)
 
-    if max_length is not None and "pattern" not in schema:
+    if max_length is not None:
         # Exactly the maximum length
         if max_length < BUFFER_SIZE and max_length not in seen:
             yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": max_length}))
