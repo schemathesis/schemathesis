@@ -265,6 +265,58 @@ def test_with_example_openapi_3(empty_open_api_3_schema):
     )
 
 
+def test_with_response_example_openapi_3(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/items/{itemId}/": {
+            "get": {
+                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Item"},
+                                "examples": {
+                                    "Example1": {"value": {"id": "123456"}},
+                                    "Example2": {"value": {"itemId": "456789"}},
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}}
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.positive],
+        [
+            {
+                "path_parameters": {
+                    "itemId": "456789",
+                },
+            },
+            {
+                "path_parameters": {
+                    "itemId": "123456",
+                },
+            },
+            {
+                "path_parameters": {
+                    "itemId": "456789",
+                },
+            },
+            {
+                "path_parameters": {
+                    "itemId": "123456",
+                },
+            },
+        ],
+        path=("/items/{itemId}/", "get"),
+    )
+
+
 def test_with_examples_openapi_3_1():
     experimental.OPEN_API_3_1.enable()
     schema = {
@@ -443,11 +495,11 @@ def test_with_examples_openapi_2(empty_open_api_2_schema):
     )
 
 
-def assert_coverage(schema, methods, expected):
+def assert_coverage(schema, methods, expected, path=None):
     schema = schemathesis.from_dict(schema, validate_schema=True)
 
     cases = []
-    operation = schema["/foo"]["post"]
+    operation = schema[path[0]][path[1]] if path else schema["/foo"]["post"]
 
     def test(case):
         assert_requests_call(case)

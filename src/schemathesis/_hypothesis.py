@@ -215,6 +215,7 @@ def _iter_coverage_cases(
     operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
 ) -> Generator[Case, None, None]:
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
+    from .specs.openapi.examples import find_in_responses, find_matching_in_responses
 
     ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
     meta = GenerationMetadata(
@@ -222,8 +223,11 @@ def _iter_coverage_cases(
     )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
+    responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
         schema = parameter.as_json_schema(operation)
+        for value in find_matching_in_responses(responses, parameter.name):
+            schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(ctx, schema)
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
