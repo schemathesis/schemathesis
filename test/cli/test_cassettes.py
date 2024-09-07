@@ -91,6 +91,80 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     assert len(cassette["http_interactions"][1]["checks"]) == 1
 
 
+@pytest.mark.operations("success", "upload_file")
+def test_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
+    hypothesis_max_examples = hypothesis_max_examples or 2
+    result = cli.run(
+        schema_url,
+        f"--cassette-path={cassette_path}",
+        f"--hypothesis-max-examples={hypothesis_max_examples}",
+        "--experimental=coverage-phase",
+        "--show-trace",
+        "--hypothesis-seed=1",
+        "--dry-run",
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    cassette = load_cassette(cassette_path)
+    assert cassette["http_interactions"][0]["id"] == "1"
+    assert cassette["http_interactions"][1]["id"] == "2"
+    assert cassette["http_interactions"][0]["status"] == "SKIP"
+    assert cassette["http_interactions"][0]["seed"] == "1"
+    assert cassette["http_interactions"][0]["phase"] in ("explicit", "coverage", "generate")
+    assert cassette["http_interactions"][0]["thread_id"] == threading.get_ident()
+    correlation_id = cassette["http_interactions"][0]["correlation_id"]
+    UUID(correlation_id)
+    assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
+    assert all("checks" in interaction for interaction in cassette["http_interactions"])
+    assert cassette["http_interactions"][0]["response"] is None
+    assert len(cassette["http_interactions"][0]["checks"]) == 0
+    assert len(cassette["http_interactions"][1]["checks"]) == 0
+
+
+@pytest.mark.operations("slow")
+@pytest.mark.openapi_version("3.0")
+def test_store_timeout(cli, schema_url, cassette_path):
+    result = cli.run(
+        schema_url,
+        f"--cassette-path={cassette_path}",
+        "--hypothesis-max-examples=1",
+        "--request-timeout=1",
+        "--show-trace",
+        "--hypothesis-seed=1",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    cassette = load_cassette(cassette_path)
+    assert cassette["http_interactions"][0]["id"] == "1"
+    assert cassette["http_interactions"][0]["status"] == "FAILURE"
+    assert cassette["http_interactions"][0]["seed"] == "1"
+    assert cassette["http_interactions"][0]["response"] is None
+
+
+@pytest.mark.parametrize(
+    ["app_fixture", "schema_url"],
+    [
+        ("loadable_flask_app", "/schema.yaml"),
+        ("loadable_fastapi_app", "/openapi.json"),
+    ],
+)
+def test_dry_run_with_app(request, cli, app_fixture, schema_url, cassette_path):
+    app = request.getfixturevalue(app_fixture)
+    result = cli.run(
+        schema_url,
+        f"--app={app}",
+        f"--cassette-path={cassette_path}",
+        "--hypothesis-max-examples=1",
+        "--show-trace",
+        "--hypothesis-seed=1",
+        "--dry-run",
+        "--experimental=openapi-3.1",
+    )
+    assert result.exit_code == ExitCode.OK, result.stdout
+    cassette = load_cassette(cassette_path)
+    assert cassette["http_interactions"][0]["id"] == "1"
+    assert cassette["http_interactions"][0]["status"] == "SKIP"
+    assert cassette["http_interactions"][0]["response"] is None
+
+
 @pytest.mark.operations("flaky")
 def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695
@@ -302,6 +376,30 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
     assert "log" in data
     assert "entries" in data["log"]
     assert len(data["log"]["entries"]) > 1
+
+
+@pytest.mark.operations("__all__")
+def test_har_format_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
+    cassette_path = cassette_path.with_suffix(".har")
+    result = cli.run(
+        schema_url,
+        f"--cassette-path={cassette_path}",
+        "--cassette-format=har",
+        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--hypothesis-seed=1",
+        "--validate-schema=false",
+        "--checks=all",
+        "--dry-run",
+    )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
+    assert str(cassette_path) in result.stdout
+    assert cassette_path.exists()
+    with cassette_path.open(encoding="utf-8") as fd:
+        data = json.load(fd)
+    assert "log" in data
+    assert "entries" in data["log"]
+    assert len(data["log"]["entries"]) > 1
+    assert data["log"]["entries"][0]["response"]["status"] == 0
 
 
 def test_invalid_format():

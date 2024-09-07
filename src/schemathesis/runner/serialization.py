@@ -390,7 +390,7 @@ def _scalar_name_from_error(exception: hypothesis.errors.InvalidArgument) -> str
 @dataclass
 class SerializedInteraction:
     request: Request
-    response: Response
+    response: Response | None
     checks: list[SerializedCheck]
     status: Status
     data_generation_method: DataGenerationMethod

@@ -1127,6 +1127,18 @@ def loadable_graphql_fastapi_app(testdir, graphql_path):
     return f"{module.purebasename}:app"
 
 
+@pytest.fixture
+def loadable_fastapi_app(testdir):
+    module = testdir.make_importable_pyfile(
+        location="""
+        from test.apps.openapi._fastapi import create_app
+
+        app = create_app()
+        """
+    )
+    return f"{module.purebasename}:app"
+
+
 @pytest.fixture(scope="session")
 def is_older_subtests():
     # For compatibility needs

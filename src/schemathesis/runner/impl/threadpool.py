@@ -13,6 +13,7 @@ from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis import create_test
 from ...internal.result import Ok
+from ...models import CheckFunction
 from ...stateful import Feedback, Stateful
 from ...transports.auth import get_requests_auth
 from ...utils import capture_hypothesis_output
@@ -20,16 +21,18 @@ from .. import events
 from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
 
 if TYPE_CHECKING:
+    from .context import RunnerContext
     import hypothesis
 
     from ...generation import DataGenerationMethod, GenerationConfig
-    from ...models import CheckFunction, TestResultSet
+    from ...models import CheckFunction
     from ...targets import Target
     from ...types import RawAuth
 
 
 def _run_task(
-    test_template: Callable,
+    *,
+    test_func: Callable,
     tasks_queue: Queue,
     events_queue: Queue,
     generator_done: threading.Event,
@@ -38,8 +41,7 @@ def _run_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    seed: int | None,
-    results: TestResultSet,
+    ctx: RunnerContext,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
     headers: dict[str, Any] | None = None,
@@ -54,10 +56,10 @@ def _run_task(
         if recursion_level > stateful_recursion_limit:
             return
         for _result in maker(
-            test_template,
+            test_func,
             settings=settings,
             generation_config=generation_config,
-            seed=seed,
+            seed=ctx.seed,
             as_strategy_kwargs=as_strategy_kwargs,
         ):
             # `result` is always `Ok` here
@@ -69,7 +71,7 @@ def _run_task(
                 checks,
                 data_generation_methods,
                 targets,
-                results,
+                ctx=ctx,
                 recursion_level=recursion_level,
                 feedback=feedback,
                 headers=headers,
@@ -92,9 +94,9 @@ def _run_task(
                 operation = result.ok()
                 test_function = create_test(
                     operation=operation,
-                    test=test_template,
+                    test=test_func,
                     settings=settings,
-                    seed=seed,
+                    seed=ctx.seed,
                     data_generation_methods=list(data_generation_methods),
                     generation_config=generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
@@ -104,7 +106,7 @@ def _run_task(
                 # `feedback.get_stateful_tests`
                 _run_tests(lambda *_, **__: (items,))  # noqa: B023
             else:
-                for event in handle_schema_error(result.err(), results, data_generation_methods, 0):
+                for event in handle_schema_error(result.err(), ctx, data_generation_methods, 0):
                     events_queue.put(event)
 
 
@@ -120,8 +122,7 @@ def thread_task(
     auth: RawAuth | None,
     auth_type: str | None,
     headers: dict[str, Any] | None,
-    seed: int | None,
-    results: TestResultSet,
+    ctx: RunnerContext,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
@@ -133,17 +134,16 @@ def thread_task(
     prepared_auth = get_requests_auth(auth, auth_type)
     with get_session(prepared_auth) as session:
         _run_task(
-            network_test,
-            tasks_queue,
-            events_queue,
-            generator_done,
-            checks,
-            targets,
-            data_generation_methods,
-            settings,
-            generation_config,
-            seed,
-            results,
+            test_func=network_test,
+            tasks_queue=tasks_queue,
+            events_queue=events_queue,
+            generator_done=generator_done,
+            checks=checks,
+            targets=targets,
+            data_generation_methods=data_generation_methods,
+            settings=settings,
+            generation_config=generation_config,
+            ctx=ctx,
             stateful=stateful,
             stateful_recursion_limit=stateful_recursion_limit,
             session=session,
@@ -161,24 +161,22 @@ def wsgi_thread_task(
     data_generation_methods: Iterable[DataGenerationMethod],
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
-    seed: int | None,
-    results: TestResultSet,
+    ctx: RunnerContext,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
-        wsgi_test,
-        tasks_queue,
-        events_queue,
-        generator_done,
-        checks,
-        targets,
-        data_generation_methods,
-        settings,
-        generation_config,
-        seed,
-        results,
+        test_func=wsgi_test,
+        tasks_queue=tasks_queue,
+        events_queue=events_queue,
+        generator_done=generator_done,
+        checks=checks,
+        targets=targets,
+        data_generation_methods=data_generation_methods,
+        settings=settings,
+        generation_config=generation_config,
+        ctx=ctx,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         **kwargs,
@@ -195,24 +193,22 @@ def asgi_thread_task(
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
     headers: dict[str, Any] | None,
-    seed: int | None,
-    results: TestResultSet,
+    ctx: RunnerContext,
     stateful: Stateful | None,
     stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
-        asgi_test,
-        tasks_queue,
-        events_queue,
-        generator_done,
-        checks,
-        targets,
-        data_generation_methods,
-        settings,
-        generation_config,
-        seed,
-        results,
+        test_func=asgi_test,
+        tasks_queue=tasks_queue,
+        events_queue=events_queue,
+        generator_done=generator_done,
+        checks=checks,
+        targets=targets,
+        data_generation_methods=data_generation_methods,
+        settings=settings,
+        generation_config=generation_config,
+        ctx=ctx,
         stateful=stateful,
         stateful_recursion_limit=stateful_recursion_limit,
         headers=headers,
@@ -231,9 +227,7 @@ class ThreadPoolRunner(BaseRunner):
 
     workers_num: int = 2
 
-    def _execute(
-        self, results: TestResultSet, stop_event: threading.Event
-    ) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute(self, ctx: RunnerContext) -> Generator[events.ExecutionEvent, None, None]:
         """All events come from a queue where different workers push their events."""
         # Instead of generating all tests at once, we do it when there is a free worker to pick it up
         # This is extremely important for memory consumption when testing large schemas
@@ -254,7 +248,7 @@ class ThreadPoolRunner(BaseRunner):
                 break
         # Events are pushed by workers via a separate queue
         events_queue: Queue = Queue()
-        workers = self._init_workers(tasks_queue, events_queue, results, generator_done)
+        workers = self._init_workers(tasks_queue, events_queue, ctx, generator_done)
 
         def stop_workers() -> None:
             for worker in workers:
@@ -273,12 +267,12 @@ class ThreadPoolRunner(BaseRunner):
                 is_finished = all(not worker.is_alive() for worker in workers)
                 while not events_queue.empty():
                     event = events_queue.get()
-                    if stop_event.is_set() or isinstance(event, events.Interrupted) or self._should_stop(event):
+                    if ctx.is_stopped or isinstance(event, events.Interrupted) or self._should_stop(event):
                         # We could still have events in the queue, but ignore them to keep the logic simple
                         # for now, could be improved in the future to show more info in such corner cases
                         stop_workers()
                         is_finished = True
-                        if stop_event.is_set():
+                        if ctx.is_stopped:
                             # Discard the event. The invariant is: the next event after `stream.stop()` is `Finished`
                             break
                     yield event
@@ -295,13 +289,13 @@ class ThreadPoolRunner(BaseRunner):
             yield events.Interrupted()
 
     def _init_workers(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
     ) -> list[threading.Thread]:
         """Initialize & start workers that will execute tests."""
         workers = [
             threading.Thread(
                 target=self._get_task(),
-                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, results, generator_done),
+                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, ctx, generator_done),
                 name=f"schemathesis_{num}",
             )
             for num in range(self.workers_num)
@@ -314,7 +308,7 @@ class ThreadPoolRunner(BaseRunner):
         return thread_task
 
     def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
     ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
@@ -327,8 +321,7 @@ class ThreadPoolRunner(BaseRunner):
             "auth": self.auth,
             "auth_type": self.auth_type,
             "headers": self.headers,
-            "seed": self.seed,
-            "results": results,
+            "ctx": ctx,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
@@ -346,7 +339,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
         return wsgi_thread_task
 
     def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
     ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
@@ -356,8 +349,7 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "targets": self.targets,
             "settings": self.hypothesis_settings,
             "generation_config": self.generation_config,
-            "seed": self.seed,
-            "results": results,
+            "ctx": ctx,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
@@ -377,7 +369,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
         return asgi_thread_task
 
     def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, results: TestResultSet, generator_done: threading.Event
+        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
     ) -> dict[str, Any]:
         return {
             "tasks_queue": tasks_queue,
@@ -388,8 +380,7 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "generation_config": self.generation_config,
             "headers": self.headers,
-            "seed": self.seed,
-            "results": results,
+            "ctx": ctx,
             "stateful": self.stateful,
             "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
