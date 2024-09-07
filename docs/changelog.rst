@@ -7,6 +7,8 @@ Changelog
 **Changed**
 
 - Extend explicit examples discovery mechanism by checking response examples.
+- Saving the generated data into a cassette when ``--dry-run`` is provided. :issue:`1423`
+- Saving timeouted requests into a cassette.
 
 **Fixed**
 

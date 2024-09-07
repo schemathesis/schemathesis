@@ -11,7 +11,6 @@ import uuid
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, List, Literal, cast
 from warnings import WarningMessage, catch_warnings
 
@@ -22,7 +21,6 @@ from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
-from requests.auth import HTTPDigestAuth
 from urllib3.exceptions import InsecureRequestWarning
 
 from ... import experimental, failures, hooks
@@ -33,7 +31,6 @@ from ..._hypothesis import (
     get_non_serializable_mark,
     has_unsatisfied_example_mark,
 )
-from ..._override import CaseOverride
 from ...auths import unregister as unregister_auth
 from ...checks import _make_max_response_time_failure_message
 from ...constants import (
@@ -61,9 +58,8 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
 from ...internal.datetime import current_datetime
 from ...internal.result import Err, Ok, Result
-from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult, TestResultSet
+from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult
 from ...runner import events
-from ...schemas import BaseSchema
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
@@ -73,12 +69,17 @@ from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
 from ...transports import RequestConfig, RequestsTransport
 from ...transports.auth import get_requests_auth, prepare_wsgi_headers
-from ...types import RawAuth
 from ...utils import capture_hypothesis_output
 from .. import probes
 from ..serialization import SerializedTestResult
+from .context import RunnerContext
 
 if TYPE_CHECKING:
+    from ...types import RawAuth
+    from ...schemas import BaseSchema
+    from ..._override import CaseOverride
+    from requests.auth import HTTPDigestAuth
+    from types import TracebackType
     from ...service.client import ServiceClient
     from ...transports.responses import GenericResponse, WSGIResponse
 
@@ -124,7 +125,7 @@ class BaseRunner:
         # If auth is explicitly provided, then the global provider is ignored
         if self.auth is not None:
             unregister_auth()
-        results = TestResultSet(seed=self.seed)
+        ctx = RunnerContext(self.seed, stop_event)
         start_time = time.monotonic()
         initialized = None
         __probes = None
@@ -136,15 +137,15 @@ class BaseRunner:
                 schema=self.schema,
                 count_operations=self.count_operations,
                 count_links=self.count_links,
-                seed=self.seed,
+                seed=ctx.seed,
                 start_time=start_time,
             )
             return initialized
 
         def _finish() -> events.Finished:
-            if has_all_not_found(results):
-                results.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
-            return events.Finished.from_results(results=results, running_time=time.monotonic() - start_time)
+            if ctx.has_all_not_found:
+                ctx.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
+            return events.Finished.from_results(results=ctx.data, running_time=time.monotonic() - start_time)
 
         def _before_probes() -> events.BeforeProbing:
             return events.BeforeProbing()
@@ -178,7 +179,7 @@ class BaseRunner:
         def _after_analysis() -> events.AfterAnalysis:
             return events.AfterAnalysis(analysis=__analysis)
 
-        if stop_event.is_set():
+        if ctx.is_stopped:
             yield _finish()
             return
 
@@ -194,16 +195,16 @@ class BaseRunner:
             event = event_factory()
             if event is not None:
                 yield event
-            if stop_event.is_set():
-                yield _finish()
+            if ctx.is_stopped:
+                yield _finish()  # type: ignore[unreachable]
                 return
 
         try:
             warnings.simplefilter("ignore", InsecureRequestWarning)
             if not experimental.STATEFUL_ONLY.is_enabled:
-                yield from self._execute(results, stop_event)
+                yield from self._execute(ctx)
             if not self._is_stopping_due_to_failure_limit:
-                yield from self._run_stateful_tests(results)
+                yield from self._run_stateful_tests(ctx)
         except KeyboardInterrupt:
             yield events.Interrupted()
 
@@ -224,19 +225,17 @@ class BaseRunner:
                 return self._failures_counter >= self.max_failures
         return False
 
-    def _execute(
-        self, results: TestResultSet, stop_event: threading.Event
-    ) -> Generator[events.ExecutionEvent, None, None]:
+    def _execute(self, ctx: RunnerContext) -> Generator[events.ExecutionEvent, None, None]:
         raise NotImplementedError
 
-    def _run_stateful_tests(self, results: TestResultSet) -> Generator[events.ExecutionEvent, None, None]:
+    def _run_stateful_tests(self, ctx: RunnerContext) -> Generator[events.ExecutionEvent, None, None]:
         # Run new-style stateful tests
         if self.stateful is not None and experimental.STATEFUL_TEST_RUNNER.is_enabled and self.schema.links_count > 0:
             result = TestResult(
                 method="",
                 path="",
                 verbose_name="Stateful tests",
-                seed=self.seed,
+                seed=ctx.seed,
                 data_generation_method=self.schema.data_generation_methods,
             )
             headers = self.headers or {}
@@ -253,7 +252,7 @@ class BaseRunner:
                 max_failures=None if self.max_failures is None else self.max_failures - self._failures_counter,
                 request=self.request_config,
                 auth=auth,
-                seed=self.seed,
+                seed=ctx.seed,
                 override=self.override,
             )
             state_machine = self.schema.as_state_machine()
@@ -279,6 +278,8 @@ class BaseRunner:
                                 case=event.case,
                                 response=response,
                                 checks=event.checks,
+                                headers=headers,
+                                session=None,
                             )
 
                 else:
@@ -319,7 +320,7 @@ class BaseRunner:
                     status = Status.error
                     result.add_error(stateful_event.exception)
                 yield events.StatefulEvent(data=stateful_event)
-            results.append(result)
+            ctx.add_result(result)
             yield events.AfterStatefulExecution(
                 status=status,
                 result=SerializedTestResult.from_test_result(result),
@@ -330,11 +331,10 @@ class BaseRunner:
     def _run_tests(
         self,
         maker: Callable,
-        template: Callable,
+        test_func: Callable,
         settings: hypothesis.settings,
         generation_config: GenerationConfig,
-        seed: int | None,
-        results: TestResultSet,
+        ctx: RunnerContext,
         recursion_level: int = 0,
         headers: dict[str, Any] | None = None,
         **kwargs: Any,
@@ -354,10 +354,10 @@ class BaseRunner:
             return kw
 
         for result in maker(
-            template,
+            test_func,
             settings=settings,
             generation_config=generation_config,
-            seed=seed,
+            seed=ctx.seed,
             as_strategy_kwargs=as_strategy_kwargs,
         ):
             if isinstance(result, Ok):
@@ -374,7 +374,7 @@ class BaseRunner:
                     for event in run_test(
                         operation,
                         test,
-                        results=results,
+                        ctx=ctx,
                         feedback=feedback,
                         recursion_level=recursion_level,
                         data_generation_methods=self.schema.data_generation_methods,
@@ -390,28 +390,25 @@ class BaseRunner:
                     if feedback is not None:
                         yield from self._run_tests(
                             feedback.get_stateful_tests,
-                            template,
+                            test_func,
                             settings=settings,
                             generation_config=generation_config,
-                            seed=seed,
                             recursion_level=recursion_level + 1,
-                            results=results,
+                            ctx=ctx,
                             headers=headers,
                             **kwargs,
                         )
                 except OperationSchemaError as exc:
                     yield from handle_schema_error(
                         exc,
-                        results,
+                        ctx,
                         self.schema.data_generation_methods,
                         recursion_level,
                         before_execution_correlation_id=before_execution_correlation_id,
                     )
             else:
                 # Schema errors
-                yield from handle_schema_error(
-                    result.err(), results, self.schema.data_generation_methods, recursion_level
-                )
+                yield from handle_schema_error(result.err(), ctx, self.schema.data_generation_methods, recursion_level)
 
 
 def run_probes(schema: BaseSchema, config: probes.ProbeConfig) -> list[probes.ProbeRun]:
@@ -456,7 +453,7 @@ class EventStream:
 
 def handle_schema_error(
     error: OperationSchemaError,
-    results: TestResultSet,
+    ctx: RunnerContext,
     data_generation_methods: Iterable[DataGenerationMethod],
     recursion_level: int,
     *,
@@ -501,11 +498,11 @@ def handle_schema_error(
             hypothesis_output=[],
             correlation_id=correlation_id,
         )
-        results.append(result)
+        ctx.add_result(result)
     else:
         # When there is no `method`, then the schema error may cover multiple operations, and we can't display it in
         # the progress bar
-        results.generic_errors.append(error)
+        ctx.add_generic_error(error)
 
 
 def run_test(
@@ -514,7 +511,7 @@ def run_test(
     checks: Iterable[CheckFunction],
     data_generation_methods: Iterable[DataGenerationMethod],
     targets: Iterable[Target],
-    results: TestResultSet,
+    ctx: RunnerContext,
     headers: dict[str, Any] | None,
     recursion_level: int,
     **kwargs: Any,
@@ -691,10 +688,10 @@ def run_test(
     result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
         test, "_hypothesis_internal_use_generated_seed", None
     )
-    results.append(result)
+    ctx.add_result(result)
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result, status_code):
-            results.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`", status_code))
+            ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`", status_code))
     yield events.AfterExecution.from_result(
         result=result,
         status=status,
@@ -727,22 +724,6 @@ def has_too_many_responses_with_status(result: TestResult, status_code: int) -> 
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
-
-
-def has_all_not_found(results: TestResultSet) -> bool:
-    """Check if all responses are 404."""
-    has_not_found = False
-    for result in results.results:
-        for check in result.checks:
-            if check.response is not None:
-                if check.response.status_code == 404:
-                    has_not_found = True
-                else:
-                    # There are non-404 responses, no reason to check any other response
-                    return False
-    # Only happens if all responses are 404, or there are no responses at all.
-    # In the first case, it returns True, for the latter - False
-    return has_not_found
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:
@@ -952,6 +933,8 @@ def network_test(
             )
             response = _network_test(case, *args)
             add_cases(case, response, _network_test, *args)
+        elif store_interactions:
+            result.store_requests_response(case, None, Status.skip, [], headers=headers, session=session)
 
 
 def _network_test(
@@ -991,6 +974,8 @@ def _network_test(
             check_name, case, None, elapsed, f"Response timed out after {1000 * elapsed:.2f}ms", exc.context, request
         )
         check_results.append(check_result)
+        if store_interactions:
+            result.store_requests_response(case, None, Status.failure, [check_result], headers=headers, session=session)
         raise exc
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
@@ -1012,7 +997,7 @@ def _network_test(
         if feedback is not None:
             feedback.add_test_case(case, response)
         if store_interactions:
-            result.store_requests_response(case, response, status, check_results)
+            result.store_requests_response(case, response, status, check_results, headers=headers, session=session)
     return response
 
 
@@ -1055,6 +1040,8 @@ def wsgi_test(
             )
             response = _wsgi_test(case, *args)
             add_cases(case, response, _wsgi_test, *args)
+        elif store_interactions:
+            result.store_wsgi_response(case, None, headers, None, Status.skip, [])
 
 
 def _wsgi_test(
@@ -1131,6 +1118,8 @@ def asgi_test(
             )
             response = _asgi_test(case, *args)
             add_cases(case, response, _asgi_test, *args)
+        elif store_interactions:
+            result.store_requests_response(case, None, Status.skip, [], headers=headers, session=None)
 
 
 def _asgi_test(
@@ -1168,5 +1157,5 @@ def _asgi_test(
         if feedback is not None:
             feedback.add_test_case(case, response)
         if store_interactions:
-            result.store_requests_response(case, response, status, check_results)
+            result.store_requests_response(case, response, status, check_results, headers, session=None)
     return response
