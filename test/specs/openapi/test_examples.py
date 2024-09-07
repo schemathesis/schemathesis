@@ -12,11 +12,14 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.generation import GenerationConfig, get_single_example
+from schemathesis.generation._hypothesis import combine_strategies
 from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
     extract_inner_examples,
+    find_in_responses,
+    find_matching_in_responses,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
@@ -1363,3 +1366,187 @@ def test_property_examples_with_all_of():
             "media_type": "application/json",
         }
     ]
+
+
+def content(schema, **kwargs):
+    return {
+        "description": "",
+        "content": {
+            "application/json": {"schema": schema, **kwargs},
+        },
+    }
+
+
+@pytest.mark.parametrize(
+    ["response", "expected"],
+    [
+        ({"description": "Ok"}, {}),
+        ({"$ref": "#/components/responses/NoExamples"}, {}),
+        (
+            {"$ref": "#/components/responses/SingleExample"},
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            {"$ref": "#/components/responses/OneExample"},
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            {"$ref": "#/components/responses/TwoExamples"},
+            {
+                "Item": [
+                    {"id": "123456"},
+                    {"id": "456789"},
+                ],
+            },
+        ),
+        (
+            content({"$ref": "#/components/schemas/Item"}, examples={"Example1": {"value": {"id": "123456"}}}),
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            content({"$ref": "#/components/schemas/Item"}, **{"x-examples": {"Example1": {"value": {"id": "123456"}}}}),
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            content({"$ref": "#/components/schemas/Item"}, **{"x-example": {"id": "123456"}}),
+            {
+                "Item": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+        (
+            content(
+                {"properties": {"id": {"type": "string"}}},
+                examples={"Example1": {"value": {"id": "123456"}}},
+            ),
+            {
+                "200/application/json": [
+                    {"id": "123456"},
+                ],
+            },
+        ),
+    ],
+)
+def test_find_in_responses(empty_open_api_3_schema, response, expected):
+    empty_open_api_3_schema["components"] = {
+        "schemas": {
+            "Item": {
+                "properties": {
+                    "id": {
+                        "type": "string",
+                    }
+                }
+            }
+        },
+        "responses": {
+            "NoExamples": content({"$ref": "#/components/schemas/Item"}),
+            "OneExample": content(
+                {"$ref": "#/components/schemas/Item"}, examples={"Example1": {"value": {"id": "123456"}}}
+            ),
+            "TwoExamples": content(
+                {"$ref": "#/components/schemas/Item"},
+                examples={
+                    "Example1": {"value": {"id": "123456"}},
+                    "Example2": {"value": {"id": "456789"}},
+                },
+            ),
+            "SingleExample": content({"$ref": "#/components/schemas/Item"}, example={"id": "123456"}),
+        },
+    }
+    empty_open_api_3_schema["paths"] = {
+        "/items/{itemId}/": {
+            "get": {
+                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                "responses": {"200": response},
+            }
+        }
+    }
+    print(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    operation = schema["/items/{itemId}/"]["get"]
+    assert find_in_responses(operation) == expected
+
+    if expected:
+        strategy = combine_strategies(operation.get_strategies_from_examples())
+        collected = []
+
+        @given(strategy)
+        def test(case):
+            collected.append(case.path_parameters)
+
+        test()
+
+        assert collected == [
+            {"itemId": value} for group in expected.values() for values in group for value in values.values()
+        ]
+
+
+@pytest.mark.parametrize(
+    ["examples", "name", "expected"],
+    [
+        (
+            {"Item": [{"id": "123"}, {"id": "456"}]},
+            "id",
+            ["123", "456"],
+        ),
+        (
+            {"Item": [{"itemId": "123"}, {"itemId": "456"}]},
+            "itemId",
+            ["123", "456"],
+        ),
+        (
+            {"Item": [{"id": "123"}, {"id": "456"}]},
+            "itemId",
+            ["123", "456"],
+        ),
+        (
+            {"Item": [{"ItemId": "123"}, {"ITEMID": "456"}]},
+            "itemId",
+            ["123", "456"],
+        ),
+        (
+            {"Product": [{"productId": "123"}, {"product_id": "456"}]},
+            "id",
+            ["123", "456"],
+        ),
+        (
+            {"User": [{"userId": "123"}, {"user_id": "456"}], "Item": [{"itemId": "789"}]},
+            "userId",
+            ["123", "456"],
+        ),
+        (
+            {"User": [{"name": "John"}, {"age": 30}]},
+            "id",
+            [],
+        ),
+    ],
+)
+def test_find_matching_in_responses(examples, name, expected):
+    assert list(find_matching_in_responses(examples, name)) == expected
+
+
+def test_find_matching_in_responses_yields_all():
+    examples = {"Item": [{"id": "123"}, {"id": "456"}], "Product": [{"id": "789"}, {"productId": "101112"}]}
+    result = list(find_matching_in_responses(examples, "id"))
+    assert result == ["123", "456", "789", "101112"]
+
+
+def test_find_matching_in_responses_empty():
+    assert list(find_matching_in_responses({}, "id")) == []

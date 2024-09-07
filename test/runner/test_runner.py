@@ -617,6 +617,40 @@ async def test_payload_explicit_example(any_app, any_app_schema):
     assert body == {"name": "John"}
 
 
+def test_explicit_examples_from_response(empty_open_api_3_schema, openapi3_base_url):
+    empty_open_api_3_schema["paths"] = {
+        "/items/{itemId}/": {
+            "get": {
+                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                "responses": {
+                    "200": {
+                        "description": "",
+                        "content": {
+                            "application/json": {
+                                "schema": {"$ref": "#/components/schemas/Item"},
+                                "examples": {
+                                    "Example1": {"value": {"id": "123456"}},
+                                    "Example2": {"value": {"itemId": "456789"}},
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        }
+    }
+    empty_open_api_3_schema["components"] = {"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}}
+    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+    *_, after, _ = from_schema(
+        schema,
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
+    ).execute()
+    assert [check.example.path_parameters for check in after.result.checks] == [
+        {"itemId": "456789"},
+        {"itemId": "123456"},
+    ]
+
+
 @pytest.mark.operations("payload")
 async def test_explicit_example_disable(any_app, any_app_schema, mocker):
     # When API operation has an example specified

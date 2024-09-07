@@ -4,7 +4,7 @@ from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from itertools import chain, cycle, islice
-from typing import TYPE_CHECKING, Any, Generator, Union, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterator, Union, cast
 
 import requests
 from hypothesis.strategies import SearchStrategy
@@ -77,6 +77,7 @@ def get_strategies_from_examples(
 
 def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Generator[Example, None, None]:
     """Extract top-level parameter examples from `examples` & `example` fields."""
+    responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
         if "schema" in parameter.definition:
             definitions = [parameter.definition, *_expand_subschemas(parameter.definition["schema"])]
@@ -106,6 +107,10 @@ def extract_top_level(operation: APIOperation[OpenAPIParameter, Case]) -> Genera
                         yield ParameterExample(
                             container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
                         )
+        for value in find_matching_in_responses(responses, parameter.name):
+            yield ParameterExample(
+                container=LOCATION_TO_CONTAINER[parameter.location], name=parameter.name, value=value
+            )
     for alternative in operation.body:
         alternative = cast(OpenAPIBody, alternative)
         if "schema" in alternative.definition:
@@ -349,3 +354,63 @@ def _produce_parameter_combinations(parameters: dict[str, dict[str, list]]) -> G
             }
             for container, variants in parameters.items()
         }
+
+
+def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]]:
+    """Find schema examples in responses."""
+    output: dict[str, list[dict[str, Any]]] = {}
+    for status_code, response in operation.definition.raw.get("responses", {}).items():
+        if isinstance(response, dict) and "$ref" in response:
+            _, response = operation.schema.resolver.resolve_in_scope(response, operation.definition.scope)  # type:ignore[attr-defined]
+        for media_type, definition in response.get("content", {}).items():
+            schema_ref = definition.get("schema", {}).get("$ref")
+            if schema_ref:
+                name = schema_ref.split("/")[-1]
+            else:
+                name = f"{status_code}/{media_type}"
+            for examples_field, example_field in (
+                ("examples", "example"),
+                ("x-examples", "x-example"),
+            ):
+                examples = definition.get(examples_field, {})
+                for example in examples.values():
+                    if "value" in example:
+                        output.setdefault(name, []).append(example["value"])
+                if example_field in definition:
+                    output.setdefault(name, []).append(definition[example_field])
+    return output
+
+
+def find_matching_in_responses(examples: dict[str, list[dict[str, Any]]], param: str) -> Iterator[Any]:
+    """Find matching parameter examples."""
+    normalized = param.lower()
+    is_id_param = normalized.endswith("id")
+    # Extract values from response examples that match input parameters.
+    # E.g., for `GET /orders/{id}/`, use "id" or "orderId" from `Order` response
+    # as examples for the "id" path parameter.
+    for schema_name, schema_examples in examples.items():
+        for example in schema_examples:
+            # Check for exact match
+            if param in example:
+                yield example[param]
+                continue
+
+            # Check for case-insensitive match
+            for key in example:
+                if key.lower() == normalized:
+                    yield example[key]
+                    break
+            else:
+                # If no match found and it's an ID parameter, try additional checks
+                if is_id_param:
+                    # Check for 'id' if parameter is '{something}Id'
+                    if "id" in example:
+                        yield example["id"]
+                    # Check for '{schemaName}Id' or '{schemaName}_id'
+                    elif normalized == "id" or normalized.startswith(schema_name.lower()):
+                        for key in (schema_name, schema_name.lower()):
+                            for suffix in ("_id", "Id"):
+                                with_suffix = f"{key}{suffix}"
+                                if with_suffix in example:
+                                    yield example[with_suffix]
+                                    break
