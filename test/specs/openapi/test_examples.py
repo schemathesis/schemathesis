@@ -1478,7 +1478,6 @@ def test_find_in_responses(empty_open_api_3_schema, response, expected):
             }
         }
     }
-    print(empty_open_api_3_schema)
     schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
     operation = schema["/items/{itemId}/"]["get"]
     assert find_in_responses(operation) == expected
