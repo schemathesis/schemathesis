@@ -246,6 +246,7 @@ def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = No
 
 def sanitize_serialized_interaction(interaction: SerializedInteraction, *, config: Config | None = None) -> None:
     sanitize_request(interaction.request, config=config)
-    sanitize_value(interaction.response.headers, config=config)
+    if interaction.response is not None:
+        sanitize_value(interaction.response.headers, config=config)
     for check in interaction.checks:
         sanitize_serialized_check(check, config=config)

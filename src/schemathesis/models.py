@@ -995,7 +995,7 @@ class Interaction:
     """A single interaction with the target app."""
 
     request: Request
-    response: Response
+    response: Response | None
     checks: list[Check]
     status: Status
     data_generation_method: DataGenerationMethod
@@ -1003,10 +1003,28 @@ class Interaction:
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
-    def from_requests(cls, case: Case, response: requests.Response, status: Status, checks: list[Check]) -> Interaction:
+    def from_requests(
+        cls,
+        case: Case,
+        response: requests.Response | None,
+        status: Status,
+        checks: list[Check],
+        headers: dict[str, Any] | None,
+        session: requests.Session | None,
+    ) -> Interaction:
+        if response is not None:
+            prepared = response.request
+            request = Request.from_prepared_request(prepared)
+        else:
+            import requests
+
+            if session is None:
+                session = requests.Session()
+                session.headers.update(headers or {})
+            request = Request.from_case(case, session)
         return cls(
-            request=Request.from_prepared_request(response.request),
-            response=Response.from_requests(response),
+            request=request,
+            response=Response.from_requests(response) if response is not None else None,
             status=status,
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
@@ -1017,9 +1035,9 @@ class Interaction:
     def from_wsgi(
         cls,
         case: Case,
-        response: WSGIResponse,
+        response: WSGIResponse | None,
         headers: dict[str, Any],
-        elapsed: float,
+        elapsed: float | None,
         status: Status,
         checks: list[Check],
     ) -> Interaction:
@@ -1029,7 +1047,7 @@ class Interaction:
         session.headers.update(headers)
         return cls(
             request=Request.from_case(case, session),
-            response=Response.from_wsgi(response, elapsed),
+            response=Response.from_wsgi(response, elapsed) if response is not None and elapsed is not None else None,
             status=status,
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
@@ -1119,16 +1137,22 @@ class TestResult:
         self.errors.append(exception)
 
     def store_requests_response(
-        self, case: Case, response: requests.Response, status: Status, checks: list[Check]
+        self,
+        case: Case,
+        response: requests.Response | None,
+        status: Status,
+        checks: list[Check],
+        headers: dict[str, Any] | None,
+        session: requests.Session | None,
     ) -> None:
-        self.interactions.append(Interaction.from_requests(case, response, status, checks))
+        self.interactions.append(Interaction.from_requests(case, response, status, checks, headers, session))
 
     def store_wsgi_response(
         self,
         case: Case,
-        response: WSGIResponse,
+        response: WSGIResponse | None,
         headers: dict[str, Any],
-        elapsed: float,
+        elapsed: float | None,
         status: Status,
         checks: list[Check],
     ) -> None:

@@ -166,10 +166,15 @@ def vcr_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: boo
         return "~" if message is None else f"{message!r}"
 
     def format_checks(checks: list[SerializedCheck]) -> str:
-        return "\n".join(
+        if not checks:
+            return "  checks: []"
+        items = "\n".join(
             f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.message)}"
             for check in checks
         )
+        return f"""
+  checks:
+{items}"""
 
     if preserve_exact_body_bytes:
 
@@ -235,9 +240,8 @@ http_interactions:"""
   correlation_id: '{item.correlation_id}'
   data_generation_method: '{interaction.data_generation_method.value}'
   phase: {phase}
-  elapsed: '{interaction.response.elapsed}'
+  elapsed: '{interaction.response.elapsed if interaction.response else 0}'
   recorded_at: '{interaction.recorded_at}'
-  checks:
 {format_checks(interaction.checks)}
   request:
     uri: '{interaction.request.uri}'
@@ -246,8 +250,9 @@ http_interactions:"""
 {format_headers(interaction.request.headers)}"""
                 )
                 format_request_body(stream, interaction.request)
-                stream.write(
-                    f"""
+                if interaction.response is not None:
+                    stream.write(
+                        f"""
   response:
     status:
       code: '{interaction.response.status_code}'
@@ -255,12 +260,16 @@ http_interactions:"""
     headers:
 {format_headers(interaction.response.headers)}
 """
-                )
-                format_response_body(stream, interaction.response)
-                stream.write(
-                    f"""
+                    )
+                    format_response_body(stream, interaction.response)
+                    stream.write(
+                        f"""
     http_version: '{interaction.response.http_version}'"""
-                )
+                    )
+                else:
+                    stream.write("""
+  response: null
+""")
                 current_id += 1
         else:
             break
@@ -326,25 +335,45 @@ def har_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: boo
             item = queue.get()
             if isinstance(item, Process):
                 for interaction in item.interactions:
-                    time = round(interaction.response.elapsed * 1000, 2)
-                    content_type = interaction.response.headers.get("Content-Type", [""])[0]
-                    content = harfile.Content(
-                        size=interaction.response.body_size or 0,
-                        mimeType=content_type,
-                        text=get_body(interaction.response.body) if interaction.response.body is not None else None,
-                        encoding="base64"
-                        if interaction.response.body is not None and preserve_exact_body_bytes
-                        else None,
-                    )
-                    http_version = f"HTTP/{interaction.response.http_version}"
                     query_params = urlparse(interaction.request.uri).query
                     if interaction.request.body is not None:
                         post_data = harfile.PostData(
-                            mimeType=content_type,
+                            mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                             text=get_body(interaction.request.body),
                         )
                     else:
                         post_data = None
+                    if interaction.response is not None:
+                        content_type = interaction.response.headers.get("Content-Type", [""])[0]
+                        content = harfile.Content(
+                            size=interaction.response.body_size or 0,
+                            mimeType=content_type,
+                            text=get_body(interaction.response.body) if interaction.response.body is not None else None,
+                            encoding="base64"
+                            if interaction.response.body is not None and preserve_exact_body_bytes
+                            else None,
+                        )
+                        http_version = f"HTTP/{interaction.response.http_version}"
+                        response = harfile.Response(
+                            status=interaction.response.status_code,
+                            httpVersion=http_version,
+                            statusText=interaction.response.message,
+                            headers=[
+                                harfile.Record(name=name, value=values[0])
+                                for name, values in interaction.response.headers.items()
+                            ],
+                            cookies=_extract_cookies(interaction.response.headers.get("Set-Cookie", [])),
+                            content=content,
+                            headersSize=_headers_size(interaction.response.headers),
+                            bodySize=interaction.response.body_size or 0,
+                            redirectURL=interaction.response.headers.get("Location", [""])[0],
+                        )
+                        time = round(interaction.response.elapsed * 1000, 2)
+                    else:
+                        response = HARFILE_NO_RESPONSE
+                        time = 0
+                        http_version = ""
+
                     har.add_entry(
                         startedDateTime=interaction.recorded_at,
                         time=time,
@@ -365,24 +394,21 @@ def har_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: boo
                             bodySize=interaction.request.body_size or 0,
                             postData=post_data,
                         ),
-                        response=harfile.Response(
-                            status=interaction.response.status_code,
-                            httpVersion=http_version,
-                            statusText=interaction.response.message,
-                            headers=[
-                                harfile.Record(name=name, value=values[0])
-                                for name, values in interaction.response.headers.items()
-                            ],
-                            cookies=_extract_cookies(interaction.response.headers.get("Set-Cookie", [])),
-                            content=content,
-                            headersSize=_headers_size(interaction.response.headers),
-                            bodySize=interaction.response.body_size or 0,
-                            redirectURL=interaction.response.headers.get("Location", [""])[0],
-                        ),
+                        response=response,
                         timings=harfile.Timings(send=0, wait=0, receive=time, blocked=0, dns=0, connect=0, ssl=0),
                     )
             elif isinstance(item, Finalize):
                 break
+
+
+HARFILE_NO_RESPONSE = harfile.Response(
+    status=0,
+    httpVersion="",
+    statusText="",
+    headers=[],
+    cookies=[],
+    content=harfile.Content(),
+)
 
 
 def _headers_size(headers: dict[str, list[str]]) -> int:
