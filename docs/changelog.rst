@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.4...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Extend explicit examples discovery mechanism by checking response examples.
+
 .. _v3.35.4:
 
 :version:`3.35.4 <v3.35.3...v3.35.4>` - 2024-09-05
