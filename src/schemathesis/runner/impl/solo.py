@@ -1,13 +1,16 @@
 from __future__ import annotations
 
-import threading
 from dataclasses import dataclass
-from typing import Generator
+from typing import TYPE_CHECKING, Generator
 
-from ...models import TestResultSet
 from ...transports.auth import get_requests_auth
-from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
+
+if TYPE_CHECKING:
+    import threading
+
+    from ...models import TestResultSet
+    from .. import events
 
 
 @dataclass

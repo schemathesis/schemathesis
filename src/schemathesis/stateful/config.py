@@ -21,7 +21,7 @@ def _default_checks_factory() -> tuple[CheckFunction, ...]:
     from ..checks import ALL_CHECKS
     from ..specs.openapi.checks import ensure_resource_availability, use_after_free
 
-    return ALL_CHECKS + (use_after_free, ensure_resource_availability)
+    return (*ALL_CHECKS, use_after_free, ensure_resource_availability)
 
 
 def _get_default_hypothesis_settings_kwargs() -> dict[str, Any]:

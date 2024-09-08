@@ -6,13 +6,15 @@ import enum
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import tomli
 import tomli_w
 
-from ..types import PathLike
 from .constants import DEFAULT_HOSTNAME, DEFAULT_HOSTS_PATH, HOSTS_FORMAT_VERSION
+
+if TYPE_CHECKING:
+    from ..types import PathLike
 
 
 @dataclass

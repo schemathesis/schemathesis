@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import functools
 import logging
+import operator
 import re
 import threading
 import time
@@ -779,7 +781,9 @@ def group_errors(errors: list[Exception]) -> None:
     serialization_errors = [error for error in errors if isinstance(error, SerializationNotPossible)]
     if len(serialization_errors) > 1:
         errors[:] = [error for error in errors if not isinstance(error, SerializationNotPossible)]
-        media_types = sum((entry.media_types for entry in serialization_errors), [])
+        media_types: list[str] = functools.reduce(
+            operator.iadd, (entry.media_types for entry in serialization_errors), []
+        )
         errors.append(SerializationNotPossible.from_media_types(*media_types))
 
 

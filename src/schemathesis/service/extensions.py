@@ -3,7 +3,7 @@ from __future__ import annotations
 import base64
 import re
 from ipaddress import IPv4Network, IPv6Network
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable
 
 from ..graphql import nodes
 from ..internal.result import Err, Ok, Result
@@ -75,7 +75,7 @@ def _apply_media_types_extension(extension: MediaTypesExtension) -> None:
     _apply_simple_extension(extension, extension.media_types, media_types.register_media_type)
 
 
-def _find_built_in_strategy(name: str) -> Optional[st.SearchStrategy]:
+def _find_built_in_strategy(name: str) -> st.SearchStrategy | None:
     """Find a built-in Hypothesis strategy by its name."""
     from hypothesis import provisional as pr
     from hypothesis import strategies as st

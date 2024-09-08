@@ -3,12 +3,11 @@ from __future__ import annotations
 import unittest
 from contextlib import contextmanager
 from functools import partial
-from typing import Any, Callable, Generator, Type, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
 
 import pytest
 from _pytest import fixtures, nodes
 from _pytest.config import hookimpl
-from _pytest.fixtures import FuncFixtureInfo
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
@@ -30,7 +29,6 @@ from ..exceptions import (
     UsageError,
 )
 from ..internal.result import Ok, Result
-from ..models import APIOperation
 from ..utils import (
     PARAMETRIZE_MARKER,
     fail_on_no_matches,
@@ -41,6 +39,11 @@ from ..utils import (
     merge_given_args,
     validate_given_args,
 )
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FuncFixtureInfo
+
+    from ..models import APIOperation
 
 
 class SchemathesisFunction(Function):

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Any, Callable, Dict, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, TypeVar, cast
 
 from ..internal.transformation import merge_recursively
 from ..runner import events
 from ..runner.serialization import _serialize_check
-from ..stateful import events as stateful_events
+
+if TYPE_CHECKING:
+    from ..stateful import events as stateful_events
 
 S = TypeVar("S", bound=events.ExecutionEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]

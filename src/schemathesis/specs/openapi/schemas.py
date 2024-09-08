@@ -20,21 +20,18 @@ from typing import (
     Mapping,
     NoReturn,
     Sequence,
-    Type,
     TypeVar,
     cast,
 )
 from urllib.parse import urlsplit
 
 import jsonschema
-from hypothesis.strategies import SearchStrategy
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from ... import experimental, failures
 from ..._compat import MultipleFailures
 from ..._override import CaseOverride, check_no_override_mark, set_override_mark
-from ...auths import AuthStorage
 from ...constants import HTTP_METHODS, NOT_SET
 from ...exceptions import (
     InternalError,
@@ -54,10 +51,8 @@ from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
 from ...stateful import Stateful, StatefulTest
-from ...stateful.state_machine import APIStateMachine
 from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
-from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
@@ -83,7 +78,12 @@ from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSe
 from .stateful import create_state_machine
 
 if TYPE_CHECKING:
+    from hypothesis.strategies import SearchStrategy
+
+    from ...auths import AuthStorage
+    from ...stateful.state_machine import APIStateMachine
     from ...transports.responses import GenericResponse
+    from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
@@ -626,7 +626,7 @@ class BaseOpenAPISchema(BaseSchema):
         return operation.definition.raw.get("tags")
 
     @property
-    def validator_cls(self) -> Type[jsonschema.Validator]:
+    def validator_cls(self) -> type[jsonschema.Validator]:
         if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
             return jsonschema.Draft202012Validator
         return jsonschema.Draft4Validator
@@ -791,11 +791,10 @@ class BaseOpenAPISchema(BaseSchema):
 
 def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
     if not errors:
-        return None
-    elif len(errors) == 1:
+        return
+    if len(errors) == 1:
         raise errors[0]
-    else:
-        raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
+    raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
 
 
 def _make_reference_key(scopes: list[str], reference: str) -> str:

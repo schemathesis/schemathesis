@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from unittest.mock import ANY
 
 import jsonschema
@@ -13,7 +13,6 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.generation import GenerationConfig, get_single_example
 from schemathesis.generation._hypothesis import combine_strategies
-from schemathesis.models import APIOperation
 from schemathesis.specs.openapi import examples
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
@@ -22,9 +21,12 @@ from schemathesis.specs.openapi.examples import (
     find_matching_in_responses,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
-from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 from schemathesis.transports import WSGITransport
 from test.utils import assert_requests_call
+
+if TYPE_CHECKING:
+    from schemathesis.models import APIOperation
+    from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
 @pytest.fixture(scope="module")

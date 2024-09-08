@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from inspect import signature
-from typing import Any, Callable, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 import pytest
-from _pytest.fixtures import FixtureRequest
 from hypothesis.core import HypothesisHandle
 from hypothesis.errors import Flaky
 from hypothesis.internal.escalation import format_exception, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
-from pyrate_limiter import Limiter
 from pytest_subtests import SubTests, nullcontext
 
 from ._compat import MultipleFailures, get_interesting_origin
@@ -20,14 +18,10 @@ from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
-from .generation import DataGenerationMethodInput, GenerationConfig
 from .hooks import HookDispatcher, HookScope
 from .internal.deprecation import warn_filtration_arguments
-from .internal.output import OutputConfig
 from .internal.result import Ok
-from .models import APIOperation
 from .schemas import BaseSchema
-from .types import Filter, GenericTest, NotSet
 from .utils import (
     GivenInput,
     fail_on_no_matches,
@@ -38,6 +32,15 @@ from .utils import (
     merge_given_args,
     validate_given_args,
 )
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from pyrate_limiter import Limiter
+
+    from .generation import DataGenerationMethodInput, GenerationConfig
+    from .internal.output import OutputConfig
+    from .models import APIOperation
+    from .types import Filter, GenericTest, NotSet
 
 
 @dataclass

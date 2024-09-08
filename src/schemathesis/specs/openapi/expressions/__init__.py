@@ -11,6 +11,13 @@ from typing import Any
 from . import lexer, nodes, parser
 from .context import ExpressionContext
 
+__all__ = [
+    "lexer",
+    "nodes",
+    "parser",
+    "ExpressionContext",
+]
+
 
 def evaluate(expr: Any, context: ExpressionContext, evaluate_nested: bool = False) -> Any:
     """Evaluate runtime expression in context."""

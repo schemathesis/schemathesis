@@ -43,6 +43,8 @@ class Binary(str):
 
     data: bytes
 
+    __slots__ = ("data",)
+
 
 @dataclass
 class SerializerContext:

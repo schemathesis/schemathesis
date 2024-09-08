@@ -15,7 +15,6 @@ from ..code_samples import get_excluded_headers
 from ..exceptions import (
     BodyInGetRequestError,
     DeadlineExceeded,
-    FailureContext,
     InternalError,
     InvalidRegularExpression,
     OperationSchemaError,
@@ -27,13 +26,15 @@ from ..exceptions import (
     format_exception,
     make_unique_by_key,
 )
-from ..generation import DataGenerationMethod
 from ..models import Case, Check, Interaction, Request, Response, Status, TestPhase, TestResult, TransitionId
 from ..transports import deserialize_payload, serialize_payload
 
 if TYPE_CHECKING:
     import hypothesis.errors
     from requests.structures import CaseInsensitiveDict
+
+    from ..failures import FailureContext
+    from ..generation import DataGenerationMethod
 
 
 @dataclass

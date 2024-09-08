@@ -111,7 +111,7 @@ def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
     request = requests.Request(**kwargs).prepare()
     assert (
         case.get_code_to_reproduce()
-        == f"requests.post('{graphql_url}', data={repr(request.body)}, headers={{'Content-Type': 'application/json'}})"
+        == f"requests.post('{graphql_url}', data={request.body!r}, headers={{'Content-Type': 'application/json'}})"
     )
 
 

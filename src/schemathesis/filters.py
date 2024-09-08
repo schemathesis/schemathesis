@@ -54,7 +54,7 @@ class Matcher:
             func = partial(by_value_list, attribute=attribute, expected=expected)
         else:
             func = partial(by_value, attribute=attribute, expected=expected)
-        label = f"{attribute}={repr(expected)}"
+        label = f"{attribute}={expected!r}"
         return cls(func, label=label, _hash=hash(label))
 
     @classmethod
@@ -68,7 +68,7 @@ class Matcher:
                 flags = 0
             regex = re.compile(regex, flags=flags)
         func = partial(by_regex, attribute=attribute, regex=regex)
-        label = f"{attribute}_regex={repr(regex)}"
+        label = f"{attribute}_regex={regex!r}"
         return cls(func, label=label, _hash=hash(label))
 
     def match(self, ctx: HasAPIOperation) -> bool:

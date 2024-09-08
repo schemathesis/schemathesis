@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, Generator
+from typing import TYPE_CHECKING, Any, ClassVar, Generator
 
-from jsonschema import RefResolver
-
-from ...models import APIOperation
 from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
+
+if TYPE_CHECKING:
+    from jsonschema import RefResolver
+
+    from ...models import APIOperation
 
 
 @dataclass

@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from ..constants import USER_AGENT
-from ..types import RawAuth
 
 if TYPE_CHECKING:
     from requests.auth import HTTPDigestAuth
+
+    from ..types import RawAuth
 
 
 def get_requests_auth(auth: RawAuth | None, auth_type: str | None) -> HTTPDigestAuth | RawAuth | None:

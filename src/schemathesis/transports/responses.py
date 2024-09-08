@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import sys
-from datetime import timedelta
 from typing import TYPE_CHECKING, Any, NoReturn, Union
 
 from werkzeug.wrappers import Response as BaseResponse
@@ -10,6 +9,8 @@ from werkzeug.wrappers import Response as BaseResponse
 from .._compat import JSONMixin
 
 if TYPE_CHECKING:
+    from datetime import timedelta
+
     from httpx import Response as httpxResponse
     from requests import PreparedRequest
     from requests import Response as requestsResponse

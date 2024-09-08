@@ -3,12 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..exceptions import CheckFailed, get_grouped_exception
-from .context import RunnerContext
 
 if TYPE_CHECKING:
     from ..failures import FailureContext
     from ..models import Case, CheckFunction
     from ..transports.responses import GenericResponse
+    from .context import RunnerContext
 
 
 def validate_response(

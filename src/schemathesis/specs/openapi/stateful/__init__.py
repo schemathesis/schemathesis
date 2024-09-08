@@ -16,11 +16,11 @@ from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
 from .statistic import OpenAPILinkStats
-from .types import FilterFunction, LinkName, StatusCode, TargetName
 
 if TYPE_CHECKING:
     from ....models import Case
     from ..schemas import BaseOpenAPISchema
+    from .types import FilterFunction, LinkName, StatusCode, TargetName
 
 
 class OpenAPIStateMachine(APIStateMachine):
@@ -193,7 +193,7 @@ def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callabl
     return compare
 
 
-@lru_cache()
+@lru_cache
 def make_response_filter(status_code: str, all_status_codes: Iterator[str]) -> FilterFunction:
     """Create a filter for stored responses.
 

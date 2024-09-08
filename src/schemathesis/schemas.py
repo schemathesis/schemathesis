@@ -18,10 +18,6 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-import hypothesis
-from hypothesis.strategies import SearchStrategy
-from pyrate_limiter import Limiter
-
 from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
 from ._hypothesis import create_test
 from .auths import AuthStorage
@@ -48,25 +44,29 @@ from .internal.deprecation import warn_filtration_arguments
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
-from .stateful import Stateful, StatefulTest
-from .stateful.state_machine import APIStateMachine
-from .types import (
-    Body,
-    Cookies,
-    Filter,
-    FormData,
-    GenericTest,
-    Headers,
-    NotSet,
-    PathParameters,
-    Query,
-    Specification,
-)
 from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
 if TYPE_CHECKING:
+    import hypothesis
+    from hypothesis.strategies import SearchStrategy
+    from pyrate_limiter import Limiter
+
+    from .stateful import Stateful, StatefulTest
+    from .stateful.state_machine import APIStateMachine
     from .transports import Transport
     from .transports.responses import GenericResponse
+    from .types import (
+        Body,
+        Cookies,
+        Filter,
+        FormData,
+        GenericTest,
+        Headers,
+        NotSet,
+        PathParameters,
+        Query,
+        Specification,
+    )
 
 
 C = TypeVar("C", bound=Case)
@@ -510,7 +510,6 @@ class BaseSchema(Mapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all defined API operations."""
-        assert len(self) > 0, "No API operations found"
         strategies = [
             operation.ok().as_strategy(
                 hooks=hooks,
@@ -548,7 +547,6 @@ class APIOperationMap(Mapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all API operations defined in this subset."""
-        assert len(self._data) > 0, "No API operations found"
         strategies = [
             operation.as_strategy(
                 hooks=hooks,

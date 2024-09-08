@@ -10,22 +10,22 @@ from difflib import get_close_matches
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
 
-from jsonschema import RefResolver
-
 from ...constants import NOT_SET
 from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case, TransitionId
-from ...parameters import ParameterSet
 from ...stateful import ParsedData, StatefulTest, UnresolvableLink
 from ...stateful.state_machine import Direction
-from ...types import NotSet
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
 from .references import RECURSION_DEPTH_LIMIT, Unresolvable
 
 if TYPE_CHECKING:
+    from jsonschema import RefResolver
+
+    from ...parameters import ParameterSet
     from ...transports.responses import GenericResponse
+    from ...types import NotSet
 
 
 @dataclass(repr=False)

@@ -51,13 +51,13 @@ def _raise_for_status(response: GenericResponse) -> None:
         else:
             type_ = SchemaErrorType.HTTP_CLIENT_ERROR
     else:
-        return None
+        return
     raise SchemaError(message=message, type=type_, url=response.request.url, response=response, extras=[])
 
 
 def load_app(path: str) -> Any:
     """Import an application from a string."""
-    path, name = (re.split(r":(?![\\/])", path, maxsplit=1) + [""])[:2]
+    path, name = ([*re.split(":(?![\\\\/])", path, maxsplit=1), ""])[:2]
     __import__(path)
     # accessing the module from sys.modules returns a proper module, while `__import__`
     # may return a parent module (system dependent)
@@ -92,7 +92,7 @@ def get_yaml_loader() -> type[yaml.SafeLoader]:
                        |[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*
                        |[-+]?\.(?:inf|Inf|INF)
                        |\.(?:nan|NaN|NAN))$""",
-            re.X,
+            re.VERBOSE,
         ),
         list("-+0123456789."),
     )

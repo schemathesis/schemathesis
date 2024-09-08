@@ -5,21 +5,22 @@ import re
 import traceback
 from dataclasses import dataclass, field
 from hashlib import sha1
-from json import JSONDecodeError
-from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
-from .failures import FailureContext
 from .internal.output import truncate_json
 
 if TYPE_CHECKING:
+    from json import JSONDecodeError
+    from types import TracebackType
+
     import hypothesis.errors
     from graphql.error import GraphQLFormattedError
     from jsonschema import RefResolutionError, ValidationError
     from jsonschema import SchemaError as JsonSchemaError
     from requests import RequestException
 
+    from .failures import FailureContext
     from .transports.responses import GenericResponse
 
 

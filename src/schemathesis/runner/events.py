@@ -7,12 +7,12 @@ from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..exceptions import RuntimeErrorType, SchemaError, SchemaErrorType, format_exception
-from ..generation import DataGenerationMethod
 from ..internal.datetime import current_datetime
 from ..internal.result import Err, Ok, Result
 from .serialization import SerializedError, SerializedTestResult
 
 if TYPE_CHECKING:
+    from ..generation import DataGenerationMethod
     from ..models import APIOperation, Status, TestResult, TestResultSet
     from ..schemas import BaseSchema, Specification
     from ..service.models import AnalysisResult

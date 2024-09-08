@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache, partial
 from itertools import chain
-from logging import LogRecord
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -28,7 +27,6 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
-from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import (
     NOT_SET,
@@ -38,7 +36,6 @@ from .constants import (
 )
 from .exceptions import (
     CheckFailed,
-    FailureContext,
     OperationSchemaError,
     SerializationNotPossible,
     SkipTest,
@@ -54,19 +51,22 @@ from .internal.deprecation import deprecated_function, deprecated_property
 from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
-from .serializers import Serializer
 from .transports import ASGITransport, RequestsTransport, WSGITransport, deserialize_payload, serialize_payload
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 
 if TYPE_CHECKING:
     import unittest
+    from logging import LogRecord
 
     import requests.auth
     import werkzeug
     from hypothesis import strategies as st
     from requests.structures import CaseInsensitiveDict
 
+    from .auths import AuthStorage
+    from .failures import FailureContext
     from .schemas import BaseSchema
+    from .serializers import Serializer
     from .stateful import Stateful, StatefulTest
     from .transports.responses import GenericResponse, WSGIResponse
 

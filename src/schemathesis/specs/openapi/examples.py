@@ -7,7 +7,6 @@ from itertools import chain, cycle, islice
 from typing import TYPE_CHECKING, Any, Generator, Iterator, Union, cast
 
 import requests
-from hypothesis.strategies import SearchStrategy
 from hypothesis_jsonschema import from_schema
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
@@ -20,6 +19,8 @@ from .formats import STRING_FORMATS
 from .parameters import OpenAPIBody, OpenAPIParameter
 
 if TYPE_CHECKING:
+    from hypothesis.strategies import SearchStrategy
+
     from ...generation import GenerationConfig
 
 
@@ -429,7 +430,7 @@ def _find_matching_in_responses(
             if "id" in example:
                 return example["id"]
             # Check for '{schemaName}Id' or '{schemaName}_id'
-            elif normalized == "id" or normalized.startswith(schema_name.lower()):
+            if normalized == "id" or normalized.startswith(schema_name.lower()):
                 for key in (schema_name, schema_name.lower()):
                     for suffix in ("_id", "Id"):
                         with_suffix = f"{key}{suffix}"

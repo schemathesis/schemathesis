@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Iterator, List, Union
+from typing import TYPE_CHECKING, Iterator, Union
 
 from ....internal.copy import fast_deepcopy
 from ....stateful.statistic import TransitionStats
-from .types import AggregatedResponseCounter, LinkName, ResponseCounter, SourceName, StatusCode, TargetName
 
 if TYPE_CHECKING:
     from ....stateful import events
+    from .types import AggregatedResponseCounter, LinkName, ResponseCounter, SourceName, StatusCode, TargetName
 
 
 @dataclass
@@ -136,7 +136,7 @@ class OpenAPILinkStats(TransitionStats):
     def to_formatted_table(self, width: int) -> str:
         """Format the statistic as a table."""
         entries = list(self.iter_with_format())
-        lines: List[str | list[str]] = [HEADER, ""]
+        lines: list[str | list[str]] = [HEADER, ""]
         column_widths = [len(column) for column in HEADER]
         for entry in entries:
             if isinstance(entry.entry, Link):

@@ -4,7 +4,7 @@ import json
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Generator, Set, Type, TypeVar, cast
+from typing import Any, Generator, TypeVar, cast
 
 import jsonschema
 from hypothesis import strategies as st
@@ -140,8 +140,8 @@ def _ignore_unfixable(
     *,
     # Cache exception types here as `jsonschema` uses a custom `__getattr__` on the module level
     # and it may cause errors during the interpreter shutdown
-    ref_error: Type[Exception] = jsonschema.RefResolutionError,
-    schema_error: Type[Exception] = jsonschema.SchemaError,
+    ref_error: type[Exception] = jsonschema.RefResolutionError,
+    schema_error: type[Exception] = jsonschema.SchemaError,
 ) -> Generator:
     try:
         yield
@@ -172,7 +172,7 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
             yield from _cover_positive_for_type(ctx, schema, ty)
     if DataGenerationMethod.negative in ctx.data_generation_methods:
         template = None
-        seen: Set[Any | tuple[type, str]] = set()
+        seen: set[Any | tuple[type, str]] = set()
         for key, value in schema.items():
             with _ignore_unfixable():
                 if key == "enum":
@@ -238,7 +238,7 @@ def _get_properties(schema: dict | bool) -> dict | bool:
     if isinstance(schema, dict):
         if "example" in schema:
             return {"const": schema["example"]}
-        if "examples" in schema and schema["examples"]:
+        if schema.get("examples"):
             return {"enum": schema["examples"]}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object")

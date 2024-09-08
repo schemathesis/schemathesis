@@ -75,17 +75,17 @@ def is_not_string(value):
 def is_type(value, ty):
     if ty == "integer":
         return not isinstance(value, bool) and isinstance(value, int)
-    elif ty == "number":
+    if ty == "number":
         return not isinstance(value, bool) and isinstance(value, (int, float))
-    elif ty == "boolean":
+    if ty == "boolean":
         return isinstance(value, bool)
-    elif ty == "string":
+    if ty == "string":
         return isinstance(value, str)
-    elif ty == "null":
+    if ty == "null":
         return value is None
-    elif ty == "array":
+    if ty == "array":
         return isinstance(value, list)
-    elif ty == "object":
+    if ty == "object":
         return isinstance(value, dict)
     raise ValueError(f"Unknown type: {ty}")
 

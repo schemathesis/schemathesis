@@ -12,21 +12,21 @@ from io import BytesIO
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
-import click
-
 from ..cli.handlers import EventHandler
 from ..runner.events import Initialized, InternalError, Interrupted
 from . import ci, events, usage
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
-from .hosts import HostData
 from .metadata import Metadata
 from .models import UploadResponse
 from .serialization import serialize_event
 
 if TYPE_CHECKING:
+    import click
+
     from ..cli.context import ExecutionContext
     from ..runner.events import ExecutionEvent
     from .client import ServiceClient
+    from .hosts import HostData
 
 
 @dataclass

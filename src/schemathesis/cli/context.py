@@ -1,22 +1,23 @@
 from __future__ import annotations
 
-import os
 import shutil
 from dataclasses import dataclass, field
-from queue import Queue
 from typing import TYPE_CHECKING, Generator
 
 from ..code_samples import CodeSampleStyle
 from ..internal.deprecation import deprecated_property
 from ..internal.output import OutputConfig
-from ..internal.result import Result
-from ..runner.probes import ProbeRun
-from ..runner.serialization import SerializedTestResult
-from ..service.models import AnalysisResult
 
 if TYPE_CHECKING:
+    import os
+    from queue import Queue
+
     import hypothesis
 
+    from ..internal.result import Result
+    from ..runner.probes import ProbeRun
+    from ..runner.serialization import SerializedTestResult
+    from ..service.models import AnalysisResult
     from ..stateful.sink import StateMachineSink
 
 

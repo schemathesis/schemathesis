@@ -6,7 +6,6 @@ import shutil
 import textwrap
 import time
 from importlib import metadata
-from queue import Queue
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
@@ -44,6 +43,8 @@ from ..handlers import EventHandler
 from ..reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
 
 if TYPE_CHECKING:
+    from queue import Queue
+
     import requests
 
 SPINNER_REPETITION_NUMBER = 10
@@ -372,7 +373,7 @@ def display_analysis(context: ExecutionContext) -> None:
         click.echo()
         if isinstance(analysis, AnalysisSuccess):
             click.secho(analysis.message, bold=True)
-            click.echo("\nAnalysis took: {:.2f}ms".format(analysis.elapsed))
+            click.echo(f"\nAnalysis took: {analysis.elapsed:.2f}ms")
             if analysis.extensions:
                 known = []
                 failed = []
@@ -417,8 +418,8 @@ def display_analysis(context: ExecutionContext) -> None:
             click.secho("Error\n", fg="red", bold=True)
             _display_service_network_error(response)
             click.echo()
-            return None
-        elif isinstance(exception, requests.RequestException):
+            return
+        if isinstance(exception, requests.RequestException):
             message, extras = extract_requests_exception_details(exception)
             suggestion = "Please check your network connection and try again."
             title = "Network Error"
@@ -649,7 +650,6 @@ def wait_for_report_handler(queue: Queue, title: str, timeout: float = service.W
 
 def create_spinner(repetitions: int) -> Generator[str, None, None]:
     """A simple spinner that yields its individual characters."""
-    assert repetitions > 0, "The number of repetitions should be greater than zero"
     while True:
         for ch in "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏":
             # Skip branch coverage, as it is not possible because of the assertion above

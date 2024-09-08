@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import platform
 from functools import lru_cache, wraps
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import click
 import pytest
@@ -16,8 +16,10 @@ from schemathesis.exceptions import CheckFailed
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.internal.transformation import merge_recursively
 from schemathesis.loaders import load_yaml
-from schemathesis.models import Case
-from schemathesis.schemas import BaseSchema
+
+if TYPE_CHECKING:
+    from schemathesis.models import Case
+    from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

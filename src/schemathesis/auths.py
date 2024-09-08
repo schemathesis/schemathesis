@@ -21,12 +21,12 @@ from typing import (
 
 from .exceptions import UsageError
 from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
-from .types import GenericTest
 
 if TYPE_CHECKING:
     import requests.auth
 
     from .models import APIOperation, Case
+    from .types import GenericTest
 
 DEFAULT_REFRESH_INTERVAL = 300
 AUTH_STORAGE_ATTRIBUTE_NAME = "_schemathesis_auth"

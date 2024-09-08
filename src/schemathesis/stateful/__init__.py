@@ -5,15 +5,15 @@ import json
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
-from .. import GenerationConfig
 from ..constants import NOT_SET
-from ..exceptions import OperationSchemaError
 from ..internal.result import Ok, Result
-from ..models import APIOperation, Case
 
 if TYPE_CHECKING:
     import hypothesis
 
+    from .. import GenerationConfig
+    from ..exceptions import OperationSchemaError
+    from ..models import APIOperation, Case
     from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine
 

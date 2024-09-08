@@ -4,10 +4,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from . import events
-from .statistic import TransitionStats
 
 if TYPE_CHECKING:
     from ..models import Check
+    from .statistic import TransitionStats
 
 
 @dataclass
