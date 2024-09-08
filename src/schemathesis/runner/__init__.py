@@ -357,7 +357,7 @@ def from_schema(
     service_client: ServiceClient | None = None,
 ) -> BaseRunner:
     import hypothesis
-    from starlette.applications import Starlette
+    from ..transports.asgi import is_asgi_app
 
     from ..checks import DEFAULT_CHECKS
     from .impl import (
@@ -414,7 +414,7 @@ def from_schema(
                 probe_config=probe_config,
                 service_client=service_client,
             )
-        if isinstance(schema.app, Starlette):
+        if is_asgi_app(schema.app):
             return ThreadPoolASGIRunner(
                 schema=schema,
                 checks=checks,
@@ -490,7 +490,7 @@ def from_schema(
             probe_config=probe_config,
             service_client=service_client,
         )
-    if isinstance(schema.app, Starlette):
+    if is_asgi_app(schema.app):
         return SingleThreadASGIRunner(
             schema=schema,
             checks=checks,
