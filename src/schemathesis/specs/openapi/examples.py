@@ -388,7 +388,7 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
 NOT_FOUND = object()
 
 
-def find_matching_in_responses(examples: dict[str, list[dict[str, Any]]], param: str) -> Iterator[Any]:
+def find_matching_in_responses(examples: dict[str, list], param: str) -> Iterator[Any]:
     """Find matching parameter examples."""
     normalized = param.lower()
     is_id_param = normalized.endswith("id")
@@ -397,6 +397,8 @@ def find_matching_in_responses(examples: dict[str, list[dict[str, Any]]], param:
     # as examples for the "id" path parameter.
     for schema_name, schema_examples in examples.items():
         for example in schema_examples:
+            if not isinstance(example, dict):
+                continue
             # Unwrapping example from `{"item": [{...}]}`
             if isinstance(example, dict) and len(example) == 1 and list(example)[0].lower() == schema_name.lower():
                 inner = list(example.values())[0]

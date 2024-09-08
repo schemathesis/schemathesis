@@ -1588,6 +1588,11 @@ def test_find_in_responses_only_in_2xx(empty_open_api_3_schema):
             "unknown",
             [],
         ),
+        (
+            {"User": [None]},
+            "unknown",
+            [],
+        ),
     ],
 )
 def test_find_matching_in_responses(examples, name, expected):
