@@ -595,9 +595,9 @@ def from_wsgi(
 
 
 def get_loader_for_app(app: Any) -> Callable:
-    from starlette.applications import Starlette
+    from ...transports.asgi import is_asgi_app
 
-    if isinstance(app, Starlette):
+    if is_asgi_app(app):
         return from_asgi
     if app.__class__.__module__.startswith("aiohttp."):
         return from_aiohttp

@@ -356,8 +356,8 @@ def from_asgi(
 
 
 def get_loader_for_app(app: Any) -> Callable:
-    from starlette.applications import Starlette
+    from ...transports.asgi import is_asgi_app
 
-    if isinstance(app, Starlette):
+    if is_asgi_app(app):
         return from_asgi
     return from_wsgi

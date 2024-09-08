@@ -8,6 +8,10 @@ Changelog
 
 - Extend explicit examples discovery mechanism by checking response examples.
 
+**Fixed**
+
+- Support non-Starlette ASGI apps in more places.
+
 .. _v3.35.4:
 
 :version:`3.35.4 <v3.35.3...v3.35.4>` - 2024-09-05
