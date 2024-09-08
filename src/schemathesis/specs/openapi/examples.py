@@ -360,6 +360,9 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
     """Find schema examples in responses."""
     output: dict[str, list[dict[str, Any]]] = {}
     for status_code, response in operation.definition.raw.get("responses", {}).items():
+        if not str(status_code).startswith("2"):
+            # Check only 2xx responses
+            continue
         if isinstance(response, dict) and "$ref" in response:
             _, response = operation.schema.resolver.resolve_in_scope(response, operation.definition.scope)  # type:ignore[attr-defined]
         for media_type, definition in response.get("content", {}).items():
@@ -381,6 +384,9 @@ def find_in_responses(operation: APIOperation) -> dict[str, list[dict[str, Any]]
     return output
 
 
+NOT_FOUND = object()
+
+
 def find_matching_in_responses(examples: dict[str, list[dict[str, Any]]], param: str) -> Iterator[Any]:
     """Find matching parameter examples."""
     normalized = param.lower()
@@ -390,27 +396,43 @@ def find_matching_in_responses(examples: dict[str, list[dict[str, Any]]], param:
     # as examples for the "id" path parameter.
     for schema_name, schema_examples in examples.items():
         for example in schema_examples:
-            # Check for exact match
-            if param in example:
-                yield example[param]
-                continue
+            # Unwrapping example from `{"item": [{...}]}`
+            if isinstance(example, dict) and len(example) == 1 and list(example)[0].lower() == schema_name.lower():
+                inner = list(example.values())[0]
+                if isinstance(inner, list):
+                    for sub_example in inner:
+                        found = _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
+                        if found is not NOT_FOUND:
+                            yield found
+                    continue
+                example = inner
+            found = _find_matching_in_responses(example, schema_name, param, normalized, is_id_param)
+            if found is not NOT_FOUND:
+                yield found
 
-            # Check for case-insensitive match
-            for key in example:
-                if key.lower() == normalized:
-                    yield example[key]
-                    break
-            else:
-                # If no match found and it's an ID parameter, try additional checks
-                if is_id_param:
-                    # Check for 'id' if parameter is '{something}Id'
-                    if "id" in example:
-                        yield example["id"]
-                    # Check for '{schemaName}Id' or '{schemaName}_id'
-                    elif normalized == "id" or normalized.startswith(schema_name.lower()):
-                        for key in (schema_name, schema_name.lower()):
-                            for suffix in ("_id", "Id"):
-                                with_suffix = f"{key}{suffix}"
-                                if with_suffix in example:
-                                    yield example[with_suffix]
-                                    break
+
+def _find_matching_in_responses(
+    example: dict[str, Any], schema_name: str, param: str, normalized: str, is_id_param: bool
+) -> Any:
+    # Check for exact match
+    if param in example:
+        return example[param]
+
+    # Check for case-insensitive match
+    for key in example:
+        if key.lower() == normalized:
+            return example[key]
+    else:
+        # If no match found and it's an ID parameter, try additional checks
+        if is_id_param:
+            # Check for 'id' if parameter is '{something}Id'
+            if "id" in example:
+                return example["id"]
+            # Check for '{schemaName}Id' or '{schemaName}_id'
+            elif normalized == "id" or normalized.startswith(schema_name.lower()):
+                for key in (schema_name, schema_name.lower()):
+                    for suffix in ("_id", "Id"):
+                        with_suffix = f"{key}{suffix}"
+                        if with_suffix in example:
+                            return example[with_suffix]
+    return NOT_FOUND

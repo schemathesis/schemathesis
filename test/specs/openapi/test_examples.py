@@ -1416,6 +1416,11 @@ def content(schema, **kwargs):
             },
         ),
         (
+            # No `value` inside
+            content({"$ref": "#/components/schemas/Item"}, examples={"Example1": {"externalValue": ""}}),
+            {},
+        ),
+        (
             content({"$ref": "#/components/schemas/Item"}, **{"x-examples": {"Example1": {"value": {"id": "123456"}}}}),
             {
                 "Item": [
@@ -1497,6 +1502,31 @@ def test_find_in_responses(empty_open_api_3_schema, response, expected):
         ]
 
 
+def test_find_in_responses_only_in_2xx(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/items/{id}/": {
+            "get": {
+                "parameters": [{"name": "id", "in": "path", "schema": {"type": "string"}, "required": True}],
+                "responses": {
+                    "400": content(
+                        {
+                            "properties": {
+                                "id": {"type": "string"},
+                            }
+                        },
+                        examples={
+                            "Example1": {"value": {"id": "123456"}},
+                        },
+                    )
+                },
+            }
+        }
+    }
+    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    operation = schema["/items/{id}/"]["get"]
+    assert find_in_responses(operation) == {}
+
+
 @pytest.mark.parametrize(
     ["examples", "name", "expected"],
     [
@@ -1509,6 +1539,17 @@ def test_find_in_responses(empty_open_api_3_schema, response, expected):
             {"Item": [{"itemId": "123"}, {"itemId": "456"}]},
             "itemId",
             ["123", "456"],
+        ),
+        (
+            {
+                "Item": [
+                    {"item": [{"itemId": "123"}, {"itemId": "789"}, {"unknown": 0}]},
+                    {"itemId": "456"},
+                    {"item": {"itemId": "42"}},
+                ]
+            },
+            "itemId",
+            ["123", "789", "456", "42"],
         ),
         (
             {"Item": [{"id": "123"}, {"id": "456"}]},
@@ -1533,6 +1574,16 @@ def test_find_in_responses(empty_open_api_3_schema, response, expected):
         (
             {"User": [{"name": "John"}, {"age": 30}]},
             "id",
+            [],
+        ),
+        (
+            {"User": [{"name": "John"}, {"age": 30}]},
+            "name",
+            ["John"],
+        ),
+        (
+            {"User": [{"name": "John"}]},
+            "unknown",
             [],
         ),
     ],
