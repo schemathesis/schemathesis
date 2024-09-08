@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from itertools import groupby
-from typing import Callable, Generator, Iterator
+from typing import TYPE_CHECKING, Callable, Generator, Iterator
 
 import click
 
-from ..code_samples import CodeSampleStyle
 from ..exceptions import RuntimeErrorType
 from ..runner.serialization import SerializedCheck, deduplicate_failures
+
+if TYPE_CHECKING:
+    from ..code_samples import CodeSampleStyle
 
 TEST_CASE_ID_TITLE = "Test Case ID"
 

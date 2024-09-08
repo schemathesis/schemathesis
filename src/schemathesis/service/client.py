@@ -11,7 +11,6 @@ import requests
 from requests.adapters import HTTPAdapter, Retry
 
 from ..constants import USER_AGENT
-from .ci import CIProvider
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata, collect_dependency_versions
 from .models import (
@@ -29,6 +28,7 @@ from .models import (
 
 if TYPE_CHECKING:
     from ..runner import probes
+    from .ci import CIProvider
 
 
 def response_hook(response: requests.Response, **_kwargs: Any) -> None:

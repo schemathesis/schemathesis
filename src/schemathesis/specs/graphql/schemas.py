@@ -22,12 +22,10 @@ from urllib.parse import urlsplit, urlunsplit
 
 import graphql
 from hypothesis import strategies as st
-from hypothesis.strategies import SearchStrategy
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from ... import auths
-from ...auths import AuthStorage
 from ...checks import not_a_server_error
 from ...constants import NOT_SET
 from ...exceptions import OperationNotFound, OperationSchemaError
@@ -42,13 +40,16 @@ from ...hooks import (
 from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, CheckFunction, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...stateful import Stateful, StatefulTest
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
 if TYPE_CHECKING:
+    from hypothesis.strategies import SearchStrategy
+
+    from ...auths import AuthStorage
+    from ...stateful import Stateful, StatefulTest
     from ...transports.responses import GenericResponse
 
 

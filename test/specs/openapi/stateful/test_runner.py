@@ -240,9 +240,9 @@ def test_distinct_assertions(runner_factory):
         counter += 1
         if counter == 1:
             raise AssertionError("First")
-        elif counter == 2:
+        if counter == 2:
             raise AssertionError("Second")
-        elif counter == 3:
+        if counter == 3:
             # No message
             assert case.headers == 43
         elif counter == 4:
@@ -280,10 +280,9 @@ def test_flaky_assertions(runner_factory, kwargs):
         counter += 1
         if counter == 1:
             raise AssertionError("First")
-        elif counter == 2:
+        if counter == 2:
             raise AssertionError("Second")
-        else:
-            assert case.headers == 43
+        assert case.headers == 43
 
     runner = runner_factory(
         config_kwargs={

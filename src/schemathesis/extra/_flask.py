@@ -1,8 +1,11 @@
 from __future__ import annotations
 
-from flask import Flask
+from typing import TYPE_CHECKING
 
 from . import _server
+
+if TYPE_CHECKING:
+    from flask import Flask
 
 
 def run_server(app: Flask, port: int | None = None, timeout: float = 0.05) -> int:

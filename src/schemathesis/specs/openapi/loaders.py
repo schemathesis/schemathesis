@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 
 from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
-from ...constants import NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
+from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...filters import filter_set_from_components
 from ...generation import (
@@ -163,6 +163,7 @@ def from_uri(
             interval=WAIT_FOR_SCHEMA_INTERVAL,
         )
         def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
+            _kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
             return requests.get(_uri, **kwargs)
 
     else:
@@ -441,7 +442,7 @@ def _format_status_codes(status_codes: list[tuple[int, list[str | int]]]) -> str
     for status_code, path in status_codes:
         buffer.write(f" - {status_code} at schema['paths']")
         for chunk in path:
-            buffer.write(f"[{repr(chunk)}]")
+            buffer.write(f"[{chunk!r}]")
         buffer.write("['responses']\n")
     return buffer.getvalue().rstrip()
 

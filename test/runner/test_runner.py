@@ -4,12 +4,12 @@ import base64
 import json
 import platform
 from dataclasses import asdict
+from typing import TYPE_CHECKING
 from unittest.mock import ANY
 
 import hypothesis
 import pytest
 import requests
-from aiohttp import web
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
 from flask import Flask
@@ -32,6 +32,9 @@ from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.stateful import Stateful
 from schemathesis.transports.auth import get_requests_auth, get_wsgi_auth
+
+if TYPE_CHECKING:
+    from aiohttp import web
 
 
 def execute(schema, **options) -> events.Finished:
@@ -126,9 +129,9 @@ def test_interactions(request, any_app_schema, workers):
     )
 
     # failure
-    interactions = [
+    interactions = next(
         event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.failure
-    ][0].result.interactions
+    ).result.interactions
     assert len(interactions) == 2
     failure = interactions[0]
     assert asdict(failure.request) == {
@@ -155,9 +158,9 @@ def test_interactions(request, any_app_schema, workers):
         assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
         assert failure.response.headers["Content-Length"] == ["26"]
     # success
-    interactions = [
+    interactions = next(
         event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.success
-    ][0].result.interactions
+    ).result.interactions
     assert len(interactions) == 1
     success = interactions[0]
     assert asdict(success.request) == {
@@ -196,7 +199,7 @@ def test_asgi_interactions(fastapi_app):
 def test_empty_response_interaction(any_app_schema):
     # When there is a GET request and a response that doesn't return content (e.g. 204)
     _, *others, _ = from_schema(any_app_schema, store_interactions=True).execute()
-    interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
+    interactions = next(event for event in others if isinstance(event, events.AfterExecution)).result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
         assert interaction.request.body is None
@@ -211,7 +214,7 @@ def test_empty_response_interaction(any_app_schema):
 def test_empty_string_response_interaction(any_app_schema):
     # When there is a response that returns payload of length 0
     _, *others, _ = from_schema(any_app_schema, store_interactions=True).execute()
-    interactions = [event for event in others if isinstance(event, events.AfterExecution)][0].result.interactions
+    interactions = next(event for event in others if isinstance(event, events.AfterExecution)).result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
         assert interaction.response.body == ""

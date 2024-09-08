@@ -7,22 +7,25 @@ import time
 import warnings
 from dataclasses import dataclass
 from queue import Queue
-from typing import Any, Callable, Generator, Iterable, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, cast
 
-import hypothesis
 from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis import create_test
-from ...generation import DataGenerationMethod, GenerationConfig
 from ...internal.result import Ok
-from ...models import CheckFunction, TestResultSet
 from ...stateful import Feedback, Stateful
-from ...targets import Target
 from ...transports.auth import get_requests_auth
-from ...types import RawAuth
 from ...utils import capture_hypothesis_output
 from .. import events
 from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
+
+if TYPE_CHECKING:
+    import hypothesis
+
+    from ...generation import DataGenerationMethod, GenerationConfig
+    from ...models import CheckFunction, TestResultSet
+    from ...targets import Target
+    from ...types import RawAuth
 
 
 def _run_task(

@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from .exceptions import UsageError
-from .parameters import ParameterSet
-from .types import GenericTest
 
 if TYPE_CHECKING:
     from .models import APIOperation
+    from .parameters import ParameterSet
+    from .types import GenericTest
 
 
 @dataclass
@@ -37,7 +37,7 @@ def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[s
     return output
 
 
-def get_override_from_mark(test: GenericTest) -> Optional[CaseOverride]:
+def get_override_from_mark(test: GenericTest) -> CaseOverride | None:
     return getattr(test, "_schemathesis_override", None)
 
 

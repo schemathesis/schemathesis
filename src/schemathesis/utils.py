@@ -5,6 +5,7 @@ from contextlib import contextmanager
 from inspect import getfullargspec
 from pathlib import Path
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Generator,
@@ -20,9 +21,10 @@ from hypothesis.strategies import SearchStrategy
 from ._compat import InferType, get_signature
 
 # Backward-compat
-from .constants import NOT_SET  # noqa: F401
 from .exceptions import SkipTest, UsageError
-from .types import GenericTest, PathLike
+
+if TYPE_CHECKING:
+    from .types import GenericTest, PathLike
 
 
 def is_schemathesis_test(func: Callable) -> bool:

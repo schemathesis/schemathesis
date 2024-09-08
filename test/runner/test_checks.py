@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from hypothesis import given, settings
@@ -21,8 +21,10 @@ from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.models import OperationDefinition, TestResult
 from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.serialization import deduplicate_failures
-from schemathesis.schemas import BaseSchema
 from schemathesis.specs.openapi.checks import _coerce_header_value
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import BaseSchema
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:

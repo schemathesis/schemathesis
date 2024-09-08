@@ -188,8 +188,7 @@ def app_factory(empty_open_api_3_schema):
         user = users.get(user_id)
         if user:
             return jsonify(user)
-        else:
-            return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     def expect_custom_headers():
         if config.custom_headers:
@@ -216,8 +215,7 @@ def app_factory(empty_open_api_3_schema):
         if config.failure_behind_failure:
             if len(name) % 10 == 7:
                 return jsonify({"invalid": "user structure"}), 201
-            else:
-                return jsonify({"error": "Error - rare"}), 500
+            return jsonify({"error": "Error - rare"}), 500
 
         nonlocal next_user_id
         new_user = {"id": next_user_id, "name": name, "last_modified": last_modified}
@@ -244,8 +242,7 @@ def app_factory(empty_open_api_3_schema):
                 assert "name" in data
                 user["name"] = data["name"]
             return jsonify(user)
-        else:
-            return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     @app.route("/users/<int:user_id>", methods=["DELETE"])
     def delete_user(user_id):
@@ -262,8 +259,7 @@ def app_factory(empty_open_api_3_schema):
             else:
                 del users[user_id]
             return jsonify({"message": "User deleted successfully"}), 204
-        else:
-            return jsonify({"error": "User not found"}), 404
+        return jsonify({"error": "User not found"}), 404
 
     @app.route("/orders/<order_id>", methods=["DELETE"])
     def delete_order(order_id):

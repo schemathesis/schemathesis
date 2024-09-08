@@ -224,11 +224,11 @@ Extension = Union[
 def extension_from_dict(data: dict[str, Any]) -> Extension:
     if data["type"] == "schema_patches":
         return SchemaPatchesExtension(patches=data["patches"])
-    elif data["type"] == "string_formats":
+    if data["type"] == "string_formats":
         return OpenApiStringFormatsExtension.from_dict(formats=data["items"])
-    elif data["type"] == "scalars":
+    if data["type"] == "scalars":
         return GraphQLScalarsExtension.from_dict(scalars=data["items"])
-    elif data["type"] == "media_types":
+    if data["type"] == "media_types":
         return MediaTypesExtension.from_dict(media_types=data["items"])
     return UnknownExtension(type=data["type"])
 

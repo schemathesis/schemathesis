@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import warnings
-from typing import Any, Callable, Generator, Mapping, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
 import hypothesis
 from hypothesis import Phase
@@ -24,7 +24,9 @@ from .models import APIOperation, Case, GenerationMetadata, TestPhase
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .types import NotSet
-from .utils import GivenInput
+
+if TYPE_CHECKING:
+    from .utils import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initilize it
 # if e.g. Schemathesis CLI is used with multiple workers
@@ -278,7 +280,7 @@ def _iter_coverage_cases(
             yield case
 
 
-def find_invalid_headers(headers: Mapping) -> Generator[Tuple[str, str], None, None]:
+def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
     for name, value in headers.items():
         if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
             yield name, value
@@ -309,11 +311,11 @@ def add_non_serializable_mark(test: Callable, exc: SerializationNotPossible) -> 
     test._schemathesis_non_serializable = exc  # type: ignore
 
 
-def get_non_serializable_mark(test: Callable) -> Optional[SerializationNotPossible]:
+def get_non_serializable_mark(test: Callable) -> SerializationNotPossible | None:
     return getattr(test, "_schemathesis_non_serializable", None)
 
 
-def get_invalid_regex_mark(test: Callable) -> Optional[SchemaError]:
+def get_invalid_regex_mark(test: Callable) -> SchemaError | None:
     return getattr(test, "_schemathesis_invalid_regex", None)
 
 
@@ -321,7 +323,7 @@ def add_invalid_regex_mark(test: Callable, exc: SchemaError) -> None:
     test._schemathesis_invalid_regex = exc  # type: ignore
 
 
-def get_invalid_example_headers_mark(test: Callable) -> Optional[dict[str, str]]:
+def get_invalid_example_headers_mark(test: Callable) -> dict[str, str] | None:
     return getattr(test, "_schemathesis_invalid_example_headers", None)
 
 

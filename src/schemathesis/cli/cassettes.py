@@ -16,7 +16,6 @@ import harfile
 
 from ..constants import SCHEMATHESIS_VERSION
 from ..runner import events
-from ..types import RequestCert
 from .handlers import EventHandler
 
 if TYPE_CHECKING:
@@ -25,6 +24,7 @@ if TYPE_CHECKING:
 
     from ..models import Request, Response
     from ..runner.serialization import SerializedCheck, SerializedInteraction
+    from ..types import RequestCert
     from .context import ExecutionContext
 
 # Wait until the worker terminates
@@ -163,7 +163,7 @@ def vcr_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: boo
         return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
     def format_check_message(message: str | None) -> str:
-        return "~" if message is None else f"{repr(message)}"
+        return "~" if message is None else f"{message!r}"
 
     def format_checks(checks: list[SerializedCheck]) -> str:
         return "\n".join(
@@ -300,11 +300,11 @@ def write_double_quoted(stream: IO, text: str) -> None:
                 if ch in Emitter.ESCAPE_REPLACEMENTS:
                     data = "\\" + Emitter.ESCAPE_REPLACEMENTS[ch]
                 elif ch <= "\xff":
-                    data = "\\x%02X" % ord(ch)
+                    data = f"\\x{ord(ch):02X}"
                 elif ch <= "\uffff":
-                    data = "\\u%04X" % ord(ch)
+                    data = f"\\u{ord(ch):04X}"
                 else:
-                    data = "\\U%08X" % ord(ch)
+                    data = f"\\U{ord(ch):08X}"
                 stream.write(data)
                 start = end + 1
         end += 1

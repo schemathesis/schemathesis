@@ -76,7 +76,7 @@ def open_api_2_user_in_body(open_api_2_user):
 
 @pytest.fixture
 def open_api_2_user_form_with_file_parameters(open_api_2_user_form_parameters):
-    return open_api_2_user_form_parameters + [{"in": "formData", "name": "scan", "required": True, "type": "file"}]
+    return [*open_api_2_user_form_parameters, {"in": "formData", "name": "scan", "required": True, "type": "file"}]
 
 
 @pytest.fixture

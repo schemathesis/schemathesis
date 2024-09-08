@@ -13,18 +13,16 @@ from importlib import metadata
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 import pytest
 import requests
 import yaml
-from _pytest.fixtures import FixtureRequest
 from click.testing import CliRunner, Result
 from hypothesis import settings
 from packaging import version
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
-from syrupy.types import PropertyFilter, PropertyMatcher
 from urllib3 import HTTPResponse
 
 import schemathesis.cli
@@ -44,6 +42,10 @@ from .apps import _graphql as graphql
 from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
 from .utils import get_schema_path, make_schema
+
+if TYPE_CHECKING:
+    from _pytest.fixtures import FixtureRequest
+    from syrupy.types import PropertyFilter, PropertyMatcher
 
 pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
 
@@ -974,7 +976,7 @@ def testdir(testdir):
     ):
         schema = schema or make_schema(schema_name=schema_name, **kwargs)
         preparation = dedent(
-            """
+            f"""
         import pytest
         import schemathesis
         from schemathesis.stateful import Stateful
@@ -992,20 +994,13 @@ def testdir(testdir):
 
         schema = schemathesis.from_dict(
             raw_schema,
-            method={method},
-            endpoint={path},
-            tag={tag},
-            validate_schema={validate_schema},
-            sanitize_output={sanitize_output}
+            method={method!r},
+            endpoint={path!r},
+            tag={tag!r},
+            validate_schema={validate_schema!r},
+            sanitize_output={sanitize_output!r}
         )
-        """.format(
-                schema=schema,
-                method=repr(method),
-                path=repr(path),
-                tag=repr(tag),
-                validate_schema=repr(validate_schema),
-                sanitize_output=repr(sanitize_output),
-            )
+        """
         )
         module = testdir.makepyfile(preparation, content)
         testdir.makepyfile(
@@ -1151,13 +1146,12 @@ def response_factory():
         headers = headers or {}
         if content_type:
             headers.setdefault("Content-Type", content_type)
-        response = httpx.Response(
+        return httpx.Response(
             status_code=status_code,
             headers=headers,
             content=content,
             request=httpx.Request(method="POST", url="http://127.0.0.1", headers=headers),
         )
-        return response
 
     def requests_factory(
         *,

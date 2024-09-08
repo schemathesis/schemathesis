@@ -176,7 +176,7 @@ class DelimitedObject(Prefixed):
 @schema.parametrize()
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.{attribute} in {repr(expected)}
+    assert case.{attribute} in {expected!r}
     """,
         schema=raw_schema,
     )

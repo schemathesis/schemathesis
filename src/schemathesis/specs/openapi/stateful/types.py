@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Callable, Dict, TypedDict, Union
+from typing import TYPE_CHECKING, Callable, Dict, TypedDict, Union
 
-from ....stateful.state_machine import StepResult
+if TYPE_CHECKING:
+    from ....stateful.state_machine import StepResult
 
 StatusCode = str
 LinkName = str

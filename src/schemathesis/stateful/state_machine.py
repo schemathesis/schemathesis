@@ -4,7 +4,7 @@ import re
 import time
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, ClassVar, Type
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
@@ -16,7 +16,6 @@ from ..models import APIOperation, Case, CheckFunction
 from .config import _default_hypothesis_settings_factory
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
 from .sink import StateMachineSink
-from .statistic import TransitionStats
 
 if TYPE_CHECKING:
     import hypothesis
@@ -24,6 +23,7 @@ if TYPE_CHECKING:
 
     from ..schemas import BaseSchema
     from ..transports.responses import GenericResponse
+    from .statistic import TransitionStats
 
 
 @dataclass
@@ -64,7 +64,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
     @classmethod
     @lru_cache
-    def _to_test_case(cls) -> Type:
+    def _to_test_case(cls) -> type:
         from . import run_state_machine_as_test
 
         class StateMachineTestCase(RuleBasedStateMachine.TestCase):
@@ -97,7 +97,7 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def _add_result_to_targets(self, targets: tuple[str, ...], result: StepResult | None) -> None:
         if result is None:
-            return None
+            return
         target = self._get_target_for_result(result)
         if target is not None:
             super()._add_result_to_targets((target,), result)
@@ -310,7 +310,7 @@ def _print_case(case: Case, kwargs: dict[str, Any]) -> str:
     headers.update(kwargs.get("headers", {}))
     case.headers = headers
     data = [
-        f"{name}={repr(getattr(case, name))}"
+        f"{name}={getattr(case, name)!r}"
         for name in ("path_parameters", "headers", "cookies", "query", "body", "media_type")
         if getattr(case, name) not in (None, NOT_SET)
     ]

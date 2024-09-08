@@ -11,13 +11,13 @@ from ..exceptions import RuntimeErrorType
 from ..internal.output import prepare_response_payload
 from ..models import Status
 from ..runner import events
-from ..runner.serialization import SerializedCheck, SerializedError
 from .handlers import EventHandler
 from .reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
 
 if TYPE_CHECKING:
     from click.utils import LazyFile
 
+    from ..runner.serialization import SerializedCheck, SerializedError
     from .context import ExecutionContext
 
 

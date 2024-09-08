@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import textwrap
 from dataclasses import dataclass
-from json import JSONDecodeError
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.internal.output import OutputConfig
 
 if TYPE_CHECKING:
+    from json import JSONDecodeError
+
     from graphql.error import GraphQLFormattedError
     from jsonschema import ValidationError
 

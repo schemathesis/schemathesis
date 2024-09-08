@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from typing import Any, ClassVar, Iterable
+from typing import TYPE_CHECKING, Any, ClassVar, Iterable
 
 from ...exceptions import OperationSchemaError
-from ...models import APIOperation
 from ...parameters import Parameter
 from .converter import to_json_schema_recursive
+
+if TYPE_CHECKING:
+    from ...models import APIOperation
 
 
 @dataclass(eq=False)

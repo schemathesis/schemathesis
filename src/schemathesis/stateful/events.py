@@ -4,7 +4,7 @@ import time
 from dataclasses import asdict as _asdict
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, Any, Type
+from typing import TYPE_CHECKING, Any
 
 from ..exceptions import format_exception
 
@@ -40,11 +40,11 @@ class RunStarted(StatefulEvent):
     """Before executing all scenarios."""
 
     started_at: float
-    state_machine: Type[APIStateMachine]
+    state_machine: type[APIStateMachine]
 
     __slots__ = ("state_machine", "timestamp", "started_at")
 
-    def __init__(self, *, state_machine: Type[APIStateMachine]) -> None:
+    def __init__(self, *, state_machine: type[APIStateMachine]) -> None:
         self.state_machine = state_machine
         self.started_at = time.time()
         self.timestamp = time.monotonic()
