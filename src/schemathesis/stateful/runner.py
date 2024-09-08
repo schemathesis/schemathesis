@@ -4,13 +4,12 @@ import queue
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Generator, Iterator, Type
+from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 import hypothesis
 import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
-from hypothesis.stateful import Rule
 
 from ..exceptions import CheckFailed
 from ..targets import TargetMetricCollector
@@ -20,6 +19,8 @@ from .context import RunnerContext
 from .validation import validate_response
 
 if TYPE_CHECKING:
+    from hypothesis.stateful import Rule
+
     from ..models import Case, CheckFunction
     from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine, Direction, StepResult
@@ -36,7 +37,7 @@ class StatefulTestRunner:
     """
 
     # State machine class to use
-    state_machine: Type[APIStateMachine]
+    state_machine: type[APIStateMachine]
     # Test runner configuration that defines the runtime behavior
     config: StatefulTestRunnerConfig = field(default_factory=StatefulTestRunnerConfig)
     # Event to stop the execution
@@ -105,7 +106,7 @@ def thread_manager(thread: threading.Thread) -> Generator[None, None, None]:
 
 def _execute_state_machine_loop(
     *,
-    state_machine: Type[APIStateMachine],
+    state_machine: type[APIStateMachine],
     event_queue: queue.Queue,
     config: StatefulTestRunnerConfig,
     stop_event: threading.Event,

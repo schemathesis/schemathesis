@@ -333,12 +333,7 @@ def test(case):
             rf".+curl -X GET {openapi3_base_url}/failure",
         ]
     result.stdout.re_match_lines(
-        [
-            r".+1. Server error",
-            r".+2. Undocumented HTTP status code",
-            r".+Documented: 200",
-        ]
-        + lines
+        [".+1. Server error", ".+2. Undocumented HTTP status code", ".+Documented: 200", *lines]
     )
 
 

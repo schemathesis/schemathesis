@@ -57,11 +57,11 @@ class RunnerContext:
     def current_scenario_status(self) -> events.ScenarioStatus:
         if self.current_step_status == events.StepStatus.SUCCESS:
             return events.ScenarioStatus.SUCCESS
-        elif self.current_step_status == events.StepStatus.FAILURE:
+        if self.current_step_status == events.StepStatus.FAILURE:
             return events.ScenarioStatus.FAILURE
-        elif self.current_step_status == events.StepStatus.ERROR:
+        if self.current_step_status == events.StepStatus.ERROR:
             return events.ScenarioStatus.ERROR
-        elif self.current_step_status == events.StepStatus.INTERRUPTED:
+        if self.current_step_status == events.StepStatus.INTERRUPTED:
             return events.ScenarioStatus.INTERRUPTED
         return events.ScenarioStatus.REJECTED
 

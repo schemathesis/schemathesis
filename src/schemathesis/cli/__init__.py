@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import base64
-import io
 import os
 import sys
 import traceback
@@ -41,38 +40,45 @@ from ..internal.datetime import current_datetime
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
-from ..models import Case, CheckFunction
 from ..runner import events, prepare_hypothesis_settings, probes
 from ..specs.graphql import loaders as gql_loaders
 from ..specs.openapi import loaders as oas_loaders
 from ..stateful import Stateful
-from ..targets import Target
 from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
-from ..types import PathLike, RequestCert
 from . import callbacks, cassettes, output
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, NotSet, OptionalInt
+from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, OptionalInt
 from .sanitization import SanitizationHandler
 
 if TYPE_CHECKING:
+    import io
+
     import hypothesis
     import requests
 
+    from ..models import Case, CheckFunction
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..specs.graphql.schemas import GraphQLSchema
+    from ..targets import Target
+    from ..types import NotSet, PathLike, RequestCert
+
+
+__all__ = [
+    "EventHandler",
+]
 
 
 def _get_callable_names(items: tuple[Callable, ...]) -> tuple[str, ...]:
     return tuple(item.__name__ for item in items)
 
 
-CUSTOM_HANDLERS: list[Type[EventHandler]] = []
+CUSTOM_HANDLERS: list[type[EventHandler]] = []
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
 DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
@@ -114,14 +120,14 @@ def reset_checks() -> None:
     """Get checks list to their default state."""
     # Useful in tests
     checks_module.ALL_CHECKS = checks_module.DEFAULT_CHECKS + checks_module.OPTIONAL_CHECKS
-    CHECKS_TYPE.choices = _get_callable_names(checks_module.ALL_CHECKS) + ("all",)
+    CHECKS_TYPE.choices = (*_get_callable_names(checks_module.ALL_CHECKS), "all")
 
 
 def reset_targets() -> None:
     """Get targets list to their default state."""
     # Useful in tests
     targets_module.ALL_TARGETS = targets_module.DEFAULT_TARGETS + targets_module.OPTIONAL_TARGETS
-    TARGETS_TYPE.choices = _get_callable_names(targets_module.ALL_TARGETS) + ("all",)
+    TARGETS_TYPE.choices = (*_get_callable_names(targets_module.ALL_TARGETS), "all")
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -282,7 +288,7 @@ REPORT_TO_SERVICE = ReportToService()
     "workers_num",
     help="Number of concurrent workers for testing. Auto-adjusts if 'auto' is specified",
     type=CustomHelpMessageChoice(
-        ["auto"] + list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1))),
+        ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
         choices_repr=f"[auto, {MIN_WORKERS}-{MAX_WORKERS}]",
     ),
     default=str(DEFAULT_WORKERS),
@@ -318,7 +324,7 @@ REPORT_TO_SERVICE = ReportToService()
     "--fixups",
     help="Apply compatibility adjustments",
     multiple=True,
-    type=click.Choice(list(ALL_FIXUPS) + ["all"]),
+    type=click.Choice([*ALL_FIXUPS, "all"]),
     metavar="",
 )
 @group("API validation options")
@@ -2000,7 +2006,7 @@ def decide_color_output(ctx: click.Context, no_color: bool, force_color: bool) -
         ctx.color = False
 
 
-def add_option(*args: Any, cls: Type = click.Option, **kwargs: Any) -> None:
+def add_option(*args: Any, cls: type = click.Option, **kwargs: Any) -> None:
     """Add a new CLI option to `st run`."""
     run.params.append(cls(args, **kwargs))
 
@@ -2024,10 +2030,10 @@ def add_group(name: str, *, index: int | None = None) -> Group:
     return Group(name)
 
 
-def handler() -> Callable[[Type], None]:
+def handler() -> Callable[[type], None]:
     """Register a new CLI event handler."""
 
-    def _wrapper(cls: Type) -> None:
+    def _wrapper(cls: type) -> None:
         CUSTOM_HANDLERS.append(cls)
 
     return _wrapper

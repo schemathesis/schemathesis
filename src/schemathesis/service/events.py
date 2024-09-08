@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..exceptions import format_exception
-from . import ci
+
+if TYPE_CHECKING:
+    from . import ci
 
 
 class Event:

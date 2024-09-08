@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import codecs
 import enum
+import operator
 import os
 import re
 import traceback
 from contextlib import contextmanager
-from functools import partial
+from functools import partial, reduce
 from typing import TYPE_CHECKING, Callable, Generator
 from urllib.parse import urlparse
 
 import click
-from click.types import LazyFile  # type: ignore
 
 from .. import exceptions, experimental, throttling
 from ..code_samples import CodeSampleStyle
@@ -24,12 +24,14 @@ from ..loaders import load_app
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..transports.headers import has_invalid_characters, is_latin_1_encodable
-from ..types import PathLike
 from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
 
 if TYPE_CHECKING:
     import hypothesis
+    from click.types import LazyFile  # type: ignore[attr-defined]
+
+    from ..types import PathLike
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
@@ -339,7 +341,7 @@ def convert_experimental(
 
 
 def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str]:
-    return sum(value, [])
+    return reduce(operator.iadd, value, [])
 
 
 def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:

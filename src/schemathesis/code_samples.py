@@ -6,10 +6,11 @@ from shlex import quote
 from typing import TYPE_CHECKING
 
 from .constants import SCHEMATHESIS_TEST_CASE_HEADER
-from .types import Headers
 
 if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
+
+    from .types import Headers
 
 
 @lru_cache
@@ -120,9 +121,9 @@ def _generate_requests(
     url = _escape_single_quotes(url)
     command = f"requests.{method.lower()}('{url}'"
     if body:
-        command += f", data={repr(body)}"
+        command += f", data={body!r}"
     if headers:
-        command += f", headers={repr(headers)}"
+        command += f", headers={headers!r}"
     if not verify:
         command += ", verify=False"
     command += ")"

@@ -495,7 +495,7 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
                     },
                 },
                 # If a readOnly or writeOnly property is included in the required list,
-                # required affects just the relevant scope – responses only or requests only
+                # required affects just the relevant scope - responses only or requests only
                 "required": ["read", "write"],
                 "additionalProperties": False,
             }

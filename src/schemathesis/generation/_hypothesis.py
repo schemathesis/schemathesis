@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
 
-@lru_cache()
+@lru_cache
 def default_settings() -> settings:
     from hypothesis import HealthCheck, Phase, Verbosity, settings
 

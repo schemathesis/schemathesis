@@ -76,9 +76,9 @@ def csv_strategy(enum):
             "auth": delimited(),
             "auth-type": st.sampled_from(["basic", "digest", "BASIC", "DIGEST"]),
             "data-generation-method": st.sampled_from([item.name for item in DataGenerationMethod]),
-            "target": st.sampled_from(ALL_TARGETS_NAMES + ("all",)),
+            "target": st.sampled_from((*ALL_TARGETS_NAMES, "all")),
             "code-sample-style": st.sampled_from([item.name for item in CodeSampleStyle]),
-            "fixups": st.sampled_from(list(ALL_FIXUPS) + ["all"]),
+            "fixups": st.sampled_from([*ALL_FIXUPS, "all"]),
             "stateful": st.sampled_from([item.name for item in Stateful]),
             "force-schema-version": st.sampled_from(["20", "30"]),
             "workers": st.integers(min_value=1, max_value=64),
@@ -113,7 +113,7 @@ def csv_strategy(enum):
     multiple_params=st.fixed_dictionaries(
         {},
         optional={
-            "checks": st.lists(st.sampled_from(ALL_CHECKS_NAMES + ("all",)), min_size=1),
+            "checks": st.lists(st.sampled_from((*ALL_CHECKS_NAMES, "all")), min_size=1),
             "header": st.lists(delimited(), min_size=1),
             "endpoint": st.lists(st.text(min_size=1)),
             "method": st.lists(st.text(min_size=1)),

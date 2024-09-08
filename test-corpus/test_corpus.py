@@ -209,11 +209,10 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
         if isinstance(event.analysis, Err):
             traceback = format_exception(event.analysis.err(), True)
             raise AssertionError(f"Analysis failed: {traceback}")
-        else:
-            analysis = event.analysis.ok()
-            assert not isinstance(analysis, AnalysisError)
-            for extension in analysis.extensions:
-                assert isinstance(extension.state, SuccessState), extension
+        analysis = event.analysis.ok()
+        assert not isinstance(analysis, AnalysisError)
+        for extension in analysis.extensions:
+            assert isinstance(extension.state, SuccessState), extension
 
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:

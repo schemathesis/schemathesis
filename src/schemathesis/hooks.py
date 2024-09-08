@@ -6,11 +6,10 @@ from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import partial
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, DefaultDict, cast
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from .filters import FilterSet, attach_filter_chain
 from .internal.deprecation import deprecated_property
-from .types import GenericTest
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
     from .models import APIOperation, Case
     from .schemas import BaseSchema
     from .transports.responses import GenericResponse
+    from .types import GenericTest
 
 
 @unique
@@ -108,7 +108,7 @@ class HookDispatcher:
     """
 
     scope: HookScope
-    _hooks: DefaultDict[str, list[Callable]] = field(default_factory=lambda: defaultdict(list))
+    _hooks: defaultdict[str, list[Callable]] = field(default_factory=lambda: defaultdict(list))
     _specs: ClassVar[dict[str, RegisteredHook]] = {}
 
     def __post_init__(self) -> None:

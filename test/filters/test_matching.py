@@ -220,7 +220,7 @@ def test_attach_filter_chain():
     assert auth.apply_to(method="GET", path="/users/") is auth
     assert not filter_set.is_empty()
     assert len(filter_set._includes) == 1
-    assert repr(list(filter_set._includes)[0]) == "<Filter: [method='GET' && path='/users/']>"
+    assert repr(next(iter(filter_set._includes))) == "<Filter: [method='GET' && path='/users/']>"
 
 
 @pytest.mark.parametrize("method", (filters.FilterSet.include, filters.FilterSet.exclude))

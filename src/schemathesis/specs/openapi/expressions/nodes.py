@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from requests.structures import CaseInsensitiveDict
 
 from .. import references
-from .context import ExpressionContext
-from .extractors import Extractor
+
+if TYPE_CHECKING:
+    from .context import ExpressionContext
+    from .extractors import Extractor
 
 
 @dataclass

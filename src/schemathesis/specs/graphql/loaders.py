@@ -7,7 +7,7 @@ from json import JSONDecodeError
 from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, cast
 
 from ...code_samples import CodeSampleStyle
-from ...constants import WAIT_FOR_SCHEMA_INTERVAL
+from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
@@ -139,6 +139,7 @@ def from_url(
             interval=WAIT_FOR_SCHEMA_INTERVAL,
         )
         def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
+            _kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
             return requests.post(_uri, **kwargs)
 
     else:

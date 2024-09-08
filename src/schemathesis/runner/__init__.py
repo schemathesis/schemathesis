@@ -4,7 +4,6 @@ from random import Random
 from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
 from urllib.parse import urlparse
 
-from .._override import CaseOverride
 from ..constants import (
     DEFAULT_DEADLINE,
     DEFAULT_STATEFUL_RECURSION_LIMIT,
@@ -22,16 +21,17 @@ from ..targets import DEFAULT_TARGETS, Target
 from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
 from ..types import Filter, NotSet, RawAuth, RequestCert
+from . import events
 from .probes import ProbeConfig
 
 if TYPE_CHECKING:
     import hypothesis
 
+    from .._override import CaseOverride
     from ..models import CheckFunction
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..stateful import Stateful
-    from . import events
     from .impl import BaseRunner
 
 
@@ -357,9 +357,9 @@ def from_schema(
     service_client: ServiceClient | None = None,
 ) -> BaseRunner:
     import hypothesis
-    from ..transports.asgi import is_asgi_app
 
     from ..checks import DEFAULT_CHECKS
+    from ..transports.asgi import is_asgi_app
     from .impl import (
         SingleThreadASGIRunner,
         SingleThreadRunner,

@@ -101,7 +101,7 @@ class RequestsTransport:
         cookies: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         final_headers = case._get_headers(headers)
-        media_type: Optional[str]
+        media_type: str | None
         if case.body is not NOT_SET and case.media_type is None:
             media_type = case.operation._get_default_media_type()
         else:
@@ -274,7 +274,7 @@ class WSGITransport:
         cookies: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         final_headers = case._get_headers(headers)
-        media_type: Optional[str]
+        media_type: str | None
         if case.body is not NOT_SET and case.media_type is None:
             media_type = case.operation._get_default_media_type()
         else:

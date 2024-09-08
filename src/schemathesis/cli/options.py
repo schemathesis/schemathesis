@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from enum import Enum
-from typing import Any, NoReturn
+from typing import TYPE_CHECKING, Any, NoReturn
 
 import click
 
 from ..constants import NOT_SET
-from ..types import NotSet
+
+if TYPE_CHECKING:
+    from enum import Enum
+
+    from ..types import NotSet
 
 
 class CustomHelpMessageChoice(click.Choice):
@@ -65,4 +68,4 @@ class OptionalInt(click.types.IntRange):
             int(value)
             return super().convert(value, param, ctx)
         except ValueError:
-            self.fail("%s is not a valid integer or None." % value, param, ctx)
+            self.fail(f"{value} is not a valid integer or None.", param, ctx)

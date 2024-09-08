@@ -20,6 +20,7 @@ from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
+from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import (
     DEPRECATED_PRE_RUN_OPTION_WARNING,
@@ -42,7 +43,7 @@ from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.internal.datetime import current_datetime
 from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
-from schemathesis.runner import CaseOverride, from_schema
+from schemathesis.runner import from_schema
 from schemathesis.runner.impl import threadpool
 from schemathesis.runner.probes import ProbeConfig
 from schemathesis.specs.openapi import unregister_string_format

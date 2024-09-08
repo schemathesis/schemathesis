@@ -7,12 +7,12 @@ from schemathesis import fixups
 def test_global_fixup(testdir, fast_api_schema):
     # When all fixups are enabled globally
     testdir.makepyfile(
-        """
+        f"""
 import schemathesis
 from hypothesis import settings
 
 schemathesis.fixups.install()
-schema = schemathesis.from_dict({schema})
+schema = schemathesis.from_dict({fast_api_schema})
 
 def teardown_module(module):
     schemathesis.fixups.uninstall()
@@ -22,7 +22,7 @@ def teardown_module(module):
 @settings(max_examples=1)
 def test(case):
     assert 0 < case.query["value"] < 10
-    """.format(schema=fast_api_schema),
+    """,
     )
     # Then Fast API schemas that are not compliant should be processed
     result = testdir.runpytest("-s")

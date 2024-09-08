@@ -2,17 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
-from ....generation import GenerationConfig
 from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
-from .types import Draw, Schema
+
+if TYPE_CHECKING:
+    from ....generation import GenerationConfig
+    from .types import Draw, Schema
 
 
 @dataclass

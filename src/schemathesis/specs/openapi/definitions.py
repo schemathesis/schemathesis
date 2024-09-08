@@ -1907,11 +1907,7 @@ _VALIDATORS = [
     "OPENAPI_31_VALIDATOR",
 ]
 
-__all__ = [
-    "SWAGGER_20",
-    "OPENAPI_30",
-    "OPENAPI_31",
-] + _VALIDATORS
+__all__ = ["SWAGGER_20", "OPENAPI_30", "OPENAPI_31", *_VALIDATORS]
 
 _imports = {
     "SWAGGER_20_VALIDATOR": lambda: make_validator(SWAGGER_20),
