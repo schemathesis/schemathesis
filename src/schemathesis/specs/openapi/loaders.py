@@ -163,12 +163,12 @@ def from_uri(
             interval=WAIT_FOR_SCHEMA_INTERVAL,
         )
         def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
-            _kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
-            return requests.get(_uri, **kwargs)
+            return requests.get(_uri, **_kwargs)
 
     else:
         _load_schema = requests.get
 
+    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
     response = load_schema_from_url(lambda: _load_schema(uri, **kwargs))
     return from_file(
         response.text,

@@ -17,6 +17,7 @@ Changelog
 **Fixed**
 
 - Avoid running checks twice in new-style stateful tests.
+- Missing ``timeout`` in certain situations when loading the schema from the network.
 
 .. _v3.35.5:
 

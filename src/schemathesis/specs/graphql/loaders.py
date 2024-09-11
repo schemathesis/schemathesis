@@ -139,12 +139,12 @@ def from_url(
             interval=WAIT_FOR_SCHEMA_INTERVAL,
         )
         def _load_schema(_uri: str, **_kwargs: Any) -> requests.Response:
-            _kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
-            return requests.post(_uri, **kwargs)
+            return requests.post(_uri, **_kwargs)
 
     else:
         _load_schema = requests.post
 
+    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
     response = load_schema_from_url(lambda: _load_schema(url, **kwargs))
     raw_schema = extract_schema_from_response(response)
     return from_dict(
