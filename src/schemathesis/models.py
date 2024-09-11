@@ -17,7 +17,6 @@ from typing import (
     Generic,
     Iterator,
     NoReturn,
-    Optional,
     Sequence,
     Type,
     TypeVar,
@@ -46,6 +45,7 @@ from .exceptions import (
 )
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
+from .internal.checks import CheckContext
 from .internal.copy import fast_deepcopy
 from .internal.deprecation import deprecated_function, deprecated_property
 from .internal.output import prepare_response_payload
@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 
     from .auths import AuthStorage
     from .failures import FailureContext
+    from .internal.checks import CheckFunction
     from .schemas import BaseSchema
     from .serializers import Serializer
     from .stateful import Stateful, StatefulTest
@@ -436,15 +437,26 @@ class Case:
         __tracebackhide__ = True
         from .checks import ALL_CHECKS
         from .transports.responses import get_payload, get_reason
+        from .internal.checks import wrap_check
 
-        checks = checks or ALL_CHECKS
+        if checks:
+            _checks = tuple(wrap_check(check) for check in checks)
+        else:
+            _checks = checks
+        if additional_checks:
+            _additional_checks = tuple(wrap_check(check) for check in additional_checks)
+        else:
+            _additional_checks = additional_checks
+
+        checks = _checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
-        additional_checks = tuple(check for check in additional_checks if check not in excluded_checks)
+        additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
         failed_checks = []
+        ctx = CheckContext()
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
             try:
-                check(response, copied_case)
+                check(ctx, response, copied_case)
             except AssertionError as exc:
                 maybe_set_assertion_message(exc, check.__name__)
                 failed_checks.append(exc)
@@ -1233,6 +1245,3 @@ class TestResultSet:
     def add_warning(self, warning: str) -> None:
         """Add a new warning to the warnings list."""
         self.warnings.append(warning)
-
-
-CheckFunction = Callable[["GenericResponse", Case], Optional[bool]]

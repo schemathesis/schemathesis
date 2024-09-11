@@ -217,7 +217,7 @@ class TokenAuth2:
 
 
 @schemathesis.check
-def verify_auth(response, case):
+def verify_auth(ctx, response, case):
     request_authorization = response.request.headers.get("Authorization")
     if case.operation.path == "/text":
         expected = f"Bearer {{TOKEN_1}}"

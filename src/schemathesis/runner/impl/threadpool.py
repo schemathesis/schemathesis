@@ -13,7 +13,6 @@ from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis import create_test
 from ...internal.result import Ok
-from ...models import CheckFunction
 from ...stateful import Feedback, Stateful
 from ...transports.auth import get_requests_auth
 from ...utils import capture_hypothesis_output
@@ -21,13 +20,13 @@ from .. import events
 from .core import BaseRunner, asgi_test, get_session, handle_schema_error, network_test, run_test, wsgi_test
 
 if TYPE_CHECKING:
-    from .context import RunnerContext
     import hypothesis
 
     from ...generation import DataGenerationMethod, GenerationConfig
-    from ...models import CheckFunction
+    from ...internal.checks import CheckFunction
     from ...targets import Target
     from ...types import RawAuth
+    from .context import RunnerContext
 
 
 def _run_task(

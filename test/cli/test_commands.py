@@ -800,7 +800,7 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
             import schemathesis
 
             @schemathesis.check
-            def conditional_check(response, case):
+            def conditional_check(ctx, response, case):
                 # skip this check
                 return True
             """
@@ -834,7 +834,7 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
                 return case
 
             @schemathesis.check
-            def add_case_check(response, case):
+            def add_case_check(ctx, response, case):
                 if case.headers and case.headers.get("copy") == "this is a copied case":
                     # we will look for this output
                     click.echo("The case was added!")
@@ -867,7 +867,7 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
                 return None
 
             @schemathesis.check
-            def add_case_check(response, case):
+            def add_case_check(ctx, response, case):
                 click.echo("Validating case.")
             """
     )
@@ -909,7 +909,7 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
                 return case
 
             @schemathesis.check
-            def add_case_check(response, case):
+            def add_case_check(ctx, response, case):
                 if case.headers and case.headers.get("first") == "first header":
                     # we will look for this output
                     click.echo("First case added!")
@@ -955,7 +955,7 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url, snap
                 return case
 
             @schemathesis.check
-            def add_case_check(response, case):
+            def add_case_check(ctx, response, case):
                 if (
                     case.headers and
                     (
@@ -992,7 +992,7 @@ def new_check(request, testdir, cli):
             import schemathesis
 
             @schemathesis.check
-            def new_check(response, result):
+            def new_check(ctx, response, result):
                 raise {exception}
             """
     )
@@ -1209,7 +1209,7 @@ import schemathesis
 
 
 @schemathesis.check
-def with_error(response, case):
+def with_error(ctx, response, case):
     1 / 0
 """
     )
@@ -2341,7 +2341,7 @@ import schemathesis
 note = print
 
 @schemathesis.check
-def data_generation_check(response, case):
+def data_generation_check(ctx, response, case):
     if case.data_generation_method:
         note("METHOD: {}".format(case.data_generation_method.name))
 """
@@ -2669,7 +2669,7 @@ def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
             import schemathesis
 
             @schemathesis.check
-            def custom_strings(response, case):
+            def custom_strings(ctx, response, case):
                 try:
                     case.body.encode("ascii")
                 except Exception as exc:
@@ -2699,7 +2699,7 @@ def test_parameter_overrides(testdir, cli, schema_url):
             import schemathesis
 
             @schemathesis.check
-            def verify_overrides(response, case):
+            def verify_overrides(ctx, response, case):
                 if "key" in case.operation.path_parameters:
                     assert case.path_parameters["key"] == "foo"
                     assert "id" not in (case.query or {}), "`id` is present"
@@ -2738,7 +2738,7 @@ def test_null_byte_in_header_probe(testdir, cli, empty_open_api_3_schema, snapsh
             import schemathesis
 
             @schemathesis.check
-            def no_null_bytes(response, case):
+            def no_null_bytes(ctx, response, case):
                 assert "\x00" not in case.headers["X-KEY"]
             """
     )

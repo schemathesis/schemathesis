@@ -56,9 +56,10 @@ from ...exceptions import (
 )
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
+from ...internal.checks import CheckContext
 from ...internal.datetime import current_datetime
 from ...internal.result import Err, Ok, Result
-from ...models import APIOperation, Case, Check, CheckFunction, Status, TestResult
+from ...models import APIOperation, Case, Check, Status, TestResult
 from ...runner import events
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
@@ -75,13 +76,16 @@ from ..serialization import SerializedTestResult
 from .context import RunnerContext
 
 if TYPE_CHECKING:
-    from ...types import RawAuth
-    from ...schemas import BaseSchema
-    from ..._override import CaseOverride
-    from requests.auth import HTTPDigestAuth
     from types import TracebackType
+
+    from requests.auth import HTTPDigestAuth
+
+    from ..._override import CaseOverride
+    from ...internal.checks import CheckFunction
+    from ...schemas import BaseSchema
     from ...service.client import ServiceClient
     from ...transports.responses import GenericResponse, WSGIResponse
+    from ...types import RawAuth
 
 
 def _should_count_towards_stop(event: events.ExecutionEvent) -> bool:
@@ -797,6 +801,7 @@ def run_checks(
     max_response_time: int | None = None,
 ) -> None:
     errors = []
+    ctx = CheckContext()
 
     def add_single_failure(error: AssertionError) -> None:
         msg = maybe_set_assertion_message(error, check_name)
@@ -811,7 +816,7 @@ def run_checks(
         check_name = check.__name__
         copied_case = case.partial_deepcopy()
         try:
-            skip_check = check(response, copied_case)
+            skip_check = check(ctx, response, copied_case)
             if not skip_check:
                 check_result = result.add_success(check_name, copied_case, response, elapsed_time)
                 check_results.append(check_result)

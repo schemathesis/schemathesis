@@ -4,6 +4,20 @@ Changelog
 :version:`Unreleased <v3.35.5...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Add ``ctx`` as the first argument for all checks. 
+  This is a step towards checks that cover multiple responses at once. 
+- Validate custom check function signatures.
+
+**Deprecated**
+
+- Custom checks that do not accept ``ctx`` as the first argument.
+
+**Fixed**
+
+- Avoid running checks twice in new-style stateful tests.
+
 .. _v3.35.5:
 
 :version:`3.35.5 <v3.35.4...v3.35.5>` - 2024-09-08

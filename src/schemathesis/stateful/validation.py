@@ -3,10 +3,12 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..exceptions import CheckFailed, get_grouped_exception
+from ..internal.checks import CheckContext
 
 if TYPE_CHECKING:
     from ..failures import FailureContext
-    from ..models import Case, CheckFunction
+    from ..internal.checks import CheckFunction
+    from ..models import Case
     from ..transports.responses import GenericResponse
     from .context import RunnerContext
 
@@ -28,6 +30,7 @@ def validate_response(
 
     exceptions: list[CheckFailed | AssertionError] = []
     check_results = ctx.checks_for_step
+    check_ctx = CheckContext()
 
     def _on_failure(exc: CheckFailed | AssertionError, message: str, context: FailureContext | None) -> None:
         exceptions.append(exc)
@@ -62,8 +65,7 @@ def validate_response(
         name = check.__name__
         copied_case = case.partial_deepcopy()
         try:
-            check(response, copied_case)
-            skip_check = check(response, copied_case)
+            skip_check = check(check_ctx, response, copied_case)
             if not skip_check:
                 _on_passed(name, copied_case)
         except CheckFailed as exc:

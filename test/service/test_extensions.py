@@ -258,7 +258,7 @@ def test_custom_format(cli, snapshot_cli, service, openapi3_base_url, empty_open
 import schemathesis
 
 @schemathesis.check
-def port_check(response, case):
+def port_check(ctx, response, case):
     assert isinstance(case.body, dict), "Not a dict"
     assert "port" in case.body, "Missing key"
     assert 1 <= int(case.body["port"]) <= 65535, "Invalid port"
@@ -420,7 +420,7 @@ PATH = {patch["path"]}
 EXPECTED = {expected}
 
 @schemathesis.check
-def schema_check(response, case):
+def schema_check(ctx, response, case):
     schema = case.operation.schema.raw_schema
     for segment in PATH[:-1]:
         schema = schema[segment]
@@ -517,7 +517,7 @@ import re
 import schemathesis
 
 @schemathesis.check
-def port_check(response, case):
+def port_check(ctx, response, case):
     value = re.findall("getByDate\(value: (\d+)\)", case.body)[0]
     assert 1 <= int(value) <= 65535, "Invalid port"
 """

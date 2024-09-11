@@ -667,7 +667,7 @@ Checks
 Checks in Schemathesis allow you to validate responses from your API, ensuring they adhere to both general and application-specific expectations. 
 They can be particularly useful for checking behaviors that are specific to your application and go beyond the built-in checks provided by Schemathesis.
 
-Define a check as a function taking two parameters: ``response`` and ``case``, and register it using the ``@schemathesis.check`` decorator.
+Define a check as a function taking three parameters: ``ctx``, ``response`` and ``case``, and register it using the ``@schemathesis.check`` decorator.
 
 .. code-block:: python
 
@@ -675,9 +675,10 @@ Define a check as a function taking two parameters: ``response`` and ``case``, a
 
 
     @schemathesis.check
-    def my_check(response, case) -> None:
+    def my_check(ctx, response, case) -> None:
         ...
 
+- ``ctx`` holds a context relevant to the current check. Currently unused and is placed here for future-compatibility.
 - ``response`` is the API response, an instance of ``requests.Response`` or ``schemathesis.utils.WSGIResponse``, based on your integration method.
 - ``case`` is the ``schemathesis.Case`` instance used to send data to the application.
 
@@ -691,7 +692,7 @@ Here’s an example of a check that ensures that when an ``item_id`` of 42 is us
 
 
     @schemathesis.check
-    def my_check(response, case) -> None:
+    def my_check(ctx, response, case) -> None:
         if case.path_parameters.get("item_id") == 42 and ANSWER not in response.text:
             raise AssertionError("The ultimate answer not found!")
 

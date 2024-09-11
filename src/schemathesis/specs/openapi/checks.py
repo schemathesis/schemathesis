@@ -25,11 +25,12 @@ from .utils import expand_status_code
 if TYPE_CHECKING:
     from requests import PreparedRequest
 
+    from ...internal.checks import CheckContext
     from ...models import APIOperation, Case
     from ...transports.responses import GenericResponse
 
 
-def status_code_conformance(response: GenericResponse, case: Case) -> bool | None:
+def status_code_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -60,7 +61,7 @@ def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, N
         yield from expand_status_code(code)
 
 
-def content_type_conformance(response: GenericResponse, case: Case) -> bool | None:
+def content_type_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -115,7 +116,7 @@ def _reraise_malformed_media_type(case: Case, exc: ValueError, location: str, ac
     ) from exc
 
 
-def response_headers_conformance(response: GenericResponse, case: Case) -> bool | None:
+def response_headers_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     import jsonschema
 
     from .parameters import OpenAPI20Parameter, OpenAPI30Parameter
@@ -171,11 +172,11 @@ def response_headers_conformance(response: GenericResponse, case: Case) -> bool 
                     )
                 except jsonschema.ValidationError as exc:
                     exc_class = get_schema_validation_error(case.operation.verbose_name, exc)
-                    ctx = failures.ValidationErrorContext.from_exception(
+                    error_ctx = failures.ValidationErrorContext.from_exception(
                         exc, output_config=case.operation.schema.output_config
                     )
                     try:
-                        raise exc_class("Response header does not conform to the schema", context=ctx) from exc
+                        raise exc_class("Response header does not conform to the schema", context=error_ctx) from exc
                     except Exception as exc:
                         errors.append(exc)
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
@@ -203,7 +204,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
     return value
 
 
-def response_schema_conformance(response: GenericResponse, case: Case) -> bool | None:
+def response_schema_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -211,7 +212,7 @@ def response_schema_conformance(response: GenericResponse, case: Case) -> bool |
     return case.operation.validate_response(response)
 
 
-def negative_data_rejection(response: GenericResponse, case: Case) -> bool | None:
+def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -258,7 +259,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     return True
 
 
-def use_after_free(response: GenericResponse, original: Case) -> bool | None:
+def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
     from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
@@ -298,7 +299,7 @@ def use_after_free(response: GenericResponse, original: Case) -> bool | None:
     return None
 
 
-def ensure_resource_availability(response: GenericResponse, original: Case) -> bool | None:
+def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
     from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
@@ -332,7 +333,7 @@ def ensure_resource_availability(response: GenericResponse, original: Case) -> b
     return None
 
 
-def ignored_auth(response: GenericResponse, case: Case) -> bool | None:
+def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema
 

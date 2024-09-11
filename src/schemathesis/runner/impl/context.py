@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-
-from ...models import TestResult, TestResultSet
 from typing import TYPE_CHECKING
 
+from ...models import TestResult, TestResultSet
+
 if TYPE_CHECKING:
-    from ...exceptions import OperationSchemaError
     import threading
+
+    from ...exceptions import OperationSchemaError
 
 
 @dataclass

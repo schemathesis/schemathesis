@@ -258,7 +258,7 @@ def test_root_url():
     def empty():
         return {}
 
-    def check(response, case):
+    def check(ctx, response, case):
         assert case.as_transport_kwargs()["url"] == "/"
         assert case.as_requests_kwargs()["url"] == "/"
         assert response.status_code == 200
@@ -321,10 +321,10 @@ def test_hypothesis_deadline_always_an_error(wsgi_app_schema, flask_app):
 
 @pytest.mark.operations("multipart")
 def test_form_data(any_app, any_app_schema):
-    def is_ok(response, case):
+    def is_ok(ctx, response, case):
         assert response.status_code == 200
 
-    def check_content(response, case):
+    def check_content(ctx, response, case):
         if isinstance(any_app, Flask):
             data = response.json
         else:
@@ -351,7 +351,7 @@ def test_form_data(any_app, any_app_schema):
 
 @pytest.mark.operations("headers")
 def test_headers_override(any_app_schema):
-    def check_headers(response, case):
+    def check_headers(ctx, response, case):
         if isinstance(any_app_schema.app, Flask):
             data = response.json
         else:
@@ -682,7 +682,7 @@ async def test_explicit_example_disable(any_app, any_app_schema, mocker):
 def test_plain_text_body(any_app, any_app_schema):
     # When the expected payload is text/plain
     # Then the payload is not encoded as JSON
-    def check_content(response, case):
+    def check_content(ctx, response, case):
         if isinstance(any_app, Flask):
             data = response.get_data()
         else:
@@ -965,7 +965,7 @@ def test_invalid_header_in_example(empty_open_api_3_schema):
 def test_dry_run(any_app_schema):
     called = False
 
-    def check(response, case):
+    def check(ctx, response, case):
         nonlocal called
         called = True
 
@@ -979,7 +979,7 @@ def test_dry_run(any_app_schema):
 def test_dry_run_asgi(fastapi_app):
     called = False
 
-    def check(response, case):
+    def check(ctx, response, case):
         nonlocal called
         called = True
 
@@ -1007,7 +1007,7 @@ def test_connection_error(empty_open_api_3_schema):
 def test_reserved_characters_in_operation_name(any_app_schema):
     # See GH-992
 
-    def check(response, case):
+    def check(ctx, response, case):
         assert response.status_code == 200
 
     # When there is `:` in the API operation path
@@ -1120,7 +1120,7 @@ def test_graphql(graphql_url):
 @pytest.mark.operations("success")
 def test_interrupted_in_test(openapi3_schema):
     # When an interrupt happens within a test body (check is called within a test body)
-    def check(response, case):
+    def check(ctx, response, case):
         raise KeyboardInterrupt
 
     *_, event, _ = from_schema(openapi3_schema, checks=(check,)).execute()
@@ -1201,11 +1201,11 @@ def test_finish(event_stream):
 def test_case_mutation(real_app_schema):
     # When two checks mutate the case
 
-    def check1(response, case):
+    def check1(ctx, response, case):
         case.headers = {"Foo": "BAR"}
         raise AssertionError("Bar!")
 
-    def check2(response, case):
+    def check2(ctx, response, case):
         case.headers = {"Foo": "BAZ"}
         raise AssertionError("Baz!")
 

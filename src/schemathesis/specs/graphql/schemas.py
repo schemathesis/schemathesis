@@ -38,7 +38,7 @@ from ...hooks import (
     should_skip_operation,
 )
 from ...internal.result import Ok, Result
-from ...models import APIOperation, Case, CheckFunction, OperationDefinition
+from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
 from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
 from ..openapi.constants import LOCATION_TO_CONTAINER
@@ -51,6 +51,7 @@ if TYPE_CHECKING:
     from ...auths import AuthStorage
     from ...stateful import Stateful, StatefulTest
     from ...transports.responses import GenericResponse
+    from ...internal.checks import CheckFunction
 
 
 @unique

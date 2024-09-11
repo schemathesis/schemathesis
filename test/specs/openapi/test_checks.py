@@ -167,4 +167,4 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         data_generation_method=DataGenerationMethod.negative,
         query={"key": 5, "unknown": 3},
     )
-    assert negative_data_rejection(response, case) is None
+    assert negative_data_rejection(None, response, case) is None

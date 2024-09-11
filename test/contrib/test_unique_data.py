@@ -110,7 +110,7 @@ def unique_hook(testdir):
         import schemathesis
 
         @schemathesis.check
-        def unique_test_cases(response, case):
+        def unique_test_cases(ctx, response, case):
             if not hasattr(case.operation.schema, "seen"):
                 case.operation.schema.seen = set()
             command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
