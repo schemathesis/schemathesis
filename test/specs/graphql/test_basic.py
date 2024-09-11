@@ -103,7 +103,7 @@ def test_response_validation(graphql_schema, response_factory, kwargs, expected)
     response = response_factory.requests(status_code=200, **kwargs)
     case = graphql_schema["Query"]["getBooks"].make_case(body="Q")
     with pytest.raises(CheckFailed, match=expected):
-        not_a_server_error(response, case)
+        not_a_server_error(None, response, case)
 
 
 def test_client_error(graphql_schema):
@@ -353,4 +353,4 @@ def test_schema_as_strategy(graphql_schema):
 def test_ignored_checks(graphql_schema, check):
     # Just in case
     case = graphql_schema["Query"]["getBooks"].make_case()
-    assert check(None, case)
+    assert check(None, None, case)

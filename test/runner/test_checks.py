@@ -18,6 +18,7 @@ from schemathesis.checks import (
 )
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.experimental import OPEN_API_3_1
+from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition, TestResult
 from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.serialization import deduplicate_failures
@@ -25,6 +26,8 @@ from schemathesis.specs.openapi.checks import _coerce_header_value
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
+
+CTX = CheckContext()
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
@@ -80,7 +83,7 @@ def case(request, spec) -> models.Case:
     indirect=["response", "case"],
 )
 def test_content_type_conformance_valid(spec, response, case):
-    assert content_type_conformance(response, case) is None
+    assert content_type_conformance(CTX, response, case) is None
 
 
 @pytest.mark.parametrize(
@@ -218,10 +221,10 @@ def assert_content_type_conformance(response_factory, raw_schema, content_type, 
     case = models.Case(operation, generation_time=0.0)
     response = response_factory.requests(content_type=content_type)
     if not is_error:
-        assert content_type_conformance(response, case) is None
+        assert content_type_conformance(CTX, response, case) is None
     else:
         with pytest.raises(AssertionError, match=match):
-            content_type_conformance(response, case)
+            content_type_conformance(CTX, response, case)
 
 
 @pytest.mark.parametrize("value", (500, 502))
@@ -230,7 +233,7 @@ def test_not_a_server_error(value, swagger_20, response_factory):
     response.status_code = value
     case = make_case(swagger_20, {})
     with pytest.raises(AssertionError) as exc_info:
-        not_a_server_error(response, case)
+        not_a_server_error(CTX, response, case)
     assert exc_info.type.__name__ == "CheckFailed"
 
 
@@ -239,7 +242,7 @@ def test_status_code_conformance_valid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"4XX"}})
-    status_code_conformance(response, case)
+    status_code_conformance(CTX, response, case)
 
 
 @pytest.mark.parametrize("value", (400, 405))
@@ -248,7 +251,7 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"5XX"}})
     with pytest.raises(AssertionError) as exc_info:
-        status_code_conformance(response, case)
+        status_code_conformance(CTX, response, case)
     assert exc_info.type.__name__ == "CheckFailed"
 
 
@@ -260,7 +263,7 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
 )
 def test_content_type_conformance_invalid(spec, response, case):
     with pytest.raises(AssertionError, match="Undocumented Content-Type") as exc_info:
-        content_type_conformance(response, case)
+        content_type_conformance(CTX, response, case)
     assert exc_info.type.__name__ == "CheckFailed"
     assert (
         exc_info.value.context.message == f"Received: {response.headers['Content-Type']}\nDocumented: application/json"
@@ -282,7 +285,7 @@ def test_invalid_schema_on_content_type_check(response_factory):
     response = response_factory.requests(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(OperationSchemaError):
-        content_type_conformance(response, case)
+        content_type_conformance(CTX, response, case)
 
 
 def test_missing_content_type_header(case, response_factory):
@@ -290,7 +293,7 @@ def test_missing_content_type_header(case, response_factory):
     response = response_factory.requests(content_type=None)
     # Then an error should be risen
     with pytest.raises(CheckFailed, match="Missing Content-Type header"):
-        content_type_conformance(response, case)
+        content_type_conformance(CTX, response, case)
 
 
 SUCCESS_SCHEMA = {"type": "object", "properties": {"success": {"type": "boolean"}}, "required": ["success"]}
@@ -318,7 +321,7 @@ STRING_FORMAT_SCHEMA = {
 def test_response_schema_conformance_swagger(swagger_20, content, definition, response_factory):
     response = response_factory.requests(content=content)
     case = make_case(swagger_20, definition)
-    assert response_schema_conformance(response, case) is None
+    assert response_schema_conformance(CTX, response, case) is None
     assert case.operation.is_response_valid(response)
 
 
@@ -379,7 +382,7 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
 def test_response_schema_conformance_openapi(openapi_30, content, definition, response_factory):
     response = response_factory.requests(content=content)
     case = make_case(openapi_30, definition)
-    assert response_schema_conformance(response, case) is None
+    assert response_schema_conformance(CTX, response, case) is None
     assert case.operation.is_response_valid(response)
 
 
@@ -402,7 +405,7 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
     )
     OPEN_API_3_1.enable()
     openapi_30.raw_schema["openapi"] = "3.1.0"
-    assert response_schema_conformance(response, case) is None
+    assert response_schema_conformance(CTX, response, case) is None
     assert case.operation.is_response_valid(response)
 
 
@@ -432,7 +435,7 @@ def assert_no_media_types(response_factory, schema, definition):
     # And no "Content-Type" header in the received response
     response = response_factory.requests(content_type=None, status_code=204)
     # Then there should be no errors
-    assert response_schema_conformance(response, case) is None
+    assert response_schema_conformance(CTX, response, case) is None
 
 
 @pytest.mark.parametrize("spec", ("swagger_20", "openapi_30"))
@@ -455,7 +458,7 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
     response = response_factory.requests(content_type=None, status_code=200)
     # Then the check should fail
     with pytest.raises(MultipleFailures, match="Missing Content-Type header"):
-        response_schema_conformance(response, case)
+        response_schema_conformance(CTX, response, case)
 
 
 @pytest.mark.parametrize(
@@ -470,7 +473,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
     response = response_factory.requests(content=content)
     case = make_case(swagger_20, definition)
     with pytest.raises(AssertionError) as exc_info:
-        response_schema_conformance(response, case)
+        response_schema_conformance(CTX, response, case)
     assert not case.operation.is_response_valid(response)
     assert exc_info.type.__name__ == "CheckFailed"
 
@@ -526,7 +529,7 @@ def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, con
     response = response_factory.requests(content=content, content_type=media_type)
     case = make_case(openapi_30, definition)
     with pytest.raises(AssertionError):
-        response_schema_conformance(response, case)
+        response_schema_conformance(CTX, response, case)
     assert not case.operation.is_response_valid(response)
 
 
@@ -544,7 +547,7 @@ def test_no_schema(openapi_30, response_factory):
     }
     case = make_case(openapi_30, definition)
     # Then the check should be ignored
-    response_schema_conformance(response, case)
+    response_schema_conformance(CTX, response, case)
     assert case.operation.is_response_valid(response)
 
 
@@ -670,7 +673,7 @@ def test_optional_headers_missing(schema_with_optional_headers, response_factory
     case = make_case(schema, schema_with_optional_headers["paths"]["/data"]["get"])
     response = response_factory.requests()
     # Then it should not be reported as missing
-    assert response_headers_conformance(response, case) is None
+    assert response_headers_conformance(CTX, response, case) is None
 
 
 INTEGER_HEADER = {"type": "integer", "maximum": 100}
@@ -710,10 +713,10 @@ def test_header_conformance(request, response_factory, base, header, schema, val
     case = make_case(schema, base_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={header: value})
     if expected is True:
-        assert response_headers_conformance(response, case) is None
+        assert response_headers_conformance(CTX, response, case) is None
     else:
         with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
-            response_headers_conformance(response, case)
+            response_headers_conformance(CTX, response, case)
 
 
 def test_header_conformance_definition_behind_ref(empty_open_api_3_schema, response_factory):
@@ -744,7 +747,7 @@ def test_header_conformance_definition_behind_ref(empty_open_api_3_schema, respo
     case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"Link": "Test"})
     with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
-        response_headers_conformance(response, case)
+        response_headers_conformance(CTX, response, case)
 
 
 MULTIPLE_HEADERS = {
@@ -770,7 +773,7 @@ def test_header_conformance_multiple_invalid_headers(empty_open_api_3_schema, re
     case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150", "X-RateLimit-Reset": "Invalid"})
     with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
-        response_headers_conformance(response, case)
+        response_headers_conformance(CTX, response, case)
 
 
 def test_header_conformance_missing_and_invalid(empty_open_api_3_schema, response_factory):
@@ -779,7 +782,7 @@ def test_header_conformance_missing_and_invalid(empty_open_api_3_schema, respons
     case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150"})
     with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
-        response_headers_conformance(response, case)
+        response_headers_conformance(CTX, response, case)
 
 
 @pytest.mark.parametrize(

@@ -235,7 +235,7 @@ def test_distinct_assertions(runner_factory):
     counter = 0
 
     # When a check contains different failing assertions
-    def custom_check(response, case):
+    def custom_check(ctx, response, case):
         nonlocal counter
         counter += 1
         if counter == 1:
@@ -275,7 +275,7 @@ def test_flaky_assertions(runner_factory, kwargs):
     counter = 0
 
     # When a check contains different failing assertions and one of them is considered flaky by Hypothesis
-    def custom_check(response, case):
+    def custom_check(ctx, response, case):
         nonlocal counter
         counter += 1
         if counter == 1:
