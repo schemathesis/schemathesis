@@ -94,7 +94,7 @@ import schemathesis
 
 
 @schemathesis.check
-def with_error(response, case):
+def with_error(ctx, response, case):
     1 / 0
 """
     )

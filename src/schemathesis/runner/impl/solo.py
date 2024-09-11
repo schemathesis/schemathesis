@@ -8,8 +8,8 @@ from .. import events
 from .core import BaseRunner, asgi_test, get_session, network_test, wsgi_test
 
 if TYPE_CHECKING:
-    from .context import RunnerContext
     from .. import events
+    from .context import RunnerContext
 
 
 @dataclass

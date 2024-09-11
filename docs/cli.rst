@@ -677,11 +677,11 @@ To use your custom checks with Schemathesis CLI, you need to register them via t
 
 
     @schemathesis.check
-    def new_check(response, case):
+    def new_check(ctx, response, case):
         # some awesome assertions!
         pass
 
-The registered check should accept a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
+The registered check should accept ``ctx``, a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
 ``case`` with ``schemathesis.models.Case`` type. This code should be placed in the module you pass to the ``SCHEMATHESIS_HOOKS`` environment variable.
 
 Then your checks will be available in Schemathesis CLI, and you can use them via the ``-c`` command-line option.
@@ -700,7 +700,7 @@ response code is ``200``.
 
 
     @schemathesis.check
-    def conditional_check(response, case):
+    def conditional_check(ctx, response, case):
         if response.status_code == 200:
             ...  # some awesome assertions!
         else:

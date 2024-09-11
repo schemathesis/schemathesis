@@ -408,10 +408,10 @@ def test_failing_custom_check(testdir, openapi3_base_url, body, expected):
         f"""
 schema.base_url = "{openapi3_base_url}"
 
-def my_check(response, case):
+def my_check(ctx, response, case):
     {body}
 
-def another_check(response, case):
+def another_check(ctx, response, case):
     raise AssertionError("Another check")
 
 @schema.parametrize()

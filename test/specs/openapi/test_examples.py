@@ -382,7 +382,7 @@ import schemathesis
 
 
 @schemathesis.check
-def explicit_header(response, case):
+def explicit_header(ctx, response, case):
     assert case.headers["anyKey"] == "OVERRIDE"
     assert case.query["id"] == "OVERRIDE"
 """

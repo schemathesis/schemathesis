@@ -17,18 +17,18 @@ schemathesis.openapi.format("fullname", fullname())
 
 
 @schemathesis.hook
-def filter_body(context, body):
+def filter_body(ctx, body):
     """Modification over the default strategy for payload generation."""
     return body.get("id", 10001) > 10000
 
 
 @schemathesis.check
-def not_so_slow(response, case):
+def not_so_slow(ctx, response, case):
     """Custom response check."""
     assert response.elapsed < timedelta(milliseconds=100), "Response is slow!"
 
 
 @schemathesis.target
-def big_response(context):
+def big_response(ctx):
     """Custom data generation target."""
-    return float(len(context.response.content))
+    return float(len(ctx.response.content))

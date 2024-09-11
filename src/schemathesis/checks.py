@@ -15,11 +15,12 @@ from .specs.openapi.checks import (
 )
 
 if TYPE_CHECKING:
-    from .models import Case, CheckFunction
+    from .internal.checks import CheckContext, CheckFunction
+    from .models import Case
     from .transports.responses import GenericResponse
 
 
-def not_a_server_error(response: GenericResponse, case: Case) -> bool | None:
+def not_a_server_error(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
     from .specs.graphql.schemas import GraphQLCase
     from .specs.graphql.validation import validate_graphql_response
@@ -64,14 +65,16 @@ def register(check: CheckFunction) -> CheckFunction:
     .. code-block:: python
 
         @schemathesis.check
-        def new_check(response, case):
+        def new_check(ctx, response, case):
             # some awesome assertions!
             ...
     """
     from . import cli
+    from .internal.checks import wrap_check
 
+    _check = wrap_check(check)
     global ALL_CHECKS
 
-    ALL_CHECKS += (check,)
-    cli.CHECKS_TYPE.choices += (check.__name__,)  # type: ignore
+    ALL_CHECKS += (_check,)
+    cli.CHECKS_TYPE.choices += (_check.__name__,)  # type: ignore
     return check

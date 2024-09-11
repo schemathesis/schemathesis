@@ -10,7 +10,7 @@ from schemathesis.cli import reset_checks
 @pytest.fixture
 def new_check():
     @schemathesis.check
-    def check_function(response, case):
+    def check_function(ctx, response, case):
         pass
 
     yield check_function
