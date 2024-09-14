@@ -27,7 +27,7 @@ from requests.structures import CaseInsensitiveDict
 
 from ... import auths
 from ...checks import not_a_server_error
-from ...constants import NOT_SET
+from ...constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from ...exceptions import OperationNotFound, OperationSchemaError
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import (
@@ -49,9 +49,9 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from ...auths import AuthStorage
+    from ...internal.checks import CheckFunction
     from ...stateful import Stateful, StatefulTest
     from ...transports.responses import GenericResponse
-    from ...internal.checks import CheckFunction
 
 
 @unique
@@ -62,6 +62,9 @@ class RootType(enum.Enum):
 
 @dataclass(repr=False)
 class GraphQLCase(Case):
+    def __hash__(self) -> int:
+        return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
+
     def _get_url(self, base_url: str | None) -> str:
         base_url = self._get_base_url(base_url)
         # Replace the path, in case if the user provided any path parameters via hooks

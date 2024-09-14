@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.35.5...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Reimplementation of test case deduplication in CLI. It effectively un-deprecates the ``--contrib-unique-data`` CLI option.
+
 **Changed**
 
 - Add ``ctx`` as the first argument for all checks. 

@@ -3,12 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from ...constants import NOT_SET
 from ...models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
     import threading
 
     from ...exceptions import OperationSchemaError
+    from ...models import Case
+    from ...types import NotSet
 
 
 @dataclass
@@ -18,13 +21,17 @@ class RunnerContext:
     data: TestResultSet
     seed: int | None
     stop_event: threading.Event
+    unique_data: bool
+    outcome_cache: dict[int, BaseException | None]
 
-    __slots__ = ("data", "seed", "stop_event")
+    __slots__ = ("data", "seed", "stop_event", "unique_data", "outcome_cache")
 
-    def __init__(self, seed: int | None, stop_event: threading.Event) -> None:
+    def __init__(self, *, seed: int | None, stop_event: threading.Event, unique_data: bool) -> None:
         self.data = TestResultSet(seed=seed)
         self.seed = seed
         self.stop_event = stop_event
+        self.outcome_cache = {}
+        self.unique_data = unique_data
 
     @property
     def is_stopped(self) -> bool:
@@ -54,6 +61,12 @@ class RunnerContext:
 
     def add_warning(self, message: str) -> None:
         self.data.add_warning(message)
+
+    def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
+        self.outcome_cache[hash(case)] = outcome
+
+    def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
+        return self.outcome_cache.get(hash(case), NOT_SET)
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"

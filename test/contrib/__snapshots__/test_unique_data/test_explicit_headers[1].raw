@@ -1,7 +1,6 @@
 Exit code: 0
 ---
 Stdout:
-The `--contrib-unique-data` CLI option and the corresponding `schemathesis.contrib.unique_data` hook are **DEPRECATED**. The concept of this feature does not fit the core principles of Hypothesis where strategies are configurable on a per-example basis but this feature implies uniqueness across examples. This leads to cryptic error messages about external state and flaky test runs, therefore it will be removed in Schemathesis 4.0
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/schema.json
 Base URL: http://127.0.0.1/api
@@ -13,14 +12,14 @@ Collected API links: 0
 API probing: SUCCESS
 Schema analysis: SKIP
 
-GET /api/success F                                                        [100%]
+GET /api/success .                                                        [100%]
 
 =================================== SUMMARY ====================================
 
 Performed checks:
-    unique_test_cases                    15 / 15 passed          PASSED 
+    unique_test_cases                    N / N passed          PASSED 
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-============================== 1 passed in 1.00s ===============================
+============================== in 1.00s ========================================
