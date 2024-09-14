@@ -111,6 +111,7 @@ class BaseRunner:
     exit_first: bool = False
     max_failures: int | None = None
     started_at: str = field(default_factory=current_datetime)
+    unique_data: bool = False
     dry_run: bool = False
     stateful: Stateful | None = None
     stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
@@ -129,7 +130,7 @@ class BaseRunner:
         # If auth is explicitly provided, then the global provider is ignored
         if self.auth is not None:
             unregister_auth()
-        ctx = RunnerContext(self.seed, stop_event)
+        ctx = RunnerContext(seed=self.seed, stop_event=stop_event, unique_data=self.unique_data)
         start_time = time.monotonic()
         initialized = None
         __probes = None
@@ -565,9 +566,10 @@ def run_test(
     try:
         with catch_warnings(record=True) as warnings, capture_hypothesis_output() as hypothesis_output:
             test(
-                checks,
-                targets,
-                result,
+                ctx=ctx,
+                checks=checks,
+                targets=targets,
+                result=result,
                 errors=errors,
                 headers=headers,
                 data_generation_methods=data_generation_methods,
@@ -902,7 +904,33 @@ def _force_data_generation_method(values: list[DataGenerationMethod], case: Case
     values[:] = [data_generation_method]
 
 
+def cached_test_func(f: Callable) -> Callable:
+    def wrapped(*, ctx: RunnerContext, case: Case, **kwargs: Any) -> None:
+        if ctx.unique_data:
+            cached = ctx.get_cached_outcome(case)
+            if isinstance(cached, BaseException):
+                raise cached
+            elif cached is None:
+                return None
+            try:
+                f(ctx=ctx, case=case, **kwargs)
+            except BaseException as exc:
+                ctx.cache_outcome(case, exc)
+                raise
+            else:
+                ctx.cache_outcome(case, None)
+        else:
+            f(ctx=ctx, case=case, **kwargs)
+
+    wrapped.__name__ = f.__name__
+
+    return wrapped
+
+
+@cached_test_func
 def network_test(
+    *,
+    ctx: RunnerContext,
     case: Case,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
@@ -1014,7 +1042,9 @@ def get_session(auth: HTTPDigestAuth | RawAuth | None = None) -> Generator[reque
         yield session
 
 
+@cached_test_func
 def wsgi_test(
+    ctx: RunnerContext,
     case: Case,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
@@ -1092,7 +1122,9 @@ def _wsgi_test(
     return response
 
 
+@cached_test_func
 def asgi_test(
+    ctx: RunnerContext,
     case: Case,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],

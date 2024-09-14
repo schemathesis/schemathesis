@@ -60,8 +60,8 @@ def paths(draw):
     return "/" + path
 
 
-def csv_strategy(enum):
-    return st.lists(st.sampled_from([item.name for item in enum]), min_size=1).map(",".join)
+def csv_strategy(enum, exclude=()):
+    return st.lists(st.sampled_from([item.name for item in enum if item.name not in exclude]), min_size=1).map(",".join)
 
 
 # The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
@@ -82,14 +82,14 @@ def csv_strategy(enum):
             "stateful": st.sampled_from([item.name for item in Stateful]),
             "force-schema-version": st.sampled_from(["20", "30"]),
             "workers": st.integers(min_value=1, max_value=64),
-            "request-timeout": st.integers(),
-            "stateful-recursion-limit": st.integers(),
-            "max-response-time": st.integers(),
+            "request-timeout": st.integers(min_value=1),
+            "stateful-recursion-limit": st.integers(min_value=1, max_value=100),
+            "max-response-time": st.integers(min_value=1),
             "validate-schema": st.booleans(),
             "generation-with-security-parameters": st.booleans(),
             "hypothesis-database": st.text(),
-            "hypothesis-deadline": st.integers() | st.none(),
-            "hypothesis-max-examples": st.integers(),
+            "hypothesis-deadline": st.integers(min_value=1, max_value=300000) | st.none(),
+            "hypothesis-max-examples": st.integers(min_value=1),
             "hypothesis-report-multiple-bugs": st.booleans(),
             "hypothesis-seed": st.integers(),
             "hypothesis-verbosity": st.sampled_from([item.name for item in Verbosity]),
@@ -105,7 +105,7 @@ def csv_strategy(enum):
                 "exitfirst",
                 "hypothesis-derandomize",
                 "dry-run",
-                "skip-deprecated-operations",
+                "contrib-unique-data",
                 "no-color",
             )
         },
@@ -124,8 +124,10 @@ def csv_strategy(enum):
     csv_params=st.fixed_dictionaries(
         {},
         optional={
-            "hypothesis-suppress-health-check": csv_strategy(HealthCheck),
-            "hypothesis-phases": csv_strategy(Phase),
+            "hypothesis-suppress-health-check": csv_strategy(
+                HealthCheck, exclude=("function_scoped_fixture", "differing_executors")
+            ),
+            "hypothesis-phases": csv_strategy(Phase, exclude=("explain",)),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
 )

@@ -78,7 +78,7 @@ def raw_schema(request, empty_open_api_3_schema):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.xfail(True, reason="The ``--contrib-unique-data`` feature is deprecated and unstable", strict=False)
+@pytest.mark.xfail(True, reason="The `schemathesis.contrib.unique_data` hook is deprecated", strict=False)
 def test_python_tests(unique_data, raw_schema, hypothesis_max_examples):
     schema = schemathesis.from_dict(raw_schema)
     endpoint = schema["/data/{path_param}/"]["GET"]
@@ -138,14 +138,28 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-@pytest.mark.xfail(True, reason="The ``--contrib-unique-data`` feature is deprecated and unstable", strict=False)
 @pytest.mark.snapshot(replace_statistic=True)
 def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
     assert run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
 
+def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
+    assert (
+        cli.main(
+            "run",
+            graphql_url,
+            "-cunique_test_cases",
+            "--hypothesis-max-examples=5",
+            "--show-trace",
+            "--contrib-unique-data",
+            hooks=unique_hook.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.parametrize("workers", (1, 2))
-@pytest.mark.xfail(True, reason="The ``--contrib-unique-data`` feature is deprecated and unstable", strict=False)
+@pytest.mark.snapshot(replace_statistic=True)
 def test_explicit_headers(
     testdir,
     unique_hook,
