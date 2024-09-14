@@ -104,13 +104,6 @@ DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING = (
     "Warning: Option `--show-errors-tracebacks` is deprecated and will be removed in Schemathesis 4.0. "
     "Use `--show-trace` instead"
 )
-DEPRECATED_CONTRIB_UNIQUE_DATA_OPTION_WARNING = (
-    "The `--contrib-unique-data` CLI option and the corresponding `schemathesis.contrib.unique_data` hook "
-    "are **DEPRECATED**. The concept of this feature does not fit the core principles of Hypothesis where "
-    "strategies are configurable on a per-example basis but this feature implies uniqueness across examples. "
-    "This leads to cryptic error messages about external state and flaky test runs, "
-    "therefore it will be removed in Schemathesis 4.0"
-)
 CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
@@ -949,9 +942,6 @@ def run(
             entry for health_check in hypothesis_suppress_health_check for entry in health_check.as_hypothesis()
         ]
 
-    if contrib_unique_data:
-        click.secho(DEPRECATED_CONTRIB_UNIQUE_DATA_OPTION_WARNING, fg="yellow")
-
     if show_errors_tracebacks:
         click.secho(DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING, fg="yellow")
         show_trace = show_errors_tracebacks
@@ -1160,8 +1150,6 @@ def run(
         else:
             _fixups.install(fixups)
 
-    if contrib_unique_data:
-        contrib.unique_data.install()
     if contrib_openapi_formats_uuid:
         contrib.openapi.formats.uuid.install()
     if contrib_openapi_fill_missing_examples:
@@ -1197,6 +1185,7 @@ def run(
         seed=hypothesis_seed,
         exit_first=exit_first,
         max_failures=max_failures,
+        unique_data=contrib_unique_data,
         dry_run=dry_run,
         store_interactions=cassette_path is not None,
         checks=selected_checks,
@@ -1321,6 +1310,7 @@ def into_event_stream(
     exit_first: bool,
     max_failures: int | None,
     rate_limit: str | None,
+    unique_data: bool,
     dry_run: bool,
     store_interactions: bool,
     stateful: Stateful | None,
@@ -1364,6 +1354,7 @@ def into_event_stream(
             exit_first=exit_first,
             max_failures=max_failures,
             started_at=started_at,
+            unique_data=unique_data,
             dry_run=dry_run,
             store_interactions=store_interactions,
             checks=checks,

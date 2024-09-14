@@ -309,6 +309,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "request_cert": None,
         "store_interactions": False,
         "seed": None,
+        "unique_data": False,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
         "probe_config": ProbeConfig(auth_type="basic", headers={}, request=RequestConfig(timeout=10000)),
@@ -2150,7 +2151,7 @@ def test_force_color(cli, schema_url):
 @pytest.mark.parametrize("graphql_path", ("/graphql", "/foo"))
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
-    assert cli.run(graphql_url, "--hypothesis-max-examples=5", *args) == snapshot_cli
+    assert cli.run(graphql_url, "--hypothesis-max-examples=5", "--show-trace", *args) == snapshot_cli
 
 
 def test_graphql_asgi(cli, loadable_graphql_fastapi_app, graphql_path, snapshot_cli):
