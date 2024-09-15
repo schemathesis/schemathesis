@@ -432,7 +432,7 @@ REPORT_TO_SERVICE = ReportToService()
     "-A",
     type=click.Choice(["basic", "digest"], case_sensitive=False),
     default="basic",
-    help="Specify the authentication method",
+    help="Specify the authentication method. For custom authentication methods, see our Authentication documentation: https://schemathesis.readthedocs.io/en/stable/auth.html#custom-auth",
     show_default=True,
     metavar="",
 )

@@ -80,8 +80,12 @@ Network requests options:
                                    Format: 'Header-Name: Value'
   -a, --auth TEXT                  Provide the server authentication details in
                                    the 'USER:PASSWORD' format
-  -A, --auth-type                  Specify the authentication method  [default:
-                                   basic] [possible values: basic, digest]
+  -A, --auth-type                  Specify the authentication method. For custom
+                                   authentication methods, see our
+                                   Authentication documentation: https://schemat
+                                   hesis.readthedocs.io/en/stable/auth.html#cust
+                                   om-auth  [default: basic] [possible values:
+                                   basic, digest]
 
 Filtering options:
   --include-path TEXT                Path to include in testing.
