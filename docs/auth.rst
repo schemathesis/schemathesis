@@ -443,6 +443,8 @@ For example, you can use refresh tokens for authentication.
             case.headers = case.headers or {}
             case.headers = {"Authorization": f"Bearer {data}"}
 
+.. _third-party-auth:
+
 Third-party implementation
 --------------------------
 

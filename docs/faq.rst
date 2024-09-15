@@ -322,6 +322,14 @@ Python:
 
 This adjustment ensures that Schemathesis does not include NULL bytes in strings for all your tests, making them compatible with systems that reject such inputs.
 
+How can I use custom authentication methods with Schemathesis?
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Schemathesis supports custom authentication through its extensions system.
+
+For detailed instructions on implementing custom authentication methods or using existing libraries for that, 
+refer to our :ref:`Custom Authentication <custom-auth>` and :ref:`Third-party Authentication <third-party-auth>` sections.
+
 Working with API schemas
 ------------------------
 
