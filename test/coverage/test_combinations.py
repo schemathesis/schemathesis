@@ -186,6 +186,9 @@ def test_negative_primitive_schemas(nctx, schema, expected):
     (
         ({"type": "string"}, {0}),
         ({"type": "string", "example": "test"}, {4}),
+        ({"type": "string", "example": "test", "default": "test"}, {4}),
+        ({"type": "string", "example": "test", "default": "another"}, {4, 7}),
+        ({"type": "string", "default": "test"}, {4}),
         ({"type": "string", "examples": ["A", "BB"]}, {1, 2}),
         ({"type": "string", "minLength": 5}, {5, 6}),
         ({"type": "string", "maxLength": 10}, {9, 10}),
@@ -227,6 +230,9 @@ def test_negative_string(nctx, schema, expected):
     (
         ({"type": "integer"}, [0], [0]),
         ({"type": "integer", "example": 2}, [2], [2]),
+        ({"type": "integer", "example": 2, "default": 2}, [2], [2]),
+        ({"type": "integer", "example": 2, "default": 4}, [2, 4], [2, 4]),
+        ({"type": "integer", "default": 2}, [2], [2]),
         ({"type": "integer", "examples": [42, 44]}, [42, 44], [42, 44]),
         ({"type": "number"}, [0], [0]),
         ({"type": "integer", "minimum": 5}, [5, 6], [6, 8]),
@@ -258,6 +264,9 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     (
         ({"type": "object"}, [{}]),
         ({"type": "object", "example": {"A": 42}}, [{"A": 42}]),
+        ({"type": "object", "example": {"A": 42}, "default": {"A": 42}}, [{"A": 42}]),
+        ({"type": "object", "example": {"A": 42}, "default": {"A": 43}}, [{"A": 42}, {"A": 43}]),
+        ({"type": "object", "default": {"A": 42}}, [{"A": 42}]),
         ({"type": "object", "examples": [{"A": 42}, {"B": 43}]}, [{"A": 42}, {"B": 43}]),
         (
             {
@@ -277,6 +286,16 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             {
                 "type": "object",
                 "properties": {"foo": {"type": "integer", "example": 42}},
+                "required": ["foo"],
+            },
+            [
+                {"foo": 42},
+            ],
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {"foo": {"type": "integer", "default": 42}},
                 "required": ["foo"],
             },
             [
@@ -481,6 +500,25 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
         ),
         (
             {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3]},
+            [
+                [1, 2, 3],
+            ],
+        ),
+        (
+            {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3], "default": [1, 2, 3]},
+            [
+                [1, 2, 3],
+            ],
+        ),
+        (
+            {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3], "default": [4, 5, 6]},
+            [
+                [1, 2, 3],
+                [4, 5, 6],
+            ],
+        ),
+        (
+            {"type": "array", "items": {"type": "integer"}, "default": [1, 2, 3]},
             [
                 [1, 2, 3],
             ],

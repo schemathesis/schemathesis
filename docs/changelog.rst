@@ -9,6 +9,7 @@ Changelog
 - Reimplementation of test case deduplication in CLI. It effectively un-deprecates the ``--contrib-unique-data`` CLI option.
 - Extend ``ignored_auth`` to check for incorrect auth.
 - More ``properties`` combinations for the coverage phase.
+- Use the `default` field as a source of valid inputs during the coverage phase.
 
 **Changed**
 
