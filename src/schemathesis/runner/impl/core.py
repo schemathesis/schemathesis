@@ -21,6 +21,7 @@ from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
+from requests.structures import CaseInsensitiveDict
 from urllib3.exceptions import InsecureRequestWarning
 
 from ... import experimental, failures, hooks
@@ -99,7 +100,7 @@ class BaseRunner:
     max_response_time: int | None
     targets: Iterable[Target]
     hypothesis_settings: hypothesis.settings
-    generation_config: GenerationConfig
+    generation_config: GenerationConfig | None
     probe_config: probes.ProbeConfig
     request_config: RequestConfig = field(default_factory=RequestConfig)
     override: CaseOverride | None = None
@@ -338,7 +339,7 @@ class BaseRunner:
         maker: Callable,
         test_func: Callable,
         settings: hypothesis.settings,
-        generation_config: GenerationConfig,
+        generation_config: GenerationConfig | None,
         ctx: RunnerContext,
         recursion_level: int = 0,
         headers: dict[str, Any] | None = None,
@@ -795,6 +796,7 @@ def deduplicate_errors(errors: list[Exception]) -> Generator[Exception, None, No
 def run_checks(
     *,
     case: Case,
+    ctx: CheckContext,
     checks: Iterable[CheckFunction],
     check_results: list[Check],
     result: TestResult,
@@ -803,7 +805,6 @@ def run_checks(
     max_response_time: int | None = None,
 ) -> None:
     errors = []
-    ctx = CheckContext()
 
     def add_single_failure(error: AssertionError) -> None:
         msg = maybe_set_assertion_message(error, check_name)
@@ -1013,9 +1014,12 @@ def _network_test(
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
     status = Status.success
+
+    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
+            ctx=ctx,
             checks=checks,
             check_results=check_results,
             result=result,
@@ -1101,9 +1105,11 @@ def _wsgi_test(
     result.logs.extend(recorded.records)
     status = Status.success
     check_results: list[Check] = []
+    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
+            ctx=ctx,
             checks=checks,
             check_results=check_results,
             result=result,
@@ -1177,9 +1183,11 @@ def _asgi_test(
     run_targets(targets, context)
     status = Status.success
     check_results: list[Check] = []
+    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
+            ctx=ctx,
             checks=checks,
             check_results=check_results,
             result=result,

@@ -606,6 +606,7 @@ def test_deduplication(empty_open_api_3_schema, response_factory):
     with pytest.raises(CheckFailed):
         run_checks(
             case=case,
+            ctx=CTX,
             checks=(content_type_conformance, response_schema_conformance),
             check_results=failures,
             result=result,

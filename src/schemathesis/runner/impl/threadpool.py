@@ -234,7 +234,7 @@ class ThreadPoolRunner(BaseRunner):
         # It would be better to have a separate producer thread and communicate via threading events.
         # Though it is a bit more complex, so the current solution is suboptimal in terms of resources utilization,
         # but good enough and easy enough to implement.
-        tasks_generator = iter(self.schema.get_all_operations())
+        tasks_generator = iter(self.schema.get_all_operations(generation_config=self.generation_config))
         generator_done = threading.Event()
         tasks_queue: Queue = Queue()
         # Add at least `workers_num` tasks first, so all workers are busy

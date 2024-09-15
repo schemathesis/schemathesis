@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Reimplementation of test case deduplication in CLI. It effectively un-deprecates the ``--contrib-unique-data`` CLI option.
+- Extend ``ignored_auth`` to check for incorrect auth.
 
 **Changed**
 
@@ -22,6 +23,7 @@ Changelog
 
 - Avoid running checks twice in new-style stateful tests.
 - Missing ``timeout`` in certain situations when loading the schema from the network.
+- Ignoring ``with_security_parameters`` in runner in some cases.
 
 .. _v3.35.5:
 
