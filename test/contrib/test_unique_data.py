@@ -143,6 +143,27 @@ def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesi
     assert run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
+@pytest.mark.operations("failure")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examples, snapshot_cli):
+    assert (
+        cli.main(
+            "run",
+            openapi3_schema_url,
+            "-cunique_test_cases",
+            "-cnot_a_server_error",
+            f"--hypothesis-max-examples={hypothesis_max_examples or 30}",
+            "--contrib-unique-data",
+            "--data-generation-method=all",
+            "--hypothesis-suppress-health-check=filter_too_much",
+            "--hypothesis-phases=generate",
+            hooks=unique_hook.purebasename,
+        )
+        == snapshot_cli
+    )
+
+
 def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
     assert (
         cli.main(
