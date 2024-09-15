@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import enum
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
@@ -333,6 +334,11 @@ def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, o
     return None
 
 
+class AuthKind(enum.Enum):
+    EXPLICIT = "explicit"
+    GENERATED = "generated"
+
+
 def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema
@@ -341,32 +347,49 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
         return True
     security_parameters = _get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
-    # Will it still be successful if there is no auth?
     if security_parameters and 200 <= response.status_code < 300:
-        if _contains_auth(response.request, security_parameters):
-            # If there is auth in the request, then drop it and retry the call
+        auth = _contains_auth(ctx, response.request, security_parameters)
+        if auth == AuthKind.EXPLICIT:
+            # Auth is explicitly set, it is expected to be valid
+            # Check if invalid auth will give an error
             _remove_auth_from_case(case, security_parameters)
             new_response = case.operation.schema.transport.send(case)
             if 200 <= new_response.status_code < 300:
-                # Mutate the response object in place on the best effort basis
-                if hasattr(response, "__attrs__"):
-                    for attribute in new_response.__attrs__:
-                        setattr(response, attribute, getattr(new_response, attribute))
-                else:
-                    response.__dict__.update(new_response.__dict__)
-                _raise_auth_error(new_response, case.operation.verbose_name)
+                _update_response(response, new_response)
+                _raise_no_auth_error(new_response, case.operation.verbose_name, "that requires authentication")
+            # Try to set invalid auth and check if it succeeds
+            for parameter in security_parameters:
+                _set_auth_for_case(case, parameter)
+                new_response = case.operation.schema.transport.send(case)
+                if 200 <= new_response.status_code < 300:
+                    _update_response(response, new_response)
+                    _raise_no_auth_error(new_response, case.operation.verbose_name, "with any auth")
+                _remove_auth_from_case(case, security_parameters)
+        elif auth == AuthKind.GENERATED:
+            # If this auth is generated which means it is likely invalid, then
+            # this request should have been an error
+            _raise_no_auth_error(response, case.operation.verbose_name, "with invalid auth")
         else:
             # Successful response when there is no auth
-            _raise_auth_error(response, case.operation.verbose_name)
+            _raise_no_auth_error(response, case.operation.verbose_name, "that requires authentication")
     return None
 
 
-def _raise_auth_error(response: GenericResponse, operation: str) -> NoReturn:
+def _update_response(old: GenericResponse, new: GenericResponse) -> None:
+    # Mutate the response object in place on the best effort basis
+    if hasattr(old, "__attrs__"):
+        for attribute in new.__attrs__:
+            setattr(old, attribute, getattr(new, attribute))
+    else:
+        old.__dict__.update(new.__dict__)
+
+
+def _raise_no_auth_error(response: GenericResponse, operation: str, suffix: str) -> NoReturn:
     from ...transports.responses import get_reason
 
     exc_class = get_ignored_auth_error(operation)
     reason = get_reason(response.status_code)
-    message = f"The API returned `{response.status_code} {reason}` for `{operation}` that requires authentication."
+    message = f"The API returned `{response.status_code} {reason}` for `{operation}` {suffix}."
     raise exc_class(
         failures.IgnoredAuth.title,
         context=failures.IgnoredAuth(message=message),
@@ -388,7 +411,9 @@ def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]
     ]
 
 
-def _contains_auth(request: PreparedRequest, security_parameters: list[SecurityParameter]) -> bool:
+def _contains_auth(
+    ctx: CheckContext, request: PreparedRequest, security_parameters: list[SecurityParameter]
+) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
 
@@ -411,10 +436,20 @@ def _contains_auth(request: PreparedRequest, security_parameters: list[SecurityP
         return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
 
     for parameter in security_parameters:
-        if has_header(parameter) or has_query(parameter) or has_cookie(parameter):
-            return True
+        if has_header(parameter):
+            if ctx.headers is not None and parameter["name"] in ctx.headers:
+                return AuthKind.EXPLICIT
+            return AuthKind.GENERATED
+        if has_cookie(parameter):
+            if ctx.headers is not None and "Cookie" in ctx.headers:
+                cookies = cast(RequestsCookieJar, ctx.headers["Cookie"])  # type: ignore
+                if parameter["name"] in cookies:
+                    return AuthKind.EXPLICIT
+            return AuthKind.GENERATED
+        if has_query(parameter):
+            return AuthKind.GENERATED
 
-    return False
+    return None
 
 
 def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParameter]) -> None:
@@ -430,6 +465,19 @@ def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParamet
             case.query.pop(name, None)
         if parameter["in"] == "cookie" and case.cookies:
             case.cookies.pop(name, None)
+
+
+def _set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:
+    name = parameter["name"]
+    for location, attr_name in (
+        ("header", "headers"),
+        ("query", "query"),
+        ("cookie", "cookies"),
+    ):
+        if parameter["in"] == location:
+            container = getattr(case, attr_name, {})
+            container[name] = "SCHEMATHESIS-INVALID-VALUE"
+            setattr(case, attr_name, container)
 
 
 @dataclass

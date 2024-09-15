@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 if TYPE_CHECKING:
     from ..models import Case
     from ..transports.responses import GenericResponse
+    from requests.structures import CaseInsensitiveDict
 
 
 CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[bool]]
@@ -19,6 +20,8 @@ class CheckContext:
 
     Provides access to broader test execution data beyond individual test cases.
     """
+
+    headers: CaseInsensitiveDict | None = None
 
 
 def wrap_check(check: Callable) -> CheckFunction:

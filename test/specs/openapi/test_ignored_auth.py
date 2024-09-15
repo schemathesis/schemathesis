@@ -4,16 +4,18 @@ from base64 import b64decode
 
 import pytest
 import requests
-from fastapi import FastAPI, Security
-from fastapi.security import APIKeyHeader
+from fastapi import FastAPI, Security, status, HTTPException
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials
 from hypothesis import given, settings
 from starlette_testclient import TestClient
 
 import schemathesis
+from schemathesis.exceptions import CheckFailed
 from schemathesis.generation import GenerationConfig
+from schemathesis.internal.checks import CheckContext
 from schemathesis.models import Status
 from schemathesis.runner import from_schema
-from schemathesis.specs.openapi.checks import _contains_auth, _remove_auth_from_case, ignored_auth
+from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_auth_from_case, ignored_auth
 
 
 def run(schema_url, headers=None, **loader_kwargs):
@@ -24,20 +26,25 @@ def run(schema_url, headers=None, **loader_kwargs):
     return event
 
 
-@pytest.mark.parametrize("kwargs", ({}, {"generation_config": GenerationConfig(with_security_parameters=False)}))
+@pytest.mark.parametrize("with_generated", [True, False])
 @pytest.mark.operations("ignored_auth")
-def test_auth_is_not_checked(schema_url, kwargs):
-    # When auth is present (generated)
+def test_auth_is_not_checked(with_generated, schema_url):
+    kwargs = {}
+    if not with_generated:
+        kwargs["generation_config"] = GenerationConfig(with_security_parameters=False)
+    # When auth is present
     # And endpoint declares auth as a requirement but doesn't actually require it
     event = run(schema_url, **kwargs)
     # Then it is a failure
     check = event.result.checks[-1]
     assert check.value == Status.failure
     assert check.name == "ignored_auth"
-    # And the corresponding serialized case has no auth
-    assert "Authorization" not in check.request.headers
-    # And the reported response is the last one from the app
-    assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
+    if with_generated:
+        assert "Authorization" in check.request.headers
+        assert json.loads(b64decode(check.response.body)) == {"has_auth": True}
+    else:
+        assert "Authorization" not in check.request.headers
+        assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
 
 
 @pytest.mark.operations("basic")
@@ -58,19 +65,68 @@ def test_no_failure(schema_url):
 
 
 @pytest.mark.parametrize(
-    "request_kwargs, parameters, expected",
+    "ctx, request_kwargs, parameters, expected",
     (
-        ({"url": "https://example.com", "headers": {"A": "V"}}, [{"name": "A", "in": "header"}], True),
-        ({"url": "https://example.com", "headers": {"A": "V"}}, [{"name": "B", "in": "header"}], False),
-        ({"url": "https://example.com?A=V"}, [{"name": "A", "in": "query"}], True),
-        ({"url": "https://example.com?A=V"}, [{"name": "B", "in": "query"}], False),
-        ({"url": "https://example.com", "cookies": {"A": "V"}}, [{"name": "A", "in": "cookie"}], True),
-        ({"url": "https://example.com", "cookies": {"A": "V"}}, [{"name": "B", "in": "cookie"}], False),
+        (
+            CheckContext(headers=None),
+            {"url": "https://example.com", "headers": {"A": "V"}},
+            [{"name": "A", "in": "header"}],
+            AuthKind.GENERATED,
+        ),
+        (
+            CheckContext(headers={"Foo": "Bar"}),
+            {"url": "https://example.com", "headers": {"A": "V"}},
+            [{"name": "A", "in": "header"}],
+            AuthKind.GENERATED,
+        ),
+        (
+            CheckContext(headers={"A": "V"}),
+            {"url": "https://example.com", "headers": {"A": "V"}},
+            [{"name": "A", "in": "header"}],
+            AuthKind.EXPLICIT,
+        ),
+        (
+            CheckContext(headers={}),
+            {"url": "https://example.com", "headers": {"A": "V"}},
+            [{"name": "B", "in": "header"}],
+            None,
+        ),
+        (
+            CheckContext(headers={}),
+            {"url": "https://example.com?A=V"},
+            [{"name": "A", "in": "query"}],
+            AuthKind.GENERATED,
+        ),
+        (CheckContext(headers={}), {"url": "https://example.com?A=V"}, [{"name": "B", "in": "query"}], None),
+        (
+            CheckContext(headers={}),
+            {"url": "https://example.com", "cookies": {"A": "V"}},
+            [{"name": "A", "in": "cookie"}],
+            AuthKind.GENERATED,
+        ),
+        (
+            CheckContext(headers={"Cookie": "A=v;"}),
+            {"url": "https://example.com", "cookies": {"A": "V"}},
+            [{"name": "A", "in": "cookie"}],
+            AuthKind.EXPLICIT,
+        ),
+        (
+            CheckContext(headers={"Cookie": "B=v;"}),
+            {"url": "https://example.com", "cookies": {"A": "V"}},
+            [{"name": "A", "in": "cookie"}],
+            AuthKind.GENERATED,
+        ),
+        (
+            CheckContext(headers={}),
+            {"url": "https://example.com", "cookies": {"A": "V"}},
+            [{"name": "B", "in": "cookie"}],
+            None,
+        ),
     ),
 )
-def test_contains_auth(request_kwargs, parameters, expected):
+def test_contains_auth(ctx, request_kwargs, parameters, expected):
     request = requests.Request("GET", **request_kwargs).prepare()
-    assert _contains_auth(request, parameters) is expected
+    assert _contains_auth(ctx, request, parameters) == expected
 
 
 @pytest.mark.parametrize(
@@ -89,14 +145,18 @@ def test_remove_auth_from_case(schema_url, key, parameters):
     assert not getattr(case, key)
 
 
+@pytest.mark.parametrize("ignores_auth", [True, False])
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
-def test_proper_session():
+def test_proper_session(ignores_auth):
     from typing import Annotated
 
     app = FastAPI()
 
-    @app.get("/", responses={200: {"model": {}}, 403: {"model": {}}})
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
     def root(api_key: Annotated[str, Security(APIKeyHeader(name="x-api-key"))]):
+        if not ignores_auth and api_key != "super-secret":
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect key")
+
         return {"message": "Hello world"}
 
     schemathesis.experimental.OPEN_API_3_1.enable()
@@ -109,19 +169,65 @@ def test_proper_session():
         client = TestClient(app)
         case.call_and_validate(session=client)
 
-    test()
+    if ignores_auth:
+        with pytest.raises(CheckFailed, match="with invalid auth"):
+            test()
+    else:
+        test()
 
 
+@pytest.mark.parametrize("ignores_auth", [True, False])
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
+def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
+    app = FastAPI()
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
+    async def root(
+        credentials: HTTPAuthorizationCredentials | None = Security(APIKeyHeader(name="x-api-key", auto_error=False)),
+    ):
+        # Accept any auth, but raise an error if Authorization header is missing
+        if ignores_auth and credentials is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authorization header is missing",
+            )
+        return {"message": "Hello world"}
+
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    schema = schemathesis.from_asgi("/openapi.json", app)
+
+    @given(case=schema["/"]["GET"].as_strategy())
+    @settings(max_examples=10)
+    def test(case):
+        client = TestClient(app)
+        case.call_and_validate(session=client, headers={"x-api-key": "INCORRECT"})
+
+    if ignores_auth:
+        matches = "with any auth"
+    else:
+        matches = "that requires authentication"
+    with pytest.raises(CheckFailed, match=matches):
+        test()
+
+
+@pytest.mark.parametrize("headers", [{}, {"Authorization": "Foo"}])
+@pytest.mark.parametrize("with_generated", [True, False])
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("ignored_auth")
-def test_wsgi(wsgi_app_schema):
+def test_wsgi(wsgi_app_schema, with_generated, headers):
+    kwargs = {"headers": headers}
+    if not with_generated:
+        kwargs["generation_config"] = GenerationConfig(with_security_parameters=False)
     _, _, _, _, _, _, event, *_ = from_schema(
-        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1)
+        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1), **kwargs
     ).execute()
     check = event.result.checks[-1]
     assert check.value == Status.failure
     assert check.name == "ignored_auth"
-    # And the corresponding serialized case has no auth
-    assert "Authorization" not in check.request.headers
-    # And the reported response is the last one from the app
-    assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
+    if with_generated and not headers:
+        assert "Authorization" in check.request.headers
+        assert json.loads(b64decode(check.response.body)) == {"has_auth": True}
+    else:
+        assert "Authorization" not in check.request.headers
+        assert json.loads(b64decode(check.response.body)) == {"has_auth": False}

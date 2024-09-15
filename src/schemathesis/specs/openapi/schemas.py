@@ -253,7 +253,7 @@ class BaseOpenAPISchema(BaseSchema):
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(
-        self, hooks: HookDispatcher | None = None
+        self, hooks: HookDispatcher | None = None, generation_config: GenerationConfig | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         """Iterate over all operations defined in the API.
 
@@ -308,7 +308,17 @@ class BaseOpenAPISchema(BaseSchema):
                                 continue
                             parameters = resolved.get("parameters", ())
                             parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
-                            operation = make_operation(path, method, parameters, entry, resolved, scope)
+                            operation = make_operation(
+                                path,
+                                method,
+                                parameters,
+                                entry,
+                                resolved,
+                                scope,
+                                with_security_parameters=generation_config.with_security_parameters
+                                if generation_config
+                                else None,
+                            )
                             context = HookContext(operation=operation)
                             if (
                                 should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
@@ -383,6 +393,7 @@ class BaseOpenAPISchema(BaseSchema):
         raw: dict[str, Any],
         resolved: dict[str, Any],
         scope: str,
+        with_security_parameters: bool | None = None,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -397,7 +408,12 @@ class BaseOpenAPISchema(BaseSchema):
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
-        if self.generation_config.with_security_parameters:
+        with_security_parameters = (
+            with_security_parameters
+            if with_security_parameters is not None
+            else self.generation_config.with_security_parameters
+        )
+        if with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation

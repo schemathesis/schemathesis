@@ -374,7 +374,6 @@ def from_schema(
     probe_config = probe_config or ProbeConfig()
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
-    generation_config = generation_config or GenerationConfig()
     request_config = RequestConfig(
         timeout=request_timeout,
         tls_verify=request_tls_verify,
