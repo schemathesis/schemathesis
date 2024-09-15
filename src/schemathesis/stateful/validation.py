@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..exceptions import CheckFailed, get_grouped_exception
 from ..internal.checks import CheckContext
@@ -21,8 +21,11 @@ def validate_response(
     checks: tuple[CheckFunction, ...],
     additional_checks: tuple[CheckFunction, ...] = (),
     max_response_time: int | None = None,
+    headers: dict[str, Any] | None = None,
 ) -> None:
     """Validate the response against the provided checks."""
+    from requests.structures import CaseInsensitiveDict
+
     from .._compat import MultipleFailures
     from ..checks import _make_max_response_time_failure_message
     from ..failures import ResponseTimeExceeded
@@ -30,7 +33,7 @@ def validate_response(
 
     exceptions: list[CheckFailed | AssertionError] = []
     check_results = ctx.checks_for_step
-    check_ctx = CheckContext()
+    check_ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
 
     def _on_failure(exc: CheckFailed | AssertionError, message: str, context: FailureContext | None) -> None:
         exceptions.append(exc)

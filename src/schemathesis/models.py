@@ -422,6 +422,7 @@ class Case:
         additional_checks: tuple[CheckFunction, ...] = (),
         excluded_checks: tuple[CheckFunction, ...] = (),
         code_sample_style: str | None = None,
+        headers: dict[str, Any] | None = None,
     ) -> None:
         """Validate application response.
 
@@ -435,9 +436,11 @@ class Case:
         :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
         __tracebackhide__ = True
+        from requests.structures import CaseInsensitiveDict
+
         from .checks import ALL_CHECKS
-        from .transports.responses import get_payload, get_reason
         from .internal.checks import wrap_check
+        from .transports.responses import get_payload, get_reason
 
         if checks:
             _checks = tuple(wrap_check(check) for check in checks)
@@ -452,7 +455,7 @@ class Case:
         checks = tuple(check for check in checks if check not in excluded_checks)
         additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
         failed_checks = []
-        ctx = CheckContext()
+        ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
             try:
@@ -526,7 +529,7 @@ class Case:
     ) -> requests.Response:
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
-        self.validate_response(response, checks, code_sample_style=code_sample_style)
+        self.validate_response(response, checks, code_sample_style=code_sample_style, headers=headers)
         return response
 
     def _get_url(self, base_url: str | None) -> str:
