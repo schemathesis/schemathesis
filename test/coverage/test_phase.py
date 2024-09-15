@@ -411,6 +411,43 @@ def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
             },
             {
                 "body": {
+                    "address": {
+                        "street": "",
+                    },
+                    "age": 0,
+                    "name": "",
+                    "tags": [],
+                },
+            },
+            {
+                "body": {
+                    "address": {
+                        "city": "",
+                    },
+                    "age": 0,
+                    "name": "",
+                    "tags": [],
+                },
+            },
+            {
+                "body": {
+                    "age": 0,
+                    "name": "",
+                },
+            },
+            {
+                "body": {
+                    "age": 0,
+                    "name": "",
+                    "tags": [],
+                },
+            },
+            {
+                "body": {
+                    "address": {
+                        "city": "",
+                        "street": "",
+                    },
                     "age": 0,
                     "name": "",
                 },

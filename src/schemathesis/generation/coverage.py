@@ -434,10 +434,20 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
                 yield PositiveValue(example)
     else:
         yield PositiveValue(template)
-    # Only required properties
+
     properties = schema.get("properties", {})
-    if set(properties) != set(schema.get("required", {})):
-        only_required = {k: v for k, v in template.items() if k in schema.get("required", [])}
+    required = set(schema.get("required", []))
+    optional = list(set(properties) - required)
+    optional.sort()
+
+    # Generate combinations with required properties and one optional property
+    for name in optional:
+        combo = {k: v for k, v in template.items() if k in required or k == name}
+        if combo != template:
+            yield PositiveValue(combo)
+    # Generate only required properties
+    if set(properties) != required:
+        only_required = {k: v for k, v in template.items() if k in required}
         yield PositiveValue(only_required)
     seen = set()
     for name, sub_schema in properties.items():
