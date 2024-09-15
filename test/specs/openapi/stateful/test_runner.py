@@ -199,11 +199,15 @@ def test_keyboard_interrupt(runner_factory, mocker):
     assert "Interrupted" in result.event_names
 
 
-def test_internal_error_in_check(runner_factory):
+@pytest.mark.parametrize(
+    ["kwargs"],
+    [({},), ({"unique_data": True},)],
+)
+def test_internal_error_in_check(runner_factory, kwargs):
     def bugged_check(*args, **kwargs):
         raise ZeroDivisionError("Oops!")
 
-    runner = runner_factory(config_kwargs={"checks": (bugged_check,)})
+    runner = runner_factory(config_kwargs={"checks": (bugged_check,), **kwargs})
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, ZeroDivisionError)
@@ -671,3 +675,23 @@ def test_negative_tests(runner_factory):
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
+
+
+def test_unique_data(runner_factory):
+    runner = runner_factory(
+        app_kwargs={"independent_500": True},
+        config_kwargs={
+            "unique_data": True,
+            "hypothesis_settings": hypothesis.settings(max_examples=30, database=None, stateful_step_count=100),
+        },
+    )
+    cases = []
+    for event in runner.execute():
+        if isinstance(event, events.ScenarioStarted):
+            cases.clear()
+        elif isinstance(event, events.StepFinished) and event.transition_id is None:
+            cases.append(event.case)
+        elif isinstance(event, events.ScenarioFinished):
+            assert len(cases) == len(set(cases)), "Duplicate cases found"
+        elif isinstance(event, events.RunFinished):
+            assert event.status == events.RunStatus.FAILURE

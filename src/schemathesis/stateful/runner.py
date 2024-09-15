@@ -163,17 +163,34 @@ def _execute_state_machine_loop(
             try:
                 if config.dry_run:
                     return None
+                if config.unique_data:
+                    cached = ctx.get_step_outcome(case)
+                    if isinstance(cached, BaseException):
+                        raise cached
+                    elif cached is None:
+                        return None
                 result = super().step(case, previous)
                 ctx.step_succeeded()
-            except CheckFailed:
+            except CheckFailed as exc:
+                if config.unique_data:
+                    ctx.store_step_outcome(case, exc)
                 ctx.step_failed()
                 raise
-            except Exception:
+            except Exception as exc:
+                if config.unique_data:
+                    ctx.store_step_outcome(case, exc)
                 ctx.step_errored()
                 raise
             except KeyboardInterrupt:
                 ctx.step_interrupted()
                 raise
+            except BaseException as exc:
+                if config.unique_data:
+                    ctx.store_step_outcome(case, exc)
+                raise exc
+            else:
+                if config.unique_data:
+                    ctx.store_step_outcome(case, None)
             finally:
                 transition_id: events.TransitionId | None
                 if previous is not None:

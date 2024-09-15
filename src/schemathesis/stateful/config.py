@@ -69,6 +69,7 @@ class StatefulTestRunnerConfig:
     max_response_time: int | None = None
     dry_run: bool = False
     targets: list[Target] = field(default_factory=list)
+    unique_data: bool = False
 
     def __post_init__(self) -> None:
         import hypothesis

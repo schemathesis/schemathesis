@@ -4,6 +4,7 @@ import traceback
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Tuple, Type, Union
 
+from ..constants import NOT_SET
 from ..exceptions import CheckFailed
 from ..targets import TargetMetricCollector
 from . import events
@@ -11,6 +12,7 @@ from . import events
 if TYPE_CHECKING:
     from ..models import Case, Check
     from ..transports.responses import GenericResponse
+    from ..types import NotSet
 
 FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
 
@@ -52,6 +54,7 @@ class RunnerContext:
     completed_scenarios: int = 0
     # Metrics collector for targeted testing
     metric_collector: TargetMetricCollector = field(default_factory=lambda: TargetMetricCollector(targets=[]))
+    step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
 
     @property
     def current_scenario_status(self) -> events.ScenarioStatus:
@@ -69,6 +72,7 @@ class RunnerContext:
         self.completed_scenarios += 1
         self.current_step_status = None
         self.current_response = None
+        self.step_outcomes.clear()
 
     def reset_step(self) -> None:
         self.checks_for_step = []
@@ -123,3 +127,9 @@ class RunnerContext:
         self.seen_in_suite.clear()
         self.reset_scenario()
         self.metric_collector.reset()
+
+    def store_step_outcome(self, case: Case, outcome: BaseException | None) -> None:
+        self.step_outcomes[hash(case)] = outcome
+
+    def get_step_outcome(self, case: Case) -> BaseException | None | NotSet:
+        return self.step_outcomes.get(hash(case), NOT_SET)
