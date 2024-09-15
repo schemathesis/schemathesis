@@ -391,6 +391,86 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 {"foo-1": 2, "foo-2": "000"},
             ],
         ),
+        # 3 properties, 2 required
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "req1": {"type": "string"},
+                    "req2": {"type": "integer"},
+                    "opt1": {"type": "string"},
+                },
+                "required": ["req1", "req2"],
+            },
+            [
+                {"req1": "", "req2": 0, "opt1": ""},
+                {"req1": "", "req2": 0},
+            ],
+        ),
+        # 5 properties, 2 required
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "req1": {"type": "string"},
+                    "req2": {"type": "integer"},
+                    "opt1": {"type": "string"},
+                    "opt2": {"type": "number"},
+                    "opt3": {"type": "array"},
+                },
+                "required": ["req1", "req2"],
+            },
+            [
+                {"req1": "", "req2": 0, "opt1": "", "opt2": 0.0, "opt3": []},
+                {"req1": "", "req2": 0, "opt1": ""},
+                {"req1": "", "req2": 0, "opt2": 0.0},
+                {"req1": "", "req2": 0, "opt3": []},
+                {"req1": "", "req2": 0},
+            ],
+        ),
+        # Nested object with optional properties
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "req1": {"type": "string"},
+                    "opt1": {
+                        "type": "object",
+                        "properties": {
+                            "nested_req": {"type": "integer"},
+                            "nested_opt": {"type": "boolean"},
+                        },
+                        "required": ["nested_req"],
+                    },
+                },
+                "required": ["req1"],
+            },
+            [
+                {"req1": "", "opt1": {"nested_req": 0, "nested_opt": False}},
+                {"req1": ""},
+                {"req1": "", "opt1": {"nested_req": 0}},
+                {"req1": "", "opt1": {"nested_req": 0, "nested_opt": True}},
+            ],
+        ),
+        # Object with all optional properties
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "opt1": {"type": "string"},
+                    "opt2": {"type": "integer"},
+                    "opt3": {"type": "boolean"},
+                },
+            },
+            [
+                {"opt1": "", "opt2": 0, "opt3": False},
+                {"opt1": ""},
+                {"opt2": 0},
+                {"opt3": False},
+                {},
+                {"opt1": "", "opt2": 0, "opt3": True},
+            ],
+        ),
         (
             {"type": "array", "items": {"type": "integer"}, "maxItems": 5},
             [
