@@ -249,6 +249,12 @@ def test_explicit_auth(wsgi_app_schema):
     assert check.name == "ignored_auth"
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("basic")
+def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "-c", "ignored_auth", "--auth=test:test", "--hypothesis-max-examples=1") == snapshot_cli
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
 def test_custom_auth():
     app = FastAPI()
