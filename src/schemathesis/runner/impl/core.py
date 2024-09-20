@@ -131,7 +131,7 @@ class BaseRunner:
         # If auth is explicitly provided, then the global provider is ignored
         if self.auth is not None:
             unregister_auth()
-        ctx = RunnerContext(seed=self.seed, stop_event=stop_event, unique_data=self.unique_data)
+        ctx = RunnerContext(auth=self.auth, seed=self.seed, stop_event=stop_event, unique_data=self.unique_data)
         start_time = time.monotonic()
         initialized = None
         __probes = None
@@ -955,6 +955,7 @@ def network_test(
             headers["User-Agent"] = USER_AGENT
         if not dry_run:
             args = (
+                ctx,
                 checks,
                 targets,
                 result,
@@ -973,6 +974,7 @@ def network_test(
 
 def _network_test(
     case: Case,
+    ctx: RunnerContext,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     result: TestResult,
@@ -1015,11 +1017,11 @@ def _network_test(
     run_targets(targets, context)
     status = Status.success
 
-    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
-            ctx=ctx,
+            ctx=check_ctx,
             checks=checks,
             check_results=check_results,
             result=result,
@@ -1069,6 +1071,7 @@ def wsgi_test(
         headers = prepare_wsgi_headers(headers, auth, auth_type)
         if not dry_run:
             args = (
+                ctx,
                 checks,
                 targets,
                 result,
@@ -1085,6 +1088,7 @@ def wsgi_test(
 
 def _wsgi_test(
     case: Case,
+    ctx: RunnerContext,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     result: TestResult,
@@ -1105,11 +1109,11 @@ def _wsgi_test(
     result.logs.extend(recorded.records)
     status = Status.success
     check_results: list[Check] = []
-    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
-            ctx=ctx,
+            ctx=check_ctx,
             checks=checks,
             check_results=check_results,
             result=result,
@@ -1151,6 +1155,7 @@ def asgi_test(
 
         if not dry_run:
             args = (
+                ctx,
                 checks,
                 targets,
                 result,
@@ -1167,6 +1172,7 @@ def asgi_test(
 
 def _asgi_test(
     case: Case,
+    ctx: RunnerContext,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     result: TestResult,
@@ -1183,11 +1189,11 @@ def _asgi_test(
     run_targets(targets, context)
     status = Status.success
     check_results: list[Check] = []
-    ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
     try:
         run_checks(
             case=case,
-            ctx=ctx,
+            ctx=check_ctx,
             checks=checks,
             check_results=check_results,
             result=result,

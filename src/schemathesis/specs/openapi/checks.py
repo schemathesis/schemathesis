@@ -417,7 +417,8 @@ def _contains_auth(
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
 
-    if case._has_explicit_auth:
+    # If auth comes from explicit `auth` option or a custom auth, it is always explicit
+    if ctx.auth is not None or case._has_explicit_auth:
         return AuthKind.EXPLICIT
     parsed = urlparse(request.url)
     query = parse_qs(parsed.query)  # type: ignore

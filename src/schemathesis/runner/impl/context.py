@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 
     from ...exceptions import OperationSchemaError
     from ...models import Case
-    from ...types import NotSet
+    from ...types import NotSet, RawAuth
 
 
 @dataclass
@@ -19,15 +19,19 @@ class RunnerContext:
     """Holds context shared for a test run."""
 
     data: TestResultSet
+    auth: RawAuth | None
     seed: int | None
     stop_event: threading.Event
     unique_data: bool
     outcome_cache: dict[int, BaseException | None]
 
-    __slots__ = ("data", "seed", "stop_event", "unique_data", "outcome_cache")
+    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache")
 
-    def __init__(self, *, seed: int | None, stop_event: threading.Event, unique_data: bool) -> None:
+    def __init__(
+        self, *, seed: int | None, auth: RawAuth | None, stop_event: threading.Event, unique_data: bool
+    ) -> None:
         self.data = TestResultSet(seed=seed)
+        self.auth = auth
         self.seed = seed
         self.stop_event = stop_event
         self.outcome_cache = {}
