@@ -6,7 +6,7 @@ Changelog
 
 **Fixed**
 
-- ``ignored_auth`` false positives on custom auth. :issue:`2462`
+- ``ignored_auth`` false positives on custom auth and explicit ``--auth`` CLI option. :issue:`2462`
 
 .. _v3.36.0:
 
