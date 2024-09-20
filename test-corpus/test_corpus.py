@@ -115,12 +115,12 @@ def app_port():
     return run_server(app)
 
 
-def combined_check(response, case):
+def combined_check(ctx, response, case):
     case.get_code_to_reproduce()
     case.as_curl_command()
     for check in ALL_CHECKS:
         try:
-            check(response, case)
+            check(ctx, response, case)
         except CheckFailed:
             pass
 
