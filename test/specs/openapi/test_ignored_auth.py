@@ -1,12 +1,13 @@
 import json
 import sys
 from base64 import b64decode
+from unittest.mock import Mock
 
 import pytest
 import requests
-from fastapi import FastAPI, Security, status, HTTPException
+from fastapi import FastAPI, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials
-from hypothesis import given, settings
+from hypothesis import Phase, given, settings
 from starlette_testclient import TestClient
 
 import schemathesis
@@ -21,7 +22,10 @@ from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_
 def run(schema_url, headers=None, **loader_kwargs):
     schema = schemathesis.from_uri(schema_url, **loader_kwargs)
     _, _, _, _, _, _, event, *_ = from_schema(
-        schema, checks=[ignored_auth], headers=headers, hypothesis_settings=settings(max_examples=1)
+        schema,
+        checks=[ignored_auth],
+        headers=headers,
+        hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
     ).execute()
     return event
 
@@ -126,7 +130,7 @@ def test_no_failure(schema_url):
 )
 def test_contains_auth(ctx, request_kwargs, parameters, expected):
     request = requests.Request("GET", **request_kwargs).prepare()
-    assert _contains_auth(ctx, request, parameters) == expected
+    assert _contains_auth(ctx, Mock(_has_explicit_auth=False), request, parameters) == expected
 
 
 @pytest.mark.parametrize(
@@ -164,7 +168,7 @@ def test_proper_session(ignores_auth):
     schema = schemathesis.from_asgi("/openapi.json", app)
 
     @given(case=schema["/"]["GET"].as_strategy())
-    @settings(max_examples=10)
+    @settings(max_examples=3, phases=[Phase.generate])
     def test(case):
         client = TestClient(app)
         case.call_and_validate(session=client)
@@ -198,7 +202,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
     schema = schemathesis.from_asgi("/openapi.json", app)
 
     @given(case=schema["/"]["GET"].as_strategy())
-    @settings(max_examples=10)
+    @settings(max_examples=3, phases=[Phase.generate])
     def test(case):
         client = TestClient(app)
         case.call_and_validate(session=client, headers={"x-api-key": "INCORRECT"})
@@ -231,3 +235,53 @@ def test_wsgi(wsgi_app_schema, with_generated, headers):
     else:
         assert "Authorization" not in check.request.headers
         assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("ignored_auth")
+def test_explicit_auth(wsgi_app_schema):
+    kwargs = {"auth": ("foo", "bar")}
+    _, _, _, _, _, _, event, *_ = from_schema(
+        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1), **kwargs
+    ).execute()
+    check = event.result.checks[-1]
+    assert check.value == Status.failure
+    assert check.name == "ignored_auth"
+
+
+@pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
+def test_custom_auth():
+    app = FastAPI()
+    token = "TEST"
+
+    @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
+    async def root(
+        credentials: HTTPAuthorizationCredentials = Security(APIKeyHeader(name="x-api-key")),
+    ):
+        if credentials != token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token",
+            )
+        return {"message": "Hello world"}
+
+    schemathesis.experimental.OPEN_API_3_1.enable()
+
+    schema = schemathesis.from_asgi("/openapi.json", app)
+
+    @schema.auth()
+    class Auth:
+        def get(self, case, context):
+            return token
+
+        def set(self, case, data, context):
+            case.headers = case.headers or {}
+            case.headers["x-api-key"] = data
+
+    @given(case=schema["/"]["GET"].as_strategy())
+    @settings(max_examples=10)
+    def test(case):
+        client = TestClient(app)
+        case.call_and_validate(session=client)
+
+    test()

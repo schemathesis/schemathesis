@@ -348,7 +348,7 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
     security_parameters = _get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful
     if security_parameters and 200 <= response.status_code < 300:
-        auth = _contains_auth(ctx, response.request, security_parameters)
+        auth = _contains_auth(ctx, case, response.request, security_parameters)
         if auth == AuthKind.EXPLICIT:
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
@@ -412,11 +412,13 @@ def _get_security_parameters(operation: APIOperation) -> list[SecurityParameter]
 
 
 def _contains_auth(
-    ctx: CheckContext, request: PreparedRequest, security_parameters: list[SecurityParameter]
+    ctx: CheckContext, case: Case, request: PreparedRequest, security_parameters: list[SecurityParameter]
 ) -> AuthKind | None:
     """Whether a request has authentication declared in the schema."""
     from requests.cookies import RequestsCookieJar
 
+    if case._has_explicit_auth:
+        return AuthKind.EXPLICIT
     parsed = urlparse(request.url)
     query = parse_qs(parsed.query)  # type: ignore
     # Load the `Cookie` header separately, because it is possible that `request._cookies` and the header are out of sync
