@@ -138,6 +138,7 @@ Schemathesis is used by a number of projects and companies, including direct usa
 - [Pixie](https://github.com/pixie-io/pixie)
 - [Qdrant](https://github.com/qdrant/qdrant)
 - Spotify ([Backstage](https://github.com/backstage/backstage))
+- [Weechat](https://github.com/weechat/weechat)
 - WordPress ([OpenVerse](https://github.com/WordPress/openverse))
 
 ## Testimonials
