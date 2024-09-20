@@ -184,6 +184,7 @@ class Case:
     # The way the case was generated (None for manually crafted ones)
     data_generation_method: DataGenerationMethod | None = None
     _auth: requests.auth.AuthBase | None = None
+    _has_explicit_auth: bool = False
 
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
@@ -562,6 +563,8 @@ class Case:
             body=fast_deepcopy(self.body),
             generation_time=self.generation_time,
             id=self.id,
+            _auth=self._auth,
+            _has_explicit_auth=self._has_explicit_auth,
         )
 
 

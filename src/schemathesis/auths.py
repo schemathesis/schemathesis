@@ -450,6 +450,7 @@ class AuthStorage(Generic[Auth]):
             data: Auth | None = _provider_get(provider, case, context)
             if data is not None:
                 provider.set(case, data, context)
+                case._has_explicit_auth = True
                 break
 
 

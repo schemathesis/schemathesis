@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.36.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- ``ignored_auth`` false positives on custom auth. :issue:`2462`
+
 .. _v3.36.0:
 
 :version:`3.36.0 <v3.35.5...v3.36.0>` - 2024-09-15
