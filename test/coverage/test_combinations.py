@@ -426,7 +426,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 {"req1": "", "req2": 0},
             ],
         ),
-        # 5 properties, 2 required
+        # 6 properties, 2 required
         (
             {
                 "type": "object",
@@ -436,15 +436,20 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                     "opt1": {"type": "string"},
                     "opt2": {"type": "number"},
                     "opt3": {"type": "array"},
+                    "opt4": {"type": "boolean"},
                 },
                 "required": ["req1", "req2"],
             },
             [
-                {"req1": "", "req2": 0, "opt1": "", "opt2": 0.0, "opt3": []},
+                {"req1": "", "req2": 0, "opt1": "", "opt2": 0.0, "opt3": [], "opt4": False},
                 {"req1": "", "req2": 0, "opt1": ""},
                 {"req1": "", "req2": 0, "opt2": 0.0},
                 {"req1": "", "req2": 0, "opt3": []},
+                {"req1": "", "req2": 0, "opt4": False},
+                {"req1": "", "req2": 0, "opt1": "", "opt2": 0.0},
+                {"req1": "", "req2": 0, "opt1": "", "opt2": 0.0, "opt3": []},
                 {"req1": "", "req2": 0},
+                {"opt1": "", "opt2": 0.0, "opt3": [], "opt4": True, "req1": "", "req2": 0},
             ],
         ),
         # Nested object with optional properties
@@ -486,6 +491,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 {"opt1": ""},
                 {"opt2": 0},
                 {"opt3": False},
+                {"opt1": "", "opt2": 0},
                 {},
                 {"opt1": "", "opt2": 0, "opt3": True},
             ],

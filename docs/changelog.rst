@@ -11,6 +11,7 @@ Changelog
 **Changed**
 
 - Reuse top-level schema examples in more places during the coverage phase.
+- Generate more combinations of optional parameters during the coverage phase.
 
 **Fixed**
 

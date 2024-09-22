@@ -4,7 +4,8 @@ import json
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from functools import lru_cache
-from typing import Any, Generator, TypeVar, cast
+from itertools import combinations
+from typing import Any, Generator, Iterator, TypeVar, cast
 
 import jsonschema
 from hypothesis import strategies as st
@@ -477,6 +478,10 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
         combo = {k: v for k, v in template.items() if k in required or k == name}
         if combo != template:
             yield PositiveValue(combo)
+    # Generate one combination for each size from 2 to N-1
+    for selection in select_combinations(optional):
+        combo = {k: v for k, v in template.items() if k in required or k in selection}
+        yield PositiveValue(combo)
     # Generate only required properties
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
@@ -490,6 +495,11 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
                 yield PositiveValue({**template, name: new.value})
                 seen.add(key)
         seen.clear()
+
+
+def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
+    for size in range(2, len(optional)):
+        yield next(combinations(optional, size))
 
 
 def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
