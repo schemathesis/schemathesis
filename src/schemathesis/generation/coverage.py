@@ -162,6 +162,7 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
         schema = {}
     else:
         types = schema.get("type", [])
+    push_examples_to_properties(schema)
     if not isinstance(types, list):
         types = [types]  # type: ignore[unreachable]
     if not types:
@@ -569,3 +570,16 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
     value = ctx.generate_from(negative_strategy, cached=True)
     yield NegativeValue(value)
     seen.add(_to_hashable_key(value))
+
+
+def push_examples_to_properties(schema: dict[str, Any]) -> None:
+    """Push examples from the top-level 'examples' field to the corresponding properties."""
+    if "examples" in schema and "properties" in schema:
+        properties = schema["properties"]
+        for example in schema["examples"]:
+            for prop, value in example.items():
+                if prop in properties:
+                    if "examples" not in properties[prop]:
+                        properties[prop]["examples"] = []
+                    if value not in schema["properties"][prop]["examples"]:
+                        properties[prop]["examples"].append(value)

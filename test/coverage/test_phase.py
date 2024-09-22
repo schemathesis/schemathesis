@@ -384,84 +384,66 @@ def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
         empty_open_api_3_schema,
         [DataGenerationMethod.positive],
         [
+            {"body": {"address": {}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
             {
                 "body": {
-                    "address": {},
-                    "age": 0,
-                    "name": "",
-                    "tags": [],
-                },
-            },
-            {
-                "body": {
-                    "address": {
-                        "street": "",
-                    },
-                    "age": 0,
-                    "name": "",
-                    "tags": [],
-                },
-            },
-            {
-                "body": {
-                    "address": {
-                        "city": "",
-                    },
-                    "age": 0,
-                    "name": "",
-                    "tags": [],
-                },
-            },
-            {
-                "body": {
-                    "age": 0,
-                    "name": "",
-                },
-            },
-            {
-                "body": {
-                    "age": 0,
-                    "name": "",
-                    "tags": [],
-                },
-            },
-            {
-                "body": {
-                    "address": {
-                        "city": "",
-                        "street": "",
-                    },
-                    "age": 0,
-                    "name": "",
-                },
-            },
-            {
-                "body": {
-                    "address": {
-                        "city": "Somewhere",
-                        "street": "456 Elm St",
-                    },
+                    "address": {"street": "456 Elm St"},
                     "age": 25,
-                    "name": "Jane Smith",
-                    "tags": [
-                        "designer",
-                        "ui/ux",
-                    ],
-                },
+                    "name": "John Doe",
+                    "tags": ["designer", "ui/ux"],
+                }
+            },
+            {"body": {"address": {"city": "Anytown"}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
+            {
+                "body": {
+                    "address": {"street": "456 Elm St", "city": "Somewhere"},
+                    "age": 25,
+                    "name": "John Doe",
+                    "tags": ["designer", "ui/ux"],
+                }
             },
             {
                 "body": {
-                    "address": {
-                        "city": "Anytown",
-                        "street": "123 Main St",
-                    },
+                    "address": {"city": "Anytown", "street": "123 Main St"},
+                    "age": 25,
+                    "name": "John Doe",
+                    "tags": ["developer", "python"],
+                }
+            },
+            {
+                "body": {
+                    "address": {"city": "Anytown", "street": "123 Main St"},
                     "age": 30,
                     "name": "John Doe",
-                    "tags": [
-                        "developer",
-                        "python",
-                    ],
-                },
+                    "tags": ["designer", "ui/ux"],
+                }
+            },
+            {
+                "body": {
+                    "address": {"city": "Anytown", "street": "123 Main St"},
+                    "age": 25,
+                    "name": "Jane Smith",
+                    "tags": ["designer", "ui/ux"],
+                }
+            },
+            {"body": {"age": 25, "name": "John Doe"}},
+            {"body": {"age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
+            {"body": {"address": {"city": "Anytown", "street": "123 Main St"}, "age": 25, "name": "John Doe"}},
+            {
+                "body": {
+                    "name": "Jane Smith",
+                    "age": 25,
+                    "tags": ["designer", "ui/ux"],
+                    "address": {"street": "456 Elm St", "city": "Somewhere"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
             },
         ],
     )
