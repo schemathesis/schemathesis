@@ -9,6 +9,7 @@ from schemathesis._hypothesis import create_test
 from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.models import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from test.utils import assert_requests_call
 
@@ -183,15 +184,13 @@ def test_with_example(empty_open_api_3_schema):
     assert_coverage(
         empty_open_api_3_schema,
         [DataGenerationMethod.positive],
-        [{"query": {"q1": "secret"}}, {"query": {"q1": "secret"}}],
+        [{"query": {"q1": "secret"}}],
     )
 
 
 EXPECTED_EXAMPLES = [
     {"query": {"q1": "A1", "q2": 20}},
     {"query": {"q1": "B2", "q2": 10}},
-    {"query": {"q1": "A1", "q2": 10}},
-    {"query": {"q1": "B2", "q2": 20}},
     {"query": {"q1": "A1", "q2": 10}},
 ]
 
@@ -255,12 +254,6 @@ def test_with_example_openapi_3(empty_open_api_3_schema):
                     "q2": 10,
                 },
             },
-            {
-                "query": {
-                    "q1": "A1",
-                    "q2": 10,
-                },
-            },
         ],
     )
 
@@ -292,16 +285,6 @@ def test_with_response_example_openapi_3(empty_open_api_3_schema):
         empty_open_api_3_schema,
         [DataGenerationMethod.positive],
         [
-            {
-                "path_parameters": {
-                    "itemId": "456789",
-                },
-            },
-            {
-                "path_parameters": {
-                    "itemId": "123456",
-                },
-            },
             {
                 "path_parameters": {
                     "itemId": "456789",
@@ -455,17 +438,6 @@ def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
             {
                 "body": {
                     "address": {
-                        "city": "",
-                        "street": "",
-                    },
-                    "age": 0,
-                    "name": "",
-                    "tags": [],
-                },
-            },
-            {
-                "body": {
-                    "address": {
                         "city": "Somewhere",
                         "street": "456 Elm St",
                     },
@@ -539,6 +511,8 @@ def assert_coverage(schema, methods, expected, path=None):
     operation = schema[path[0]][path[1]] if path else schema["/foo"]["post"]
 
     def test(case):
+        if case.meta.phase != TestPhase.COVERAGE:
+            return
         assert_requests_call(case)
         if len(methods) == 1:
             assert case.data_generation_method == methods[0]
