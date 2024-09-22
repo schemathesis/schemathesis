@@ -266,6 +266,8 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     """Generate positive string values."""
     # Boundary and near boundary values
     min_length = schema.get("minLength")
+    if min_length == 0:
+        min_length = None
     max_length = schema.get("maxLength")
     example = schema.get("example")
     examples = schema.get("examples")
@@ -285,6 +287,12 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     elif not min_length and not max_length:
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema))
+    elif "pattern" in schema:
+        # Without merging `maxLength` & `minLength` into a regex it is problematic
+        # to generate a valid value as the unredlying machinery will resort to filtering
+        # and it is unlikely that it will generate a string of that length
+        yield PositiveValue(ctx.generate_from_schema(schema))
+        return
 
     seen = set()
 
