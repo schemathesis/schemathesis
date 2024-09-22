@@ -136,8 +136,7 @@ def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
     )
 
 
-@dataclass
-class TestPhase(Enum):
+class TestPhase(str, Enum):
     __test__ = False
 
     EXPLICIT = "explicit"

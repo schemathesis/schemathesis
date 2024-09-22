@@ -245,6 +245,11 @@ def _iter_coverage_cases(
     if operation.body:
         for body in operation.body:
             schema = body.as_json_schema(operation)
+            # Definition could be a list for Open API 2.0
+            definition = body.definition if isinstance(body.definition, dict) else {}
+            examples = [example["value"] for example in definition.get("examples", {}).values() if "value" in example]
+            if examples:
+                schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(ctx, schema)
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet):
