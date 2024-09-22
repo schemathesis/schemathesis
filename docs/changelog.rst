@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.36.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Use ``requestBody`` examples as the source of valid inputs during the coverage phase.
+
 **Fixed**
 
 - ``ignored_auth`` false positives on custom auth and explicit ``--auth`` CLI option. :issue:`2462`
