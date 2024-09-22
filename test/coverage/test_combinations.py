@@ -190,11 +190,14 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         ({"type": "string", "example": "test", "default": "another"}, {4, 7}),
         ({"type": "string", "default": "test"}, {4}),
         ({"type": "string", "examples": ["A", "BB"]}, {1, 2}),
+        ({"type": "string", "minLength": 0}, {0}),
+        ({"type": "string", "pattern": "^[\\w\\W]+$"}, {1}),
         ({"type": "string", "minLength": 5}, {5, 6}),
         ({"type": "string", "maxLength": 10}, {9, 10}),
         ({"type": "string", "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
         ({"type": "string", "minLength": 5, "maxLength": 6}, {5, 6}),
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
+        ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": "^[\\w\\W]+$"}, {1}),
     ),
 )
 def test_positive_string(ctx, schema, lengths):

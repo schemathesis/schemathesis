@@ -4,18 +4,16 @@ Changelog
 :version:`Unreleased <v3.36.0...HEAD>` - TBD
 --------------------------------------------
 
-**Added**
-
-- Use ``requestBody`` examples as the source of valid inputs during the coverage phase.
-
 **Changed**
 
+- Use ``requestBody`` examples as the source of valid inputs during the coverage phase.
 - Reuse top-level schema examples in more places during the coverage phase.
 - Generate more combinations of optional parameters during the coverage phase.
 
 **Fixed**
 
 - ``ignored_auth`` false positives on custom auth and explicit ``--auth`` CLI option. :issue:`2462`
+- Avoid skipping string generation if they have ``pattern`` during the coverage phase.
 
 .. _v3.36.0:
 
