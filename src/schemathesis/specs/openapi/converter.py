@@ -5,6 +5,7 @@ from typing import Any, Callable
 
 from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
+from .patterns import update_quantifier
 
 
 def to_json_schema(
@@ -24,6 +25,15 @@ def to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+    pattern = schema.get("pattern")
+    min_length = schema.get("minLength")
+    max_length = schema.get("maxLength")
+    if pattern and (min_length or max_length):
+        new_pattern = update_quantifier(pattern, min_length, max_length)
+        if new_pattern != pattern:
+            schema.pop("minLength", None)
+            schema.pop("maxLength", None)
+            schema["pattern"] = new_pattern
     if schema_type == "object":
         if is_response_schema:
             # Write-only properties should not occur in responses

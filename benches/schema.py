@@ -6,8 +6,8 @@ import pytest
 from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
-from schemathesis.runner import from_schema
 from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.runner import from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
