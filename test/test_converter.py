@@ -34,6 +34,38 @@ from schemathesis.specs.openapi.converter import forbid_properties, is_read_only
                 "required": ["success"],
             },
         ),
+        (
+            {
+                "minLength": 3,
+                "maxLength": 40,
+                "pattern": r"^[abc\d]$",
+            },
+            {"pattern": r"^([abc\d]){3,40}$"},
+        ),
+        (
+            {
+                "maxLength": 40,
+                "pattern": r"^[abc\d]$",
+            },
+            {"pattern": r"^([abc\d]){1,40}$"},
+        ),
+        (
+            {
+                "minLength": 3,
+                "pattern": r"^[abc\d]$",
+            },
+            {"pattern": r"^([abc\d]){3,}$"},
+        ),
+        (
+            {
+                "minLength": 10,
+                "pattern": r"^[abc\d]{1,3}$",
+            },
+            {
+                "minLength": 10,
+                "pattern": r"^[abc\d]{1,3}$",
+            },
+        ),
     ),
 )
 def test_to_jsonschema_recursive(schema, expected):

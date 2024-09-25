@@ -6,10 +6,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
-    from ..types import RawAuth
+    from requests.structures import CaseInsensitiveDict
+
     from ..models import Case
     from ..transports.responses import GenericResponse
-    from requests.structures import CaseInsensitiveDict
+    from ..types import RawAuth
 
 
 CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[bool]]

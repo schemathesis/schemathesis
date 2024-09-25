@@ -527,7 +527,12 @@ def is_valid_path(parameters: dict[str, Any]) -> bool:
     disallowed_values = (SLASH, "")
 
     return not any(
-        (value in disallowed_values or is_illegal_surrogate(value) or isinstance(value, str) and SLASH in value)
+        (
+            value in disallowed_values
+            or is_illegal_surrogate(value)
+            or isinstance(value, str)
+            and (SLASH in value or "}" in value or "{" in value)
+        )
         for value in parameters.values()
     )
 

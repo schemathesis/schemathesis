@@ -10,6 +10,7 @@ import schemathesis
 from schemathesis.constants import NOT_SET
 from schemathesis.exceptions import OperationSchemaError
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.generation._hypothesis import get_single_example
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
@@ -182,7 +183,6 @@ def test_custom_strategies(swagger_20):
     assert int(result.query["id"]) % 2 == 0
 
 
-@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_default_strategies_binary(swagger_20):
     body = OpenAPI20CompositeBody.from_parameters(
         {
@@ -195,10 +195,44 @@ def test_default_strategies_binary(swagger_20):
     )
     operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
     swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
-    case = get_case_strategy(operation).example()
+    case = get_single_example(get_case_strategy(operation))
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
     assert kwargs["files"] == [("upfile", case.body["upfile"].data)]
+
+
+def test_merge_length_into_pattern(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/data": {
+            "post": {
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "string",
+                                # Unlikely to generate a string of this length from a pattern
+                                "minLength": 460,
+                                "maxLength": 465,
+                                "pattern": "^[a-z]+$",
+                            },
+                        }
+                    },
+                },
+                "responses": {"200": {"description": "OK"}},
+            },
+        },
+    }
+
+    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    operation = schema["/data"]["POST"]
+
+    @given(operation.as_strategy())
+    @settings(max_examples=1)
+    def test(case):
+        pass
+
+    test()
 
 
 @pytest.mark.parametrize("media_type", ("application/json", "text/yaml"))

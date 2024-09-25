@@ -1,4 +1,5 @@
 import pytest
+
 from schemathesis.generation.coverage import push_examples_to_properties
 
 

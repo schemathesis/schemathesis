@@ -559,7 +559,7 @@ def filter_path_parameters():
 @pytest.mark.operations("path_variable")
 @pytest.mark.usefixtures("filter_path_parameters")
 def test_path_parameters_encoding(real_app_schema):
-    # NOTE. WSGI and ASGI applications decodes %2F as / and returns 404
+    # NOTE. WSGI and ASGI applications decode %2F as / and returns 404
     # When API operation has a path parameter
     results = execute(
         real_app_schema,
@@ -568,8 +568,8 @@ def test_path_parameters_encoding(real_app_schema):
     )
     # Then there should be no failures
     # since all path parameters are quoted
-    assert not results.has_errors
-    assert not results.has_failures
+    assert not results.has_errors, results
+    assert not results.has_failures, results
 
 
 @pytest.mark.parametrize(

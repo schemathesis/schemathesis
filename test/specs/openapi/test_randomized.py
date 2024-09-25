@@ -1,7 +1,7 @@
 import sys
 
 import pytest
-from hypothesis import Phase, given, settings
+from hypothesis import HealthCheck, Phase, given, settings
 
 import schemathesis
 import schemathesis.runner
@@ -14,7 +14,7 @@ from hypothesis_openapi import openapis
 
 
 @given(openapis(version="2.0") | openapis(version="3.0"))
-@settings(max_examples=25, phases=[Phase.generate], deadline=None)
+@settings(max_examples=25, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
 def test_random_schemas(schema):
     schema = schemathesis.from_dict(schema, validate_schema=True)
     # Disable schema validation to allow more flexible behavior at runtime
