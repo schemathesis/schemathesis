@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 import enum
+from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
