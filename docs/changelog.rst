@@ -8,6 +8,7 @@ Changelog
 
 - Merge ``minLength`` & ``maxLength`` into ``pattern`` to avoid extremely slow generation in most popular cases.
 - Avoid generating ``{`` and ``}`` for path parameters.
+- Generate all negative types in the coverage phase.
 
 **Fixed**
 
