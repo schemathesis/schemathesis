@@ -9,6 +9,10 @@ Changelog
 - Merge ``minLength`` & ``maxLength`` into ``pattern`` to avoid extremely slow generation in most popular cases.
 - Avoid generating ``{`` and ``}`` for path parameters.
 
+**Fixed**
+
+- Internal error on incorrect examples during the coverage phase.
+
 .. _v3.36.1:
 
 :version:`3.36.1 <v3.36.0...v3.36.1>` - 2024-09-23

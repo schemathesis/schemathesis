@@ -595,9 +595,10 @@ def push_examples_to_properties(schema: dict[str, Any]) -> None:
     if "examples" in schema and "properties" in schema:
         properties = schema["properties"]
         for example in schema["examples"]:
-            for prop, value in example.items():
-                if prop in properties:
-                    if "examples" not in properties[prop]:
-                        properties[prop]["examples"] = []
-                    if value not in schema["properties"][prop]["examples"]:
-                        properties[prop]["examples"].append(value)
+            if isinstance(example, dict):
+                for prop, value in example.items():
+                    if prop in properties:
+                        if "examples" not in properties[prop]:
+                            properties[prop]["examples"] = []
+                        if value not in schema["properties"][prop]["examples"]:
+                            properties[prop]["examples"].append(value)
