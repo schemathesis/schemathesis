@@ -15,7 +15,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 
 from schemathesis.constants import NOT_SET
 
-from ._hypothesis import combine_strategies, get_single_example
+from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
 
 BUFFER_SIZE = 8 * 1024
@@ -157,7 +157,11 @@ def _ignore_unfixable(
             raise
 
 
-def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[GeneratedValue, None, None]:
+def cover_schema_iter(
+    ctx: CoverageContext, schema: dict | bool, seen: set[Any | tuple[type, str]] | None = None
+) -> Generator[GeneratedValue, None, None]:
+    if seen is None:
+        seen = set()
     if isinstance(schema, bool):
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
@@ -174,13 +178,16 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
             yield from _cover_positive_for_type(ctx, schema, ty)
     if DataGenerationMethod.negative in ctx.data_generation_methods:
         template = None
-        seen: set[Any | tuple[type, str]] = set()
         for key, value in schema.items():
             with _ignore_unfixable():
                 if key == "enum":
                     yield from _negative_enum(ctx, value)
                 elif key == "const":
-                    yield from _negative_enum(ctx, [value])
+                    for value_ in _negative_enum(ctx, [value]):
+                        k = _to_hashable_key(value_.value)
+                        if k not in seen:
+                            yield value_
+                            seen.add(k)
                 elif key == "type":
                     yield from _negative_type(ctx, seen, value)
                 elif key == "properties":
@@ -192,27 +199,37 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
                     yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
                     next = value + 1
-                    yield NegativeValue(next)
-                    seen.add(next)
+                    if next not in seen:
+                        yield NegativeValue(next)
+                        seen.add(next)
                 elif key == "minimum":
                     next = value - 1
-                    yield NegativeValue(next)
-                    seen.add(next)
+                    if next not in seen:
+                        yield NegativeValue(next)
+                        seen.add(next)
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and value not in seen:
                     yield NegativeValue(value)
                     seen.add(value)
                 elif key == "multipleOf":
-                    yield from _negative_multiple_of(ctx, schema, value)
+                    for value_ in _negative_multiple_of(ctx, schema, value):
+                        k = _to_hashable_key(value_.value)
+                        if k not in seen:
+                            yield value_
+                            seen.add(k)
                 elif key == "minLength" and 0 < value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
-                        yield NegativeValue(
-                            ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
-                        )
+                        value = ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
+                        k = _to_hashable_key(value)
+                        if k not in seen:
+                            yield NegativeValue(value)
+                            seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
-                        yield NegativeValue(
-                            ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
-                        )
+                        value = ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
+                        k = _to_hashable_key(value)
+                        if k not in seen:
+                            yield NegativeValue(value)
+                            seen.add(k)
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
@@ -224,16 +241,16 @@ def cover_schema_iter(ctx: CoverageContext, schema: dict | bool) -> Generator[Ge
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
-                        yield from cover_schema_iter(nctx, value[0])
+                        yield from cover_schema_iter(nctx, value[0], seen)
                     else:
                         with _ignore_unfixable():
                             canonical = canonicalish(schema)
-                            yield from cover_schema_iter(nctx, canonical)
+                            yield from cover_schema_iter(nctx, canonical, seen)
                 elif key == "anyOf" or key == "oneOf":
                     nctx = ctx.with_negative()
                     # NOTE: Other sub-schemas are not filtered out
                     for sub_schema in value:
-                        yield from cover_schema_iter(nctx, sub_schema)
+                        yield from cover_schema_iter(nctx, sub_schema, seen)
 
 
 def _get_properties(schema: dict | bool) -> dict | bool:
@@ -584,10 +601,13 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         del strategies["integer"]
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(lambda x: x != int(x))
-    negative_strategy = combine_strategies(tuple(strategies.values())).filter(lambda x: _to_hashable_key(x) not in seen)
-    value = ctx.generate_from(negative_strategy, cached=True)
-    yield NegativeValue(value)
-    seen.add(_to_hashable_key(value))
+    for strat in strategies.values():
+        value = ctx.generate_from(strat, cached=True)
+        hashed = _to_hashable_key(value)
+        if hashed in seen:
+            continue
+        yield NegativeValue(value)
+        seen.add(hashed)
 
 
 def push_examples_to_properties(schema: dict[str, Any]) -> None:
