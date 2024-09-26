@@ -127,6 +127,22 @@ from schemathesis.generation.coverage import push_examples_to_properties
                 ],
             },
         ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "examples": ["Alice"]},
+                },
+                "examples": [2],
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string", "examples": ["Alice"]},
+                },
+                "examples": [2],
+            },
+        ),
     ],
 )
 def test_push_examples_to_properties(schema, expected):
