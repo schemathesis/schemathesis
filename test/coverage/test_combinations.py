@@ -152,22 +152,22 @@ class NotNumber:
 @pytest.mark.parametrize(
     "schema, expected",
     (
-        ({"type": "null"}, 0),
-        ({"type": "boolean"}, 0),
-        ({"type": ["boolean", "null"]}, 0),
-        ({"enum": [1, 2]}, None),
-        ({"enum": [1, 2, {}]}, None),
-        ({"const": 42}, None),
+        ({"type": "null"}, [0, "", [], {}]),
+        ({"type": "boolean"}, [0, None, "", [], {}]),
+        ({"type": ["boolean", "null"]}, [0, "", [], {}]),
+        ({"enum": [1, 2]}, [None]),
+        ({"enum": [1, 2, {}]}, [None]),
+        ({"const": 42}, [None]),
         ({"multipleOf": 2}, lambda x: x % 2 != 0),
-        ({"format": "date-time"}, AnyString()),
-        ({"format": "hostname"}, AnyString()),
-        ({"format": "unknown"}, AnyString()),
-        ({"uniqueItems": True}, [None, None]),
-        ({"maximum": 5}, 6),
-        ({"minimum": 5}, 4),
-        ({"exclusiveMinimum": 5}, 5),
-        ({"exclusiveMaximum": 5}, 5),
-        ({"required": ["a"]}, {}),
+        ({"format": "date-time"}, [AnyString()]),
+        ({"format": "hostname"}, [AnyString()]),
+        ({"format": "unknown"}, [AnyString()]),
+        ({"uniqueItems": True}, [[None, None]]),
+        ({"maximum": 5}, [6]),
+        ({"minimum": 5}, [4]),
+        ({"exclusiveMinimum": 5}, [5]),
+        ({"exclusiveMaximum": 5}, [5]),
+        ({"required": ["a"]}, [{}]),
     ),
 )
 def test_negative_primitive_schemas(nctx, schema, expected):
@@ -176,7 +176,7 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         assert len(covered) == 1
         assert expected(covered[0])
     else:
-        assert covered == [expected]
+        assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
@@ -211,13 +211,13 @@ def test_positive_string(ctx, schema, lengths):
 @pytest.mark.parametrize(
     "schema, expected",
     (
-        ({"type": "string"}, [0]),
-        ({"type": "string", "minLength": 5}, [0, "0000"]),
-        ({"type": "string", "maxLength": 10}, [0, "00000000000"]),
-        ({"type": "string", "minLength": 5, "maxLength": 10}, [0, "0000", "00000000000"]),
-        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, ""]),
-        ({"type": "string", "pattern": "^[0-9]"}, [0, ""]),
-        ({"type": "string", "format": "date-time"}, [0, ""]),
+        ({"type": "string"}, [0, None, [], {}]),
+        ({"type": "string", "minLength": 5}, [0, None, [], {}, "0000"]),
+        ({"type": "string", "maxLength": 10}, [0, None, [], {}, "00000000000"]),
+        ({"type": "string", "minLength": 5, "maxLength": 10}, [0, None, [], {}, "0000", "00000000000"]),
+        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, ""]),
+        ({"type": "string", "pattern": "^[0-9]"}, [0, None, [], {}, ""]),
+        ({"type": "string", "format": "date-time"}, [0, None, [], {}, ""]),
     ),
 )
 def test_negative_string(nctx, schema, expected):
@@ -745,8 +745,32 @@ def test_positive_other(pctx, schema, expected):
                     "bar": "",
                 },
                 {
-                    "foo": "",
+                    "bar": "",
+                    "foo": None,
+                },
+                {
+                    "bar": "",
+                    "foo": [],
+                },
+                {
+                    "bar": "",
+                    "foo": {},
+                },
+                {
                     "bar": 0,
+                    "foo": "",
+                },
+                {
+                    "bar": None,
+                    "foo": "",
+                },
+                {
+                    "bar": [],
+                    "foo": "",
+                },
+                {
+                    "foo": "",
+                    "bar": {},
                 },
                 {
                     "bar": "",
@@ -765,12 +789,36 @@ def test_positive_other(pctx, schema, expected):
             },
             [
                 {
-                    "foo": 0,
                     "bar": "",
+                    "foo": 0,
                 },
                 {
-                    "foo": "",
+                    "bar": "",
+                    "foo": None,
+                },
+                {
+                    "bar": "",
+                    "foo": [],
+                },
+                {
+                    "bar": "",
+                    "foo": {},
+                },
+                {
                     "bar": 0,
+                    "foo": "",
+                },
+                {
+                    "bar": None,
+                    "foo": "",
+                },
+                {
+                    "bar": [],
+                    "foo": "",
+                },
+                {
+                    "bar": {},
+                    "foo": "",
                 },
             ],
         ),
@@ -784,6 +832,15 @@ def test_positive_other(pctx, schema, expected):
             [
                 {
                     "foo": 0,
+                },
+                {
+                    "foo": None,
+                },
+                {
+                    "foo": [],
+                },
+                {
+                    "foo": {},
                 },
                 {
                     "foo": "",
@@ -818,7 +875,7 @@ def test_negative_objects(nctx, schema, expected):
                     {"minimum": 5},
                 ],
             },
-            [4, NotNumber()],
+            [4, AnyNumber(), False, None, "", [], {}],
         ),
         (
             {
@@ -827,7 +884,7 @@ def test_negative_objects(nctx, schema, expected):
                     {"type": "string"},
                 ],
             },
-            [4, 0],
+            [4, 0, None, [], {}],
         ),
         (
             {
@@ -846,7 +903,7 @@ def test_negative_objects(nctx, schema, expected):
                     },
                 ]
             },
-            [ANY, None, 0],
+            [ANY, None, 0, ANY],
         ),
         (
             {
