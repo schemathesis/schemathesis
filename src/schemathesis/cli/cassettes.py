@@ -239,6 +239,16 @@ http_interactions:"""
   thread_id: {item.thread_id}
   correlation_id: '{item.correlation_id}'
   data_generation_method: '{interaction.data_generation_method.value}'
+  meta:
+    description: """
+                )
+
+                if interaction.description is not None:
+                    write_double_quoted(stream, interaction.description)
+                else:
+                    stream.write("null")
+                stream.write(
+                    f"""
   phase: {phase}
   elapsed: '{interaction.response.elapsed if interaction.response else 0}'
   recorded_at: '{interaction.recorded_at}'

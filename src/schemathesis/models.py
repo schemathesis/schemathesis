@@ -154,8 +154,9 @@ class GenerationMetadata:
     cookies: DataGenerationMethod | None
     body: DataGenerationMethod | None
     phase: TestPhase
+    description: str | None
 
-    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase")
+    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase", "description")
 
 
 @dataclass(repr=False)
@@ -1017,6 +1018,7 @@ class Interaction:
     status: Status
     data_generation_method: DataGenerationMethod
     phase: TestPhase | None
+    description: str | None
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
@@ -1046,6 +1048,7 @@ class Interaction:
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
             phase=case.meta.phase if case.meta is not None else None,
+            description=case.meta.description if case.meta is not None else None,
         )
 
     @classmethod
@@ -1069,6 +1072,7 @@ class Interaction:
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
             phase=case.meta.phase if case.meta is not None else None,
+            description=case.meta.description if case.meta is not None else None,
         )
 
 

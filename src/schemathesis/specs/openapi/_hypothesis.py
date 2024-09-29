@@ -215,6 +215,7 @@ def get_case_strategy(
             cookies=cookies_.generator,
             body=body_.generator,
             phase=phase,
+            description=None,
         ),
     )
     auth_context = auths.AuthContext(

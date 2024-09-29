@@ -297,6 +297,7 @@ def test_sanitize_serialized_interaction(serialized_check):
         recorded_at="",
         data_generation_method=DataGenerationMethod.positive,
         phase=TestPhase.GENERATE,
+        description=None,
     )
     sanitize_serialized_interaction(interaction)
 
