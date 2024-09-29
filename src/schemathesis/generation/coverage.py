@@ -36,16 +36,17 @@ UNKNOWN_PROPERTY_VALUE = 42
 class GeneratedValue:
     value: Any
     data_generation_method: DataGenerationMethod
+    description: str
 
-    __slots__ = ("value", "data_generation_method")
-
-    @classmethod
-    def with_positive(cls, value: Any) -> GeneratedValue:
-        return cls(value, DataGenerationMethod.positive)
+    __slots__ = ("value", "data_generation_method", "description")
 
     @classmethod
-    def with_negative(cls, value: Any) -> GeneratedValue:
-        return cls(value, DataGenerationMethod.negative)
+    def with_positive(cls, value: Any, *, description: str) -> GeneratedValue:
+        return cls(value=value, data_generation_method=DataGenerationMethod.positive, description=description)
+
+    @classmethod
+    def with_negative(cls, value: Any, *, description: str) -> GeneratedValue:
+        return cls(value=value, data_generation_method=DataGenerationMethod.negative, description=description)
 
 
 PositiveValue = GeneratedValue.with_positive
@@ -117,15 +118,15 @@ def _cover_positive_for_type(
                     yield from cover_schema_iter(ctx, canonical)
         if enum is not NOT_SET:
             for value in enum:
-                yield PositiveValue(value)
+                yield PositiveValue(value, description="Enum value")
         elif const is not NOT_SET:
-            yield PositiveValue(const)
+            yield PositiveValue(const, description="Const value")
         elif ty is not None:
             if ty == "null":
-                yield PositiveValue(None)
+                yield PositiveValue(None, description="Value null value")
             elif ty == "boolean":
-                yield PositiveValue(True)
-                yield PositiveValue(False)
+                yield PositiveValue(True, description="Valid boolean value")
+                yield PositiveValue(False, description="Valid boolean value")
             elif ty == "string":
                 yield from _positive_string(ctx, schema)
             elif ty == "integer" or ty == "number":
@@ -200,15 +201,17 @@ def cover_schema_iter(
                 elif key == "maximum":
                     next = value + 1
                     if next not in seen:
-                        yield NegativeValue(next)
+                        yield NegativeValue(next, description="Value greater than maximum")
                         seen.add(next)
                 elif key == "minimum":
                     next = value - 1
                     if next not in seen:
-                        yield NegativeValue(next)
+                        yield NegativeValue(next, description="Value smaller than minimum")
                         seen.add(next)
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and value not in seen:
-                    yield NegativeValue(value)
+                    verb = "greater" if key == "exclusiveMaximum" else "smaller"
+                    limit = "maximum" if key == "exclusiveMaximum" else "minimum"
+                    yield NegativeValue(value, description=f"Value {verb} than {limit}")
                     seen.add(value)
                 elif key == "multipleOf":
                     for value_ in _negative_multiple_of(ctx, schema, value):
@@ -221,14 +224,14 @@ def cover_schema_iter(
                         value = ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
                         k = _to_hashable_key(value)
                         if k not in seen:
-                            yield NegativeValue(value)
+                            yield NegativeValue(value, description="String smaller than minLength")
                             seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
                         value = ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
                         k = _to_hashable_key(value)
                         if k not in seen:
-                            yield NegativeValue(value)
+                            yield NegativeValue(value, description="String larger than maxLength")
                             seen.add(k)
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
@@ -237,7 +240,10 @@ def cover_schema_iter(
                     yield from _negative_required(ctx, template, value)
                 elif key == "additionalProperties" and not value:
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
-                    yield NegativeValue({**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE})
+                    yield NegativeValue(
+                        {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
+                        description="Object with unexpected properties",
+                    )
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
@@ -291,43 +297,50 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     default = schema.get("default")
     if example or examples or default:
         if example:
-            yield PositiveValue(example)
+            yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example)
+                yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
-            yield PositiveValue(default)
+            yield PositiveValue(default, description="Default value")
     elif not min_length and not max_length:
         # Default positive value
-        yield PositiveValue(ctx.generate_from_schema(schema))
+        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
     elif "pattern" in schema:
         # Without merging `maxLength` & `minLength` into a regex it is problematic
         # to generate a valid value as the unredlying machinery will resort to filtering
         # and it is unlikely that it will generate a string of that length
-        yield PositiveValue(ctx.generate_from_schema(schema))
+        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
         return
 
     seen = set()
 
     if min_length is not None and min_length < BUFFER_SIZE:
         # Exactly the minimum length
-        yield PositiveValue(ctx.generate_from_schema({**schema, "maxLength": min_length}))
+        yield PositiveValue(
+            ctx.generate_from_schema({**schema, "maxLength": min_length}), description="Minimum length string"
+        )
         seen.add(min_length)
 
         # One character more than minimum if possible
         larger = min_length + 1
         if larger < BUFFER_SIZE and larger not in seen and (not max_length or larger <= max_length):
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger}),
+                description="Near-boundary length string",
+            )
             seen.add(larger)
 
     if max_length is not None:
         # Exactly the maximum length
         if max_length < BUFFER_SIZE and max_length not in seen:
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": max_length}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minLength": max_length}), description="Maximum length string"
+            )
             seen.add(max_length)
 
         # One character less than maximum if possible
@@ -337,7 +350,10 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             and smaller not in seen
             and (smaller > 0 and (min_length is None or smaller >= min_length))
         ):
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller}),
+                description="Near-boundary length string",
+            )
             seen.add(smaller)
 
 
@@ -367,19 +383,19 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
 
     if example or examples or default:
         if example:
-            yield PositiveValue(example)
+            yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example)
+                yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
-            yield PositiveValue(default)
+            yield PositiveValue(default, description="Default value")
     elif not minimum and not maximum:
         # Default positive value
-        yield PositiveValue(ctx.generate_from_schema(schema))
+        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid number")
 
     seen = set()
 
@@ -390,7 +406,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         else:
             smallest = minimum
         seen.add(smallest)
-        yield PositiveValue(smallest)
+        yield PositiveValue(smallest, description="Minimum value")
 
         # One more than minimum if possible
         if multiple_of is not None:
@@ -399,7 +415,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             larger = minimum + 1
         if larger not in seen and (not maximum or larger <= maximum):
             seen.add(larger)
-            yield PositiveValue(larger)
+            yield PositiveValue(larger, description="Near-boundary number")
 
     if maximum is not None:
         # Exactly the maximum
@@ -409,7 +425,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             largest = maximum
         if largest not in seen:
             seen.add(largest)
-            yield PositiveValue(largest)
+            yield PositiveValue(largest, description="Maximum value")
 
         # One less than maximum if possible
         if multiple_of is not None:
@@ -418,7 +434,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             smaller = maximum - 1
         if smaller not in seen and (smaller > 0 and (minimum is None or smaller >= minimum)):
             seen.add(smaller)
-            yield PositiveValue(smaller)
+            yield PositiveValue(smaller, description="Near-boundary number")
 
 
 def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
@@ -429,18 +445,18 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
 
     if example or examples or default:
         if example:
-            yield PositiveValue(example)
+            yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example)
+                yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
-            yield PositiveValue(default)
+            yield PositiveValue(default, description="Default value")
     else:
-        yield PositiveValue(template)
+        yield PositiveValue(template, description="Valid array")
     seen.add(len(template))
 
     # Boundary and near-boundary sizes
@@ -452,12 +468,18 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         # One item more than minimum if possible
         larger = min_items + 1
         if larger not in seen and (max_items is None or larger <= max_items):
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger}),
+                description="Near-boundary items array",
+            )
             seen.add(larger)
 
     if max_items is not None:
         if max_items < BUFFER_SIZE and max_items not in seen:
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": max_items}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minItems": max_items}),
+                description="Maximum items array",
+            )
             seen.add(max_items)
 
         # One item smaller than maximum if possible
@@ -468,7 +490,10 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             and smaller not in seen
             and (min_items is None or smaller >= min_items)
         ):
-            yield PositiveValue(ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller}))
+            yield PositiveValue(
+                ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller}),
+                description="Near-boundary items array",
+            )
             seen.add(smaller)
 
 
@@ -479,19 +504,18 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
 
     if example or examples or default:
         if example:
-            yield PositiveValue(example)
+            yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example)
+                yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
-            yield PositiveValue(default)
-
+            yield PositiveValue(default, description="Default value")
     else:
-        yield PositiveValue(template)
+        yield PositiveValue(template, description="Valid object")
 
     properties = schema.get("properties", {})
     required = set(schema.get("required", []))
@@ -502,22 +526,24 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
     for name in optional:
         combo = {k: v for k, v in template.items() if k in required or k == name}
         if combo != template:
-            yield PositiveValue(combo)
+            yield PositiveValue(combo, description=f"Object with all required properties and '{name}'")
     # Generate one combination for each size from 2 to N-1
     for selection in select_combinations(optional):
         combo = {k: v for k, v in template.items() if k in required or k in selection}
-        yield PositiveValue(combo)
+        yield PositiveValue(combo, description="Object with all required and a subset of optional properties")
     # Generate only required properties
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
-        yield PositiveValue(only_required)
+        yield PositiveValue(only_required, description="Object with only required properties")
     seen = set()
     for name, sub_schema in properties.items():
         seen.add(_to_hashable_key(template.get(name)))
         for new in cover_schema_iter(ctx, sub_schema):
             key = _to_hashable_key(new.value)
             if key not in seen:
-                yield PositiveValue({**template, name: new.value})
+                yield PositiveValue(
+                    {**template, name: new.value}, description=f"Object with valid '{name}' value: {new.description}"
+                )
                 seen.add(key)
         seen.clear()
 
@@ -530,7 +556,7 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
 def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
     strategy = JSON_STRATEGY.filter(lambda x: x not in value)
     # The exact negative value is not important here
-    yield NegativeValue(ctx.generate_from(strategy, cached=True))
+    yield NegativeValue(ctx.generate_from(strategy, cached=True), description="Invalid enum value")
 
 
 def _negative_properties(
@@ -539,11 +565,17 @@ def _negative_properties(
     nctx = ctx.with_negative()
     for key, sub_schema in properties.items():
         for value in cover_schema_iter(nctx, sub_schema):
-            yield NegativeValue({**template, key: value.value})
+            yield NegativeValue(
+                {**template, key: value.value},
+                description=f"Object with invalid '{key}' value: {value.description}",
+            )
 
 
 def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
-    yield NegativeValue(ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True))
+    yield NegativeValue(
+        ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True),
+        description=f"Value not matching the '{pattern}' pattern",
+    )
 
 
 def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
@@ -553,19 +585,25 @@ def _with_negated_key(schema: dict, key: str, value: Any) -> dict:
 def _negative_multiple_of(
     ctx: CoverageContext, schema: dict, multiple_of: int | float
 ) -> Generator[GeneratedValue, None, None]:
-    yield NegativeValue(ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)))
+    yield NegativeValue(
+        ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)),
+        description=f"Non-multiple of {multiple_of}",
+    )
 
 
 def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     unique = ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})
-    yield NegativeValue(unique + unique)
+    yield NegativeValue(unique + unique, description="Non-unique items")
 
 
 def _negative_required(
     ctx: CoverageContext, template: dict, required: list[str]
 ) -> Generator[GeneratedValue, None, None]:
     for key in required:
-        yield NegativeValue({k: v for k, v in template.items() if k != key})
+        yield NegativeValue(
+            {k: v for k, v in template.items() if k != key},
+            description=f"Missing required property: {key}",
+        )
 
 
 def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generator[GeneratedValue, None, None]:
@@ -578,7 +616,7 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
             lambda v: (format == "hostname" and v == "")
             or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
         )
-    yield NegativeValue(ctx.generate_from(strategy))
+    yield NegativeValue(ctx.generate_from(strategy), description=f"Value not matching the '{format}' format")
 
 
 def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator[GeneratedValue, None, None]:
@@ -606,7 +644,7 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         hashed = _to_hashable_key(value)
         if hashed in seen:
             continue
-        yield NegativeValue(value)
+        yield NegativeValue(value, description="Incorrect type")
         seen.add(hashed)
 
 

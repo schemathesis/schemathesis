@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.36.2...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Meta information about generated data in the coverage phase.
+
 .. _v3.36.2:
 
 :version:`3.36.2 <v3.36.1...v3.36.2>` - 2024-09-26

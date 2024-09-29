@@ -395,6 +395,7 @@ class SerializedInteraction:
     status: Status
     data_generation_method: DataGenerationMethod
     phase: TestPhase | None
+    description: str | None
     recorded_at: str
 
     @classmethod
@@ -406,6 +407,7 @@ class SerializedInteraction:
             status=interaction.status,
             data_generation_method=interaction.data_generation_method,
             phase=interaction.phase,
+            description=interaction.description,
             recorded_at=interaction.recorded_at,
         )
 
