@@ -69,7 +69,7 @@ def to_ipv6(url):
     url = URL(url)
     parts = list(map(int, url.host.split(".")))
     ipv6_host = "2002:{:02x}{:02x}:{:02x}{:02x}::".format(*parts)
-    return str(url.with_host(f"[{ipv6_host}]"))
+    return str(url.with_host(ipv6_host))
 
 
 @pytest.mark.parametrize(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from copy import copy
 import warnings
 from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
@@ -221,7 +222,13 @@ def _iter_coverage_cases(
 
     ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
     meta = GenerationMetadata(
-        query=None, path_parameters=None, headers=None, cookies=None, body=None, phase=TestPhase.COVERAGE
+        query=None,
+        path_parameters=None,
+        headers=None,
+        cookies=None,
+        body=None,
+        phase=TestPhase.COVERAGE,
+        description=None,
     )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
@@ -259,17 +266,19 @@ def _iter_coverage_cases(
                 template["media_type"] = body.media_type
             case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
             case.data_generation_method = value.data_generation_method
-            case.meta = meta
+            case.meta = copy(meta)
+            case.meta.description = value.description
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
                 case.data_generation_method = next_value.data_generation_method
-                case.meta = meta
+                case.meta = copy(meta)
+                case.meta.description = next_value.description
                 yield case
     elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
         case.data_generation_method = DataGenerationMethod.positive
-        case.meta = meta
+        case.meta = copy(meta)
         yield case
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
@@ -281,7 +290,8 @@ def _iter_coverage_cases(
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
             case.data_generation_method = value.data_generation_method
-            case.meta = meta
+            case.meta = copy(meta)
+            case.meta.description = value.description
             yield case
 
 
