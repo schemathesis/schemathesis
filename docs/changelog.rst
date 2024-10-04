@@ -6,6 +6,9 @@ Changelog
 
 .. _v3.36.2:
 
+**Fixed**
+- OpenApi3.1 spec using $ref in a path is incorrectly validated as invalid
+
 :version:`3.36.2 <v3.36.1...v3.36.2>` - 2024-09-26
 --------------------------------------------------
 
