@@ -12,6 +12,7 @@ from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
 from ..exceptions import CheckFailed
+from ..internal.checks import CheckContext
 from ..targets import TargetMetricCollector
 from . import events
 from .config import StatefulTestRunnerConfig
@@ -113,6 +114,7 @@ def _execute_state_machine_loop(
 ) -> None:
     """Execute the state machine testing loop."""
     from hypothesis import reporting
+    from requests.structures import CaseInsensitiveDict
 
     from ..transports import RequestsTransport
 
@@ -129,6 +131,7 @@ def _execute_state_machine_loop(
         if config.auth is not None:
             session.auth = config.auth
         call_kwargs["session"] = session
+    check_ctx = CheckContext(auth=config.auth, headers=CaseInsensitiveDict(config.headers) if config.headers else None)
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -223,7 +226,8 @@ def _execute_state_machine_loop(
             validate_response(
                 response=response,
                 case=case,
-                ctx=ctx,
+                runner_ctx=ctx,
+                check_ctx=check_ctx,
                 checks=config.checks,
                 additional_checks=additional_checks,
                 max_response_time=config.max_response_time,
