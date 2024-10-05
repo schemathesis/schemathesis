@@ -70,12 +70,8 @@ class CoverageContext:
     def with_negative(cls) -> CoverageContext:
         return CoverageContext(data_generation_methods=[DataGenerationMethod.negative])
 
-    def generate_from(self, strategy: st.SearchStrategy, cached: bool = False) -> Any:
-        if cached:
-            value = cached_draw(strategy)
-        else:
-            value = get_single_example(strategy)
-        return value
+    def generate_from(self, strategy: st.SearchStrategy) -> Any:
+        return cached_draw(strategy)
 
     def generate_from_schema(self, schema: dict) -> Any:
         return self.generate_from(from_schema(schema))
@@ -556,7 +552,7 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
 def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
     strategy = JSON_STRATEGY.filter(lambda x: x not in value)
     # The exact negative value is not important here
-    yield NegativeValue(ctx.generate_from(strategy, cached=True), description="Invalid enum value")
+    yield NegativeValue(ctx.generate_from(strategy), description="Invalid enum value")
 
 
 def _negative_properties(
@@ -573,7 +569,7 @@ def _negative_properties(
 
 def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
     yield NegativeValue(
-        ctx.generate_from(st.text().filter(lambda x: x != pattern), cached=True),
+        ctx.generate_from(st.text().filter(pattern.__ne__)),
         description=f"Value not matching the '{pattern}' pattern",
     )
 
@@ -640,7 +636,7 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(lambda x: x != int(x))
     for strat in strategies.values():
-        value = ctx.generate_from(strat, cached=True)
+        value = ctx.generate_from(strat)
         hashed = _to_hashable_key(value)
         if hashed in seen:
             continue
