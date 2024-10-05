@@ -255,6 +255,82 @@ def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "-c", "ignored_auth", "--auth=test:test", "--hypothesis-max-examples=1") == snapshot_cli
 
 
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.parametrize("with_error", [True, False])
+@pytest.mark.snapshot(replace_statistic=True)
+def test_stateful_in_cli_no_error(testdir, cli, with_error, base_url, snapshot_cli):
+    target = "ignored" if with_error else "valid"
+    schema = {
+        "info": {"description": "An API to test Schemathesis", "title": "Example API", "version": "1.0.0"},
+        "openapi": "3.0.2",
+        "paths": {
+            "/basic": {
+                "get": {
+                    "operationId": "valid",
+                    "security": [{"basicAuth": []}],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            "/ignored_auth": {
+                "get": {
+                    "operationId": "ignored",
+                    "security": [{"heisenAuth": []}],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+            "/users/": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string", "minLength": 3},
+                                        "last_name": {"type": "string", "minLength": 3},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                    "additionalProperties": False,
+                                },
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "links": {
+                                "TestLink": {"operationId": target, "parameters": {}},
+                            },
+                        }
+                    },
+                }
+            },
+        },
+        "components": {
+            "securitySchemes": {
+                "basicAuth": {"scheme": "basic", "type": "http"},
+                "heisenAuth": {"scheme": "basic", "type": "http"},
+            },
+        },
+    }
+    schema_file = testdir.make_openapi_schema_file(schema)
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={base_url}",
+            "-c",
+            "ignored_auth",
+            "--header=Authorization: Basic dGVzdDp0ZXN0",
+            "--hypothesis-max-examples=100",
+            "--experimental=stateful-only",
+            "--experimental=stateful-test-runner",
+            "--show-trace",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.skipif(sys.version_info < (3, 10), reason="Typing syntax is not supported on Python 3.9 and below")
 def test_custom_auth():
     app = FastAPI()

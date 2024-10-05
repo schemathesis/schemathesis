@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
+    from requests.auth import HTTPDigestAuth
     from requests.structures import CaseInsensitiveDict
 
     from ..models import Case
@@ -23,7 +24,7 @@ class CheckContext:
     Provides access to broader test execution data beyond individual test cases.
     """
 
-    auth: RawAuth | None = None
+    auth: HTTPDigestAuth | RawAuth | None = None
     headers: CaseInsensitiveDict | None = None
 
 
