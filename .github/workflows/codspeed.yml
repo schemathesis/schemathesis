@@ -7,6 +7,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  SCHEMATHESIS_BENCHMARK_SEED: "42"
+
 jobs:
   benchmarks:
     runs-on: ubuntu-latest
