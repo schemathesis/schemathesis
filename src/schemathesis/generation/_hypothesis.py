@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from functools import lru_cache, reduce
 from operator import or_
 from typing import TYPE_CHECKING, TypeVar
@@ -7,6 +8,8 @@ from typing import TYPE_CHECKING, TypeVar
 if TYPE_CHECKING:
     from hypothesis import settings
     from hypothesis import strategies as st
+
+SCHEMATHESIS_BENCHMARK_SEED = os.environ.get("SCHEMATHESIS_BENCHMARK_SEED")
 
 
 @lru_cache
@@ -33,12 +36,15 @@ def get_single_example(strategy: st.SearchStrategy[T]) -> T:  # type: ignore[typ
 
 
 def add_single_example(strategy: st.SearchStrategy[T], examples: list[T]) -> None:
-    from hypothesis import given
+    from hypothesis import given, seed
 
     @given(strategy)  # type: ignore
     @default_settings()  # type: ignore
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
+
+    if SCHEMATHESIS_BENCHMARK_SEED is not None:
+        example_generating_inner_function = seed(SCHEMATHESIS_BENCHMARK_SEED)(example_generating_inner_function)
 
     example_generating_inner_function()
 
