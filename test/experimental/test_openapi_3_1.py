@@ -98,4 +98,4 @@ def test_openapi_3_1_regression_path_ref():
         },
     }
 
-    from_dict(raw_schema,validate_schema=True)
+    from_dict(raw_schema, validate_schema=True)
