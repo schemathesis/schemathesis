@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import functools
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass, field
 from functools import lru_cache
@@ -18,12 +19,20 @@ from schemathesis.constants import NOT_SET
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
 
+
+def _replace_zero_with_nonzero(x: float) -> float:
+    return x or 0.0
+
+
+def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
+    return st.lists(strategy, max_size=3) | st.dictionaries(st.text(), strategy, max_size=3)
+
+
 BUFFER_SIZE = 8 * 1024
-FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(lambda x: x or 0.0)
+FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
-    st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(),
-    lambda strategy: st.lists(strategy, max_size=3) | st.dictionaries(st.text(), strategy, max_size=3),
+    st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(), json_recursive_strategy
 )
 ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY)
 OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
@@ -550,7 +559,10 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
 
 
 def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
-    strategy = JSON_STRATEGY.filter(lambda x: x not in value)
+    def is_not_in_value(x: Any) -> bool:
+        return x not in value
+
+    strategy = JSON_STRATEGY.filter(is_not_in_value)
     # The exact negative value is not important here
     yield NegativeValue(ctx.generate_from(strategy), description="Invalid enum value")
 
@@ -602,17 +614,29 @@ def _negative_required(
         )
 
 
+def _is_invalid_hostname(v: Any) -> bool:
+    return v == "" or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, "hostname")
+
+
+def _is_invalid_format(v: Any, format: str) -> bool:
+    return not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
+
+
 def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generator[GeneratedValue, None, None]:
     # Hypothesis-jsonschema does not canonicalise it properly right now, which leads to unsatisfiable schema
     without_format = {k: v for k, v in schema.items() if k != "format"}
     without_format.setdefault("type", "string")
     strategy = from_schema(without_format)
     if format in jsonschema.Draft202012Validator.FORMAT_CHECKER.checkers:
-        strategy = strategy.filter(
-            lambda v: (format == "hostname" and v == "")
-            or not jsonschema.Draft202012Validator.FORMAT_CHECKER.conforms(v, format)
-        )
+        if format == "hostname":
+            strategy = strategy.filter(_is_invalid_hostname)
+        else:
+            strategy = strategy.filter(functools.partial(_is_invalid_format, format=format))
     yield NegativeValue(ctx.generate_from(strategy), description=f"Value not matching the '{format}' format")
+
+
+def _is_non_integer_float(x: float) -> bool:
+    return x != int(x)
 
 
 def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator[GeneratedValue, None, None]:
@@ -634,7 +658,7 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
     if "number" in types:
         del strategies["integer"]
     if "integer" in types:
-        strategies["number"] = FLOAT_STRATEGY.filter(lambda x: x != int(x))
+        strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     for strat in strategies.values():
         value = ctx.generate_from(strat)
         hashed = _to_hashable_key(value)
