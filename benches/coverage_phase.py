@@ -5,6 +5,7 @@ import pytest
 from schemathesis.generation.coverage import cover_schema_iter, CoverageContext
 
 CONTEXTS = [CoverageContext.with_positive(), CoverageContext.with_negative()]
+CONTEXT_NAMES = [",".join([m.value for m in ctx.data_generation_methods]) for ctx in CONTEXTS]
 
 BASIC_TYPES = [
     {"type": "string"},
@@ -16,8 +17,8 @@ BASIC_TYPES = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", BASIC_TYPES, ids=lambda x: f"basic_{x['type']}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", BASIC_TYPES, ids=lambda x: f"basic-{x['type']}")
 def test_basic_types(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -31,8 +32,8 @@ STRING_CONSTRAINTS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", STRING_CONSTRAINTS, ids=lambda x: f"string_{list(x.keys())[1]}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", STRING_CONSTRAINTS, ids=lambda x: f"string-{list(x.keys())[1]}")
 def test_string_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -45,8 +46,8 @@ NUMBER_CONSTRAINTS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", NUMBER_CONSTRAINTS, ids=lambda x: f"number_{list(x.keys())[1]}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", NUMBER_CONSTRAINTS, ids=lambda x: f"number-{list(x.keys())[1]}")
 def test_number_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -59,8 +60,8 @@ ARRAY_CONSTRAINTS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", ARRAY_CONSTRAINTS, ids=lambda x: f"array_{list(x.keys())[1]}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", ARRAY_CONSTRAINTS, ids=lambda x: f"array-{list(x.keys())[1]}")
 def test_array_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -73,8 +74,8 @@ OBJECT_CONSTRAINTS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", OBJECT_CONSTRAINTS, ids=lambda x: f"object_{list(x.keys())[1]}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", OBJECT_CONSTRAINTS, ids=lambda x: f"object-{list(x.keys())[1]}")
 def test_object_constraints(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -88,8 +89,8 @@ COMBINED_SCHEMAS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", COMBINED_SCHEMAS, ids=lambda x: f"combined_{list(x.keys())[0]}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", COMBINED_SCHEMAS, ids=lambda x: f"combined-{list(x.keys())[0]}")
 def test_combined_schemas(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
 
@@ -126,7 +127,7 @@ COMPLEX_NESTED_SCHEMAS = [
 
 
 @pytest.mark.benchmark
-@pytest.mark.parametrize("ctx", CONTEXTS)
-@pytest.mark.parametrize("schema", COMPLEX_NESTED_SCHEMAS, ids=lambda x: f"complex_{x['type']}")
+@pytest.mark.parametrize("ctx", CONTEXTS, ids=CONTEXT_NAMES)
+@pytest.mark.parametrize("schema", COMPLEX_NESTED_SCHEMAS, ids=lambda x: f"complex-{x['type']}")
 def test_complex_nested_schemas(benchmark, ctx, schema):
     benchmark(lambda: list(cover_schema_iter(ctx, schema)))
