@@ -7,6 +7,7 @@ import os
 import platform
 import re
 import shlex
+import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from importlib import metadata
@@ -129,6 +130,7 @@ def pytest_configure(config):
         "markers",
         "openapi_version(*versions): Restrict test parametrization only to the specified Open API version(s).",
     )
+    warnings.filterwarnings("ignore", category=pytest.PytestDeprecationWarning)
 
 
 @pytest.fixture(scope="session")
