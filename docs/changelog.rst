@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.36.3...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- False positive for ``ignored_auth`` when used in stateful test runner. :issue:`2482`
+- Open Api 3.1 spec using ``$ref`` in a path is incorrectly validated as invalid. :issue:`2484`
+
 .. _v3.36.3:
 
 :version:`3.36.3 <v3.36.2...v3.36.3>` - 2024-09-29
@@ -14,9 +19,6 @@ Changelog
 - Meta information about generated data in the coverage phase.
 
 .. _v3.36.2:
-
-**Fixed**
-- OpenApi3.1 spec using $ref in a path is incorrectly validated as invalid
 
 :version:`3.36.2 <v3.36.1...v3.36.2>` - 2024-09-26
 --------------------------------------------------

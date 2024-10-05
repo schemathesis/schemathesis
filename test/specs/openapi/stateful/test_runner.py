@@ -13,7 +13,7 @@ from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.service.serialization import _serialize_stateful_event
-from schemathesis.specs.openapi.checks import response_schema_conformance, use_after_free
+from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.config import StatefulTestRunnerConfig
 from schemathesis.stateful.runner import events
 from schemathesis.stateful.sink import StateMachineSink
@@ -695,3 +695,34 @@ def test_unique_data(runner_factory):
             assert len(cases) == len(set(cases)), "Duplicate cases found"
         elif isinstance(event, events.RunFinished):
             assert event.status == events.RunStatus.FAILURE
+
+
+def test_ignored_auth_valid(runner_factory):
+    # When auth works properly
+    token = "Test"
+    runner = runner_factory(
+        app_kwargs={"auth_token": token},
+        config_kwargs={
+            "checks": (ignored_auth,),
+            "headers": {"Authorization": f"Bearer {token}"},
+        },
+    )
+    result = collect_result(runner)
+    # Then no failures are reported
+    assert result.events[-1].status == events.RunStatus.SUCCESS
+
+
+def test_ignored_auth_invalid(runner_factory):
+    # When auth is ignored
+    token = "Test"
+    runner = runner_factory(
+        app_kwargs={"auth_token": token, "ignored_auth": True},
+        config_kwargs={
+            "checks": (ignored_auth,),
+            "headers": {"Authorization": "Bearer UNKNOWN"},
+        },
+    )
+    result = collect_result(runner)
+    # Then it should be reported
+    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.failures[0].message == "Authentication declared but not enforced for this operation"

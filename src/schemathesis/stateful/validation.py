@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from ..exceptions import CheckFailed, get_grouped_exception
 from ..internal.checks import CheckContext
@@ -17,27 +17,24 @@ def validate_response(
     *,
     response: GenericResponse,
     case: Case,
-    ctx: RunnerContext,
+    runner_ctx: RunnerContext,
+    check_ctx: CheckContext,
     checks: tuple[CheckFunction, ...],
     additional_checks: tuple[CheckFunction, ...] = (),
     max_response_time: int | None = None,
-    headers: dict[str, Any] | None = None,
 ) -> None:
     """Validate the response against the provided checks."""
-    from requests.structures import CaseInsensitiveDict
-
     from .._compat import MultipleFailures
     from ..checks import _make_max_response_time_failure_message
     from ..failures import ResponseTimeExceeded
     from ..models import Check, Status
 
     exceptions: list[CheckFailed | AssertionError] = []
-    check_results = ctx.checks_for_step
-    check_ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
+    check_results = runner_ctx.checks_for_step
 
     def _on_failure(exc: CheckFailed | AssertionError, message: str, context: FailureContext | None) -> None:
         exceptions.append(exc)
-        if ctx.is_seen_in_suite(exc):
+        if runner_ctx.is_seen_in_suite(exc):
             return
         failed_check = Check(
             name=name,
@@ -49,9 +46,9 @@ def validate_response(
             context=context,
             request=None,
         )
-        ctx.add_failed_check(failed_check)
+        runner_ctx.add_failed_check(failed_check)
         check_results.append(failed_check)
-        ctx.mark_as_seen_in_suite(exc)
+        runner_ctx.mark_as_seen_in_suite(exc)
 
     def _on_passed(_name: str, _case: Case) -> None:
         passed_check = Check(
@@ -72,16 +69,16 @@ def validate_response(
             if not skip_check:
                 _on_passed(name, copied_case)
         except CheckFailed as exc:
-            if ctx.is_seen_in_run(exc):
+            if runner_ctx.is_seen_in_run(exc):
                 continue
             _on_failure(exc, str(exc), exc.context)
         except AssertionError as exc:
-            if ctx.is_seen_in_run(exc):
+            if runner_ctx.is_seen_in_run(exc):
                 continue
             _on_failure(exc, str(exc) or f"Custom check failed: `{name}`", None)
         except MultipleFailures as exc:
             for subexc in exc.exceptions:
-                if ctx.is_seen_in_run(subexc):
+                if runner_ctx.is_seen_in_run(subexc):
                     continue
                 _on_failure(subexc, str(subexc), subexc.context)
 
@@ -93,7 +90,7 @@ def validate_response(
             try:
                 raise AssertionError(message)
             except AssertionError as _exc:
-                if not ctx.is_seen_in_run(_exc):
+                if not runner_ctx.is_seen_in_run(_exc):
                     _on_failure(_exc, message, context)
         else:
             _on_passed("max_response_time", case)

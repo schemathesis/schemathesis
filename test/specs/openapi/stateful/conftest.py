@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 import hypothesis
 import pytest
-from flask import Flask, jsonify, request
+from flask import Flask, abort, jsonify, request
 
 import schemathesis
 from schemathesis.stateful.runner import StatefulTestRunnerConfig
@@ -22,6 +22,8 @@ class AppConfig:
     unsatisfiable: bool = False
     custom_headers: dict | None = None
     multiple_source_links: bool = False
+    auth_token: str | None = None
+    ignored_auth: bool = False
     slowdown: float | int | None = None
 
 
@@ -267,6 +269,26 @@ def app_factory(empty_open_api_3_schema):
             time.sleep(config.slowdown)
         return jsonify({"message": "Nothing happened"}), 200
 
+    @app.before_request
+    def check_auth():
+        if config.ignored_auth or config.auth_token is None or request.endpoint == get_spec.__name__:
+            # Allow all requests if auth is ignored or no token is set + to schema
+            return
+
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            abort(401, description="Authorization header is missing")
+
+        try:
+            token_type, token = auth_header.split()
+            if token_type.lower() != "bearer":
+                abort(401, description="Invalid token type")
+
+            if token != config.auth_token:
+                abort(401, description="Invalid token")
+        except ValueError:
+            abort(401, description="Invalid Authorization header format")
+
     def _factory(
         *,
         use_after_free=False,
@@ -279,10 +301,20 @@ def app_factory(empty_open_api_3_schema):
         custom_headers=None,
         multiple_source_links=False,
         single_link=False,
+        auth_token=None,
+        ignored_auth=False,
         slowdown=None,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
+        config.auth_token = auth_token
+        config.ignored_auth = ignored_auth
+        if ignored_auth:
+            empty_open_api_3_schema["components"]["securitySchemes"] = {
+                "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
+            }
+            empty_open_api_3_schema["security"] = [{"bearerAuth": []}]
+
         config.merge_body = merge_body
         if not merge_body:
             empty_open_api_3_schema["paths"]["/users"]["post"]["responses"]["201"]["links"]["UpdateUser"][
