@@ -79,24 +79,18 @@ class CassetteWriter(EventHandler):
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, events.Initialized):
             # In the beginning we write metadata and start `http_interactions` list
-            self.queue.put(Initialize())
+            self.queue.put(Initialize(seed=event.seed))
         elif isinstance(event, events.AfterExecution):
-            # Seed is always present at this point, the original Optional[int] type is there because `TestResult`
-            # instance is created before `seed` is generated on the hypothesis side
-            seed = cast(int, event.result.seed)
             self.queue.put(
                 Process(
-                    seed=seed,
                     correlation_id=event.correlation_id,
                     thread_id=event.thread_id,
                     interactions=event.result.interactions,
                 )
             )
         elif isinstance(event, events.AfterStatefulExecution):
-            seed = cast(int, event.result.seed)
             self.queue.put(
                 Process(
-                    seed=seed,
                     # Correlation ID is not used in stateful testing
                     correlation_id="",
                     thread_id=event.thread_id,
@@ -118,12 +112,13 @@ class CassetteWriter(EventHandler):
 class Initialize:
     """Start up, the first message to make preparations before proceeding the input data."""
 
+    seed: int | None
+
 
 @dataclass
 class Process:
     """A new chunk of data should be processed."""
 
-    seed: int
     correlation_id: str
     thread_id: int
     interactions: list[SerializedInteraction]
@@ -219,9 +214,11 @@ def vcr_writer(file_handle: click.utils.LazyFile, preserve_exact_body_bytes: boo
                 )
                 write_double_quoted(output, string)
 
+    seed = "null"
     while True:
         item = queue.get()
         if isinstance(item, Initialize):
+            seed = f"'{item.seed}'"
             stream.write(
                 f"""command: '{get_command_representation()}'
 recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'
@@ -235,7 +232,7 @@ http_interactions:"""
                 stream.write(
                     f"""\n- id: '{current_id}'
   status: '{status}'
-  seed: '{item.seed}'
+  seed: {seed}
   thread_id: {item.thread_id}
   correlation_id: '{item.correlation_id}'
   data_generation_method: '{interaction.data_generation_method.value}'

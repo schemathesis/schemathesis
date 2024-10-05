@@ -7,7 +7,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Any, Generator, Optional, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar, cast
 from urllib.parse import urlparse
 
 from .. import failures
