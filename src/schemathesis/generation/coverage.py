@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import functools
 from contextlib import contextmanager, suppress
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import lru_cache
 from itertools import combinations
 from typing import Any, Generator, Iterator, TypeVar, cast
@@ -69,7 +69,14 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 
 @dataclass
 class CoverageContext:
-    data_generation_methods: list[DataGenerationMethod] = field(default_factory=DataGenerationMethod.all)
+    data_generation_methods: list[DataGenerationMethod]
+
+    __slots__ = ("data_generation_methods",)
+
+    def __init__(self, data_generation_methods: list[DataGenerationMethod] | None = None) -> None:
+        self.data_generation_methods = (
+            data_generation_methods if data_generation_methods is not None else DataGenerationMethod.all()
+        )
 
     @classmethod
     def with_positive(cls) -> CoverageContext:
