@@ -8,6 +8,7 @@ Changelog
 
 - False positive for ``ignored_auth`` when used in stateful test runner. :issue:`2482`
 - Open Api 3.1 spec using ``$ref`` in a path is incorrectly validated as invalid. :issue:`2484`
+- Properly serialize ``seed`` in cassettes if ``--hypothesis-derandomize`` is present.
 
 .. _v3.36.3:
 
