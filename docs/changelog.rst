@@ -10,6 +10,10 @@ Changelog
 - Open Api 3.1 spec using ``$ref`` in a path is incorrectly validated as invalid. :issue:`2484`
 - Properly serialize ``seed`` in cassettes if ``--hypothesis-derandomize`` is present.
 
+**Performance**
+
+- Improvements for the coverage phase.
+
 .. _v3.36.3:
 
 :version:`3.36.3 <v3.36.2...v3.36.3>` - 2024-09-29
