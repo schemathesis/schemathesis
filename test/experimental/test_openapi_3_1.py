@@ -83,3 +83,19 @@ def test_openapi_3_1_schema_validation():
     }
     with pytest.raises(SchemaError):
         from_dict(raw_schema, validate_schema=True, force_schema_version="30")
+
+
+def test_openapi_3_1_regression_path_ref():
+    OPEN_API_3_1.enable()
+    raw_schema = {
+        "openapi": "3.1.0",
+        "info": {"title": "Test correct validation of spec using $ref in pathItem", "version": "0.0.1"},
+        "paths": {
+            "/foo": {
+                "get": {"summary": "dummy", "operationId": "dummy", "responses": {"200": {"description": "Success"}}}
+            },
+            "/bar": {"$ref": "#/paths/~1bar"},
+        },
+    }
+
+    from_dict(raw_schema,validate_schema=True)

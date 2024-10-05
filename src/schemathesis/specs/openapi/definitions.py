@@ -1330,6 +1330,8 @@ OPENAPI_30 = {
         },
     },
 }
+# Generated from the updated schema.yaml from 0035208, which includes unpublished bugfixes
+# https://github.com/OAI/OpenAPI-Specification/blob/0035208611701b4f7f2c959eb99a8725cca41e6e/schemas/v3.1/schema.yaml
 OPENAPI_31 = {
     "$id": "https://spec.openapis.org/oas/3.1/schema/2022-10-07",
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -1345,7 +1347,7 @@ OPENAPI_31 = {
         },
         "servers": {"type": "array", "items": {"$ref": "#/$defs/server"}, "default": [{"url": "/"}]},
         "paths": {"$ref": "#/$defs/paths"},
-        "webhooks": {"type": "object", "additionalProperties": {"$ref": "#/$defs/path-item-or-reference"}},
+        "webhooks": {"type": "object", "additionalProperties": {"$ref": "#/$defs/path-item"}},
         "components": {"$ref": "#/$defs/components"},
         "security": {"type": "array", "items": {"$ref": "#/$defs/security-requirement"}},
         "tags": {"type": "array", "items": {"$ref": "#/$defs/tag"}},
@@ -1400,7 +1402,7 @@ OPENAPI_31 = {
             "$comment": "https://spec.openapis.org/oas/v3.1.0#server-object",
             "type": "object",
             "properties": {
-                "url": {"type": "string", "format": "uri-reference"},
+                "url": {"type": "string"},
                 "description": {"type": "string"},
                 "variables": {"type": "object", "additionalProperties": {"$ref": "#/$defs/server-variable"}},
             },
@@ -1439,7 +1441,7 @@ OPENAPI_31 = {
                 },
                 "links": {"type": "object", "additionalProperties": {"$ref": "#/$defs/link-or-reference"}},
                 "callbacks": {"type": "object", "additionalProperties": {"$ref": "#/$defs/callbacks-or-reference"}},
-                "pathItems": {"type": "object", "additionalProperties": {"$ref": "#/$defs/path-item-or-reference"}},
+                "pathItems": {"type": "object", "additionalProperties": {"$ref": "#/$defs/path-item"}},
             },
             "patternProperties": {
                 "^(schemas|responses|parameters|examples|requestBodies|headers|securitySchemes|links|callbacks|pathItems)$": {
@@ -1461,6 +1463,7 @@ OPENAPI_31 = {
             "$comment": "https://spec.openapis.org/oas/v3.1.0#path-item-object",
             "type": "object",
             "properties": {
+                "$ref": {"type": "string", "format": "uri-reference"},
                 "summary": {"type": "string"},
                 "description": {"type": "string"},
                 "servers": {"type": "array", "items": {"$ref": "#/$defs/server"}},
@@ -1476,11 +1479,6 @@ OPENAPI_31 = {
             },
             "$ref": "#/$defs/specification-extensions",
             "unevaluatedProperties": False,
-        },
-        "path-item-or-reference": {
-            "if": {"type": "object", "required": ["$ref"]},
-            "then": {"$ref": "#/$defs/reference"},
-            "else": {"$ref": "#/$defs/path-item"},
         },
         "operation": {
             "$comment": "https://spec.openapis.org/oas/v3.1.0#operation-object",
@@ -1542,7 +1540,6 @@ OPENAPI_31 = {
                             "if": {"properties": {"in": {"const": "path"}}, "required": ["in"]},
                             "then": {
                                 "properties": {
-                                    "name": {"pattern": "[^/#?]+$"},
                                     "style": {"default": "simple", "enum": ["matrix", "label", "simple"]},
                                     "required": {"const": True},
                                 },
@@ -1662,7 +1659,7 @@ OPENAPI_31 = {
             "$comment": "https://spec.openapis.org/oas/v3.1.0#callback-object",
             "type": "object",
             "$ref": "#/$defs/specification-extensions",
-            "additionalProperties": {"$ref": "#/$defs/path-item-or-reference"},
+            "additionalProperties": {"$ref": "#/$defs/path-item"},
         },
         "callbacks-or-reference": {
             "if": {"type": "object", "required": ["$ref"]},
@@ -1755,7 +1752,6 @@ OPENAPI_31 = {
                 "summary": {"type": "string"},
                 "description": {"type": "string"},
             },
-            "unevaluatedProperties": False,
         },
         "schema": {
             "$comment": "https://spec.openapis.org/oas/v3.1.0#schema-object",
