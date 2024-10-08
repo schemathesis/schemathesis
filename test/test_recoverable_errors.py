@@ -58,9 +58,9 @@ def test_(case):
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     result.assert_outcomes(passed=1, failed=2)
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
         expected = EXPECTED_OUTPUT_LINES
-    else:
+    elif is_older_subtests.below_0_11_0:
         expected = [
             # Path-level error. no method is displayed
             r".*test_\[/foo\] SUBFAIL",
@@ -71,6 +71,18 @@ def test_(case):
             # The error in both failing cases
             ".*Unresolvable JSON pointer in the schema.*",
         ]
+    else:
+        expected = [
+            # Path-level error. no method is displayed
+            r".*test_\[/foo\] \(path='/foo'\) SUBFAIL",
+            # Valid operation
+            r".*test_\[GET /bar\] \(verbose_name='GET /bar'\) SUBPASS",
+            # Operation-level error
+            r".*test_\[POST /bar\] \(method='POST', path='/bar'\) SUBFAIL",
+            # The error in both failing cases
+            ".*Unresolvable JSON pointer in the schema.*",
+        ]
+
     result.stdout.re_match_lines(expected)
 
 
