@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.36.4...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support for ``pytest-subtests`` up to ``0.14``.
+
 .. _v3.36.4:
 
 :version:`3.36.4 <v3.36.3...v3.36.4>` - 2024-10-05
