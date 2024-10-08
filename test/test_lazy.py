@@ -788,13 +788,15 @@ def test_(case):
     )
     # Then it should be skipped
     result = testdir.runpytest("-v", "-rs")
-    result.assert_outcomes(passed=1, skipped=1)
     if is_older_subtests.below_0_6_0:
+        result.assert_outcomes(passed=1, skipped=1)
         expected = [r".* SKIPPED .*"]
     elif is_older_subtests.below_0_11_0:
+        result.assert_outcomes(passed=1, skipped=1)
         expected = [r".* SUBSKIP .*"]
     else:
-        expected = [r".* SUBSKIP .*"]
+        # We do not assert the outcome here, because it is not reported.
+        expected = []
     expected.append(r".*It is not possible to generate negative test cases.*")
     result.stdout.re_match_lines(expected)
 
