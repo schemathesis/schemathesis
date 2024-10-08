@@ -14,6 +14,7 @@ from ...exceptions import (
     get_malformed_media_type_error,
     get_missing_content_type_error,
     get_negative_rejection_error,
+    get_positive_acceptance_error,
     get_response_type_error,
     get_schema_validation_error,
     get_status_code_error,
@@ -21,7 +22,7 @@ from ...exceptions import (
 )
 from ...internal.transformation import convert_boolean_string
 from ...transports.content_types import parse_content_type
-from .utils import expand_status_code
+from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
@@ -228,6 +229,42 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
         raise exc_class(
             failures.AcceptedNegativeData.title,
             context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),
+        )
+    return None
+
+
+def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+    from .schemas import BaseOpenAPISchema
+
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+        return True
+
+    config = ctx.config.positive_data_acceptance
+    expected_success_codes = expand_status_codes(config.expected_success_codes or [])
+    allowed_failure_codes = expand_status_codes(config.allowed_failure_codes or [])
+
+    if (
+        case.data_generation_method
+        and case.data_generation_method.is_positive
+        and response.status_code not in expected_success_codes
+        and response.status_code not in allowed_failure_codes
+    ):
+        sorted_expected_success_codes = sorted(config.expected_success_codes)
+        sorted_allowed_failure_codes = sorted(config.allowed_failure_codes)
+
+        message = (
+            f"Expected success codes: {', '.join(sorted_expected_success_codes)}\n"
+            f"Allowed failure codes: {', '.join(sorted_allowed_failure_codes)}"
+        )
+        exc_class = get_positive_acceptance_error(case.operation.verbose_name, response.status_code)
+        raise exc_class(
+            failures.RejectedPositiveData.title,
+            context=failures.RejectedPositiveData(
+                message=message,
+                actual_status_code=response.status_code,
+                expected_success_codes=sorted_expected_success_codes,
+                allowed_failure_codes=sorted_allowed_failure_codes,
+            ),
         )
     return None
 

@@ -1,13 +1,16 @@
 import pytest
 
 import schemathesis
+from schemathesis.exceptions import CheckFailed
 from schemathesis.generation import DataGenerationMethod
+from schemathesis.internal.checks import CheckConfig, CheckContext, PositiveDataAcceptanceConfig
 from schemathesis.models import Case, GenerationMetadata, TestPhase
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
     negative_data_rejection,
+    positive_data_acceptance,
 )
 
 
@@ -169,3 +172,61 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         query={"key": 5, "unknown": 3},
     )
     assert negative_data_rejection(None, response, case) is None
+
+
+@pytest.mark.parametrize(
+    "status_code, expected_success_codes, allowed_failure_codes, is_positive, should_raise",
+    [
+        (200, ["200"], ["400"], True, False),
+        (400, ["200"], ["400"], True, False),
+        (300, ["200"], ["400"], True, True),
+        (200, ["2XX"], ["4XX"], True, False),
+        (299, ["2XX"], ["4XX"], True, False),
+        (400, ["2XX"], ["4XX"], True, False),
+        (500, ["2XX"], ["4XX"], True, True),
+        (200, ["200", "201"], ["400", "401"], True, False),
+        (201, ["200", "201"], ["400", "401"], True, False),
+        (400, ["200", "201"], ["400", "401"], True, False),
+        (402, ["200", "201"], ["400", "401"], True, True),
+        (200, ["2XX", "3XX"], ["4XX"], True, False),
+        (300, ["2XX", "3XX"], ["4XX"], True, False),
+        (400, ["2XX", "3XX"], ["4XX"], True, False),
+        (500, ["2XX", "3XX"], ["4XX"], True, True),
+        # Negative data, should not raise
+        (200, ["200"], ["400"], False, False),
+        (400, ["200"], ["400"], False, False),
+    ],
+)
+def test_positive_data_acceptance(
+    response_factory,
+    sample_schema,
+    status_code,
+    expected_success_codes,
+    allowed_failure_codes,
+    is_positive,
+    should_raise,
+):
+    schema = schemathesis.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    response = response_factory.requests(status_code=status_code)
+    case = Case(
+        operation=operation,
+        generation_time=0.0,
+        meta=build_metadata(query=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative),
+        data_generation_method=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative,
+    )
+    ctx = CheckContext(
+        config=CheckConfig(
+            positive_data_acceptance=PositiveDataAcceptanceConfig(
+                expected_success_codes=expected_success_codes,
+                allowed_failure_codes=allowed_failure_codes,
+            )
+        )
+    )
+
+    if should_raise:
+        with pytest.raises(CheckFailed) as exc_info:
+            positive_data_acceptance(ctx, response, case)
+        assert "Rejected positive data" in str(exc_info.value)
+    else:
+        assert positive_data_acceptance(ctx, response, case) is None

@@ -58,6 +58,13 @@ class CsvChoice(BaseCsvChoice):
         self.fail_on_invalid_options(invalid_options, selected)
 
 
+class CsvListChoice(click.ParamType):
+    def convert(  # type: ignore[return]
+        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
+    ) -> list[str]:
+        return [item for item in value.split(",") if item]
+
+
 class OptionalInt(click.types.IntRange):
     def convert(  # type: ignore
         self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None

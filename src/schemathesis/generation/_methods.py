@@ -27,6 +27,10 @@ class DataGenerationMethod(str, Enum):
         }[self]
 
     @property
+    def is_positive(self) -> bool:
+        return self == DataGenerationMethod.positive
+
+    @property
     def is_negative(self) -> bool:
         return self == DataGenerationMethod.negative
 

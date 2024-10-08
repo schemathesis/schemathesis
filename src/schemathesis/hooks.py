@@ -285,9 +285,9 @@ class HookDispatcher:
         self._hooks = defaultdict(list)
 
 
-def _should_skip_hook(hook: Callable, context: HookContext) -> bool:
+def _should_skip_hook(hook: Callable, ctx: HookContext) -> bool:
     filter_set = getattr(hook, "filter_set", None)
-    return filter_set is not None and not filter_set.match(context)
+    return filter_set is not None and ctx.operation is not None and not filter_set.match(ctx)
 
 
 def apply_to_all_dispatchers(

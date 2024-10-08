@@ -344,6 +344,48 @@ def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: 
     return reduce(operator.iadd, value, [])
 
 
+def convert_status_codes(
+    ctx: click.core.Context, param: click.core.Parameter, value: list[str] | None
+) -> list[str] | None:
+    if not value:
+        return value
+
+    invalid = []
+
+    for code in value:
+        if len(code) != 3:
+            invalid.append(code)
+            continue
+
+        if code[0] not in {"1", "2", "3", "4", "5"}:
+            invalid.append(code)
+            continue
+
+        upper_code = code.upper()
+
+        if "X" in upper_code:
+            if (
+                upper_code[1:] == "XX"
+                or (upper_code[1] == "X" and upper_code[2].isdigit())
+                or (upper_code[1].isdigit() and upper_code[2] == "X")
+            ):
+                continue
+            else:
+                invalid.append(code)
+                continue
+
+        if not code.isnumeric():
+            invalid.append(code)
+
+    if invalid:
+        raise click.UsageError(
+            f"Invalid status code(s): {', '.join(invalid)}. "
+            "Use valid 3-digit codes between 100 and 599, "
+            "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
+        )
+    return value
+
+
 def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
     return CodeSampleStyle.from_str(value)
 

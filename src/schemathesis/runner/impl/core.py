@@ -57,7 +57,7 @@ from ...exceptions import (
 )
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
-from ...internal.checks import CheckContext
+from ...internal.checks import CheckConfig, CheckContext
 from ...internal.datetime import current_datetime
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, Check, Status, TestResult
@@ -102,6 +102,7 @@ class BaseRunner:
     hypothesis_settings: hypothesis.settings
     generation_config: GenerationConfig | None
     probe_config: probes.ProbeConfig
+    checks_config: CheckConfig
     request_config: RequestConfig = field(default_factory=RequestConfig)
     override: CaseOverride | None = None
     auth: RawAuth | None = None
@@ -131,7 +132,13 @@ class BaseRunner:
         # If auth is explicitly provided, then the global provider is ignored
         if self.auth is not None:
             unregister_auth()
-        ctx = RunnerContext(auth=self.auth, seed=self.seed, stop_event=stop_event, unique_data=self.unique_data)
+        ctx = RunnerContext(
+            auth=self.auth,
+            seed=self.seed,
+            stop_event=stop_event,
+            unique_data=self.unique_data,
+            checks_config=self.checks_config,
+        )
         start_time = time.monotonic()
         initialized = None
         __probes = None
@@ -1017,7 +1024,9 @@ def _network_test(
     run_targets(targets, context)
     status = Status.success
 
-    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(
+        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+    )
     try:
         run_checks(
             case=case,
@@ -1109,7 +1118,9 @@ def _wsgi_test(
     result.logs.extend(recorded.records)
     status = Status.success
     check_results: list[Check] = []
-    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(
+        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+    )
     try:
         run_checks(
             case=case,
@@ -1189,7 +1200,9 @@ def _asgi_test(
     run_targets(targets, context)
     status = Status.success
     check_results: list[Check] = []
-    check_ctx = CheckContext(auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None)
+    check_ctx = CheckContext(
+        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+    )
     try:
         run_checks(
             case=case,

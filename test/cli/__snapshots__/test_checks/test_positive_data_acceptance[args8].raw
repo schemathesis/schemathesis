@@ -1,0 +1,7 @@
+Exit code: 2
+---
+Stdout:
+Usage: run [OPTIONS] SCHEMA [API_NAME]
+Try 'run -h' for help.
+
+Error: Invalid status code(s): 600. Use valid 3-digit codes between 100 and 599, or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit.

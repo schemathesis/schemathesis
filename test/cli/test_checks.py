@@ -127,3 +127,84 @@ def get_users(x_token: Annotated[str, Header()]):
         )
         == snapshot_cli
     )
+
+
+@pytest.fixture
+def schema(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/test": {
+            "get": {
+                "responses": {
+                    "200": {"description": "Successful response"},
+                    "400": {"description": "Bad request"},
+                }
+            }
+        }
+    }
+    return empty_open_api_3_schema
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        [],  # Default case
+        ["--experimental-positive-data-acceptance-expected-success-codes=404"],
+        ["--experimental-positive-data-acceptance-allowed-failure-codes=405"],
+        ["--experimental-positive-data-acceptance-expected-success-codes=2xx,404"],
+        ["--experimental-positive-data-acceptance-expected-success-codes=200"],
+        [
+            "--experimental-positive-data-acceptance-expected-success-codes=200",
+            "--experimental-positive-data-acceptance-allowed-failure-codes=404",
+        ],
+        ["--experimental-positive-data-acceptance-expected-success-codes=2xx"],
+        ["--experimental-positive-data-acceptance-allowed-failure-codes=4xx"],
+        # Invalid status code
+        ["--experimental-positive-data-acceptance-expected-success-codes=200,600"],
+        # Invalid wildcard
+        ["--experimental-positive-data-acceptance-expected-success-codes=xxx"],
+        [
+            "--experimental-positive-data-acceptance-expected-success-codes=200,201",
+            "--experimental-positive-data-acceptance-allowed-failure-codes=400,401",
+        ],
+    ],
+)
+def test_positive_data_acceptance(
+    testdir,
+    cli,
+    snapshot_cli,
+    schema,
+    openapi3_base_url,
+    args,
+):
+    schema_file = testdir.make_openapi_schema_file(schema)
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-max-examples=5",
+            "--experimental=positive_data_acceptance",
+            *args,
+        )
+        == snapshot_cli
+    )
+
+
+def test_positive_data_acceptance_with_env_vars(
+    testdir,
+    cli,
+    snapshot_cli,
+    schema,
+    openapi3_base_url,
+    monkeypatch,
+):
+    schema_file = testdir.make_openapi_schema_file(schema)
+    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE", "true")
+    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES", "403")
+    assert (
+        cli.run(
+            str(schema_file),
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-max-examples=5",
+        )
+        == snapshot_cli
+    )

@@ -1,0 +1,55 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+GET /api/test F                                                           [100%]
+
+=================================== FAILURES ===================================
+________________________________ GET /api/test _________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Rejected positive data
+
+    Expected success codes: 2xx
+    Allowed failure codes: 405
+
+[404] Not Found:
+
+    `404: Not Found`
+
+Reproduce with: 
+
+    curl -X GET http://127.0.0.1/api/test
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                          2 / 2 passed          PASSED 
+    positive_data_acceptance                    0 / 2 passed          FAILED 
+
+WARNING: All API responses have a 404 status code. Did you specify the proper API location?
+
+Experimental Features:
+  - Positive Data Acceptance: Verifying schema-conformant data is accepted
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
+Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+
+Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== 1 failed in 1.00s ===============================
