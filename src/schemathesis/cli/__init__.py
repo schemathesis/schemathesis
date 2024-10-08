@@ -36,6 +36,7 @@ from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
+from ..internal.checks import CheckConfig, PositiveDataAcceptanceConfig
 from ..internal.datetime import current_datetime
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
@@ -52,7 +53,7 @@ from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CsvChoice, CsvEnumChoice, CustomHelpMessageChoice, OptionalInt
+from .options import CsvChoice, CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt
 from .sanitization import SanitizationHandler
 
 if TYPE_CHECKING:
@@ -297,6 +298,14 @@ REPORT_TO_SERVICE = ReportToService()
     help="Simulate test execution without making any actual requests, useful for validating data generation",
 )
 @grouped_option(
+    "--fixups",
+    help="Apply compatibility adjustments",
+    multiple=True,
+    type=click.Choice([*ALL_FIXUPS, "all"]),
+    metavar="",
+)
+@group("Experimental options")
+@grouped_option(
     "--experimental",
     "experiments",
     help="Enable experimental features",
@@ -307,6 +316,7 @@ REPORT_TO_SERVICE = ReportToService()
             experimental.STATEFUL_TEST_RUNNER.name,
             experimental.STATEFUL_ONLY.name,
             experimental.COVERAGE_PHASE.name,
+            experimental.POSITIVE_DATA_ACCEPTANCE.name,
         ]
     ),
     callback=callbacks.convert_experimental,
@@ -314,11 +324,22 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
-    "--fixups",
-    help="Apply compatibility adjustments",
-    multiple=True,
-    type=click.Choice([*ALL_FIXUPS, "all"]),
+    "--experimental-positive-data-acceptance-expected-success-codes",
+    "positive_data_acceptance_expected_success_codes",
+    help="Comma-separated list of status codes considered as successful responses",
+    type=CsvListChoice(),
+    callback=callbacks.convert_status_codes,
     metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_EXPECTED_SUCCESS_CODES",
+)
+@grouped_option(
+    "--experimental-positive-data-acceptance-allowed-failure-codes",
+    "positive_data_acceptance_allowed_failure_codes",
+    help="Comma-separated list of status codes allowed without triggering the check",
+    type=CsvListChoice(),
+    callback=callbacks.convert_status_codes,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES",
 )
 @group("API validation options")
 @grouped_option(
@@ -834,6 +855,8 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
+    positive_data_acceptance_expected_success_codes: list[str],
+    positive_data_acceptance_allowed_failure_codes: list[str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -1142,6 +1165,19 @@ def run(
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
+    if experimental.POSITIVE_DATA_ACCEPTANCE.is_enabled:
+        from ..specs.openapi.checks import positive_data_acceptance
+
+        selected_checks += (positive_data_acceptance,)
+        checks_config = CheckConfig(
+            positive_data_acceptance=PositiveDataAcceptanceConfig(
+                expected_success_codes=positive_data_acceptance_expected_success_codes or ["2xx"],
+                allowed_failure_codes=positive_data_acceptance_allowed_failure_codes or ["404", "401", "403"],
+            )
+        )
+    else:
+        checks_config = CheckConfig()
+
     selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
 
     if fixups:
@@ -1197,6 +1233,7 @@ def run(
         stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
+        checks_config=checks_config,
         output_config=output_config,
         service_client=client,
         filter_set=filter_set,
@@ -1300,6 +1337,7 @@ def into_event_stream(
     filter_set: FilterSet,
     # Runtime behavior
     checks: Iterable[CheckFunction],
+    checks_config: CheckConfig,
     max_response_time: int | None,
     targets: Iterable[Target],
     workers_num: int,
@@ -1358,6 +1396,7 @@ def into_event_stream(
             dry_run=dry_run,
             store_interactions=store_interactions,
             checks=checks,
+            checks_config=checks_config,
             max_response_time=max_response_time,
             targets=targets,
             workers_num=workers_num,

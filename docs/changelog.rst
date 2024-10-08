@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support for ``pytest-subtests`` up to ``0.14``.
+- Experimental "Positive Data Acceptance" check to verify that schema-conforming data receives 2xx status responses. Enable with `--experimental=positive_data_acceptance`
 
 .. _v3.36.4:
 

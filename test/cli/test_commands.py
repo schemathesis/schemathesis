@@ -40,6 +40,7 @@ from schemathesis.constants import (
 )
 from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.internal.checks import CheckConfig
 from schemathesis.internal.datetime import current_datetime
 from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
@@ -291,6 +292,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
 
     expected = {
         "checks": DEFAULT_CHECKS,
+        "checks_config": CheckConfig(),
         "targets": DEFAULT_TARGETS,
         "workers_num": 1,
         "exit_first": False,

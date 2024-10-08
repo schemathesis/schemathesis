@@ -142,6 +142,18 @@ class AcceptedNegativeData(FailureContext):
 
 
 @dataclass(repr=False)
+class RejectedPositiveData(FailureContext):
+    """Response with positive data was rejected."""
+
+    message: str
+    actual_status_code: int
+    expected_success_codes: list[str]
+    allowed_failure_codes: list[str]
+    title: str = "Rejected positive data"
+    type: str = "rejected_positive_data"
+
+
+@dataclass(repr=False)
 class UseAfterFree(FailureContext):
     """Resource was used after a successful DELETE operation on it."""
 

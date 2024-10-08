@@ -100,3 +100,10 @@ COVERAGE_PHASE = GLOBAL_EXPERIMENTS.create_experiment(
     description="Generate covering test cases",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2418",
 )
+POSITIVE_DATA_ACCEPTANCE = GLOBAL_EXPERIMENTS.create_experiment(
+    name="positive_data_acceptance",
+    verbose_name="Positive Data Acceptance",
+    env_var="POSITIVE_DATA_ACCEPTANCE",
+    description="Verifying schema-conformant data is accepted",
+    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2499",
+)

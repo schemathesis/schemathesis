@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 import functools
+import json
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import lru_cache

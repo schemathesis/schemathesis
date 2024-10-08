@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from ...constants import NOT_SET
+from ...internal.checks import CheckConfig
 from ...models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
@@ -24,11 +25,18 @@ class RunnerContext:
     stop_event: threading.Event
     unique_data: bool
     outcome_cache: dict[int, BaseException | None]
+    checks_config: CheckConfig
 
-    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache")
+    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache", "checks_config")
 
     def __init__(
-        self, *, seed: int | None, auth: RawAuth | None, stop_event: threading.Event, unique_data: bool
+        self,
+        *,
+        seed: int | None,
+        auth: RawAuth | None,
+        stop_event: threading.Event,
+        unique_data: bool,
+        checks_config: CheckConfig,
     ) -> None:
         self.data = TestResultSet(seed=seed)
         self.auth = auth
@@ -36,6 +44,7 @@ class RunnerContext:
         self.stop_event = stop_event
         self.outcome_cache = {}
         self.unique_data = unique_data
+        self.checks_config = checks_config
 
     @property
     def is_stopped(self) -> bool:

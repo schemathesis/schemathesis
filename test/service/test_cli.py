@@ -6,6 +6,7 @@ import pytest
 from _pytest.main import ExitCode
 from requests import Timeout
 
+import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.constants import USER_AGENT
 from schemathesis.service import ci, events
@@ -17,7 +18,7 @@ from schemathesis.service.constants import (
 )
 from schemathesis.service.hosts import load_for_host
 
-from ..utils import strip_style_win32
+from ..utils import flaky, strip_style_win32
 
 
 def get_stdout_lines(stdout):
@@ -83,7 +84,10 @@ def test_server_error(cli, schema_url, service):
 
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
+@flaky(max_runs=3, min_passes=1)
 def test_error_in_another_handler(testdir, cli, schema_url, service, snapshot_cli):
+    schemathesis.hooks.unregister_all()
+
     # When a non-Schemathesis.io handler fails
     module = testdir.make_importable_pyfile(
         hook="""

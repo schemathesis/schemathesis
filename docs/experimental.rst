@@ -144,6 +144,52 @@ Using Environment Variables
 
 For more details, join the `GitHub Discussion #2418 <https://github.com/schemathesis/schemathesis/discussions/2418>`_.
 
+Positive Data Acceptance
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+Verifies that schema-conforming data receives 2xx status responses, highlighting mismatches between schema and API behavior across all endpoints.
+
+**Expected success codes**: 2xx
+**Allowed failure codes**: 404, 401, 403
+
+**Note**: May produce false positives with complex validation that is not reflected in the schema.
+
+.. _positive-data-acceptance-cli:
+
+In CLI
+~~~~~~
+
+.. code-block:: bash
+
+   st run https://example.schemathesis.io/openapi.json --experimental=positive_data_acceptance
+
+Configuration options:
+
+.. code-block:: bash
+
+   --experimental-positive-data-acceptance-expected-success-codes=200,201,202,204
+   --experimental-positive-data-acceptance-allowed-failure-codes=418
+
+.. _positive-data-acceptance-env-vars:
+
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To enable Positive Data Acceptance via environment variables:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE=true
+
+Configure status codes:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_EXPECTED_SUCCESS_CODES=200,201,202,204
+    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES=418
+
+For more details, join the `GitHub Discussion #2499 <https://github.com/schemathesis/schemathesis/discussions/2499>`_.
+
 .. _stateful-test-runner:
 
 New Stateful Test Runner

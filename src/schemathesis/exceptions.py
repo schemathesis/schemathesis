@@ -148,6 +148,10 @@ def get_negative_rejection_error(prefix: str, status: int) -> type[CheckFailed]:
     return _get_hashed_exception(f"AcceptedNegativeDataError{prefix}", str(status))
 
 
+def get_positive_acceptance_error(prefix: str, status: int) -> type[CheckFailed]:
+    return _get_hashed_exception(f"RejectedPositiveDataError{prefix}", str(status))
+
+
 def get_use_after_free_error(free: str) -> type[CheckFailed]:
     return _get_hashed_exception("UseAfterFreeError", free)
 
