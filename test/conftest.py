@@ -1141,11 +1141,19 @@ def loadable_fastapi_app(testdir):
     return f"{module.purebasename}:app"
 
 
+class SubtestsVersion:
+    """Helper to check the version of pytest-subtests."""
+
+    def __init__(self):
+        self.version = version.parse(metadata.version("pytest_subtests"))
+        self.below_0_6_0 = self.version < version.parse("0.6.0")
+        self.below_0_11_0 = self.version < version.parse("0.11.0")
+
+
 @pytest.fixture(scope="session")
-def is_older_subtests():
+def is_older_subtests() -> SubtestsVersion:
     # For compatibility needs
-    version_string = metadata.version("pytest_subtests")
-    return version.parse(version_string) < version.parse("0.6.0")
+    return SubtestsVersion()
 
 
 @pytest.fixture

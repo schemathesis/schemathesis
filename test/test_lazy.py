@@ -72,20 +72,28 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
     result.assert_outcomes(passed=1, failed=1)
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
         expected = [
             r"test_invalid_operation.py::test_\[GET /v1/valid\] PASSED *\[ 25%\]",
             r"test_invalid_operation.py::test_\[GET /v1/invalid\] FAILED *\[ 50%\]",
             r"test_invalid_operation.py::test_\[GET /v1/users\] PASSED *\[ 75%\]",
             r".*1 passed",
         ]
-    else:
+    elif is_older_subtests.below_0_11_0:
         expected = [
             r"test_invalid_operation.py::test_\[GET /v1/valid\] SUBPASS +\[ 25%\]",
             r"test_invalid_operation.py::test_\[GET /v1/invalid\] SUBFAIL +\[ 50%\]",
             r"test_invalid_operation.py::test_\[GET /v1/users\] SUBPASS +\[ 75%\]",
             r".*1 passed",
         ]
+    else:
+        expected = [
+            r"test_invalid_operation.py::test_\[GET /v1/valid\] \(verbose_name='GET /v1/valid'\) SUBPASS +\[ 25%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/invalid\] \(verbose_name='GET /v1/invalid'\) SUBFAIL +\[ 50%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS +\[ 75%\]",
+            r"test_invalid_operation.py::test_ PASSED +\[100%\]",
+        ]
+
     result.stdout.re_match_lines(expected)
     # 100 for /valid, 1 for /users
     hypothesis_calls = (hypothesis_max_examples or 100) + 1
@@ -540,16 +548,22 @@ def test_(case):
     result = testdir.runpytest("-v")
     # Then tests should be parametrized as usual
     result.assert_outcomes(passed=2)
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
         expected = [
             r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] PASSED",
             r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] PASSED",
         ]
-    else:
+    elif is_older_subtests.below_0_11_0:
         expected = [
             r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] SUBPASS",
             r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] SUBPASS",
         ]
+    else:
+        expected = [
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] \(verbose_name='GET /api/users'\) SUBPASS +\[ 33%\]",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] \(verbose_name='GET /api/users'\) SUBPASS +\[ 75%\]",
+        ]
+
     result.stdout.re_match_lines(expected)
 
 
@@ -600,13 +614,17 @@ def pytest_terminal_summary(terminalreporter) -> None:
     )
     # Then it should be taken into account
     result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)  # It is still a single test on the top level
     # And it should be the same test in the end
     message = r"test_data_generation_methods.py::test_\[GET /v1/users\] "
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
         message += "PASSED"
-    else:
+        result.assert_outcomes(passed=1)  # It is still a single test on the top level
+    elif is_older_subtests.below_0_11_0:
         message += "SUBPASS"
+        result.assert_outcomes(passed=1)  # It is still a single test on the top level
+    else:
+        message += r"\(verbose_name='GET /v1/users'\) SUBPASS"
+        # We do not assert the outcome here, because it is not reported.
     result.stdout.re_match_lines([message])
 
 
@@ -633,10 +651,12 @@ def test_(case):
     # Then the overridden one should be used
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
         expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] PASSED *\[ 50%\]"
-    else:
+    elif is_older_subtests.below_0_11_0:
         expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] SUBPASS *\[ 50%\]"
+    else:
+        expected = r"test_data_generation_methods_override.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS *\[ 50%\]"
     result.stdout.re_match_lines([expected])
 
 
@@ -768,11 +788,15 @@ def test_(case):
     )
     # Then it should be skipped
     result = testdir.runpytest("-v", "-rs")
-    result.assert_outcomes(passed=1, skipped=1)
-    if is_older_subtests:
+    if is_older_subtests.below_0_6_0:
+        result.assert_outcomes(passed=1, skipped=1)
         expected = [r".* SKIPPED .*"]
-    else:
+    elif is_older_subtests.below_0_11_0:
+        result.assert_outcomes(passed=1, skipped=1)
         expected = [r".* SUBSKIP .*"]
+    else:
+        # We do not assert the outcome here, because it is not reported.
+        expected = []
     expected.append(r".*It is not possible to generate negative test cases.*")
     result.stdout.re_match_lines(expected)
 

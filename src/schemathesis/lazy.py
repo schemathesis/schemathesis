@@ -1,15 +1,16 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from inspect import signature
-from typing import TYPE_CHECKING, Any, Callable, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator, Type
 
 import pytest
 from hypothesis.core import HypothesisHandle
 from hypothesis.errors import Flaky
 from hypothesis.internal.escalation import format_exception, get_trimmed_traceback
 from hypothesis.internal.reflection import impersonate
-from pytest_subtests import SubTests, nullcontext
+from pytest_subtests import SubTests
 
 from ._compat import MultipleFailures, get_interesting_origin
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
@@ -310,7 +311,7 @@ def _copy_marks(source: Callable, target: Callable) -> None:
     target.pytestmark.extend(marks)  # type: ignore
 
 
-def _get_capturemanager(request: FixtureRequest) -> Generator:
+def _get_capturemanager(request: FixtureRequest) -> Generator | Type[nullcontext]:
     capturemanager = request.node.config.pluginmanager.get_plugin("capturemanager")
     if capturemanager is not None:
         return capturemanager.global_and_fixture_disabled
