@@ -614,15 +614,17 @@ def pytest_terminal_summary(terminalreporter) -> None:
     )
     # Then it should be taken into account
     result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)  # It is still a single test on the top level
     # And it should be the same test in the end
     message = r"test_data_generation_methods.py::test_\[GET /v1/users\] "
     if is_older_subtests.below_0_6_0:
         message += "PASSED"
-    elif is_older_subtests.below_0_12_0:
+        result.assert_outcomes(passed=1)  # It is still a single test on the top level
+    elif is_older_subtests.below_0_11_0:
         message += "SUBPASS"
+        result.assert_outcomes(passed=1)  # It is still a single test on the top level
     else:
-        message += "SUBPASS"
+        message += r"\(verbose_name='GET /v1/users'\) SUBPASS"
+        # We do not assert the outcome here, because it is not reported.
     result.stdout.re_match_lines([message])
 
 
@@ -789,7 +791,7 @@ def test_(case):
     result.assert_outcomes(passed=1, skipped=1)
     if is_older_subtests.below_0_6_0:
         expected = [r".* SKIPPED .*"]
-    elif is_older_subtests.below_0_12_0:
+    elif is_older_subtests.below_0_11_0:
         expected = [r".* SUBSKIP .*"]
     else:
         expected = [r".* SUBSKIP .*"]
