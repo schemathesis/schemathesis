@@ -11,15 +11,25 @@ Usage: run [OPTIONS] SCHEMA [API_NAME]
   [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io
 
 Options:
-  -w, --workers    Number of concurrent workers for testing. Auto-adjusts if
-                   'auto' is specified  [default: 1][auto, 1-64]
-  --dry-run        Simulate test execution without making any actual requests,
-                   useful for validating data generation
-  --experimental   Enable experimental features [possible values: openapi-3.1,
-                   schema-analysis, stateful-test-runner, stateful-only,
-                   coverage-phase]
-  --fixups         Apply compatibility adjustments [possible values: fast_api,
-                   utf8_bom, all]
+  -w, --workers   Number of concurrent workers for testing. Auto-adjusts if
+                  'auto' is specified  [default: 1][auto, 1-64]
+  --dry-run       Simulate test execution without making any actual requests,
+                  useful for validating data generation
+  --fixups        Apply compatibility adjustments [possible values: fast_api,
+                  utf8_bom, all]
+
+Experimental options:
+  --experimental                            Enable experimental features
+                                            [possible values: openapi-3.1,
+                                            schema-analysis, stateful-test-
+                                            runner, stateful-only, coverage-
+                                            phase, positive_data_acceptance]
+  --experimental-positive-data-acceptance-expected-success-codes 
+                                            Comma-separated list of status codes
+                                            considered as successful responses
+  --experimental-positive-data-acceptance-allowed-failure-codes 
+                                            Comma-separated list of status codes
+                                            allowed without triggering the check
 
 API validation options:
   -c, --checks                       Comma-separated list of checks to run

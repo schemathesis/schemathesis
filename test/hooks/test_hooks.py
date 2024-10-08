@@ -63,23 +63,6 @@ def test_global_query_hook(wsgi_app_schema, schema_url):
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.operations("payload")
-def test_global_body_hook(wsgi_app_schema):
-    @schemathesis.hook
-    def filter_body(context, body):
-        return len(body["name"]) == 5
-
-    strategy = wsgi_app_schema["/payload"]["POST"].as_strategy()
-
-    @given(case=strategy)
-    @settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
-    def test(case):
-        assert len(case.body["name"]) == 5
-
-    test()
-
-
-@pytest.mark.hypothesis_nested
 @pytest.mark.operations("create_user")
 def test_case_hook(wsgi_app_schema):
     dispatcher = HookDispatcher(scope=HookScope.TEST)

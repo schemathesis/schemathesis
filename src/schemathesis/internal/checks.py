@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import inspect
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
@@ -18,6 +18,17 @@ CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[b
 
 
 @dataclass
+class PositiveDataAcceptanceConfig:
+    expected_success_codes: list[str] = field(default_factory=lambda: ["2xx"])
+    allowed_failure_codes: list[str] = field(default_factory=lambda: ["404", "401", "403"])
+
+
+@dataclass
+class CheckConfig:
+    positive_data_acceptance: PositiveDataAcceptanceConfig = field(default_factory=PositiveDataAcceptanceConfig)
+
+
+@dataclass
 class CheckContext:
     """Context for Schemathesis checks.
 
@@ -26,6 +37,7 @@ class CheckContext:
 
     auth: HTTPDigestAuth | RawAuth | None = None
     headers: CaseInsensitiveDict | None = None
+    config: CheckConfig = field(default_factory=CheckConfig)
 
 
 def wrap_check(check: Callable) -> CheckFunction:

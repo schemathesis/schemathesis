@@ -11,6 +11,7 @@ from ..constants import (
 )
 from ..exceptions import SchemaError
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod, GenerationConfig
+from ..internal.checks import CheckConfig
 from ..internal.datetime import current_datetime
 from ..internal.deprecation import deprecated_function
 from ..internal.validation import file_exists
@@ -355,6 +356,7 @@ def from_schema(
     count_operations: bool = True,
     count_links: bool = True,
     probe_config: ProbeConfig | None = None,
+    checks_config: CheckConfig | None = None,
     service_client: ServiceClient | None = None,
 ) -> BaseRunner:
     import hypothesis
@@ -371,6 +373,7 @@ def from_schema(
     )
 
     checks = checks or DEFAULT_CHECKS
+    checks_config = checks_config or CheckConfig()
     probe_config = probe_config or ProbeConfig()
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
@@ -413,6 +416,7 @@ def from_schema(
                 count_operations=count_operations,
                 count_links=count_links,
                 probe_config=probe_config,
+                checks_config=checks_config,
                 service_client=service_client,
             )
         if is_asgi_app(schema.app):
@@ -439,6 +443,7 @@ def from_schema(
                 count_operations=count_operations,
                 count_links=count_links,
                 probe_config=probe_config,
+                checks_config=checks_config,
                 service_client=service_client,
             )
         return ThreadPoolWSGIRunner(
@@ -465,6 +470,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            checks_config=checks_config,
             service_client=service_client,
         )
     if not schema.app:
@@ -492,6 +498,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            checks_config=checks_config,
             service_client=service_client,
         )
     if is_asgi_app(schema.app):
@@ -518,6 +525,7 @@ def from_schema(
             count_operations=count_operations,
             count_links=count_links,
             probe_config=probe_config,
+            checks_config=checks_config,
             service_client=service_client,
         )
     return SingleThreadWSGIRunner(
@@ -543,6 +551,7 @@ def from_schema(
         count_operations=count_operations,
         count_links=count_links,
         probe_config=probe_config,
+        checks_config=checks_config,
         service_client=service_client,
     )
 
