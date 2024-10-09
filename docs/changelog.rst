@@ -9,6 +9,10 @@ Changelog
 - Support for ``pytest-subtests`` up to ``0.14``.
 - Experimental "Positive Data Acceptance" check to verify that schema-conforming data receives 2xx status responses. Enable with `--experimental=positive_data_acceptance`
 
+**Fixed**
+
+- Internal error in conditional hooks.
+
 .. _v3.36.4:
 
 :version:`3.36.4 <v3.36.3...v3.36.4>` - 2024-10-05
