@@ -8,6 +8,7 @@ Changelog
 
 - Support negative cases for ``items`` and ``patternProperties`` during the coverage phase.
 - Location information for all negative values generated at the coverage phase.
+- Python 3.13 support.
 
 **Changed**
 
