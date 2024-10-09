@@ -11,7 +11,7 @@ schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 
 @pytest.mark.parametrize("headers", (None, {"X-Key": "42"}))
 @schema.parametrize()
-@settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
+@settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
