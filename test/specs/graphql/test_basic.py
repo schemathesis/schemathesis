@@ -4,7 +4,6 @@ from unittest.mock import ANY
 import pytest
 import requests
 import strawberry
-from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
