@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import functools
 import json
+import re
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
-from functools import lru_cache
+from functools import lru_cache, partial
 from itertools import combinations
 from typing import Any, Generator, Iterator, TypeVar, cast
 
@@ -586,9 +587,13 @@ def _negative_properties(
             )
 
 
+def _not_matching_pattern(value: str, pattern: str) -> bool:
+    return re.search(value, pattern) is None
+
+
 def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
     yield NegativeValue(
-        ctx.generate_from(st.text().filter(pattern.__ne__)),
+        ctx.generate_from(st.text().filter(partial(_not_matching_pattern, pattern=pattern))),
         description=f"Value not matching the '{pattern}' pattern",
     )
 
