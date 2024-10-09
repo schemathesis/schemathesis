@@ -107,7 +107,7 @@ def with_error(ctx, response, case):
 
 
 def extract_message(testcase, server_host):
-    return re.sub("Test Case ID: (.+?) ", "Test Case ID: <PLACEHOLDER> ", testcase.attrib["message"]).replace(
+    return re.sub(r"Test Case ID: (\w+)", "Test Case ID: <PLACEHOLDER>", testcase.attrib["message"]).replace(
         server_host, "localhost"
     )
 

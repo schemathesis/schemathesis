@@ -10,6 +10,7 @@ Changelog
 - Experimental "Positive Data Acceptance" check to verify that schema-conforming data receives 2xx status responses. Enable with `--experimental=positive_data_acceptance`
 - Experimental CLI options to configure the ``negative_data_rejection`` check.
 - More negative string combinations with patterns in the coverage phase.
+- Python 3.13 support
 
 **Fixed**
 
