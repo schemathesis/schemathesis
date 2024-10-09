@@ -227,6 +227,19 @@ def test_negative_string(nctx, schema, expected):
     assert_not_conform(covered, schema)
 
 
+def test_negative_string_with_pattern(nctx):
+    schema = {
+        "type": "string",
+        "minLength": 5,
+        "maxLength": 8,
+        "pattern": r"^[\da-z]+$",
+    }
+    covered = cover_schema(nctx, schema)
+    assert covered == [0, None, [], {}, "0000", "000000000", ""]
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
+
+
 @pytest.mark.parametrize("multiple_of", (None, 2))
 @pytest.mark.parametrize(
     "schema, values, with_multiple_of",

@@ -15,8 +15,8 @@ from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
 
-from schemathesis.constants import NOT_SET
-
+from ..constants import NOT_SET
+from ..specs.openapi.patterns import update_quantifier
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
 
@@ -234,14 +234,23 @@ def cover_schema_iter(
                             seen.add(k)
                 elif key == "minLength" and 0 < value < BUFFER_SIZE:
                     with suppress(InvalidArgument):
-                        value = ctx.generate_from_schema({**schema, "minLength": value - 1, "maxLength": value - 1})
+                        min_length = max_length = value - 1
+                        new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                        if "pattern" in new_schema:
+                            new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                        value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(value, description="String smaller than minLength")
                             seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
-                    with suppress(InvalidArgument):
-                        value = ctx.generate_from_schema({**schema, "minLength": value + 1, "maxLength": value + 1})
+                    with suppress(InvalidArgument, Unsatisfiable):
+                        min_length = value + 1
+                        max_length = value + 1
+                        new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                        if "pattern" in new_schema:
+                            new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                        value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(value, description="String larger than maxLength")
@@ -588,7 +597,7 @@ def _negative_properties(
 
 
 def _not_matching_pattern(value: str, pattern: str) -> bool:
-    return re.search(value, pattern) is None
+    return re.search(pattern, value) is None
 
 
 def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
