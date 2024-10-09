@@ -360,7 +360,7 @@ class CliSnapshotConfig:
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Compressed report size: \d+ [KMG]B", "Compressed report size: XX KB", data)
         if "Traceback (most recent call last):" in data:
-            lines = [line for line in data.splitlines() if set(line) != {" ", "^"}]
+            lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
             comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
             # Drop frames that are related to comprehensions
             for idx in comprehension_ids[::-1]:
