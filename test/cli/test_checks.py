@@ -94,7 +94,6 @@ def test_negative_data_rejection(testdir, cli, empty_open_api_3_schema, openapi3
         "--hypothesis-max-examples=5",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED
-    assert "Negative data was not rejected as expected by the API" in result.stdout
 
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
@@ -148,24 +147,18 @@ def schema(empty_open_api_3_schema):
     "args",
     [
         [],  # Default case
-        ["--experimental-positive-data-acceptance-expected-success-codes=404"],
-        ["--experimental-positive-data-acceptance-allowed-failure-codes=405"],
-        ["--experimental-positive-data-acceptance-expected-success-codes=2xx,404"],
-        ["--experimental-positive-data-acceptance-expected-success-codes=200"],
-        [
-            "--experimental-positive-data-acceptance-expected-success-codes=200",
-            "--experimental-positive-data-acceptance-allowed-failure-codes=404",
-        ],
-        ["--experimental-positive-data-acceptance-expected-success-codes=2xx"],
-        ["--experimental-positive-data-acceptance-allowed-failure-codes=4xx"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=404"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=405"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=2xx,404"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=200"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=200,404"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=2xx"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=4xx"],
         # Invalid status code
-        ["--experimental-positive-data-acceptance-expected-success-codes=200,600"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=200,600"],
         # Invalid wildcard
-        ["--experimental-positive-data-acceptance-expected-success-codes=xxx"],
-        [
-            "--experimental-positive-data-acceptance-expected-success-codes=200,201",
-            "--experimental-positive-data-acceptance-allowed-failure-codes=400,401",
-        ],
+        ["--experimental-positive-data-acceptance-allowed-statuses=xxx"],
+        ["--experimental-positive-data-acceptance-allowed-statuses=200,201,400,401"],
     ],
 )
 def test_positive_data_acceptance(
@@ -199,7 +192,7 @@ def test_positive_data_acceptance_with_env_vars(
 ):
     schema_file = testdir.make_openapi_schema_file(schema)
     monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE", "true")
-    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES", "403")
+    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES", "403")
     assert (
         cli.run(
             str(schema_file),

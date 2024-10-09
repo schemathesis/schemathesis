@@ -324,22 +324,22 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
-    "--experimental-positive-data-acceptance-expected-success-codes",
-    "positive_data_acceptance_expected_success_codes",
+    "--experimental-positive-data-acceptance-allowed-statuses",
+    "positive_data_acceptance_allowed_statuses",
     help="Comma-separated list of status codes considered as successful responses",
     type=CsvListChoice(),
     callback=callbacks.convert_status_codes,
     metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_EXPECTED_SUCCESS_CODES",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
 )
 @grouped_option(
-    "--experimental-positive-data-acceptance-allowed-failure-codes",
-    "positive_data_acceptance_allowed_failure_codes",
-    help="Comma-separated list of status codes allowed without triggering the check",
+    "--experimental-negative-data-rejection-allowed-statuses",
+    "negative_data_rejection_allowed_statuses",
+    help="Comma-separated list of status codes expected for rejected negative data",
     type=CsvListChoice(),
     callback=callbacks.convert_status_codes,
     metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
 )
 @group("API validation options")
 @grouped_option(
@@ -855,8 +855,8 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
-    positive_data_acceptance_expected_success_codes: list[str],
-    positive_data_acceptance_allowed_failure_codes: list[str],
+    positive_data_acceptance_allowed_statuses: list[str],
+    negative_data_rejection_allowed_statuses: list[str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
     exclude_checks: Iterable[str] = (),
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
@@ -1165,18 +1165,15 @@ def run(
     else:
         selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
 
+    checks_config = CheckConfig()
     if experimental.POSITIVE_DATA_ACCEPTANCE.is_enabled:
         from ..specs.openapi.checks import positive_data_acceptance
 
         selected_checks += (positive_data_acceptance,)
-        checks_config = CheckConfig(
-            positive_data_acceptance=PositiveDataAcceptanceConfig(
-                expected_success_codes=positive_data_acceptance_expected_success_codes or ["2xx"],
-                allowed_failure_codes=positive_data_acceptance_allowed_failure_codes or ["404", "401", "403"],
-            )
-        )
-    else:
-        checks_config = CheckConfig()
+        if positive_data_acceptance_allowed_statuses:
+            checks_config.positive_data_acceptance.allowed_statuses = positive_data_acceptance_allowed_statuses
+    if negative_data_rejection_allowed_statuses:
+        checks_config.negative_data_rejection.allowed_statuses = negative_data_rejection_allowed_statuses
 
     selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
 

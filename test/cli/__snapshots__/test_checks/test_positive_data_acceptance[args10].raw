@@ -20,8 +20,7 @@ ________________________________ GET /api/test _________________________________
 
 - Rejected positive data
 
-    Expected success codes: 200, 201
-    Allowed failure codes: 400, 401
+    Allowed statuses: 200, 201, 400, 401
 
 [404] Not Found:
 
