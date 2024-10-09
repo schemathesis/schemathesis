@@ -13,6 +13,7 @@ Changelog
 **Fixed**
 
 - Internal error in conditional hooks.
+- Negative test cases for patterns in the coverage phase.
 
 .. _v3.36.4:
 

@@ -215,8 +215,8 @@ def test_positive_string(ctx, schema, lengths):
         ({"type": "string", "minLength": 5}, [0, None, [], {}, "0000"]),
         ({"type": "string", "maxLength": 10}, [0, None, [], {}, "00000000000"]),
         ({"type": "string", "minLength": 5, "maxLength": 10}, [0, None, [], {}, "0000", "00000000000"]),
-        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, ""]),
-        ({"type": "string", "pattern": "^[0-9]"}, [0, None, [], {}, ""]),
+        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, AnyString()]),
+        ({"type": "string", "pattern": "^[0-9]"}, [0, None, [], {}, AnyString()]),
         ({"type": "string", "format": "date-time"}, [0, None, [], {}, ""]),
     ),
 )
