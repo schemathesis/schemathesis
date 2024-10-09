@@ -24,12 +24,12 @@ Experimental options:
                                             schema-analysis, stateful-test-
                                             runner, stateful-only, coverage-
                                             phase, positive_data_acceptance]
-  --experimental-positive-data-acceptance-expected-success-codes 
+  --experimental-positive-data-acceptance-allowed-statuses 
                                             Comma-separated list of status codes
                                             considered as successful responses
-  --experimental-positive-data-acceptance-allowed-failure-codes 
+  --experimental-negative-data-rejection-allowed-statuses 
                                             Comma-separated list of status codes
-                                            allowed without triggering the check
+                                            expected for rejected negative data
 
 API validation options:
   -c, --checks                       Comma-separated list of checks to run

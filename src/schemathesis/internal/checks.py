@@ -18,13 +18,19 @@ CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[b
 
 
 @dataclass
+class NegativeDataRejectionConfig:
+    # 5xx will pass through
+    allowed_statuses: list[str] = field(default_factory=lambda: ["4xx", "5xx"])
+
+
+@dataclass
 class PositiveDataAcceptanceConfig:
-    expected_success_codes: list[str] = field(default_factory=lambda: ["2xx"])
-    allowed_failure_codes: list[str] = field(default_factory=lambda: ["404", "401", "403"])
+    allowed_statuses: list[str] = field(default_factory=lambda: ["2xx", "401", "403", "404"])
 
 
 @dataclass
 class CheckConfig:
+    negative_data_rejection: NegativeDataRejectionConfig = field(default_factory=NegativeDataRejectionConfig)
     positive_data_acceptance: PositiveDataAcceptanceConfig = field(default_factory=PositiveDataAcceptanceConfig)
 
 

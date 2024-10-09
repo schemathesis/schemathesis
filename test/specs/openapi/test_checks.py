@@ -171,38 +171,37 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         data_generation_method=DataGenerationMethod.negative,
         query={"key": 5, "unknown": 3},
     )
-    assert negative_data_rejection(None, response, case) is None
+    assert negative_data_rejection(CheckContext(), response, case) is None
 
 
 @pytest.mark.parametrize(
-    "status_code, expected_success_codes, allowed_failure_codes, is_positive, should_raise",
+    "status_code, allowed_statuses, is_positive, should_raise",
     [
-        (200, ["200"], ["400"], True, False),
-        (400, ["200"], ["400"], True, False),
-        (300, ["200"], ["400"], True, True),
-        (200, ["2XX"], ["4XX"], True, False),
-        (299, ["2XX"], ["4XX"], True, False),
-        (400, ["2XX"], ["4XX"], True, False),
-        (500, ["2XX"], ["4XX"], True, True),
-        (200, ["200", "201"], ["400", "401"], True, False),
-        (201, ["200", "201"], ["400", "401"], True, False),
-        (400, ["200", "201"], ["400", "401"], True, False),
-        (402, ["200", "201"], ["400", "401"], True, True),
-        (200, ["2XX", "3XX"], ["4XX"], True, False),
-        (300, ["2XX", "3XX"], ["4XX"], True, False),
-        (400, ["2XX", "3XX"], ["4XX"], True, False),
-        (500, ["2XX", "3XX"], ["4XX"], True, True),
+        (200, ["200", "400"], True, False),
+        (400, ["200", "400"], True, False),
+        (300, ["200", "400"], True, True),
+        (200, ["2XX", "4XX"], True, False),
+        (299, ["2XX", "4XX"], True, False),
+        (400, ["2XX", "4XX"], True, False),
+        (500, ["2XX", "4XX"], True, True),
+        (200, ["200", "201", "400", "401"], True, False),
+        (201, ["200", "201", "400", "401"], True, False),
+        (400, ["200", "201", "400", "401"], True, False),
+        (402, ["200", "201", "400", "401"], True, True),
+        (200, ["2XX", "3XX", "4XX"], True, False),
+        (300, ["2XX", "3XX", "4XX"], True, False),
+        (400, ["2XX", "3XX", "4XX"], True, False),
+        (500, ["2XX", "3XX", "4XX"], True, True),
         # Negative data, should not raise
-        (200, ["200"], ["400"], False, False),
-        (400, ["200"], ["400"], False, False),
+        (200, ["200", "400"], False, False),
+        (400, ["200", "400"], False, False),
     ],
 )
 def test_positive_data_acceptance(
     response_factory,
     sample_schema,
     status_code,
-    expected_success_codes,
-    allowed_failure_codes,
+    allowed_statuses,
     is_positive,
     should_raise,
 ):
@@ -216,12 +215,7 @@ def test_positive_data_acceptance(
         data_generation_method=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative,
     )
     ctx = CheckContext(
-        config=CheckConfig(
-            positive_data_acceptance=PositiveDataAcceptanceConfig(
-                expected_success_codes=expected_success_codes,
-                allowed_failure_codes=allowed_failure_codes,
-            )
-        )
+        config=CheckConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses))
     )
 
     if should_raise:

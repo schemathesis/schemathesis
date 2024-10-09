@@ -219,16 +219,25 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
+
+    config = ctx.config.negative_data_rejection
+    allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+
     if (
         case.data_generation_method
         and case.data_generation_method.is_negative
-        and 200 <= response.status_code < 300
+        and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
+        message = f"Allowed statuses: {', '.join(config.allowed_statuses)}"
         exc_class = get_negative_rejection_error(case.operation.verbose_name, response.status_code)
         raise exc_class(
             failures.AcceptedNegativeData.title,
-            context=failures.AcceptedNegativeData(message="Negative data was not rejected as expected by the API"),
+            context=failures.AcceptedNegativeData(
+                message=message,
+                status_code=response.status_code,
+                allowed_statuses=config.allowed_statuses,
+            ),
         )
     return None
 
@@ -240,30 +249,21 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
         return True
 
     config = ctx.config.positive_data_acceptance
-    expected_success_codes = expand_status_codes(config.expected_success_codes or [])
-    allowed_failure_codes = expand_status_codes(config.allowed_failure_codes or [])
+    allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
     if (
         case.data_generation_method
         and case.data_generation_method.is_positive
-        and response.status_code not in expected_success_codes
-        and response.status_code not in allowed_failure_codes
+        and response.status_code not in allowed_statuses
     ):
-        sorted_expected_success_codes = sorted(config.expected_success_codes)
-        sorted_allowed_failure_codes = sorted(config.allowed_failure_codes)
-
-        message = (
-            f"Expected success codes: {', '.join(sorted_expected_success_codes)}\n"
-            f"Allowed failure codes: {', '.join(sorted_allowed_failure_codes)}"
-        )
+        message = f"Allowed statuses: {', '.join(config.allowed_statuses)}"
         exc_class = get_positive_acceptance_error(case.operation.verbose_name, response.status_code)
         raise exc_class(
             failures.RejectedPositiveData.title,
             context=failures.RejectedPositiveData(
                 message=message,
-                actual_status_code=response.status_code,
-                expected_success_codes=sorted_expected_success_codes,
-                allowed_failure_codes=sorted_allowed_failure_codes,
+                status_code=response.status_code,
+                allowed_statuses=config.allowed_statuses,
             ),
         )
     return None

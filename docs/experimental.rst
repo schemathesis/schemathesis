@@ -149,8 +149,7 @@ Positive Data Acceptance
 
 Verifies that schema-conforming data receives 2xx status responses, highlighting mismatches between schema and API behavior across all endpoints.
 
-**Expected success codes**: 2xx
-**Allowed failure codes**: 404, 401, 403
+**Allowed status codes**: 2xx, 401, 403, 404
 
 **Note**: May produce false positives with complex validation that is not reflected in the schema.
 
@@ -167,8 +166,7 @@ Configuration options:
 
 .. code-block:: bash
 
-   --experimental-positive-data-acceptance-expected-success-codes=200,201,202,204
-   --experimental-positive-data-acceptance-allowed-failure-codes=418
+   --experimental-positive-data-acceptance-allowed-statuses=202
 
 .. _positive-data-acceptance-env-vars:
 
@@ -185,8 +183,7 @@ Configure status codes:
 
 .. code-block:: bash
 
-    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_EXPECTED_SUCCESS_CODES=200,201,202,204
-    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_FAILURE_CODES=418
+    export SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES=201,202,204
 
 For more details, join the `GitHub Discussion #2499 <https://github.com/schemathesis/schemathesis/discussions/2499>`_.
 
