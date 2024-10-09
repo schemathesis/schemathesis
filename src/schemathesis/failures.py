@@ -137,6 +137,8 @@ class AcceptedNegativeData(FailureContext):
     """Response with negative data was accepted."""
 
     message: str
+    status_code: int
+    allowed_statuses: list[str]
     title: str = "Accepted negative data"
     type: str = "accepted_negative_data"
 
@@ -146,9 +148,8 @@ class RejectedPositiveData(FailureContext):
     """Response with positive data was rejected."""
 
     message: str
-    actual_status_code: int
-    expected_success_codes: list[str]
-    allowed_failure_codes: list[str]
+    status_code: int
+    allowed_statuses: list[str]
     title: str = "Rejected positive data"
     type: str = "rejected_positive_data"
 
