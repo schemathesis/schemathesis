@@ -52,7 +52,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04, windows-2019]
-        python: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+        python: ["3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
         # Set the patch version for "python", so GitHub adds these configurations instead of expanding existing ones
         include:
           - os: ubuntu-22.04

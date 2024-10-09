@@ -29,7 +29,6 @@ division by zero
         skip_check = check(ctx, response, copied_case)
       File "/tmp/hook.py", line XXX, in with_error
         1 / 0
-        ~~^~~
     ZeroDivisionError: division by zero
 
 Need more help?

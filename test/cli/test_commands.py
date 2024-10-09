@@ -1204,7 +1204,7 @@ def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 @pytest.mark.skipif(
-    sys.version_info < (3, 11) or platform.system() == "Windows",
+    sys.version_info < (3, 11) or sys.version_info >= (3, 13) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
 def test_useful_traceback(testdir, cli, schema_url, snapshot_cli):
@@ -1248,7 +1248,9 @@ def test_wsgi_app_internal_exception(testdir, cli):
     lines = result.stdout.strip().split("\n")
     assert "== APPLICATION LOGS ==" in lines[48], result.stdout.strip()
     assert "ERROR in app: Exception on /api/success [GET]" in lines[50]
-    if sys.version_info >= (3, 11):
+    if sys.version_info >= (3, 13):
+        assert lines[63] == "ZeroDivisionError: division by zero"
+    elif sys.version_info >= (3, 11):
         assert lines[66] == "ZeroDivisionError: division by zero"
     else:
         assert lines[61] == '    raise ZeroDivisionError("division by zero")'
