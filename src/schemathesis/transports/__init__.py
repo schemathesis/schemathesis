@@ -21,6 +21,7 @@ if TYPE_CHECKING:
     import requests
     import werkzeug
     from _typeshed.wsgi import WSGIApplication
+    from hypothesis.vendor.pretty import RepresentationPrinter
     from starlette_testclient._testclient import ASGI2App, ASGI3App
 
     from ..models import Case
@@ -33,6 +34,9 @@ class RequestConfig:
     tls_verify: bool | str = True
     proxy: str | None = None
     cert: RequestCert | None = None
+
+    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+        return None
 
     @property
     def prepared_timeout(self) -> float | None:
