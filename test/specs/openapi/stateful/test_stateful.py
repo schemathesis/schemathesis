@@ -124,6 +124,7 @@ TestStateful.settings = settings(
     result.stdout.re_match_lines([rf"E +curl -X GET '{openapi3_base_url}/users/\w+.+"])
     # And the reproducing example should work
     example = find_reproduction_code(result.outlines)
+    print("XXX", example)
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"

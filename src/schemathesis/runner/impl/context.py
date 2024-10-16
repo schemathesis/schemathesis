@@ -10,6 +10,8 @@ from ...models import TestResult, TestResultSet
 if TYPE_CHECKING:
     import threading
 
+    from hypothesis.vendor.pretty import RepresentationPrinter
+
     from ...exceptions import OperationSchemaError
     from ...models import Case
     from ...types import NotSet, RawAuth
@@ -45,6 +47,9 @@ class RunnerContext:
         self.outcome_cache = {}
         self.unique_data = unique_data
         self.checks_config = checks_config
+
+    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+        return None
 
     @property
     def is_stopped(self) -> bool:
