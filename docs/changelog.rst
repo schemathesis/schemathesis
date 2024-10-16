@@ -6,7 +6,7 @@ Changelog
 
 **Fixed**
 
-- Pin ``Hypothesis`` to ``<6.115`` to temporarily avoid a performance regression. :issue:`2507`
+- Performance regression caused by adjusted pretty-printing logic in ``Hypothesis``. :issue:`2507`
 
 .. _v3.37.0:
 
