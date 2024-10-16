@@ -12,7 +12,7 @@ jobs:
     name: Default corpus tests
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.1
         with:
           fetch-depth: 1
           submodules: true
@@ -29,7 +29,7 @@ jobs:
     name: Corpus tests for the coverage phase
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4.2.0
+      - uses: actions/checkout@v4.2.1
         with:
           fetch-depth: 1
           submodules: true
