@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.37.0...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Pin ``Hypothesis`` to ``<6.115`` to temporarily avoid a performance regression. :issue:`2507`
+
 .. _v3.37.0:
 
 :version:`3.37.0 <v3.36.4...v3.37.0>` - 2024-10-09
