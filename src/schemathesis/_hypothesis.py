@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from functools import wraps
 import json
 import warnings
 from copy import copy
@@ -12,7 +13,6 @@ import hypothesis
 from hypothesis import Phase
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
-from hypothesis.internal.reflection import proxies
 from jsonschema.exceptions import SchemaError
 
 from .auths import get_auth_storage_from_test
@@ -72,7 +72,7 @@ def create_test(
     # tests in multiple threads because Hypothesis stores some internal attributes on function objects and re-writing
     # them from different threads may lead to unpredictable side-effects.
 
-    @proxies(test)  # type: ignore
+    @wraps(test)
     def test_function(*args: Any, **kwargs: Any) -> Any:
         __tracebackhide__ = True
         return test(*args, **kwargs)
