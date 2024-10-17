@@ -8,6 +8,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis._compat import MultipleFailures
+from schemathesis.checks import not_a_server_error
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.generation import DataGenerationMethod
@@ -224,14 +225,26 @@ def test_call(override, base_url, swagger_20):
     assert response.json() == {"success": True}
 
 
+def custom_check(ctx, response, case):
+    pass
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {},
+        {"additional_checks": (custom_check,)},
+        {"excluded_checks": (not_a_server_error,)},
+    ],
+)
 @pytest.mark.operations("success")
-def test_call_and_validate(openapi3_schema_url):
+def test_call_and_validate(openapi3_schema_url, kwargs):
     api_schema = schemathesis.from_uri(openapi3_schema_url)
 
     @given(case=api_schema["/success"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None)
     def test(case):
-        case.call_and_validate()
+        case.call_and_validate(**kwargs)
 
     test()
 

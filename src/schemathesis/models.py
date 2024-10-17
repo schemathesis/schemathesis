@@ -536,9 +536,14 @@ class Case:
     ) -> requests.Response:
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
-        self.validate_response(response, checks, code_sample_style=code_sample_style,
-                               headers=headers,additional_checks=additional_checks,
-                               excluded_checks=excluded_checks)
+        self.validate_response(
+            response,
+            checks,
+            code_sample_style=code_sample_style,
+            headers=headers,
+            additional_checks=additional_checks,
+            excluded_checks=excluded_checks,
+        )
         return response
 
     def _get_url(self, base_url: str | None) -> str:
