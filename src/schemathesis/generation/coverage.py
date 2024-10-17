@@ -9,11 +9,13 @@ from functools import lru_cache, partial
 from itertools import combinations
 from typing import Any, Generator, Iterator, TypeVar, cast
 
+from hypothesis.internal.reflection import is_first_param_referenced_in_function
 import jsonschema
 from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis.strategies._internal import core
 
 from ..constants import NOT_SET
 from ..internal.copy import fast_deepcopy
@@ -21,6 +23,16 @@ from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.patterns import update_quantifier
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
+
+
+# This one is used a lot, and under the hood it re-parses the AST of the same function
+def _is_first_param_referenced_in_function(f: Any) -> bool:
+    if f.__name__ == "from_object_schema" and f.__module__ == "hypothesis_jsonschema._from_schema":
+        return True
+    return is_first_param_referenced_in_function(f)
+
+
+core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function  # type: ignore
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
