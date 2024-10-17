@@ -538,6 +538,89 @@ def test_with_examples_openapi_2(empty_open_api_2_schema):
     )
 
 
+def test_negative_patterns(empty_open_api_3_schema):
+    empty_open_api_3_schema["paths"] = {
+        "/foo": {
+            "post": {
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 3,
+                                        "maxLength": 10,
+                                        "pattern": "^[a-zA-Z0-9-_]$",
+                                    },
+                                },
+                                "required": ["name"],
+                            },
+                        }
+                    },
+                    "required": True,
+                },
+                "responses": {"default": {"description": "OK"}},
+            }
+        },
+    }
+    assert_coverage(
+        empty_open_api_3_schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "body": {},
+            },
+            {
+                "body": {
+                    "name": "",
+                },
+            },
+            {
+                "body": {
+                    "name": "00000000000",
+                },
+            },
+            {
+                "body": {
+                    "name": "00",
+                },
+            },
+            {
+                "body": {
+                    "name": {},
+                },
+            },
+            {
+                "body": {
+                    "name": [],
+                },
+            },
+            {
+                "body": {
+                    "name": None,
+                },
+            },
+            {
+                "body": {
+                    "name": 0,
+                },
+            },
+            {
+                "body": [],
+            },
+            {
+                "body": "",
+            },
+            {},
+            {
+                "body": 0,
+            },
+        ],
+    )
+
+
 def assert_coverage(schema, methods, expected, path=None):
     schema = schemathesis.from_dict(schema, validate_schema=True)
 

@@ -986,7 +986,9 @@ class SwaggerV20(BaseOpenAPISchema):
             return scopes, None
         # Extra conversion to JSON Schema is needed here if there was one $ref in the input
         # because it is not converted
-        return scopes, to_json_schema_recursive(schema, self.nullable_name, is_response_schema=True)
+        return scopes, to_json_schema_recursive(
+            schema, self.nullable_name, is_response_schema=True, update_quantifiers=False
+        )
 
     def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
@@ -1137,7 +1139,9 @@ class OpenApi30(SwaggerV20):
         if option and "schema" in option:
             # Extra conversion to JSON Schema is needed here if there was one $ref in the input
             # because it is not converted
-            return scopes, to_json_schema_recursive(option["schema"], self.nullable_name, is_response_schema=True)
+            return scopes, to_json_schema_recursive(
+                option["schema"], self.nullable_name, is_response_schema=True, update_quantifiers=False
+            )
         return scopes, None
 
     def get_strategies_from_examples(
