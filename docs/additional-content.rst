@@ -16,6 +16,15 @@ Papers
 
   - **Date**: 24 Nov 2023
 
+Tutorials
+---------
+
+- `Automated REST API fuzzing using Schemathesis <https://killercoda.com/rafdev/scenario/rest-fuzzing-with-schemathesis>`_ by **RafDevX** and **sofiaedv** at **KTH Royal Institute of Technology**
+
+  - **Description**: Hands-on tutorial about fuzzing REST APIs with Schemathesis as taught in **DD2482 Automated Software Testing and DevOps**
+
+  - **Date**: 15 Oct 2024
+
 Articles
 --------
 
