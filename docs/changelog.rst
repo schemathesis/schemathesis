@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Passing ``additional_checks`` & ``excluded_checks`` to ``Case.call_and_validate``.
+- Not generating some negative patterns during the coverage phase.
 
 .. _v3.37.1:
 

@@ -9,7 +9,12 @@ from .patterns import update_quantifier
 
 
 def to_json_schema(
-    schema: dict[str, Any], *, nullable_name: str, copy: bool = True, is_response_schema: bool = False
+    schema: dict[str, Any],
+    *,
+    nullable_name: str,
+    copy: bool = True,
+    is_response_schema: bool = False,
+    update_quantifiers: bool = True,
 ) -> dict[str, Any]:
     """Convert Open API parameters to JSON Schema.
 
@@ -25,6 +30,19 @@ def to_json_schema(
     if schema_type == "file":
         schema["type"] = "string"
         schema["format"] = "binary"
+    if update_quantifiers:
+        update_pattern_in_schema(schema)
+    if schema_type == "object":
+        if is_response_schema:
+            # Write-only properties should not occur in responses
+            rewrite_properties(schema, is_write_only)
+        else:
+            # Read-only properties should not occur in requests
+            rewrite_properties(schema, is_read_only)
+    return schema
+
+
+def update_pattern_in_schema(schema: dict[str, Any]) -> None:
     pattern = schema.get("pattern")
     min_length = schema.get("minLength")
     max_length = schema.get("maxLength")
@@ -34,14 +52,6 @@ def to_json_schema(
             schema.pop("minLength", None)
             schema.pop("maxLength", None)
             schema["pattern"] = new_pattern
-    if schema_type == "object":
-        if is_response_schema:
-            # Write-only properties should not occur in responses
-            rewrite_properties(schema, is_write_only)
-        else:
-            # Read-only properties should not occur in requests
-            rewrite_properties(schema, is_read_only)
-    return schema
 
 
 def rewrite_properties(schema: dict[str, Any], predicate: Callable[[dict[str, Any]], bool]) -> None:
@@ -82,6 +92,12 @@ def is_read_only(schema: dict[str, Any] | bool) -> bool:
 
 
 def to_json_schema_recursive(
-    schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False
+    schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False, update_quantifiers: bool = True
 ) -> dict[str, Any]:
-    return traverse_schema(schema, to_json_schema, nullable_name=nullable_name, is_response_schema=is_response_schema)
+    return traverse_schema(
+        schema,
+        to_json_schema,
+        nullable_name=nullable_name,
+        is_response_schema=is_response_schema,
+        update_quantifiers=update_quantifiers,
+    )

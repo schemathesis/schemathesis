@@ -234,7 +234,7 @@ def _iter_coverage_cases(
     template: dict[str, Any] = {}
     responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
-        schema = parameter.as_json_schema(operation)
+        schema = parameter.as_json_schema(operation, update_quantifiers=False)
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(ctx, schema)
@@ -251,7 +251,7 @@ def _iter_coverage_cases(
         generators[(location, name)] = gen
     if operation.body:
         for body in operation.body:
-            schema = body.as_json_schema(operation)
+            schema = body.as_json_schema(operation, update_quantifiers=False)
             # Definition could be a list for Open API 2.0
             definition = body.definition if isinstance(body.definition, dict) else {}
             examples = [example["value"] for example in definition.get("examples", {}).values() if "value" in example]
