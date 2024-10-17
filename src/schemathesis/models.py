@@ -529,12 +529,16 @@ class Case:
         session: requests.Session | None = None,
         headers: dict[str, Any] | None = None,
         checks: tuple[CheckFunction, ...] = (),
+        additional_checks: tuple[CheckFunction, ...] = (),
+        excluded_checks: tuple[CheckFunction, ...] = (),
         code_sample_style: str | None = None,
         **kwargs: Any,
     ) -> requests.Response:
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
-        self.validate_response(response, checks, code_sample_style=code_sample_style, headers=headers)
+        self.validate_response(response, checks, code_sample_style=code_sample_style,
+                               headers=headers,additional_checks=additional_checks,
+                               excluded_checks=excluded_checks)
         return response
 
     def _get_url(self, base_url: str | None) -> str:
