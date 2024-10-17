@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 import asyncio
-from functools import wraps
 import json
 import warnings
 from copy import copy
+from functools import wraps
 from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
 import hypothesis
