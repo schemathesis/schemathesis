@@ -43,6 +43,8 @@ def add_single_example(strategy: st.SearchStrategy[T], examples: list[T]) -> Non
     def example_generating_inner_function(ex: T) -> None:
         examples.append(ex)
 
+    example_generating_inner_function._hypothesis_internal_database_key = b""  # type: ignore
+
     if SCHEMATHESIS_BENCHMARK_SEED is not None:
         example_generating_inner_function = seed(SCHEMATHESIS_BENCHMARK_SEED)(example_generating_inner_function)
 
