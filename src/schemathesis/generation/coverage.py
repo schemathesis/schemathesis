@@ -16,6 +16,8 @@ from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
 
 from ..constants import NOT_SET
+from ..internal.copy import fast_deepcopy
+from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.patterns import update_quantifier
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
@@ -238,6 +240,9 @@ def cover_schema_iter(
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                         if "pattern" in new_schema:
                             new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                            if min_length == 0 and new_schema["pattern"] == schema["pattern"]:
+                                # Can't update the pattern, therefore the generation will fail anyway
+                                continue
                         value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)
                         if k not in seen:
@@ -245,8 +250,7 @@ def cover_schema_iter(
                             seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
                     with suppress(InvalidArgument, Unsatisfiable):
-                        min_length = value + 1
-                        max_length = value + 1
+                        min_length = max_length = value + 1
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                         if "pattern" in new_schema:
                             new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
@@ -291,6 +295,9 @@ def _get_properties(schema: dict | bool) -> dict | bool:
             return {"enum": schema["examples"]}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object")
+        _schema = fast_deepcopy(schema)
+        update_pattern_in_schema(_schema)
+        return _schema
     return schema
 
 
