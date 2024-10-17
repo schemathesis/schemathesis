@@ -9,6 +9,10 @@ Changelog
 - Passing ``additional_checks`` & ``excluded_checks`` to ``Case.call_and_validate``.
 - Not generating some negative patterns during the coverage phase.
 
+**Performance**
+
+- Minor speedup for the coverage phase.
+
 .. _v3.37.1:
 
 :version:`3.37.1 <v3.37.0...v3.37.1>` - 2024-10-17
