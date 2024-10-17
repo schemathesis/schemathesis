@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import functools
 from contextlib import contextmanager
 from inspect import getfullargspec
 from pathlib import Path
@@ -143,10 +142,13 @@ def validate_given_args(func: GenericTest, args: tuple, kwargs: dict[str, Any]) 
 def compose(*functions: Callable) -> Callable:
     """Compose multiple functions into a single one."""
 
-    def noop(x: Any) -> Any:
-        return x
+    def composed(x: Any) -> Any:
+        result = x
+        for func in reversed(functions):
+            result = func(result)
+        return result
 
-    return functools.reduce(lambda f, g: lambda x: f(g(x)), functions, noop)
+    return composed
 
 
 def skip(operation_name: str) -> NoReturn:
