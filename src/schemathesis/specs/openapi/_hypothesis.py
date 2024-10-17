@@ -30,7 +30,7 @@ from ...serializers import Binary
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
-from ...utils import compose, skip
+from ...utils import skip
 from .constants import LOCATION_TO_CONTAINER
 from .formats import STRING_FORMATS
 from .media_types import MEDIA_TYPES
@@ -417,12 +417,10 @@ def get_parameters_strategy(
             # `True` / `False` / `None` improves chances of them passing validation in apps
             # that expect boolean / null types
             # and not aware of Python-specific representation of those types
-            map_func = {
-                "path": compose(quote_all, jsonify_python_specific_types),
-                "query": jsonify_python_specific_types,
-            }.get(location)
-            if map_func:
-                strategy = strategy.map(map_func)  # type: ignore
+            if location == "path":
+                strategy = strategy.map(quote_all).map(jsonify_python_specific_types)
+            elif location == "query":
+                strategy = strategy.map(jsonify_python_specific_types)
         _PARAMETER_STRATEGIES_CACHE.setdefault(operation, {})[nested_cache_key] = strategy
         return strategy
     # No parameters defined for this location
