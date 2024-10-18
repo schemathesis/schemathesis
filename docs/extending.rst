@@ -29,7 +29,7 @@ The function name, such as ``filter_query``, indicates it's a hook to filter que
 .. note::
 
     The second argument could be ``None`` if there are no parameters of such a kind or if it is optional.
-    Keep it in mind when acessing the keys of the dictionary.
+    Keep it in mind when accessing the keys of the dictionary.
 
 When dealing with multiple hooks that serve similar purposes, especially across different schemas within the same file, custom names can be assigned as the first argument in the decorator to avoid conflicts and maintain clarity.
 

@@ -580,7 +580,7 @@ Async support
 
 Schemathesis supports asynchronous test functions executed via ``asyncio`` or ``trio``.
 They work the same way as regular async tests and don't require any additional configuration beyond
-installing ``pytest-asyncio`` or ``pytest-trio`` and follwing their usage guidelines.
+installing ``pytest-asyncio`` or ``pytest-trio`` and following their usage guidelines.
 
 .. code:: python
 

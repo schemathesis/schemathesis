@@ -30,7 +30,7 @@ from .types import NotSet
 if TYPE_CHECKING:
     from .utils import GivenInput
 
-# Forcefully initializes Hypothesis' global PRNG to avoid races that initilize it
+# Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
 # if e.g. Schemathesis CLI is used with multiple workers
 with deterministic_PRNG():
     pass

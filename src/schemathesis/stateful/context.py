@@ -18,7 +18,7 @@ FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
 
 
 def _failure_cache_key(exc: CheckFailed | AssertionError) -> FailureKey:
-    """Create a ket to identify unique failures."""
+    """Create a key to identify unique failures."""
     from hypothesis.internal.escalation import get_trimmed_traceback
 
     # For CheckFailed, we already have all distinctive information about the failure, which is contained
