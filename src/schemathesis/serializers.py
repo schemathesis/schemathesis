@@ -45,6 +45,9 @@ class Binary(str):
 
     __slots__ = ("data",)
 
+    def __hash__(self) -> int:
+        return hash(self.data)
+
 
 @dataclass
 class SerializerContext:

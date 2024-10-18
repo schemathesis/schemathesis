@@ -204,7 +204,7 @@ def make_strftime(format: str) -> Callable:
 
 
 def _get_map_function(definition: TransformFunctionDefinition) -> Result[Callable | None, Exception]:
-    from ..specs.openapi._hypothesis import Binary
+    from ..serializers import Binary
 
     TRANSFORM_FACTORIES: dict[str, Callable] = {
         "str": lambda: str,
