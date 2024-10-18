@@ -823,13 +823,13 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         types = [ty]
     else:
         types = ty
-    strategies = {ty: strat for ty, strat in STRATEGIES_FOR_TYPE.items() if ty not in types}
+    strategies = {ty: strategy for ty, strategy in STRATEGIES_FOR_TYPE.items() if ty not in types}
     if "number" in types:
         del strategies["integer"]
     if "integer" in types:
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
-    for strat in strategies.values():
-        value = ctx.generate_from(strat)
+    for strategy in strategies.values():
+        value = ctx.generate_from(strategy)
         hashed = _to_hashable_key(value)
         if hashed in seen:
             continue

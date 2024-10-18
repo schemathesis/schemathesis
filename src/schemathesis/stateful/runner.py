@@ -69,7 +69,7 @@ class StatefulTestRunner:
                     try:
                         event = self.event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
                         # Set the run status based on the suite status
-                        # ERROR & INTERRPUTED statuses are terminal, therefore they should not be overridden
+                        # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
                         if isinstance(event, events.SuiteFinished):
                             if event.status == events.SuiteStatus.FAILURE:
                                 run_status = events.RunStatus.FAILURE

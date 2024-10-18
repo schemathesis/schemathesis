@@ -118,3 +118,11 @@ jobs:
           fi
         working-directory: ./test/apps
         shell: bash
+
+  spell-check:
+    name: Spell Check
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: crate-ci/typos@master
