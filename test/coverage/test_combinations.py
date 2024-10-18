@@ -1003,3 +1003,16 @@ def test_negative_combinators(nctx, schema, expected):
     assert covered == expected
     assert_unique(covered)
     assert_not_conform(covered, schema)
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "^[A-Za-z0-9]$|^[A-Za-z0-9][\\w-\\.]*[A-Za-z0-9]$",
+        "^[-._\\p{L}\\p{N}]+$",
+    ],
+)
+def test_unsupported_patterns(nctx, pattern):
+    covered = cover_schema(nctx, {"type": "string", "pattern": pattern})
+    assert covered == [0, None, [], {}]
+    assert not cover_schema(nctx, {"patternProperties": {pattern: {"type": "string"}}})
