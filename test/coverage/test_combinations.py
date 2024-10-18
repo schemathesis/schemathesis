@@ -344,7 +344,6 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                                     "allOf": [
                                         {
                                             "type": "string",
-                                            "pattern": "^[-._\\p{L}\\p{N}]+$",
                                         },
                                         {
                                             "minLength": 1,
@@ -357,7 +356,20 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                     }
                 },
             },
-            [],
+            [{"foo": []}],
+        ),
+        (
+            {
+                "type": "object",
+                "required": ["foo"],
+                "properties": {
+                    "foo": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                    }
+                },
+            },
+            [{"foo": []}],
         ),
         (
             {
@@ -518,6 +530,17 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                 [],
                 [0, 0, 0, 0, 0],
                 [0, 0, 0, 0],
+            ],
+        ),
+        (
+            {"type": "array", "items": {"enum": ["FOO"]}},
+            [[]],
+        ),
+        (
+            {"type": "array", "items": {"enum": ["FOO"]}, "minItems": 1},
+            [
+                ["FOO"],
+                ["FOO", "FOO"],
             ],
         ),
         (
