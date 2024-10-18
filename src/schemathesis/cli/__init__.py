@@ -36,7 +36,7 @@ from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
-from ..internal.checks import CheckConfig, PositiveDataAcceptanceConfig
+from ..internal.checks import CheckConfig
 from ..internal.datetime import current_datetime
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists

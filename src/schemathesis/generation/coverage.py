@@ -14,10 +14,12 @@ from hypothesis import strategies as st
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
+from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from ..constants import NOT_SET
 from ..internal.copy import fast_deepcopy
 from ..specs.openapi.converter import update_pattern_in_schema
+from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
@@ -39,6 +41,18 @@ JSON_STRATEGY: st.SearchStrategy = st.recursive(
 )
 ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY)
 OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
+
+
+STRATEGIES_FOR_TYPE = {
+    "integer": st.integers(),
+    "number": NUMERIC_STRATEGY,
+    "boolean": st.booleans(),
+    "null": st.none(),
+    "string": st.text(),
+    "array": ARRAY_STRATEGY,
+    "object": OBJECT_STRATEGY,
+}
+FORMAT_STRATEGIES = {**BUILT_IN_STRING_FORMATS, **get_default_format_strategies(), **STRING_FORMATS}
 
 UNKNOWN_PROPERTY_KEY = "x-schemathesis-unknown-property"
 UNKNOWN_PROPERTY_VALUE = 42
@@ -93,6 +107,19 @@ class CoverageContext:
         return cached_draw(strategy)
 
     def generate_from_schema(self, schema: dict) -> Any:
+        keys = sorted(schema)
+        if (
+            keys in (["type"], ["description", "type"])
+            and isinstance(schema["type"], str)
+            and schema["type"] in STRATEGIES_FOR_TYPE
+        ):
+            return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
+        if keys == ["format", "type"]:
+            if schema["type"] != "string":
+                return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
+            elif schema["format"] in FORMAT_STRATEGIES:
+                return cached_draw(FORMAT_STRATEGIES[schema["format"]])
+
         return self.generate_from(from_schema(schema))
 
 
@@ -262,7 +289,7 @@ def cover_schema_iter(
                             yield NegativeValue(value, description="String smaller than minLength")
                             seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
-                    with suppress(InvalidArgument, Unsatisfiable):
+                    try:
                         min_length = max_length = value + 1
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                         new_schema.setdefault("type", "string")
@@ -281,6 +308,8 @@ def cover_schema_iter(
                         if k not in seen:
                             yield NegativeValue(value, description="String larger than maxLength")
                             seen.add(k)
+                    except (InvalidArgument, Unsatisfiable):
+                        pass
                 elif key == "uniqueItems" and value:
                     yield from _negative_unique_items(ctx, schema)
                 elif key == "required":
@@ -726,21 +755,11 @@ def _is_non_integer_float(x: float) -> bool:
 
 
 def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator[GeneratedValue, None, None]:
-    strategies = {
-        "integer": st.integers(),
-        "number": NUMERIC_STRATEGY,
-        "boolean": st.booleans(),
-        "null": st.none(),
-        "string": st.text(),
-        "array": ARRAY_STRATEGY,
-        "object": OBJECT_STRATEGY,
-    }
     if isinstance(ty, str):
         types = [ty]
     else:
         types = ty
-    for ty_ in types:
-        strategies.pop(ty_)
+    strategies = {ty: strat for ty, strat in STRATEGIES_FOR_TYPE.items() if ty not in types}
     if "number" in types:
         del strategies["integer"]
     if "integer" in types:
