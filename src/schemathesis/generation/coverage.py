@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import functools
-import json
 import re
+from json.encoder import _make_iterencode, encode_basestring_ascii, c_make_encoder  # type: ignore
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import lru_cache, partial
@@ -117,16 +117,32 @@ class CoverageContext:
                 return cached_draw(FORMAT_STRATEGIES[schema["format"]])
         if keys == ["maxLength", "minLength", "type"] and schema["type"] == "string":
             return cached_draw(st.text(min_size=schema["minLength"], max_size=schema["maxLength"]))
+        if (
+            keys == ["properties", "required", "type"]
+            and all(not isinstance(prop, bool) and "const" in prop for prop in schema["properties"].values())
+            and sorted(schema["properties"]) == sorted(schema["required"])
+        ):
+            return {key: value["const"] for key, value in schema["properties"].items()}
 
         return self.generate_from(from_schema(schema))
 
 
 T = TypeVar("T")
 
-ENCODER = json.JSONEncoder(sort_keys=True)
+
+if c_make_encoder is not None:
+    _iterencode = c_make_encoder(None, None, encode_basestring_ascii, None, ":", ",", True, False, False)
+else:
+    _iterencode = _make_iterencode(
+        None, None, encode_basestring_ascii, None, float.__repr__, ":", ",", True, False, True
+    )
 
 
-def _to_hashable_key(value: T, _encode: Callable = ENCODER.encode) -> T | tuple[type, str]:
+def _encode(o: Any) -> str:
+    return "".join(_iterencode(o, 0))
+
+
+def _to_hashable_key(value: T, _encode: Callable = _encode) -> T | tuple[type, str]:
     if isinstance(value, (dict, list)):
         serialized = _encode(value)
         return (type(value), serialized)
