@@ -106,8 +106,10 @@ class CoverageContext:
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
 
-    def generate_from_schema(self, schema: dict) -> Any:
-        keys = sorted([k for k in schema if k not in ["description", "example"]])
+    def generate_from_schema(self, schema: dict | bool) -> Any:
+        if isinstance(schema, bool):
+            return 0
+        keys = sorted([k for k in schema if not k.startswith("x-") and k not in ["description", "example"]])
         if keys == ["type"] and isinstance(schema["type"], str) and schema["type"] in STRATEGIES_FOR_TYPE:
             return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
         if keys == ["format", "type"]:
@@ -115,14 +117,60 @@ class CoverageContext:
                 return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
             elif schema["format"] in FORMAT_STRATEGIES:
                 return cached_draw(FORMAT_STRATEGIES[schema["format"]])
-        if keys == ["maxLength", "minLength", "type"] and schema["type"] == "string":
-            return cached_draw(st.text(min_size=schema["minLength"], max_size=schema["maxLength"]))
+        if (keys == ["maxLength", "minLength", "type"] or keys == ["maxLength", "type"]) and schema["type"] == "string":
+            return cached_draw(st.text(min_size=schema.get("minLength", 0), max_size=schema["maxLength"]))
         if (
             keys == ["properties", "required", "type"]
-            and all(not isinstance(prop, bool) and "const" in prop for prop in schema["properties"].values())
-            and sorted(schema["properties"]) == sorted(schema["required"])
+            or keys == ["properties", "required"]
+            or keys == ["properties", "type"]
+            or keys == ["properties"]
         ):
-            return {key: value["const"] for key, value in schema["properties"].items()}
+            obj = {}
+            for key, sub_schema in schema["properties"].items():
+                if isinstance(sub_schema, dict) and "const" in sub_schema:
+                    obj[key] = sub_schema["const"]
+                else:
+                    obj[key] = self.generate_from_schema(sub_schema)
+            return obj
+        if (
+            keys == ["maximum", "minimum", "type"] or keys == ["maximum", "type"] or keys == ["minimum", "type"]
+        ) and schema["type"] == "integer":
+            return cached_draw(st.integers(min_value=schema.get("minimum"), max_value=schema.get("maximum")))
+        if "enum" in schema:
+            return cached_draw(st.sampled_from(schema["enum"]))
+        if "pattern" in schema:
+            pattern = schema["pattern"]
+            try:
+                re.compile(pattern)
+            except re.error:
+                raise Unsatisfiable from None
+            return cached_draw(st.from_regex(pattern))
+        if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
+            items = schema["items"]
+            min_items = schema.get("minItems", 0)
+            if "enum" in items:
+                return cached_draw(st.lists(st.sampled_from(items["enum"]), min_size=min_items))
+            sub_keys = sorted([k for k in items if not k.startswith("x-") and k not in ["description", "example"]])
+            if sub_keys == ["type"] and items["type"] == "string":
+                return cached_draw(st.lists(st.text(), min_size=min_items))
+            if (
+                sub_keys == ["properties", "required", "type"]
+                or sub_keys == ["properties", "type"]
+                or sub_keys == ["properties"]
+            ):
+                return cached_draw(
+                    st.lists(
+                        st.fixed_dictionaries(
+                            {key: from_schema(sub_schema) for key, sub_schema in items["properties"].items()}
+                        ),
+                        min_size=min_items,
+                    )
+                )
+
+        if keys == ["allOf"]:
+            schema = canonicalish(schema)
+            if isinstance(schema, dict) and "allOf" not in schema:
+                return self.generate_from_schema(schema)
 
         return self.generate_from(from_schema(schema))
 
@@ -331,7 +379,7 @@ def cover_schema_iter(
                 elif key == "required":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_required(ctx, template, value)
-                elif key == "additionalProperties" and not value:
+                elif key == "additionalProperties" and not value and "pattern" not in schema:
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield NegativeValue(
                         {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
