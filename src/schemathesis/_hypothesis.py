@@ -15,6 +15,7 @@ from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
+from . import _patches
 from .auths import get_auth_storage_from_test
 from .constants import DEFAULT_DEADLINE, NOT_SET
 from .exceptions import OperationSchemaError, SerializationNotPossible
@@ -33,6 +34,8 @@ if TYPE_CHECKING:
 # if e.g. Schemathesis CLI is used with multiple workers
 with deterministic_PRNG():
     pass
+
+_patches.install()
 
 
 def create_test(
