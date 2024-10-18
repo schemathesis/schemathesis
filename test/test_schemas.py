@@ -201,7 +201,7 @@ def test_get_operation(operation_id, reference, path, method):
 
 
 def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
-    # When a path enty is behind a reference
+    # When a path entry is behind a reference
     # it should be resolved correctly
     empty_open_api_3_schema["paths"]["/foo"] = {"$ref": "#/components/x-paths/Path"}
     empty_open_api_3_schema["components"] = {
@@ -216,7 +216,7 @@ def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
 
 
 def test_get_operation_by_id_in_referenced_path_shared_parameters(empty_open_api_3_schema):
-    # When a path enty is behind a reference
+    # When a path entry is behind a reference
     # and it shares parameters with the parent path
     # it should be resolved correctly
     # and the parameters should be merged

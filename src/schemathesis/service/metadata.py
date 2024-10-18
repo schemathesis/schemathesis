@@ -35,7 +35,7 @@ class CliMetadata:
     version: str = SCHEMATHESIS_VERSION
 
 
-DEPDENDENCY_NAMES = ["hypothesis", "hypothesis-jsonschema", "hypothesis-graphql"]
+DEPENDENCY_NAMES = ["hypothesis", "hypothesis-jsonschema", "hypothesis-graphql"]
 
 
 @dataclass
@@ -53,7 +53,7 @@ class Dependency:
 
 
 def collect_dependency_versions() -> list[Dependency]:
-    return [Dependency.from_name(name) for name in DEPDENDENCY_NAMES]
+    return [Dependency.from_name(name) for name in DEPENDENCY_NAMES]
 
 
 @dataclass
@@ -68,4 +68,4 @@ class Metadata:
     cli: CliMetadata = field(default_factory=CliMetadata)
     # Used Docker image if any
     docker_image: str | None = field(default_factory=lambda: os.getenv(DOCKER_IMAGE_ENV_VAR))
-    depdenencies: list[Dependency] = field(default_factory=collect_dependency_versions)
+    depedenencies: list[Dependency] = field(default_factory=collect_dependency_versions)
