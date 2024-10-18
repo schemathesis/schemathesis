@@ -574,7 +574,7 @@ def test_negative_patterns(empty_open_api_3_schema):
             },
             {
                 "body": {
-                    "name": "",
+                    "name": "000",
                 },
             },
             {

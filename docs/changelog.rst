@@ -4,6 +4,14 @@ Changelog
 :version:`Unreleased <v3.37.1...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support negative cases for ``items`` and ``patternProperties`` during the coverage phase.
+
+**Changed**
+
+- Ensure ``minLength`` & ``maxLength`` are taken into account when generating negative cases with ``pattern`` during the coverage phase.
+
 **Fixed**
 
 - Passing ``additional_checks`` & ``excluded_checks`` to ``Case.call_and_validate``.
