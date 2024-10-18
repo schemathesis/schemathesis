@@ -7,7 +7,7 @@ from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
-from typing import Any, Generator, Iterator, TypeVar, cast
+from typing import Any, Callable, Generator, Iterator, TypeVar, cast
 
 import jsonschema
 from hypothesis import strategies as st
@@ -107,28 +107,28 @@ class CoverageContext:
         return cached_draw(strategy)
 
     def generate_from_schema(self, schema: dict) -> Any:
-        keys = sorted(schema)
-        if (
-            keys in (["type"], ["description", "type"])
-            and isinstance(schema["type"], str)
-            and schema["type"] in STRATEGIES_FOR_TYPE
-        ):
+        keys = sorted([k for k in schema if k not in ["description", "example"]])
+        if keys == ["type"] and isinstance(schema["type"], str) and schema["type"] in STRATEGIES_FOR_TYPE:
             return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
         if keys == ["format", "type"]:
             if schema["type"] != "string":
                 return cached_draw(STRATEGIES_FOR_TYPE[schema["type"]])
             elif schema["format"] in FORMAT_STRATEGIES:
                 return cached_draw(FORMAT_STRATEGIES[schema["format"]])
+        if keys == ["maxLength", "minLength", "type"] and schema["type"] == "string":
+            return cached_draw(st.text(min_size=schema["minLength"], max_size=schema["maxLength"]))
 
         return self.generate_from(from_schema(schema))
 
 
 T = TypeVar("T")
 
+ENCODER = json.JSONEncoder(sort_keys=True)
 
-def _to_hashable_key(value: T) -> T | tuple[type, str]:
+
+def _to_hashable_key(value: T, _encode: Callable = ENCODER.encode) -> T | tuple[type, str]:
     if isinstance(value, (dict, list)):
-        serialized = json.dumps(value, sort_keys=True)
+        serialized = _encode(value)
         return (type(value), serialized)
     return value
 
