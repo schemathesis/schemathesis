@@ -429,7 +429,7 @@ def run_probes(schema: BaseSchema, config: probes.ProbeConfig) -> list[probes.Pr
     results = probes.run(schema, config)
     for result in results:
         if isinstance(result.probe, probes.NullByteInHeader) and result.is_failure:
-            from ...specs.openapi._hypothesis import HEADER_FORMAT, header_values
+            from ...specs.openapi.formats import HEADER_FORMAT, header_values
 
             formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
     return results

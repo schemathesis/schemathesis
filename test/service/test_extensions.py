@@ -6,6 +6,7 @@ import requests.exceptions
 from hypothesis import find
 
 import schemathesis
+from schemathesis.serializers import Binary
 from schemathesis.service.extensions import _apply_schema_patches_extension, apply, strategy_from_definitions
 from schemathesis.service.models import (
     SchemaPatchesExtension,
@@ -13,7 +14,6 @@ from schemathesis.service.models import (
     UnknownExtension,
     extension_from_dict,
 )
-from schemathesis.specs.openapi._hypothesis import Binary
 from schemathesis.specs.openapi.formats import STRING_FORMATS, unregister_string_format
 
 

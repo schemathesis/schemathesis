@@ -1016,3 +1016,15 @@ def test_unsupported_patterns(nctx, pattern):
     covered = cover_schema(nctx, {"type": "string", "pattern": pattern})
     assert covered == [0, None, [], {}]
     assert not cover_schema(nctx, {"patternProperties": {pattern: {"type": "string"}}})
+
+
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    [
+        ({"type": "integer", "format": "int32"}, [0]),
+        ({"type": "string", "format": "unknown"}, [""]),
+    ],
+)
+def test_ignoring_unknown_formats(pctx, schema, expected):
+    covered = cover_schema(pctx, schema)
+    assert covered == expected
