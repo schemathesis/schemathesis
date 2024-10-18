@@ -209,8 +209,15 @@ def cover_schema_iter(
                 elif key == "properties":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_properties(ctx, template, value)
+                elif key == "patternProperties":
+                    template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
+                    yield from _negative_pattern_properties(ctx, template, value)
+                elif key == "items" and isinstance(value, dict):
+                    yield from _negative_items(ctx, value)
                 elif key == "pattern":
-                    yield from _negative_pattern(ctx, value)
+                    min_length = schema.get("minLength")
+                    max_length = schema.get("maxLength")
+                    yield from _negative_pattern(ctx, value, min_length=min_length, max_length=max_length)
                 elif key == "format" and ("string" in types or not types):
                     yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
@@ -238,12 +245,18 @@ def cover_schema_iter(
                     with suppress(InvalidArgument):
                         min_length = max_length = value - 1
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                        new_schema.setdefault("type", "string")
                         if "pattern" in new_schema:
                             new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                            if min_length == 0 and new_schema["pattern"] == schema["pattern"]:
-                                # Can't update the pattern, therefore the generation will fail anyway
-                                continue
-                        value = ctx.generate_from_schema(new_schema)
+                            if new_schema["pattern"] == schema["pattern"]:
+                                # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
+                                del new_schema["minLength"]
+                                del new_schema["maxLength"]
+                                value = ctx.generate_from_schema(new_schema)[:max_length]
+                            else:
+                                value = ctx.generate_from_schema(new_schema)
+                        else:
+                            value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(value, description="String smaller than minLength")
@@ -252,9 +265,18 @@ def cover_schema_iter(
                     with suppress(InvalidArgument, Unsatisfiable):
                         min_length = max_length = value + 1
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                        new_schema.setdefault("type", "string")
                         if "pattern" in new_schema:
                             new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                        value = ctx.generate_from_schema(new_schema)
+                            if new_schema["pattern"] == schema["pattern"]:
+                                # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
+                                del new_schema["minLength"]
+                                del new_schema["maxLength"]
+                                value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
+                            else:
+                                value = ctx.generate_from_schema(new_schema)
+                        else:
+                            value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(value, description="String larger than maxLength")
@@ -603,13 +625,45 @@ def _negative_properties(
             )
 
 
+def _negative_pattern_properties(
+    ctx: CoverageContext, template: dict, pattern_properties: dict
+) -> Generator[GeneratedValue, None, None]:
+    nctx = ctx.with_negative()
+    for pattern, sub_schema in pattern_properties.items():
+        try:
+            key = ctx.generate_from(st.from_regex(pattern))
+        except re.error:
+            continue
+        for value in cover_schema_iter(nctx, sub_schema):
+            yield NegativeValue(
+                {**template, key: value.value},
+                description=f"Object with invalid pattern key '{key}' ('{pattern}') value: {value.description}",
+            )
+
+
+def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Generator[GeneratedValue, None, None]:
+    """Arrays not matching the schema."""
+    nctx = ctx.with_negative()
+    for value in cover_schema_iter(nctx, schema):
+        yield NegativeValue(
+            [value.value],
+            description=f"Array with invalid items: {value.description}",
+        )
+
+
 def _not_matching_pattern(value: str, pattern: str) -> bool:
     return re.search(pattern, value) is None
 
 
-def _negative_pattern(ctx: CoverageContext, pattern: str) -> Generator[GeneratedValue, None, None]:
+def _negative_pattern(
+    ctx: CoverageContext, pattern: str, min_length: int | None = None, max_length: int | None = None
+) -> Generator[GeneratedValue, None, None]:
     yield NegativeValue(
-        ctx.generate_from(st.text().filter(partial(_not_matching_pattern, pattern=pattern))),
+        ctx.generate_from(
+            st.text(min_size=min_length or 0, max_size=max_length).filter(
+                partial(_not_matching_pattern, pattern=pattern)
+            )
+        ),
         description=f"Value not matching the '{pattern}' pattern",
     )
 

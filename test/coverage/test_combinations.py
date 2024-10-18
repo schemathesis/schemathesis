@@ -215,7 +215,7 @@ def test_positive_string(ctx, schema, lengths):
         ({"type": "string", "minLength": 5}, [0, None, [], {}, "0000"]),
         ({"type": "string", "maxLength": 10}, [0, None, [], {}, "00000000000"]),
         ({"type": "string", "minLength": 5, "maxLength": 10}, [0, None, [], {}, "0000", "00000000000"]),
-        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, AnyString()]),
+        ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, AnyString(), ""]),
         ({"type": "string", "pattern": "^[0-9]"}, [0, None, [], {}, AnyString()]),
         ({"type": "string", "format": "date-time"}, [0, None, [], {}, ""]),
     ),
@@ -235,7 +235,7 @@ def test_negative_string_with_pattern(nctx):
         "pattern": r"^[\da-z]+$",
     }
     covered = cover_schema(nctx, schema)
-    assert covered == [0, None, [], {}, "0000", "000000000", ""]
+    assert covered == [0, None, [], {}, "0000", "000000000", AnyString()]
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
@@ -870,6 +870,75 @@ def test_negative_objects(nctx, schema, expected):
     assert_not_conform(covered, schema)
 
 
+SCHEMA_WITH_PATTERN = {"minLength": 2, "pattern": "^A{2}$"}
+
+
+@pytest.mark.parametrize(
+    ["schema", "expected"],
+    [
+        # Top-level pattern
+        (SCHEMA_WITH_PATTERN, ["A", "00"]),
+        # Pattern inside properties
+        ({"properties": {"username": SCHEMA_WITH_PATTERN}}, [{"username": "A"}, {"username": "00"}]),
+        # Pattern inside items
+        ({"items": SCHEMA_WITH_PATTERN}, [["A"], ["00"]]),
+        # Pattern inside nested properties
+        (
+            {
+                "properties": {"user": {"properties": {"id": SCHEMA_WITH_PATTERN}}},
+            },
+            [{"user": {"id": "A"}}, {"user": {"id": "00"}}],
+        ),
+        # Pattern inside items of an array property
+        (
+            {
+                "properties": {"tags": {"items": SCHEMA_WITH_PATTERN}},
+            },
+            [{"tags": ["A"]}, {"tags": ["00"]}],
+        ),
+        # Multiple patterns in different locations
+        (
+            {
+                "properties": {
+                    "id": SCHEMA_WITH_PATTERN,
+                    "items": {"items": SCHEMA_WITH_PATTERN},
+                },
+                "patternProperties": {"^meta_": SCHEMA_WITH_PATTERN},
+            },
+            [
+                {"id": "A", "items": None},
+                {"id": "00", "items": None},
+                {"id": None, "items": ["A"]},
+                {"id": None, "items": ["00"]},
+                {"id": None, "items": None, "meta_": "A"},
+                {"id": None, "items": None, "meta_": "00"},
+            ],
+        ),
+        # Pattern in combination with other keywords
+        ({"pattern": "^A{2}$", "minLength": 3, "maxLength": 20}, ["000", "AA", "AA0000000000000000000"]),
+        # Pattern inside allOf
+        ({"allOf": [SCHEMA_WITH_PATTERN, {"minLength": 5}]}, ["AA", "00000"]),
+    ],
+)
+def test_negative_pattern(nctx, schema, expected):
+    covered = cover_schema(nctx, schema)
+    assert covered == expected
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
+
+
+def test_negative_pattern_with_incompatible_length(nctx):
+    schema = {
+        "minLength": 6,
+        "maxLength": 20,
+        "pattern": "^[a-zA-Z]{4}-\\d{4,15}$",
+    }
+    covered = cover_schema(nctx, schema)
+    assert covered == ["AAAA-", "AAAA-0000000000000000", "000000"]
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
+
+
 @pytest.mark.parametrize(
     "schema, expected",
     (
@@ -916,7 +985,7 @@ def test_negative_objects(nctx, schema, expected):
                     },
                 ]
             },
-            [ANY, None, 0, ANY],
+            [ANY, "00000000000", 0, None, ANY],
         ),
         (
             {
