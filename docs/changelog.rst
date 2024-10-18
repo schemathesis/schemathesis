@@ -16,6 +16,7 @@ Changelog
 
 - Passing ``additional_checks`` & ``excluded_checks`` to ``Case.call_and_validate``.
 - Not generating some negative patterns during the coverage phase.
+- Internal error on unsupported regex in the coverage phase.
 
 **Performance**
 

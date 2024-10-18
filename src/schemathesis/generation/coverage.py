@@ -651,17 +651,21 @@ def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Gene
         )
 
 
-def _not_matching_pattern(value: str, pattern: str) -> bool:
-    return re.search(pattern, value) is None
+def _not_matching_pattern(value: str, pattern: re.Pattern) -> bool:
+    return pattern.search(value) is None
 
 
 def _negative_pattern(
     ctx: CoverageContext, pattern: str, min_length: int | None = None, max_length: int | None = None
 ) -> Generator[GeneratedValue, None, None]:
+    try:
+        compiled = re.compile(pattern)
+    except re.error:
+        return
     yield NegativeValue(
         ctx.generate_from(
             st.text(min_size=min_length or 0, max_size=max_length).filter(
-                partial(_not_matching_pattern, pattern=pattern)
+                partial(_not_matching_pattern, pattern=compiled)
             )
         ),
         description=f"Value not matching the '{pattern}' pattern",
