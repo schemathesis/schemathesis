@@ -131,7 +131,11 @@ def _execute_state_machine_loop(
         if config.auth is not None:
             session.auth = config.auth
         call_kwargs["session"] = session
-    check_ctx = CheckContext(auth=config.auth, headers=CaseInsensitiveDict(config.headers) if config.headers else None)
+    check_ctx = CheckContext(
+        override=config.override,
+        auth=config.auth,
+        headers=CaseInsensitiveDict(config.headers) if config.headers else None,
+    )
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""

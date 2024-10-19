@@ -138,6 +138,7 @@ class BaseRunner:
             stop_event=stop_event,
             unique_data=self.unique_data,
             checks_config=self.checks_config,
+            override=self.override,
         )
         start_time = time.monotonic()
         initialized = None
@@ -1025,7 +1026,10 @@ def _network_test(
     status = Status.success
 
     check_ctx = CheckContext(
-        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+        override=ctx.override,
+        auth=ctx.auth,
+        headers=CaseInsensitiveDict(headers) if headers else None,
+        config=ctx.checks_config,
     )
     try:
         run_checks(
@@ -1119,7 +1123,10 @@ def _wsgi_test(
     status = Status.success
     check_results: list[Check] = []
     check_ctx = CheckContext(
-        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+        override=ctx.override,
+        auth=ctx.auth,
+        headers=CaseInsensitiveDict(headers) if headers else None,
+        config=ctx.checks_config,
     )
     try:
         run_checks(
@@ -1201,7 +1208,10 @@ def _asgi_test(
     status = Status.success
     check_results: list[Check] = []
     check_ctx = CheckContext(
-        auth=ctx.auth, headers=CaseInsensitiveDict(headers) if headers else None, config=ctx.checks_config
+        override=ctx.override,
+        auth=ctx.auth,
+        headers=CaseInsensitiveDict(headers) if headers else None,
+        config=ctx.checks_config,
     )
     try:
         run_checks(

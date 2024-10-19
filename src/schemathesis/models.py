@@ -460,7 +460,7 @@ class Case:
         checks = tuple(check for check in checks if check not in excluded_checks)
         additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
         failed_checks = []
-        ctx = CheckContext(headers=CaseInsensitiveDict(headers) if headers else None)
+        ctx = CheckContext(override=None, auth=None, headers=CaseInsensitiveDict(headers) if headers else None)
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
             try:

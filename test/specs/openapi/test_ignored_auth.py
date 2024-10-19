@@ -72,56 +72,61 @@ def test_no_failure(schema_url):
     "ctx, request_kwargs, parameters, expected",
     (
         (
-            CheckContext(headers=None),
+            CheckContext(override=None, auth=None, headers=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(headers={"Foo": "Bar"}),
+            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(headers={"A": "V"}),
+            CheckContext(override=None, auth=None, headers={"A": "V"}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(headers={}),
+            CheckContext(override=None, auth=None, headers={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(headers={}),
+            CheckContext(override=None, auth=None, headers={}),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
-        (CheckContext(headers={}), {"url": "https://example.com?A=V"}, [{"name": "B", "in": "query"}], None),
         (
-            CheckContext(headers={}),
+            CheckContext(override=None, auth=None, headers={}),
+            {"url": "https://example.com?A=V"},
+            [{"name": "B", "in": "query"}],
+            None,
+        ),
+        (
+            CheckContext(override=None, auth=None, headers={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(headers={"Cookie": "A=v;"}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(headers={"Cookie": "B=v;"}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(headers={}),
+            CheckContext(override=None, auth=None, headers={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,
@@ -367,3 +372,43 @@ def test_custom_auth():
         case.call_and_validate(session=client)
 
     test()
+
+
+@pytest.mark.parametrize("location", ["query", "cookie"])
+def test_auth_via_override_cli(cli, testdir, snapshot_cli, location):
+    # When auth is provided via `--set-*`
+    module = testdir.make_importable_pyfile(
+        f"""
+from fastapi import FastAPI, Depends, HTTPException, Security
+from fastapi.security import APIKey{'Query' if location == 'query' else 'Cookie'}
+
+
+app = FastAPI()
+
+API_KEY = "42"
+API_KEY_NAME = "api_key"
+
+api_key = APIKey{'Query' if location == 'query' else 'Cookie'}(name=API_KEY_NAME, auto_error=False)
+
+async def get_api_key(api_key: str = Security(api_key)):
+    if api_key == API_KEY:
+        return api_key
+    raise HTTPException(status_code=403, detail="Could not validate credentials")
+
+@app.get("/data")
+async def data(api_key: str = Depends(get_api_key)):
+    return {{"message": "Authenticated"}}
+        """
+    )
+    # Then it should counts during auth detection
+    assert (
+        cli.run(
+            "/openapi.json",
+            f"--app={module.purebasename}:app",
+            "-c",
+            "ignored_auth",
+            "--experimental=openapi-3.1",
+            f"--set-{location}=api_key=42",
+        )
+        == snapshot_cli
+    )
