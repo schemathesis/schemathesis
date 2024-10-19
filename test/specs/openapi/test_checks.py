@@ -171,7 +171,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         data_generation_method=DataGenerationMethod.negative,
         query={"key": 5, "unknown": 3},
     )
-    assert negative_data_rejection(CheckContext(), response, case) is None
+    assert negative_data_rejection(CheckContext(override=None, auth=None, headers=None), response, case) is None
 
 
 @pytest.mark.parametrize(
@@ -215,7 +215,10 @@ def test_positive_data_acceptance(
         data_generation_method=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative,
     )
     ctx = CheckContext(
-        config=CheckConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses))
+        override=None,
+        auth=None,
+        headers=None,
+        config=CheckConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)),
     )
 
     if should_raise:

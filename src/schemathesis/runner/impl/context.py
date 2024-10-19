@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 
     from hypothesis.vendor.pretty import RepresentationPrinter
 
+    from ..._override import CaseOverride
     from ...exceptions import OperationSchemaError
     from ...models import Case
     from ...types import NotSet, RawAuth
@@ -28,8 +29,9 @@ class RunnerContext:
     unique_data: bool
     outcome_cache: dict[int, BaseException | None]
     checks_config: CheckConfig
+    override: CaseOverride | None
 
-    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache", "checks_config")
+    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache", "checks_config", "override")
 
     def __init__(
         self,
@@ -39,6 +41,7 @@ class RunnerContext:
         stop_event: threading.Event,
         unique_data: bool,
         checks_config: CheckConfig,
+        override: CaseOverride | None,
     ) -> None:
         self.data = TestResultSet(seed=seed)
         self.auth = auth
@@ -47,6 +50,7 @@ class RunnerContext:
         self.outcome_cache = {}
         self.unique_data = unique_data
         self.checks_config = checks_config
+        self.override = override
 
     def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
         return None

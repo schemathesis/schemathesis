@@ -9,6 +9,7 @@ if TYPE_CHECKING:
     from requests.auth import HTTPDigestAuth
     from requests.structures import CaseInsensitiveDict
 
+    from .._override import CaseOverride
     from ..models import Case
     from ..transports.responses import GenericResponse
     from ..types import RawAuth
@@ -41,8 +42,9 @@ class CheckContext:
     Provides access to broader test execution data beyond individual test cases.
     """
 
-    auth: HTTPDigestAuth | RawAuth | None = None
-    headers: CaseInsensitiveDict | None = None
+    override: CaseOverride | None
+    auth: HTTPDigestAuth | RawAuth | None
+    headers: CaseInsensitiveDict | None
     config: CheckConfig = field(default_factory=CheckConfig)
 
 
