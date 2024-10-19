@@ -26,6 +26,7 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from . import serializers
 from ._dependency_versions import IS_WERKZEUG_ABOVE_3
+from ._override import CaseOverride
 from .code_samples import CodeSampleStyle
 from .constants import (
     NOT_SET,
@@ -48,6 +49,7 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.checks import CheckContext
 from .internal.copy import fast_deepcopy
 from .internal.deprecation import deprecated_function, deprecated_property
+from .internal.diff import diff
 from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_request, sanitize_response
@@ -187,6 +189,12 @@ class Case:
     _auth: requests.auth.AuthBase | None = None
     _has_explicit_auth: bool = False
 
+    def __post_init__(self) -> None:
+        self._original_path_parameters = self.path_parameters.copy() if self.path_parameters else None
+        self._original_headers = self.headers.copy() if self.headers else None
+        self._original_cookies = self.cookies.copy() if self.cookies else None
+        self._original_query = self.query.copy() if self.query else None
+
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
         first = True
@@ -202,6 +210,17 @@ class Case:
 
     def __hash__(self) -> int:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
+
+    @property
+    def _override(self) -> CaseOverride:
+        return CaseOverride(
+            path_parameters=diff(self._original_path_parameters, self.path_parameters)
+            if self.path_parameters and self._original_path_parameters
+            else {},
+            headers=diff(self._original_headers, self.headers) if self.headers and self._original_headers else {},
+            query=diff(self._original_query, self.query) if self.query and self._original_query else {},
+            cookies=diff(self._original_cookies, self.cookies) if self.cookies and self._original_cookies else {},
+        )
 
     def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
         return None
@@ -460,7 +479,9 @@ class Case:
         checks = tuple(check for check in checks if check not in excluded_checks)
         additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
         failed_checks = []
-        ctx = CheckContext(override=None, auth=None, headers=CaseInsensitiveDict(headers) if headers else None)
+        ctx = CheckContext(
+            override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
+        )
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
             try:

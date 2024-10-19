@@ -478,7 +478,7 @@ def _contains_auth(
     for parameter in security_parameters:
         name = parameter["name"]
         if has_header(parameter):
-            if ctx.headers is not None and name in ctx.headers:
+            if (ctx.headers is not None and name in ctx.headers) or (ctx.override and name in ctx.override.headers):
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_cookie(parameter):

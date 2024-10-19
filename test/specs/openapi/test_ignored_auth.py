@@ -374,13 +374,18 @@ def test_custom_auth():
     test()
 
 
-@pytest.mark.parametrize("location", ["query", "cookie"])
-def test_auth_via_override_cli(cli, testdir, snapshot_cli, location):
-    # When auth is provided via `--set-*`
-    module = testdir.make_importable_pyfile(
-        f"""
+def make_app(auth_location):
+    if auth_location == "query":
+        cls = "APIKeyQuery"
+    elif auth_location == "cookie":
+        cls = "APIKeyCookie"
+    elif auth_location == "header":
+        cls = "APIKeyHeader"
+    else:
+        raise ValueError(f"Unknown auth location: {auth_location}")
+    return f"""
 from fastapi import FastAPI, Depends, HTTPException, Security
-from fastapi.security import APIKey{'Query' if location == 'query' else 'Cookie'}
+from fastapi.security import {cls}
 
 
 app = FastAPI()
@@ -388,7 +393,7 @@ app = FastAPI()
 API_KEY = "42"
 API_KEY_NAME = "api_key"
 
-api_key = APIKey{'Query' if location == 'query' else 'Cookie'}(name=API_KEY_NAME, auto_error=False)
+api_key = {cls}(name=API_KEY_NAME, auto_error=False)
 
 async def get_api_key(api_key: str = Security(api_key)):
     if api_key == API_KEY:
@@ -399,7 +404,12 @@ async def get_api_key(api_key: str = Security(api_key)):
 async def data(api_key: str = Depends(get_api_key)):
     return {{"message": "Authenticated"}}
         """
-    )
+
+
+@pytest.mark.parametrize("location", ["query", "cookie"])
+def test_auth_via_override_cli(cli, testdir, snapshot_cli, location):
+    # When auth is provided via `--set-*`
+    module = testdir.make_importable_pyfile(make_app(location))
     # Then it should counts during auth detection
     assert (
         cli.run(
@@ -412,3 +422,42 @@ async def data(api_key: str = Depends(get_api_key)):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize("location", ["query", "cookie", "header"])
+def test_auth_via_setitem(testdir, location):
+    app = make_app(location)
+    if location == "query":
+        container = "query"
+    elif location == "cookie":
+        container = "cookies"
+    elif location == "header":
+        container = "headers"
+    else:
+        raise ValueError(f"Unknown auth location: {location}")
+    testdir.makepyfile(
+        f"""
+{app}
+from hypothesis import settings
+import schemathesis
+schemathesis.experimental.OPEN_API_3_1.enable()
+
+schema = schemathesis.from_asgi("/openapi.json", app)
+
+@schema.parametrize()
+@settings(max_examples=3)
+def test_update(case):
+    case.{container}["api_key"] = "42"
+    case.call_and_validate()
+
+@schema.parametrize()
+@settings(max_examples=3)
+def test_replace(case):
+    case.{container} = None
+    case.{container} = {{"api_key": "42"}}
+    case.call_and_validate()
+"""
+    )
+
+    result = testdir.runpytest("-v", "-s")
+    result.assert_outcomes(passed=2)
