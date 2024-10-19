@@ -18,10 +18,11 @@ Changelog
 - Not generating some negative patterns during the coverage phase.
 - Internal error on unsupported regex in the coverage phase.
 - False positive in ``ignored_auth`` if auth is provided via ``--set-query`` or ``--set-cookie``.
+- ``ignored_auth`` not working under ``pytest``.
 
 **Performance**
 
-- Minor speedup for the coverage phase.
+- Major speedup for the coverage phase.
 
 .. _v3.37.1:
 
