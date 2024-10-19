@@ -59,6 +59,7 @@ def create_app(
             web.get("/api/cookies", set_cookies),
             web.get("/api/binary", handlers.binary),
             web.get("/api/long", handlers.long),
+            web.get("/api/users/", handlers.list_users),
         ]
         + [web.route(item.value[0], item.value[1], wrapper(item.name)) for item in Operation if item.name != "all"]
     )

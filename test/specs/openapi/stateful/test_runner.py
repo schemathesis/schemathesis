@@ -726,3 +726,69 @@ def test_ignored_auth_invalid(runner_factory):
     # Then it should be reported
     assert result.events[-1].status == events.RunStatus.FAILURE
     assert result.failures[0].message == "Authentication declared but not enforced for this operation"
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user")
+def test_something_new(base_url):
+    schemathesis.experimental.OPEN_API_3_1.enable()
+    raw_schema = {
+        "openapi": "3.1.0",
+        "paths": {
+            "/users/": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "first_name": {"minLength": 3, "type": "string"},
+                                        "last_name": {"minLength": 3, "type": "string"},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                    "type": "object",
+                                },
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"201": {"description": "OK"}},
+                },
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK"},
+                    },
+                },
+            },
+            "/users/{user_id}": {
+                "get": {
+                    "parameters": [
+                        {"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {
+                        "200": {"description": "OK"},
+                        "404": {"description": "Not found"},
+                    },
+                },
+            },
+        },
+    }
+    schema = schemathesis.from_dict(raw_schema, base_url=base_url)
+    schema.add_link(
+        source=schema["/users/"]["GET"],
+        target=schema["/users/{user_id}"]["GET"],
+        status_code="200",
+        parameters={"user_id": "$response.body#/0/id"},
+    )
+    schema.add_link(
+        source=schema["/users/"]["POST"],
+        target=schema["/users/{user_id}"]["GET"],
+        status_code="201",
+        parameters={"user_id": "$response.body#/id"},
+    )
+    state_machine = schema.as_state_machine()
+    config_kwargs = {"hypothesis_settings": hypothesis.settings(max_examples=55, database=None)}
+    runner = state_machine.runner(config=StatefulTestRunnerConfig(**config_kwargs))
+    result = collect_result(runner)
+    assert result.events[-1].status == events.RunStatus.SUCCESS

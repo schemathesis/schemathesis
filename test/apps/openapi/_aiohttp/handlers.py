@@ -243,6 +243,10 @@ async def form(request: web.Request) -> web.Response:
     return web.json_response({"size": request.content_length})
 
 
+async def list_users(request: web.Request) -> web.Response:
+    return web.json_response(request.app["users"])
+
+
 async def create_user(request: web.Request) -> web.Response:
     data = await request.json()
     if not isinstance(data, dict):
