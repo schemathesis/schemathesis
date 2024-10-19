@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import functools
 import re
-from json.encoder import _make_iterencode, encode_basestring_ascii, c_make_encoder  # type: ignore
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from functools import lru_cache, partial
 from itertools import combinations
+from json.encoder import _make_iterencode, c_make_encoder, encode_basestring_ascii  # type: ignore
 from typing import Any, Callable, Generator, Iterator, TypeVar, cast
 
 import jsonschema
