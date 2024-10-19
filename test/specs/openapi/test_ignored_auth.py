@@ -456,8 +456,14 @@ def test_replace(case):
     case.{container} = None
     case.{container} = {{"api_key": "42"}}
     case.call_and_validate()
+
+
+@schema.parametrize()
+@settings(max_examples=3)
+@schema.override({container}={{"api_key": "42"}})
+def test_override(case):
+    case.call_and_validate()
 """
     )
-
     result = testdir.runpytest("-v", "-s")
-    result.assert_outcomes(passed=2)
+    result.assert_outcomes(passed=3)

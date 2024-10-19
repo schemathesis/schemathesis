@@ -16,6 +16,7 @@ from typing import (
     Generator,
     Generic,
     Iterator,
+    Literal,
     NoReturn,
     Sequence,
     Type,
@@ -195,6 +196,20 @@ class Case:
         self._original_cookies = self.cookies.copy() if self.cookies else None
         self._original_query = self.query.copy() if self.query else None
 
+    def _has_generated_component(self, name: str) -> bool:
+        assert name in ["path_parameters", "headers", "cookies", "query"]
+        if self.meta is None:
+            return False
+        return getattr(self.meta, name) is not None
+
+    def _get_diff(self, component: Literal["path_parameters", "headers", "query", "cookies"]) -> dict[str, Any]:
+        original = getattr(self, f"_original_{component}")
+        current = getattr(self, component)
+        if not (current and original):
+            return {}
+        original_value = original if self._has_generated_component(component) else {}
+        return diff(original_value, current)
+
     def __repr__(self) -> str:
         parts = [f"{self.__class__.__name__}("]
         first = True
@@ -214,12 +229,10 @@ class Case:
     @property
     def _override(self) -> CaseOverride:
         return CaseOverride(
-            path_parameters=diff(self._original_path_parameters, self.path_parameters)
-            if self.path_parameters and self._original_path_parameters
-            else {},
-            headers=diff(self._original_headers, self.headers) if self.headers and self._original_headers else {},
-            query=diff(self._original_query, self.query) if self.query and self._original_query else {},
-            cookies=diff(self._original_cookies, self.cookies) if self.cookies and self._original_cookies else {},
+            path_parameters=self._get_diff("path_parameters"),
+            headers=self._get_diff("headers"),
+            query=self._get_diff("query"),
+            cookies=self._get_diff("cookies"),
         )
 
     def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
