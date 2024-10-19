@@ -27,7 +27,7 @@ from schemathesis.specs.openapi.checks import _coerce_header_value
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext()
+CTX = CheckContext(override=None, auth=None, headers=None)
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:

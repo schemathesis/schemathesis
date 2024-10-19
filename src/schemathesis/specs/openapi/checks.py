@@ -476,17 +476,22 @@ def _contains_auth(
         return p["in"] == "cookie" and (p["name"] in cookies or p["name"] in header_cookies)
 
     for parameter in security_parameters:
+        name = parameter["name"]
         if has_header(parameter):
-            if ctx.headers is not None and parameter["name"] in ctx.headers:
+            if ctx.headers is not None and name in ctx.headers:
                 return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_cookie(parameter):
             if ctx.headers is not None and "Cookie" in ctx.headers:
                 cookies = cast(RequestsCookieJar, ctx.headers["Cookie"])  # type: ignore
-                if parameter["name"] in cookies:
+                if name in cookies:
                     return AuthKind.EXPLICIT
+            if ctx.override and name in ctx.override.cookies:
+                return AuthKind.EXPLICIT
             return AuthKind.GENERATED
         if has_query(parameter):
+            if ctx.override and name in ctx.override.query:
+                return AuthKind.EXPLICIT
             return AuthKind.GENERATED
 
     return None

@@ -17,6 +17,7 @@ Changelog
 - Passing ``additional_checks`` & ``excluded_checks`` to ``Case.call_and_validate``.
 - Not generating some negative patterns during the coverage phase.
 - Internal error on unsupported regex in the coverage phase.
+- False positive in ``ignored_auth`` if auth is provided via ``--set-query`` or ``--set-cookie``.
 
 **Performance**
 
