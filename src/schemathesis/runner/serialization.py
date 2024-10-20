@@ -397,6 +397,7 @@ class SerializedInteraction:
     data_generation_method: DataGenerationMethod
     phase: TestPhase | None
     description: str | None
+    location: str | None
     recorded_at: str
 
     @classmethod
@@ -409,6 +410,7 @@ class SerializedInteraction:
             data_generation_method=interaction.data_generation_method,
             phase=interaction.phase,
             description=interaction.description,
+            location=interaction.location,
             recorded_at=interaction.recorded_at,
         )
 
