@@ -244,6 +244,12 @@ http_interactions:"""
                     write_double_quoted(stream, interaction.description)
                 else:
                     stream.write("null")
+                stream.write("\n    location: ")
+
+                if interaction.location is not None:
+                    write_double_quoted(stream, interaction.location)
+                else:
+                    stream.write("null")
                 stream.write(
                     f"""
   phase: {phase}

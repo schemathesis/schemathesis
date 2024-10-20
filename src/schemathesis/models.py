@@ -159,8 +159,9 @@ class GenerationMetadata:
     body: DataGenerationMethod | None
     phase: TestPhase
     description: str | None
+    location: str | None
 
-    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase", "description")
+    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase", "description", "location")
 
 
 @dataclass(repr=False)
@@ -1065,7 +1066,10 @@ class Interaction:
     status: Status
     data_generation_method: DataGenerationMethod
     phase: TestPhase | None
+    # `description` & `location` are related to metadata about this interaction
+    # NOTE: It will be better to keep it in a separate attribute
     description: str | None
+    location: str | None
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
@@ -1096,6 +1100,7 @@ class Interaction:
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
             phase=case.meta.phase if case.meta is not None else None,
             description=case.meta.description if case.meta is not None else None,
+            location=case.meta.location if case.meta is not None else None,
         )
 
     @classmethod
@@ -1120,6 +1125,7 @@ class Interaction:
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
             phase=case.meta.phase if case.meta is not None else None,
             description=case.meta.description if case.meta is not None else None,
+            location=case.meta.location if case.meta is not None else None,
         )
 
 

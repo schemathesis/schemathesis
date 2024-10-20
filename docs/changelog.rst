@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Support negative cases for ``items`` and ``patternProperties`` during the coverage phase.
+- Location information for all negative values generated at the coverage phase.
 
 **Changed**
 

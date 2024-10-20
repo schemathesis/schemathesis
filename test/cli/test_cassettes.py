@@ -66,29 +66,34 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["id"] == "1"
-    assert cassette["http_interactions"][1]["id"] == "2"
-    assert cassette["http_interactions"][0]["status"] == "SUCCESS"
-    assert cassette["http_interactions"][0]["seed"] == "1"
+    interactions = cassette["http_interactions"]
+    assert interactions[0]["id"] == "1"
+    assert interactions[1]["id"] == "2"
+    assert interactions[0]["status"] == "SUCCESS"
+    assert interactions[0]["seed"] == "1"
     if data_generation_method == "all":
-        assert cassette["http_interactions"][0]["data_generation_method"] in ["positive", "negative"]
+        assert interactions[0]["data_generation_method"] in ["positive", "negative"]
     else:
-        assert cassette["http_interactions"][0]["data_generation_method"] == data_generation_method
-    assert cassette["http_interactions"][0]["phase"] in ("explicit", "coverage", "generate")
-    assert cassette["http_interactions"][0]["thread_id"] == threading.get_ident()
-    correlation_id = cassette["http_interactions"][0]["correlation_id"]
+        assert interactions[0]["data_generation_method"] == data_generation_method
+    assert interactions[0]["phase"] in ("explicit", "coverage", "generate")
+    assert interactions[0]["thread_id"] == threading.get_ident()
+    correlation_id = interactions[0]["correlation_id"]
     UUID(correlation_id)
-    assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
+    assert float(interactions[0]["elapsed"]) >= 0
     if data_generation_method == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
-    assert all("checks" in interaction for interaction in cassette["http_interactions"])
-    assert len(cassette["http_interactions"][0]["checks"]) == 1
-    assert cassette["http_interactions"][0]["checks"][0] == {
+    assert all("checks" in interaction for interaction in interactions)
+    assert len(interactions[0]["checks"]) == 1
+    assert interactions[0]["checks"][0] == {
         "name": "not_a_server_error",
         "status": "SUCCESS",
         "message": None,
     }
-    assert len(cassette["http_interactions"][1]["checks"]) == 1
+    assert len(interactions[1]["checks"]) == 1
+    for interaction in interactions:
+        if interaction["phase"] == "coverage":
+            if interaction["data_generation_method"] == "negative":
+                assert interaction["meta"]["location"] is not None
 
 
 @pytest.mark.operations("success", "upload_file")
