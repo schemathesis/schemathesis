@@ -86,42 +86,44 @@ def test_b(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
-def test_common_parameters_with_references_stateful(empty_open_api_2_schema):
+def test_common_parameters_with_references_stateful(ctx):
     # When common parameter that is shared on an API operation level contains a reference
     # And used in stateful tests
     responses = {"responses": {"200": {"description": "OK"}}}
-    empty_open_api_2_schema["paths"] = {
-        "/foo": {
-            "parameters": [
-                {"$ref": "#/parameters/Param"},
-                {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True},
-            ],
-            "put": {"parameters": [integer(name="not_common_id", required=True)], **responses},
-            "post": {
-                "operationId": "post-foo",
-                "parameters": [integer(name="not_common_id", required=True)],
-                **responses,
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "parameters": [
+                    {"$ref": "#/parameters/Param"},
+                    {"schema": {"$ref": "#/definitions/SimpleIntRef"}, "in": "body", "name": "id", "required": True},
+                ],
+                "put": {"parameters": [integer(name="not_common_id", required=True)], **responses},
+                "post": {
+                    "operationId": "post-foo",
+                    "parameters": [integer(name="not_common_id", required=True)],
+                    **responses,
+                },
             },
-        },
-        "/bar": {
-            "post": {
-                "responses": {
-                    "200": {
-                        "x-links": {
-                            "FooPut": {"operationRef": "#/paths/~1foo/put", "parameters": {"not_common_id": 42}},
-                            "FooPOST": {"operationId": "post-foo", "parameters": {"not_common_id": 42}},
-                        },
-                        "description": "OK",
+            "/bar": {
+                "post": {
+                    "responses": {
+                        "200": {
+                            "x-links": {
+                                "FooPut": {"operationRef": "#/paths/~1foo/put", "parameters": {"not_common_id": 42}},
+                                "FooPOST": {"operationId": "post-foo", "parameters": {"not_common_id": 42}},
+                            },
+                            "description": "OK",
+                        }
                     }
                 }
-            }
+            },
         },
-    }
-    empty_open_api_2_schema["definitions"] = {"SimpleIntRef": {"type": "integer"}}
-    empty_open_api_2_schema["parameters"] = {
-        "Param": {"in": "query", "name": "key", "required": True, "type": "integer"}
-    }
-    schema = schemathesis.from_dict(empty_open_api_2_schema)
+        definitions={"SimpleIntRef": {"type": "integer"}},
+        parameters={"Param": {"in": "query", "name": "key", "required": True, "type": "integer"}},
+        basePath="/v1",
+        version="2.0",
+    )
+    schema = schemathesis.from_dict(schema)
     # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
     assert len(state_machine.bundles) == 1

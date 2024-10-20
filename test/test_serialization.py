@@ -136,21 +136,23 @@ def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
     test()
 
 
-def test_serialize_any(empty_open_api_3_schema):
+def test_serialize_any(ctx):
     # See GH-1526
     # When API expects `*/*`
-    empty_open_api_3_schema["paths"] = {
-        "/any": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {"*/*": {"schema": {"type": "array"}}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/any": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"*/*": {"schema": {"type": "array"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/any"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -161,23 +163,25 @@ def test_serialize_any(empty_open_api_3_schema):
     test()
 
 
-def test_serialization_not_possible_manual(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "integer"},
-                        }
+def test_serialization_not_possible_manual(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "integer"},
+                            }
+                        },
                     },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -194,24 +198,26 @@ def test_serialization_not_possible_manual(empty_open_api_3_schema):
 @pytest.mark.parametrize(
     "media_type", ("text/yaml", "application/x-www-form-urlencoded", "text/plain", "multipart/form-data")
 )
-def test_binary_data(empty_open_api_3_schema, media_type):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        media_type: {
-                            "schema": {},
-                            "examples": {"answer": {"externalValue": "http://127.0.0.1:1/answer.json"}},
-                        }
+def test_binary_data(ctx, media_type):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            media_type: {
+                                "schema": {},
+                                "examples": {"answer": {"externalValue": "http://127.0.0.1:1/answer.json"}},
+                            }
+                        },
                     },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema["/test"]["POST"]
     # When an explicit bytes value is passed as body (it happens with `externalValue`)
     body = b"\x92\x42"
@@ -366,22 +372,24 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
         {"type": "integer", "xml": {"prefix": "smp"}},
     ),
 )
-def test_serialize_xml_unbound_prefix(empty_open_api_3_schema, schema_object):
+def test_serialize_xml_unbound_prefix(ctx, schema_object):
     # When the schema contains an unbound prefix
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/xml": {"schema": {"$ref": "#/components/schemas/Main"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {"schemas": {"Main": schema_object}}
+        },
+        components={"schemas": {"Main": schema_object}},
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -453,20 +461,22 @@ def test_serialize_xml_hypothesis(data, schema_object, media_type):
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
 
 
-def test_xml_with_binary(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {"application/xml": {"schema": {"type": "string", "format": "file"}}},
-                    "required": True,
+def test_xml_with_binary(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {"application/xml": {"schema": {"type": "string", "format": "file"}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
+        }
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)

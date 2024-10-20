@@ -90,26 +90,27 @@ def build_metadata(path_parameters=None, query=None, headers=None, cookies=None,
 
 
 @pytest.fixture
-def sample_schema(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "key",
-                        "schema": {"type": "integer", "minimum": 5},
-                    },
-                    {
-                        "in": "headers",
-                        "name": "X-Key",
-                        "schema": {"type": "integer", "minimum": 5},
-                    },
-                ]
+def sample_schema(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "key",
+                            "schema": {"type": "integer", "minimum": 5},
+                        },
+                        {
+                            "in": "headers",
+                            "name": "X-Key",
+                            "schema": {"type": "integer", "minimum": 5},
+                        },
+                    ]
+                }
             }
         }
-    }
-    return empty_open_api_3_schema
+    )
 
 
 @pytest.mark.parametrize(

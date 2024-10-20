@@ -471,27 +471,29 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
-def test_nullable_body_behind_a_reference(empty_open_api_2_schema):
+def test_nullable_body_behind_a_reference(ctx):
     # When a body parameter is nullable and is behind a reference
-    empty_open_api_2_schema["parameters"] = {
-        "Foo": {
-            "in": "body",
-            "name": "payload",
-            "required": True,
-            "schema": {"type": "string"},
-            "x-nullable": True,
-        }
-    }
-    empty_open_api_2_schema["paths"] = {
-        "/payload": {
-            "post": {
-                "parameters": [{"$ref": "#/parameters/Foo"}],
-                "responses": {"200": {"description": "OK"}},
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/payload": {
+                "post": {
+                    "parameters": [{"$ref": "#/parameters/Foo"}],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
+        },
+        parameters={
+            "Foo": {
+                "in": "body",
+                "name": "payload",
+                "required": True,
+                "schema": {"type": "string"},
+                "x-nullable": True,
+            }
+        },
+    )
     # Then it should be properly collected
-    schema = schemathesis.from_dict(empty_open_api_2_schema)
+    schema = schemathesis.from_dict(raw_schema)
     operation = schema["/payload"]["POST"]
     # And its definition is not transformed to JSON Schema
     assert operation.body[0].definition == {
@@ -504,37 +506,40 @@ def test_nullable_body_behind_a_reference(empty_open_api_2_schema):
 
 
 @pytest.fixture(params=["aiohttp", "flask"])
-def api_schema(request, openapi_version):
+def api_schema(ctx, request, openapi_version):
     if openapi_version.is_openapi_2:
-        schema = request.getfixturevalue("empty_open_api_2_schema")
-        schema["paths"] = {
-            "/payload": {
-                "post": {
-                    "parameters": [
-                        {
-                            "in": "body",
-                            "required": True,
-                            "name": "payload",
-                            "schema": {"type": "boolean", "x-nullable": True},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
+        schema = ctx.openapi.build_schema(
+            {
+                "/payload": {
+                    "post": {
+                        "parameters": [
+                            {
+                                "in": "body",
+                                "required": True,
+                                "name": "payload",
+                                "schema": {"type": "boolean", "x-nullable": True},
+                            }
+                        ],
+                        "responses": {"200": {"description": "OK"}},
+                    }
                 }
-            }
-        }
+            },
+            version="2.0",
+        )
     else:
-        schema = request.getfixturevalue("empty_open_api_3_schema")
-        schema["paths"] = {
-            "/payload": {
-                "post": {
-                    "requestBody": {
-                        "required": True,
-                        "content": {"application/json": {"schema": {"type": "boolean", "nullable": True}}},
-                    },
-                    "responses": {"200": {"description": "OK"}},
+        schema = ctx.openapi.build_schema(
+            {
+                "/payload": {
+                    "post": {
+                        "requestBody": {
+                            "required": True,
+                            "content": {"application/json": {"schema": {"type": "boolean", "nullable": True}}},
+                        },
+                        "responses": {"200": {"description": "OK"}},
+                    }
                 }
             }
-        }
+        )
     if request.param == "aiohttp":
         base_url = request.getfixturevalue("base_url")
         return schemathesis.from_dict(schema, base_url=base_url)
@@ -597,12 +602,12 @@ def test_write_only(schema_url):
 
 
 @pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
-def test_missing_content_and_schema(empty_open_api_3_schema, location):
+def test_missing_content_and_schema(ctx, location):
     # When an Open API 3 parameter is missing `schema` & `content`
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+    schema = ctx.openapi.build_schema(
+        {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=False)
 
     @given(schema["/foo"]["GET"].as_strategy())
     @settings(max_examples=1)

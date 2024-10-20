@@ -28,7 +28,7 @@ class AppConfig:
 
 
 @pytest.fixture
-def app_factory(empty_open_api_3_schema):
+def app_factory(ctx):
     post_links = {
         "GetUser": {
             "operationId": "getUser",
@@ -65,112 +65,114 @@ def app_factory(empty_open_api_3_schema):
             "parameters": {"userId": 42},
         },
     }
-    empty_open_api_3_schema["paths"] = {
-        "/users": {
-            "post": {
-                "operationId": "createUser",
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
-                },
-                "responses": {
-                    "201": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": post_links,
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
                     },
-                    "400": {"description": "Bad request"},
-                    "default": {"description": "Default"},
+                    "responses": {
+                        "201": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                            "links": post_links,
+                        },
+                        "400": {"description": "Bad request"},
+                        "default": {"description": "Default"},
+                    },
+                },
+            },
+            "/users/{userId}": {
+                "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                "get": {
+                    "summary": "Get a user",
+                    "operationId": "getUser",
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                            "links": get_links,
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
+                },
+                "delete": {
+                    "summary": "Delete a user",
+                    "operationId": "deleteUser",
+                    "responses": {
+                        "204": {
+                            "description": "Successful response",
+                            "links": delete_links,
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
+                },
+                "patch": {
+                    "summary": "Update a user",
+                    "operationId": "updateUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
+                },
+            },
+            "/orders/{orderId}": {
+                # Stub to check that not every "DELETE" counts
+                "delete": {
+                    "parameters": [{"in": "path", "name": "orderId", "required": True, "schema": {"type": "integer"}}],
+                    "operationId": "deleteOrder",
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "links": order_links,
+                        },
+                        "default": {"description": "Default"},
+                    },
                 },
             },
         },
-        "/users/{userId}": {
-            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
-            "get": {
-                "summary": "Get a user",
-                "operationId": "getUser",
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": get_links,
+        components={
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "last_modified": {"type": "string"},
                     },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
+                    "required": ["id", "name", "last_modified"],
                 },
-            },
-            "delete": {
-                "summary": "Delete a user",
-                "operationId": "deleteUser",
-                "responses": {
-                    "204": {
-                        "description": "Successful response",
-                        "links": delete_links,
+                "NewUser": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string", "maxLength": 50}},
+                    "additionalProperties": False,
+                },
+                "UpdateUser": {
+                    "type": "object",
+                    "required": ["name", "last_modified"],
+                    "properties": {
+                        "name": {"type": "string"},
+                        "last_modified": {"type": "string"},
                     },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
+                    "additionalProperties": False,
                 },
-            },
-            "patch": {
-                "summary": "Update a user",
-                "operationId": "updateUser",
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                    },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
-                },
-            },
+            }
         },
-        "/orders/{orderId}": {
-            # Stub to check that not every "DELETE" counts
-            "delete": {
-                "parameters": [{"in": "path", "name": "orderId", "required": True, "schema": {"type": "integer"}}],
-                "operationId": "deleteOrder",
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "links": order_links,
-                    },
-                    "default": {"description": "Default"},
-                },
-            },
-        },
-    }
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            "User": {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "last_modified": {"type": "string"},
-                },
-                "required": ["id", "name", "last_modified"],
-            },
-            "NewUser": {
-                "type": "object",
-                "required": ["name"],
-                "properties": {"name": {"type": "string", "maxLength": 50}},
-                "additionalProperties": False,
-            },
-            "UpdateUser": {
-                "type": "object",
-                "required": ["name", "last_modified"],
-                "properties": {
-                    "name": {"type": "string"},
-                    "last_modified": {"type": "string"},
-                },
-                "additionalProperties": False,
-            },
-        }
-    }
+    )
 
     app = Flask(__name__)
     config = AppConfig()
@@ -181,7 +183,7 @@ def app_factory(empty_open_api_3_schema):
 
     @app.route("/openapi.json", methods=["GET"])
     def get_spec():
-        return jsonify(empty_open_api_3_schema)
+        return jsonify(schema)
 
     @app.route("/users/<int:user_id>", methods=["GET"])
     def get_user(user_id):
@@ -310,29 +312,27 @@ def app_factory(empty_open_api_3_schema):
         config.auth_token = auth_token
         config.ignored_auth = ignored_auth
         if ignored_auth:
-            empty_open_api_3_schema["components"]["securitySchemes"] = {
+            schema["components"]["securitySchemes"] = {
                 "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}
             }
-            empty_open_api_3_schema["security"] = [{"bearerAuth": []}]
+            schema["security"] = [{"bearerAuth": []}]
 
         config.merge_body = merge_body
         if not merge_body:
-            empty_open_api_3_schema["paths"]["/users"]["post"]["responses"]["201"]["links"]["UpdateUser"][
-                "x-schemathesis"
-            ] = {"merge_body": merge_body}
+            schema["paths"]["/users"]["post"]["responses"]["201"]["links"]["UpdateUser"]["x-schemathesis"] = {
+                "merge_body": merge_body
+            }
         config.independent_500 = independent_500
         config.failure_behind_failure = failure_behind_failure
         config.multiple_conformance_issues = multiple_conformance_issues
         config.unsatisfiable = unsatisfiable
         if unsatisfiable:
-            empty_open_api_3_schema["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 100
+            schema["components"]["schemas"]["NewUser"]["properties"]["name"]["minLength"] = 100
         if custom_headers:
             config.custom_headers = custom_headers
         config.multiple_source_links = multiple_source_links
         if multiple_source_links:
-            empty_open_api_3_schema["paths"]["/users/{userId}"]["delete"]["responses"]["204"]["links"][
-                "DeleteUserAgain"
-            ] = {
+            schema["paths"]["/users/{userId}"]["delete"]["responses"]["204"]["links"]["DeleteUserAgain"] = {
                 "operationId": "deleteUser",
                 "parameters": {"userId": "$request.path.userId"},
             }

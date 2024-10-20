@@ -485,218 +485,237 @@ def test_multipart_examples():
     assert find(strategies[0], lambda case: case.body == {"key": "test"})
 
 
-def test_invalid_x_examples(empty_open_api_2_schema):
+def test_invalid_x_examples(ctx):
     # See GH-982
     # When an Open API 2.0 schema contains a non-object type in `x-examples`
-    empty_open_api_2_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {"name": "body", "in": "body", "schema": {"type": "integer"}, "x-examples": {"foo": "value"}}
-                ],
-                "responses": {"default": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {"name": "body", "in": "body", "schema": {"type": "integer"}, "x-examples": {"foo": "value"}}
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
             }
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_2_schema)
+        },
+        version="2.0",
+    )
+    schema = schemathesis.from_dict(schema)
     # Then such examples should be skipped as invalid (there should be an object)
     assert schema["/test"]["POST"].get_strategies_from_examples() == []
 
 
-def test_shared_examples_openapi_2(empty_open_api_2_schema):
-    empty_open_api_2_schema["paths"] = {
-        "/test": {
-            "parameters": [
-                {
-                    "name": "any",
-                    "in": "body",
-                    "required": True,
-                    "schema": {},
+def test_shared_examples_openapi_2(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "parameters": [
+                    {
+                        "name": "any",
+                        "in": "body",
+                        "required": True,
+                        "schema": {},
+                    },
+                ],
+                "post": {
+                    "parameters": [
+                        {"name": "body", "in": "body", "schema": {}, "x-examples": {"foo": {"value": "value"}}}
+                    ],
+                    "responses": {"default": {"description": "OK"}},
                 },
-            ],
-            "post": {
-                "parameters": [{"name": "body", "in": "body", "schema": {}, "x-examples": {"foo": {"value": "value"}}}],
-                "responses": {"default": {"description": "OK"}},
-            },
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_2_schema)
+            }
+        },
+        version="2.0",
+    )
+    schema = schemathesis.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
 
 
-def test_examples_ref_openapi_2(empty_open_api_2_schema):
-    empty_open_api_2_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [{"$ref": "#/components/parameters/Referenced"}],
-                "responses": {"default": {"description": "OK"}},
-            },
-        }
-    }
-    empty_open_api_2_schema["components"] = {
-        "parameters": {
-            "Referenced": {
-                "name": "Referenced",
-                "in": "body",
-                "required": True,
-                "schema": {},
-                "x-examples": {"example1": {"value": "value"}},
+def test_examples_ref_openapi_2(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [{"$ref": "#/components/parameters/Referenced"}],
+                    "responses": {"default": {"description": "OK"}},
+                },
             }
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_2_schema)
+        },
+        components={
+            "parameters": {
+                "Referenced": {
+                    "name": "Referenced",
+                    "in": "body",
+                    "required": True,
+                    "schema": {},
+                    "x-examples": {"example1": {"value": "value"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    schema = schemathesis.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
 
 
 @pytest.mark.parametrize("body", ("BodyDirect", "BodyRef"))
-def test_examples_ref_openapi_3(empty_open_api_3_schema, body):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {"$ref": f"#/components/requestBodies/{body}"},
-                "responses": {"default": {"description": "OK"}},
-            },
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "requestBodies": {
-            "BodyDirect": {
-                "content": {
-                    "application/json": {
-                        "schema": {},
-                        "examples": {"example1": {"value": "value"}},
+def test_examples_ref_openapi_3(ctx, body):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {"$ref": f"#/components/requestBodies/{body}"},
+                    "responses": {"default": {"description": "OK"}},
+                },
+            }
+        },
+        components={
+            "requestBodies": {
+                "BodyDirect": {
+                    "content": {
+                        "application/json": {
+                            "schema": {},
+                            "examples": {"example1": {"value": "value"}},
+                        }
                     }
-                }
-            },
-            "BodyRef": {"$ref": "#/components/requestBodies/BodyDirect"},
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+                },
+                "BodyRef": {"$ref": "#/components/requestBodies/BodyDirect"},
+            }
+        },
+    )
+    schema = schemathesis.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
 
 
-def test_boolean_subschema(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"foo": {"type": "string", "example": "foo-value"}, "bar": True},
-                                "required": ["foo", "bar"],
-                            },
+def test_boolean_subschema(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"foo": {"type": "string", "example": "foo-value"}, "bar": True},
+                                    "required": ["foo", "bar"],
+                                },
+                            }
                         }
-                    }
+                    },
+                    "responses": {"default": {"description": "OK"}},
                 },
-                "responses": {"default": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = get_single_example(strategy)
     assert example.body == {"bar": ANY, "foo": "foo-value"}
 
 
-def test_examples_ref_missing_components(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "foo-1": {"type": "string", "example": "foo-11"},
-                                "spam-1": {"$ref": "#/components/schemas/Referenced"},
+def test_examples_ref_missing_components(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "foo-1": {"type": "string", "example": "foo-11"},
+                                    "spam-1": {"$ref": "#/components/schemas/Referenced"},
+                                },
+                                "required": ["foo-1", "spam-1"],
                             },
-                            "required": ["foo-1", "spam-1"],
-                        },
-                    }
-                ],
-                "responses": {"default": {"description": "OK"}},
-            },
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            "Referenced": {
-                "type": "object",
-                "properties": {"inner": {"$ref": "#/components/schemas/Key0"}},
-                "required": ["inner"],
-            },
-            **{f"Key{idx}": {"$ref": f"#/components/schemas/Key{idx + 1}"} for idx in range(8)},
-            "Key8": {"enum": ["example"]},
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+                        }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                },
+            }
+        },
+        components={
+            "schemas": {
+                "Referenced": {
+                    "type": "object",
+                    "properties": {"inner": {"$ref": "#/components/schemas/Key0"}},
+                    "required": ["inner"],
+                },
+                **{f"Key{idx}": {"$ref": f"#/components/schemas/Key{idx + 1}"} for idx in range(8)},
+                "Key8": {"enum": ["example"]},
+            }
+        },
+    )
+    schema = schemathesis.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = get_single_example(strategy)
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
 
 
 @pytest.mark.parametrize("key", ("anyOf", "oneOf"))
-def test_examples_in_any_of_top_level(empty_open_api_3_schema, key):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "schema": {
-                            key: [
-                                {
-                                    "example": "foo-1-1",
-                                    "examples": ["foo-1-2"],
-                                    "type": "string",
-                                },
-                                {
-                                    "example": "foo-2-1",
-                                    "examples": ["foo-2-2"],
-                                    "type": "string",
-                                },
-                                True,
-                            ]
-                        },
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
+def test_examples_in_any_of_top_level(ctx, key):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
                             "schema": {
                                 key: [
                                     {
-                                        "example": "body-1-1",
-                                        "examples": ["body-1-2"],
+                                        "example": "foo-1-1",
+                                        "examples": ["foo-1-2"],
                                         "type": "string",
                                     },
                                     {
-                                        "example": "body-2-1",
-                                        "examples": ["body-2-2"],
+                                        "example": "foo-2-1",
+                                        "examples": ["foo-2-2"],
                                         "type": "string",
                                     },
                                     True,
                                 ]
-                            }
-                        },
-                    }
+                            },
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    key: [
+                                        {
+                                            "example": "body-1-1",
+                                            "examples": ["body-1-2"],
+                                            "type": "string",
+                                        },
+                                        {
+                                            "example": "body-2-1",
+                                            "examples": ["body-2-2"],
+                                            "type": "string",
+                                        },
+                                        True,
+                                    ]
+                                }
+                            },
+                        }
+                    },
+                    "responses": {"default": {"description": "OK"}},
                 },
-                "responses": {"default": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
@@ -710,57 +729,59 @@ def test_examples_in_any_of_top_level(empty_open_api_3_schema, key):
     ]
 
 
-def test_examples_in_all_of_top_level(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "example": "foo-1-1",
-                                    "examples": ["foo-1-2"],
-                                    "type": "string",
-                                },
-                                {
-                                    "example": "foo-2-1",
-                                    "examples": ["foo-2-2"],
-                                    "type": "string",
-                                },
-                                True,
-                            ]
-                        },
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
+def test_examples_in_all_of_top_level(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q",
+                            "in": "query",
                             "schema": {
                                 "allOf": [
                                     {
-                                        "example": "body-1-1",
-                                        "examples": ["body-1-2"],
+                                        "example": "foo-1-1",
+                                        "examples": ["foo-1-2"],
                                         "type": "string",
                                     },
                                     {
-                                        "example": "body-2-1",
-                                        "examples": ["body-2-2"],
+                                        "example": "foo-2-1",
+                                        "examples": ["foo-2-2"],
                                         "type": "string",
                                     },
                                     True,
                                 ]
-                            }
-                        },
-                    }
+                            },
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "allOf": [
+                                        {
+                                            "example": "body-1-1",
+                                            "examples": ["body-1-2"],
+                                            "type": "string",
+                                        },
+                                        {
+                                            "example": "body-2-1",
+                                            "examples": ["body-2-2"],
+                                            "type": "string",
+                                        },
+                                        True,
+                                    ]
+                                }
+                            },
+                        }
+                    },
+                    "responses": {"default": {"description": "OK"}},
                 },
-                "responses": {"default": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
@@ -775,82 +796,84 @@ def test_examples_in_all_of_top_level(empty_open_api_3_schema):
 
 
 @pytest.mark.parametrize("key", ("anyOf", "oneOf"))
-def test_examples_in_any_of_in_schemas(empty_open_api_3_schema, key):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "q-1",
-                        "in": "query",
-                        "schema": {
-                            "type": "object",
-                            "properties": {
-                                "foo-1": {
-                                    key: [
-                                        {
-                                            "example": "foo-1-1-1",
-                                            "examples": ["foo-1-1-2"],
-                                            "type": "string",
-                                        },
-                                        {
-                                            "example": "foo-1-2-1",
-                                            "examples": ["foo-1-2-2"],
-                                            "type": "string",
-                                        },
-                                        True,
-                                    ]
-                                },
-                                "bar-1": {
-                                    key: [
-                                        {
-                                            "example": "bar-1-1-1",
-                                            "type": "string",
-                                        },
-                                        {
-                                            "example": "bar-1-2-1",
-                                            "type": "string",
-                                        },
-                                        True,
-                                    ]
-                                },
-                                "spam-1": {"type": "string"},
-                            },
-                            "required": ["foo-1", "bar-1"],
-                        },
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
+def test_examples_in_any_of_in_schemas(ctx, key):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q-1",
+                            "in": "query",
                             "schema": {
                                 "type": "object",
                                 "properties": {
-                                    "key": {
+                                    "foo-1": {
                                         key: [
                                             {
-                                                "example": "json-key-1-1",
-                                                "examples": ["json-key-1-2"],
+                                                "example": "foo-1-1-1",
+                                                "examples": ["foo-1-1-2"],
                                                 "type": "string",
                                             },
                                             {
-                                                "example": "json-key-2-1",
-                                                "examples": ["json-key-2-2"],
+                                                "example": "foo-1-2-1",
+                                                "examples": ["foo-1-2-2"],
                                                 "type": "string",
                                             },
                                             True,
                                         ]
-                                    }
+                                    },
+                                    "bar-1": {
+                                        key: [
+                                            {
+                                                "example": "bar-1-1-1",
+                                                "type": "string",
+                                            },
+                                            {
+                                                "example": "bar-1-2-1",
+                                                "type": "string",
+                                            },
+                                            True,
+                                        ]
+                                    },
+                                    "spam-1": {"type": "string"},
                                 },
-                            }
-                        },
-                    }
+                                "required": ["foo-1", "bar-1"],
+                            },
+                        }
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {
+                                            key: [
+                                                {
+                                                    "example": "json-key-1-1",
+                                                    "examples": ["json-key-1-2"],
+                                                    "type": "string",
+                                                },
+                                                {
+                                                    "example": "json-key-2-1",
+                                                    "examples": ["json-key-2-2"],
+                                                    "type": "string",
+                                                },
+                                                True,
+                                            ]
+                                        }
+                                    },
+                                }
+                            },
+                        }
+                    },
+                    "responses": {"default": {"description": "OK"}},
                 },
-                "responses": {"default": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1"}},
@@ -864,26 +887,28 @@ def test_examples_in_any_of_in_schemas(empty_open_api_3_schema, key):
     ]
 
 
-def test_partial_examples(empty_open_api_3_schema):
+def test_partial_examples(ctx):
     # When the API schema contains multiple parameters in the same location
     # And some of them don't have explicit examples and others do
-    empty_open_api_3_schema["paths"] = {
-        "/test/{foo}/{bar}/": {
-            "post": {
-                "parameters": [
-                    {"name": "foo", "in": "path", "required": True, "schema": {"type": "string", "enum": ["A"]}},
-                    {
-                        "name": "bar",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "example": "bar-example"},
-                    },
-                ],
-                "responses": {"default": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test/{foo}/{bar}/": {
+                "post": {
+                    "parameters": [
+                        {"name": "foo", "in": "path", "required": True, "schema": {"type": "string", "enum": ["A"]}},
+                        {
+                            "name": "bar",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "example": "bar-example"},
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema["/test/{foo}/{bar}/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
@@ -892,41 +917,49 @@ def test_partial_examples(empty_open_api_3_schema):
     jsonschema.validate(example.path_parameters, parameters_schema)
 
 
-def test_partial_examples_without_null_bytes_and_formats(empty_open_api_3_schema):
+def test_partial_examples_without_null_bytes_and_formats(ctx):
     schemathesis.openapi.format("even_4_digits", st.from_regex(r"\A[0-9]{4}\Z").filter(lambda x: int(x) % 2 == 0))
-    empty_open_api_3_schema["paths"] = {
-        "/test/": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "q1",
-                        "in": "query",
-                        "required": True,
-                        "schema": {
-                            "type": "object",
-                            "properties": {"foo": {"type": "string"}},
-                            "required": ["foo"],
-                            "additionalProperties": False,
+    schema = ctx.openapi.build_schema(
+        {
+            "/test/": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "q1",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {"foo": {"type": "string"}},
+                                "required": ["foo"],
+                                "additionalProperties": False,
+                            },
                         },
-                    },
-                    {
-                        "name": "q2",
-                        "in": "query",
-                        "required": True,
-                        "schema": {
-                            "type": "object",
-                            "properties": {"foo": {"type": "string", "format": "even_4_digits"}},
-                            "required": ["foo"],
-                            "additionalProperties": False,
+                        {
+                            "name": "q2",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "properties": {"foo": {"type": "string", "format": "even_4_digits"}},
+                                "required": ["foo"],
+                                "additionalProperties": False,
+                            },
                         },
-                    },
-                    {"name": "q3", "in": "query", "required": True, "schema": {"type": "string"}, "example": "test"},
-                ],
-                "responses": {"default": {"description": "OK"}},
+                        {
+                            "name": "q3",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "test",
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, generation_config=GenerationConfig(allow_x00=False))
+    )
+    schema = schemathesis.from_dict(schema, generation_config=GenerationConfig(allow_x00=False))
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
 
@@ -940,24 +973,28 @@ def test_partial_examples_without_null_bytes_and_formats(empty_open_api_3_schema
     test()
 
 
-def test_external_value(empty_open_api_3_schema, server):
+def test_external_value(ctx, server):
     # When the API schema contains examples via `externalValue` keyword
-    empty_open_api_3_schema["paths"] = {
-        "/test/": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "integer"},
-                            "examples": {"answer": {"externalValue": f"http://127.0.0.1:{server['port']}/answer.json"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test/": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "integer"},
+                                "examples": {
+                                    "answer": {"externalValue": f"http://127.0.0.1:{server['port']}/answer.json"}
+                                },
+                            }
                         }
-                    }
-                },
-                "responses": {"default": {"description": "OK"}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then this example should be used
@@ -968,29 +1005,31 @@ def test_external_value(empty_open_api_3_schema, server):
     assert WSGITransport(None).serialize_case(example)["data"] == b"42"
 
 
-def test_external_value_network_error(empty_open_api_3_schema):
+def test_external_value_network_error(ctx):
     # When the external value is not available
-    empty_open_api_3_schema["paths"] = {
-        "/test/": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {"type": "integer"},
-                            "examples": {
-                                "answer": {
-                                    # Not available
-                                    "externalValue": "http://127.0.0.1:1/answer.json"
-                                }
-                            },
+    schema = ctx.openapi.build_schema(
+        {
+            "/test/": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "integer"},
+                                "examples": {
+                                    "answer": {
+                                        # Not available
+                                        "externalValue": "http://127.0.0.1:1/answer.json"
+                                    }
+                                },
+                            }
                         }
-                    }
-                },
-                "responses": {"default": {"description": "OK"}},
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema["/test/"]["POST"]
     # Then this example should not be used
     assert not operation.get_strategies_from_examples()
@@ -1451,41 +1490,43 @@ def content(schema, **kwargs):
         ),
     ],
 )
-def test_find_in_responses(empty_open_api_3_schema, response, expected):
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            "Item": {
-                "properties": {
-                    "id": {
-                        "type": "string",
-                    }
+def test_find_in_responses(ctx, response, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{itemId}/": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "responses": {"200": response},
                 }
             }
         },
-        "responses": {
-            "NoExamples": content({"$ref": "#/components/schemas/Item"}),
-            "OneExample": content(
-                {"$ref": "#/components/schemas/Item"}, examples={"Example1": {"value": {"id": "123456"}}}
-            ),
-            "TwoExamples": content(
-                {"$ref": "#/components/schemas/Item"},
-                examples={
-                    "Example1": {"value": {"id": "123456"}},
-                    "Example2": {"value": {"id": "456789"}},
-                },
-            ),
-            "SingleExample": content({"$ref": "#/components/schemas/Item"}, example={"id": "123456"}),
+        components={
+            "schemas": {
+                "Item": {
+                    "properties": {
+                        "id": {
+                            "type": "string",
+                        }
+                    }
+                }
+            },
+            "responses": {
+                "NoExamples": content({"$ref": "#/components/schemas/Item"}),
+                "OneExample": content(
+                    {"$ref": "#/components/schemas/Item"}, examples={"Example1": {"value": {"id": "123456"}}}
+                ),
+                "TwoExamples": content(
+                    {"$ref": "#/components/schemas/Item"},
+                    examples={
+                        "Example1": {"value": {"id": "123456"}},
+                        "Example2": {"value": {"id": "456789"}},
+                    },
+                ),
+                "SingleExample": content({"$ref": "#/components/schemas/Item"}, example={"id": "123456"}),
+            },
         },
-    }
-    empty_open_api_3_schema["paths"] = {
-        "/items/{itemId}/": {
-            "get": {
-                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
-                "responses": {"200": response},
-            }
-        }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=True)
     operation = schema["/items/{itemId}/"]["get"]
     assert find_in_responses(operation) == expected
 
@@ -1504,27 +1545,29 @@ def test_find_in_responses(empty_open_api_3_schema, response, expected):
         ]
 
 
-def test_find_in_responses_only_in_2xx(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/items/{id}/": {
-            "get": {
-                "parameters": [{"name": "id", "in": "path", "schema": {"type": "string"}, "required": True}],
-                "responses": {
-                    "400": content(
-                        {
-                            "properties": {
-                                "id": {"type": "string"},
-                            }
-                        },
-                        examples={
-                            "Example1": {"value": {"id": "123456"}},
-                        },
-                    )
-                },
+def test_find_in_responses_only_in_2xx(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{id}/": {
+                "get": {
+                    "parameters": [{"name": "id", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "responses": {
+                        "400": content(
+                            {
+                                "properties": {
+                                    "id": {"type": "string"},
+                                }
+                            },
+                            examples={
+                                "Example1": {"value": {"id": "123456"}},
+                            },
+                        )
+                    },
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=True)
     operation = schema["/items/{id}/"]["get"]
     assert find_in_responses(operation) == {}
 

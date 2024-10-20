@@ -3,7 +3,6 @@ from dataclasses import fields
 import pytest
 
 import schemathesis
-from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi.definitions import OPENAPI_30_VALIDATOR, SWAGGER_20_VALIDATOR
 
 
@@ -80,19 +79,23 @@ def open_api_2_user_form_with_file_parameters(open_api_2_user_form_parameters):
 
 
 @pytest.fixture
-def make_openapi_2_schema(empty_open_api_2_schema):
+def make_openapi_2_schema(ctx):
     def maker(consumes, parameters):
-        schema = fast_deepcopy(empty_open_api_2_schema)
-        schema["paths"]["/users"] = {
-            "post": {
-                "summary": "Test operation",
-                "description": "Test",
-                "parameters": parameters,
-                "consumes": consumes,
-                "produces": ["application/json"],
-                "responses": {"200": {"description": "OK"}},
-            }
-        }
+        schema = ctx.openapi.build_schema(
+            {
+                "/users": {
+                    "post": {
+                        "summary": "Test operation",
+                        "description": "Test",
+                        "parameters": parameters,
+                        "consumes": consumes,
+                        "produces": ["application/json"],
+                        "responses": {"200": {"description": "OK"}},
+                    }
+                }
+            },
+            version="2.0",
+        )
         SWAGGER_20_VALIDATOR.validate(schema)
         return schema
 
@@ -114,9 +117,9 @@ def open_api_3_user_with_file():
 
 
 @pytest.fixture
-def make_openapi_3_schema(empty_open_api_3_schema):
+def make_openapi_3_schema(ctx):
     def maker(body=None, parameters=None):
-        schema = fast_deepcopy(empty_open_api_3_schema)
+        schema = ctx.openapi.build_schema({})
         definition = {
             "summary": "Test operation",
             "description": "Test",

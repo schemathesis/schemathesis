@@ -620,30 +620,32 @@ async def test_payload_explicit_example(any_app, any_app_schema):
     assert body == {"name": "John"}
 
 
-def test_explicit_examples_from_response(empty_open_api_3_schema, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/items/{itemId}/": {
-            "get": {
-                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": "#/components/schemas/Item"},
-                                "examples": {
-                                    "Example1": {"value": {"id": "123456"}},
-                                    "Example2": {"value": {"itemId": "456789"}},
-                                },
-                            }
-                        },
-                    }
-                },
+def test_explicit_examples_from_response(ctx, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{itemId}/": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "responses": {
+                        "200": {
+                            "description": "",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Item"},
+                                    "examples": {
+                                        "Example1": {"value": {"id": "123456"}},
+                                        "Example2": {"value": {"itemId": "456789"}},
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}}
-    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+        },
+        components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
+    )
+    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
     *_, after, _ = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
@@ -784,39 +786,41 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
         ([Phase.explicit], "Failed to generate test cases from examples for this API operation", 1),
     ),
 )
-def test_unsatisfiable_example(empty_open_api_3_schema, phases, expected, total_errors):
+def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # See GH-904
     # When filling missing properties during examples generation leads to unsatisfiable schemas
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [
-                    # This parameter is not satisfiable
-                    {
-                        "name": "key",
-                        "in": "query",
-                        "required": True,
-                        "schema": {"type": "integer", "minimum": 5, "maximum": 4},
-                    }
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "foo": {"type": "string", "example": "foo example string"},
-                                },
-                            },
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        # This parameter is not satisfiable
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "integer", "minimum": 5, "maximum": 4},
                         }
-                    }
-                },
-                "responses": {"200": {"description": "OK"}},
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "foo": {"type": "string", "example": "foo example string"},
+                                    },
+                                },
+                            }
+                        }
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    schema = oas_loaders.from_dict(schema)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
@@ -839,27 +843,29 @@ def test_unsatisfiable_example(empty_open_api_3_schema, phases, expected, total_
         ),
     ),
 )
-def test_non_serializable_example(empty_open_api_3_schema, phases, expected):
+def test_non_serializable_example(ctx, phases, expected):
     # When filling missing request body during examples generation leads to serialization error
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [
-                    {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
-                ],
-                "requestBody": {
-                    "content": {
-                        "image/jpeg": {
-                            "schema": {"format": "base64", "type": "string"},
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {"format": "base64", "type": "string"},
+                            }
                         }
-                    }
-                },
-                "responses": {"200": {"description": "OK"}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    schema = oas_loaders.from_dict(schema)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
@@ -886,38 +892,40 @@ def test_non_serializable_example(empty_open_api_3_schema, phases, expected):
         ),
     ),
 )
-def test_invalid_regex_example(empty_open_api_3_schema, phases, expected):
+def test_invalid_regex_example(ctx, phases, expected):
     # When filling missing properties during examples generation contains invalid regex
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [
-                    {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "region": {
-                                        "nullable": True,
-                                        "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
-                                        "type": "string",
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "region": {
+                                            "nullable": True,
+                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "type": "string",
+                                        },
                                     },
-                                },
-                                "required": ["region"],
-                                "type": "object",
+                                    "required": ["region"],
+                                    "type": "object",
+                                }
                             }
-                        }
+                        },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    schema = oas_loaders.from_dict(schema)
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases),
@@ -928,25 +936,27 @@ def test_invalid_regex_example(empty_open_api_3_schema, phases, expected):
     assert len(after.result.errors) == 1
 
 
-def test_invalid_header_in_example(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "SESSION",
-                        "in": "header",
-                        "required": True,
-                        "schema": {"type": "integer"},
-                        "example": "test\ntest",
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
+def test_invalid_header_in_example(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "SESSION",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "integer"},
+                            "example": "test\ntest",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(empty_open_api_3_schema)
+    schema = oas_loaders.from_dict(schema)
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -990,9 +1000,9 @@ def test_dry_run_asgi(fastapi_app):
     assert not called
 
 
-def test_connection_error(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {"/success": {"post": {"responses": {"200": {"description": "OK"}}}}}
-    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url="http://127.0.0.1:1")
+def test_connection_error(ctx):
+    schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
+    schema = oas_loaders.from_dict(schema, base_url="http://127.0.0.1:1")
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -1031,37 +1041,39 @@ def test_count_links(real_app_schema):
     assert event.links_count is None
 
 
-def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_url):
+def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     # See: GH-1046
     # When the operation contains a media type, that Schemathesis can't serialize
     # And there is still a supported media type
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        # This one is known
-                        "application/json": {
-                            "schema": {
-                                "type": "array",
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            # This one is known
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                },
+                            },
+                            # This one is not
+                            "application/xml": {
+                                "schema": {
+                                    "type": "array",
+                                }
                             },
                         },
-                        # This one is not
-                        "application/xml": {
-                            "schema": {
-                                "type": "array",
-                            }
-                        },
                     },
-                },
-                "responses": {"200": {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
 
     max_examples = 10
-    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None)
     ).execute()
@@ -1073,28 +1085,30 @@ def test_hypothesis_errors_propagation(empty_open_api_3_schema, openapi3_base_ur
     assert not finished.has_errors
 
 
-def test_encoding_octet_stream(empty_open_api_3_schema, openapi3_base_url):
+def test_encoding_octet_stream(ctx, openapi3_base_url):
     # See: GH-1134
     # When the operation contains the `application/octet-stream` media type
     # And has no `format: binary` in its schema
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/octet-stream": {
-                            "schema": {
-                                "type": "string",
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/octet-stream": {
+                                "schema": {
+                                    "type": "string",
+                                },
                             },
                         },
                     },
-                },
-                "responses": {"200": {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = oas_loaders.from_dict(empty_open_api_3_schema, base_url=openapi3_base_url)
+    )
+    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
     *_, after, finished = from_schema(schema).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
@@ -1222,10 +1236,10 @@ def test_case_mutation(real_app_schema):
         ("/{.format}/", "Replacement index 0 out of range for positional args tuple"),
     ),
 )
-def test_malformed_path_template(empty_open_api_3_schema, path, expected):
+def test_malformed_path_template(ctx, path, expected):
     # When schema contains a malformed path template
-    empty_open_api_3_schema["paths"] = {path: {"get": {"responses": {"200": {"description": "OK"}}}}}
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = ctx.openapi.build_schema({path: {"get": {"responses": {"200": {"description": "OK"}}}}})
+    schema = schemathesis.from_dict(schema)
     # Then it should not cause a fatal error
     *_, event, _ = list(from_schema(schema).execute())
     assert event.status == Status.error
@@ -1276,18 +1290,20 @@ def test_authorization_warning_missing_threshold(result):
         ([], Status.skip),
     ),
 )
-def test_explicit_header_negative(empty_open_api_3_schema, parameters, expected):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "get": {
-                "parameters": parameters,
-                "security": [{"basicAuth": []}],
-                "responses": {"200": {"description": ""}},
+def test_explicit_header_negative(ctx, parameters, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": parameters,
+                    "security": [{"basicAuth": []}],
+                    "responses": {"200": {"description": ""}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}}
-    schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
+        },
+        components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
+    )
+    schema = schemathesis.from_dict(schema, data_generation_methods=DataGenerationMethod.negative)
     *_, event, finished = list(
         from_schema(
             schema,
@@ -1301,16 +1317,18 @@ def test_explicit_header_negative(empty_open_api_3_schema, parameters, expected)
     assert event.status == expected
 
 
-def test_skip_non_negated_headers(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "get": {
-                "parameters": [{"in": "header", "name": "If-Modified-Since", "schema": {"type": "string"}}],
-                "responses": {"200": {"description": ""}},
+def test_skip_non_negated_headers(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "parameters": [{"in": "header", "name": "If-Modified-Since", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": ""}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, data_generation_methods=DataGenerationMethod.negative)
+    )
+    schema = schemathesis.from_dict(schema, data_generation_methods=DataGenerationMethod.negative)
     *_, event, finished = list(
         from_schema(
             schema,
@@ -1324,10 +1342,10 @@ def test_skip_non_negated_headers(empty_open_api_3_schema):
 
 
 @pytest.mark.parametrize("derandomize", (True, False))
-def test_use_the_same_seed(empty_open_api_3_schema, derandomize):
+def test_use_the_same_seed(ctx, derandomize):
     definition = {"get": {"responses": {"200": {"description": ""}}}}
-    empty_open_api_3_schema["paths"] = {"/first": definition, "/second": definition}
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = ctx.openapi.build_schema({"/first": definition, "/second": definition})
+    schema = schemathesis.from_dict(schema)
     after_execution = [
         event
         for event in from_schema(
@@ -1430,37 +1448,40 @@ def test_stateful_exit_first(real_app_schema):
     assert not any(isinstance(event, events.StatefulEvent) for event in ev)
 
 
-def test_generation_config_in_explicit_examples(empty_open_api_2_schema, openapi2_base_url):
-    empty_open_api_2_schema["paths"] = {
-        "/what": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "header",
-                        "name": "X-VO-Api-Id",
-                        "required": True,
-                        "type": "string",
-                    },
-                    {
-                        "in": "body",
-                        "name": "body",
-                        "required": True,
-                        "schema": {
-                            "properties": {
-                                "type": {
-                                    "example": "email",
-                                    "type": "string",
-                                },
-                            },
-                            "type": "object",
+def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/what": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "header",
+                            "name": "X-VO-Api-Id",
+                            "required": True,
+                            "type": "string",
                         },
-                    },
-                ],
-                "responses": {"200": {"description": "Ok"}},
-            }
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "properties": {
+                                    "type": {
+                                        "example": "email",
+                                        "type": "string",
+                                    },
+                                },
+                                "type": "object",
+                            },
+                        },
+                    ],
+                    "responses": {"200": {"description": "Ok"}},
+                }
+            },
         },
-    }
-    schema = schemathesis.from_dict(empty_open_api_2_schema, base_url=openapi2_base_url)
+        version="2.0",
+    )
+    schema = schemathesis.from_dict(schema, base_url=openapi2_base_url)
     runner = schemathesis.runner.from_schema(
         schema,
         hypothesis_settings=settings(max_examples=10),

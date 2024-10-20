@@ -11,7 +11,6 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.config import StatefulTestRunnerConfig
@@ -524,8 +523,7 @@ def test_targeted(runner_factory):
     assert calls > 0
 
 
-def test_external_link(empty_open_api_3_schema, app_factory):
-    empty_open_api_3_schema = fast_deepcopy(empty_open_api_3_schema)
+def test_external_link(ctx, app_factory):
     remote_app = app_factory(independent_500=True)
     remote_app_port = run_server(remote_app)
     base_ref = f"http://127.0.0.1:{remote_app_port}/openapi.json#/paths/~1users~1{{userId}}"
@@ -558,91 +556,93 @@ def test_external_link(empty_open_api_3_schema, app_factory):
             "parameters": {"userId": "$request.path.userId"},
         },
     }
-    empty_open_api_3_schema["paths"] = {
-        "/users": {
-            "post": {
-                "operationId": "createUser",
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
-                },
-                "responses": {
-                    "201": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": post_links,
+    schema = ctx.openapi.build_schema(
+        {
+            "/users": {
+                "post": {
+                    "operationId": "createUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}},
                     },
-                    "400": {"description": "Bad request"},
-                    "default": {"description": "Default"},
+                    "responses": {
+                        "201": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                            "links": post_links,
+                        },
+                        "400": {"description": "Bad request"},
+                        "default": {"description": "Default"},
+                    },
+                },
+            },
+            "/users/{userId}": {
+                "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
+                "get": {
+                    "summary": "Get a user",
+                    "operationId": "getUser",
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                            "links": get_links,
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
+                },
+                "delete": {
+                    "summary": "Delete a user",
+                    "operationId": "deleteUser",
+                    "responses": {
+                        "204": {
+                            "description": "Successful response",
+                            "links": delete_links,
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
+                },
+                "patch": {
+                    "summary": "Update a user",
+                    "operationId": "updateUser",
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
+                        },
+                        "404": {"description": "User not found"},
+                        "default": {"description": "Default"},
+                    },
                 },
             },
         },
-        "/users/{userId}": {
-            "parameters": [{"in": "path", "name": "userId", "required": True, "schema": {"type": "integer"}}],
-            "get": {
-                "summary": "Get a user",
-                "operationId": "getUser",
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                        "links": get_links,
+        components={
+            "schemas": {
+                "User": {
+                    "type": "object",
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "name": {"type": "string"},
+                        "last_modified": {"type": "string"},
                     },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
+                    "required": ["id", "name", "last_modified"],
                 },
-            },
-            "delete": {
-                "summary": "Delete a user",
-                "operationId": "deleteUser",
-                "responses": {
-                    "204": {
-                        "description": "Successful response",
-                        "links": delete_links,
-                    },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
+                "NewUser": {
+                    "type": "object",
+                    "required": ["name"],
+                    "properties": {"name": {"type": "string", "maxLength": 50}},
+                    "additionalProperties": False,
                 },
-            },
-            "patch": {
-                "summary": "Update a user",
-                "operationId": "updateUser",
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/json": {"schema": {"$ref": "#/components/schemas/UpdateUser"}}},
-                },
-                "responses": {
-                    "200": {
-                        "description": "Successful response",
-                        "content": {"application/json": {"schema": {"$ref": "#/components/schemas/User"}}},
-                    },
-                    "404": {"description": "User not found"},
-                    "default": {"description": "Default"},
-                },
-            },
+            }
         },
-    }
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            "User": {
-                "type": "object",
-                "properties": {
-                    "id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "last_modified": {"type": "string"},
-                },
-                "required": ["id", "name", "last_modified"],
-            },
-            "NewUser": {
-                "type": "object",
-                "required": ["name"],
-                "properties": {"name": {"type": "string", "maxLength": 50}},
-                "additionalProperties": False,
-            },
-        }
-    }
+    )
     root_app = app_factory(independent_500=True)
-    schema = schemathesis.from_dict(empty_open_api_3_schema, app=root_app)
+    schema = schemathesis.from_dict(schema, app=root_app)
     state_machine = schema.as_state_machine()
     runner = state_machine.runner(
         config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None))
