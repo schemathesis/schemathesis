@@ -372,6 +372,11 @@ def negate_constraints(context: MutationContext, draw: Draw, schema: Schema) -> 
         # Should we negate this key?
         if k == "required":
             return v != []
+        if k in ("example", "examples"):
+            return False
+        if context.is_path_location and k == "minLength" and v == 1:
+            # Empty path parameter will be filtered out
+            return False
         return not (
             k in ("type", "properties", "items", "minItems")
             or (k == "additionalProperties" and context.is_header_location)
