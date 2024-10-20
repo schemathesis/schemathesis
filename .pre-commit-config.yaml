@@ -25,12 +25,12 @@ repos:
       - id: yamllint
 
   - repo: https://github.com/codingjoe/relint
-    rev: 3.2.0
+    rev: 3.3.0
     hooks:
       - id: relint
 
   - repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.11.2
+    rev: v1.12.0
     hooks:
       - id: mypy
         exclude: ^(docs/|test/|test-corpus/|example/|benches/).*$
@@ -38,12 +38,12 @@ repos:
         additional_dependencies: [types-click, types-requests, types-PyYAML]
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.7.0
     hooks:
       - id: ruff-format
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+    rev: v0.7.0
     hooks:
       - id: ruff
 
