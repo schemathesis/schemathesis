@@ -200,7 +200,7 @@ class SchemathesisCase(PyCollector):
             kwargs["_ispytest"] = True
         metafunc = Metafunc(definition, fixtureinfo, self.config, **kwargs)
         methods = []
-        if hasattr(module, "pytest_generate_tests"):
+        if module is not None and hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
         if hasattr(cls, "pytest_generate_tests"):
             cls = cast(Type, cls)
