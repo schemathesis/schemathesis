@@ -1159,36 +1159,38 @@ def test_wsgi_app_exception(testdir, cli):
     assert "ZeroDivisionError: division by zero" in result.stdout
 
 
-def test_no_useless_traceback(testdir, cli, empty_open_api_3_schema, snapshot_cli):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [
-                    {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "properties": {
-                                    "region": {
-                                        "nullable": True,
-                                        "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
-                                        "type": "string",
+def test_no_useless_traceback(ctx, testdir, cli, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}, "example": 42}
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "region": {
+                                            "nullable": True,
+                                            "pattern": "^[\\w\\s\\-\\/\\pL,.#;:()']+$",
+                                            "type": "string",
+                                        },
                                     },
-                                },
-                                "required": ["region"],
-                                "type": "object",
+                                    "required": ["region"],
+                                    "type": "object",
+                                }
                             }
-                        }
+                        },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), "--show-trace", "--dry-run") == snapshot_cli
 
 
@@ -1388,29 +1390,31 @@ def test_no_schema_in_media_type(testdir, cli, base_url, snapshot_cli):
     )
 
 
-def test_nested_binary_in_yaml(testdir, openapi3_base_url, cli, snapshot_cli, empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/property": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "*/*": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"file": {"type": "string", "format": "binary"}},
-                                "required": ["file"],
+def test_nested_binary_in_yaml(ctx, testdir, openapi3_base_url, cli, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/property": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "*/*": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"file": {"type": "string", "format": "binary"}},
+                                    "required": ["file"],
+                                }
                             }
-                        }
+                        },
                     },
-                },
-                "responses": {
-                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
-                },
-            }
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}
+                    },
+                }
+            },
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=10") == snapshot_cli
 
 
@@ -1776,77 +1780,79 @@ def test_openapi_links_disabled(cli, schema_url, hypothesis_max_examples, snapsh
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user")
-def test_unresolvable_links(cli, empty_open_api_3_schema, testdir, snapshot_cli, base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/users/": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "first_name": {"type": "string", "minLength": 3},
-                                    "last_name": {"type": "string", "minLength": 3},
-                                },
-                                "required": ["first_name", "last_name"],
-                                "additionalProperties": False,
+def test_unresolvable_links(ctx, cli, testdir, snapshot_cli, base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/users/": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string", "minLength": 3},
+                                        "last_name": {"type": "string", "minLength": 3},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                    "additionalProperties": False,
+                                }
                             }
-                        }
-                    },
-                },
-                "responses": {
-                    "201": {
-                        "description": "OK",
-                        "links": {
-                            "next": {
-                                "operationId": "get_user",
-                                "parameters": {"user_id": "$response.body#/invalid_value"},
-                            },
-                            "update": {
-                                "operationId": "update_user",
-                                "parameters": {"user_id": "$response.body#/id"},
-                                "requestBody": {"first_name": "foo", "last_name": "bar"},
-                            },
                         },
-                    }
-                },
-            },
-        },
-        "/users/{user_id}": {
-            "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}],
-            "get": {
-                "operationId": "get_user",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                    }
-                },
-            },
-            "patch": {
-                "operationId": "update_user",
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "first_name": {"type": "string", "minLength": 3},
-                                    "last_name": {"type": "string", "minLength": 3},
+                    },
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "links": {
+                                "next": {
+                                    "operationId": "get_user",
+                                    "parameters": {"user_id": "$response.body#/invalid_value"},
                                 },
-                                "required": ["first_name", "last_name"],
-                                "additionalProperties": False,
-                            }
+                                "update": {
+                                    "operationId": "update_user",
+                                    "parameters": {"user_id": "$response.body#/id"},
+                                    "requestBody": {"first_name": "foo", "last_name": "bar"},
+                                },
+                            },
                         }
                     },
-                    "required": True,
                 },
-                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+            "/users/{user_id}": {
+                "parameters": [{"in": "path", "name": "user_id", "required": True, "schema": {"type": "string"}}],
+                "get": {
+                    "operationId": "get_user",
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                        }
+                    },
+                },
+                "patch": {
+                    "operationId": "update_user",
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "first_name": {"type": "string", "minLength": 3},
+                                        "last_name": {"type": "string", "minLength": 3},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                    "additionalProperties": False,
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                },
+            },
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert (
         cli.run(
             str(schema_file),
@@ -1964,29 +1970,31 @@ def test_exit_first(cli, schema_url, workers_num, mocker):
 
 
 @pytest.mark.openapi_version("3.0")
-def test_base_url_not_required_for_dry_run(testdir, cli, empty_open_api_3_schema):
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+def test_base_url_not_required_for_dry_run(ctx, testdir, cli):
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(ctx.openapi.build_schema({})))
     result = cli.run(str(schema_file), "--dry-run")
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def test_long_operation_output(testdir, empty_open_api_3_schema):
+def test_long_operation_output(ctx, testdir):
     # See GH-990
     # When there is a narrow screen
     # And the API schema contains an operation with a long name
-    empty_open_api_3_schema["paths"] = {
-        f"/{'a' * 100}": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-        f"/{'a' * 10}": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    schema = ctx.openapi.build_schema(
+        {
+            f"/{'a' * 100}": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+            f"/{'a' * 10}": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
     # Then this operation name should be truncated
     assert result.ret == ExitCode.OK
@@ -1994,24 +2002,26 @@ def test_long_operation_output(testdir, empty_open_api_3_schema):
     assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [100%]" in result.outlines
 
 
-def test_reserved_characters_in_operation_name(testdir, empty_open_api_3_schema):
+def test_reserved_characters_in_operation_name(ctx, testdir):
     # See GH-992
     # When an API operation name contains `:`
-    empty_open_api_3_schema["paths"] = {
-        "/foo:bar": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo:bar": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
     # Then this operation name should be displayed with the leading `/`
     assert result.ret == ExitCode.OK
     assert "GET /foo:bar .                                                            [100%]" in result.outlines
 
 
-def test_unsupported_regex(testdir, cli, empty_open_api_3_schema, snapshot_cli):
+def test_unsupported_regex(ctx, testdir, cli, snapshot_cli):
     def make_definition(min_items):
         return {
             "post": {
@@ -2034,13 +2044,15 @@ def test_unsupported_regex(testdir, cli, empty_open_api_3_schema, snapshot_cli):
         }
 
     # When an operation uses an unsupported regex syntax
-    empty_open_api_3_schema["paths"] = {
-        # Can't generate anything
-        "/foo": make_definition(min_items=1),
-        # Can generate an empty array
-        "/bar": make_definition(min_items=0),
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(empty_open_api_3_schema))
+    schema = ctx.openapi.build_schema(
+        {
+            # Can't generate anything
+            "/foo": make_definition(min_items=1),
+            # Can generate an empty array
+            "/bar": make_definition(min_items=0),
+        }
+    )
+    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     # Then if it is possible it should generate at least something
     # And if it is not then there should be an error with a descriptive error message
     assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
@@ -2211,13 +2223,13 @@ def test_get_exit_code(swagger_20):
 
 @pytest.mark.parametrize("base_url", (None, "http://127.0.0.1/apiv2"))
 @pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
-def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open_api_3_schema, location, snapshot_cli):
+def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, testdir, location, snapshot_cli):
     debug_file = tmp_path / "debug.jsonl"
     # When an Open API 3 parameter is missing `schema` & `content`
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    schema = ctx.openapi.build_schema(
+        {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     args = [
         str(schema_file),
         f"--debug-output-file={debug_file}",
@@ -2240,25 +2252,27 @@ def test_missing_content_and_schema(cli, base_url, tmp_path, testdir, empty_open
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure")
-def test_explicit_query_token_sanitization(empty_open_api_3_schema, testdir, cli, snapshot_cli, base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/failure": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
+def test_explicit_query_token_sanitization(ctx, testdir, cli, snapshot_cli, base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/failure": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["security"] = [{"api_key": []}]
-    empty_open_api_3_schema["components"] = {
-        "securitySchemes": {
-            "api_key": {
-                "type": "apiKey",
-                "name": "token",
-                "in": "query",
-            },
-        }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        },
+        security=[{"api_key": []}],
+        components={
+            "securitySchemes": {
+                "api_key": {
+                    "type": "apiKey",
+                    "name": "token",
+                    "in": "query",
+                },
+            }
+        },
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     token = "token=secret"
     result = cli.run(str(schema_file), "--set-query", token, f"--base-url={base_url}")
     assert result == snapshot_cli
@@ -2493,177 +2507,199 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
 @pytest.mark.operations("success")
 @flaky(max_runs=5, min_passes=1)
 def test_multiple_failures_in_single_check(
-    testdir, mocker, response_factory, cli, empty_open_api_3_schema, openapi3_base_url, snapshot_cli
+    ctx, testdir, mocker, response_factory, cli, openapi3_base_url, snapshot_cli
 ):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "get": {
-                "responses": {
-                    "default": {"description": "text", "content": {"application/json": {"schema": {"type": "integer"}}}}
-                }
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {"application/json": {"schema": {"type": "integer"}}},
+                        }
+                    }
+                },
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     response = response_factory.requests(content_type=None, status_code=200)
     mocker.patch("requests.Session.request", return_value=response)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_binary_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/binary": {
-            "get": {
-                "responses": {
-                    "default": {
-                        "description": "text",
-                        "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+def test_binary_payload(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/binary": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+                        }
                     }
-                }
+                },
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_long_payload(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/long": {
-            "get": {
-                "responses": {
-                    "default": {"description": "text", "content": {"application/json": {"schema": {"type": "array"}}}}
-                }
+def test_long_payload(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/long": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {"application/json": {"schema": {"type": "array"}}},
+                        }
+                    }
+                },
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
-def test_multiple_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/octet-stream": {
-                            "examples": {
-                                "first": {
-                                    "value": "FIRST",
-                                }
+def test_multiple_errors(ctx, testdir, cli, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/octet-stream": {
+                                "examples": {
+                                    "first": {
+                                        "value": "FIRST",
+                                    }
+                                },
+                                "schema": {"format": "binary", "type": "string"},
                             },
-                            "schema": {"format": "binary", "type": "string"},
-                        },
-                        "application/zip": {
-                            "examples": {
-                                "second": {
-                                    "value": "SECOND",
-                                }
+                            "application/zip": {
+                                "examples": {
+                                    "second": {
+                                        "value": "SECOND",
+                                    }
+                                },
+                                "schema": {"format": "binary", "type": "string"},
                             },
-                            "schema": {"format": "binary", "type": "string"},
                         },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"204": {"description": "Success."}},
+                    "responses": {"204": {"description": "Success."}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
 @pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
-def test_group_errors(testdir, cli, empty_open_api_3_schema, snapshot_cli):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/x-json-smile": {
-                            "schema": {
-                                "properties": {
-                                    "user_id": {
-                                        "example": 1,
-                                        "type": "integer",
+def test_group_errors(ctx, testdir, cli, snapshot_cli):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/x-json-smile": {
+                                "schema": {
+                                    "properties": {
+                                        "user_id": {
+                                            "example": 1,
+                                            "type": "integer",
+                                        },
                                     },
-                                },
-                                "required": ["user_id"],
-                            }
-                        },
-                        "text/csv": {
-                            "schema": {
-                                "properties": {
-                                    "user_id": {
-                                        "example": 1,
-                                        "type": "integer",
+                                    "required": ["user_id"],
+                                }
+                            },
+                            "text/csv": {
+                                "schema": {
+                                    "properties": {
+                                        "user_id": {
+                                            "example": 1,
+                                            "type": "integer",
+                                        },
                                     },
-                                },
-                                "required": ["user_id"],
-                            }
-                        },
-                    }
-                },
-                "responses": {"204": {"description": "Success."}},
+                                    "required": ["user_id"],
+                                }
+                            },
+                        }
+                    },
+                    "responses": {"204": {"description": "Success."}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
-def test_complex_urlencoded_example(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "invalid": {"schema": {"example": 1}},
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "example": [
-                                    {"tag": "0", "timestamp": "2016-04-07T19:39:18Z", "url": "http://127.0.0.1:8001"},
-                                    {"tag": "1", "url": "http://127.0.0.1:8002"},
-                                    {
-                                        "tag": "2",
-                                        "timestamp": "2016-04-07T19:39:18Z",
-                                        "url": "http://127.0.0.1:8003",
+def test_complex_urlencoded_example(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "invalid": {"schema": {"example": 1}},
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "example": [
+                                        {
+                                            "tag": "0",
+                                            "timestamp": "2016-04-07T19:39:18Z",
+                                            "url": "http://127.0.0.1:8001",
+                                        },
+                                        {"tag": "1", "url": "http://127.0.0.1:8002"},
+                                        {
+                                            "tag": "2",
+                                            "timestamp": "2016-04-07T19:39:18Z",
+                                            "url": "http://127.0.0.1:8003",
+                                        },
+                                    ],
+                                    "items": {
+                                        "properties": {
+                                            "closest": {
+                                                "enum": ["either", "after", "before"],
+                                                "type": "string",
+                                            },
+                                            "tag": {
+                                                "type": "string",
+                                            },
+                                            "timestamp": {
+                                                "type": "string",
+                                            },
+                                            "url": {"type": "string"},
+                                        },
+                                        "required": ["url"],
+                                        "type": "object",
                                     },
-                                ],
-                                "items": {
-                                    "properties": {
-                                        "closest": {
-                                            "enum": ["either", "after", "before"],
-                                            "type": "string",
-                                        },
-                                        "tag": {
-                                            "type": "string",
-                                        },
-                                        "timestamp": {
-                                            "type": "string",
-                                        },
-                                        "url": {"type": "string"},
-                                    },
-                                    "required": ["url"],
-                                    "type": "object",
-                                },
-                                "type": "array",
-                            }
-                        },
-                    }
-                },
-                "responses": {"204": {"description": "Success."}},
+                                    "type": "array",
+                                }
+                            },
+                        }
+                    },
+                    "responses": {"204": {"description": "Success."}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-phases=explicit") == snapshot_cli
 
 
@@ -2729,16 +2765,18 @@ def test_parameter_overrides(testdir, cli, schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def test_null_byte_in_header_probe(testdir, cli, empty_open_api_3_schema, snapshot_cli, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "get": {
-                "parameters": [{"name": "X-KEY", "in": "header", "required": True, "schema": {"type": "string"}}],
-                "responses": {"200": {"description": "OK"}},
+def test_null_byte_in_header_probe(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [{"name": "X-KEY", "in": "header", "required": True, "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     module = testdir.make_importable_pyfile(
         hook=r"""
             import schemathesis

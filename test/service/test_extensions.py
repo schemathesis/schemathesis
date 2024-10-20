@@ -231,28 +231,30 @@ def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
         }
     ]
 )
-def test_custom_format(cli, snapshot_cli, service, openapi3_base_url, empty_open_api_3_schema, testdir):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"port": {"type": "string", "format": "port"}},
-                                "required": ["port"],
-                                "additionalProperties": False,
+def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, testdir):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"port": {"type": "string", "format": "port"}},
+                                    "required": ["port"],
+                                    "additionalProperties": False,
+                                }
                             }
-                        }
+                        },
                     },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     module = testdir.make_importable_pyfile(
         hook="""
 import schemathesis
@@ -329,22 +331,22 @@ def test_dry_run(cli, cli_args, snapshot_cli):
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.analyze_schema(autouse=False)
-def test_media_type_extension(
-    cli, service, openapi3_base_url, snapshot_cli, empty_open_api_3_schema, testdir, analyze_schema, strategy
-):
+def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli, testdir, analyze_schema, strategy):
     analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": strategy}}])
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"application/pdf": {"schema": {"type": "string", "format": "binary"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     assert (
         cli.run(
             str(schema_file),
@@ -387,8 +389,8 @@ def test_media_type_extension(
 )
 @pytest.mark.analyze_schema(autouse=False)
 def test_schema_patches(
+    ctx,
     cli,
-    empty_open_api_3_schema,
     patch,
     expected,
     analyze_schema,
@@ -398,15 +400,17 @@ def test_schema_patches(
     snapshot_cli,
     httpserver,
 ):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
+                    "responses": {"200": {"description": "OK"}},
+                },
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     for idx, h in enumerate(httpserver.handlers):
         if h.matcher.uri == "/cli/analysis/":
             httpserver.handlers.pop(idx)
@@ -445,8 +449,8 @@ def schema_check(ctx, response, case):
     )
 
 
-def test_schema_patches_remove_all(empty_open_api_3_schema):
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+def test_schema_patches_remove_all(ctx):
+    schema = schemathesis.from_dict(ctx.openapi.build_schema({}))
     _apply_schema_patches_extension(SchemaPatchesExtension(patches=[{"operation": "remove", "path": []}]), schema)
     assert schema.raw_schema == {}
 
@@ -471,15 +475,17 @@ def test_schema_patches_remove_all(empty_open_api_3_schema):
         ),
     ),
 )
-def test_invalid_schema_patches(path, expected, empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "post": {
-                "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
+def test_invalid_schema_patches(ctx, path, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "post": {
+                    "parameters": [{"name": "date", "in": "query", "schema": {"type": "string"}}],
+                },
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     extension = SchemaPatchesExtension(patches=[{"operation": "remove", "path": path}])
     _apply_schema_patches_extension(extension, schema)
     assert extension.state.errors == [expected]

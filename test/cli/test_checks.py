@@ -74,16 +74,18 @@ def test_exclude_checks(
     assert expected_result in result.stdout
 
 
-def test_negative_data_rejection(testdir, cli, empty_open_api_3_schema, openapi3_base_url):
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "get": {
-                "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}],
-                "responses": {"200": {"description": "OK"}},
+def test_negative_data_rejection(ctx, testdir, cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [{"name": "key", "in": "query", "required": True, "schema": {"type": "integer"}}],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     result = cli.run(
         str(schema_file),
         f"--base-url={openapi3_base_url}",
@@ -129,18 +131,19 @@ def get_users(x_token: Annotated[str, Header()]):
 
 
 @pytest.fixture
-def schema(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "get": {
-                "responses": {
-                    "200": {"description": "Successful response"},
-                    "400": {"description": "Bad request"},
+def schema(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/test": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "Successful response"},
+                        "400": {"description": "Bad request"},
+                    }
                 }
             }
         }
-    }
-    return empty_open_api_3_schema
+    )
 
 
 @pytest.mark.parametrize(

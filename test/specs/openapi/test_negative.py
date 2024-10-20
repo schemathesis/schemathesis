@@ -302,18 +302,22 @@ def test_no_unsatisfiable_schemas(data):
 
 
 @pytest.mark.hypothesis_nested
-def test_optional_query_param_negation(empty_open_api_3_schema):
+def test_optional_query_param_negation(ctx):
     # When all query parameters are optional
-    empty_open_api_3_schema["paths"]["/bug"] = {
-        "get": {
-            "parameters": [
-                {"name": "key1", "in": "query", "required": False, "schema": {"type": "string"}},
-            ],
-            "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/bug": {
+                "get": {
+                    "parameters": [
+                        {"name": "key1", "in": "query", "required": False, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
         }
-    }
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
@@ -361,19 +365,30 @@ DYNAMIC_OBJECT_PARAMETER = {"type": "object", "additionalProperties": {"type": "
     ],
 )
 @pytest.mark.hypothesis_nested
-def test_non_default_styles(empty_open_api_3_schema, location, schema, style, explode):
+def test_non_default_styles(ctx, location, schema, style, explode):
     # See GH-1208
     # When the schema contains a parameter with a not-default "style"
-    empty_open_api_3_schema["paths"]["/bug"] = {
-        "get": {
-            "parameters": [
-                {"name": "key", "in": location, "required": True, "style": style, "explode": explode, "schema": schema},
-            ],
-            "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/bug": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": location,
+                            "required": True,
+                            "style": style,
+                            "explode": explode,
+                            "schema": schema,
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
         }
-    }
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)

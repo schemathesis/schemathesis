@@ -200,37 +200,41 @@ def test_get_operation(operation_id, reference, path, method):
         assert operation.method.upper() == method
 
 
-def test_get_operation_by_id_in_referenced_path(empty_open_api_3_schema):
+def test_get_operation_by_id_in_referenced_path(ctx):
     # When a path entry is behind a reference
     # it should be resolved correctly
-    empty_open_api_3_schema["paths"]["/foo"] = {"$ref": "#/components/x-paths/Path"}
-    empty_open_api_3_schema["components"] = {
-        "x-paths": {
-            "Path": {"get": {"operationId": "getFoo", **RESPONSES}},
+    schema = ctx.openapi.build_schema(
+        {"/foo": {"$ref": "#/components/x-paths/Path"}},
+        components={
+            "x-paths": {
+                "Path": {"get": {"operationId": "getFoo", **RESPONSES}},
+            },
         },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema.get_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
 
 
-def test_get_operation_by_id_in_referenced_path_shared_parameters(empty_open_api_3_schema):
+def test_get_operation_by_id_in_referenced_path_shared_parameters(ctx):
     # When a path entry is behind a reference
     # and it shares parameters with the parent path
     # it should be resolved correctly
     # and the parameters should be merged
     parameter = {"name": "foo", "in": "query", "schema": {"type": "string"}}
-    empty_open_api_3_schema["paths"]["/foo"] = {"$ref": "#/components/x-paths/Path"}
-    empty_open_api_3_schema["components"] = {
-        "x-paths": {
-            "Path": {
-                "get": {"operationId": "getFoo", **RESPONSES},
-                "parameters": [parameter],
-            }
+    schema = ctx.openapi.build_schema(
+        {"/foo": {"$ref": "#/components/x-paths/Path"}},
+        components={
+            "x-paths": {
+                "Path": {
+                    "get": {"operationId": "getFoo", **RESPONSES},
+                    "parameters": [parameter],
+                }
+            },
         },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema.get_operation_by_id("getFoo")
     assert operation.path == "/foo"
     assert operation.method.upper() == "GET"
