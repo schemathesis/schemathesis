@@ -1051,3 +1051,57 @@ def test_unsupported_patterns(nctx, pattern):
 def test_ignoring_unknown_formats(pctx, schema, expected):
     covered = cover_schema(pctx, schema)
     assert covered == expected
+
+
+@pytest.mark.parametrize(
+    "schema, expected",
+    [
+        ({"type": "string", "minLength": 5, "maxLength": 10}, {"/minLength", "/maxLength", "/type"}),
+        ({"type": "number", "minimum": 0, "maximum": 100}, {"/minimum", "/maximum", "/type"}),
+        (
+            {"type": "array", "items": {"type": "string", "pattern": "^[a-z]+$"}},
+            {"/items/pattern", "/items/type", "/type"},
+        ),
+        (
+            {"type": "object", "properties": {"name": {"type": "string", "minLength": 3}}},
+            {"/properties/name/minLength", "/type", "/properties/name/type"},
+        ),
+        ({"type": "string", "enum": ["red", "green", "blue"]}, {"/enum", "/type"}),
+        (
+            {"type": "object", "required": ["id"], "properties": {"id": {"type": "integer"}}},
+            {"/required", "/type", "/properties/id/type"},
+        ),
+        ({"type": "string", "format": "email"}, {"/format", "/type"}),
+        ({"anyOf": [{"type": "string"}, {"type": "number"}]}, {"/anyOf/0/type", "/anyOf/1/type"}),
+        (
+            {"type": "object", "additionalProperties": False},
+            {"/additionalProperties", "/type"},
+        ),
+        (
+            {"type": "object", "patternProperties": {"^meta": {"type": "string"}}},
+            {"/patternProperties/^meta/type", "/type"},
+        ),
+        (
+            {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "properties": {
+                            "address": {"type": "object", "properties": {"street": {"type": "string", "minLength": 5}}}
+                        },
+                    }
+                },
+            },
+            {
+                "/properties/user/properties/address/properties/street/minLength",
+                "/properties/user/properties/address/properties/street/type",
+                "/properties/user/properties/address/type",
+                "/properties/user/type",
+                "/type",
+            },
+        ),
+    ],
+)
+def test_negative_value_locations(nctx, schema, expected):
+    assert {v.location for v in cover_schema_iter(nctx, schema)} == expected

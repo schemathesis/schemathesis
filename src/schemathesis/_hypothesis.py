@@ -223,7 +223,6 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
 
-    ctx = coverage.CoverageContext(data_generation_methods=data_generation_methods)
     meta = GenerationMetadata(
         query=None,
         path_parameters=None,
@@ -232,6 +231,7 @@ def _iter_coverage_cases(
         body=None,
         phase=TestPhase.COVERAGE,
         description=None,
+        location=None,
     )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
@@ -240,7 +240,9 @@ def _iter_coverage_cases(
         schema = parameter.as_json_schema(operation, update_quantifiers=False)
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
-        gen = coverage.cover_schema_iter(ctx, schema)
+        gen = coverage.cover_schema_iter(
+            coverage.CoverageContext(data_generation_methods=data_generation_methods), schema
+        )
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
             continue
@@ -260,7 +262,9 @@ def _iter_coverage_cases(
             examples = [example["value"] for example in definition.get("examples", {}).values() if "value" in example]
             if examples:
                 schema.setdefault("examples", []).extend(examples)
-            gen = coverage.cover_schema_iter(ctx, schema)
+            gen = coverage.cover_schema_iter(
+                coverage.CoverageContext(data_generation_methods=data_generation_methods), schema
+            )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet):
                 continue
@@ -271,12 +275,14 @@ def _iter_coverage_cases(
             case.data_generation_method = value.data_generation_method
             case.meta = copy(meta)
             case.meta.description = value.description
+            case.meta.location = value.location
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
                 case.data_generation_method = next_value.data_generation_method
                 case.meta = copy(meta)
                 case.meta.description = next_value.description
+                case.meta.location = next_value.location
                 yield case
     elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
@@ -295,6 +301,7 @@ def _iter_coverage_cases(
             case.data_generation_method = value.data_generation_method
             case.meta = copy(meta)
             case.meta.description = value.description
+            case.meta.location = value.location
             yield case
 
 

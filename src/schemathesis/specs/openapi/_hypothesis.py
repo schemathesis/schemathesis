@@ -178,6 +178,7 @@ def get_case_strategy(
             body=body_.generator,
             phase=phase,
             description=None,
+            location=None,
         ),
     )
     auth_context = auths.AuthContext(
