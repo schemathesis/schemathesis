@@ -580,18 +580,20 @@ def test_response_schema_conformance_references_valid(complex_schema, value, res
     test()
 
 
-def test_deduplication(empty_open_api_3_schema, response_factory):
+def test_deduplication(ctx, response_factory):
     # See GH-1394
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "get": {
-                "responses": {
-                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+                    },
                 },
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     operation = schema["/data"]["GET"]
     case = operation.make_case()
     response = response_factory.requests()
@@ -618,52 +620,52 @@ def test_deduplication(empty_open_api_3_schema, response_factory):
 
 
 @pytest.fixture(params=["2.0", "3.0"])
-def schema_with_optional_headers(request):
+def schema_with_optional_headers(ctx, request):
     if request.param == "2.0":
-        # definition["x-required"] = False
-        base_schema = request.getfixturevalue("empty_open_api_2_schema")
-        base_schema["paths"] = {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "schema": {"type": "object"},
-                            "headers": {
-                                "X-Optional": {
-                                    "description": "Optional header",
-                                    "type": "integer",
-                                    "x-required": False,
-                                }
-                            },
-                        }
-                    },
-                }
+        return ctx.openapi.build_schema(
+            {
+                "/data": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "schema": {"type": "object"},
+                                "headers": {
+                                    "X-Optional": {
+                                        "description": "Optional header",
+                                        "type": "integer",
+                                        "x-required": False,
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
             },
-        }
-        return base_schema
+            version="2.0",
+        )
     if request.param == "3.0":
-        base_schema = request.getfixturevalue("empty_open_api_3_schema")
-        base_schema["paths"] = {
-            "/data": {
-                "get": {
-                    "responses": {
-                        "200": {
-                            "description": "OK",
-                            "content": {"application/json": {"schema": {"type": "object"}}},
-                            "headers": {
-                                "X-Optional": {
-                                    "description": "Optional header",
-                                    "schema": {"type": "integer"},
-                                    "required": False,
-                                }
-                            },
-                        }
-                    },
-                }
-            },
-        }
-        return base_schema
+        return ctx.openapi.build_schema(
+            {
+                "/data": {
+                    "get": {
+                        "responses": {
+                            "200": {
+                                "description": "OK",
+                                "content": {"application/json": {"schema": {"type": "object"}}},
+                                "headers": {
+                                    "X-Optional": {
+                                        "description": "Optional header",
+                                        "schema": {"type": "integer"},
+                                        "required": False,
+                                    }
+                                },
+                            }
+                        },
+                    }
+                },
+            }
+        )
 
 
 def test_optional_headers_missing(schema_with_optional_headers, response_factory):
@@ -681,7 +683,7 @@ INTEGER_HEADER = {"type": "integer", "maximum": 100}
 DATETIME_HEADER = {"type": "string", "format": "date-time"}
 
 
-@pytest.mark.parametrize("base", ("empty_open_api_2_schema", "empty_open_api_3_schema"))
+@pytest.mark.parametrize("version", ("2.0", "3.0.2"))
 @pytest.mark.parametrize(
     "header, schema, value, expected",
     (
@@ -691,25 +693,27 @@ DATETIME_HEADER = {"type": "string", "format": "date-time"}
         ("X-RateLimit-Reset", DATETIME_HEADER, "Invalid", False),
     ),
 )
-def test_header_conformance(request, response_factory, base, header, schema, value, expected):
-    base_schema = request.getfixturevalue(base)
-    base_schema["paths"] = {
-        "/data": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "headers": {
-                            header: {
-                                "description": "Header",
-                                **({"schema": schema} if base == "empty_open_api_3_schema" else schema),
-                            }
-                        },
-                    }
-                },
-            }
+def test_header_conformance(ctx, response_factory, version, header, schema, value, expected):
+    base_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {
+                                header: {
+                                    "description": "Header",
+                                    **({"schema": schema} if version == "3.0.2" else schema),
+                                }
+                            },
+                        }
+                    },
+                }
+            },
         },
-    }
+        version=version,
+    )
     schema = schemathesis.from_dict(base_schema, validate_schema=True)
     case = make_case(schema, base_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={header: value})
@@ -720,32 +724,34 @@ def test_header_conformance(request, response_factory, base, header, schema, val
             response_headers_conformance(CTX, response, case)
 
 
-def test_header_conformance_definition_behind_ref(empty_open_api_3_schema, response_factory):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "get": {
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "headers": {
-                            "Link": {
-                                "$ref": "#/components/headers/Link",
-                            }
-                        },
-                    }
-                },
-            }
-        },
-    }
-    empty_open_api_3_schema["components"] = {
-        "headers": {
-            "Link": {
-                "schema": {"type": "integer"},
+def test_header_conformance_definition_behind_ref(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "headers": {
+                                "Link": {
+                                    "$ref": "#/components/headers/Link",
+                                }
+                            },
+                        }
+                    },
+                }
             },
         },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
-    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+        components={
+            "headers": {
+                "Link": {
+                    "schema": {"type": "integer"},
+                },
+            },
+        },
+    )
+    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"Link": "Test"})
     with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
         response_headers_conformance(CTX, response, case)
@@ -768,19 +774,19 @@ MULTIPLE_HEADERS = {
 }
 
 
-def test_header_conformance_multiple_invalid_headers(empty_open_api_3_schema, response_factory):
-    empty_open_api_3_schema["paths"] = MULTIPLE_HEADERS
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
-    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+def test_header_conformance_multiple_invalid_headers(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(MULTIPLE_HEADERS)
+    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150", "X-RateLimit-Reset": "Invalid"})
     with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
         response_headers_conformance(CTX, response, case)
 
 
-def test_header_conformance_missing_and_invalid(empty_open_api_3_schema, response_factory):
-    empty_open_api_3_schema["paths"] = MULTIPLE_HEADERS
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
-    case = make_case(schema, empty_open_api_3_schema["paths"]["/data"]["get"])
+def test_header_conformance_missing_and_invalid(ctx, response_factory):
+    raw_schema = ctx.openapi.build_schema(MULTIPLE_HEADERS)
+    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150"})
     with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
         response_headers_conformance(CTX, response, case)

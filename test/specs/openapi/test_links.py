@@ -93,57 +93,59 @@ def test_get_links(openapi3_base_url, schema_url, url, expected):
         assert test.parameters == value.parameters
 
 
-def test_response_type(case, empty_open_api_3_schema):
+def test_response_type(ctx, case):
     # See GH-1068
     # When runtime expression for `requestBody` contains a reference to the whole body
-    empty_open_api_3_schema["paths"] = {
-        "/users/{user_id}/": {
-            "get": {
-                "operationId": "getUser",
-                "parameters": [
-                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "links": {
-                            "UpdateUserById": {
-                                "operationRef": "#/paths/~1users~1{user_id}~1/patch",
-                                "parameters": {"user_id": "$response.body#/id"},
-                                "requestBody": "$response.body",
+    schema = ctx.openapi.build_schema(
+        {
+            "/users/{user_id}/": {
+                "get": {
+                    "operationId": "getUser",
+                    "parameters": [
+                        {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "links": {
+                                "UpdateUserById": {
+                                    "operationRef": "#/paths/~1users~1{user_id}~1/patch",
+                                    "parameters": {"user_id": "$response.body#/id"},
+                                    "requestBody": "$response.body",
+                                }
+                            },
+                        },
+                        "404": {"description": "Not found"},
+                    },
+                },
+                "patch": {
+                    "operationId": "updateUser",
+                    "parameters": [
+                        {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "string", "minLength": 3},
+                                        "first_name": {"type": "string", "minLength": 3},
+                                        "last_name": {"type": "string", "minLength": 3},
+                                    },
+                                    "required": ["first_name", "last_name"],
+                                    "additionalProperties": False,
+                                }
                             }
                         },
+                        "required": True,
                     },
-                    "404": {"description": "Not found"},
+                    "responses": {"200": {"description": "OK"}},
                 },
-            },
-            "patch": {
-                "operationId": "updateUser",
-                "parameters": [
-                    {"in": "query", "name": "user_id", "required": True, "schema": {"type": "string"}},
-                ],
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "id": {"type": "string", "minLength": 3},
-                                    "first_name": {"type": "string", "minLength": 3},
-                                    "last_name": {"type": "string", "minLength": 3},
-                                },
-                                "required": ["first_name", "last_name"],
-                                "additionalProperties": False,
-                            }
-                        }
-                    },
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
     response = requests.Response()
     body = b'{"id": "foo", "first_name": "TEST", "last_name": "TEST"}'
     response._content = body

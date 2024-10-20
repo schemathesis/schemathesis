@@ -205,20 +205,22 @@ def test_misspelled_parameter(schema_url, parameter, message):
         ("2XX", "2XX"),
     ),
 )
-def test_link_override(empty_open_api_3_schema, schema_code, link_code):
+def test_link_override(ctx, schema_code, link_code):
     # See GH-1022
     # When the schema contains response codes as integers
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "get": {
-                "parameters": [
-                    {"in": "query", "name": "key", "schema": {"type": "integer"}, "required": True},
-                ],
-                "responses": {schema_code: {"description": "OK", "schema": {"type": "object"}}},
-            }
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "get": {
+                    "parameters": [
+                        {"in": "query", "name": "key", "schema": {"type": "integer"}, "required": True},
+                    ],
+                    "responses": {schema_code: {"description": "OK", "schema": {"type": "object"}}},
+                }
+            },
+        }
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=False)
     schema.add_link(
         source=schema["/foo"]["GET"], target=schema["/foo"]["GET"], status_code=link_code, parameters={"key": "42"}
     )
@@ -232,29 +234,31 @@ def test_link_override(empty_open_api_3_schema, schema_code, link_code):
         ("unknown", "`unknown` not found"),
     ),
 )
-def test_missing_operation(operation_id, expected, empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/users/": {
-            "post": {
-                "responses": {
-                    "201": {
-                        "description": "OK",
-                        "links": {
-                            "GetUserByUserId": {
-                                "operationId": operation_id,
-                                "parameters": {"path.user_id": "$response.body#/id"},
+def test_missing_operation(ctx, operation_id, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/users/": {
+                "post": {
+                    "responses": {
+                        "201": {
+                            "description": "OK",
+                            "links": {
+                                "GetUserByUserId": {
+                                    "operationId": operation_id,
+                                    "parameters": {"path.user_id": "$response.body#/id"},
+                                },
                             },
-                        },
-                    }
-                },
-            }
-        },
-        "/users/{user_id}": {
-            "get": {"operationId": "getUser", "responses": {"200": {"description": "OK"}}},
-        },
-    }
+                        }
+                    },
+                }
+            },
+            "/users/{user_id}": {
+                "get": {"operationId": "getUser", "responses": {"200": {"description": "OK"}}},
+            },
+        }
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     with pytest.raises(SchemaError) as exc:
         schema.as_state_machine()

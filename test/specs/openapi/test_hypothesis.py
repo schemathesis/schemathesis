@@ -61,42 +61,43 @@ def test_explicit_attributes(operation, values, expected):
 
 
 @pytest.fixture
-def deeply_nested_schema(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": "key",
-                        "in": "query",
-                        "required": True,
-                        "schema": {
-                            # In the end it will be replaced with "#/components/schemas/bar"
-                            "$ref": "#/components/schemas/foo1"
-                        },
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
+def deeply_nested_schema(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {
+                                # In the end it will be replaced with "#/components/schemas/bar"
+                                "$ref": "#/components/schemas/foo1"
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            "foo1": {"$ref": "#/components/schemas/foo2"},
-            "foo2": {"$ref": "#/components/schemas/foo3"},
-            "foo3": {"$ref": "#/components/schemas/foo4"},
-            "foo4": {"$ref": "#/components/schemas/foo5"},
-            "foo5": {"$ref": "#/components/schemas/foo6"},
-            "foo6": {"$ref": "#/components/schemas/foo7"},
-            "foo7": {"$ref": "#/components/schemas/foo8"},
-            "foo8": {"$ref": "#/components/schemas/foo9"},
-            "foo9": {"$ref": "#/components/schemas/bar"},
-            "bar": {
-                "type": "string",
-            },
-        }
-    }
-    return empty_open_api_3_schema
+        },
+        components={
+            "schemas": {
+                "foo1": {"$ref": "#/components/schemas/foo2"},
+                "foo2": {"$ref": "#/components/schemas/foo3"},
+                "foo3": {"$ref": "#/components/schemas/foo4"},
+                "foo4": {"$ref": "#/components/schemas/foo5"},
+                "foo5": {"$ref": "#/components/schemas/foo6"},
+                "foo6": {"$ref": "#/components/schemas/foo7"},
+                "foo7": {"$ref": "#/components/schemas/foo8"},
+                "foo8": {"$ref": "#/components/schemas/foo9"},
+                "foo9": {"$ref": "#/components/schemas/bar"},
+                "bar": {
+                    "type": "string",
+                },
+            }
+        },
+    )
 
 
 def test_missed_ref(deeply_nested_schema):
@@ -309,12 +310,13 @@ def make_header_param(schema, **kwargs):
     }
 
 
-def test_header_filtration_not_needed(empty_open_api_3_schema, mocker):
+def test_header_filtration_not_needed(ctx, mocker):
     # When schema contains a simple header
     mocked = mocker.spy(_hypothesis, "is_valid_header")
-    make_header_param(empty_open_api_3_schema)
+    schema = ctx.openapi.build_schema({})
+    make_header_param(schema)
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(schema["/data"]["GET"].as_strategy())
     def test(case):
@@ -326,12 +328,13 @@ def test_header_filtration_not_needed(empty_open_api_3_schema, mocker):
     mocked.assert_not_called()
 
 
-def test_header_filtration_needed(empty_open_api_3_schema, mocker):
+def test_header_filtration_needed(ctx, mocker):
     # When schema contains a header with a custom format
     mocked = mocker.spy(_hypothesis, "is_valid_header")
-    make_header_param(empty_open_api_3_schema, format="date")
+    schema = ctx.openapi.build_schema({})
+    make_header_param(schema, format="date")
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(schema["/data"]["GET"].as_strategy())
     @settings(max_examples=1)
@@ -344,34 +347,36 @@ def test_header_filtration_needed(empty_open_api_3_schema, mocker):
     mocked.assert_called()
 
 
-def test_missing_header_filter(empty_open_api_3_schema, mocker):
+def test_missing_header_filter(ctx, mocker):
     # Regression. See GH-1142
     mocked = mocker.spy(_hypothesis, "is_valid_header")
     # When some header parameters have the `format` keyword
     # And some don't
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": "key1",
-                        "in": "header",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    },
-                    {
-                        "name": "key2",
-                        "in": "header",
-                        "required": True,
-                        "schema": {"type": "string"},
-                    },
-                ],
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key1",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        },
+                        {
+                            "name": "key2",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
 
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(schema["/data"]["GET"].as_strategy())
     def test(case):
@@ -408,40 +413,42 @@ def test_serializing_shared_header_parameters():
     test()
 
 
-def test_filter_urlencoded(empty_open_api_3_schema):
+def test_filter_urlencoded(ctx):
     # When API schema allows for inputs that can't be serialized to `application/x-www-form-urlencoded`
     # Then such examples should be filtered out during generation
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/x-www-form-urlencoded": {
-                            "schema": {
-                                "type": "array",
-                                "items": {
-                                    "properties": {
-                                        "value": {
-                                            "enum": ["A"],
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "properties": {
+                                            "value": {
+                                                "enum": ["A"],
+                                            },
+                                            "key": {
+                                                "enum": ["B"],
+                                            },
                                         },
-                                        "key": {
-                                            "enum": ["B"],
-                                        },
+                                        "required": ["key", "value"],
+                                        # Additional properties are allowed
                                     },
-                                    "required": ["key", "value"],
-                                    # Additional properties are allowed
-                                },
-                                "maxItems": 3,
+                                    "maxItems": 3,
+                                }
                             }
-                        }
+                        },
                     },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
-            },
+            }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
 
     @given(schema["/test"]["POST"].as_strategy())
     @settings(phases=[Phase.generate], max_examples=15, deadline=None)

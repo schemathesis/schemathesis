@@ -491,30 +491,30 @@ def test_nullable_parameters(
     assert func("foo", **kwargs)({"foo": None}) == {"foo": ""}
 
 
-def test_security_definition_parameter(testdir, empty_open_api_2_schema):
+def test_security_definition_parameter(ctx, testdir):
     # When the API contains an example for one of its parameters
-    empty_open_api_2_schema["paths"] = {
-        "/test": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "body",
-                        "in": "body",
-                        "schema": {
-                            "type": "object",
-                            "example": {"foo": "bar"},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "body",
+                            "in": "body",
+                            "schema": {
+                                "type": "object",
+                                "example": {"foo": "bar"},
+                            },
                         },
-                    },
-                ],
-                "responses": {"200": {"description": "OK"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    # And a security definition that is used for data generation
-    empty_open_api_2_schema["securityDefinitions"] = {
-        "token": {"type": "apiKey", "name": "Authorization", "in": "header"}
-    }
-    empty_open_api_2_schema["security"] = [{"token": []}]
+        },
+        securityDefinitions={"token": {"type": "apiKey", "name": "Authorization", "in": "header"}},
+        security=[{"token": []}],
+        version="2.0",
+    )
     testdir.make_test(
         """
 @schema.parametrize()
@@ -522,7 +522,7 @@ def test_security_definition_parameter(testdir, empty_open_api_2_schema):
 def test_(case):
     pass
         """,
-        schema=empty_open_api_2_schema,
+        schema=schema,
     )
     result = testdir.runpytest("-v")
     # Then it should work as expected
@@ -536,19 +536,24 @@ def test_(case):
     # for simplicity
     ("null", "string", "boolean", "array", "integer", "number"),
 )
-def test_unusual_form_schema(empty_open_api_3_schema, type_name):
+def test_unusual_form_schema(ctx, type_name):
     # See GH-1152
     # When API schema defines multipart media type
     # And its schema is not an object or bytes (string + format=byte)
-    empty_open_api_3_schema["paths"] = {
-        "/multipart": {
-            "post": {
-                "requestBody": {"content": {"multipart/form-data": {"schema": {"type": type_name}}}, "required": True},
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/multipart": {
+                "post": {
+                    "requestBody": {
+                        "content": {"multipart/form-data": {"schema": {"type": type_name}}},
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=False)
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=False)
 
     @given(case=schema["/multipart"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)

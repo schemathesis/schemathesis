@@ -144,34 +144,37 @@ def test_is_json_path(type_, value, expected):
     assert loaders._is_json_path(type_(value)) == expected
 
 
-def test_numeric_status_codes(empty_open_api_3_schema):
+def test_numeric_status_codes(ctx):
     # When the API schema contains a numeric status code, which is not allowed by the spec
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "parameters": [],
-            "get": {
-                "responses": {200: {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "parameters": [],
+                "get": {
+                    "responses": {200: {"description": "OK"}},
+                },
+                "post": {
+                    "responses": {201: {"description": "OK"}},
+                },
             },
-            "post": {
-                "responses": {201: {"description": "OK"}},
-            },
-        },
-    }
+        }
+    )
     # And schema validation is enabled
     # Then Schemathesis reports an error about numeric status codes
     with pytest.raises(SchemaError, match="Numeric HTTP status codes detected in your YAML schema") as exc:
-        schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+        schemathesis.from_dict(schema, validate_schema=True)
     # And shows all locations of these keys
     assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.message
     assert " - 201 at schema['paths']['/foo']['post']['responses']" in exc.value.message
 
 
-def test_non_string_keys(empty_open_api_3_schema):
+def test_non_string_keys(ctx):
     # If API schema contains a non-string key
-    empty_open_api_3_schema[True] = 42
+    schema = ctx.openapi.build_schema({})
+    schema[True] = 42
     # Then it should be reported with a proper message
     with pytest.raises(SchemaError, match=NON_STRING_OBJECT_KEY_MESSAGE):
-        schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+        schemathesis.from_dict(schema, validate_schema=True)
 
 
 JSON_ERROR = ["Expecting property name enclosed in double quotes: line 1 column 2 (char 1)"]

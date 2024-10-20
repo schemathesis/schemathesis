@@ -16,23 +16,25 @@ def uuid_format():
 
 @pytest.mark.usefixtures("uuid_format")
 @pytest.mark.hypothesis_nested
-def test_generates_uuid(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data/{key}/": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": "key",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "string", "format": "uuid"},
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
+def test_generates_uuid(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data/{key}/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", "format": "uuid"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    )
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/data/{key}/"]["GET"].as_strategy())
     @settings(max_examples=3, phases=[Phase.generate], deadline=None)

@@ -140,101 +140,105 @@ MIXED_CASES = [
         ),
     ),
 )
-def test_phase(empty_open_api_3_schema, methods, expected):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "q1",
-                        "schema": {"type": "integer", "minimum": 5},
+def test_phase(ctx, methods, expected):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {"type": "integer", "minimum": 5},
+                            "required": True,
+                        },
+                        {
+                            "in": "query",
+                            "name": "q2",
+                            "schema": {"type": "string", "minLength": 3},
+                            "required": True,
+                        },
+                        {
+                            "in": "header",
+                            "name": "h1",
+                            "schema": {"type": "integer", "maximum": 5},
+                            "required": True,
+                        },
+                        {
+                            "in": "header",
+                            "name": "h2",
+                            "schema": {"type": "string", "maxLength": 3},
+                            "required": True,
+                        },
+                    ],
+                    "requestBody": {
                         "required": True,
-                    },
-                    {
-                        "in": "query",
-                        "name": "q2",
-                        "schema": {"type": "string", "minLength": 3},
-                        "required": True,
-                    },
-                    {
-                        "in": "header",
-                        "name": "h1",
-                        "schema": {"type": "integer", "maximum": 5},
-                        "required": True,
-                    },
-                    {
-                        "in": "header",
-                        "name": "h2",
-                        "schema": {"type": "string", "maxLength": 3},
-                        "required": True,
-                    },
-                ],
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"j-prop": {"type": "integer"}},
-                                "required": ["j-prop"],
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"j-prop": {"type": "integer"}},
+                                    "required": ["j-prop"],
+                                },
+                            },
+                            "application/xml": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"x-prop": {"type": "string"}},
+                                    "required": ["x-prop"],
+                                },
                             },
                         },
-                        "application/xml": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {"x-prop": {"type": "string"}},
-                                "required": ["x-prop"],
-                            },
-                        },
                     },
-                },
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
-    assert_coverage(empty_open_api_3_schema, methods, expected)
-
-
-def test_phase_no_body(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "q1",
-                        "schema": {"type": "integer", "minimum": 5},
-                        "required": True,
-                    },
-                ],
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
-    assert_coverage(
-        empty_open_api_3_schema, [DataGenerationMethod.positive], [{"query": {"q1": 6}}, {"query": {"q1": 5}}]
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
     )
+    assert_coverage(schema, methods, expected)
 
 
-def test_with_example(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "q1",
-                        "schema": {"type": "string", "example": "secret"},
-                        "required": True,
-                    },
-                ],
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
+def test_phase_no_body(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {"type": "integer", "minimum": 5},
+                            "required": True,
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(schema, [DataGenerationMethod.positive], [{"query": {"q1": 6}}, {"query": {"q1": 5}}])
+
+
+def test_with_example(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {"type": "string", "example": "secret"},
+                            "required": True,
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.positive],
         [{"query": {"q1": "secret"}}],
     )
@@ -247,57 +251,61 @@ EXPECTED_EXAMPLES = [
 ]
 
 
-def test_with_examples_openapi_3(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "q1",
-                        "schema": {"type": "string"},
-                        "required": True,
-                        "examples": {
-                            "first": {"value": "A1"},
-                            "second": {"value": "B2"},
+def test_with_examples_openapi_3(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {"type": "string"},
+                            "required": True,
+                            "examples": {
+                                "first": {"value": "A1"},
+                                "second": {"value": "B2"},
+                            },
                         },
-                    },
-                    {
-                        "in": "query",
-                        "name": "q2",
-                        "schema": {"type": "integer"},
-                        "required": True,
-                        "examples": {
-                            "first": {"value": 10},
-                            "second": {"value": 20},
+                        {
+                            "in": "query",
+                            "name": "q2",
+                            "schema": {"type": "integer"},
+                            "required": True,
+                            "examples": {
+                                "first": {"value": 10},
+                                "second": {"value": 20},
+                            },
                         },
-                    },
-                ],
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.positive],
         EXPECTED_EXAMPLES,
     )
 
 
-def test_with_example_openapi_3(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
-                    {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": True, "example": 10},
-                ],
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
+def test_with_example_openapi_3(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
+                        {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": True, "example": 10},
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.positive],
         [
             {
@@ -310,31 +318,33 @@ def test_with_example_openapi_3(empty_open_api_3_schema):
     )
 
 
-def test_with_response_example_openapi_3(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/items/{itemId}/": {
-            "get": {
-                "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {"$ref": "#/components/schemas/Item"},
-                                "examples": {
-                                    "Example1": {"value": {"id": "123456"}},
-                                    "Example2": {"value": {"itemId": "456789"}},
-                                },
-                            }
-                        },
-                    }
-                },
+def test_with_response_example_openapi_3(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/items/{itemId}/": {
+                "get": {
+                    "parameters": [{"name": "itemId", "in": "path", "schema": {"type": "string"}, "required": True}],
+                    "responses": {
+                        "200": {
+                            "description": "",
+                            "content": {
+                                "application/json": {
+                                    "schema": {"$ref": "#/components/schemas/Item"},
+                                    "examples": {
+                                        "Example1": {"value": {"id": "123456"}},
+                                        "Example2": {"value": {"itemId": "456789"}},
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}}
+        },
+        components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.positive],
         [
             {
@@ -386,54 +396,56 @@ def test_with_examples_openapi_3_1():
     )
 
 
-def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {"type": "string"},
-                                    "age": {"type": "integer"},
-                                    "tags": {"type": "array", "items": {"type": "string"}},
-                                    "address": {
-                                        "type": "object",
-                                        "properties": {"street": {"type": "string"}, "city": {"type": "string"}},
+def test_with_examples_openapi_3_request_body(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {"type": "string"},
+                                        "age": {"type": "integer"},
+                                        "tags": {"type": "array", "items": {"type": "string"}},
+                                        "address": {
+                                            "type": "object",
+                                            "properties": {"street": {"type": "string"}, "city": {"type": "string"}},
+                                        },
+                                    },
+                                    "required": ["name", "age"],
+                                },
+                                "examples": {
+                                    "example1": {
+                                        "value": {
+                                            "name": "John Doe",
+                                            "age": 30,
+                                            "tags": ["developer", "python"],
+                                            "address": {"street": "123 Main St", "city": "Anytown"},
+                                        }
+                                    },
+                                    "example2": {
+                                        "value": {
+                                            "name": "Jane Smith",
+                                            "age": 25,
+                                            "tags": ["designer", "ui/ux"],
+                                            "address": {"street": "456 Elm St", "city": "Somewhere"},
+                                        }
                                     },
                                 },
-                                "required": ["name", "age"],
-                            },
-                            "examples": {
-                                "example1": {
-                                    "value": {
-                                        "name": "John Doe",
-                                        "age": 30,
-                                        "tags": ["developer", "python"],
-                                        "address": {"street": "123 Main St", "city": "Anytown"},
-                                    }
-                                },
-                                "example2": {
-                                    "value": {
-                                        "name": "Jane Smith",
-                                        "age": 25,
-                                        "tags": ["designer", "ui/ux"],
-                                        "address": {"street": "456 Elm St", "city": "Somewhere"},
-                                    }
-                                },
-                            },
-                        }
+                            }
+                        },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.positive],
         [
             {"body": {"address": {}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
@@ -501,72 +513,77 @@ def test_with_examples_openapi_3_request_body(empty_open_api_3_schema):
     )
 
 
-def test_with_examples_openapi_2(empty_open_api_2_schema):
-    empty_open_api_2_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "parameters": [
-                    {
-                        "in": "query",
-                        "name": "q1",
-                        "type": "string",
-                        "required": True,
-                        "x-examples": {
-                            "first": {"value": "A1"},
-                            "second": {"value": "B2"},
+def test_with_examples_openapi_2(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "type": "string",
+                            "required": True,
+                            "x-examples": {
+                                "first": {"value": "A1"},
+                                "second": {"value": "B2"},
+                            },
                         },
-                    },
-                    {
-                        "in": "query",
-                        "name": "q2",
-                        "type": "integer",
-                        "required": True,
-                        "x-examples": {
-                            "first": {"value": 10},
-                            "second": {"value": 20},
+                        {
+                            "in": "query",
+                            "name": "q2",
+                            "type": "integer",
+                            "required": True,
+                            "x-examples": {
+                                "first": {"value": 10},
+                                "second": {"value": 20},
+                            },
                         },
-                    },
-                ],
-                "responses": {"default": {"description": "OK"}},
-            }
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
         },
-    }
+        version="2.0",
+    )
     assert_coverage(
-        empty_open_api_2_schema,
+        schema,
         [DataGenerationMethod.positive],
         EXPECTED_EXAMPLES,
     )
 
 
-def test_negative_patterns(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "name": {
-                                        "type": "string",
-                                        "minLength": 3,
-                                        "maxLength": 10,
-                                        "pattern": "^[a-zA-Z0-9-_]$",
+def test_negative_patterns(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "name": {
+                                            "type": "string",
+                                            "minLength": 3,
+                                            "maxLength": 10,
+                                            "pattern": "^[a-zA-Z0-9-_]$",
+                                        },
                                     },
+                                    "required": ["name"],
                                 },
-                                "required": ["name"],
-                            },
-                        }
+                            }
+                        },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"default": {"description": "OK"}},
-            }
-        },
-    }
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
     assert_coverage(
-        empty_open_api_3_schema,
+        schema,
         [DataGenerationMethod.negative],
         [
             {

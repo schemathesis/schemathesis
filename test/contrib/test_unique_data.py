@@ -42,31 +42,33 @@ def unique_data():
         None,
     ]
 )
-def raw_schema(request, empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data/{path_param}/": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": f"{location}_param",
-                        "in": location,
-                        "required": True,
-                        "schema": {"type": "string"},
-                        **kwargs,
-                    }
-                    for location, kwargs in (
-                        ("path", {}),
-                        ("query", {"style": "simple", "explode": True}),
-                        ("header", {}),
-                        ("cookie", {}),
-                    )
-                ],
-                "responses": {"200": {"description": "OK"}},
+def raw_schema(ctx, request):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data/{path_param}/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": f"{location}_param",
+                            "in": location,
+                            "required": True,
+                            "schema": {"type": "string"},
+                            **kwargs,
+                        }
+                        for location, kwargs in (
+                            ("path", {}),
+                            ("query", {"style": "simple", "explode": True}),
+                            ("header", {}),
+                            ("cookie", {}),
+                        )
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     if request.param is not None:
-        empty_open_api_3_schema["paths"]["/data/{path_param}/"]["get"].update(
+        schema["paths"]["/data/{path_param}/"]["get"].update(
             {
                 "requestBody": {
                     "content": request.param,
@@ -74,7 +76,7 @@ def raw_schema(request, empty_open_api_3_schema):
                 }
             }
         )
-    return empty_open_api_3_schema
+    return schema
 
 
 @pytest.mark.hypothesis_nested
@@ -182,9 +184,9 @@ def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
 @pytest.mark.parametrize("workers", (1, 2))
 @pytest.mark.snapshot(replace_statistic=True)
 def test_explicit_headers(
+    ctx,
     testdir,
     unique_hook,
-    empty_open_api_3_schema,
     cli,
     openapi3_base_url,
     hypothesis_max_examples,
@@ -192,25 +194,27 @@ def test_explicit_headers(
     snapshot_cli,
 ):
     header_name = "X-Session-ID"
-    empty_open_api_3_schema["paths"] = {
-        "/success": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": name,
-                        "in": location,
-                        "required": True,
-                        "schema": {"type": "string"},
-                    }
-                    for name, location in (
-                        (header_name, "header"),
-                        ("key", "query"),
-                    )
-                ],
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": name,
+                            "in": location,
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                        for name, location in (
+                            (header_name, "header"),
+                            ("key", "query"),
+                        )
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
         }
-    }
+    )
     # When explicit headers are passed to CLI
     # And they match one of the parameters
     # Then they should be included in the uniqueness check
@@ -219,7 +223,7 @@ def test_explicit_headers(
             testdir,
             cli,
             unique_hook,
-            empty_open_api_3_schema,
+            schema,
             openapi3_base_url,
             hypothesis_max_examples,
             f"-H {header_name}: fixed",

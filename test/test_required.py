@@ -53,19 +53,20 @@ def test_(request, case):
 
 
 @pytest.mark.parametrize(
-    "spec_version, param",
+    "version, param",
     (
-        ("open_api_2", {"in": "query", "name": "key", "type": "string"}),
-        ("open_api_2", {"in": "body", "name": "body", "schema": {"type": "string"}}),
-        ("open_api_3", {"in": "query", "name": "key", "schema": {"type": "string"}}),
-        ("open_api_3", {"content": {"application/json": {"schema": {"type": "string"}}}}),
+        ("2.0", {"in": "query", "name": "key", "type": "string"}),
+        ("2.0", {"in": "body", "name": "body", "schema": {"type": "string"}}),
+        ("3.0.2", {"in": "query", "name": "key", "schema": {"type": "string"}}),
+        ("3.0.2", {"content": {"application/json": {"schema": {"type": "string"}}}}),
     ),
 )
-def test_without_required(request, testdir, spec_version, param):
+def test_without_required(ctx, testdir, version, param):
     # When "required" field is not present in the parameter
-    schema = request.getfixturevalue(f"empty_{spec_version}_schema")
-    if spec_version == "open_api_2":
-        schema["paths"] = {"/users": {"post": {"parameters": [param], "responses": {"200": {"description": "OK"}}}}}
+    if version == "2.0":
+        schema = ctx.openapi.build_schema(
+            {"/users": {"post": {"parameters": [param], "responses": {"200": {"description": "OK"}}}}}, version="2.0"
+        )
         location = param["in"]
     else:
         path = {"responses": {"200": {"description": "OK"}}}
@@ -75,7 +76,7 @@ def test_without_required(request, testdir, spec_version, param):
         else:
             path["parameters"] = [param]
             location = param["in"]
-        schema["paths"] = {"/users": {"post": path}}
+        schema = ctx.openapi.build_schema({"/users": {"post": path}})
     testdir.make_test(
         f"""
 @schema.parametrize()

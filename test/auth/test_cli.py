@@ -68,34 +68,36 @@ def after_call(context, case, response):
     assert cli.main("run", schema_url, "--show-trace", *args, hooks=module.purebasename) == snapshot_cli
 
 
-def test_multiple_auth_mechanisms_with_explicit_auth(testdir, empty_open_api_3_schema, cli, snapshot_cli):
+def test_multiple_auth_mechanisms_with_explicit_auth(ctx, testdir, cli, snapshot_cli):
     # When the schema defines multiple auth mechanisms on the same operation
     # And the user passes an explicit `Authorization` header
-    empty_open_api_3_schema["paths"] = {
-        "/health": {
-            "get": {
-                "summary": "",
-                "responses": {"200": {"description": "OK"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/health": {
+                "get": {
+                    "summary": "",
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "securitySchemes": {
-            "bearerAuth": {
-                "type": "http",
-                "scheme": "bearer",
-                "bearerFormat": "uuid",
-                "description": '* Thing access: "Authorization: Thing <thing_key>"\n',
-            },
-            "basicAuth": {
-                "type": "http",
-                "scheme": "basic",
-                "description": '* Things access: "Authorization: Basic <base64-encoded_credentials>"\n',
-            },
-        }
-    }
-    empty_open_api_3_schema["security"] = [{"bearerAuth": []}, {"basicAuth": []}]
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        },
+        components={
+            "securitySchemes": {
+                "bearerAuth": {
+                    "type": "http",
+                    "scheme": "bearer",
+                    "bearerFormat": "uuid",
+                    "description": '* Thing access: "Authorization: Thing <thing_key>"\n',
+                },
+                "basicAuth": {
+                    "type": "http",
+                    "scheme": "basic",
+                    "description": '* Things access: "Authorization: Basic <base64-encoded_credentials>"\n',
+                },
+            }
+        },
+        security=[{"bearerAuth": []}, {"basicAuth": []}],
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     # Then it should be able to generate requests
     assert cli.run(str(schema_file), "--dry-run", "-H", "Authorization: Bearer foo") == snapshot_cli
 

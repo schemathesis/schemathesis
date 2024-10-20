@@ -112,21 +112,23 @@ def extract_message(testcase, server_host):
     )
 
 
-def test_binary_response(empty_open_api_3_schema, testdir, cli, openapi3_base_url, tmp_path, server_host):
+def test_binary_response(ctx, testdir, cli, openapi3_base_url, tmp_path, server_host):
     xml_path = tmp_path / "junit.xml"
-    empty_open_api_3_schema["paths"] = {
-        "/binary": {
-            "get": {
-                "responses": {
-                    "default": {
-                        "description": "text",
-                        "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/binary": {
+                "get": {
+                    "responses": {
+                        "default": {
+                            "description": "text",
+                            "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+                        }
                     }
-                }
+                },
             },
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--checks=all", f"--junit-xml={xml_path}")
     tree = ElementTree.parse(xml_path)
     testsuite = tree.getroot()[0]

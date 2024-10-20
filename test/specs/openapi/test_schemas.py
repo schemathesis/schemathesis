@@ -82,9 +82,9 @@ def matches_operation(case, operation):
     return operation.method.upper() == case.method.upper() and operation.full_path == case.full_path
 
 
-def test_path_as_strategy(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = TWO_METHOD_PATHS
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+def test_path_as_strategy(ctx):
+    schema = ctx.openapi.build_schema(TWO_METHOD_PATHS)
+    schema = schemathesis.from_dict(schema)
     operations = schema["/test"]
     strategy = operations.as_strategy()
     for operation in operations.values():
@@ -92,9 +92,9 @@ def test_path_as_strategy(empty_open_api_3_schema):
         find(strategy, partial(matches_operation, operation=operation))
 
 
-def test_schema_as_strategy(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {**SINGLE_METHOD_PATHS, **TWO_METHOD_PATHS}
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+def test_schema_as_strategy(ctx):
+    schema = ctx.openapi.build_schema({**SINGLE_METHOD_PATHS, **TWO_METHOD_PATHS})
+    schema = schemathesis.from_dict(schema)
     strategy = schema.as_strategy()
     for operations in schema.values():
         for operation in operations.values():

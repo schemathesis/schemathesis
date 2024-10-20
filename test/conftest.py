@@ -48,7 +48,7 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
     from syrupy.types import PropertyFilter, PropertyMatcher
 
-pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock"]
+pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock", "test.fixtures.ctx"]
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
@@ -545,93 +545,75 @@ def simple_schema():
 
 
 @pytest.fixture
-def empty_open_api_2_schema():
-    return {
-        "swagger": "2.0",
-        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-        "host": "api.example.com",
-        "basePath": "/v1",
-        "schemes": ["https"],
-        "paths": {},
-    }
-
-
-@pytest.fixture
-def empty_open_api_3_schema():
-    return {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {},
-    }
-
-
-@pytest.fixture
-def open_api_3_schema_with_recoverable_errors(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/foo": {"$ref": "#/components/UnknownMethods"},
-        "/bar": {
-            "get": {
-                "responses": {"200": {"description": "OK"}},
-            },
-            "post": {
-                "parameters": [{"$ref": "#/components/UnknownParameter"}],
-                "responses": {"200": {"description": "OK"}},
-            },
-        },
-    }
-    return empty_open_api_3_schema
-
-
-@pytest.fixture
-def open_api_3_schema_with_yaml_payload(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/yaml": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "text/yaml": {
-                            "schema": {"type": "array", "items": {"enum": [42]}, "minItems": 1, "maxItems": 1}
-                        }
-                    },
+def open_api_3_schema_with_recoverable_errors(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/foo": {"$ref": "#/components/UnknownMethods"},
+            "/bar": {
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
-            },
-        },
-    }
-    return empty_open_api_3_schema
-
-
-@pytest.fixture
-def openapi_3_schema_with_invalid_security(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "application/json": {"schema": {"type": "integer"}},
-                    },
+                "post": {
+                    "parameters": [{"$ref": "#/components/UnknownParameter"}],
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
-            },
-        },
-    }
-    empty_open_api_3_schema["components"] = {
-        "securitySchemes": {
-            "bearerAuth": {
-                # Missing `type` key
-                "scheme": "bearer",
-                "bearerFormat": "uuid",
             },
         }
-    }
-    empty_open_api_3_schema["security"] = [{"bearerAuth": []}]
-    return empty_open_api_3_schema
+    )
 
 
 @pytest.fixture
-def openapi_3_schema_with_xml(empty_open_api_3_schema):
+def open_api_3_schema_with_yaml_payload(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/yaml": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "text/yaml": {
+                                "schema": {"type": "array", "items": {"enum": [42]}, "minItems": 1, "maxItems": 1}
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+
+
+@pytest.fixture
+def openapi_3_schema_with_invalid_security(ctx):
+    return ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {"schema": {"type": "integer"}},
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        components={
+            "securitySchemes": {
+                "bearerAuth": {
+                    # Missing `type` key
+                    "scheme": "bearer",
+                    "bearerFormat": "uuid",
+                },
+            }
+        },
+        security=[{"bearerAuth": []}],
+    )
+
+
+@pytest.fixture
+def openapi_3_schema_with_xml(ctx):
     id_schema = {"type": "integer", "enum": [42]}
 
     def operation(schema: dict):
@@ -704,53 +686,54 @@ def openapi_3_schema_with_xml(empty_open_api_3_schema):
         items=id_schema, xml={"namespace": "http://example.com/schema", "prefix": "smp", "wrapped": True}
     )
 
-    empty_open_api_3_schema["components"] = {
-        "schemas": {
-            # This name is used in XML
-            "AutoName": no_xml_object,
-            "ExplicitName": {**no_xml_object, "xml": {"name": "CustomName"}},
-            "RenamedProperty": renamed_property_xml_object,
-            "PropertyAsAttribute": property_as_attribute,
-            "SimpleArray": simple_array,
-            "WrappedArray": wrapped_array,
-            "ArrayWithRenaming": array_with_renaming,
-            "ObjectInArray": object_in_array,
-            "ArrayInObject": array_in_object,
-            "PrefixedObject": prefixed_object,
-            "PrefixedArray": prefixed_array,
-            "PrefixedAttribute": prefixed_attribute,
-            "NamespacedObject": namespaced_object,
-            "NamespacedArray": namespaced_array,
-            "NamespacedWrappedArray": namespaced_wrapped_array,
-            "NamespacedPrefixedObject": namespaced_prefixed_object,
-            "NamespacedPrefixedArray": namespaced_prefixed_array,
-            "NamespacedPrefixedWrappedArray": namespaced_prefixed_wrapped_array,
-        }
-    }
-    empty_open_api_3_schema["paths"] = {
-        "/root-name": operation(make_object()),
-        "/auto-name": operation({"$ref": "#/components/schemas/AutoName"}),
-        "/explicit-name": operation({"$ref": "#/components/schemas/ExplicitName"}),
-        "/renamed-property": operation({"$ref": "#/components/schemas/RenamedProperty"}),
-        "/property-attribute": operation({"$ref": "#/components/schemas/PropertyAsAttribute"}),
-        "/simple-array": operation({"$ref": "#/components/schemas/SimpleArray"}),
-        "/wrapped-array": operation({"$ref": "#/components/schemas/WrappedArray"}),
-        "/array-with-renaming": operation({"$ref": "#/components/schemas/ArrayWithRenaming"}),
-        "/object-in-array": operation({"$ref": "#/components/schemas/ObjectInArray"}),
-        "/array-in-object": operation({"$ref": "#/components/schemas/ArrayInObject"}),
-        "/prefixed-object": operation({"$ref": "#/components/schemas/PrefixedObject"}),
-        "/prefixed-array": operation({"$ref": "#/components/schemas/PrefixedArray"}),
-        "/prefixed-attribute": operation({"$ref": "#/components/schemas/PrefixedAttribute"}),
-        "/namespaced-object": operation({"$ref": "#/components/schemas/NamespacedObject"}),
-        "/namespaced-array": operation({"$ref": "#/components/schemas/NamespacedArray"}),
-        "/namespaced-wrapped-array": operation({"$ref": "#/components/schemas/NamespacedWrappedArray"}),
-        "/namespaced-prefixed-object": operation({"$ref": "#/components/schemas/NamespacedPrefixedObject"}),
-        "/namespaced-prefixed-array": operation({"$ref": "#/components/schemas/NamespacedPrefixedArray"}),
-        "/namespaced-prefixed-wrapped-array": operation(
-            {"$ref": "#/components/schemas/NamespacedPrefixedWrappedArray"}
-        ),
-    }
-    return empty_open_api_3_schema
+    return ctx.openapi.build_schema(
+        {
+            "/root-name": operation(make_object()),
+            "/auto-name": operation({"$ref": "#/components/schemas/AutoName"}),
+            "/explicit-name": operation({"$ref": "#/components/schemas/ExplicitName"}),
+            "/renamed-property": operation({"$ref": "#/components/schemas/RenamedProperty"}),
+            "/property-attribute": operation({"$ref": "#/components/schemas/PropertyAsAttribute"}),
+            "/simple-array": operation({"$ref": "#/components/schemas/SimpleArray"}),
+            "/wrapped-array": operation({"$ref": "#/components/schemas/WrappedArray"}),
+            "/array-with-renaming": operation({"$ref": "#/components/schemas/ArrayWithRenaming"}),
+            "/object-in-array": operation({"$ref": "#/components/schemas/ObjectInArray"}),
+            "/array-in-object": operation({"$ref": "#/components/schemas/ArrayInObject"}),
+            "/prefixed-object": operation({"$ref": "#/components/schemas/PrefixedObject"}),
+            "/prefixed-array": operation({"$ref": "#/components/schemas/PrefixedArray"}),
+            "/prefixed-attribute": operation({"$ref": "#/components/schemas/PrefixedAttribute"}),
+            "/namespaced-object": operation({"$ref": "#/components/schemas/NamespacedObject"}),
+            "/namespaced-array": operation({"$ref": "#/components/schemas/NamespacedArray"}),
+            "/namespaced-wrapped-array": operation({"$ref": "#/components/schemas/NamespacedWrappedArray"}),
+            "/namespaced-prefixed-object": operation({"$ref": "#/components/schemas/NamespacedPrefixedObject"}),
+            "/namespaced-prefixed-array": operation({"$ref": "#/components/schemas/NamespacedPrefixedArray"}),
+            "/namespaced-prefixed-wrapped-array": operation(
+                {"$ref": "#/components/schemas/NamespacedPrefixedWrappedArray"}
+            ),
+        },
+        components={
+            "schemas": {
+                # This name is used in XML
+                "AutoName": no_xml_object,
+                "ExplicitName": {**no_xml_object, "xml": {"name": "CustomName"}},
+                "RenamedProperty": renamed_property_xml_object,
+                "PropertyAsAttribute": property_as_attribute,
+                "SimpleArray": simple_array,
+                "WrappedArray": wrapped_array,
+                "ArrayWithRenaming": array_with_renaming,
+                "ObjectInArray": object_in_array,
+                "ArrayInObject": array_in_object,
+                "PrefixedObject": prefixed_object,
+                "PrefixedArray": prefixed_array,
+                "PrefixedAttribute": prefixed_attribute,
+                "NamespacedObject": namespaced_object,
+                "NamespacedArray": namespaced_array,
+                "NamespacedWrappedArray": namespaced_wrapped_array,
+                "NamespacedPrefixedObject": namespaced_prefixed_object,
+                "NamespacedPrefixedArray": namespaced_prefixed_array,
+                "NamespacedPrefixedWrappedArray": namespaced_prefixed_wrapped_array,
+            }
+        },
+    )
 
 
 @pytest.fixture(scope="session")

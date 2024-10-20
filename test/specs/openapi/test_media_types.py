@@ -24,23 +24,25 @@ MEDIA_TYPE = "application/pdf"
 ALIAS = "application/x-pdf"
 
 
-def test_pdf_generation(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/pdf": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}},
-                        ALIAS: {"schema": {"type": "string", "format": "binary"}},
+def test_pdf_generation(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/pdf": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            MEDIA_TYPE: {"schema": {"type": "string", "format": "binary"}},
+                            ALIAS: {"schema": {"type": "string", "format": "binary"}},
+                        },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-    }
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
     schemathesis.openapi.media_type(MEDIA_TYPE, PDFS, aliases=[ALIAS])
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     strategy = schema["/pdf"]["post"].as_strategy()
 
@@ -54,26 +56,26 @@ def test_pdf_generation(empty_open_api_3_schema):
     test()
 
 
-def test_explicit_example_with_custom_media_type(
-    empty_open_api_3_schema, testdir, cli, snapshot_cli, openapi3_base_url
-):
-    empty_open_api_3_schema["paths"] = {
-        "/csv": {
-            "post": {
-                "requestBody": {
-                    "content": {
-                        "text/csv": {
-                            "schema": {"type": "string", "format": "binary"},
-                            "example": [{"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 4, "c": 5}],
+def test_explicit_example_with_custom_media_type(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+    schema = ctx.openapi.build_schema(
+        {
+            "/csv": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "text/csv": {
+                                "schema": {"type": "string", "format": "binary"},
+                                "example": [{"a": 1, "b": 2, "c": 3}, {"a": 3, "b": 4, "c": 5}],
+                            },
                         },
+                        "required": True,
                     },
-                    "required": True,
-                },
-                "responses": {"200": {"description": "OK"}},
-            }
-        },
-    }
-    schema_file = testdir.make_openapi_schema_file(empty_open_api_3_schema)
+                    "responses": {"200": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    schema_file = testdir.make_openapi_schema_file(schema)
     schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
 
     assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}") == snapshot_cli

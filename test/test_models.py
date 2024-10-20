@@ -18,36 +18,38 @@ from schemathesis.transports import WSGITransport, _merge_dict_to
 
 
 @pytest.fixture
-def schema_with_payload(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {"text/plain": {"schema": {"type": "string"}}},
+def schema_with_payload(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
-            },
-            "put": {
-                "requestBody": {"$ref": "#/components/requestBodies/Sample"},
-                "responses": {"200": {"description": "OK"}},
-            },
-            "patch": {
-                "requestBody": {"$ref": "#/components/requestBodies/Ref"},
-                "responses": {"200": {"description": "OK"}},
+                "put": {
+                    "requestBody": {"$ref": "#/components/requestBodies/Sample"},
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "patch": {
+                    "requestBody": {"$ref": "#/components/requestBodies/Ref"},
+                    "responses": {"200": {"description": "OK"}},
+                },
             },
         },
-    }
-    empty_open_api_3_schema["components"] = {
-        "requestBodies": {
-            "Sample": {
-                "required": True,
-                "content": {"text/plain": {"schema": {"type": "object"}}},
-            },
-            "Ref": {"$ref": "#/components/requestBodies/Sample"},
-        }
-    }
-    return schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+        components={
+            "requestBodies": {
+                "Sample": {
+                    "required": True,
+                    "content": {"text/plain": {"schema": {"type": "object"}}},
+                },
+                "Ref": {"$ref": "#/components/requestBodies/Sample"},
+            }
+        },
+    )
+    return schemathesis.from_dict(schema, validate_schema=True)
 
 
 def test_make_case_explicit_media_type(schema_with_payload):
@@ -68,23 +70,25 @@ def test_make_case_automatic_media_type(schema_with_payload):
         assert case.media_type == "text/plain"
 
 
-def test_make_case_missing_media_type(empty_open_api_3_schema):
+def test_make_case_missing_media_type(ctx):
     # When there are multiple available media types
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "text/plain": {"schema": {"type": "string"}},
-                        "application/json": {"schema": {"type": "array"}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "text/plain": {"schema": {"type": "string"}},
+                            "application/json": {"schema": {"type": "array"}},
+                        },
                     },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     # And the `media_type` argument is not passed to `make_case`
     # Then there should be a usage error
     with pytest.raises(UsageError):
@@ -185,19 +189,21 @@ def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swag
 
 
 @pytest.mark.parametrize("header", ("content-Type", "Content-Type"))
-def test_as_transport_kwargs_override_content_type(empty_open_api_3_schema, header):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {"text/plain": {"schema": {"type": "string"}}},
+def test_as_transport_kwargs_override_content_type(ctx, header):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     case = schema["/data"]["post"].make_case(body="<html></html>", media_type="text/plain")
     # When the `Content-Type` header is explicitly passed
     data = case.as_transport_kwargs(headers={header: "text/html"})
@@ -402,29 +408,31 @@ def test_(case):
     ),
 )
 def test_validate_response_schema_path(
+    ctx,
     response_factory,
     factory_type,
-    empty_open_api_3_schema,
     response_schema,
     payload,
     schema_path,
     instance,
     instance_path,
 ):
-    empty_open_api_3_schema["paths"] = {
-        "/test": {
-            "post": {
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "content": {"application/json": {"schema": response_schema}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "responses": {
+                        "200": {
+                            "description": "OK",
+                            "content": {"application/json": {"schema": response_schema}},
+                        },
                     },
                 },
-            },
-        }
-    }
-    empty_open_api_3_schema["components"] = {"schemas": {"Foo": {"type": "object"}}}
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+            }
+        },
+        components={"schemas": {"Foo": {"type": "object"}}},
+    )
+    schema = schemathesis.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
     with pytest.raises(CheckFailed) as exc:
         schema["/test"]["POST"].validate_response(response)
@@ -490,21 +498,23 @@ def test_deprecated_attribute(swagger_20):
 
 @pytest.mark.parametrize("method", DataGenerationMethod.all())
 @pytest.mark.hypothesis_nested
-def test_data_generation_method_is_available(method, empty_open_api_3_schema):
+def test_data_generation_method_is_available(ctx, method):
     # When a new case is generated
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "requestBody": {
-                    "required": True,
-                    "content": {"text/plain": {"schema": {"type": "string"}}},
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {"text/plain": {"schema": {"type": "string"}}},
+                    },
+                    "responses": {"200": {"description": "OK"}},
                 },
-                "responses": {"200": {"description": "OK"}},
             },
-        },
-    }
+        }
+    )
 
-    api_schema = schemathesis.from_dict(empty_open_api_3_schema)
+    api_schema = schemathesis.from_dict(schema)
 
     @given(case=api_schema["/data"]["POST"].as_strategy(data_generation_method=method))
     @settings(max_examples=1)
@@ -516,24 +526,26 @@ def test_data_generation_method_is_available(method, empty_open_api_3_schema):
 
 
 @pytest.mark.hypothesis_nested
-def test_case_insensitive_headers(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "X-id",
-                        "in": "header",
-                        "required": True,
-                        "schema": {"type": "string"},
-                    }
-                ],
-                "responses": {"200": {"description": "OK"}},
+def test_case_insensitive_headers(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-id",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
             },
-        },
-    }
+        }
+    )
     # When headers are generated
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+    schema = schemathesis.from_dict(schema)
 
     @given(case=schema["/data"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -547,47 +559,51 @@ def test_case_insensitive_headers(empty_open_api_3_schema):
     test()
 
 
-def test_iter_parameters(empty_open_api_3_schema):
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "post": {
-                "parameters": [
-                    {
-                        "name": "X-id",
-                        "in": "header",
-                        "required": True,
-                        "schema": {"type": "string"},
-                    },
-                    {
-                        "name": "q",
-                        "in": "query",
-                        "required": True,
-                        "schema": {"type": "string"},
-                    },
-                ],
-                "responses": {"200": {"description": "OK"}},
+def test_iter_parameters(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-id",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        },
+                        {
+                            "name": "q",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     params = list(schema["/data"]["POST"].iter_parameters())
     assert len(params) == 2
     assert params[0].name == "X-id"
     assert params[1].name == "q"
 
 
-def test_checks_errors_deduplication(empty_open_api_3_schema):
+def test_checks_errors_deduplication(ctx):
     # See GH-1394
-    empty_open_api_3_schema["paths"] = {
-        "/data": {
-            "get": {
-                "responses": {
-                    "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+    schema = ctx.openapi.build_schema(
+        {
+            "/data": {
+                "get": {
+                    "responses": {
+                        "200": {"description": "OK", "content": {"application/json": {"schema": {"type": "integer"}}}}
+                    },
                 },
             },
-        },
-    }
-    schema = schemathesis.from_dict(empty_open_api_3_schema)
+        }
+    )
+    schema = schemathesis.from_dict(schema)
     case = schema["/data"]["GET"].make_case()
     response = requests.Response()
     response.status_code = 200
@@ -669,40 +685,42 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
         ("unknown", "unknown", False),
     ),
 )
-def test_get_parameter(empty_open_api_3_schema, name, location, exists):
-    empty_open_api_3_schema["paths"] = {
-        "/data/": {
-            "get": {
-                "parameters": [
-                    {
-                        "name": name,
-                        "in": location,
+def test_get_parameter(ctx, name, location, exists):
+    schema = ctx.openapi.build_schema(
+        {
+            "/data/": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": name,
+                            "in": location,
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                        for name, location in (
+                            ("X-Key", "header"),
+                            ("key", "query"),
+                        )
+                    ],
+                    "requestBody": {
                         "required": True,
-                        "schema": {"type": "string"},
-                    }
-                    for name, location in (
-                        ("X-Key", "header"),
-                        ("key", "query"),
-                    )
-                ],
-                "requestBody": {
-                    "required": True,
-                    "content": {
-                        "text/plain": {"schema": {"type": "string"}},
-                        "application/json": {"schema": {"type": "array"}},
+                        "content": {
+                            "text/plain": {"schema": {"type": "string"}},
+                            "application/json": {"schema": {"type": "array"}},
+                        },
                     },
-                },
-                "responses": {"200": {"description": "OK"}},
+                    "responses": {"200": {"description": "OK"}},
+                }
             }
-        }
-    }
-    empty_open_api_3_schema["components"] = {
-        "securitySchemes": {
-            "ApiKeyAuth": {"type": "apiKey", "name": "X-Key", "in": "header"},
-        }
-    }
-    empty_open_api_3_schema["security"] = [{"ApiKeyAuth": []}]
-    schema = schemathesis.from_dict(empty_open_api_3_schema, validate_schema=True)
+        },
+        components={
+            "securitySchemes": {
+                "ApiKeyAuth": {"type": "apiKey", "name": "X-Key", "in": "header"},
+            }
+        },
+        security=[{"ApiKeyAuth": []}],
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=True)
 
     parameter = schema["/data/"]["GET"].get_parameter(name, location)
     assert (parameter is not None) is exists
