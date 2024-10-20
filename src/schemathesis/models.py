@@ -653,6 +653,9 @@ class OperationDefinition(Generic[D]):
 
     __slots__ = ("raw", "resolved", "scope")
 
+    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+        return None
+
 
 C = TypeVar("C", bound=Case)
 
