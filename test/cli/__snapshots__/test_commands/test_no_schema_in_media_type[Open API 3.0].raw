@@ -4,7 +4,7 @@ Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/schema.json
 Base URL: http://127.0.0.1/api
-Specification version: Open API 3.0.0
+Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
 Collected API operations: 1

@@ -4,7 +4,7 @@ from schemathesis.generation.coverage import push_examples_to_properties
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
+    ("schema", "expected"),
     [
         (
             {

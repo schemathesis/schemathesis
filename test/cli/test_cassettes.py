@@ -50,7 +50,7 @@ def load_response_body(cassette, idx):
 
 
 @pytest.mark.parametrize("data_generation_method", [m.value for m in DataGenerationMethod.all()] + ["all"])
-@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
+@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, data_generation_method):
     hypothesis_max_examples = hypothesis_max_examples or 2
@@ -145,7 +145,7 @@ def test_store_timeout(cli, schema_url, cassette_path):
 
 
 @pytest.mark.parametrize(
-    ["app_fixture", "schema_url"],
+    ("app_fixture", "schema_url"),
     [
         ("loadable_flask_app", "/schema.yaml"),
         ("loadable_fastapi_app", "/openapi.json"),
@@ -288,8 +288,8 @@ def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_p
 
 
 @pytest.mark.operations("__all__")
-@pytest.mark.parametrize("verbose", (True, False))
-@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
+@pytest.mark.parametrize("verbose", [True, False])
+@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 async def test_replay(
     openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples, verbose, args
 ):
@@ -360,7 +360,7 @@ async def test_replay(
 
 
 @pytest.mark.operations("__all__")
-@pytest.mark.parametrize("args", ((), ("--cassette-preserve-exact-body-bytes",)), ids=("plain", "base64"))
+@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args):
     cassette_path = cassette_path.with_suffix(".har")
     result = cli.run(
@@ -413,8 +413,8 @@ def test_invalid_format():
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         (
             "has_recent_activity=1; path=/; expires=Sat, 29 Jun 2024 18:22:49 GMT; secure; HttpOnly; SameSite=Lax",
             [
@@ -435,7 +435,7 @@ def test_invalid_format():
                 harfile.Cookie(name="spam", value="baz"),
             ],
         ),
-    ),
+    ],
 )
 def test_cookie_to_har(value, expected):
     assert list(_cookie_to_har(value)) == expected
@@ -501,7 +501,7 @@ def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples
     # And should be loadable
 
 
-@pytest.mark.parametrize("value", ("true", "false"))
+@pytest.mark.parametrize("value", ["true", "false"])
 @pytest.mark.operations("headers")
 def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
     auth = "secret-auth"
@@ -563,8 +563,8 @@ def test_empty_body():
 
 
 @pytest.mark.parametrize(
-    "filters, expected",
-    (
+    ("filters", "expected"),
+    [
         ({"id_": "1"}, ["1"]),
         ({"id_": "2"}, ["2"]),
         ({"status": "SUCCESS"}, ["1"]),
@@ -574,7 +574,7 @@ def test_empty_body():
         ({"method": "PO"}, ["2"]),
         ({"uri": "error|failure"}, ["2", "3"]),
         ({"uri": "error|failure", "method": "POST"}, ["2"]),
-    ),
+    ],
 )
 def test_filter_cassette(filters, expected):
     cassette = [

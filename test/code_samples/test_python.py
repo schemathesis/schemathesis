@@ -28,8 +28,8 @@ def get_full_code(url_params="", data=None):
 
 
 @pytest.mark.parametrize(
-    "openapi_case, url_params, data_repr",
-    (
+    ("openapi_case", "url_params", "data_repr"),
+    [
         # Body can be of any primitive type supported by Open API
         ({"body": {"test": 1}}, "", {"test": 1}),
         ({"body": ["foo"]}, "", ["foo"]),
@@ -39,7 +39,7 @@ def get_full_code(url_params="", data=None):
         ({"body": True}, "", True),
         ({}, "", ""),
         ({"query": {"a": 1}}, "?a=1", ""),
-    ),
+    ],
     indirect=["openapi_case"],
 )
 def test_open_api_code_sample(openapi_case, url_params, data_repr):
@@ -51,7 +51,7 @@ def test_open_api_code_sample(openapi_case, url_params, data_repr):
         eval(code)
 
 
-@pytest.mark.parametrize("verify", (True, False))
+@pytest.mark.parametrize("verify", [True, False])
 def test_code_sample_from_request(openapi_case, verify):
     url = "http://example.com/api/success"
     request = requests.Request(method="GET", url=url).prepare()
@@ -90,13 +90,13 @@ def test_get_code_sample_code_validity(mocker, loose_schema):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ("http://example.com", "http://example.com"),
         ("http://example.com'", "http://example.com\\'"),
         ("http://example.com\\'", "http://example.com\\'"),
         ("http://example.com\\\\'", "http://example.com\\\\\\'"),
-    ),
+    ],
 )
 def test_escape_single_quotes(value, expected):
     escaped = _escape_single_quotes(value)

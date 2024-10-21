@@ -37,7 +37,7 @@ def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
     return models.Case(operation, generation_time=0.0)
 
 
-@pytest.fixture()
+@pytest.fixture
 def spec(request):
     param = getattr(request, "param", None)
     if param == "swagger":
@@ -47,12 +47,12 @@ def spec(request):
     return request.getfixturevalue("swagger_20")
 
 
-@pytest.fixture()
+@pytest.fixture
 def response(request, response_factory):
     return response_factory.requests(content_type=request.param)
 
 
-@pytest.fixture()
+@pytest.fixture
 def case(request, spec) -> models.Case:
     if "swagger" in spec.raw_schema:
         data = {"produces": getattr(request, "param", ["application/json"])}
@@ -72,14 +72,14 @@ def case(request, spec) -> models.Case:
     return make_case(spec, data)
 
 
-@pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
+@pytest.mark.parametrize("spec", ["swagger", "openapi"], indirect=["spec"])
 @pytest.mark.parametrize(
-    "response, case",
-    (
+    ("response", "case"),
+    [
         ("application/json", []),
         ("application/json", ["application/json"]),
         ("application/json;charset=utf-8", ["application/json"]),
-    ),
+    ],
     indirect=["response", "case"],
 )
 def test_content_type_conformance_valid(spec, response, case):
@@ -88,7 +88,7 @@ def test_content_type_conformance_valid(spec, response, case):
 
 @pytest.mark.parametrize(
     "raw_schema",
-    (
+    [
         {
             "swagger": "2.0",
             "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
@@ -123,19 +123,19 @@ def test_content_type_conformance_valid(spec, response, case):
                 }
             },
         },
-    ),
+    ],
 )
-@pytest.mark.parametrize("content_type, is_error", (("application/json", False), ("application/xml", True)))
+@pytest.mark.parametrize(("content_type", "is_error"), [("application/json", False), ("application/xml", True)])
 def test_content_type_conformance_integration(response_factory, raw_schema, content_type, is_error):
     assert_content_type_conformance(response_factory, raw_schema, content_type, is_error)
 
 
 @pytest.mark.parametrize(
-    "content_type, is_error",
-    (
+    ("content_type", "is_error"),
+    [
         ("application/json", False),
         ("application/xml", True),
-    ),
+    ],
 )
 def test_content_type_conformance_default_response(response_factory, content_type, is_error):
     raw_schema = {
@@ -153,8 +153,8 @@ def test_content_type_conformance_default_response(response_factory, content_typ
 
 
 @pytest.mark.parametrize(
-    "schema_media_type, response_media_type",
-    (("application:json", "application/json"), ("application/json", "application:json")),
+    ("schema_media_type", "response_media_type"),
+    [("application:json", "application/json"), ("application/json", "application:json")],
 )
 def test_malformed_content_type(schema_media_type, response_media_type, response_factory):
     # When the verified content type is malformed
@@ -192,13 +192,13 @@ def test_content_type_conformance_another_status_code(response_factory):
 
 
 @pytest.mark.parametrize(
-    "content_type, is_error",
-    (
+    ("content_type", "is_error"),
+    [
         ("application/*", False),
         ("*/xml", False),
         ("*/*", False),
         ("application/json", True),
-    ),
+    ],
 )
 def test_content_type_wildcards(content_type, is_error, response_factory):
     raw_schema = {
@@ -227,7 +227,7 @@ def assert_content_type_conformance(response_factory, raw_schema, content_type, 
             content_type_conformance(CTX, response, case)
 
 
-@pytest.mark.parametrize("value", (500, 502))
+@pytest.mark.parametrize("value", [500, 502])
 def test_not_a_server_error(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
@@ -237,7 +237,7 @@ def test_not_a_server_error(value, swagger_20, response_factory):
     assert exc_info.type.__name__ == "CheckFailed"
 
 
-@pytest.mark.parametrize("value", (400, 405))
+@pytest.mark.parametrize("value", [400, 405])
 def test_status_code_conformance_valid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
@@ -245,7 +245,7 @@ def test_status_code_conformance_valid(value, swagger_20, response_factory):
     status_code_conformance(CTX, response, case)
 
 
-@pytest.mark.parametrize("value", (400, 405))
+@pytest.mark.parametrize("value", [400, 405])
 def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
@@ -255,10 +255,10 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     assert exc_info.type.__name__ == "CheckFailed"
 
 
-@pytest.mark.parametrize("spec", ("swagger", "openapi"), indirect=["spec"])
+@pytest.mark.parametrize("spec", ["swagger", "openapi"], indirect=["spec"])
 @pytest.mark.parametrize(
-    "response, case",
-    (("text/plain", ["application/json"]), ("text/plain;charset=utf-8", ["application/json"])),
+    ("response", "case"),
+    [("text/plain", ["application/json"]), ("text/plain;charset=utf-8", ["application/json"])],
     indirect=["response", "case"],
 )
 def test_content_type_conformance_invalid(spec, response, case):
@@ -305,8 +305,8 @@ STRING_FORMAT_SCHEMA = {
 
 
 @pytest.mark.parametrize(
-    "content, definition",
-    (
+    ("content", "definition"),
+    [
         (b'{"success": true}', {}),
         (b'{"success": true}', {"responses": {"200": {"description": "text"}}}),
         (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
@@ -316,7 +316,7 @@ STRING_FORMAT_SCHEMA = {
             b'{"value": "2017-07-21"}',
             {"responses": {"default": {"description": "text", "schema": STRING_FORMAT_SCHEMA}}},
         ),
-    ),
+    ],
 )
 def test_response_schema_conformance_swagger(swagger_20, content, definition, response_factory):
     response = response_factory.requests(content=content)
@@ -326,8 +326,8 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
 
 
 @pytest.mark.parametrize(
-    "content, definition",
-    (
+    ("content", "definition"),
+    [
         (b'{"success": true}', {}),
         (b'{"success": true}', {"responses": {"200": {"description": "text"}}}),
         (b'{"random": "text"}', {"responses": {"200": {"description": "text"}}}),
@@ -377,7 +377,7 @@ def test_response_schema_conformance_swagger(swagger_20, content, definition, re
                 }
             },
         ),
-    ),
+    ],
 )
 def test_response_schema_conformance_openapi(openapi_30, content, definition, response_factory):
     response = response_factory.requests(content=content)
@@ -411,12 +411,12 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
 
 @pytest.mark.parametrize(
     "extra",
-    (
+    [
         # "content" is not required
         {},
         # "content" can be empty
         {"content": {}},
-    ),
+    ],
 )
 def test_response_conformance_openapi_no_media_types(openapi_30, extra, response_factory):
     # When there is no media type defined in the schema
@@ -438,7 +438,7 @@ def assert_no_media_types(response_factory, schema, definition):
     assert response_schema_conformance(CTX, response, case) is None
 
 
-@pytest.mark.parametrize("spec", ("swagger_20", "openapi_30"))
+@pytest.mark.parametrize("spec", ["swagger_20", "openapi_30"])
 def test_response_conformance_no_content_type(request, spec, response_factory):
     # When there is a media type defined in the schema
     schema = request.getfixturevalue(spec)
@@ -462,12 +462,12 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
 
 
 @pytest.mark.parametrize(
-    "content, definition",
-    (
+    ("content", "definition"),
+    [
         (b'{"random": "text"}', {"responses": {"200": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"random": "text"}', {"responses": {"default": {"description": "text", "schema": SUCCESS_SCHEMA}}}),
         (b'{"value": "text"}', {"responses": {"default": {"description": "text", "schema": STRING_FORMAT_SCHEMA}}}),
-    ),
+    ],
 )
 def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition, response_factory):
     response = response_factory.requests(content=content)
@@ -479,8 +479,8 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
 
 
 @pytest.mark.parametrize(
-    "media_type, content, definition",
-    (
+    ("media_type", "content", "definition"),
+    [
         (
             "application/json",
             b'{"random": "text"}',
@@ -523,7 +523,7 @@ def test_response_schema_conformance_invalid_swagger(swagger_20, content, defini
                 }
             },
         ),
-    ),
+    ],
 )
 def test_response_schema_conformance_invalid_openapi(openapi_30, media_type, content, definition, response_factory):
     response = response_factory.requests(content=content, content_type=media_type)
@@ -567,7 +567,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
 
 
 @pytest.mark.hypothesis_nested
-@pytest.mark.parametrize("value", ("foo", None))
+@pytest.mark.parametrize("value", ["foo", None])
 def test_response_schema_conformance_references_valid(complex_schema, value, response_factory):
     schema = schemathesis.from_path(complex_schema)
 
@@ -683,15 +683,15 @@ INTEGER_HEADER = {"type": "integer", "maximum": 100}
 DATETIME_HEADER = {"type": "string", "format": "date-time"}
 
 
-@pytest.mark.parametrize("version", ("2.0", "3.0.2"))
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 @pytest.mark.parametrize(
-    "header, schema, value, expected",
-    (
+    ("header", "schema", "value", "expected"),
+    [
         ("X-RateLimit-Limit", INTEGER_HEADER, "42", True),
         ("X-RateLimit-Limit", INTEGER_HEADER, "150", False),
         ("X-RateLimit-Reset", DATETIME_HEADER, "2021-01-01T00:00:00Z", True),
         ("X-RateLimit-Reset", DATETIME_HEADER, "Invalid", False),
-    ),
+    ],
 )
 def test_header_conformance(ctx, response_factory, version, header, schema, value, expected):
     base_schema = ctx.openapi.build_schema(
@@ -793,7 +793,7 @@ def test_header_conformance_missing_and_invalid(ctx, response_factory):
 
 
 @pytest.mark.parametrize(
-    "value, schema, expected",
+    ("value", "schema", "expected"),
     [
         # String type
         ("test", {"type": "string"}, "test"),

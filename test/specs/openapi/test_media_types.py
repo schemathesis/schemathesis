@@ -56,8 +56,8 @@ def test_pdf_generation(ctx):
     test()
 
 
-def test_explicit_example_with_custom_media_type(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
-    schema = ctx.openapi.build_schema(
+def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi3_base_url):
+    schema_path = ctx.openapi.write_schema(
         {
             "/csv": {
                 "post": {
@@ -75,7 +75,6 @@ def test_explicit_example_with_custom_media_type(ctx, testdir, cli, snapshot_cli
             },
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
 
-    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli

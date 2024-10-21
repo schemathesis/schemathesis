@@ -58,31 +58,31 @@ def test_serialize_internal_error():
 
 
 @pytest.mark.parametrize(
-    "query, expected",
-    (
+    ("query", "expected"),
+    [
         (None, {}),
         ({"f": 1}, {"f": ["1"]}),
         ({"f": "1"}, {"f": ["1"]}),
         ({"f": [1]}, {"f": ["1"]}),
-    ),
+    ],
 )
 def test_prepare_query(query, expected):
     assert prepare_query(query) == expected
 
 
 @pytest.mark.parametrize(
-    "query, expected",
-    (
+    ("query", "expected"),
+    [
         (None, {}),
         ({"f": 1}, {"f": "1"}),
-    ),
+    ],
 )
 def test_stringify_path_parameters(query, expected):
     assert stringify_path_parameters(query) == expected
 
 
 @pytest.mark.parametrize(
-    "serializer, expected", ((None, "GET /api/success"), (lambda e: {"verbose_name": "Bar"}, "Bar"))
+    ("serializer", "expected"), [(None, "GET /api/success"), (lambda e: {"verbose_name": "Bar"}, "Bar")]
 )
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")

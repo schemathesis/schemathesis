@@ -16,12 +16,12 @@ from schemathesis.runner import events, prepare
 
 @pytest.mark.parametrize(
     "loader",
-    (
+    [
         schemathesis.openapi.from_asgi,
         schemathesis.openapi.from_wsgi,
         schemathesis.graphql.from_asgi,
         schemathesis.graphql.from_wsgi,
-    ),
+    ],
 )
 def test_absolute_urls_for_apps(loader):
     # When an absolute URL passed to a ASGI / WSGI loader
@@ -31,7 +31,7 @@ def test_absolute_urls_for_apps(loader):
 
 
 @pytest.mark.parametrize(
-    "loader", (schemathesis.openapi.from_dict, schemathesis.openapi.from_pytest_fixture, schemathesis.graphql.from_dict)
+    "loader", [schemathesis.openapi.from_dict, schemathesis.openapi.from_pytest_fixture, schemathesis.graphql.from_dict]
 )
 def test_invalid_code_sample_style(loader):
     with pytest.raises(ValueError, match="Invalid value for code sample style: ruby. Available styles: python, curl"):
@@ -44,12 +44,12 @@ def default_schema_url():
 
 
 @pytest.mark.parametrize(
-    "loader, url_fixture, expected",
-    (
+    ("loader", "url_fixture", "expected"),
+    [
         (schemathesis.openapi.from_uri, "openapi3_schema_url", "http://127.0.0.1:8081/schema.yaml"),
         (schemathesis.openapi.from_uri, "default_schema_url", "http://127.0.0.1:8081/schema.yaml"),
         (schemathesis.graphql.from_url, "graphql_url", "http://127.0.0.1:8081/graphql"),
-    ),
+    ],
 )
 def test_port_override(request, loader, url_fixture, expected):
     url = request.getfixturevalue(url_fixture)
@@ -73,8 +73,8 @@ def to_ipv6(url):
 
 
 @pytest.mark.parametrize(
-    "loader, url_fixture, target, expected",
-    (
+    ("loader", "url_fixture", "target", "expected"),
+    [
         (
             schemathesis.openapi.from_uri,
             "openapi3_schema_url",
@@ -87,7 +87,7 @@ def to_ipv6(url):
             "requests.post",
             "http://[2002:7f00:1::]:8081/graphql",
         ),
-    ),
+    ],
 )
 def test_port_override_with_ipv6(request, loader, url_fixture, target, mocker, expected):
     url = request.getfixturevalue(url_fixture)
@@ -104,13 +104,13 @@ def test_port_override_with_ipv6(request, loader, url_fixture, target, mocker, e
 
 
 @pytest.mark.parametrize(
-    "loader, url_fixture",
-    (
+    ("loader", "url_fixture"),
+    [
         (schemathesis.openapi.from_uri, "openapi3_schema_url"),
         (schemathesis.graphql.from_url, "graphql_url"),
-    ),
+    ],
 )
-@pytest.mark.parametrize("base_url", ("http://example.com/", "http://example.com"))
+@pytest.mark.parametrize("base_url", ["http://example.com/", "http://example.com"])
 def test_base_url_override(request, loader, url_fixture, base_url):
     url = request.getfixturevalue(url_fixture)
     # When the user overrides base_url
@@ -121,11 +121,11 @@ def test_base_url_override(request, loader, url_fixture, base_url):
 
 
 @pytest.mark.parametrize(
-    "target, loader",
-    (
+    ("target", "loader"),
+    [
         ("requests.get", schemathesis.openapi.from_uri),
         ("requests.post", schemathesis.graphql.from_url),
-    ),
+    ],
 )
 def test_uri_loader_custom_kwargs(mocker, target, loader):
     # All custom kwargs are passed to `requests` as is
@@ -136,37 +136,37 @@ def test_uri_loader_custom_kwargs(mocker, target, loader):
     assert mocked.call_args[1]["headers"] == {"X-Test": "foo", "User-Agent": USER_AGENT}
 
 
-@pytest.fixture()
+@pytest.fixture
 def raw_schema(app):
     return app["config"]["schema_data"]
 
 
-@pytest.fixture()
+@pytest.fixture
 def json_string(raw_schema):
     return json.dumps(raw_schema)
 
 
-@pytest.fixture()
+@pytest.fixture
 def schema_path(json_string, tmp_path):
     path = tmp_path / "schema.json"
     path.write_text(json_string)
     return str(path)
 
 
-@pytest.fixture()
+@pytest.fixture
 def relative_schema_url():
     return "/schema.yaml"
 
 
 @pytest.mark.parametrize(
-    "loader, fixture",
-    (
+    ("loader", "fixture"),
+    [
         (schemathesis.openapi.from_dict, "raw_schema"),
         (schemathesis.openapi.from_file, "json_string"),
         (schemathesis.openapi.from_path, "schema_path"),
         (schemathesis.openapi.from_wsgi, "relative_schema_url"),
         (schemathesis.openapi.from_aiohttp, "relative_schema_url"),
-    ),
+    ],
 )
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
@@ -189,8 +189,8 @@ FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dic
 
 
 @pytest.mark.parametrize(
-    "loader, schema, message",
-    (
+    ("loader", "schema", "message"),
+    [
         (schemathesis.openapi.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
         (schemathesis.openapi.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
         (schemathesis.graphql.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
@@ -198,7 +198,7 @@ FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dic
         (schemathesis.openapi.from_file, {}, FROM_DICT_ERROR_MESSAGE),
         (schemathesis.openapi.from_path, {}, FROM_DICT_ERROR_MESSAGE),
         (schemathesis.graphql.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
-    ),
+    ],
 )
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_validation(loader, schema, message):

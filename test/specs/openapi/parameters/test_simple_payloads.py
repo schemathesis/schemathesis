@@ -9,11 +9,11 @@ from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI30Body
 
 @pytest.mark.parametrize(
     "consumes",
-    (
+    [
         ["application/json"],
         # Multiple values in "consumes" implies multiple payload variants
         ["application/json", "application/xml"],
-    ),
+    ],
 )
 def test_payload_open_api_2(
     consumes,
@@ -37,13 +37,13 @@ def test_payload_open_api_2(
 
 @pytest.mark.parametrize(
     "media_types",
-    (
+    [
         ["application/json"],
         # Each media type corresponds to a payload variant
         ["application/json", "application/xml"],
         # Forms can be also combined
         ["application/x-www-form-urlencoded", "multipart/form-data"],
-    ),
+    ],
 )
 def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schema, open_api_3_user, user_jsonschema):
     schema = make_openapi_3_schema(

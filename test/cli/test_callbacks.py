@@ -12,7 +12,7 @@ from schemathesis.transports.headers import is_latin_1_encodable
 from ..utils import SIMPLE_PATH
 
 
-@pytest.mark.parametrize("value", ("//test", "//ÿ["))
+@pytest.mark.parametrize("value", ["//test", "//ÿ["])
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
         kind = callbacks.parse_schema_kind(value, app=None)
@@ -71,7 +71,7 @@ def test_reraise_format_error():
 
 @pytest.mark.parametrize(
     "value",
-    ("+", "\\", "[", r"0EEE|[>:>\UEEEEEEEEEEEEEEEEEEEEEEEE>", "(?(8))"),
+    ["+", "\\", "[", r"0EEE|[>:>\UEEEEEEEEEEEEEEEEEEEEEEEE>", "(?(8))"],
 )
 def test_validate_regex(value):
     with pytest.raises(click.BadParameter, match="Invalid regex: "):
@@ -79,23 +79,23 @@ def test_validate_regex(value):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ("On", True),
         ("F", False),
         ("/tmp/cert.pem", "/tmp/cert.pem"),
-    ),
+    ],
 )
 def test_convert_request_tls_verify(value, expected):
     assert callbacks.convert_boolean_string(None, None, value) == expected
 
 
-@pytest.mark.parametrize("value, expected", (("2", 2), ("auto", callbacks.get_workers_count())))
+@pytest.mark.parametrize(("value", "expected"), [("2", 2), ("auto", callbacks.get_workers_count())])
 def test_convert_workers(value, expected):
     assert callbacks.convert_workers(None, None, value) == expected
 
 
-@pytest.mark.parametrize("value", ("1", "1/g", "f/g"))
+@pytest.mark.parametrize("value", ["1", "1/g", "f/g"])
 def test_validate_rate_limit_invalid(value):
     with pytest.raises(click.UsageError) as exc:
         callbacks.validate_rate_limit(None, None, value)
@@ -110,7 +110,7 @@ def test_validate_rate_limit_valid():
 
 
 @pytest.mark.parametrize(
-    "input_codes, output, error",
+    ("input_codes", "output", "error"),
     [
         (["200", "404"], ["200", "404"], None),
         (["2xx", "4xx"], ["2xx", "4xx"], None),

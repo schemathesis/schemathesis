@@ -61,8 +61,8 @@ def test_string_formats_success(string_formats, openapi_30):
 
 
 @pytest.mark.parametrize(
-    "definition, expected_type",
-    (
+    ("definition", "expected_type"),
+    [
         ([{"name": "uuids", "transforms": [{"kind": "map", "name": "str"}]}], str),
         ([{"name": "ip_addresses", "transforms": [{"kind": "map", "name": "str"}]}], str),
         ([{"name": "ip_addresses", "transforms": [{"kind": "map", "name": "str"}], "arguments": {"v": 6}}], str),
@@ -108,9 +108,7 @@ def test_string_formats_success(string_formats, openapi_30):
             ],
             str,
         ),
-        ([{"name": "timezone_keys"}], str),
-        ([{"name": "timezone_keys"}], str),
-    ),
+    ],
 )
 def test_strategy_from_definition(definition, expected_type):
     strategy = strategy_from_definitions([StrategyDefinition(**item) for item in definition])
@@ -118,8 +116,8 @@ def test_strategy_from_definition(definition, expected_type):
 
 
 @pytest.mark.parametrize(
-    "strategies, errors",
-    (
+    ("strategies", "errors"),
+    [
         ([{"name": "uuids", "transforms": [{"kind": "map", "name": "unknown"}]}], ["Unknown transform: unknown"]),
         (
             [{"name": "uuids", "transforms": [{"kind": "unknown", "name": "unknown-func"}]}],
@@ -138,7 +136,7 @@ def test_strategy_from_definition(definition, expected_type):
             ],
             ["Invalid input for `sampled_from`: Cannot sample from a length-zero sequence"],
         ),
-    ),
+    ],
 )
 def test_invalid_string_format_extension(strategies, errors, openapi_30):
     extension = extension_from_dict({"type": "string_formats", "items": {"invalid": strategies}})
@@ -232,7 +230,7 @@ def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
     ]
 )
 def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, testdir):
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/success": {
                 "post": {
@@ -254,7 +252,6 @@ def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, testd
             },
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     module = testdir.make_importable_pyfile(
         hook="""
 import schemathesis
@@ -269,7 +266,7 @@ def port_check(ctx, response, case):
     assert (
         cli.main(
             "run",
-            str(schema_file),
+            str(schema_path),
             "-c",
             "port_check",
             f"--base-url={openapi3_base_url}",
@@ -291,7 +288,7 @@ def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
 
 @pytest.mark.parametrize(
     "extension",
-    (
+    [
         42,
         [
             {"name": "binary"},
@@ -301,7 +298,7 @@ def test_unknown_extension_in_cli(cli, cli_args, snapshot_cli):
                 "transforms": [{"kind": "map", "name": "unknown"}],
             },
         ],
-    ),
+    ],
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.analyze_schema(autouse=False)
@@ -317,7 +314,7 @@ def test_dry_run(cli, cli_args, snapshot_cli):
 
 @pytest.mark.parametrize(
     "strategy",
-    (
+    [
         [{"name": "binary"}],
         [
             {"name": "binary"},
@@ -327,13 +324,13 @@ def test_dry_run(cli, cli_args, snapshot_cli):
                 "transforms": [{"kind": "map", "name": "base64_decode"}],
             },
         ],
-    ),
+    ],
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.analyze_schema(autouse=False)
-def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli, testdir, analyze_schema, strategy):
+def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli, analyze_schema, strategy):
     analyze_schema(extensions=[{"type": "media_types", "items": {"application/pdf": strategy}}])
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/success": {
                 "post": {
@@ -346,10 +343,9 @@ def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli
             },
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     assert (
         cli.run(
-            str(schema_file),
+            str(schema_path),
             f"--base-url={openapi3_base_url}",
             f"--schemathesis-io-token={service.token}",
             f"--schemathesis-io-url={service.base_url}",
@@ -361,8 +357,8 @@ def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli
 
 
 @pytest.mark.parametrize(
-    "patch, expected",
-    (
+    ("patch", "expected"),
+    [
         (
             {
                 "operation": "add",
@@ -385,7 +381,7 @@ def test_media_type_extension(ctx, cli, service, openapi3_base_url, snapshot_cli
             },
             [],
         ),
-    ),
+    ],
 )
 @pytest.mark.analyze_schema(autouse=False)
 def test_schema_patches(
@@ -400,7 +396,7 @@ def test_schema_patches(
     snapshot_cli,
     httpserver,
 ):
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/success": {
                 "post": {
@@ -410,7 +406,6 @@ def test_schema_patches(
             },
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     for idx, h in enumerate(httpserver.handlers):
         if h.matcher.uri == "/cli/analysis/":
             httpserver.handlers.pop(idx)
@@ -434,7 +429,7 @@ def schema_check(ctx, response, case):
     assert (
         cli.main(
             "run",
-            str(schema_file),
+            str(schema_path),
             "-c",
             "schema_check",
             f"--base-url={openapi3_base_url}",
@@ -456,8 +451,8 @@ def test_schema_patches_remove_all(ctx):
 
 
 @pytest.mark.parametrize(
-    "path, expected",
-    (
+    ("path", "expected"),
+    [
         (["unknown"], "Invalid path: ['unknown']"),
         (["paths", 0, "foo"], "Invalid path: ['paths', 0, 'foo']"),
         (
@@ -473,7 +468,7 @@ def test_schema_patches_remove_all(ctx):
             ["paths", "/success", "post", "parameters", "invalid"],
             "Invalid path: ['paths', '/success', 'post', 'parameters', 'invalid']",
         ),
-    ),
+    ],
 )
 def test_invalid_schema_patches(ctx, path, expected):
     schema = ctx.openapi.build_schema(

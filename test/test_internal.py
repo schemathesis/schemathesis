@@ -38,7 +38,7 @@ def test_extensible_replace(monkeypatch):
     assert func() == 43
 
 
-@pytest.mark.parametrize("value", ("test.test_internal.wrong", "unknown.unknown", "unknown"))
+@pytest.mark.parametrize("value", ["test.test_internal.wrong", "unknown.unknown", "unknown"])
 def test_extensible_invalid(monkeypatch, value):
     monkeypatch.setenv(ENV_VAR, value)
 

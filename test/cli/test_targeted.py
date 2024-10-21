@@ -5,7 +5,7 @@ import schemathesis
 from schemathesis.cli import reset_targets
 
 
-@pytest.fixture()
+@pytest.fixture
 def new_target(testdir, cli):
     module = testdir.make_importable_pyfile(
         hook="""

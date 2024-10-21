@@ -3,7 +3,7 @@ import pytest
 from .utils import integer
 
 
-@pytest.mark.parametrize("endpoint", ("'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"))
+@pytest.mark.parametrize("endpoint", ["'/foo'", "'/v1/foo'", ["/foo"], "'/.*oo'"])
 def test_endpoint_filter(testdir, endpoint):
     # When `endpoint` is specified
     parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
@@ -24,7 +24,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"test_endpoint_filter.py::test_[GET /v1/foo] PASSED"])
 
 
-@pytest.mark.parametrize("method", ("'get'", "'GET'", ["GET"], ["get"]))
+@pytest.mark.parametrize("method", ["'get'", "'GET'", ["GET"], ["get"]])
 def test_method_filter(testdir, method):
     # When `method` is specified
     parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}

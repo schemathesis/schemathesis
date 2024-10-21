@@ -20,11 +20,11 @@ def test_experiments():
 
 
 @pytest.mark.parametrize(
-    "args, kwargs",
-    (
+    ("args", "kwargs"),
+    [
         ((f"--experimental={OPEN_API_3_1.name}",), {}),
         ((), {"env": {OPEN_API_3_1.env_var: "true"}}),
-    ),
+    ],
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
@@ -35,11 +35,9 @@ def test_enable_via_cli(cli, schema_url, args, kwargs):
     assert OPEN_API_3_1.is_enabled
 
 
-def test_not_enabled(cli, testdir, snapshot_cli):
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "test", "version": "0.1.0"},
-        "paths": {
+def test_not_enabled(ctx, cli, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
+        {
             "/users": {
                 "get": {
                     "summary": "Root",
@@ -50,9 +48,9 @@ def test_not_enabled(cli, testdir, snapshot_cli):
                 }
             }
         },
-    }
-    schema_file = testdir.make_openapi_schema_file(raw_schema)
-    assert cli.run(str(schema_file), "--base-url=http://127.0.0.1:1") == snapshot_cli
+        version="3.1.0",
+    )
+    assert cli.run(str(schema_path), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
 def test_enable_via_env_var(monkeypatch):
@@ -63,7 +61,7 @@ def test_enable_via_env_var(monkeypatch):
     assert example.is_enabled
 
 
-@pytest.mark.parametrize("is_enabled", (True, False))
+@pytest.mark.parametrize("is_enabled", [True, False])
 def test_multiple_threads(is_enabled):
     experiments = ExperimentSet()
     example = experiments.create_experiment("Example", "", "FOO", "", "")

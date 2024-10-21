@@ -90,7 +90,7 @@ def case_id(case):
 
 
 @pytest.mark.parametrize(
-    "chain, expected",
+    ("chain", "expected"),
     [
         (
             [("include", kwargs)],
@@ -151,8 +151,8 @@ def matcher_func(ctx):
 
 
 @pytest.mark.parametrize(
-    "matchers, expected",
-    (
+    ("matchers", "expected"),
+    [
         ([filters.Matcher.for_function(matcher_func)], "<Filter: [matcher_func]>"),
         ([filters.Matcher.for_function(lambda ctx: True)], "<Filter: [<lambda>]>"),
         ([filters.Matcher.for_value("method", "POST")], "<Filter: [method='POST']>"),
@@ -165,7 +165,7 @@ def matcher_func(ctx):
             [filters.Matcher.for_regex("path", re.compile("^/u", re.IGNORECASE))],
             "<Filter: [path_regex=re.compile('^/u', re.IGNORECASE)]>",
         ),
-    ),
+    ],
 )
 def test_filter_repr(matchers, expected):
     assert repr(filters.Filter(matchers)) == expected
@@ -176,8 +176,8 @@ def test_matcher_repr():
 
 
 @pytest.mark.parametrize(
-    "args, kwargs, expected",
-    (
+    ("args", "kwargs", "expected"),
+    [
         (
             (matcher_func,),
             {},
@@ -193,7 +193,7 @@ def test_matcher_repr():
             {"deprecated": True},
             "[<Filter: [is_deprecated]>]",
         ),
-    ),
+    ],
 )
 def test_exclude_custom(args, kwargs, expected):
     lazy_schema = schemathesis.from_pytest_fixture("name")
@@ -223,15 +223,15 @@ def test_attach_filter_chain():
     assert repr(next(iter(filter_set._includes))) == "<Filter: [method='GET' && path='/users/']>"
 
 
-@pytest.mark.parametrize("method", (filters.FilterSet.include, filters.FilterSet.exclude))
+@pytest.mark.parametrize("method", [filters.FilterSet.include, filters.FilterSet.exclude])
 @pytest.mark.parametrize(
     "kwargs",
-    (
+    [
         {"name": "foo"},
         {"func": matcher_func},
         {"func": matcher_func, "method": "POST"},
         {"func": lambda o: True},
-    ),
+    ],
 )
 def test_repeating_filter(method, kwargs):
     # Adding the same filter twice is an error

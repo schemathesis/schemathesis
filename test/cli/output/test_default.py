@@ -29,7 +29,7 @@ def click_context():
         yield
 
 
-@pytest.fixture()
+@pytest.fixture
 def execution_context():
     return schemathesis.cli.context.ExecutionContext(hypothesis.settings(), [], operations_count=1)
 
@@ -59,7 +59,7 @@ def response():
     return response
 
 
-@pytest.fixture()
+@pytest.fixture
 def results_set(operation):
     statistic = models.TestResult(
         operation.method,
@@ -70,7 +70,7 @@ def results_set(operation):
     return models.TestResultSet(seed=42, results=[statistic])
 
 
-@pytest.fixture()
+@pytest.fixture
 def after_execution(results_set, operation, swagger_20):
     return runner.events.AfterExecution.from_result(
         result=results_set.results[0],
@@ -88,7 +88,7 @@ def test_get_terminal_width():
 
 
 @pytest.mark.parametrize(
-    "title,separator,printed,expected",
+    ("title", "separator", "printed", "expected"),
     [
         ("TEST", "-", "data in section", "------- TEST -------"),
         ("TEST", "*", "data in section", "******* TEST *******"),
@@ -106,7 +106,7 @@ def test_display_section_name(capsys, title, separator, printed, expected):
     assert expected in out
 
 
-@pytest.mark.parametrize("verbosity", (0, 1))
+@pytest.mark.parametrize("verbosity", [0, 1])
 def test_handle_initialized(capsys, mocker, execution_context, results_set, swagger_20, verbosity):
     execution_context.verbosity = verbosity
     # Given Initialized event
@@ -210,13 +210,15 @@ def test_capture_hypothesis_output():
     assert hypothesis_output == [value, value]
 
 
-@pytest.mark.parametrize("position, length, expected", ((1, 100, "[  1%]"), (20, 100, "[ 20%]"), (100, 100, "[100%]")))
+@pytest.mark.parametrize(
+    ("position", "length", "expected"), [(1, 100, "[  1%]"), (20, 100, "[ 20%]"), (100, 100, "[100%]")]
+)
 def test_get_percentage(position, length, expected):
     assert default.get_percentage(position, length) == expected
 
 
-@pytest.mark.parametrize("current_line_length", (0, 20))
-@pytest.mark.parametrize("operations_processed, percentage", ((0, "[  0%]"), (1, "[100%]")))
+@pytest.mark.parametrize("current_line_length", [0, 20])
+@pytest.mark.parametrize(("operations_processed", "percentage"), [(0, "[  0%]"), (1, "[100%]")])
 def test_display_percentage(
     capsys, execution_context, after_execution, swagger_20, current_line_length, operations_processed, percentage
 ):
@@ -242,7 +244,7 @@ def test_display_hypothesis_output(capsys):
     assert " ".join(lines[1:3]) == strip_style_win32(click.style("foo bar", fg="red"))
 
 
-@pytest.mark.parametrize("body", ({}, {"foo": "bar"}, NOT_SET))
+@pytest.mark.parametrize("body", [{}, {"foo": "bar"}, NOT_SET])
 def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
     media_type = "application/json" if body is not NOT_SET else None
@@ -294,8 +296,8 @@ def test_display_single_failure(capsys, swagger_20, execution_context, operation
 
 
 @pytest.mark.parametrize(
-    "status, expected_symbol, color",
-    ((models.Status.success, ".", "green"), (models.Status.failure, "F", "red"), (models.Status.error, "E", "red")),
+    ("status", "expected_symbol", "color"),
+    [(models.Status.success, ".", "green"), (models.Status.failure, "F", "red"), (models.Status.error, "E", "red")],
 )
 def test_handle_after_execution(capsys, execution_context, after_execution, status, expected_symbol, color):
     # Given AfterExecution even with certain status
@@ -326,7 +328,7 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-@pytest.mark.parametrize("show_errors_tracebacks", (True, False))
+@pytest.mark.parametrize("show_errors_tracebacks", [True, False])
 def test_display_internal_error(capsys, execution_context, show_errors_tracebacks):
     execution_context.show_trace = show_errors_tracebacks
     try:

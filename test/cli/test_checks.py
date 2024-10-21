@@ -26,7 +26,7 @@ def test_register_returns_a_value(new_check):
 
 
 @pytest.mark.parametrize(
-    "exclude_checks,expected_exit_code,expected_result",
+    ("exclude_checks", "expected_exit_code", "expected_result"),
     [
         ("not_a_server_error", ExitCode.TESTS_FAILED, "1 passed, 1 failed in"),
         ("not_a_server_error,status_code_conformance", ExitCode.OK, "2 passed in"),
@@ -75,7 +75,7 @@ def test_exclude_checks(
 
 
 def test_negative_data_rejection(ctx, testdir, cli, openapi3_base_url):
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/success": {
                 "get": {
@@ -85,9 +85,8 @@ def test_negative_data_rejection(ctx, testdir, cli, openapi3_base_url):
             }
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={openapi3_base_url}",
         "--checks",
         "negative_data_rejection",
@@ -164,18 +163,11 @@ def schema(ctx):
         ["--experimental-positive-data-acceptance-allowed-statuses=200,201,400,401"],
     ],
 )
-def test_positive_data_acceptance(
-    testdir,
-    cli,
-    snapshot_cli,
-    schema,
-    openapi3_base_url,
-    args,
-):
-    schema_file = testdir.make_openapi_schema_file(schema)
+def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, args):
+    schema_path = ctx.makefile(schema)
     assert (
         cli.run(
-            str(schema_file),
+            str(schema_path),
             f"--base-url={openapi3_base_url}",
             "--hypothesis-max-examples=5",
             "--experimental=positive_data_acceptance",
@@ -185,20 +177,13 @@ def test_positive_data_acceptance(
     )
 
 
-def test_positive_data_acceptance_with_env_vars(
-    testdir,
-    cli,
-    snapshot_cli,
-    schema,
-    openapi3_base_url,
-    monkeypatch,
-):
-    schema_file = testdir.make_openapi_schema_file(schema)
+def test_positive_data_acceptance_with_env_vars(ctx, cli, snapshot_cli, schema, openapi3_base_url, monkeypatch):
+    schema_path = ctx.makefile(schema)
     monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE", "true")
     monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES", "403")
     assert (
         cli.run(
-            str(schema_file),
+            str(schema_path),
             f"--base-url={openapi3_base_url}",
             "--hypothesis-max-examples=5",
         )

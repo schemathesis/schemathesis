@@ -56,11 +56,11 @@ def test_no_dict_truncation():
 
 
 @pytest.mark.parametrize(
-    "payload, expected",
-    (
+    ("payload", "expected"),
+    [
         ("ABCDEF\r\n", "ABCDEF"),
         ("ABCDEF\n", "ABCDEF"),
-    ),
+    ],
 )
 def test_prepare_response_payload(payload, expected):
     assert prepare_response_payload(payload) == expected

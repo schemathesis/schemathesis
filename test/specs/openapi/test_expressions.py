@@ -70,8 +70,8 @@ def context(case, response):
 
 
 @pytest.mark.parametrize(
-    "expr, expected",
-    (
+    ("expr", "expected"),
+    [
         ("", ""),
         ("foo", "foo"),
         ("$url", "http://127.0.0.1:8080/api/users/5?username=foo"),
@@ -106,14 +106,14 @@ def context(case, response):
         ("eq.{$request.query.username#regex:f(.+)}", "eq.oo"),
         ("eq.{$request.query.username#regex:t(.+)}", "eq."),
         ("eq.{$request.query.unknown}", "eq."),
-    ),
+    ],
 )
 def test_evaluate(context, expr, expected):
     assert expressions.evaluate(expr, context) == expected
 
 
 @pytest.mark.parametrize(
-    "expr, expected",
+    ("expr", "expected"),
     [
         ({"key": "value"}, {"key": "value"}),
         ({"key": "$response.body#/a~1b"}, {"key": 1}),
@@ -134,7 +134,7 @@ def test_dynamic_body(context, expr, expected):
 
 @pytest.mark.parametrize(
     "expr",
-    (
+    [
         "$u",
         "$urlfoo",
         "{{$foo.$bar}}",
@@ -151,7 +151,7 @@ def test_dynamic_body(context, expr, expected):
         "$response.header.unknown#regex:[",
         "$response.header.unknown#regex:(.+)(.+)",
         "$response}",
-    ),
+    ],
 )
 def test_invalid_expression(context, expr):
     with pytest.raises(RuntimeExpressionError):
@@ -168,8 +168,8 @@ def test_random_expression(expr):
 
 
 @pytest.mark.parametrize(
-    "expr, expected",
-    (
+    ("expr", "expected"),
+    [
         ("$url", [Token.variable("$url", 3)]),
         ("foo", [Token.string("foo", 2)]),
         ("foo1", [Token.string("foo1", 3)]),
@@ -196,7 +196,7 @@ def test_random_expression(expr):
             "$request.body#/foo/bar",
             [Token.variable("$request", 7), Token.dot(8), Token.string("body", 12), Token.pointer("#/foo/bar", 21)],
         ),
-    ),
+    ],
 )
 def test_lexer(expr, expected):
     tokens = list(expressions.lexer.tokenize(expr))
@@ -205,8 +205,8 @@ def test_lexer(expr, expected):
 
 
 @pytest.mark.parametrize(
-    "pointer, expected",
-    (
+    ("pointer", "expected"),
+    [
         ("", DOCUMENT),
         ("abc", UNRESOLVABLE),
         ("/foo/123", UNRESOLVABLE),
@@ -222,7 +222,7 @@ def test_lexer(expr, expected):
         ('/k"l', 6),
         ("/ ", 7),
         ("/m~0n", 8),
-    ),
+    ],
 )
 def test_pointer(pointer, expected):
     assert resolve_pointer(DOCUMENT, pointer) == expected

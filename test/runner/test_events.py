@@ -14,7 +14,7 @@ def test_unknown_exception():
         assert event.exception.strip() == "ZeroDivisionError: division by zero"
 
 
-@pytest.mark.parametrize("factory_name", ("requests", "werkzeug"))
+@pytest.mark.parametrize("factory_name", ["requests", "werkzeug"])
 def test_serialize_history(case_factory, response_factory, factory_name):
     factory = getattr(response_factory, factory_name)
     root_case = case_factory()

@@ -25,10 +25,10 @@ successful_login = pytest.mark.service(data={"username": USERNAME}, status=200, 
 
 @pytest.mark.parametrize(
     "setup",
-    (
+    [
         lambda f: None,
         malform_hosts,
-    ),
+    ],
     ids=["nothing", "malformed-file"],
 )
 @successful_login

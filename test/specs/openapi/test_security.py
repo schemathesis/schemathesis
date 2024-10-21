@@ -64,11 +64,11 @@ SCHEMA_WITH_PARAMETER_AND_SECURITY_SCHEME = {
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected",
-    (
+    ("kwargs", "expected"),
+    [
         ({}, "EXPECTED"),
         ({"headers": {"TestApiKey": "EXPLICIT"}}, "EXPLICIT"),
-    ),
+    ],
 )
 def test_name_clash(kwargs, expected):
     # Operation definition should take precedence over security schemes
@@ -82,7 +82,7 @@ def test_name_clash(kwargs, expected):
     test()
 
 
-@pytest.mark.parametrize("with_security_parameters", (True, False))
+@pytest.mark.parametrize("with_security_parameters", [True, False])
 def test_without_security_parameters(with_security_parameters):
     schema = {
         "openapi": "3.0.0",

@@ -4,7 +4,7 @@ from schemathesis.filters import parse_expression
 
 
 @pytest.mark.parametrize(
-    "expression, expected",
+    ("expression", "expected"),
     [
         ('/user/name == "John Doe"', ("/user/name", "==", "John Doe")),
         ("/user/age != 30", ("/user/age", "!=", 30)),

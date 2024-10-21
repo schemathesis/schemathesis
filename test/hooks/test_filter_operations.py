@@ -3,7 +3,7 @@ import pytest
 
 @pytest.mark.parametrize(
     "schema_fixture",
-    ("graphql_schema", "openapi3_schema"),
+    ["graphql_schema", "openapi3_schema"],
 )
 def test_hook(request, schema_fixture):
     schema = request.getfixturevalue(schema_fixture)

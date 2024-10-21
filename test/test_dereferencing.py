@@ -13,14 +13,14 @@ from schemathesis.exceptions import SchemaError
 from .utils import as_param, get_schema, integer
 
 
-@pytest.fixture()
+@pytest.fixture
 def petstore():
     return get_schema("petstore_v2.yaml")
 
 
 @pytest.mark.parametrize(
-    "ref, expected",
-    (
+    ("ref", "expected"),
+    [
         (
             {"$ref": "#/definitions/Category"},
             {
@@ -66,7 +66,7 @@ def petstore():
                 "xml": {"name": "Pet"},
             },
         ),
-    ),
+    ],
 )
 def test_resolve(petstore, ref, expected):
     assert petstore.resolver.resolve_all(ref) == expected
@@ -102,7 +102,7 @@ def build_schema_with_recursion(schema, definition):
 
 @pytest.mark.parametrize(
     "definition",
-    (
+    [
         {
             "type": "object",
             "additionalProperties": False,
@@ -140,7 +140,7 @@ def build_schema_with_recursion(schema, definition):
         },
         {"type": "array", "items": {"allOf": [USER_REFERENCE]}, "maxItems": 1},
         ALL_OF_ROOT,
-    ),
+    ],
     ids=[
         "properties",
         "items-object",
@@ -181,7 +181,7 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
 
 @pytest.mark.parametrize(
     "definition",
-    (
+    [
         USER_REFERENCE,
         {
             "type": "object",
@@ -202,7 +202,7 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
                 }
             },
         },
-    ),
+    ],
 )
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_non_removable_recursive_references(ctx, definition):
@@ -446,8 +446,8 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
 
 
-@pytest.mark.parametrize("extra", ({}, {"enum": ["foo"]}))
-@pytest.mark.parametrize("version", ("2.0", "3.0.2"))
+@pytest.mark.parametrize("extra", [{}, {"enum": ["foo"]}])
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 def test_nullable_parameters(ctx, testdir, version, extra):
     schema = ctx.openapi.build_schema(
         {"/users": {"get": {"responses": {"200": {"description": "OK"}}}}}, version=version
@@ -777,11 +777,11 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
 
 
 @pytest.mark.parametrize(
-    "key, expected",
-    (
+    ("key", "expected"),
+    [
         ("Key7", 'Can not generate data for query parameter "key"! Its schema should be an object, got None'),
         ("Key8", "Unresolvable JSON pointer: 'components/schemas/Key8'"),
-    ),
+    ],
 )
 def test_uncommon_type_in_generation(ctx, testdir, key, expected):
     # When there is a reference that leads to a non-dictionary

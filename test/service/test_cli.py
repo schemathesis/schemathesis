@@ -374,7 +374,7 @@ def test_anonymous_upload(cli, schema_url, service, hosts_file, correlation_id):
     assert load_for_host(service.hostname, hosts_file)["correlation_id"] == correlation_id
 
 
-@pytest.mark.parametrize("name", (None, "test-api"))
+@pytest.mark.parametrize("name", [None, "test-api"])
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
 def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
@@ -399,8 +399,8 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
     assert not service.server.log
 
 
-@pytest.mark.parametrize("kind", ("service", "file"))
-@pytest.mark.parametrize("telemetry", ("true", "false"))
+@pytest.mark.parametrize("kind", ["service", "file"])
+@pytest.mark.parametrize("telemetry", ["true", "false"])
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
 def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, monkeypatch, kind, telemetry):
@@ -453,7 +453,7 @@ DEFAULT_GITHUB_ENVIRONMENT = ci.GitHubActionsEnvironment(
 @pytest.mark.parametrize(
     "environment",
     (
-        (
+        [
             DEFAULT_GITHUB_ENVIRONMENT,
             ci.GitLabCIEnvironment(
                 api_v4_url="https://gitlab.com/api/v4",
@@ -465,7 +465,7 @@ DEFAULT_GITHUB_ENVIRONMENT = ci.GitHubActionsEnvironment(
                 merge_request_target_branch_name="main",
                 merge_request_iid="43",
             ),
-        )
+        ]
     ),
 )
 @pytest.mark.operations("success")

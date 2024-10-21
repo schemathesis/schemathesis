@@ -13,7 +13,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
 
 
 @pytest.mark.parametrize(
-    "pattern, min_length, max_length, expected",
+    ("pattern", "min_length", "max_length", "expected"),
     [
         # Single literal
         ("a", None, 3, "(a){1,3}"),

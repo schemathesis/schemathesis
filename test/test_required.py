@@ -53,13 +53,13 @@ def test_(request, case):
 
 
 @pytest.mark.parametrize(
-    "version, param",
-    (
+    ("version", "param"),
+    [
         ("2.0", {"in": "query", "name": "key", "type": "string"}),
         ("2.0", {"in": "body", "name": "body", "schema": {"type": "string"}}),
         ("3.0.2", {"in": "query", "name": "key", "schema": {"type": "string"}}),
         ("3.0.2", {"content": {"application/json": {"schema": {"type": "string"}}}}),
-    ),
+    ],
 )
 def test_without_required(ctx, testdir, version, param):
     # When "required" field is not present in the parameter

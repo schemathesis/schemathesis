@@ -8,8 +8,8 @@ from schemathesis.stateful.config import (
 
 
 @pytest.mark.parametrize(
-    "settings, expected",
-    (
+    ("settings", "expected"),
+    [
         (
             {},
             _get_default_hypothesis_settings_kwargs(),
@@ -19,7 +19,7 @@ from schemathesis.stateful.config import (
             {"deadline": None, "stateful_step_count": 6, "suppress_health_check": list(hypothesis.HealthCheck)},
         ),
         (_get_default_hypothesis_settings_kwargs(), {}),
-    ),
+    ],
 )
 def test_hypothesis_settings(settings, expected):
     assert _get_hypothesis_settings_kwargs_override(hypothesis.settings(**settings)) == expected

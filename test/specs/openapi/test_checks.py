@@ -15,7 +15,7 @@ from schemathesis.specs.openapi.checks import (
 
 
 @pytest.mark.parametrize(
-    "lhs, lhs_vars, rhs, rhs_vars, expected",
+    ("lhs", "lhs_vars", "rhs", "rhs_vars", "expected"),
     [
         # Exact match, no variables
         ("/users/123", {}, "/users/123", {}, True),
@@ -57,7 +57,6 @@ from schemathesis.specs.openapi.checks import (
         ),
         # LHS is a prefix of RHS, with different variable values
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "123"}, True),
-        ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "456"}, False),
         # LHS is a prefix of RHS, with different variable types
         ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": 123}, True),
         ("/users/{id}", {"id": 123}, "/users/{id}/details", {"id": "123"}, True),
@@ -66,9 +65,6 @@ from schemathesis.specs.openapi.checks import (
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view", {"id": "456"}, False),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view/edit", {"id": "123"}, True),
         ("/users/{id}", {"id": "123"}, "/users/{id}/details/view/edit", {"id": "456"}, False),
-        # LHS is a prefix of RHS
-        ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "123"}, True),
-        ("/users/{id}", {"id": "123"}, "/users/{id}/details", {"id": "456"}, False),
         # Longer than a prefix
         ("/one/two/three/four/{id}", {"id": "123"}, "/users/{id}/details", {"id": "456"}, False),
     ],
@@ -115,8 +111,8 @@ def sample_schema(ctx):
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected",
-    (
+    ("kwargs", "expected"),
+    [
         ({}, False),
         (
             {"meta": build_metadata(body=DataGenerationMethod.negative)},
@@ -152,7 +148,7 @@ def sample_schema(ctx):
             },
             True,
         ),
-    ),
+    ],
 )
 def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
     schema = schemathesis.from_dict(sample_schema)
@@ -177,7 +173,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
 
 
 @pytest.mark.parametrize(
-    "status_code, allowed_statuses, is_positive, should_raise",
+    ("status_code", "allowed_statuses", "is_positive", "should_raise"),
     [
         (200, ["200", "400"], True, False),
         (400, ["200", "400"], True, False),

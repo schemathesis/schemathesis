@@ -118,14 +118,14 @@ def nctx():
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         ({"type": "null"}, [None]),
         ({"type": "boolean"}, [True, False]),
         ({"type": ["boolean", "null"]}, [True, False, None]),
         ({"enum": [1, 2]}, [1, 2]),
         ({"const": 42}, [42]),
-    ),
+    ],
 )
 def test_positive_primitive_schemas(pctx, schema, expected):
     covered = cover_schema(pctx, schema)
@@ -150,8 +150,8 @@ class NotNumber:
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         ({"type": "null"}, [0, "", [], {}]),
         ({"type": "boolean"}, [0, None, "", [], {}]),
         ({"type": ["boolean", "null"]}, [0, "", [], {}]),
@@ -168,7 +168,7 @@ class NotNumber:
         ({"exclusiveMinimum": 5}, [5]),
         ({"exclusiveMaximum": 5}, [5]),
         ({"required": ["a"]}, [{}]),
-    ),
+    ],
 )
 def test_negative_primitive_schemas(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
@@ -182,8 +182,8 @@ def test_negative_primitive_schemas(nctx, schema, expected):
 
 
 @pytest.mark.parametrize(
-    "schema, lengths",
-    (
+    ("schema", "lengths"),
+    [
         ({"type": "string"}, {0}),
         ({"type": "string", "example": "test"}, {4}),
         ({"type": "string", "example": "test", "default": "test"}, {4}),
@@ -198,7 +198,7 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         ({"type": "string", "minLength": 5, "maxLength": 6}, {5, 6}),
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
         ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": "^[\\w\\W]+$"}, {1}),
-    ),
+    ],
 )
 def test_positive_string(ctx, schema, lengths):
     covered = list(_positive_string(ctx, schema))
@@ -209,8 +209,8 @@ def test_positive_string(ctx, schema, lengths):
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         ({"type": "string"}, [0, None, [], {}]),
         ({"type": "string", "minLength": 5}, [0, None, [], {}, "0000"]),
         ({"type": "string", "maxLength": 10}, [0, None, [], {}, "00000000000"]),
@@ -218,7 +218,7 @@ def test_positive_string(ctx, schema, lengths):
         ({"type": "string", "pattern": "^[0-9]", "minLength": 1}, [0, None, [], {}, AnyString(), ""]),
         ({"type": "string", "pattern": "^[0-9]"}, [0, None, [], {}, AnyString()]),
         ({"type": "string", "format": "date-time"}, [0, None, [], {}, ""]),
-    ),
+    ],
 )
 def test_negative_string(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
@@ -240,10 +240,10 @@ def test_negative_string_with_pattern(nctx):
     assert_not_conform(covered, schema)
 
 
-@pytest.mark.parametrize("multiple_of", (None, 2))
+@pytest.mark.parametrize("multiple_of", [None, 2])
 @pytest.mark.parametrize(
-    "schema, values, with_multiple_of",
-    (
+    ("schema", "values", "with_multiple_of"),
+    [
         ({"type": "integer"}, [0], [0]),
         ({"type": "integer", "example": 2}, [2], [2]),
         ({"type": "integer", "example": 2, "default": 2}, [2], [2]),
@@ -261,7 +261,7 @@ def test_negative_string_with_pattern(nctx):
         ({"type": "integer", "exclusiveMinimum": 5}, [6, 7], [6, 8]),
         ({"type": "integer", "exclusiveMaximum": 10}, [9, 8], [8, 6]),
         ({"type": "integer", "exclusiveMinimum": 5, "exclusiveMaximum": 10}, [6, 7, 9, 8], [6, 8]),
-    ),
+    ],
 )
 def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
     if with_multiple_of is None and multiple_of is not None:
@@ -276,8 +276,8 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         ({"type": "object"}, [{}]),
         ({"type": "object", "example": {"A": 42}}, [{"A": 42}]),
         ({"type": "object", "example": {"A": 42}, "default": {"A": 42}}, [{"A": 42}]),
@@ -755,7 +755,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             },
             [],
         ),
-    ),
+    ],
 )
 def test_positive_other(pctx, schema, expected):
     covered = cover_schema(pctx, schema)
@@ -765,8 +765,8 @@ def test_positive_other(pctx, schema, expected):
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         (
             {
                 "properties": {
@@ -884,7 +884,7 @@ def test_positive_other(pctx, schema, expected):
                 },
             ],
         ),
-    ),
+    ],
 )
 def test_negative_objects(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
@@ -897,7 +897,7 @@ SCHEMA_WITH_PATTERN = {"minLength": 2, "pattern": "^A{2}$"}
 
 
 @pytest.mark.parametrize(
-    ["schema", "expected"],
+    ("schema", "expected"),
     [
         # Top-level pattern
         (SCHEMA_WITH_PATTERN, ["A", "00"]),
@@ -963,8 +963,8 @@ def test_negative_pattern_with_incompatible_length(nctx):
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
-    (
+    ("schema", "expected"),
+    [
         (
             {
                 "allOf": [
@@ -1019,7 +1019,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
             },
             [],
         ),
-    ),
+    ],
 )
 def test_negative_combinators(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
@@ -1042,7 +1042,7 @@ def test_unsupported_patterns(nctx, pattern):
 
 
 @pytest.mark.parametrize(
-    ["schema", "expected"],
+    ("schema", "expected"),
     [
         ({"type": "integer", "format": "int32"}, [0]),
         ({"type": "string", "format": "unknown"}, [""]),
@@ -1054,7 +1054,7 @@ def test_ignoring_unknown_formats(pctx, schema, expected):
 
 
 @pytest.mark.parametrize(
-    "schema, expected",
+    ("schema", "expected"),
     [
         ({"type": "string", "minLength": 5, "maxLength": 10}, {"/minLength", "/maxLength", "/type"}),
         ({"type": "number", "minimum": 0, "maximum": 100}, {"/minimum", "/maximum", "/type"}),

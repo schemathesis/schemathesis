@@ -6,12 +6,12 @@ import schemathesis
 from schemathesis.models import Case
 
 
-@pytest.fixture()
+@pytest.fixture
 def schema(flask_app):
     return schemathesis.from_wsgi("/schema.yaml", flask_app)
 
 
-@pytest.mark.parametrize("method", ("call", "call_wsgi"))
+@pytest.mark.parametrize("method", ["call", "call_wsgi"])
 @pytest.mark.hypothesis_nested
 def test_cookies(flask_app, method):
     @flask_app.route("/cookies", methods=["GET"])

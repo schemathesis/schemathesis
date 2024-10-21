@@ -305,7 +305,7 @@ def test(case):
     result.assert_outcomes(failed=1)
 
 
-@pytest.mark.parametrize("style", ("python", "curl"))
+@pytest.mark.parametrize("style", ["python", "curl"])
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_failure_reproduction_message(testdir, openapi3_base_url, style):
     # When a test fails
@@ -396,11 +396,11 @@ def test(case):
 
 
 @pytest.mark.parametrize(
-    "body, expected",
-    (
+    ("body", "expected"),
+    [
         ("raise AssertionError", "Custom check failed: `my_check`"),
         ("raise AssertionError('My message')", "My message"),
-    ),
+    ],
 )
 def test_failing_custom_check(testdir, openapi3_base_url, body, expected):
     # When the user passes a custom check that fails
@@ -554,7 +554,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 1"])
 
 
-@pytest.mark.parametrize("location", ("header", "cookie", "query"))
+@pytest.mark.parametrize("location", ["header", "cookie", "query"])
 def test_path_parameters_allow_partial_negation(testdir, location):
     # If path parameters can not be negated and other parameters can be negated
     testdir.make_test(
@@ -667,7 +667,7 @@ def test(value):
     assert "InvalidSchema: Cannot have" not in result.stdout.str()
 
 
-@pytest.mark.parametrize("value", (True, False))
+@pytest.mark.parametrize("value", [True, False])
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_output_sanitization(testdir, openapi3_base_url, value):
     auth = "secret-auth"
@@ -745,8 +745,8 @@ def test(case):
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
-    "phases, expected",
-    (
+    ("phases", "expected"),
+    [
         (
             "Phase.explicit",
             "Failed to generate test cases from examples for this API operation because of "
@@ -757,7 +757,7 @@ def test(case):
             "Failed to generate test cases for this API operation because of "
             r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
         ),
-    ),
+    ],
 )
 def test_invalid_regex_example(testdir, openapi3_base_url, phases, expected):
     testdir.make_test(
@@ -808,7 +808,7 @@ def test(case):
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
     "phases",
-    ("Phase.explicit", "Phase.explicit, Phase.generate"),
+    ["Phase.explicit", "Phase.explicit, Phase.generate"],
 )
 def test_invalid_header_in_example(testdir, openapi3_base_url, phases):
     testdir.make_test(

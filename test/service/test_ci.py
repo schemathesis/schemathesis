@@ -4,8 +4,8 @@ from schemathesis.service import ci
 
 
 @pytest.mark.parametrize(
-    "env, expected",
-    (
+    ("env", "expected"),
+    [
         (
             {
                 "GITHUB_ACTIONS": "true",
@@ -58,7 +58,7 @@ from schemathesis.service import ci
             {},
             None,
         ),
-    ),
+    ],
     ids=["github", "gitlab", "none"],
 )
 def test_environment(monkeypatch, env, expected):
