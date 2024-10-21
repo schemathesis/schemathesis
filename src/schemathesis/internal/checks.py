@@ -21,7 +21,7 @@ CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[b
 @dataclass
 class NegativeDataRejectionConfig:
     # 5xx will pass through
-    allowed_statuses: list[str] = field(default_factory=lambda: ["4xx", "5xx"])
+    allowed_statuses: list[str] = field(default_factory=lambda: ["400", "401", "403", "404", "422", "5xx"])
 
 
 @dataclass
