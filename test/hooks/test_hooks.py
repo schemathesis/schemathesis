@@ -43,7 +43,7 @@ def global_hook(request):
             return strategy.filter(integer_id)
 
 
-@pytest.fixture()
+@pytest.fixture
 def dispatcher():
     return HookDispatcher(scope=HookScope.SCHEMA)
 
@@ -216,7 +216,7 @@ def test_save_test_function(wsgi_app_schema):
     assert getattr(test, PARAMETRIZE_MARKER).test_function is test
 
 
-@pytest.mark.parametrize("apply_first", (True, False))
+@pytest.mark.parametrize("apply_first", [True, False])
 def test_local_dispatcher(wsgi_app_schema, apply_first):
     assert wsgi_app_schema.hooks.scope == HookScope.SCHEMA
 

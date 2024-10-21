@@ -12,12 +12,12 @@ from schemathesis.models import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
 
-@pytest.fixture()
+@pytest.fixture
 def schema(fastapi_app):
     return from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
 
 
-@pytest.mark.parametrize("method", ("call", "call_asgi"))
+@pytest.mark.parametrize("method", ["call", "call_asgi"])
 @pytest.mark.hypothesis_nested
 def test_cookies(fastapi_app, method):
     @fastapi_app.get("/cookies")
@@ -166,8 +166,8 @@ class FastAPIExtended(FastAPI):
     pass
 
 
-@pytest.mark.parametrize("app_factory", (FastAPI, FastAPIExtended))
-@pytest.mark.parametrize("with_existing_fixup", (True, False))
+@pytest.mark.parametrize("app_factory", [FastAPI, FastAPIExtended])
+@pytest.mark.parametrize("with_existing_fixup", [True, False])
 def test_automatic_fixup(ctx, with_existing_fixup, app_factory):
     if with_existing_fixup:
         # Install everything
@@ -232,7 +232,7 @@ def with_on_event(data: dict):
     return app
 
 
-@pytest.mark.parametrize("setup", (with_lifespan, with_on_event))
+@pytest.mark.parametrize("setup", [with_lifespan, with_on_event])
 @pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_events(setup):
     data = {}

@@ -61,11 +61,11 @@ def test_as_wsgi_kwargs(graphql_strategy):
 
 
 @pytest.mark.parametrize(
-    "kwargs, base_path, expected",
-    (
+    ("kwargs", "base_path", "expected"),
+    [
         ({"base_url": "http://0.0.0.0:1234/something"}, "/something", "http://0.0.0.0:1234/something"),
         ({"port": 8888}, "/graphql", "http://127.0.0.1:8888/graphql"),
-    ),
+    ],
 )
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_base_url(graphql_url, kwargs, base_path, expected):
@@ -90,7 +90,7 @@ def test_custom_base_url(graphql_url, kwargs, base_path, expected):
         assert case.as_transport_kwargs()["url"] == expected
 
 
-@pytest.mark.parametrize("kwargs", ({"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}))
+@pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
 def test_make_case(graphql_schema, kwargs):
     case = graphql_schema["Query"]["getBooks"].make_case(**kwargs)
     assert isinstance(case, GraphQLCase)
@@ -98,11 +98,11 @@ def test_make_case(graphql_schema, kwargs):
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected",
-    (
+    ("kwargs", "expected"),
+    [
         ({"content": b"INTERNAL SERVER ERROR", "content_type": "text/plain"}, "JSON deserialization error"),
         ({"content": b"[]"}, "Unexpected GraphQL Response"),
-    ),
+    ],
 )
 def test_response_validation(graphql_schema, response_factory, kwargs, expected):
     response = response_factory.requests(status_code=200, **kwargs)
@@ -173,7 +173,7 @@ def test_no_query(graphql_url):
     assert schema.operations_count == 0
 
 
-@pytest.mark.parametrize("with_data_key", (True, False))
+@pytest.mark.parametrize("with_data_key", [True, False])
 def test_data_key(graphql_url, with_data_key):
     response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     decoded = response.json()
@@ -202,7 +202,7 @@ CUSTOM_QUERY_NAME = "MyQuery"
 CUSTOM_MUTATION_NAME = "MyMutation"
 
 
-@pytest.mark.parametrize("name", (CUSTOM_QUERY_NAME, CUSTOM_MUTATION_NAME))
+@pytest.mark.parametrize("name", [CUSTOM_QUERY_NAME, CUSTOM_MUTATION_NAME])
 def test_type_names(name):
     # When the user gives custom names to query types
     raw_schema = f"""
@@ -231,8 +231,8 @@ def test_type_names(name):
 
 
 @pytest.mark.parametrize(
-    "schema, extension",
-    (
+    ("schema", "extension"),
+    [
         (
             """
 type Query {
@@ -247,14 +247,14 @@ type Query {
 }""",
             ".whatever",
         ),
-    ),
+    ],
 )
 def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
     schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
     assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
 
 
-@pytest.mark.parametrize("arg", ("--include-name=Query.getBooks", "--exclude-name=Query.getBooks"))
+@pytest.mark.parametrize("arg", ["--include-name=Query.getBooks", "--exclude-name=Query.getBooks"])
 def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
     assert cli.run(graphql_url, "--hypothesis-max-examples=1", "--dry-run", arg) == snapshot_cli
 
@@ -295,11 +295,11 @@ def test_unknown_type_name(graphql_schema):
 
 
 @pytest.mark.parametrize(
-    "name, expected",
-    (
+    ("name", "expected"),
+    [
         ("getBookz", "`getBookz` field not found. Did you mean `getBooks`?"),
         ("abcdef", "`abcdef` field not found"),
-    ),
+    ],
 )
 def test_unknown_field_name(graphql_schema, name, expected):
     with pytest.raises(KeyError, match=expected):
@@ -315,7 +315,7 @@ def test_repr(graphql_schema):
     assert repr(graphql_schema) == "<GraphQLSchema>"
 
 
-@pytest.mark.parametrize("type_name", ("Query", "Mutation"))
+@pytest.mark.parametrize("type_name", ["Query", "Mutation"])
 def test_type_as_strategy(graphql_schema, type_name):
     operations = graphql_schema[type_name]
     strategy = operations.as_strategy()
@@ -334,7 +334,7 @@ def test_schema_as_strategy(graphql_schema):
 
 @pytest.mark.parametrize(
     "check",
-    (use_after_free, ensure_resource_availability, ignored_auth, positive_data_acceptance, negative_data_rejection),
+    [use_after_free, ensure_resource_availability, ignored_auth, positive_data_acceptance, negative_data_rejection],
 )
 def test_ignored_checks(graphql_schema, check):
     # Just in case

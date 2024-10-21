@@ -237,7 +237,7 @@ def test_merge_length_into_pattern(ctx):
     test()
 
 
-@pytest.mark.parametrize("media_type", ("application/json", "text/yaml"))
+@pytest.mark.parametrize("media_type", ["application/json", "text/yaml"])
 def test_binary_is_serializable(ctx, media_type):
     schema = ctx.openapi.build_schema(
         {
@@ -284,11 +284,11 @@ def test_default_strategies_bytes(swagger_20):
 
 
 @pytest.mark.parametrize(
-    "values, error",
-    (
+    ("values", "error"),
+    [
         (("valid", "invalid"), f"strategy must be of type {st.SearchStrategy}, not {str}"),
         ((123, st.from_regex(r"\d")), f"name must be of type {str}, not {int}"),
-    ),
+    ],
 )
 def test_invalid_custom_strategy(values, error):
     with pytest.raises(TypeError) as exc:
@@ -298,7 +298,7 @@ def test_invalid_custom_strategy(values, error):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize(
-    "definition", ({"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"})
+    "definition", [{"name": "api_key", "in": "header", "type": "string"}, {"name": "api_key", "in": "header"}]
 )
 def test_valid_headers(openapi2_base_url, swagger_20, definition):
     operation = APIOperation(
@@ -342,7 +342,7 @@ def make_swagger(*parameters):
 
 @pytest.mark.parametrize(
     "raw_schema",
-    (
+    [
         make_swagger(
             {"name": "a", "in": "formData", "required": True, "type": "number"},
             {"name": "b", "in": "formData", "required": True, "type": "boolean"},
@@ -376,7 +376,7 @@ def make_swagger(*parameters):
                 }
             },
         },
-    ),
+    ],
 )
 @pytest.mark.hypothesis_nested
 def test_valid_form_data(request, raw_schema):
@@ -433,25 +433,25 @@ def test_optional_form_data(ctx, openapi3_base_url):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False), ({"key": ["1", "abc", "\udcff"]}, False)),
+    ("value", "expected"),
+    [({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False), ({"key": ["1", "abc", "\udcff"]}, False)],
 )
 def test_is_valid_query(value, expected):
     assert is_valid_query(value) == expected
 
 
-@pytest.mark.parametrize("value", ("/", "\udc9b"))
+@pytest.mark.parametrize("value", ["/", "\udc9b"])
 def test_filter_path_parameters(value):
     assert not is_valid_path({"foo": value})
 
 
-@pytest.mark.parametrize("value, expected", ((".", "%2E"), ("..", "%2E%2E"), (".foo", ".foo")))
+@pytest.mark.parametrize(("value", "expected"), [(".", "%2E"), ("..", "%2E%2E"), (".foo", ".foo")])
 def test_path_parameters_quotation(value, expected):
     # See GH-1036
     assert quote_all({"foo": value})["foo"] == expected
 
 
-@pytest.mark.parametrize("expected", ("null", "true", "false"))
+@pytest.mark.parametrize("expected", ["null", "true", "false"])
 def test_parameters_jsonified(ctx, expected):
     # See GH-1166
     # When `None` or `True` / `False` are generated in path or query
@@ -500,7 +500,7 @@ def test_is_valid_query_strategy():
     test()
 
 
-@pytest.mark.parametrize("version", ("2.0", "3.0.2"))
+@pytest.mark.parametrize("version", ["2.0", "3.0.2"])
 def test_optional_payload(ctx, version):
     # When body are not required
     raw_schema = ctx.openapi.build_schema(
@@ -560,21 +560,21 @@ def test_date_format(data):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ({"foo": True}, {"foo": "true"}),
         ({"foo": False}, {"foo": "false"}),
         ({"foo": None}, {"foo": "null"}),
         ([{"foo": None}], [{"foo": "null"}]),
         ([{"foo": {"bar": True}}], [{"foo": {"bar": "true"}}]),
-    ),
+    ],
 )
 def test_jsonify_python_specific_types(value, expected):
     assert jsonify_python_specific_types(value) == expected
 
 
-def test_health_check_failed_large_base_example(ctx, testdir, cli, snapshot_cli):
-    schema = ctx.openapi.build_schema(
+def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(
         {
             "/data": {
                 "post": {
@@ -591,6 +591,5 @@ def test_health_check_failed_large_base_example(ctx, testdir, cli, snapshot_cli)
             },
         }
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     # Then it should be able to generate requests
-    assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
+    assert cli.run(str(schema_path), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli

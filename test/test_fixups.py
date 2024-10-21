@@ -30,8 +30,8 @@ def test(case):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         # No-op case
         ({"exclusiveMinimum": True, "minimum": 5}, {"exclusiveMinimum": True, "minimum": 5}),
         # Draft 7 to Draft 4
@@ -40,7 +40,7 @@ def test(case):
         # Nested cases
         ({"schema": {"exclusiveMaximum": 5}}, {"schema": {"exclusiveMaximum": True, "maximum": 5}}),
         ([{"schema": {"exclusiveMaximum": 5}}], [{"schema": {"exclusiveMaximum": True, "maximum": 5}}]),
-    ),
+    ],
 )
 def test_fastapi_schema_conversion(value, expected):
     fixups.fast_api.before_load_schema(None, value)

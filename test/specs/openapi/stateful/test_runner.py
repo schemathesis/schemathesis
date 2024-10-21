@@ -87,12 +87,12 @@ def assert_linked_calls_followed(result: RunnerResult):
 
 @pytest.mark.parametrize(
     "kwargs",
-    (
+    [
         {"exit_first": False},
         {"exit_first": True},
         {"max_failures": 1},
         {"max_failures": 2},
-    ),
+    ],
 )
 def test_find_independent_5xx(runner_factory, kwargs):
     # When the app contains multiple endpoints with 5xx responses
@@ -148,14 +148,15 @@ def stop_runner(r):
     r.stop()
 
 
-@pytest.mark.parametrize("func", (keyboard_interrupt, stop_runner))
+@pytest.mark.parametrize("func", [keyboard_interrupt, stop_runner])
 def test_stop_in_check(runner_factory, func):
     def stop_immediately(*args, **kwargs):
         func(runner)
 
     runner = runner_factory(config_kwargs={"checks": (stop_immediately,)})
     result = collect_result(runner)
-    assert result.sink.duration and result.sink.duration > 0
+    assert result.sink.duration
+    assert result.sink.duration > 0
     assert result.sink.suites[events.SuiteStatus.INTERRUPTED] == 1
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
@@ -163,7 +164,7 @@ def test_stop_in_check(runner_factory, func):
     serialize_all_events(result.events)
 
 
-@pytest.mark.parametrize("event_cls", (events.ScenarioStarted, events.ScenarioFinished))
+@pytest.mark.parametrize("event_cls", [events.ScenarioStarted, events.ScenarioFinished])
 def test_explicit_stop(runner_factory, event_cls):
     runner = runner_factory()
     sink = runner.state_machine.sink()
@@ -213,7 +214,7 @@ def test_internal_error_in_check(runner_factory, kwargs):
     serialize_all_events(result.events)
 
 
-@pytest.mark.parametrize("exception_args", ((), ("Oops!",)))
+@pytest.mark.parametrize("exception_args", [(), ("Oops!",)])
 def test_custom_assertion_in_check(runner_factory, exception_args):
     def custom_check(*args, **kwargs):
         raise AssertionError(*exception_args)
@@ -272,7 +273,7 @@ def test_distinct_assertions(runner_factory):
 
 @pytest.mark.parametrize(
     "kwargs",
-    ({"exit_first": False}, {"exit_first": True}),
+    [{"exit_first": False}, {"exit_first": True}],
 )
 def test_flaky_assertions(runner_factory, kwargs):
     counter = 0
@@ -384,7 +385,7 @@ def test_failed_health_check(runner_factory):
 
 @pytest.mark.parametrize(
     "kwargs",
-    ({"exit_first": False}, {"exit_first": True}),
+    [{"exit_first": False}, {"exit_first": True}],
 )
 def test_flaky(runner_factory, kwargs):
     found = False

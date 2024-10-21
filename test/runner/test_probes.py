@@ -40,11 +40,11 @@ DEFAULT_HEADERS = {
 
 
 @pytest.mark.parametrize(
-    "kwargs, headers",
-    (
+    ("kwargs", "headers"),
+    [
         ({"request_cert": str(HERE.parent / "cli" / "cert.pem")}, {}),
         ({"auth": ("test", "test")}, {"Authorization": ["[Filtered]"]}),
-    ),
+    ],
 )
 def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url, kwargs, headers):
     config = config_factory(base_url=openapi3_base_url, **kwargs)

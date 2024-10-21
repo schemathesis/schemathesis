@@ -53,8 +53,8 @@ def response():
 
 
 @pytest.mark.parametrize(
-    "url, expected",
-    (
+    ("url", "expected"),
+    [
         (
             "/users/",
             [
@@ -80,7 +80,7 @@ def response():
             ],
         ),
         ("/unknown", []),
-    ),
+    ],
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_get_links(openapi3_base_url, schema_url, url, expected):
@@ -181,8 +181,8 @@ EXPECTED_PATH_PARAMETERS = [
 
 
 @pytest.mark.parametrize(
-    "value, path_user_id, query_user_id, code",
-    (
+    ("value", "path_user_id", "query_user_id", "code"),
+    [
         (
             [{"path.user_id": 1, "query.user_id": 2, "code": 7}, {"path.user_id": 3, "query.user_id": 4, "code": 5}],
             [1, 3],
@@ -195,7 +195,7 @@ EXPECTED_PATH_PARAMETERS = [
             {"type": "integer"},
             {"type": "integer"},
         ),
-    ),
+    ],
 )
 def test_make_operation(value, path_user_id, query_user_id, code):
     operation = LINK.make_operation(list(map(ParsedData, value)))
@@ -242,7 +242,7 @@ BODY_SCHEMA = {"required": ["foo"], "type": "object", "properties": {"foo": {"ty
 
 @pytest.mark.parametrize(
     "body",
-    (
+    [
         OpenAPI20Body(
             {
                 "name": "attributes",
@@ -253,7 +253,7 @@ BODY_SCHEMA = {"required": ["foo"], "type": "object", "properties": {"foo": {"ty
             media_type="application/json",
         ),
         OpenAPI30Body(definition={"schema": BODY_SCHEMA}, media_type="application/json", required=True),
-    ),
+    ],
 )
 def test_make_operation_body(body):
     # See GH-1069
@@ -295,7 +295,7 @@ def test_invalid_request_body_definition():
         Link(name="Link", operation=operation, parameters={}, request_body={"requestBody": {"foo": "bar"}})
 
 
-@pytest.mark.parametrize("parameter", ("wrong.id", "unknown", "header.id"))
+@pytest.mark.parametrize("parameter", ["wrong.id", "unknown", "header.id"])
 def test_make_operation_invalid_location(parameter):
     with pytest.raises(
         ValueError, match=f"Parameter `{parameter}` is not defined in API operation GET /users/{{user_id}}"
@@ -328,11 +328,11 @@ def test_get_container_invalid_location(swagger_20):
 
 
 @pytest.mark.parametrize(
-    "status_code, expected",
-    (
+    ("status_code", "expected"),
+    [
         (200, ["Foo"]),
         (201, ["Bar"]),
-    ),
+    ],
 )
 def test_get_links_numeric_response_codes(status_code, openapi_30, expected):
     # See GH-1226

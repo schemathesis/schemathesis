@@ -32,13 +32,13 @@ type Query {
 
 
 @pytest.mark.parametrize(
-    "class_decorator, pre_parametrize_decorator, post_parametrize_decorator",
-    (
+    ("class_decorator", "pre_parametrize_decorator", "post_parametrize_decorator"),
+    [
         ("@schemathesis.auth()", "", ""),
         ("@schema.auth()", "", ""),
         ("", f"@schema.auth({AUTH_CLASS_NAME})", ""),
         ("", "", f"@schema.auth({AUTH_CLASS_NAME})"),
-    ),
+    ],
     ids=("global", "schema", "test-pre-parametrize", "test-post-parametrize"),
 )
 def test_different_scopes(

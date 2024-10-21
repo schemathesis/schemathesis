@@ -209,13 +209,13 @@ def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISch
     return schemathesis.from_dict(dict_with_property_examples)
 
 
-@pytest.fixture()
+@pytest.fixture
 def operation(schema_with_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
     return next(schema_with_examples.get_all_operations()).ok()
 
 
-@pytest.fixture()
+@pytest.fixture
 def operation_with_property_examples(schema_with_property_examples) -> APIOperation:
     """Returns first (and only) API operation from schema_with_examples."""
     return next(schema_with_property_examples.get_all_operations()).ok()
@@ -563,7 +563,7 @@ def test_examples_ref_openapi_2(ctx):
     assert find(strategies[0], lambda case: case.body == "value")
 
 
-@pytest.mark.parametrize("body", ("BodyDirect", "BodyRef"))
+@pytest.mark.parametrize("body", ["BodyDirect", "BodyRef"])
 def test_examples_ref_openapi_3(ctx, body):
     schema = ctx.openapi.build_schema(
         {
@@ -662,7 +662,7 @@ def test_examples_ref_missing_components(ctx):
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
 
 
-@pytest.mark.parametrize("key", ("anyOf", "oneOf"))
+@pytest.mark.parametrize("key", ["anyOf", "oneOf"])
 def test_examples_in_any_of_top_level(ctx, key):
     schema = ctx.openapi.build_schema(
         {
@@ -795,7 +795,7 @@ def test_examples_in_all_of_top_level(ctx):
     ]
 
 
-@pytest.mark.parametrize("key", ("anyOf", "oneOf"))
+@pytest.mark.parametrize("key", ["anyOf", "oneOf"])
 def test_examples_in_any_of_in_schemas(ctx, key):
     schema = ctx.openapi.build_schema(
         {
@@ -1036,11 +1036,11 @@ def test_external_value_network_error(ctx):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ({"foo": {"value": 42}}, [42]),
         ({"foo": {}}, []),
-    ),
+    ],
 )
 def test_empty_example(value, expected):
     assert list(extract_inner_examples(value, value)) == expected
@@ -1419,7 +1419,7 @@ def content(schema, **kwargs):
 
 
 @pytest.mark.parametrize(
-    ["response", "expected"],
+    ("response", "expected"),
     [
         ({"description": "Ok"}, {}),
         ({"$ref": "#/components/responses/NoExamples"}, {}),
@@ -1573,7 +1573,7 @@ def test_find_in_responses_only_in_2xx(ctx):
 
 
 @pytest.mark.parametrize(
-    ["examples", "name", "expected"],
+    ("examples", "name", "expected"),
     [
         (
             {"Item": [{"id": "123"}, {"id": "456"}]},

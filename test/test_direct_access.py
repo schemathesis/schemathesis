@@ -29,7 +29,7 @@ def test_repr(swagger_20):
     assert str(swagger_20) == "<SwaggerV20 for Sample API 1.0.0>"
 
 
-@pytest.mark.parametrize("method", ("GET", "get"))
+@pytest.mark.parametrize("method", ["GET", "get"])
 def test_operation_access(swagger_20, method):
     assert isinstance(swagger_20["/users"][method], APIOperation)
 

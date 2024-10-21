@@ -111,7 +111,7 @@ def test_(case):
     )
 
 
-@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.parametrize("workers", [1, 2])
 def test_in_cli(testdir, cli, open_api_3_schema_with_recoverable_errors, workers, snapshot_cli):
     schema_file = testdir.makefile(".yaml", schema=yaml.dump(open_api_3_schema_with_recoverable_errors))
     # Then valid operation should be tested

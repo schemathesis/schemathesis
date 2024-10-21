@@ -102,14 +102,14 @@ def test_path(swagger_20):
 
 
 @pytest.mark.parametrize(
-    "kwargs, expected",
-    (
+    ("kwargs", "expected"),
+    [
         ({"path_parameters": {"name": "test"}}, "Case(path_parameters={'name': 'test'})"),
         (
             {"path_parameters": {"name": "test"}, "query": {"q": 1}},
             "Case(path_parameters={'name': 'test'}, query={'q': 1})",
         ),
-    ),
+    ],
 )
 def test_case_repr(swagger_20, kwargs, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
@@ -117,8 +117,8 @@ def test_case_repr(swagger_20, kwargs, expected):
     assert repr(case) == expected
 
 
-@pytest.mark.parametrize("override", (False, True))
-@pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
+@pytest.mark.parametrize("override", [False, True])
+@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
 def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
     operation = APIOperation("/success", "GET", {}, swagger_20)
@@ -161,13 +161,13 @@ def test_reserved_characters_in_operation_name(swagger_20):
 
 
 @pytest.mark.parametrize(
-    "headers, expected",
-    (
+    ("headers", "expected"),
+    [
         (None, {"User-Agent": USER_AGENT, "X-Key": "foo"}),
         ({"User-Agent": "foo/1.0"}, {"User-Agent": "foo/1.0", "X-Key": "foo"}),
         ({"X-Value": "bar"}, {"X-Value": "bar", "User-Agent": USER_AGENT, "X-Key": "foo"}),
         ({"UsEr-agEnT": "foo/1.0"}, {"UsEr-agEnT": "foo/1.0", "X-Key": "foo"}),
-    ),
+    ],
 )
 def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
@@ -188,7 +188,7 @@ def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swag
     assert response.json() == {"success": True}
 
 
-@pytest.mark.parametrize("header", ("content-Type", "Content-Type"))
+@pytest.mark.parametrize("header", ["content-Type", "Content-Type"])
 def test_as_transport_kwargs_override_content_type(ctx, header):
     schema = ctx.openapi.build_schema(
         {
@@ -218,7 +218,7 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
     }
 
 
-@pytest.mark.parametrize("override", (False, True))
+@pytest.mark.parametrize("override", [False, True])
 def test_call(override, base_url, swagger_20):
     operation = APIOperation("/success", "GET", {}, swagger_20)
     case = operation.make_case()
@@ -392,10 +392,10 @@ def test_(case):
     result.assert_outcomes(passed=1)
 
 
-@pytest.mark.parametrize("factory_type", ("httpx", "requests"))
+@pytest.mark.parametrize("factory_type", ["httpx", "requests"])
 @pytest.mark.parametrize(
-    "response_schema, payload, schema_path, instance, instance_path",
-    (
+    ("response_schema", "payload", "schema_path", "instance", "instance_path"),
+    [
         ({"type": "object"}, [], ["type"], [], []),
         ({"$ref": "#/components/schemas/Foo"}, [], ["type"], [], []),
         (
@@ -405,7 +405,7 @@ def test_(case):
             42,
             ["foo"],
         ),
-    ),
+    ],
 )
 def test_validate_response_schema_path(
     ctx,
@@ -442,7 +442,7 @@ def test_validate_response_schema_path(
     assert exc.value.context.instance_path == instance_path
 
 
-@pytest.mark.operations()
+@pytest.mark.operations
 def test_response_from_requests(base_url):
     response = requests.get(f"{base_url}/cookies", timeout=1)
     serialized = Response.from_requests(response)
@@ -453,7 +453,7 @@ def test_response_from_requests(base_url):
     assert serialized.headers["Set-Cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
 
 
-@pytest.mark.parametrize("body, expected", ((NOT_SET, None), (b"example", b"example")))
+@pytest.mark.parametrize(("body", "expected"), [(NOT_SET, None), (b"example", b"example")])
 def test_from_case(swagger_20, body, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
     case = Case(
@@ -470,11 +470,11 @@ def test_from_case(swagger_20, body, expected):
 
 
 @pytest.mark.parametrize(
-    "value, message",
-    (
+    ("value", "message"),
+    [
         ("/userz", "`/userz` not found. Did you mean `/users`?"),
         ("/what?", "`/what?` not found"),
-    ),
+    ],
 )
 def test_operation_path_suggestion(swagger_20, value, message):
     with pytest.raises(KeyError, match=re.escape(message)):
@@ -625,7 +625,7 @@ def _assert_override(spy, arg, original, overridden):
         assert all(key not in kwargs for key in overridden)
 
 
-@pytest.mark.parametrize("arg", ("headers", "cookies", "params"))
+@pytest.mark.parametrize("arg", ["headers", "cookies", "params"])
 def test_call_overrides(mocker, arg, openapi_30):
     spy = mocker.patch("requests.Session.request", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
@@ -651,7 +651,7 @@ def test_merge_dict_to():
     assert data == {"params": {"A": 1, "B": 2}}
 
 
-@pytest.mark.parametrize("call_arg, client_arg", (("headers", "headers"), ("params", "query_string")))
+@pytest.mark.parametrize(("call_arg", "client_arg"), [("headers", "headers"), ("params", "query_string")])
 def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
@@ -673,8 +673,8 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
 
 
 @pytest.mark.parametrize(
-    "name, location, exists",
-    (
+    ("name", "location", "exists"),
+    [
         ("X-Key", "header", True),
         ("X-Key2", "header", False),
         ("X-Key", "cookie", False),
@@ -683,7 +683,7 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
         ("bla", "body", False),
         ("body", "body", True),
         ("unknown", "unknown", False),
-    ),
+    ],
 )
 def test_get_parameter(ctx, name, location, exists):
     schema = ctx.openapi.build_schema(

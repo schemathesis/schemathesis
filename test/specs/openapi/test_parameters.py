@@ -12,8 +12,8 @@ DESCRIPTION = "Foo"
 
 
 @pytest.mark.parametrize(
-    "cls, kwargs, expected",
-    (
+    ("cls", "kwargs", "expected"),
+    [
         (
             OpenAPI20Parameter,
             {"definition": {"description": DESCRIPTION, "in": "query", "name": "foo", "type": "string"}},
@@ -49,7 +49,7 @@ DESCRIPTION = "Foo"
             },
             None,
         ),
-    ),
+    ],
 )
 def test_description(cls, kwargs, expected):
     assert cls(**kwargs).description == expected

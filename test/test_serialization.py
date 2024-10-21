@@ -118,7 +118,7 @@ def test_in_cli(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url) == snapshot_cli
 
 
-@pytest.mark.parametrize("transport", (RequestsTransport(), WSGITransport(42)))
+@pytest.mark.parametrize("transport", [RequestsTransport(), WSGITransport(42)])
 def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
     # See GH-1010
     # When API expects `text/yaml`
@@ -196,7 +196,7 @@ def test_serialization_not_possible_manual(ctx):
 
 
 @pytest.mark.parametrize(
-    "media_type", ("text/yaml", "application/x-www-form-urlencoded", "text/plain", "multipart/form-data")
+    "media_type", ["text/yaml", "application/x-www-form-urlencoded", "text/plain", "multipart/form-data"]
 )
 def test_binary_data(ctx, media_type):
     schema = ctx.openapi.build_schema(
@@ -234,8 +234,8 @@ def test_binary_data(ctx, media_type):
 
 
 @pytest.mark.parametrize(
-    "media_type, expected",
-    (
+    ("media_type", "expected"),
+    [
         ("application/json", {"application/json"}),
         ("application/problem+json", {"application/problem+json"}),
         (
@@ -251,15 +251,15 @@ def test_binary_data(ctx, media_type):
         ),
         ("*/form-data", {"multipart/form-data"}),
         ("*/*", set(serializers.SERIALIZERS)),
-    ),
+    ],
 )
 def test_get_matching_serializers(media_type, expected):
     assert set(serializers.get_matching_media_types(media_type)) == expected
 
 
 @pytest.mark.parametrize(
-    "path, expected",
-    (
+    ("path", "expected"),
+    [
         ("/root-name", b"<data><id>42</id></data>"),
         ("/auto-name", b"<AutoName><id>42</id></AutoName>"),
         ("/explicit-name", b"<CustomName><id>42</id></CustomName>"),
@@ -329,7 +329,7 @@ def test_get_matching_serializers(media_type, expected):
             b"<smp:NamespacedPrefixedWrappedArray>42</smp:NamespacedPrefixedWrappedArray>"
             b"</smp:NamespacedPrefixedWrappedArray>",
         ),
-    ),
+    ],
 )
 def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
     # When the schema contains XML payload
@@ -355,7 +355,7 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
 
 @pytest.mark.parametrize(
     "schema_object",
-    (
+    [
         {
             "type": "object",
             "properties": {"id": {"enum": [42], "xml": {"prefix": "smp"}}},
@@ -370,7 +370,7 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
             "xml": {"wrapped": True},
         },
         {"type": "integer", "xml": {"prefix": "smp"}},
-    ),
+    ],
 )
 def test_serialize_xml_unbound_prefix(ctx, schema_object):
     # When the schema contains an unbound prefix
@@ -428,7 +428,7 @@ SCHEMA_OBJECT_STRATEGY = st.deferred(
 )
 
 
-@pytest.mark.parametrize("media_type", ("application/xml", "application/xml; charset=utf-8"))
+@pytest.mark.parametrize("media_type", ["application/xml", "application/xml; charset=utf-8"])
 @given(data=st.data(), schema_object=SCHEMA_OBJECT_STRATEGY)
 @settings(suppress_health_check=list(HealthCheck), deadline=None, max_examples=25, phases=[Phase.generate])
 def test_serialize_xml_hypothesis(data, schema_object, media_type):

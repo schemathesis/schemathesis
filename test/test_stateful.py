@@ -12,7 +12,7 @@ pytestmark = [pytest.mark.openapi_version("3.0")]
 
 
 @pytest.mark.parametrize(
-    "parameters, body", (({"a": 1}, None), ({"a": 1}, NOT_SET), ({"a": 1}, {"value": 1}), ({"a": 1}, [1, 2, 3]))
+    ("parameters", "body"), [({"a": 1}, None), ({"a": 1}, NOT_SET), ({"a": 1}, {"value": 1}), ({"a": 1}, [1, 2, 3])]
 )
 def test_hashable(parameters, body):
     # All parsed data should be hashable
@@ -45,7 +45,7 @@ def test_add_link_default(schema_url):
     }
 
 
-@pytest.mark.parametrize("status_code", ("201", 201))
+@pytest.mark.parametrize("status_code", ["201", 201])
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_no_operations_cache(schema_url, status_code):
     schema = schemathesis.from_uri(schema_url)
@@ -143,8 +143,8 @@ def test_add_link_nothing_is_provided(schema_url):
 
 
 @pytest.mark.parametrize(
-    "change, message",
-    (
+    ("change", "message"),
+    [
         (
             lambda e: setattr(e, "method", "GET"),
             "Method `GET` not found. Available methods: POST",
@@ -154,7 +154,7 @@ def test_add_link_nothing_is_provided(schema_url):
             "`/userz/` not found. Did you mean `/users/`?",
         ),
         (lambda e: setattr(e, "path", "/what?/"), "`/what?/` not found"),
-    ),
+    ],
     ids=("method-change", "path-with-suggestion", "path-without-suggestion"),
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
@@ -177,11 +177,11 @@ def test_links_access(schema_url):
 
 
 @pytest.mark.parametrize(
-    "parameter, message",
-    (
+    ("parameter", "message"),
+    [
         ("userId", "No such parameter in `GET /users/{user_id}`: `userId`. Did you mean `user_id`?"),
         ("what?", "No such parameter in `GET /users/{user_id}`: `what?`."),
-    ),
+    ],
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_misspelled_parameter(schema_url, parameter, message):
@@ -196,14 +196,14 @@ def test_misspelled_parameter(schema_url, parameter, message):
 
 
 @pytest.mark.parametrize(
-    "schema_code, link_code",
-    (
+    ("schema_code", "link_code"),
+    [
         (200, "200"),
         (200, 200),
         ("200", "200"),
         ("200", 200),
         ("2XX", "2XX"),
-    ),
+    ],
 )
 def test_link_override(ctx, schema_code, link_code):
     # See GH-1022
@@ -228,11 +228,11 @@ def test_link_override(ctx, schema_code, link_code):
 
 
 @pytest.mark.parametrize(
-    "operation_id, expected",
-    (
+    ("operation_id", "expected"),
+    [
         ("get_User", "`get_User` not found. Did you mean `getUser`?"),
         ("unknown", "`unknown` not found"),
-    ),
+    ],
 )
 def test_missing_operation(ctx, operation_id, expected):
     schema = ctx.openapi.build_schema(

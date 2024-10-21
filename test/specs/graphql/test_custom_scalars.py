@@ -77,11 +77,11 @@ type Query {
 
 
 @pytest.mark.parametrize(
-    "name, value, expected",
-    (
+    ("name", "value", "expected"),
+    [
         (42, st.just("foo").map(nodes.String), "Scalar name 42 must be a string"),
         ("Date", 42, "42 must be a Hypothesis strategy which generates AST nodes matching this scalar"),
-    ),
+    ],
 )
 def test_invalid_strategy(name, value, expected):
     with pytest.raises(UsageError, match=expected):

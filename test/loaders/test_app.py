@@ -6,12 +6,12 @@ from schemathesis.loaders import load_app
 
 
 @pytest.mark.parametrize(
-    "path, exception, match",
-    (
+    ("path", "exception", "match"),
+    [
         ("", ValueError, "Empty module name"),
         ("foo", ImportError, "No module named 'foo'"),
         ("schemathesis:foo", AttributeError, "module 'schemathesis' has no attribute 'foo'"),
-    ),
+    ],
 )
 def test_load_app(path, exception, match):
     with pytest.raises(exception, match=match):

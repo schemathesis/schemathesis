@@ -10,11 +10,11 @@ from schemathesis.throttling import _get_max_delay
 
 
 @pytest.mark.parametrize(
-    "loader, fixture",
-    (
+    ("loader", "fixture"),
+    [
         (schemathesis.graphql.from_url, "graphql_url"),
         (schemathesis.openapi.from_uri, "openapi3_schema_url"),
-    ),
+    ],
 )
 @pytest.mark.operations("success")
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
@@ -55,13 +55,13 @@ def test_maximum_requests(request, loader, fixture, mocker):
 
 
 @pytest.mark.parametrize(
-    "unit, expected",
-    (
+    ("unit", "expected"),
+    [
         (Duration.SECOND, 1100),
         (Duration.MINUTE, 60100),
         (Duration.HOUR, 3600100),
         (Duration.DAY, 86400100),
-    ),
+    ],
 )
 def test_get_max_delay(unit, expected):
     assert _get_max_delay(1, unit) == expected

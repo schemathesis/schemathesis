@@ -17,12 +17,12 @@ from test.utils import flaky
 
 
 @pytest.mark.parametrize(
-    "response_status, filter_value, matching",
-    (
+    ("response_status", "filter_value", "matching"),
+    [
         (200, 200, True),
         (200, 201, False),
         (200, "20X", True),
-    ),
+    ],
 )
 def test_match_status_code(response_status, filter_value, matching, response_factory):
     # When the response has `response_status` status
@@ -35,13 +35,13 @@ def test_match_status_code(response_status, filter_value, matching, response_fac
 
 
 @pytest.mark.parametrize(
-    "response_status, status_codes, matching",
-    (
+    ("response_status", "status_codes", "matching"),
+    [
         (202, (200, "default"), True),
         (200, (200, "default"), False),
         (200, ("20X", "default"), False),
         (210, ("20X", "default"), True),
-    ),
+    ],
 )
 def test_default_status_code(response_status, status_codes, matching, response_factory):
     response = response_factory.requests(status_code=response_status)
@@ -142,7 +142,7 @@ def removeprefix(value: str, prefix: str) -> str:
     return value
 
 
-@pytest.mark.parametrize("factory_name", ("wsgi_app_factory", "asgi_app_factory"))
+@pytest.mark.parametrize("factory_name", ["wsgi_app_factory", "asgi_app_factory"])
 def test_hidden_failure_app(request, factory_name, open_api_3):
     factory = request.getfixturevalue(factory_name)
     app = factory(operations=("create_user", "get_user", "update_user"), version=open_api_3)
@@ -264,7 +264,7 @@ TestStateful = schema.as_state_machine().TestCase
     assert " in step" not in result.stdout.str()
 
 
-@pytest.mark.parametrize("method", ("requests", "werkzeug"))
+@pytest.mark.parametrize("method", ["requests", "werkzeug"])
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_history(app_schema, response_factory, method):
@@ -348,7 +348,7 @@ def test_use_after_free(app_factory):
     )
 
 
-@pytest.mark.parametrize("merge_body", (True, False))
+@pytest.mark.parametrize("merge_body", [True, False])
 def test_dynamic_body(merge_body, app_factory):
     app = app_factory(merge_body=merge_body)
     schema = schemathesis.from_wsgi("/openapi.json", app=app)
