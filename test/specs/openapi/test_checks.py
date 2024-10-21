@@ -83,6 +83,8 @@ def build_metadata(path_parameters=None, query=None, headers=None, cookies=None,
         phase=TestPhase.GENERATE,
         description=None,
         location=None,
+        parameter=None,
+        parameter_location=None,
     )
 
 

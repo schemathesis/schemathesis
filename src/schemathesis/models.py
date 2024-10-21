@@ -158,10 +158,24 @@ class GenerationMetadata:
     cookies: DataGenerationMethod | None
     body: DataGenerationMethod | None
     phase: TestPhase
+    # Temporary attributes to carry info specific to the coverage phase
     description: str | None
     location: str | None
+    parameter: str | None
+    parameter_location: str | None
 
-    __slots__ = ("query", "path_parameters", "headers", "cookies", "body", "phase", "description", "location")
+    __slots__ = (
+        "query",
+        "path_parameters",
+        "headers",
+        "cookies",
+        "body",
+        "phase",
+        "description",
+        "location",
+        "parameter",
+        "parameter_location",
+    )
 
 
 @dataclass(repr=False)
@@ -1073,6 +1087,8 @@ class Interaction:
     # NOTE: It will be better to keep it in a separate attribute
     description: str | None
     location: str | None
+    parameter: str | None
+    parameter_location: str | None
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
@@ -1104,6 +1120,8 @@ class Interaction:
             phase=case.meta.phase if case.meta is not None else None,
             description=case.meta.description if case.meta is not None else None,
             location=case.meta.location if case.meta is not None else None,
+            parameter=case.meta.parameter if case.meta is not None else None,
+            parameter_location=case.meta.parameter_location if case.meta is not None else None,
         )
 
     @classmethod
@@ -1129,6 +1147,8 @@ class Interaction:
             phase=case.meta.phase if case.meta is not None else None,
             description=case.meta.description if case.meta is not None else None,
             location=case.meta.location if case.meta is not None else None,
+            parameter=case.meta.parameter if case.meta is not None else None,
+            parameter_location=case.meta.parameter_location if case.meta is not None else None,
         )
 
 

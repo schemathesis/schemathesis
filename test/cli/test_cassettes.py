@@ -94,6 +94,8 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         if interaction["phase"] == "coverage":
             if interaction["data_generation_method"] == "negative":
                 assert interaction["meta"]["location"] is not None
+                assert interaction["meta"]["parameter"] is not None
+                assert interaction["meta"]["parameter_location"] is not None
 
 
 @pytest.mark.operations("success", "upload_file")

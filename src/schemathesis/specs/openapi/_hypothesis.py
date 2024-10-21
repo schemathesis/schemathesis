@@ -179,6 +179,8 @@ def get_case_strategy(
             phase=phase,
             description=None,
             location=None,
+            parameter=None,
+            parameter_location=None,
         ),
     )
     auth_context = auths.AuthContext(
