@@ -187,6 +187,33 @@ Configure status codes:
 
 For more details, join the `GitHub Discussion #2499 <https://github.com/schemathesis/schemathesis/discussions/2499>`_.
 
+Negative Data Rejection
+~~~~~~~~~~~~~~~~~~~~~~~
+
+This feature covers configuring the ``negative_data_rejection`` check and allows for defining what status codes won't trigger this check.
+
+**Allowed status codes**: 400, 401, 403, 404, 422, 5XX
+
+In CLI
+~~~~~~
+
+Configuration options:
+
+.. code-block:: bash
+
+   --experimental-negative-data-rejection-allowed-statuses=4XX
+
+Using Environment Variables
+~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Configure status codes:
+
+.. code-block:: bash
+
+    export SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES=4XX
+
+For more details, join the `GitHub Discussion #2499 <https://github.com/schemathesis/schemathesis/discussions/2499>`_.
+
 .. _stateful-test-runner:
 
 New Stateful Test Runner
