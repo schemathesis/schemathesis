@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Generating test cases with missing required parameters during the coverage phase.
+- Store information about what parameter is mutated during the coverage phase.
 
 **Changed**
 

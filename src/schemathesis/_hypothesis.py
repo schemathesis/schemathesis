@@ -232,6 +232,8 @@ def _iter_coverage_cases(
         phase=TestPhase.COVERAGE,
         description=None,
         location=None,
+        parameter=None,
+        parameter_location=None,
     )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
@@ -276,6 +278,8 @@ def _iter_coverage_cases(
             case.meta = copy(meta)
             case.meta.description = value.description
             case.meta.location = value.location
+            case.meta.parameter = body.media_type
+            case.meta.parameter_location = "body"
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
@@ -283,6 +287,8 @@ def _iter_coverage_cases(
                 case.meta = copy(meta)
                 case.meta.description = next_value.description
                 case.meta.location = next_value.location
+                case.meta.parameter = body.media_type
+                case.meta.parameter_location = "body"
                 yield case
     elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
@@ -302,6 +308,8 @@ def _iter_coverage_cases(
             case.meta = copy(meta)
             case.meta.description = value.description
             case.meta.location = value.location
+            case.meta.parameter = name
+            case.meta.parameter_location = location
             yield case
     # Generate missing required parameters
     if DataGenerationMethod.negative in data_generation_methods:
@@ -318,6 +326,8 @@ def _iter_coverage_cases(
                 case.meta = copy(meta)
                 case.meta.description = f"Missing `{name}` at {location}"
                 case.meta.location = parameter.location
+                case.meta.parameter = name
+                case.meta.parameter_location = location
                 yield case
 
 

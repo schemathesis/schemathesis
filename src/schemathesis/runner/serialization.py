@@ -398,6 +398,8 @@ class SerializedInteraction:
     phase: TestPhase | None
     description: str | None
     location: str | None
+    parameter: str | None
+    parameter_location: str | None
     recorded_at: str
 
     @classmethod
@@ -411,6 +413,8 @@ class SerializedInteraction:
             phase=interaction.phase,
             description=interaction.description,
             location=interaction.location,
+            parameter=interaction.parameter,
+            parameter_location=interaction.parameter_location,
             recorded_at=interaction.recorded_at,
         )
 
