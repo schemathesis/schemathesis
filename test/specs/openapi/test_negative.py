@@ -58,7 +58,7 @@ validate_schema = Draft4Validator.check_schema
 
 
 @pytest.mark.parametrize(
-    "location, schema",
+    ("location", "schema"),
     [(location, OBJECT_SCHEMA) for location in sorted(LOCATION_TO_CONTAINER)]
     + [
         # These schemas are only possible for "body"
@@ -92,8 +92,8 @@ def test_top_level_strategy(data, location, schema):
 
 
 @pytest.mark.parametrize(
-    "mutation, schema, location, validate",
-    (
+    ("mutation", "schema", "location", "validate"),
+    [
         # No constraints besides `type`
         (negate_constraints, {"type": "integer"}, "body", True),
         # Missing type (i.e. all types are possible)
@@ -120,7 +120,7 @@ def test_top_level_strategy(data, location, schema):
         # Query and path parameters are always strings
         (change_type, {"type": "string"}, "path", True),
         (change_type, {"type": "string"}, "query", True),
-    ),
+    ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
@@ -151,8 +151,8 @@ def test_change_type_urlencoded(data):
 
 
 @pytest.mark.parametrize(
-    "mutation, schema",
-    (
+    ("mutation", "schema"),
+    [
         (negate_constraints, {"type": "integer", "minimum": 42}),
         (negate_constraints, {"minimum": 42}),
         (change_type, {"type": "object"}),
@@ -180,7 +180,7 @@ def test_change_type_urlencoded(data):
                 "additionalProperties": False,
             },
         ),
-    ),
+    ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
@@ -202,7 +202,7 @@ def test_successful_mutations(data, mutation, schema):
 
 @pytest.mark.parametrize(
     "schema",
-    (
+    [
         {
             "type": "object",
             "properties": {
@@ -223,7 +223,7 @@ def test_successful_mutations(data, mutation, schema):
             ],
             "additionalProperties": False,
         },
-    ),
+    ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
@@ -244,7 +244,7 @@ def test_path_parameters_are_string(data, schema):
     assert not validator.is_valid(new_instance)
 
 
-@pytest.mark.parametrize("key", ("components", "description"))
+@pytest.mark.parametrize("key", ["components", "description"])
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
 def test_custom_fields_are_intact(data, key):
@@ -260,13 +260,13 @@ def test_custom_fields_are_intact(data, key):
 
 
 @pytest.mark.parametrize(
-    "left, right, expected",
-    (
+    ("left", "right", "expected"),
+    [
         (MutationResult.SUCCESS, MutationResult.SUCCESS, MutationResult.SUCCESS),
         (MutationResult.FAILURE, MutationResult.SUCCESS, MutationResult.SUCCESS),
         (MutationResult.SUCCESS, MutationResult.FAILURE, MutationResult.SUCCESS),
         (MutationResult.FAILURE, MutationResult.FAILURE, MutationResult.FAILURE),
-    ),
+    ],
 )
 def test_mutation_result_success(left, right, expected):
     assert left | right == expected
@@ -276,11 +276,11 @@ def test_mutation_result_success(left, right, expected):
 
 @pytest.mark.parametrize(
     "schema",
-    (
+    [
         {"minimum": 5, "exclusiveMinimum": True},
         {"maximum": 5, "exclusiveMaximum": True},
         {"maximum": 5, "exclusiveMaximum": True, "minimum": 1, "exclusiveMinimum": True},
-    ),
+    ],
 )
 @given(data=st.data())
 @settings(deadline=None, suppress_health_check=SUPPRESSED_HEALTH_CHECKS, max_examples=MAX_EXAMPLES)
@@ -331,11 +331,11 @@ def test_optional_query_param_negation(ctx):
 
 
 @pytest.mark.parametrize(
-    "schema, new_type",
-    (
+    ("schema", "new_type"),
+    [
         ({"type": "object", "required": ["a"]}, "string"),
         ({"required": ["a"], "not": {"maxLength": 5}}, "string"),
-    ),
+    ],
 )
 def test_prevent_unsatisfiable_schema(schema, new_type):
     prevent_unsatisfiable_schema(schema, new_type)
@@ -352,9 +352,9 @@ OBJECT_PARAMETER = {
 DYNAMIC_OBJECT_PARAMETER = {"type": "object", "additionalProperties": {"type": "string"}}
 
 
-@pytest.mark.parametrize("explode", (True, False))
+@pytest.mark.parametrize("explode", [True, False])
 @pytest.mark.parametrize(
-    "location, schema, style",
+    ("location", "schema", "style"),
     [("query", ARRAY_PARAMETER, style) for style in ("pipeDelimited", "spaceDelimited")]
     + [("query", OBJECT_PARAMETER, "deepObject")]
     + [("query", DYNAMIC_OBJECT_PARAMETER, "form")]

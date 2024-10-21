@@ -412,12 +412,12 @@ def test_(request, case):
 
 @pytest.mark.parametrize(
     "decorators",
-    (
+    [
         """@lazy_schema.hooks.apply(before_generate_headers)
 @lazy_schema.parametrize()""",
         """@lazy_schema.parametrize()
 @lazy_schema.hooks.apply(before_generate_headers)""",
-    ),
+    ],
 )
 def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
     testdir.make_test(
@@ -448,7 +448,7 @@ def test_(request, case):
     result.stdout.re_match_lines(["Hypothesis calls: 5"])
 
 
-@pytest.mark.parametrize("given", ("data=st.data()", "st.data()"))
+@pytest.mark.parametrize("given", ["data=st.data()", "st.data()"])
 def test_schema_given(testdir, given):
     # When the schema is defined via a pytest fixture
     # And `schema.given` is used
@@ -526,7 +526,7 @@ def test_b(case):
     result.assert_outcomes(passed=2)
 
 
-@pytest.mark.parametrize("settings", ("", "@settings(deadline=None)"))
+@pytest.mark.parametrize("settings", ["", "@settings(deadline=None)"])
 def test_parametrized_fixture(testdir, openapi3_base_url, is_older_subtests, settings):
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
@@ -742,12 +742,12 @@ def test_(case):
 
 @pytest.mark.parametrize(
     "decorators",
-    (
+    [
         """@schema.parametrize()
 @pytest.mark.acceptance""",
         """@pytest.mark.acceptance
 @schema.parametrize()""",
-    ),
+    ],
 )
 def test_marks_transfer(testdir, decorators):
     # See GH-1378
@@ -904,7 +904,7 @@ def test_(case):
 
 
 @pytest.mark.operations("failure")
-@pytest.mark.parametrize("value", (True, False))
+@pytest.mark.parametrize("value", [True, False])
 def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(

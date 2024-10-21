@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import json
 import logging
 import os
 import platform
@@ -191,54 +190,54 @@ def openapi_3_app(_app, reset_app):
 def server(_app):
     """Run the app on an unused port."""
     port = run_aiohttp_server(_app)
-    yield {"port": port}
+    return {"port": port}
 
 
-@pytest.fixture()
+@pytest.fixture
 def server_host(server):
     return f"127.0.0.1:{server['port']}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def server_address(server_host):
     return f"http://{server_host}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def base_url(server_address, app):
     """Base URL for the running application."""
     return f"{server_address}/api"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi2_base_url(server_address, openapi_2_app):
     return f"{server_address}/api"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi3_base_url(server_address, openapi_3_app):
     return f"{server_address}/api"
 
 
-@pytest.fixture()
+@pytest.fixture
 def schema_url(server_address, app):
     """URL of the schema of the running application."""
     return f"{server_address}/schema.yaml"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi2_schema_url(server_address, openapi_2_app):
     """URL of the schema of the running application."""
     return f"{server_address}/schema.yaml"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi3_schema_url(server_address, openapi_3_app):
     """URL of the schema of the running application."""
     return f"{server_address}/schema.yaml"
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi3_schema(openapi3_schema_url):
     return oas_loaders.from_uri(openapi3_schema_url)
 
@@ -253,23 +252,23 @@ def graphql_app(graphql_path):
     return graphql._flask.create_app(graphql_path)
 
 
-@pytest.fixture()
+@pytest.fixture
 def graphql_server(graphql_app):
     port = run_flask_server(graphql_app)
-    yield {"port": port}
+    return {"port": port}
 
 
-@pytest.fixture()
+@pytest.fixture
 def graphql_server_host(graphql_server):
     return f"127.0.0.1:{graphql_server['port']}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def graphql_url(graphql_server_host, graphql_path):
     return f"http://{graphql_server_host}{graphql_path}"
 
 
-@pytest.fixture()
+@pytest.fixture
 def graphql_schema(graphql_url):
     return schemathesis.graphql.from_url(graphql_url)
 
@@ -483,7 +482,7 @@ def snapshot_cli(request, snapshot):
     return snapshot.rebuild()
 
 
-@pytest.fixture()
+@pytest.fixture
 def cli():
     """CLI runner helper.
 
@@ -868,7 +867,7 @@ ATTRIBUTES = {"referenced": {"$ref": "attributes_nested.yaml#/nested_reference"}
 ATTRIBUTES_NESTED = {"nested_reference": {"type": "string", "nullable": True}}
 
 
-@pytest.fixture()
+@pytest.fixture
 def complex_schema(testdir):
     # This schema includes:
     #   - references to other files
@@ -929,23 +928,23 @@ def _get_schema_path():
     return get_schema_path
 
 
-@pytest.fixture()
+@pytest.fixture
 def swagger_20(simple_schema):
     return schemathesis.from_dict(simple_schema)
 
 
-@pytest.fixture()
+@pytest.fixture
 def openapi_30():
     raw = make_schema("simple_openapi.yaml")
     return schemathesis.from_dict(raw)
 
 
-@pytest.fixture()
+@pytest.fixture
 def app_schema(openapi_version, operations):
     return openapi._aiohttp.make_openapi_schema(operations=operations, version=openapi_version)
 
 
-@pytest.fixture()
+@pytest.fixture
 def testdir(testdir):
     def maker(
         content,
@@ -1017,11 +1016,6 @@ def testdir(testdir):
 
     testdir.run_and_assert = run_and_assert
 
-    def make_openapi_schema_file(schema):
-        return testdir.makefile(".json", schema=json.dumps(schema))
-
-    testdir.make_openapi_schema_file = make_openapi_schema_file
-
     def make_graphql_schema_file(schema: str, extension=".gql"):
         return testdir.makefile(extension, schema=schema)
 
@@ -1035,7 +1029,7 @@ def wsgi_app_factory():
     return openapi._flask.create_app
 
 
-@pytest.fixture()
+@pytest.fixture
 def flask_app(wsgi_app_factory, operations):
     return wsgi_app_factory(operations)
 
@@ -1045,12 +1039,12 @@ def asgi_app_factory():
     return openapi._fastapi.create_app
 
 
-@pytest.fixture()
+@pytest.fixture
 def fastapi_app(asgi_app_factory):
     return asgi_app_factory()
 
 
-@pytest.fixture()
+@pytest.fixture
 def fastapi_graphql_app(graphql_path):
     return graphql._fastapi.create_app(graphql_path)
 

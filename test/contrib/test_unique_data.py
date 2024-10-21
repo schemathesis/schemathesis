@@ -122,8 +122,8 @@ def unique_hook(testdir):
     )
 
 
-def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):
-    schema_file = testdir.make_openapi_schema_file(schema)
+def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):
+    schema_file = ctx.makefile(schema)
     return cli.main(
         "run",
         str(schema_file),
@@ -141,8 +141,8 @@ def run(testdir, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_exa
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_cli(testdir, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
-    assert run(testdir, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
+def test_cli(ctx, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
+    assert run(ctx, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
@@ -181,11 +181,10 @@ def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
     )
 
 
-@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.snapshot(replace_statistic=True)
 def test_explicit_headers(
     ctx,
-    testdir,
     unique_hook,
     cli,
     openapi3_base_url,
@@ -220,7 +219,7 @@ def test_explicit_headers(
     # Then they should be included in the uniqueness check
     assert (
         run(
-            testdir,
+            ctx,
             cli,
             unique_hook,
             schema,

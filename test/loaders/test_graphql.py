@@ -67,7 +67,7 @@ def assert_schema(schema):
     assert defines_type(schema.raw_schema, "Book")
 
 
-@pytest.mark.parametrize("transform", (lambda x: x, StringIO))
+@pytest.mark.parametrize("transform", [lambda x: x, StringIO])
 def test_graphql_file_loader(transform):
     raw_schema = transform(RAW_SCHEMA)
     schema = loaders.from_file(raw_schema)
@@ -90,7 +90,7 @@ def test_from_json_file(tmp_path):
     assert_schema(schema)
 
 
-@pytest.mark.parametrize("data", ("{}", "[]", "--"))
+@pytest.mark.parametrize("data", ["{}", "[]", "--"])
 def test_from_invalid_json_file(tmp_path, data):
     path = tmp_path / "schema.json"
     path.write_text(data)

@@ -9,8 +9,8 @@ SCHEMA = "http://127.0.0.1:/schema.json"
 
 
 @pytest.mark.parametrize(
-    "args, expected",
-    (
+    ("args", "expected"),
+    [
         ([SCHEMA], {"schema_kind": "URL", "parameters": {}, "used_headers": []}),
         (
             [SCHEMA, "-H", "Authorization:key", "-H", "X-Key:value"],
@@ -52,7 +52,7 @@ SCHEMA = "http://127.0.0.1:/schema.json"
             [SCHEMA, "-E", "a", "-E", "b"],
             {"schema_kind": "URL", "parameters": {"endpoints": {"count": 2}}, "used_headers": []},
         ),
-    ),
+    ],
 )
 def test_collect(args, expected):
     cli_runner = CliRunner()

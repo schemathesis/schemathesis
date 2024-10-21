@@ -42,11 +42,11 @@ def after_call(context, case, response):
 
 
 @pytest.mark.parametrize(
-    "args, expected",
-    (
+    ("args", "expected"),
+    [
         (("--auth", "user:pass"), "Basic dXNlcjpwYXNz"),
         (("-H", "Authorization: Bearer EXPLICIT"), "Bearer EXPLICIT"),
-    ),
+    ],
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
@@ -68,10 +68,10 @@ def after_call(context, case, response):
     assert cli.main("run", schema_url, "--show-trace", *args, hooks=module.purebasename) == snapshot_cli
 
 
-def test_multiple_auth_mechanisms_with_explicit_auth(ctx, testdir, cli, snapshot_cli):
+def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli):
     # When the schema defines multiple auth mechanisms on the same operation
     # And the user passes an explicit `Authorization` header
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/health": {
                 "get": {
@@ -97,9 +97,8 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, testdir, cli, snapshot
         },
         security=[{"bearerAuth": []}, {"basicAuth": []}],
     )
-    schema_file = testdir.make_openapi_schema_file(schema)
     # Then it should be able to generate requests
-    assert cli.run(str(schema_file), "--dry-run", "-H", "Authorization: Bearer foo") == snapshot_cli
+    assert cli.run(str(schema_path), "--dry-run", "-H", "Authorization: Bearer foo") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")

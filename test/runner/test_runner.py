@@ -119,7 +119,7 @@ def test_execute(any_app, any_app_schema):
     assert stats.total == {"not_a_server_error": {Status.success: 1, Status.failure: 2, "total": 3}}
 
 
-@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.parametrize("workers", [1, 2])
 def test_interactions(request, any_app_schema, workers):
     _, *others, _ = from_schema(any_app_schema, workers_num=workers, store_interactions=True).execute()
     base_url = (
@@ -233,7 +233,7 @@ def test_auth(any_app, any_app_schema):
     assert_request(any_app, 2, "GET", "/api/success", headers)
 
 
-@pytest.mark.parametrize("converter", (lambda x: x, lambda x: x + "/"))
+@pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
 def test_base_url(openapi3_base_url, schema_url, app, converter):
     base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
@@ -542,7 +542,7 @@ def test_response_conformance_malformed_json(any_app_schema):
     assert check.context.position == 1
 
 
-@pytest.fixture()
+@pytest.fixture
 def filter_path_parameters():
     # ".." and "." strings are treated specially, but this behavior is outside the test's scope
     # "" shouldn't be allowed as a valid path parameter
@@ -553,7 +553,7 @@ def filter_path_parameters():
         )
 
     schemathesis.hook(before_generate_path_parameters)
-    yield
+    return
 
 
 @pytest.mark.operations("path_variable")
@@ -573,11 +573,11 @@ def test_path_parameters_encoding(real_app_schema):
 
 
 @pytest.mark.parametrize(
-    "loader_options, from_schema_options",
-    (
+    ("loader_options", "from_schema_options"),
+    [
         ({"base_url": "http://127.0.0.1:1/"}, {}),
         ({}, {"hypothesis_settings": hypothesis.settings(deadline=1)}),
-    ),
+    ],
 )
 @pytest.mark.operations("slow")
 def test_exceptions(schema_url, app, loader_options, from_schema_options):
@@ -754,7 +754,7 @@ def test_workers_num_regression(mocker, real_app_schema):
     assert spy.call_args[1]["workers_num"] == 5
 
 
-@pytest.mark.parametrize("schema_path", ("petstore_v2.yaml", "petstore_v3.yaml"))
+@pytest.mark.parametrize("schema_path", ["petstore_v2.yaml", "petstore_v3.yaml"])
 def test_url_joining(request, server, get_schema_path, schema_path):
     if schema_path == "petstore_v2.yaml":
         base_url = request.getfixturevalue("openapi2_base_url")
@@ -780,11 +780,11 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
 
 
 @pytest.mark.parametrize(
-    "phases, expected, total_errors",
-    (
+    ("phases", "expected", "total_errors"),
+    [
         ([Phase.explicit, Phase.generate], "Failed to generate test cases for this API operation", 2),
         ([Phase.explicit], "Failed to generate test cases from examples for this API operation", 1),
-    ),
+    ],
 )
 def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # See GH-904
@@ -831,8 +831,8 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
 
 
 @pytest.mark.parametrize(
-    "phases, expected",
-    (
+    ("phases", "expected"),
+    [
         ([Phase.explicit, Phase.generate], "Schemathesis can't serialize data to any of the defined media types"),
         (
             [Phase.explicit],
@@ -841,7 +841,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
                 "unsupported payload media types"
             ),
         ),
-    ),
+    ],
 )
 def test_non_serializable_example(ctx, phases, expected):
     # When filling missing request body during examples generation leads to serialization error
@@ -876,8 +876,8 @@ def test_non_serializable_example(ctx, phases, expected):
 
 
 @pytest.mark.parametrize(
-    "phases, expected",
-    (
+    ("phases", "expected"),
+    [
         (
             [Phase.explicit, Phase.generate],
             "Failed to generate test cases for this API operation because of "
@@ -890,7 +890,7 @@ def test_non_serializable_example(ctx, phases, expected):
                 r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`"
             ),
         ),
-    ),
+    ],
 )
 def test_invalid_regex_example(ctx, phases, expected):
     # When filling missing properties during examples generation contains invalid regex
@@ -1230,11 +1230,11 @@ def test_case_mutation(real_app_schema):
 
 
 @pytest.mark.parametrize(
-    "path, expected",
-    (
+    ("path", "expected"),
+    [
         ("/foo}/", "Single '}' encountered in format string"),
         ("/{.format}/", "Replacement index 0 out of range for positional args tuple"),
-    ),
+    ],
 )
 def test_malformed_path_template(ctx, path, expected):
     # When schema contains a malformed path template
@@ -1284,11 +1284,11 @@ def test_authorization_warning_missing_threshold(result):
 
 
 @pytest.mark.parametrize(
-    "parameters, expected",
-    (
+    ("parameters", "expected"),
+    [
         ([{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}], Status.success),
         ([], Status.skip),
-    ),
+    ],
 )
 def test_explicit_header_negative(ctx, parameters, expected):
     schema = ctx.openapi.build_schema(
@@ -1341,7 +1341,7 @@ def test_skip_non_negated_headers(ctx):
     assert event.status == Status.skip
 
 
-@pytest.mark.parametrize("derandomize", (True, False))
+@pytest.mark.parametrize("derandomize", [True, False])
 def test_use_the_same_seed(ctx, derandomize):
     definition = {"get": {"responses": {"200": {"description": ""}}}}
     schema = ctx.openapi.build_schema({"/first": definition, "/second": definition})

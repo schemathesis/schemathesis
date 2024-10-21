@@ -8,7 +8,7 @@ from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 
 
-@pytest.mark.parametrize("base_path", ("/v1", "/v1/"))
+@pytest.mark.parametrize("base_path", ["/v1", "/v1/"])
 def test_base_path_suffix(swagger_20, base_path):
     # When suffix is present or not present in the raw schema's "basePath"
     swagger_20.raw_schema["basePath"] = base_path
@@ -19,8 +19,8 @@ def test_base_path_suffix(swagger_20, base_path):
 
 
 @pytest.mark.parametrize(
-    "server, base_path",
-    (
+    ("server", "base_path"),
+    [
         (
             [
                 {
@@ -31,7 +31,7 @@ def test_base_path_suffix(swagger_20, base_path):
             "/v1/foo/bar/",
         ),
         ([], "/"),
-    ),
+    ],
 )
 def test_open_api_base_path(openapi_30, server, base_path):
     openapi_30.raw_schema["servers"] = server
@@ -133,7 +133,9 @@ def test_schema_parsing_error(simple_schema):
     assert oks[0].method == "post"
 
 
-@pytest.mark.parametrize("validate_schema, expected_exception", ((False, OperationSchemaError), (True, SchemaError)))
+@pytest.mark.parametrize(
+    ("validate_schema", "expected_exception"), [(False, OperationSchemaError), (True, SchemaError)]
+)
 def test_not_recoverable_schema_error(simple_schema, validate_schema, expected_exception):
     # When there is an error in the API schema that leads to inability to generate any tests
     del simple_schema["paths"]
@@ -186,11 +188,11 @@ SCHEMA = {
 
 
 @pytest.mark.parametrize(
-    "operation_id, reference, path, method",
-    (
+    ("operation_id", "reference", "path", "method"),
+    [
         ("getFoo", "#/paths/~1foo/get", "/foo", "GET"),
         ("postBar", "#/paths/~1bar/post", "/bar", "POST"),
-    ),
+    ],
 )
 def test_get_operation(operation_id, reference, path, method):
     schema = schemathesis.from_dict(SCHEMA)
@@ -253,11 +255,11 @@ def test_get_operation_by_id_no_paths_on_openapi_3_1():
 
 
 @pytest.mark.parametrize(
-    "fixture, path",
-    (
+    ("fixture", "path"),
+    [
         ("simple_schema", "/users"),
         ("simple_openapi", "/query"),
-    ),
+    ],
 )
 def test_missing_payload_schema(request, fixture, path):
     raw_schema = request.getfixturevalue(fixture)

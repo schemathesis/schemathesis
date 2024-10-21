@@ -25,7 +25,7 @@ def test_wsgi_app(testdir, cli):
     assert "1 passed, 1 failed in" in result.stdout
 
 
-@pytest.mark.parametrize("workers", (1, 2))
+@pytest.mark.parametrize("workers", [1, 2])
 def test_cli_run_output_success(testdir, cli, workers):
     module = testdir.make_importable_pyfile(
         location="""

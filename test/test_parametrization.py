@@ -192,7 +192,7 @@ def test(request, case):
 
 @pytest.mark.parametrize(
     "schema",
-    (
+    [
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -229,7 +229,7 @@ def test(request, case):
                 }
             },
         },
-    ),
+    ],
 )
 def test_specified_example_query(testdir, schema):
     # When the given query parameter contains an example
@@ -495,11 +495,11 @@ def test_b(request, case):
 
 
 @pytest.mark.parametrize(
-    "schema_name, paths",
-    (
+    ("schema_name", "paths"),
+    [
         ("simple_swagger.yaml", {"/users": {"x-handler": "foo"}}),
         ("simple_openapi.yaml", {"/users": {"x-handler": "foo", "description": "Text"}}),
-    ),
+    ],
 )
 def test_custom_properties(testdir, schema_name, paths):
     # When custom properties are present in operation definitions (e.g. vendor extensions, or some other allowed fields)
@@ -543,7 +543,7 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*Error during collection$"])
 
 
-@pytest.mark.parametrize("as_kwarg", (True, False))
+@pytest.mark.parametrize("as_kwarg", [True, False])
 def test_invalid_schema_with_parametrize(testdir, as_kwarg):
     # When the given schema is not valid but validation is disabled via validate_schema=False argument
     testdir.make_test(

@@ -124,8 +124,8 @@ MIXED_CASES = [
 
 
 @pytest.mark.parametrize(
-    "methods, expected",
-    (
+    ("methods", "expected"),
+    [
         (
             [DataGenerationMethod.positive],
             POSITIVE_CASES,
@@ -138,7 +138,7 @@ MIXED_CASES = [
             [DataGenerationMethod.positive, DataGenerationMethod.negative],
             MIXED_CASES,
         ),
-    ),
+    ],
 )
 def test_phase(ctx, methods, expected):
     schema = ctx.openapi.build_schema(

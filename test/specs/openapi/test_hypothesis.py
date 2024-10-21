@@ -30,8 +30,8 @@ def operation(make_openapi_3_schema):
 
 
 @pytest.mark.parametrize(
-    "values, expected",
-    (
+    ("values", "expected"),
+    [
         ({"body": "TEST"}, {"body": "TEST"}),
         ({"path_parameters": {"p1": "TEST"}}, {"path_parameters": {"p1": "TEST"}}),
         ({"path_parameters": {}}, {"path_parameters": {"p1": "FOO"}}),
@@ -43,7 +43,7 @@ def operation(make_openapi_3_schema):
         ({"cookies": {}}, {"cookies": {"c1": "FOO"}}),
         ({"query": {"q1": "TEST"}}, {"query": {"q1": "TEST"}}),
         ({"query": {}}, {"query": {"q1": "FOO"}}),
-    ),
+    ],
 )
 def test_explicit_attributes(operation, values, expected):
     # When some Case's attribute is passed explicitly to the case strategy
@@ -131,7 +131,7 @@ def test_inlined_definitions(deeply_nested_schema):
     test()
 
 
-@pytest.mark.parametrize("keywords", ({}, {"pattern": r"\A[A-F0-9]{12}\Z"}))
+@pytest.mark.parametrize("keywords", [{}, {"pattern": r"\A[A-F0-9]{12}\Z"}])
 @pytest.mark.hypothesis_nested
 def test_valid_headers(keywords):
     # When headers are generated
@@ -261,15 +261,15 @@ def _scoped_remote_schema(testdir):
 
 @pytest.mark.usefixtures("clear_caches")
 @pytest.mark.parametrize(
-    "setup, check",
-    (
+    ("setup", "check"),
+    [
         (_remote_schema, lambda v: isinstance(v, int)),
         (_nested_remote_schema, lambda v: isinstance(v, int)),
         (_deep_nested_remote_schema, lambda v: isinstance(v["a"], int)),
         (_colliding_remote_schema, lambda v: isinstance(v["a"], int) and isinstance(v["b"], str)),
         (_back_reference_remote_schema, lambda v: isinstance(v, int)),
         (_scoped_remote_schema, lambda v: isinstance(v, int)),
-    ),
+    ],
 )
 def test_inline_remote_refs(testdir, deeply_nested_schema, setup, check):
     # See GH-986
@@ -459,12 +459,12 @@ def test_filter_urlencoded(ctx):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ("foo", True),
         ("тест", False),
         ("\n", False),
-    ),
+    ],
 )
 def test_is_valid_header(value, expected):
     assert is_valid_header({"foo": value}) is expected

@@ -69,8 +69,8 @@ def test_no_failure(schema_url):
 
 
 @pytest.mark.parametrize(
-    "ctx, request_kwargs, parameters, expected",
-    (
+    ("ctx", "request_kwargs", "parameters", "expected"),
+    [
         (
             CheckContext(override=None, auth=None, headers=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
@@ -131,7 +131,7 @@ def test_no_failure(schema_url):
             [{"name": "B", "in": "cookie"}],
             None,
         ),
-    ),
+    ],
 )
 def test_contains_auth(ctx, request_kwargs, parameters, expected):
     request = requests.Request("GET", **request_kwargs).prepare()
@@ -139,12 +139,12 @@ def test_contains_auth(ctx, request_kwargs, parameters, expected):
 
 
 @pytest.mark.parametrize(
-    "key, parameters",
-    (
+    ("key", "parameters"),
+    [
         ("headers", [{"name": "A", "in": "header"}]),
         ("query", [{"name": "A", "in": "query"}]),
         ("cookies", [{"name": "A", "in": "cookie"}]),
-    ),
+    ],
 )
 @pytest.mark.operations("success")
 def test_remove_auth_from_case(schema_url, key, parameters):
@@ -263,12 +263,10 @@ def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize("with_error", [True, False])
 @pytest.mark.snapshot(replace_statistic=True)
-def test_stateful_in_cli_no_error(testdir, cli, with_error, base_url, snapshot_cli):
+def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
     target = "ignored" if with_error else "valid"
-    schema = {
-        "info": {"description": "An API to test Schemathesis", "title": "Example API", "version": "1.0.0"},
-        "openapi": "3.0.2",
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/basic": {
                 "get": {
                     "operationId": "valid",
@@ -312,17 +310,16 @@ def test_stateful_in_cli_no_error(testdir, cli, with_error, base_url, snapshot_c
                 }
             },
         },
-        "components": {
+        components={
             "securitySchemes": {
                 "basicAuth": {"scheme": "basic", "type": "http"},
                 "heisenAuth": {"scheme": "basic", "type": "http"},
             },
         },
-    }
-    schema_file = testdir.make_openapi_schema_file(schema)
+    )
     assert (
         cli.run(
-            str(schema_file),
+            str(schema_path),
             f"--base-url={base_url}",
             "-c",
             "ignored_auth",

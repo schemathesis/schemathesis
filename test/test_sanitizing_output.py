@@ -47,7 +47,7 @@ def sanitized_case_factory_factory(case_factory):
 
 
 @pytest.mark.parametrize(
-    "attr, initial, expected",
+    ("attr", "initial", "expected"),
     [
         ("path_parameters", {"password": "1234"}, {"password": "[Filtered]"}),
         ("headers", {"Authorization": "Bearer token"}, {"Authorization": "[Filtered]"}),
@@ -85,7 +85,7 @@ def test_sanitize_case_custom_replacement(sanitized_case_factory_factory):
 
 
 @pytest.mark.parametrize(
-    "body, expected",
+    ("body", "expected"),
     [
         ({"nested": {"secret": "reveal"}, "foo": 123}, {"nested": {"secret": "[Filtered]"}, "foo": 123}),
         ([{"secret": "reveal"}, 1], [{"secret": "[Filtered]"}, 1]),
@@ -149,12 +149,12 @@ def test_sanitize_history_empty(case_factory):
 
 
 @pytest.mark.parametrize(
-    "headers, expected",
-    (
+    ("headers", "expected"),
+    [
         ({"Authorization": "Bearer token"}, {"Authorization": "[Filtered]"}),
         ({"Custom-Token": "custom_token_value"}, {"Custom-Token": "[Filtered]"}),
         ({"Content-Type": "application/json"}, {"Content-Type": "application/json"}),
-    ),
+    ],
 )
 def test_sanitize_request(request_factory, headers, expected):
     request = request_factory(headers=headers)
@@ -199,7 +199,7 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
 
 
 @pytest.mark.parametrize(
-    "input_url, expected_url",
+    ("input_url", "expected_url"),
     [
         # No sensitive data
         (
@@ -344,7 +344,7 @@ def test_default_replacement_unchanged(config):
     assert updated_config.replacement == DEFAULT_REPLACEMENT
 
 
-@pytest.mark.parametrize("header", ("x-customer-id", "X-CUSTOMER-ID", "X-Customer-Id"))
+@pytest.mark.parametrize("header", ["x-customer-id", "X-CUSTOMER-ID", "X-Customer-Id"])
 def test_configure_keys_to_sanitize(case_factory, header):
     configure(Config().with_keys_to_sanitize("X-Customer-ID"))
     case = case_factory(headers={header: "sensitive"})
@@ -352,7 +352,7 @@ def test_configure_keys_to_sanitize(case_factory, header):
     assert case.headers == {header: "[Filtered]"}
 
 
-@pytest.mark.parametrize("header", ("billing-address", "BILLING-ADDRESS", "Billing-Address"))
+@pytest.mark.parametrize("header", ["billing-address", "BILLING-ADDRESS", "Billing-Address"])
 def test_configure_sensitive_markers(case_factory, header):
     configure(Config().with_sensitive_markers("billing"))
     case = case_factory(headers={header: "sensitive"})

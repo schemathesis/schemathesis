@@ -31,12 +31,12 @@ def test_openapi_wsgi_loader(flask_app, run_test):
 
 
 @pytest.mark.parametrize(
-    "version, schema, expected",
-    (
+    ("version", "schema", "expected"),
+    [
         ("20", {"swagger": "3.0.0"}, SwaggerV20),
         ("30", {"openapi": "2.0"}, OpenApi30),
         ("30", {"openapi": "3.1.0"}, OpenApi30),
-    ),
+    ],
 )
 def test_force_open_api_version(version, schema, expected):
     loaded = loaders.from_dict(schema, force_schema_version=version, validate_schema=False)
@@ -44,11 +44,11 @@ def test_force_open_api_version(version, schema, expected):
 
 
 @pytest.mark.parametrize(
-    "version, expected",
-    (
+    ("version", "expected"),
+    [
         ("3.1.0", "The provided schema uses Open API 3.1.0, which is currently not fully supported."),
         ("3.2.0", "The provided schema uses Open API 3.2.0, which is currently not supported."),
-    ),
+    ],
 )
 def test_unsupported_openapi_version(version, expected):
     with pytest.raises(SchemaError, match=expected):
@@ -97,13 +97,13 @@ def test_unsupported_type():
 
 
 @pytest.mark.parametrize(
-    "content_type, expected",
-    (
+    ("content_type", "expected"),
+    [
         (True, SCHEMA_LOADING_ERROR),
         (None, SCHEMA_LOADING_ERROR),
         ("application/json", SCHEMA_SYNTAX_ERROR),
         ("application/x-yaml", SCHEMA_SYNTAX_ERROR),
-    ),
+    ],
 )
 def test_invalid_content_type(httpserver, content_type, expected: str):
     # When the user tries to load an HTML as a schema
@@ -133,13 +133,13 @@ def test_invalid_content_type(httpserver, content_type, expected: str):
 
 
 @pytest.mark.parametrize(
-    "value, expected",
-    (
+    ("value", "expected"),
+    [
         ("file.json", True),
         ("file.txt", False),
-    ),
+    ],
 )
-@pytest.mark.parametrize("type_", (Path, str))
+@pytest.mark.parametrize("type_", [Path, str])
 def test_is_json_path(type_, value, expected):
     assert loaders._is_json_path(type_(value)) == expected
 
@@ -185,11 +185,11 @@ YAML_ERROR = [
 
 
 @pytest.mark.parametrize(
-    "schema_url, content_type, payload, expected",
-    (
+    ("schema_url", "content_type", "payload", "expected"),
+    [
         ("openapi.json", "application/json", b"{1", JSON_ERROR),
         ("openapi.yaml", "text/yaml", b'{"\x80": 1}', YAML_ERROR),
-    ),
+    ],
 )
 def test_parsing_errors_uri(schema_url, content_type, payload, expected):
     app = Flask("test_app")
@@ -206,11 +206,11 @@ def test_parsing_errors_uri(schema_url, content_type, payload, expected):
 
 
 @pytest.mark.parametrize(
-    "schema_path, content_type, payload, expected",
-    (
+    ("schema_path", "content_type", "payload", "expected"),
+    [
         ("openapi.json", "application/json", "{1", JSON_ERROR),
         ("openapi.yaml", "text/yaml", '{"\x80": 1}', YAML_ERROR),
-    ),
+    ],
 )
 def test_parsing_errors_path(testdir, schema_path, content_type, payload, expected):
     name, ext = schema_path.split(".")

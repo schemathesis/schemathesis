@@ -13,8 +13,8 @@ from schemathesis.specs.openapi._hypothesis import get_default_format_strategies
 from .utils import as_param
 
 
-@pytest.mark.parametrize("schema_name", ("simple_swagger.yaml", "simple_openapi.yaml"))
-@pytest.mark.parametrize("type_", ("string", "integer", "array", "boolean", "number"))
+@pytest.mark.parametrize("schema_name", ["simple_swagger.yaml", "simple_openapi.yaml"])
+@pytest.mark.parametrize("type_", ["string", "integer", "array", "boolean", "number"])
 def test_headers(testdir, schema_name, type_):
     # When parameter is specified for "header"
     if schema_name == "simple_swagger.yaml":
@@ -36,7 +36,7 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
-@pytest.mark.parametrize("type_", ("string", "integer", "array", "object", "boolean", "number"))
+@pytest.mark.parametrize("type_", ["string", "integer", "array", "object", "boolean", "number"])
 def test_cookies(testdir, type_):
     # When parameter is specified for "cookie"
     testdir.make_test(
@@ -262,7 +262,7 @@ def test_security_as_parameters_api_key_overridden(overridden_security_schema, s
     _assert_parameter(overridden_security_schema, schema_spec, location, [])
 
 
-@pytest.fixture()
+@pytest.fixture
 def overridden_security_schema(schema, schema_spec):
     if schema_spec == "swagger":
         schema["paths"]["/users"]["get"]["security"] = []
@@ -288,7 +288,7 @@ def test_(case):
     testdir.run_and_assert(passed=1)
 
 
-@pytest.fixture()
+@pytest.fixture
 def basic_auth_schema(base_schema, schema_spec):
     if schema_spec == "swagger":
         base_schema["securityDefinitions"] = {"basic_auth": {"type": "basic"}}
@@ -601,7 +601,7 @@ def test_write_only(schema_url):
     test()
 
 
-@pytest.mark.parametrize("location", ("path", "query", "header", "cookie"))
+@pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
 def test_missing_content_and_schema(ctx, location):
     # When an Open API 3 parameter is missing `schema` & `content`
     schema = ctx.openapi.build_schema(
