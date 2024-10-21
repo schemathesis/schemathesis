@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.0...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Adjust the ``negative_data_rejection`` config to include fewer 4XX status codes (400, 401, 403, 404, 422).
+
 .. _v3.38.0:
 
 :version:`3.38.0 <v3.37.1...v3.38.0>` - 2024-10-21
