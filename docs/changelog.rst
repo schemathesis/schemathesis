@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.0...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Generating test cases with missing required parameters during the coverage phase.
+
 **Changed**
 
 - Adjust the ``negative_data_rejection`` config to include fewer 4XX status codes (400, 401, 403, 404, 422).

@@ -212,8 +212,6 @@ Configure status codes:
 
     export SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES=4XX
 
-For more details, join the `GitHub Discussion #2499 <https://github.com/schemathesis/schemathesis/discussions/2499>`_.
-
 .. _stateful-test-runner:
 
 New Stateful Test Runner

@@ -28,6 +28,10 @@ POSITIVE_CASES = [
     {"headers": {"h1": "5", "h2": "000"}, "query": {"q1": 5, "q2": "000"}, "body": {"j-prop": 0}},
 ]
 NEGATIVE_CASES = [
+    {"query": {"q1": ANY}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY}, "body": 0},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": {}}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": []}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
@@ -70,6 +74,10 @@ NEGATIVE_CASES = [
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
 ]
 MIXED_CASES = [
+    {"query": {"q1": 5}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": {}}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": []}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -633,6 +641,52 @@ def test_negative_patterns(ctx):
             {},
             {
                 "body": 0,
+            },
+        ],
+    )
+
+
+def test_required_header(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-API-Key-2", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "headers": {"X-API-Key-1": "0"},
+            },
+            {
+                "headers": {"X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "{}"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "[]"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "[]", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null", "X-API-Key-2": "0"},
             },
         ],
     )
