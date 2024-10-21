@@ -299,6 +299,8 @@ def test_sanitize_serialized_interaction(serialized_check):
         phase=TestPhase.GENERATE,
         description=None,
         location=None,
+        parameter=None,
+        parameter_location=None,
     )
     sanitize_serialized_interaction(interaction)
 
