@@ -303,6 +303,22 @@ def _iter_coverage_cases(
             case.meta.description = value.description
             case.meta.location = value.location
             yield case
+    # Generate missing required parameters
+    if DataGenerationMethod.negative in data_generation_methods:
+        for parameter in operation.iter_parameters():
+            if parameter.is_required:
+                name = parameter.name
+                location = parameter.location
+                container_name = LOCATION_TO_CONTAINER[location]
+                container = template[container_name]
+                case = operation.make_case(
+                    **{**template, container_name: {k: v for k, v in container.items() if k != name}}
+                )
+                case.data_generation_method = DataGenerationMethod.negative
+                case.meta = copy(meta)
+                case.meta.description = f"Missing `{name}` at {location}"
+                case.meta.location = parameter.location
+                yield case
 
 
 def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
