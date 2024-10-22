@@ -19,7 +19,6 @@ def test_payload_open_api_2(
     consumes,
     assert_parameters,
     make_openapi_2_schema,
-    open_api_2_user_form_with_file_parameters,
     open_api_2_user_in_body,
     user_jsonschema,
 ):

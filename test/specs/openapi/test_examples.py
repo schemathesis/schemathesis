@@ -5,7 +5,6 @@ from unittest.mock import ANY
 
 import jsonschema
 import pytest
-import yaml
 from _pytest.main import ExitCode
 from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
@@ -322,12 +321,12 @@ def test_extract_top_level(operation):
     ]
 
 
-def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
+def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
     schema = schema_with_examples.raw_schema
     app["config"].update({"schema_data": schema})
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
+    schema_path = ctx.makefile(schema)
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={base_url}",
         "--hypothesis-phases=explicit",
     )
@@ -339,10 +338,10 @@ def test_examples_from_cli(app, testdir, cli, base_url, schema_with_examples):
     assert "9 / 9 passed" in not_a_server_line
 
 
-def test_network_error_with_flaky_generation(testdir, cli, snapshot_cli, schema_with_examples):
+def test_network_error_with_flaky_generation(ctx, cli, snapshot_cli, schema_with_examples):
     # Assume that there is a user-defined hook that makes data generation flaky
-    module = testdir.make_importable_pyfile(
-        hook="""
+    module = ctx.write_pymodule(
+        """
 import schemathesis
 
 
@@ -361,7 +360,7 @@ def before_generate_case(context, strategy):
 """
     )
 
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_examples.raw_schema))
+    schema_file = ctx.makefile(schema_with_examples.raw_schema)
     assert (
         cli.main(
             "run",
@@ -369,15 +368,15 @@ def before_generate_case(context, strategy):
             "--base-url=http://127.0.0.1:1",
             "--hypothesis-seed=23",
             "--hypothesis-phases=generate",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
 
 
-def test_parameter_override(testdir, cli, openapi3_base_url, snapshot_cli):
-    module = testdir.make_importable_pyfile(
-        hook="""
+def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli):
+    module = ctx.write_pymodule(
+        """
 import schemathesis
 
 
@@ -387,11 +386,8 @@ def explicit_header(ctx, response, case):
     assert case.query["id"] == "OVERRIDE"
 """
     )
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "servers": [{"url": "http://127.0.0.1:8081/{basePath}", "variables": {"basePath": {"default": "api"}}}],
-        "paths": {
+    schema_file = ctx.openapi.write_schema(
+        {
             "/success": {
                 "post": {
                     "parameters": [
@@ -413,9 +409,8 @@ def explicit_header(ctx, response, case):
                     "responses": {"200": {"description": "OK"}},
                 },
             }
-        },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+        }
+    )
     assert (
         cli.main(
             "run",
@@ -426,7 +421,7 @@ def explicit_header(ctx, response, case):
             "--checks=explicit_header",
             "--set-header=anyKey=OVERRIDE",
             "--set-query=id=OVERRIDE",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )

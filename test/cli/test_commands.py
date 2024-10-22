@@ -129,18 +129,18 @@ def test_hooks_module_not_found(cli, snapshot_cli):
     assert os.getcwd() in sys.path
 
 
-def test_hooks_with_inner_import_error(testdir, cli, snapshot_cli):
+def test_hooks_with_inner_import_error(ctx, cli, snapshot_cli):
     # When the hook module itself raises an ImportError
-    module = testdir.make_importable_pyfile(hook="import something_else")
-    assert cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename) == snapshot_cli
+    module = ctx.write_pymodule("import something_else")
+    assert cli.main("run", "http://127.0.0.1:1", hooks=module) == snapshot_cli
 
 
-def test_hooks_invalid(testdir, cli):
+def test_hooks_invalid(ctx, cli):
     # When hooks are passed to the CLI call
     # And its importing causes an exception
-    module = testdir.make_importable_pyfile(hook="1 / 0")
+    module = ctx.write_pymodule("1 / 0")
 
-    result = cli.main("run", "http://127.0.0.1:1", hooks=module.purebasename)
+    result = cli.main("run", "http://127.0.0.1:1", hooks=module)
 
     # Then CLI run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -374,17 +374,17 @@ def test_load_schema_arguments(cli, mocker, args, expected):
     assert load_schema.call_args[0][0] == expected
 
 
-def test_load_schema_arguments_headers_to_loader_for_app(testdir, cli, mocker):
+def test_load_schema_arguments_headers_to_loader_for_app(ctx, cli, mocker):
     from_wsgi = mocker.patch("schemathesis.specs.openapi.loaders.from_wsgi", autospec=True)
 
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._flask import create_app
-
-        app = create_app()
+    module = ctx.write_pymodule(
         """
+from test.apps.openapi._flask import create_app
+
+app = create_app()
+"""
     )
-    cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "-H", "Authorization: Bearer 123")
+    cli.run("/schema.yaml", "--app", f"{module}:app", "-H", "Authorization: Bearer 123")
 
     assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
 
@@ -752,11 +752,10 @@ def test_proxy_error(cli, schema_url, snapshot_cli):
 
 
 @pytest.fixture
-def digits_format(testdir):
-    module = testdir.make_importable_pyfile(
-        hook="""
+def digits_format(ctx):
+    module = ctx.write_pymodule(
+        """
     import string
-    import schemathesis
     from hypothesis import strategies as st
 
     schemathesis.openapi.format(
@@ -778,8 +777,8 @@ def digits_format(testdir):
 @pytest.mark.parametrize(
     "prepare_args_kwargs",
     [
-        lambda module: (("--pre-run", module.purebasename), {}),
-        lambda module: ((), {"hooks": module.purebasename}),
+        lambda module: (("--pre-run", module), {}),
+        lambda module: ((), {"hooks": module}),
     ],
 )
 @pytest.mark.operations("custom_format")
@@ -797,16 +796,14 @@ def test_hooks_valid(cli, schema_url, app, digits_format, prepare_args_kwargs):
         assert DEPRECATED_PRE_RUN_OPTION_WARNING in result.stdout
 
 
-def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-
-            @schemathesis.check
-            def conditional_check(ctx, response, case):
-                # skip this check
-                return True
-            """
+def test_conditional_checks(ctx, cli, hypothesis_max_examples, schema_url):
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+def conditional_check(ctx, response, case):
+    # skip this check
+    return True
+"""
     )
 
     result = cli.main(
@@ -815,7 +812,7 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
         "conditional_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module.purebasename,
+        hooks=module,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -823,25 +820,24 @@ def test_conditional_checks(testdir, cli, hypothesis_max_examples, schema_url):
     assert "No checks were performed." in result.stdout
 
 
-def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-            import click
+def test_add_case(ctx, cli, hypothesis_max_examples, schema_url):
+    module = ctx.write_pymodule(
+        """
+import click
 
-            @schemathesis.hook
-            def add_case(context, case, response):
-                if not case.headers:
-                    case.headers = {}
-                case.headers["copy"] = "this is a copied case"
-                return case
+@schemathesis.hook
+def add_case(context, case, response):
+    if not case.headers:
+        case.headers = {}
+    case.headers["copy"] = "this is a copied case"
+    return case
 
-            @schemathesis.check
-            def add_case_check(ctx, response, case):
-                if case.headers and case.headers.get("copy") == "this is a copied case":
-                    # we will look for this output
-                    click.echo("The case was added!")
-            """
+@schemathesis.check
+def add_case_check(ctx, response, case):
+    if case.headers and case.headers.get("copy") == "this is a copied case":
+        # we will look for this output
+        click.echo("The case was added!")
+"""
     )
 
     result = cli.main(
@@ -850,7 +846,7 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module.purebasename,
+        hooks=module,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -858,21 +854,20 @@ def test_add_case(testdir, cli, hypothesis_max_examples, schema_url):
     assert result.stdout.count("The case was added!") == 2
 
 
-def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url):
+def test_add_case_returns_none(ctx, cli, hypothesis_max_examples, schema_url):
     """Tests that no additional test case created when the add_case hook returns None."""
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-            import click
+    module = ctx.write_pymodule(
+        """
+import click
 
-            @schemathesis.hook
-            def add_case(context, case, response):
-                return None
+@schemathesis.hook
+def add_case(context, case, response):
+    return None
 
-            @schemathesis.check
-            def add_case_check(ctx, response, case):
-                click.echo("Validating case.")
-            """
+@schemathesis.check
+def add_case_check(ctx, response, case):
+    click.echo("Validating case.")
+"""
     )
 
     result = cli.main(
@@ -881,7 +876,7 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module.purebasename,
+        hooks=module,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -890,36 +885,35 @@ def test_add_case_returns_none(testdir, cli, hypothesis_max_examples, schema_url
     assert result.stdout.count("Validating case.") == 2
 
 
-def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_url):
+def test_multiple_add_case_hooks(ctx, cli, hypothesis_max_examples, schema_url):
     """add_case hooks that mutate the case in place should not affect other cases."""
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-            import click
+    module = ctx.write_pymodule(
+        """
+import click
 
-            @schemathesis.hook("add_case")
-            def add_first_header(context, case, response):
-                if not case.headers:
-                    case.headers = {}
-                case.headers["first"] = "first header"
-                return case
+@schemathesis.hook("add_case")
+def add_first_header(context, case, response):
+    if not case.headers:
+        case.headers = {}
+    case.headers["first"] = "first header"
+    return case
 
-            @schemathesis.hook("add_case")
-            def add_second_header(context, case, response):
-                if not case.headers:
-                    case.headers = {}
-                case.headers["second"] = "second header"
-                return case
+@schemathesis.hook("add_case")
+def add_second_header(context, case, response):
+    if not case.headers:
+        case.headers = {}
+    case.headers["second"] = "second header"
+    return case
 
-            @schemathesis.check
-            def add_case_check(ctx, response, case):
-                if case.headers and case.headers.get("first") == "first header":
-                    # we will look for this output
-                    click.echo("First case added!")
-                if case.headers and case.headers.get("second") == "second header":
-                    # we will look for this output
-                    click.echo("Second case added!")
-            """
+@schemathesis.check
+def add_case_check(ctx, response, case):
+    if case.headers and case.headers.get("first") == "first header":
+        # we will look for this output
+        click.echo("First case added!")
+    if case.headers and case.headers.get("second") == "second header":
+        # we will look for this output
+        click.echo("Second case added!")
+"""
     )
 
     result = cli.main(
@@ -928,7 +922,7 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
         "add_case_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module.purebasename,
+        hooks=module,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -937,36 +931,35 @@ def test_multiple_add_case_hooks(testdir, cli, hypothesis_max_examples, schema_u
     assert result.stdout.count("Second case added!") == 2
 
 
-def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url, snapshot_cli):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-            import click
+def test_add_case_output(ctx, cli, hypothesis_max_examples, schema_url, snapshot_cli):
+    module = ctx.write_pymodule(
+        """
+import click
 
-            @schemathesis.hook("add_case")
-            def add_first_header(context, case, response):
-                if not case.headers:
-                    case.headers = {}
-                case.headers["first"] = "first header"
-                return case
+@schemathesis.hook("add_case")
+def add_first_header(context, case, response):
+    if not case.headers:
+        case.headers = {}
+    case.headers["first"] = "first header"
+    return case
 
-            @schemathesis.hook("add_case")
-            def add_second_header(context, case, response):
-                if not case.headers:
-                    case.headers = {}
-                case.headers["second"] = "second header"
-                return case
+@schemathesis.hook("add_case")
+def add_second_header(context, case, response):
+    if not case.headers:
+        case.headers = {}
+    case.headers["second"] = "second header"
+    return case
 
-            @schemathesis.check
-            def add_case_check(ctx, response, case):
-                if (
-                    case.headers and
-                    (
-                        case.headers.get("second") == "second header"
-                    )
-                ):
-                    assert False, "failing cases from second add_case hook"
-            """
+@schemathesis.check
+def add_case_check(ctx, response, case):
+    if (
+        case.headers and
+        (
+            case.headers.get("second") == "second header"
+        )
+    ):
+        assert False, "failing cases from second add_case hook"
+"""
     )
 
     assert (
@@ -976,7 +969,7 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url, snap
             "add_case_check",
             schema_url,
             f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -988,16 +981,14 @@ def test_add_case_output(testdir, cli, hypothesis_max_examples, schema_url, snap
         "AssertionError",
     ]
 )
-def new_check(request, testdir, cli):
+def new_check(ctx, request, cli):
     exception = request.param
-    module = testdir.make_importable_pyfile(
-        hook=f"""
-            import schemathesis
-
-            @schemathesis.check
-            def new_check(ctx, response, result):
-                raise {exception}
-            """
+    module = ctx.write_pymodule(
+        f"""
+@schemathesis.check
+def new_check(ctx, response, result):
+    raise {exception}
+"""
     )
     yield module
     reset_checks()
@@ -1011,7 +1002,7 @@ def test_register_check(new_check, cli, schema_url, snapshot_cli):
     # And it contains registering a new check, which always fails for the testing purposes
     # Then CLI run should fail
     # And a message from the new check should be displayed
-    assert cli.main("run", "-c", "new_check", schema_url, hooks=new_check.purebasename) == snapshot_cli
+    assert cli.main("run", "-c", "new_check", schema_url, hooks=new_check) == snapshot_cli
 
 
 def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
@@ -1087,17 +1078,11 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
 
 
-async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max_examples, openapi2_base_url):
+async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_examples, openapi2_base_url):
     # When the schema contains references to other files
     uri = pathlib.Path(HERE).as_uri() + "/"
-    schema = {
-        "swagger": "2.0",
-        "info": {"title": "Example API", "description": "An API to test Schemathesis", "version": "1.0.0"},
-        "host": "127.0.0.1:8888",
-        "basePath": "/api",
-        "schemes": ["http"],
-        "produces": ["application/json"],
-        "paths": {
+    schema = ctx.openapi.build_schema(
+        {
             "/teapot": {
                 "post": {
                     "parameters": [
@@ -1114,12 +1099,13 @@ async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max
                 }
             }
         },
-    }
+        version="2.0",
+    )
+    schema_path = ctx.makefile(schema)
     openapi_2_app["config"].update({"should_fail": True, "schema_data": schema})
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     # And file path is given to the CLI
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={openapi2_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-derandomize",
@@ -1132,28 +1118,22 @@ async def test_multiple_files_schema(openapi_2_app, testdir, cli, hypothesis_max
     assert isinstance(payload["photoUrls"], list)
 
 
-def test_wsgi_app(testdir, cli):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._flask import create_app
-
-        app = create_app()
+def test_wsgi_app(ctx, cli):
+    module = ctx.write_pymodule(
         """
+from test.apps.openapi._flask import create_app
+
+app = create_app()
+"""
     )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
+    result = cli.run("/schema.yaml", "--app", f"{module}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "1 passed, 1 failed in" in result.stdout
 
 
-def test_wsgi_app_exception(testdir, cli):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._flask import create_app
-
-        1 / 0
-        """
-    )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--show-trace")
+def test_wsgi_app_exception(ctx, cli):
+    module = ctx.write_pymodule("1 / 0")
+    result = cli.run("/schema.yaml", "--app", f"{module}:app", "--show-trace")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert "Traceback (most recent call last):" in result.stdout
     assert "ZeroDivisionError: division by zero" in result.stdout
@@ -1206,43 +1186,36 @@ def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
     sys.version_info < (3, 11) or sys.version_info >= (3, 13) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
-def test_useful_traceback(testdir, cli, schema_url, snapshot_cli):
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
-
-
+def test_useful_traceback(ctx, cli, schema_url, snapshot_cli):
+    module = ctx.write_pymodule(
+        """
 @schemathesis.check
 def with_error(ctx, response, case):
     1 / 0
 """
     )
-    assert cli.main("run", schema_url, "-c", "with_error", "--show-trace", hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, "-c", "with_error", "--show-trace", hooks=module) == snapshot_cli
 
 
-def test_wsgi_app_missing(testdir, cli):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._flask import create_app
-        """
-    )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app")
+def test_wsgi_app_missing(ctx, cli):
+    module = ctx.write_pymodule("")
+    result = cli.run("/schema.yaml", "--app", f"{module}:app")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
-    assert "AttributeError: module 'location' has no attribute 'app'" in lines
-    assert "An error occurred while loading the application from 'location:app'." in lines
+    assert "AttributeError: module 'module' has no attribute 'app'" in lines
+    assert "An error occurred while loading the application from 'module:app'." in lines
 
 
-def test_wsgi_app_internal_exception(testdir, cli):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._flask import create_app
-
-        app = create_app()
-        app.config["internal_exception"] = True
+def test_wsgi_app_internal_exception(ctx, cli):
+    module = ctx.write_pymodule(
         """
+from test.apps.openapi._flask import create_app
+
+app = create_app()
+app.config["internal_exception"] = True
+"""
     )
-    result = cli.run("/schema.yaml", "--app", f"{module.purebasename}:app", "--hypothesis-derandomize")
+    result = cli.run("/schema.yaml", "--app", f"{module}:app", "--hypothesis-derandomize")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     lines = result.stdout.strip().split("\n")
     assert "== APPLICATION LOGS ==" in lines[48], result.stdout.strip()
@@ -1283,14 +1256,12 @@ def test_wsgi_app_path_schema(cli, loadable_flask_app):
 
 
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
-def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_base_url, cli, media_type):
+def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_url, cli, media_type):
     cassette_path = tmp_path / "output.yaml"
     # When requestBody has a binary field or an array of binary items
     responses = {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
-    schema = {
-        "openapi": "3.0.0",
-        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/property": {
                 "post": {
                     "requestBody": {
@@ -1327,12 +1298,10 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
                     "responses": responses,
                 }
             },
-        },
-        "servers": [{"url": "https://api.example.com/{basePath}", "variables": {"basePath": {"default": "v1"}}}],
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
+        }
+    )
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--show-trace",
@@ -1354,10 +1323,10 @@ def test_multipart_upload(testdir, tmp_path, hypothesis_max_examples, openapi3_b
 
     first_decoded = decode(0)
     if first_decoded:
-        assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in first_decoded
+        assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in first_decoded
     last_decoded = decode(-1)
     if last_decoded:
-        assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in last_decoded
+        assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in last_decoded
     # NOTE, that the actual API operation is not checked in this test
 
 
@@ -1445,15 +1414,13 @@ def test_targeted(mocker, cli, cli_args, workers):
         ),
     ],
 )
-def test_exclude_deprecated(testdir, cli, openapi3_base_url, options, expected):
+def test_exclude_deprecated(ctx, cli, openapi3_base_url, options, expected):
     # When there are some deprecated API operations
     definition = {
         "responses": {"200": {"description": "OK", "content": {"application/json": {"schema": {"type": "object"}}}}}
     }
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/users": {
                 "get": definition,
                 "post": {
@@ -1461,10 +1428,9 @@ def test_exclude_deprecated(testdir, cli, openapi3_base_url, options, expected):
                     **definition,
                 },
             }
-        },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
-    result = cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", *options)
+        }
+    )
+    result = cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", *options)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout.splitlines()
@@ -1493,11 +1459,11 @@ def test_filter_by(cli, schema_url, snapshot_cli, value):
 
 
 @pytest.mark.parametrize("fixup", ["all", "fast_api"])
-def test_fast_api_fixup(testdir, cli, base_url, fast_api_schema, hypothesis_max_examples, fixup):
+def test_fast_api_fixup(ctx, cli, base_url, fast_api_schema, hypothesis_max_examples, fixup):
     # When schema contains Draft 7 definitions as ones from FastAPI may contain
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(fast_api_schema))
+    schema_path = ctx.makefile(fast_api_schema)
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         f"--fixups={fixup}",
@@ -1884,11 +1850,11 @@ def test_openapi_links_multiple_threads(cli, cli_args, recursion_limit, hypothes
     )
 
 
-def test_get_request_with_body(testdir, cli, base_url, hypothesis_max_examples, schema_with_get_payload, snapshot_cli):
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema_with_get_payload))
+def test_get_request_with_body(ctx, cli, base_url, hypothesis_max_examples, schema_with_get_payload, snapshot_cli):
+    schema_path = ctx.makefile(schema_with_get_payload)
     assert (
         cli.run(
-            str(schema_file),
+            str(schema_path),
             f"--base-url={base_url}",
             f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
             "--validate-schema=true",
@@ -1966,17 +1932,17 @@ def test_exit_first(cli, schema_url, workers_num, mocker):
 
 
 @pytest.mark.openapi_version("3.0")
-def test_base_url_not_required_for_dry_run(ctx, testdir, cli):
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(ctx.openapi.build_schema({})))
-    result = cli.run(str(schema_file), "--dry-run")
+def test_base_url_not_required_for_dry_run(ctx, cli):
+    schema_path = ctx.openapi.write_schema({})
+    result = cli.run(str(schema_path), "--dry-run")
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def test_long_operation_output(ctx, testdir):
+def test_long_operation_output(ctx, cli):
     # See GH-990
     # When there is a narrow screen
     # And the API schema contains an operation with a long name
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             f"/{'a' * 100}": {
                 "get": {
@@ -1990,18 +1956,18 @@ def test_long_operation_output(ctx, testdir):
             },
         }
     )
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
-    result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
+    result = cli.run(str(schema_path), "--dry-run")
     # Then this operation name should be truncated
-    assert result.ret == ExitCode.OK
-    assert "GET /aaaaaaaaaa .                                                         [ 50%]" in result.outlines
-    assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [100%]" in result.outlines
+    assert result.exit_code == ExitCode.OK
+    print(result.stdout)
+    assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [ 50%]" in result.stdout
+    assert "GET /aaaaaaaaaa .                                                         [100%]" in result.stdout
 
 
-def test_reserved_characters_in_operation_name(ctx, testdir):
+def test_reserved_characters_in_operation_name(ctx, cli):
     # See GH-992
     # When an API operation name contains `:`
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             "/foo:bar": {
                 "get": {
@@ -2010,14 +1976,13 @@ def test_reserved_characters_in_operation_name(ctx, testdir):
             },
         }
     )
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
-    result = testdir.run("schemathesis", "run", str(schema_file), "--dry-run")
+    result = cli.run(str(schema_path), "--dry-run")
     # Then this operation name should be displayed with the leading `/`
-    assert result.ret == ExitCode.OK
-    assert "GET /foo:bar .                                                            [100%]" in result.outlines
+    assert result.exit_code == ExitCode.OK
+    assert "GET /foo:bar .                                                            [100%]" in result.stdout
 
 
-def test_unsupported_regex(ctx, testdir, cli, snapshot_cli):
+def test_unsupported_regex(ctx, cli, snapshot_cli):
     def make_definition(min_items):
         return {
             "post": {
@@ -2040,7 +2005,7 @@ def test_unsupported_regex(ctx, testdir, cli, snapshot_cli):
         }
 
     # When an operation uses an unsupported regex syntax
-    schema = ctx.openapi.build_schema(
+    schema_path = ctx.openapi.write_schema(
         {
             # Can't generate anything
             "/foo": make_definition(min_items=1),
@@ -2048,10 +2013,9 @@ def test_unsupported_regex(ctx, testdir, cli, snapshot_cli):
             "/bar": make_definition(min_items=0),
         }
     )
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
     # Then if it is possible it should generate at least something
     # And if it is not then there should be an error with a descriptive error message
-    assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
+    assert cli.run(str(schema_path), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
 
 
 @pytest.mark.parametrize("extra", ["--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"])
@@ -2295,22 +2259,19 @@ def test_dont_skip_when_generation_is_possible(cli, schema_url):
 
 
 @pytest.mark.operations("failure")
-def test_explicit_example_failure_output(testdir, cli, openapi3_base_url, snapshot_cli):
+def test_explicit_example_failure_output(ctx, cli, openapi3_base_url, snapshot_cli):
     # When an explicit example fails
-    schema = {
-        "openapi": "3.0.0",
-        "info": {"title": "Sample API", "description": "API description in Markdown.", "version": "1.0.0"},
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/failure": {
                 "get": {
                     "parameters": [{"in": "query", "name": "key", "example": "foo", "schema": {"type": "string"}}],
                     "responses": {"200": {"description": "OK"}},
                 }
             },
-        },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(schema))
-    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}", "--sanitize-output=false") == snapshot_cli
+        }
+    )
+    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--sanitize-output=false") == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -2346,12 +2307,10 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
 
 @flaky(max_runs=5, min_passes=1)
 @pytest.mark.operations("payload")
-def test_multiple_data_generation_methods(testdir, cli, openapi3_schema_url):
+def test_multiple_data_generation_methods(ctx, cli, openapi3_schema_url):
     # When multiple data generation methods are supplied in CLI
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
-
+    module = ctx.write_pymodule(
+        """
 note = print
 
 @schemathesis.check
@@ -2371,7 +2330,7 @@ def data_generation_check(ctx, response, case):
         "--hypothesis-suppress-health-check=all",
         "-D",
         "all",
-        hooks=module.purebasename,
+        hooks=module,
     )
     # Then there should be cases generated from different methods
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -2691,19 +2650,17 @@ def test_complex_urlencoded_example(ctx, cli, snapshot_cli, openapi3_base_url):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("plain_text_body")
-def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-
-            @schemathesis.check
-            def custom_strings(ctx, response, case):
-                try:
-                    case.body.encode("ascii")
-                except Exception as exc:
-                    raise AssertionError(str(exc))
-                assert "\\x00" not in case.body
-            """
+def test_custom_strings(ctx, cli, hypothesis_max_examples, schema_url):
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+def custom_strings(ctx, response, case):
+    try:
+        case.body.encode("ascii")
+    except Exception as exc:
+        raise AssertionError(str(exc))
+    assert "\\x00" not in case.body
+"""
     )
 
     result = cli.main(
@@ -2714,27 +2671,25 @@ def test_custom_strings(testdir, cli, hypothesis_max_examples, schema_url):
         "--generation-codec=ascii",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
-        hooks=module.purebasename,
+        hooks=module,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("path_variable", "custom_format")
-def test_parameter_overrides(testdir, cli, schema_url):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-
-            @schemathesis.check
-            def verify_overrides(ctx, response, case):
-                if "key" in case.operation.path_parameters:
-                    assert case.path_parameters["key"] == "foo"
-                    assert "id" not in (case.query or {}), "`id` is present"
-                if "id" in case.operation.query:
-                    assert case.query["id"] == "bar"
-                    assert "key" not in (case.path_parameters or {}), "`key` is present"
-            """
+def test_parameter_overrides(ctx, cli, schema_url):
+    module = ctx.write_pymodule(
+        """
+@schemathesis.check
+def verify_overrides(ctx, response, case):
+    if "key" in case.operation.path_parameters:
+        assert case.path_parameters["key"] == "foo"
+        assert "id" not in (case.query or {}), "`id` is present"
+    if "id" in case.operation.query:
+        assert case.query["id"] == "bar"
+        assert "key" not in (case.path_parameters or {}), "`key` is present"
+"""
     )
 
     result = cli.main(
@@ -2746,12 +2701,12 @@ def test_parameter_overrides(testdir, cli, schema_url):
         "--set-query",
         "id=bar",
         schema_url,
-        hooks=module.purebasename,
+        hooks=module,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def test_null_byte_in_header_probe(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
+def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -2762,14 +2717,12 @@ def test_null_byte_in_header_probe(ctx, testdir, cli, snapshot_cli, openapi3_bas
             }
         }
     )
-    module = testdir.make_importable_pyfile(
-        hook=r"""
-            import schemathesis
-
-            @schemathesis.check
-            def no_null_bytes(ctx, response, case):
-                assert "\x00" not in case.headers["X-KEY"]
-            """
+    module = ctx.write_pymodule(
+        r"""
+@schemathesis.check
+def no_null_bytes(ctx, response, case):
+    assert "\x00" not in case.headers["X-KEY"]
+"""
     )
     assert (
         cli.main(
@@ -2779,7 +2732,7 @@ def test_null_byte_in_header_probe(ctx, testdir, cli, snapshot_cli, openapi3_bas
             "no_null_bytes",
             f"--base-url={openapi3_base_url}",
             "--hypothesis-max-examples=1",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -2803,38 +2756,38 @@ def test_unknown_schema_error(mocker, schema_url, cli, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
-    module = testdir.make_importable_pyfile(
-        hook=r"""
-    from schemathesis import cli, runner
+def test_custom_cli_option(ctx, cli, schema_url, snapshot_cli):
+    module = ctx.write_pymodule(
+        r"""
+from schemathesis import cli, runner
 
 
-    group = cli.add_group("My custom group")
-    group.add_option("--custom-counter", type=int)
+group = cli.add_group("My custom group")
+group.add_option("--custom-counter", type=int)
 
-    group = cli.add_group("Another group", index=-1)
-    group.add_option("--custom-counter-2", type=int)
+group = cli.add_group("Another group", index=-1)
+group.add_option("--custom-counter-2", type=int)
 
-    def gen():
-        yield "first"
-        yield "second"
+def gen():
+    yield "first"
+    yield "second"
 
 
-    @cli.handler()
-    class EventCounter(cli.EventHandler):
-        def __init__(self, *args, **params):
-            self.counter = params["custom_counter"] or 0
+@cli.handler()
+class EventCounter(cli.EventHandler):
+    def __init__(self, *args, **params):
+        self.counter = params["custom_counter"] or 0
 
-        def handle_event(self, context, event) -> None:
-            self.counter += 1
-            if isinstance(event, runner.events.Initialized):
-                context.add_initialization_line("Counter initialized!")
-                context.add_initialization_line(gen())
-            elif isinstance(event, runner.events.Finished):
-                context.add_summary_line(
-                    f"Counter: {self.counter}",
-                )
-                context.add_summary_line(gen())
+    def handle_event(self, context, event) -> None:
+        self.counter += 1
+        if isinstance(event, runner.events.Initialized):
+            context.add_initialization_line("Counter initialized!")
+            context.add_initialization_line(gen())
+        elif isinstance(event, runner.events.Finished):
+            context.add_summary_line(
+                f"Counter: {self.counter}",
+            )
+            context.add_summary_line(gen())
 """
     )
     assert (
@@ -2844,7 +2797,7 @@ def test_custom_cli_option(testdir, cli, schema_url, snapshot_cli):
             "--custom-counter=42",
             "--dry-run",
             "--hypothesis-max-examples=1",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )

@@ -404,14 +404,14 @@ async def data(api_key: str = Depends(get_api_key)):
 
 
 @pytest.mark.parametrize("location", ["query", "cookie"])
-def test_auth_via_override_cli(cli, testdir, snapshot_cli, location):
+def test_auth_via_override_cli(ctx, cli, snapshot_cli, location):
     # When auth is provided via `--set-*`
-    module = testdir.make_importable_pyfile(make_app(location))
+    module = ctx.write_pymodule(make_app(location))
     # Then it should counts during auth detection
     assert (
         cli.run(
             "/openapi.json",
-            f"--app={module.purebasename}:app",
+            f"--app={module}:app",
             "-c",
             "ignored_auth",
             "--experimental=openapi-3.1",

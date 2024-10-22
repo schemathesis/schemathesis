@@ -71,7 +71,7 @@ def results_set(operation):
 
 
 @pytest.fixture
-def after_execution(results_set, operation, swagger_20):
+def after_execution(results_set, operation):
     return runner.events.AfterExecution.from_result(
         result=results_set.results[0],
         status=models.Status.success,
@@ -88,13 +88,13 @@ def test_get_terminal_width():
 
 
 @pytest.mark.parametrize(
-    ("title", "separator", "printed", "expected"),
+    ("title", "separator", "expected"),
     [
-        ("TEST", "-", "data in section", "------- TEST -------"),
-        ("TEST", "*", "data in section", "******* TEST *******"),
+        ("TEST", "-", "------- TEST -------"),
+        ("TEST", "*", "******* TEST *******"),
     ],
 )
-def test_display_section_name(capsys, title, separator, printed, expected):
+def test_display_section_name(capsys, title, separator, expected):
     # When section name is displayed
     default.display_section_name(title, separator=separator)
     out = capsys.readouterr().out.strip()
@@ -107,7 +107,7 @@ def test_display_section_name(capsys, title, separator, printed, expected):
 
 
 @pytest.mark.parametrize("verbosity", [0, 1])
-def test_handle_initialized(capsys, mocker, execution_context, results_set, swagger_20, verbosity):
+def test_handle_initialized(capsys, mocker, execution_context, swagger_20, verbosity):
     execution_context.verbosity = verbosity
     # Given Initialized event
     event = runner.events.Initialized.from_schema(schema=swagger_20, seed=42)
@@ -130,7 +130,7 @@ def test_handle_initialized(capsys, mocker, execution_context, results_set, swag
     assert out.endswith("\n")
 
 
-def test_display_statistic(capsys, swagger_20, execution_context, operation, response):
+def test_display_statistic(capsys, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
     success = models.Check(
         "not_a_server_error", models.Status.success, response, 0, models.Case(operation, generation_time=0.0)
@@ -169,7 +169,7 @@ def test_display_statistic(capsys, swagger_20, execution_context, operation, res
     ]
 
 
-def test_display_multiple_warnings(capsys, swagger_20, execution_context, operation, response):
+def test_display_multiple_warnings(capsys, execution_context):
     results = models.TestResultSet(seed=42, results=[])
     results.add_warning("Foo")
     results.add_warning("Bar")
@@ -220,7 +220,7 @@ def test_get_percentage(position, length, expected):
 @pytest.mark.parametrize("current_line_length", [0, 20])
 @pytest.mark.parametrize(("operations_processed", "percentage"), [(0, "[  0%]"), (1, "[100%]")])
 def test_display_percentage(
-    capsys, execution_context, after_execution, swagger_20, current_line_length, operations_processed, percentage
+    capsys, execution_context, after_execution, current_line_length, operations_processed, percentage
 ):
     execution_context.current_line_length = current_line_length
     execution_context.operations_processed = operations_processed
@@ -245,7 +245,7 @@ def test_display_hypothesis_output(capsys):
 
 
 @pytest.mark.parametrize("body", [{}, {"foo": "bar"}, NOT_SET])
-def test_display_single_failure(capsys, swagger_20, execution_context, operation, body, response):
+def test_display_single_failure(capsys, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
     media_type = "application/json" if body is not NOT_SET else None
     success = models.Check(
@@ -341,7 +341,7 @@ def test_display_internal_error(capsys, execution_context, show_errors_traceback
         assert "ZeroDivisionError: division by zero" in out
 
 
-def test_display_summary(capsys, results_set, swagger_20):
+def test_display_summary(capsys, results_set):
     # Given the Finished event
     event = runner.events.Finished.from_results(results=results_set, running_time=1.257)
     # When `display_summary` is called

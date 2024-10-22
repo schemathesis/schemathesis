@@ -2,7 +2,7 @@ Exit code: 1
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
-Schema location: file:///tmp/schema.yaml
+Schema location: file:///tmp/schema.json
 Base URL: file:///
 Specification version: Open API 3.0.2
 Random seed: 42
@@ -12,8 +12,8 @@ Collected API links: 0
 API probing: SKIP
 Schema analysis: SKIP
 
-POST /bar .                                                               [ 50%]
-POST /foo E                                                               [100%]
+POST /foo E                                                               [ 50%]
+POST /bar .                                                               [100%]
 
 ==================================== ERRORS ====================================
 __________________________________ POST /foo ___________________________________

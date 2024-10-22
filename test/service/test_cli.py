@@ -6,7 +6,6 @@ import pytest
 from _pytest.main import ExitCode
 from requests import Timeout
 
-import schemathesis
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.constants import USER_AGENT
 from schemathesis.service import ci, events
@@ -27,7 +26,7 @@ def get_stdout_lines(stdout):
 
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_no_failures(cli, schema_url, service, next_url, upload_message):
+def test_no_failures(cli, service, next_url, upload_message):
     # When Schemathesis.io is enabled and there are no errors
     result = cli.run(
         "my-api",
@@ -85,30 +84,28 @@ def test_server_error(cli, schema_url, service):
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
 @flaky(max_runs=3, min_passes=1)
-def test_error_in_another_handler(testdir, cli, schema_url, service, snapshot_cli):
-    schemathesis.hooks.unregister_all()
-
+def test_error_in_another_handler(ctx, cli, schema_url, service, snapshot_cli):
     # When a non-Schemathesis.io handler fails
-    module = testdir.make_importable_pyfile(
-        hook="""
-        import click
-        import schemathesis
-        from schemathesis.cli.handlers import EventHandler
-        from schemathesis.runner import events
-
-        class FailingHandler(EventHandler):
-
-            def handle_event(self, context, event):
-                raise ZeroDivisionError
-
-        @schemathesis.hook
-        def after_init_cli_run_handlers(
-            context,
-            handlers,
-            execution_context
-        ):
-            handlers.append(FailingHandler())
+    module = ctx.write_pymodule(
         """
+import click
+import schemathesis
+from schemathesis.cli.handlers import EventHandler
+from schemathesis.runner import events
+
+class FailingHandler(EventHandler):
+
+    def handle_event(self, context, event):
+        raise ZeroDivisionError
+
+@schemathesis.hook
+def after_init_cli_run_handlers(
+    context,
+    handlers,
+    execution_context
+):
+    handlers.append(FailingHandler())
+"""
     )
     # And all handlers are shutdown forcefully
     # And the run fails
@@ -119,7 +116,7 @@ def test_error_in_another_handler(testdir, cli, schema_url, service, snapshot_cl
             "my-api",
             f"--schemathesis-io-token={service.token}",
             f"--schemathesis-io-url={service.base_url}",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -158,7 +155,7 @@ def test_wait_for_report_handler():
     path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
-def test_unauthorized(cli, schema_url, service, snapshot_cli):
+def test_unauthorized(cli, service, snapshot_cli):
     # When the token is invalid
     # Then a proper error message should be displayed
     assert (
@@ -214,7 +211,7 @@ def test_unknown_error_on_upload(cli, schema_url, service, snapshot_cli):
     path="/cli/projects/my-api/",
 )
 @pytest.mark.openapi_version("3.0")
-def test_client_error_on_project_details(cli, schema_url, service, snapshot_cli):
+def test_client_error_on_project_details(cli, service, snapshot_cli):
     assert (
         cli.run(
             "my-api",
@@ -283,7 +280,7 @@ def test_api_name(cli, schema_url, service, next_url):
     path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
-def test_invalid_name(cli, schema_url, service, next_url):
+def test_invalid_name(cli, service):
     # When API name does not exist
     # And API data is loaded by name
     result = cli.run(
@@ -304,7 +301,7 @@ def test_invalid_name(cli, schema_url, service, next_url):
     path=re.compile("/cli/projects/.*/"),
 )
 @pytest.mark.openapi_version("3.0")
-def test_forbidden(cli, schema_url, service):
+def test_forbidden(cli, service):
     # When there is 403 from Schemathesis.io
     result = cli.run("my-api", f"--schemathesis-io-token={service.token}", f"--schemathesis-io-url={service.base_url}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout

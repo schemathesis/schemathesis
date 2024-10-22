@@ -1002,13 +1002,6 @@ def testdir(testdir):
 
     testdir.make_test = maker
 
-    def make_importable_pyfile(*args, **kwargs):
-        module = testdir.makepyfile(*args, **kwargs)
-        make_importable(module)
-        return module
-
-    testdir.make_importable_pyfile = make_importable_pyfile
-
     def run_and_assert(*args, **kwargs):
         result = testdir.runpytest(*args)
         result.assert_outcomes(**kwargs)
@@ -1055,7 +1048,7 @@ def real_app_schema(schema_url):
 
 
 @pytest.fixture
-def wsgi_app_schema(schema_url, flask_app):
+def wsgi_app_schema(flask_app):
     return oas_loaders.from_wsgi("/schema.yaml", flask_app)
 
 
@@ -1064,58 +1057,53 @@ def any_app_schema(openapi_version, request):
     return request.getfixturevalue(request.param)
 
 
-def make_importable(module):
-    """Make the package importable by the inline CLI execution."""
-    pkgroot = module.dirpath()
-    module._ensuresyspath(True, pkgroot)
+@pytest.fixture
+def loadable_flask_app(ctx, operations):
+    module = ctx.write_pymodule(
+        f"""
+from test.apps.openapi._flask import create_app
+
+app = create_app({operations})
+""",
+        filename="flaskapp",
+    )
+    return f"{module}:app"
 
 
 @pytest.fixture
-def loadable_flask_app(testdir, operations):
-    module = testdir.make_importable_pyfile(
-        location=f"""
-        from test.apps.openapi._flask import create_app
+def loadable_aiohttp_app(ctx, operations, openapi_version):
+    module = ctx.write_pymodule(
+        f"""
+from test.apps.openapi._aiohttp import create_app
 
-        app = create_app({operations})
-        """
+app = create_app({operations})
+"""
     )
-    return f"{module.purebasename}:app"
+    return f"{module}:app"
 
 
 @pytest.fixture
-def loadable_aiohttp_app(testdir, operations, openapi_version):
-    module = testdir.make_importable_pyfile(
-        location=f"""
-        from test.apps.openapi._aiohttp import create_app
+def loadable_graphql_fastapi_app(ctx, graphql_path):
+    module = ctx.write_pymodule(
+        f"""
+from test.apps._graphql._fastapi import create_app
 
-        app = create_app({operations})
-        """
+app = create_app('{graphql_path}')
+"""
     )
-    return f"{module.purebasename}:app"
+    return f"{module}:app"
 
 
 @pytest.fixture
-def loadable_graphql_fastapi_app(testdir, graphql_path):
-    module = testdir.make_importable_pyfile(
-        location=f"""
-        from test.apps._graphql._fastapi import create_app
-
-        app = create_app('{graphql_path}')
+def loadable_fastapi_app(ctx):
+    module = ctx.write_pymodule(
         """
+from test.apps.openapi._fastapi import create_app
+
+app = create_app()
+"""
     )
-    return f"{module.purebasename}:app"
-
-
-@pytest.fixture
-def loadable_fastapi_app(testdir):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from test.apps.openapi._fastapi import create_app
-
-        app = create_app()
-        """
-    )
-    return f"{module.purebasename}:app"
+    return f"{module}:app"
 
 
 class SubtestsVersion:

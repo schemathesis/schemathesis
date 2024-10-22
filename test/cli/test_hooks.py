@@ -5,32 +5,31 @@ from _pytest.main import ExitCode
 
 
 @pytest.mark.operations("success")
-def test_custom_cli_handlers(testdir, cli, schema_url, app):
+def test_custom_cli_handlers(ctx, cli, schema_url):
     # When `after_init_cli_run_handlers` redefines handlers
-    module = testdir.make_importable_pyfile(
-        hook="""
-    import click
-    import schemathesis
-    from schemathesis.cli.handlers import EventHandler
-    from schemathesis.runner import events
+    module = ctx.write_pymodule(
+        """
+import click
+from schemathesis.cli.handlers import EventHandler
+from schemathesis.runner import events
 
-    class SimpleHandler(EventHandler):
+class SimpleHandler(EventHandler):
 
-        def handle_event(self, context, event):
-            if isinstance(event, events.Finished):
-                click.echo("Done!")
+    def handle_event(self, context, event):
+        if isinstance(event, events.Finished):
+            click.echo("Done!")
 
-    @schemathesis.hook
-    def after_init_cli_run_handlers(
-        context,
-        handlers,
-        execution_context
-    ):
-        handlers[:] = [SimpleHandler()]
-    """
+@schemathesis.hook
+def after_init_cli_run_handlers(
+    context,
+    handlers,
+    execution_context
+):
+    handlers[:] = [SimpleHandler()]
+"""
     )
 
-    result = cli.main("run", schema_url, hooks=module.purebasename)
+    result = cli.main("run", schema_url, hooks=module)
 
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -40,12 +39,10 @@ def test_custom_cli_handlers(testdir, cli, schema_url, app):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_before_call(testdir, cli, cli_args):
+def test_before_call(ctx, cli, cli_args):
     # When the `before_call` hook is registered
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
-
+    module = ctx.write_pymodule(
+        """
 note = print  # To avoid linting error
 
 @schemathesis.hook
@@ -54,7 +51,7 @@ def before_call(context, case):
     case.query = {"q": "42"}
         """
     )
-    result = cli.main("run", *cli_args, hooks=module.purebasename)
+    result = cli.main("run", *cli_args, hooks=module)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should be called before each `case.call`
     assert "Before!" in result.stdout.splitlines()
@@ -62,12 +59,11 @@ def before_call(context, case):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_after_call(testdir, cli, cli_args, snapshot_cli):
+def test_after_call(ctx, cli, cli_args, snapshot_cli):
     # When the `after_call` hook is registered
     # And it modifies the response and making it incorrect
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
+    module = ctx.write_pymodule(
+        """
 import requests
 
 @schemathesis.hook
@@ -80,17 +76,16 @@ def after_call(context, case, response):
         """
     )
     # Then the tests should fail
-    assert cli.main("run", *cli_args, "-c", "all", hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", *cli_args, "-c", "all", hooks=module) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_process_call_kwargs(testdir, cli, cli_args, mocker, app_type):
+def test_process_call_kwargs(ctx, cli, cli_args, mocker, app_type):
     # When the `process_call_kwargs` hook is registered
     # And it modifies `kwargs` by adding a new key there
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
+    module = ctx.write_pymodule(
+        """
 import requests
 
 @schemathesis.hook
@@ -105,7 +100,7 @@ def process_call_kwargs(context, case, kwargs):
         spy = mocker.spy(requests.Session, "request")
     else:
         spy = mocker.spy(werkzeug.Client, "open")
-    result = cli.main("run", *cli_args, hooks=module.purebasename)
+    result = cli.main("run", *cli_args, hooks=module)
     assert result.exit_code == ExitCode.OK, result.stdout
     if app_type == "real":
         assert spy.call_args[1]["allow_redirects"] is False

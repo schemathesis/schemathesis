@@ -196,17 +196,15 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     assert load_response_body(cassette, 2) == '{"result": "flaky!"}'
 
 
-def test_bad_yaml_headers(testdir, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
+def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
     # See GH-708
     # When the schema expects an input that is not ascii and represented as UTF-8
     # And is not representable in CP1251. E.g. "àààà"
     # And these interactions are recorded to a cassette
     fixed_header = "àààà"
     header_name = "*lh"
-    raw_schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/users": {
                 "post": {
                     "parameters": [
@@ -223,10 +221,10 @@ def test_bad_yaml_headers(testdir, cli, cassette_path, hypothesis_max_examples, 
                 }
             }
         },
-    }
-    schema_file = testdir.makefile(".yaml", schema=yaml.dump(raw_schema))
+        format="yaml",
+    )
     result = cli.run(
-        str(schema_file),
+        str(schema_path),
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         f"--cassette-path={cassette_path}",

@@ -23,16 +23,14 @@ def test_wrap_check_old_style():
 
 
 def test_wrap_check_invalid():
-    def invalid_check(arg1):
-        return True
+    def invalid_check(arg1): ...
 
     with pytest.raises(ValueError, match="Invalid check function signature"):
         wrap_check(invalid_check)
 
 
 def test_wrap_check_too_many_args():
-    def too_many_args(arg1, arg2, arg3, arg4):
-        return True
+    def too_many_args(arg1, arg2, arg3, arg4): ...
 
     with pytest.raises(ValueError, match="Invalid check function signature"):
         wrap_check(too_many_args)
