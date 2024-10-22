@@ -314,7 +314,7 @@ def _iter_coverage_cases(
     # Generate missing required parameters
     if DataGenerationMethod.negative in data_generation_methods:
         for parameter in operation.iter_parameters():
-            if parameter.is_required:
+            if parameter.is_required and parameter.location != "path":
                 name = parameter.name
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]

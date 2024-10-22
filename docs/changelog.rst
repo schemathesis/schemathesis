@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.1...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error on generating missed required path parameter during the coverage phase.
+
 .. _v3.38.1:
 
 :version:`3.38.1 <v3.38.0...v3.38.1>` - 2024-10-21

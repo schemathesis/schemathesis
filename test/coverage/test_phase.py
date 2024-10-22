@@ -692,6 +692,43 @@ def test_required_header(ctx):
     )
 
 
+def test_path_parameter(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo/{id}": {
+                "post": {
+                    "parameters": [
+                        {"name": "id", "in": "path", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "path_parameters": {
+                    "id": {},
+                },
+            },
+            {
+                "path_parameters": {
+                    "id": [],
+                },
+            },
+            {
+                "path_parameters": {
+                    "id": None,
+                },
+            },
+        ],
+        path=("/foo/{id}", "post"),
+    )
+
+
 def assert_coverage(schema, methods, expected, path=None):
     schema = schemathesis.from_dict(schema, validate_schema=True)
 
