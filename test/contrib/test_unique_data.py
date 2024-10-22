@@ -106,19 +106,17 @@ def test_python_tests(unique_data, raw_schema, hypothesis_max_examples):
 
 
 @pytest.fixture
-def unique_hook(testdir):
-    return testdir.make_importable_pyfile(
-        hook="""
-        import schemathesis
-
-        @schemathesis.check
-        def unique_test_cases(ctx, response, case):
-            if not hasattr(case.operation.schema, "seen"):
-                case.operation.schema.seen = set()
-            command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
-            assert command not in case.operation.schema.seen, f"Test case already seen! {command}"
-            case.operation.schema.seen.add(command)
+def unique_hook(ctx):
+    return ctx.write_pymodule(
         """
+@schemathesis.check
+def unique_test_cases(ctx, response, case):
+    if not hasattr(case.operation.schema, "seen"):
+        case.operation.schema.seen = set()
+    command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
+    assert command not in case.operation.schema.seen, f"Test case already seen! {command}"
+    case.operation.schema.seen.add(command)
+"""
     )
 
 
@@ -135,7 +133,7 @@ def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_example
         "--hypothesis-suppress-health-check=filter_too_much",
         "--hypothesis-phases=generate",
         *args,
-        hooks=unique_hook.purebasename,
+        hooks=unique_hook,
     )
 
 
@@ -160,7 +158,7 @@ def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examp
             "--data-generation-method=all",
             "--hypothesis-suppress-health-check=filter_too_much",
             "--hypothesis-phases=generate",
-            hooks=unique_hook.purebasename,
+            hooks=unique_hook,
         )
         == snapshot_cli
     )
@@ -175,7 +173,7 @@ def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
             "--hypothesis-max-examples=5",
             "--show-trace",
             "--contrib-unique-data",
-            hooks=unique_hook.purebasename,
+            hooks=unique_hook,
         )
         == snapshot_cli
     )

@@ -274,7 +274,7 @@ def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
     assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
 
 
-def test_ssl_error(openapi3_schema_url, server):
+def test_ssl_error(server):
     with pytest.raises(SchemaError) as exc:
         schemathesis.from_uri(f"https://127.0.0.1:{server['port']}")
     assert exc.value.message == "SSL verification problem"

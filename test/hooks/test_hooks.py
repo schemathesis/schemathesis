@@ -51,7 +51,7 @@ def dispatcher():
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
 @pytest.mark.usefixtures("global_hook")
-def test_global_query_hook(wsgi_app_schema, schema_url):
+def test_global_query_hook(wsgi_app_schema):
     strategy = wsgi_app_schema["/custom_format"]["GET"].as_strategy()
 
     @given(case=strategy)
@@ -90,7 +90,7 @@ def test_case_hook(wsgi_app_schema):
 
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("custom_format")
-def test_schema_query_hook(wsgi_app_schema, schema_url):
+def test_schema_query_hook(wsgi_app_schema):
     @wsgi_app_schema.hook
     def filter_query(context, query):
         return query["id"].isdigit() and query["id"].isascii()

@@ -885,7 +885,7 @@ def test(case):
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.operations("path_variable", "custom_format")
-def test_override(testdir, openapi3_base_url, openapi3_schema_url):
+def test_override(testdir, openapi3_schema_url):
     testdir.make_test(
         f"""
 schema = schemathesis.from_uri('{openapi3_schema_url}')
@@ -905,7 +905,7 @@ def test(case):
     result.assert_outcomes(passed=2)
 
 
-def test_override_double(testdir, openapi3_base_url, openapi3_schema_url):
+def test_override_double(testdir):
     testdir.make_test(
         """
 @schema.parametrize()

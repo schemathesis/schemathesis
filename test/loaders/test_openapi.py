@@ -206,13 +206,13 @@ def test_parsing_errors_uri(schema_url, content_type, payload, expected):
 
 
 @pytest.mark.parametrize(
-    ("schema_path", "content_type", "payload", "expected"),
+    ("schema_path", "payload", "expected"),
     [
-        ("openapi.json", "application/json", "{1", JSON_ERROR),
-        ("openapi.yaml", "text/yaml", '{"\x80": 1}', YAML_ERROR),
+        ("openapi.json", "{1", JSON_ERROR),
+        ("openapi.yaml", '{"\x80": 1}', YAML_ERROR),
     ],
 )
-def test_parsing_errors_path(testdir, schema_path, content_type, payload, expected):
+def test_parsing_errors_path(testdir, schema_path, payload, expected):
     name, ext = schema_path.split(".")
     schema_file = testdir.makefile(f".{ext}", **{name: payload})
 

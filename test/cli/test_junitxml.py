@@ -87,19 +87,16 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
 )
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_error_with_traceback(cli, schema_url, tmp_path, testdir, args, expected):
-    module = testdir.make_importable_pyfile(
-        hook="""
-import schemathesis
-
-
+def test_error_with_traceback(ctx, cli, schema_url, tmp_path, args, expected):
+    module = ctx.write_pymodule(
+        """
 @schemathesis.check
 def with_error(ctx, response, case):
     1 / 0
 """
     )
     xml_path = tmp_path / "junit.xml"
-    cli.main("run", schema_url, "-c", "with_error", f"--junit-xml={xml_path}", *args, hooks=module.purebasename)
+    cli.main("run", schema_url, "-c", "with_error", f"--junit-xml={xml_path}", *args, hooks=module)
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     testcases = list(root[0])

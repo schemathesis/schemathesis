@@ -1,7 +1,6 @@
 import datetime
 
 import pytest
-import yaml
 from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import NoSuchExample
 
@@ -369,12 +368,10 @@ def test_(case):
 
 
 @pytest.mark.hypothesis_nested
-def test_date_deserializing(testdir):
+def test_date_deserializing(ctx):
     # When dates in schema are written without quotes (achieved by dumping the schema with date instances)
-    schema = {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
+    schema_path = ctx.openapi.write_schema(
+        {
             "/teapot": {
                 "get": {
                     "summary": "Test",
@@ -396,9 +393,8 @@ def test_date_deserializing(testdir):
                 }
             }
         },
-    }
-
-    schema_path = testdir.makefile(".yaml", schema=yaml.dump(schema))
+        format="yaml",
+    )
     # Then yaml loader should ignore it
     # And data generation should work without errors
     schema = schemathesis.from_path(str(schema_path))
