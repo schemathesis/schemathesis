@@ -32,28 +32,22 @@ def test_register_returns_a_value(new_check):
         ("not_a_server_error,status_code_conformance", ExitCode.OK, "2 passed in"),
     ],
 )
-def test_exclude_checks(
-    testdir,
-    cli,
-    exclude_checks,
-    expected_exit_code,
-    expected_result,
-):
-    module = testdir.make_importable_pyfile(
-        location="""
-        from fastapi import FastAPI
-        from fastapi import HTTPException
-
-        app = FastAPI()
-
-        @app.get("/api/success")
-        async def success():
-            return {"success": True}
-
-        @app.get("/api/failure")
-        async def failure():
-            raise HTTPException(status_code=500)
+def test_exclude_checks(ctx, cli, exclude_checks, expected_exit_code, expected_result):
+    module = ctx.write_pymodule(
         """
+from fastapi import FastAPI
+from fastapi import HTTPException
+
+app = FastAPI()
+
+@app.get("/api/success")
+async def success():
+    return {"success": True}
+
+@app.get("/api/failure")
+async def failure():
+    raise HTTPException(status_code=500)
+"""
     )
     result = cli.run(
         "/openapi.json",
@@ -62,7 +56,7 @@ def test_exclude_checks(
         "--exclude-checks",
         exclude_checks,
         "--app",
-        f"{module.purebasename}:app",
+        f"{module}:app",
         "--force-schema-version=30",
     )
 
@@ -74,7 +68,7 @@ def test_exclude_checks(
     assert expected_result in result.stdout
 
 
-def test_negative_data_rejection(ctx, testdir, cli, openapi3_base_url):
+def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -99,10 +93,10 @@ def test_negative_data_rejection(ctx, testdir, cli, openapi3_base_url):
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_deduplication_on_sanitized_header(testdir, cli, snapshot_cli):
+def test_deduplication_on_sanitized_header(ctx, cli, snapshot_cli):
     # See GH-2294
-    module = testdir.make_importable_pyfile(
-        location="""
+    module = ctx.write_pymodule(
+        """
 from typing import Annotated
 
 from fastapi import FastAPI, HTTPException, Header
@@ -122,7 +116,7 @@ def get_users(x_token: Annotated[str, Header()]):
             "--checks",
             "all",
             "--app",
-            f"{module.purebasename}:app",
+            f"{module}:app",
             "--force-schema-version=30",
         )
         == snapshot_cli

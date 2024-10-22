@@ -6,18 +6,17 @@ from schemathesis.cli import reset_targets
 
 
 @pytest.fixture
-def new_target(testdir, cli):
-    module = testdir.make_importable_pyfile(
-        hook="""
-            import schemathesis
-            import click
+def new_target(ctx, cli):
+    module = ctx.write_pymodule(
+        """
+import click
 
-            @schemathesis.target
-            def new_target(context) -> float:
-                click.echo("NEW TARGET IS CALLED")
-                assert context.case.data_generation_method is not None, "Empty data_generation_method"
-                return float(len(context.response.content))
-            """
+@schemathesis.target
+def new_target(context) -> float:
+    click.echo("NEW TARGET IS CALLED")
+    assert context.case.data_generation_method is not None, "Empty data_generation_method"
+    return float(len(context.response.content))
+"""
     )
     yield module
     reset_targets()
@@ -30,7 +29,7 @@ def new_target(testdir, cli):
 def test_custom_target(cli, new_target, openapi3_schema_url):
     # When hooks are passed to the CLI call
     # And it contains registering a new target
-    result = cli.main("run", "-t", "new_target", openapi3_schema_url, hooks=new_target.purebasename)
+    result = cli.main("run", "-t", "new_target", openapi3_schema_url, hooks=new_target)
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the specified target is called
@@ -49,7 +48,7 @@ def test_custom_target_graphql(cli, new_target, graphql_url):
         graphql_url,
         "--hypothesis-suppress-health-check=too_slow,filter_too_much",
         "--hypothesis-max-examples=1",
-        hooks=new_target.purebasename,
+        hooks=new_target,
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout

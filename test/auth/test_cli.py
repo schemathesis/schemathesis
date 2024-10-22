@@ -22,10 +22,10 @@ class TokenAuth:
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_custom_auth(testdir, cli, schema_url, app, snapshot_cli):
+def test_custom_auth(ctx, cli, schema_url, app, snapshot_cli):
     # When a custom auth is used
-    module = testdir.make_importable_pyfile(
-        hook=f"""
+    module = ctx.write_pymodule(
+        f"""
 {AUTH_PROVIDER_MODULE_CODE}
 @schemathesis.hook
 def after_call(context, case, response):
@@ -38,7 +38,7 @@ def after_call(context, case, response):
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, hooks=module) == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -50,10 +50,10 @@ def after_call(context, case, response):
 )
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_explicit_auth_precedence(testdir, cli, schema_url, args, expected, snapshot_cli):
+def test_explicit_auth_precedence(ctx, cli, schema_url, args, expected, snapshot_cli):
     # If explicit auth is passed via CLI
-    module = testdir.make_importable_pyfile(
-        hook=f"""
+    module = ctx.write_pymodule(
+        f"""
 {AUTH_PROVIDER_MODULE_CODE}
 @schemathesis.hook
 def after_call(context, case, response):
@@ -65,7 +65,7 @@ def after_call(context, case, response):
     )
     # Then it overrides the one from the auth provider
     # And the auth should be used
-    assert cli.main("run", schema_url, "--show-trace", *args, hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, "--show-trace", *args, hooks=module) == snapshot_cli
 
 
 def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli):
@@ -103,10 +103,9 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "custom_format")
-def test_multiple_threads(testdir, cli, schema_url, snapshot_cli):
-    module = testdir.make_importable_pyfile(
-        hook=f"""
-    import schemathesis
+def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
+    module = ctx.write_pymodule(
+        f"""
     import time
 
     TOKEN = "{TOKEN}"
@@ -140,7 +139,7 @@ def test_multiple_threads(testdir, cli, schema_url, snapshot_cli):
             "2",
             "--hypothesis-max-examples=1",
             "--show-trace",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -148,13 +147,11 @@ def test_multiple_threads(testdir, cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "text")
-def test_requests_auth(testdir, cli, schema_url, snapshot_cli):
+def test_requests_auth(ctx, cli, schema_url, snapshot_cli):
     # When the user registers auth from `requests`
     expected = "Basic dXNlcjpwYXNz"
-    module = testdir.make_importable_pyfile(
-        hook=f"""
-import schemathesis
-
+    module = ctx.write_pymodule(
+        f"""
 from requests.auth import HTTPBasicAuth
 
 schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass")).apply_to(method="GET", path="/success")
@@ -174,12 +171,12 @@ def after_call(context, case, response):
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, hooks=module) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "text")
-def test_conditional(testdir, cli, schema_url, snapshot_cli):
+def test_conditional(ctx, cli, schema_url, snapshot_cli):
     # When the user sets up multiple auths applied to different API operations
     if sys.version_info < (3, 9):
         dec1 = """
@@ -191,10 +188,8 @@ auth = schemathesis.auth()
     else:
         dec1 = '@schemathesis.auth().apply_to(method="GET", path="/text")'
         dec2 = '@schemathesis.auth().apply_to(method="GET", path="/success")'
-    module = testdir.make_importable_pyfile(
-        hook=f"""
-import schemathesis
-
+    module = ctx.write_pymodule(
+        f"""
 TOKEN_1 = "ABC"
 
 {dec1}
@@ -228,4 +223,4 @@ def verify_auth(ctx, response, case):
 """
     )
     # Then all auths should be properly applied
-    assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module.purebasename) == snapshot_cli
+    assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli

@@ -1,5 +1,4 @@
 import json
-import re
 from unittest.mock import ANY
 
 import jsonschema
@@ -64,44 +63,6 @@ def assert_not_conform(values: list, schema: dict):
             pass
 
 
-def is_string(value):
-    return isinstance(value, str)
-
-
-def is_not_string(value):
-    return not isinstance(value, str)
-
-
-def is_type(value, ty):
-    if ty == "integer":
-        return not isinstance(value, bool) and isinstance(value, int)
-    if ty == "number":
-        return not isinstance(value, bool) and isinstance(value, (int, float))
-    if ty == "boolean":
-        return isinstance(value, bool)
-    if ty == "string":
-        return isinstance(value, str)
-    if ty == "null":
-        return value is None
-    if ty == "array":
-        return isinstance(value, list)
-    if ty == "object":
-        return isinstance(value, dict)
-    raise ValueError(f"Unknown type: {ty}")
-
-
-def is_not_type(value, ty):
-    return not is_type(value, ty)
-
-
-def matches_pattern(value, pattern):
-    return re.match(pattern, value) is not None
-
-
-def does_not_match_pattern(value, pattern):
-    return not matches_pattern(value, pattern)
-
-
 @pytest.fixture
 def ctx():
     return CoverageContext()
@@ -142,11 +103,6 @@ class AnyString:
 class AnyNumber:
     def __eq__(self, value: object, /) -> bool:
         return not isinstance(value, bool) and isinstance(value, (int, float))
-
-
-class NotNumber:
-    def __eq__(self, value: object, /) -> bool:
-        return not (not isinstance(value, bool) and isinstance(value, (int, float)))
 
 
 @pytest.mark.parametrize(

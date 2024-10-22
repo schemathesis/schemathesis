@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from textwrap import dedent
 from typing import Any
 
 import pytest
@@ -24,6 +25,7 @@ class OpenApiContext:
             template["openapi"] = version
         elif version.startswith("2"):
             template["swagger"] = version
+            template["basePath"] = "/api"
         else:
             raise ValueError("Unknown version")
         return {**template, **kwargs}
@@ -55,6 +57,13 @@ class Context:
         if format == "yaml":
             return self._testdir.makefile(".yaml", schema=yaml.dump(schema))
         raise ValueError(f"Unknown format: {format}")
+
+    def write_pymodule(self, content: str, *, filename: str = "module"):
+        content = f"import schemathesis\n{dedent(content)}"
+        module = self._testdir.makepyfile(**{filename: content})
+        pkgroot = module.dirpath()
+        module._ensuresyspath(True, pkgroot)
+        return module.purebasename
 
 
 @pytest.fixture

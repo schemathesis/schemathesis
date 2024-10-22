@@ -26,7 +26,7 @@ successful_login = pytest.mark.service(data={"username": USERNAME}, status=200, 
 @pytest.mark.parametrize(
     "setup",
     [
-        lambda f: None,
+        lambda _: None,
         malform_hosts,
     ],
     ids=["nothing", "malformed-file"],
@@ -88,7 +88,7 @@ ERROR_MESSAGE = "Invalid credentials"
 
 
 @pytest.mark.service(data={"detail": ERROR_MESSAGE}, status=401, method="POST", path="/auth/cli/login/")
-def test_invalid_auth(cli, hosts_file, hostname, service, tmp_path):
+def test_invalid_auth(cli, hosts_file, hostname, service):
     # When token is invalid
     result = cli.auth.login("sample_token", f"--hosts-file={hosts_file}", f"--hostname={hostname}", "--protocol=http")
     # Then there should be an error with proper error message

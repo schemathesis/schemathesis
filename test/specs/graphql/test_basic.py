@@ -259,14 +259,14 @@ def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
     assert cli.run(graphql_url, "--hypothesis-max-examples=1", "--dry-run", arg) == snapshot_cli
 
 
-def test_disallow_null(cli, testdir, snapshot_cli):
+def test_disallow_null(ctx, cli, testdir, snapshot_cli):
     schema = """type Query {
     getValue(value: Int): Int
 }
 """
     schema_file = testdir.make_graphql_schema_file(schema, extension=".gql")
-    module = testdir.make_importable_pyfile(
-        hook="""
+    module = ctx.write_pymodule(
+        """
 import schemathesis
 
 @schemathesis.hook
@@ -283,7 +283,7 @@ def filter_body(context, body):
             "--dry-run",
             "--generation-graphql-allow-null=false",
             "--show-trace",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )

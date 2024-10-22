@@ -961,7 +961,7 @@ def test_(case):
 
 
 @pytest.mark.operations("path_variable", "custom_format")
-def test_override(testdir, openapi3_base_url, openapi3_schema_url):
+def test_override(testdir, openapi3_schema_url):
     testdir.make_test(
         f"""
 @pytest.fixture

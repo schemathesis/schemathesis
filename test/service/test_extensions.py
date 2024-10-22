@@ -229,7 +229,7 @@ def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
         }
     ]
 )
-def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, testdir):
+def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -252,8 +252,8 @@ def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, testd
             },
         }
     )
-    module = testdir.make_importable_pyfile(
-        hook="""
+    module = ctx.write_pymodule(
+        """
 import schemathesis
 
 @schemathesis.check
@@ -274,7 +274,7 @@ def port_check(ctx, response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -390,11 +390,9 @@ def test_schema_patches(
     patch,
     expected,
     analyze_schema,
-    testdir,
     service,
     openapi3_base_url,
     snapshot_cli,
-    httpserver,
 ):
     schema_path = ctx.openapi.write_schema(
         {
@@ -406,13 +404,9 @@ def test_schema_patches(
             },
         }
     )
-    for idx, h in enumerate(httpserver.handlers):
-        if h.matcher.uri == "/cli/analysis/":
-            httpserver.handlers.pop(idx)
-            break
     analyze_schema(extensions=[{"type": "schema_patches", "patches": [patch]}])
-    module = testdir.make_importable_pyfile(
-        hook=f"""
+    module = ctx.write_pymodule(
+        f"""
 import schemathesis
 
 PATH = {patch["path"]}
@@ -438,7 +432,7 @@ def schema_check(ctx, response, case):
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
             "--show-trace",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )
@@ -502,7 +496,7 @@ def test_invalid_schema_patches(ctx, path, expected):
         }
     ]
 )
-def test_graphql_scalars(testdir, cli, snapshot_cli, service, openapi3_base_url):
+def test_graphql_scalars(ctx, testdir, cli, snapshot_cli, service, openapi3_base_url):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar FooBar
@@ -512,8 +506,8 @@ type Query {
 }
     """,
     )
-    module = testdir.make_importable_pyfile(
-        hook=r"""
+    module = ctx.write_pymodule(
+        r"""
 import re
 import schemathesis
 
@@ -534,7 +528,7 @@ def port_check(ctx, response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
-            hooks=module.purebasename,
+            hooks=module,
         )
         == snapshot_cli
     )

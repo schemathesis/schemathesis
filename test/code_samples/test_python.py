@@ -105,7 +105,7 @@ def test_escape_single_quotes(value, expected):
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
+def test_graphql_code_sample(graphql_url, graphql_strategy):
     case = graphql_strategy.example()
     kwargs = case.as_transport_kwargs()
     request = requests.Request(**kwargs).prepare()
@@ -116,12 +116,12 @@ def test_graphql_code_sample(graphql_url, graphql_schema, graphql_strategy):
 
 
 @pytest.mark.operations("failure")
-def test_cli_output(cli, base_url, schema_url, snapshot_cli):
+def test_cli_output(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--code-sample-style=python") == snapshot_cli
 
 
 @pytest.mark.operations("failure")
-def test_reproduce_code_with_overridden_headers(any_app_schema, base_url):
+def test_reproduce_code_with_overridden_headers(any_app_schema):
     headers = {"X-Token": "test"}
     *_, after, finished = from_schema(
         any_app_schema,

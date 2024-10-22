@@ -27,7 +27,7 @@ division by zero
         run_checks(
       File "/package-root/runner/impl/core.py", line XXX, in run_checks
         skip_check = check(ctx, response, copied_case)
-      File "/tmp/hook.py", line XXX, in with_error
+      File "/tmp/module.py", line XXX, in with_error
         1 / 0
     ZeroDivisionError: division by zero
 

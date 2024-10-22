@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
-Schema location: file:///tmp/schema.yaml
+Schema location: file:///tmp/schema.json
 Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42

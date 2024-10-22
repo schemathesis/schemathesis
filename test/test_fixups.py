@@ -48,17 +48,17 @@ def test_fastapi_schema_conversion(value, expected):
 
 
 @pytest.fixture(params=["flask_app", "openapi_3_app"])
-def app_args(request, testdir, operations):
+def app_args(ctx, request, operations):
     if request.param == "flask_app":
-        module = testdir.make_importable_pyfile(
-            location=f"""
-            from test.apps.openapi._flask import create_app
+        module = ctx.write_pymodule(
+            f"""
+from test.apps.openapi._flask import create_app
 
-            app = create_app({operations})
-            app.config["prefix_with_bom"] = True
-            """
+app = create_app({operations})
+app.config["prefix_with_bom"] = True
+"""
         )
-        return f"--app={module.purebasename}:app", "/schema.yaml"
+        return f"--app={module}:app", "/schema.yaml"
     app = request.getfixturevalue(request.param)
     app["config"]["prefix_with_bom"] = True
     return (request.getfixturevalue("openapi3_schema_url"),)
