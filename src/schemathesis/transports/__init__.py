@@ -35,8 +35,8 @@ class RequestConfig:
     proxy: str | None = None
     cert: RequestCert | None = None
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return None
 
     @property
     def prepared_timeout(self) -> float | None:

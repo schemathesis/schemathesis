@@ -57,8 +57,8 @@ class ParameterSet(Generic[P]):
 
     items: list[P] = field(default_factory=list)
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return None
 
     def add(self, parameter: P) -> None:
         """Add a new parameter."""

@@ -204,8 +204,8 @@ class OpenAPILink(Direction):
         method = self.operation.method
         return f"state.schema['{path}']['{method}'].links['{self.status_code}']['{self.name}']"
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return printer.text(repr(self))
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return printer.text(repr(self))
 
     def __post_init__(self) -> None:
         extension = self.definition.get(SCHEMATHESIS_LINK_EXTENSION)

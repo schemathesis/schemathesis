@@ -52,8 +52,8 @@ class RunnerContext:
         self.checks_config = checks_config
         self.override = override
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return None
 
     @property
     def is_stopped(self) -> bool:

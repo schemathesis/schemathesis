@@ -23,8 +23,8 @@ class OpenAPIParameter(Parameter):
     nullable_field: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[tuple[str, ...]]
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return None
 
     @property
     def description(self) -> str | None:

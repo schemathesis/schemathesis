@@ -33,8 +33,8 @@ class RegisteredHook:
     signature: inspect.Signature
     scopes: list[HookScope]
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    # def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+    #     return None
 
 
 @dataclass
