@@ -298,6 +298,82 @@ def test_with_examples_openapi_3(ctx):
     )
 
 
+def test_with_optional_parameters(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {"in": "query", "name": "q1", "schema": {"type": "string"}, "required": True, "example": "A1"},
+                        {"in": "query", "name": "q2", "schema": {"type": "integer"}, "required": False, "example": 10},
+                        {"in": "query", "name": "q3", "schema": {"type": "integer"}, "required": False, "example": 15},
+                        {"in": "query", "name": "q4", "schema": {"type": "integer"}, "required": False, "example": 20},
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.positive],
+        [
+            {
+                "query": {
+                    "q1": "A1",
+                    "q3": 15,
+                    "q4": 20,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                    "q4": 20,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                    "q3": 15,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q4": 20,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q3": 15,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                },
+            },
+            {
+                "query": {
+                    "q1": "A1",
+                    "q2": 10,
+                    "q3": 15,
+                    "q4": 20,
+                },
+            },
+        ],
+    )
+
+
 def test_with_example_openapi_3(ctx):
     schema = ctx.openapi.build_schema(
         {
