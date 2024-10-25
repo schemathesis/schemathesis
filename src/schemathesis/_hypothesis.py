@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 import warnings
-from copy import copy
 from functools import wraps
+from itertools import combinations
 from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
 import hypothesis
@@ -223,18 +223,6 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
 
-    meta = GenerationMetadata(
-        query=None,
-        path_parameters=None,
-        headers=None,
-        cookies=None,
-        body=None,
-        phase=TestPhase.COVERAGE,
-        description=None,
-        location=None,
-        parameter=None,
-        parameter_location=None,
-    )
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
     responses = find_in_responses(operation)
@@ -275,25 +263,27 @@ def _iter_coverage_cases(
                 template["media_type"] = body.media_type
             case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
             case.data_generation_method = value.data_generation_method
-            case.meta = copy(meta)
-            case.meta.description = value.description
-            case.meta.location = value.location
-            case.meta.parameter = body.media_type
-            case.meta.parameter_location = "body"
+            case.meta = _make_meta(
+                description=value.description,
+                location=value.location,
+                parameter=body.media_type,
+                parameter_location="body",
+            )
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
                 case.data_generation_method = next_value.data_generation_method
-                case.meta = copy(meta)
-                case.meta.description = next_value.description
-                case.meta.location = next_value.location
-                case.meta.parameter = body.media_type
-                case.meta.parameter_location = "body"
+                case.meta = _make_meta(
+                    description=next_value.description,
+                    location=next_value.location,
+                    parameter=body.media_type,
+                    parameter_location="body",
+                )
                 yield case
     elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
         case.data_generation_method = DataGenerationMethod.positive
-        case.meta = copy(meta)
+        case.meta = _make_meta()
         yield case
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
@@ -305,11 +295,12 @@ def _iter_coverage_cases(
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
             case.data_generation_method = value.data_generation_method
-            case.meta = copy(meta)
-            case.meta.description = value.description
-            case.meta.location = value.location
-            case.meta.parameter = name
-            case.meta.parameter_location = location
+            case.meta = _make_meta(
+                description=value.description,
+                location=value.location,
+                parameter=name,
+                parameter_location=location,
+            )
             yield case
     # Generate missing required parameters
     if DataGenerationMethod.negative in data_generation_methods:
@@ -323,12 +314,87 @@ def _iter_coverage_cases(
                     **{**template, container_name: {k: v for k, v in container.items() if k != name}}
                 )
                 case.data_generation_method = DataGenerationMethod.negative
-                case.meta = copy(meta)
-                case.meta.description = f"Missing `{name}` at {location}"
-                case.meta.location = parameter.location
-                case.meta.parameter = name
-                case.meta.parameter_location = location
+                case.meta = _make_meta(
+                    description=f"Missing `{name}` at {location}",
+                    location=parameter.location,
+                    parameter=name,
+                    parameter_location=location,
+                )
                 yield case
+    # Generate combinations for each location
+    for location, parameter_set in [
+        ("query", operation.query),
+        ("header", operation.headers),
+        ("cookie", operation.cookies),
+    ]:
+        if not parameter_set:
+            continue
+
+        container_name = LOCATION_TO_CONTAINER[location]
+        base_container = template.get(container_name, {})
+
+        # Get required and optional parameters
+        required = {p.name for p in parameter_set if p.is_required}
+        all_params = {p.name for p in parameter_set}
+        optional = sorted(all_params - required)
+
+        # Helper function to create and yield a case
+        def make_case(container_values: dict, description: str, _location: str, _container_name: str) -> Case:
+            if _location in ("header", "cookie"):
+                container = {
+                    name: json.dumps(val) if not isinstance(val, str) else val for name, val in container_values.items()
+                }
+            else:
+                container = container_values
+
+            case = operation.make_case(**{**template, _container_name: container})
+            case.data_generation_method = DataGenerationMethod.positive
+            case.meta = _make_meta(
+                description=description,
+                location=_location,
+                parameter_location=_location,
+            )
+            return case
+
+        # 1. Generate only required properties
+        if required and all_params != required:
+            only_required = {k: v for k, v in base_container.items() if k in required}
+            yield make_case(only_required, "Only required properties", location, container_name)
+
+        # 2. Generate combinations with required properties and one optional property
+        for opt_param in optional:
+            combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
+            if combo != base_container:
+                yield make_case(combo, f"All required properties and optional '{opt_param}'", location, container_name)
+
+        # 3. Generate one combination for each size from 2 to N-1 of optional parameters
+        if len(optional) > 1:
+            for size in range(2, len(optional)):
+                for combination in combinations(optional, size):
+                    combo = {k: v for k, v in base_container.items() if k in required or k in combination}
+                    if combo != base_container:
+                        yield make_case(combo, f"All required and {size} optional properties", location, container_name)
+
+
+def _make_meta(
+    *,
+    description: str | None = None,
+    location: str | None = None,
+    parameter: str | None = None,
+    parameter_location: str | None = None,
+) -> GenerationMetadata:
+    return GenerationMetadata(
+        query=None,
+        path_parameters=None,
+        headers=None,
+        cookies=None,
+        body=None,
+        phase=TestPhase.COVERAGE,
+        description=description,
+        location=location,
+        parameter=parameter,
+        parameter_location=parameter_location,
+    )
 
 
 def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
