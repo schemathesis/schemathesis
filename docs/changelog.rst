@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.38.2...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Generate more negative combinations during the coverage phase.
+- Ensure text description is always present for test cases in the coverage phase.
+
 .. _v3.38.2:
 
 :version:`3.38.2 <v3.38.1...v3.38.2>` - 2024-10-22
