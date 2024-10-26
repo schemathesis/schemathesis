@@ -11,7 +11,6 @@ from yarl import URL
 import schemathesis
 from schemathesis.constants import USER_AGENT
 from schemathesis.exceptions import SchemaError
-from schemathesis.runner import events, prepare
 
 
 @pytest.mark.parametrize(
@@ -134,111 +133,6 @@ def test_uri_loader_custom_kwargs(mocker, target, loader):
         loader("http://127.0.0.1:8000", verify=False, headers={"X-Test": "foo"})
     assert mocked.call_args[1]["verify"] is False
     assert mocked.call_args[1]["headers"] == {"X-Test": "foo", "User-Agent": USER_AGENT}
-
-
-@pytest.fixture
-def raw_schema(app):
-    return app["config"]["schema_data"]
-
-
-@pytest.fixture
-def json_string(raw_schema):
-    return json.dumps(raw_schema)
-
-
-@pytest.fixture
-def schema_path(json_string, tmp_path):
-    path = tmp_path / "schema.json"
-    path.write_text(json_string)
-    return str(path)
-
-
-@pytest.fixture
-def relative_schema_url():
-    return "/schema.yaml"
-
-
-@pytest.mark.parametrize(
-    ("loader", "fixture"),
-    [
-        (schemathesis.openapi.from_dict, "raw_schema"),
-        (schemathesis.openapi.from_file, "json_string"),
-        (schemathesis.openapi.from_path, "schema_path"),
-        (schemathesis.openapi.from_wsgi, "relative_schema_url"),
-        (schemathesis.openapi.from_aiohttp, "relative_schema_url"),
-    ],
-)
-@pytest.mark.operations("success")
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_non_default_loader(openapi_version, request, loader, fixture):
-    schema = request.getfixturevalue(fixture)
-    kwargs = {}
-    if loader is schemathesis.openapi.from_wsgi:
-        kwargs["app"] = request.getfixturevalue("loadable_flask_app")
-    else:
-        if loader is schemathesis.openapi.from_aiohttp:
-            kwargs["app"] = request.getfixturevalue("loadable_aiohttp_app")
-        kwargs["base_url"] = request.getfixturevalue("base_url")
-    # Common kwargs combinations for loaders should work without errors
-    *_, finished = prepare(schema, loader=loader, headers={"TEST": "foo"}, **kwargs)
-    assert not finished.has_errors
-    assert not finished.has_failures
-
-
-FROM_DICT_ERROR_MESSAGE = "Dictionary as a schema is allowed only with `from_dict` loader"
-
-
-@pytest.mark.parametrize(
-    ("loader", "schema", "message"),
-    [
-        (schemathesis.openapi.from_uri, {}, FROM_DICT_ERROR_MESSAGE),
-        (schemathesis.openapi.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
-        (schemathesis.graphql.from_dict, "", "Schema should be a dictionary for `from_dict` loader"),
-        (schemathesis.openapi.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
-        (schemathesis.openapi.from_file, {}, FROM_DICT_ERROR_MESSAGE),
-        (schemathesis.openapi.from_path, {}, FROM_DICT_ERROR_MESSAGE),
-        (schemathesis.graphql.from_wsgi, {}, FROM_DICT_ERROR_MESSAGE),
-    ],
-)
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_validation(loader, schema, message):
-    # When incorrect schema is passed to a loader
-    with pytest.raises(ValueError, match=message):
-        # Then it should be rejected
-        list(prepare(schema, loader=loader))
-
-
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_custom_loader(swagger_20, openapi2_base_url):
-    swagger_20.base_url = openapi2_base_url
-    # Custom loaders are not validated
-    *_, finished = list(prepare({}, loader=lambda *args, **kwargs: swagger_20))
-    assert not finished.has_errors
-    assert not finished.has_failures
-
-
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_from_path_loader_ignore_network_parameters(openapi2_base_url):
-    # When `from_path` loader is used
-    # And network-related parameters are passed
-    all_events = list(
-        prepare(
-            openapi2_base_url,
-            loader=schemathesis.openapi.from_path,
-            auth=("user", "password"),
-            headers={"X-Foo": "Bar"},
-            auth_type="basic",
-        )
-    )
-    # Then those parameters should be ignored during schema loading
-    # And a proper error message should be displayed
-    assert len(all_events) == 1
-    assert isinstance(all_events[0], events.InternalError)
-    if platform.system() == "Windows":
-        exception_type = "builtins.OSError"
-    else:
-        exception_type = "builtins.FileNotFoundError"
-    assert all_events[0].exception_type == exception_type
 
 
 def test_auth_loader_options(schema_url, app):
