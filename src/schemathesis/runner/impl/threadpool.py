@@ -13,7 +13,6 @@ from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis import create_test
 from ...internal.result import Ok
-from ...stateful import Feedback, Stateful
 from ...transports.auth import get_requests_auth
 from ...utils import capture_hypothesis_output
 from .. import events
@@ -41,8 +40,6 @@ def _run_task(
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
     ctx: RunnerContext,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
     headers: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> None:
@@ -52,8 +49,6 @@ def _run_task(
         as_strategy_kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
 
     def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
-        if recursion_level > stateful_recursion_limit:
-            return
         for _result in maker(
             test_func,
             settings=settings,
@@ -63,7 +58,6 @@ def _run_task(
         ):
             # `result` is always `Ok` here
             _operation, test = _result.ok()
-            feedback = Feedback(stateful, _operation)
             for _event in run_test(
                 _operation,
                 test,
@@ -72,12 +66,10 @@ def _run_task(
                 targets,
                 ctx=ctx,
                 recursion_level=recursion_level,
-                feedback=feedback,
                 headers=headers,
                 **kwargs,
             ):
                 events_queue.put(_event)
-            _run_tests(feedback.get_stateful_tests, recursion_level + 1)
 
     with capture_hypothesis_output():
         while True:
@@ -101,8 +93,8 @@ def _run_task(
                     as_strategy_kwargs=as_strategy_kwargs,
                 )
                 items = Ok((operation, test_function))
+                # TODO: Simplify
                 # This lambda ignores the input arguments to support the same interface for
-                # `feedback.get_stateful_tests`
                 _run_tests(lambda *_, **__: (items,))  # noqa: B023
             else:
                 for event in handle_schema_error(result.err(), ctx, data_generation_methods, 0):
@@ -122,8 +114,6 @@ def thread_task(
     auth_type: str | None,
     headers: dict[str, Any] | None,
     ctx: RunnerContext,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     """A single task, that threads do.
@@ -143,8 +133,6 @@ def thread_task(
             settings=settings,
             generation_config=generation_config,
             ctx=ctx,
-            stateful=stateful,
-            stateful_recursion_limit=stateful_recursion_limit,
             session=session,
             headers=headers,
             **kwargs,
@@ -161,8 +149,6 @@ def wsgi_thread_task(
     settings: hypothesis.settings,
     generation_config: GenerationConfig,
     ctx: RunnerContext,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -176,8 +162,6 @@ def wsgi_thread_task(
         settings=settings,
         generation_config=generation_config,
         ctx=ctx,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
         **kwargs,
     )
 
@@ -193,8 +177,6 @@ def asgi_thread_task(
     generation_config: GenerationConfig,
     headers: dict[str, Any] | None,
     ctx: RunnerContext,
-    stateful: Stateful | None,
-    stateful_recursion_limit: int,
     kwargs: Any,
 ) -> None:
     _run_task(
@@ -208,8 +190,6 @@ def asgi_thread_task(
         settings=settings,
         generation_config=generation_config,
         ctx=ctx,
-        stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
         headers=headers,
         **kwargs,
     )
@@ -321,8 +301,6 @@ class ThreadPoolRunner(BaseRunner):
             "auth_type": self.auth_type,
             "headers": self.headers,
             "ctx": ctx,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "request_config": self.request_config,
@@ -349,8 +327,6 @@ class ThreadPoolWSGIRunner(ThreadPoolRunner):
             "settings": self.hypothesis_settings,
             "generation_config": self.generation_config,
             "ctx": ctx,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "auth": self.auth,
@@ -380,8 +356,6 @@ class ThreadPoolASGIRunner(ThreadPoolRunner):
             "generation_config": self.generation_config,
             "headers": self.headers,
             "ctx": ctx,
-            "stateful": self.stateful,
-            "stateful_recursion_limit": self.stateful_recursion_limit,
             "data_generation_methods": self.schema.data_generation_methods,
             "kwargs": {
                 "store_interactions": self.store_interactions,

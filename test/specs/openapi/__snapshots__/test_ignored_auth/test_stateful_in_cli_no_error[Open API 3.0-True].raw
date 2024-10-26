@@ -47,8 +47,6 @@ Performed checks:
 Experimental Features:
   - Stateful Only: Run only stateful tests
     Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
-  - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
