@@ -3,20 +3,10 @@ import re
 import pytest
 
 import schemathesis
-from schemathesis.constants import NOT_SET
 from schemathesis.exceptions import SchemaError
 from schemathesis.specs.openapi import expressions
-from schemathesis.stateful import ParsedData
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
-
-
-@pytest.mark.parametrize(
-    ("parameters", "body"), [({"a": 1}, None), ({"a": 1}, NOT_SET), ({"a": 1}, {"value": 1}), ({"a": 1}, [1, 2, 3])]
-)
-def test_hashable(parameters, body):
-    # All parsed data should be hashable
-    hash(ParsedData(parameters, body))
 
 
 def add_link(schema, target, **kwargs):

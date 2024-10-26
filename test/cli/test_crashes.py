@@ -83,7 +83,6 @@ def csv_strategy(enum, exclude=()):
             "force-schema-version": st.sampled_from(["20", "30"]),
             "workers": st.integers(min_value=1, max_value=64),
             "request-timeout": st.integers(min_value=1),
-            "stateful-recursion-limit": st.integers(min_value=1, max_value=100),
             "max-response-time": st.integers(min_value=1),
             "validate-schema": st.booleans(),
             "generation-with-security-parameters": st.booleans(),

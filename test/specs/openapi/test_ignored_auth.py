@@ -326,7 +326,6 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
             "--header=Authorization: Basic dGVzdDp0ZXN0",
             "--hypothesis-max-examples=100",
             "--experimental=stateful-only",
-            "--experimental=stateful-test-runner",
             "--show-trace",
         )
         == snapshot_cli
