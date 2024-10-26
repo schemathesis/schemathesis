@@ -21,9 +21,9 @@ Options:
 Experimental options:
   --experimental                            Enable experimental features
                                             [possible values: openapi-3.1,
-                                            schema-analysis, stateful-test-
-                                            runner, stateful-only, coverage-
-                                            phase, positive_data_acceptance]
+                                            schema-analysis, stateful-only,
+                                            coverage-phase,
+                                            positive_data_acceptance]
   --experimental-positive-data-acceptance-allowed-statuses 
                                             Comma-separated list of status codes
                                             considered as successful responses

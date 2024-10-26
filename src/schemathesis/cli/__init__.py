@@ -24,7 +24,6 @@ from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
     DEFAULT_RESPONSE_TIMEOUT,
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
     EXTENSIONS_DOCUMENTATION_URL,
     HOOKS_MODULE_ENV_VAR,
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
@@ -313,7 +312,6 @@ REPORT_TO_SERVICE = ReportToService()
         [
             experimental.OPEN_API_3_1.name,
             experimental.SCHEMA_ANALYSIS.name,
-            experimental.STATEFUL_TEST_RUNNER.name,
             experimental.STATEFUL_ONLY.name,
             experimental.COVERAGE_PHASE.name,
             experimental.POSITIVE_DATA_ACCEPTANCE.name,
@@ -627,14 +625,6 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
-    "--stateful-recursion-limit",
-    help="Recursion depth limit for stateful testing",
-    default=DEFAULT_STATEFUL_RECURSION_LIMIT,
-    show_default=True,
-    type=click.IntRange(1, 100),
-    hidden=True,
-)
-@grouped_option(
     "--generation-allow-x00",
     help="Whether to allow the generation of `\x00` bytes within strings",
     type=str,
@@ -915,7 +905,6 @@ def run(
     fixups: tuple[str] = (),  # type: ignore
     rate_limit: str | None = None,
     stateful: Stateful | None = None,
-    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT,
     force_schema_version: str | None = None,
     sanitize_output: bool = True,
     output_truncate: bool = True,
@@ -1227,7 +1216,6 @@ def run(
         workers_num=workers_num,
         rate_limit=rate_limit,
         stateful=stateful,
-        stateful_recursion_limit=stateful_recursion_limit,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
         checks_config=checks_config,
@@ -1349,7 +1337,6 @@ def into_event_stream(
     dry_run: bool,
     store_interactions: bool,
     stateful: Stateful | None,
-    stateful_recursion_limit: int,
     service_client: ServiceClient | None,
 ) -> Generator[events.ExecutionEvent, None, None]:
     try:
@@ -1398,7 +1385,6 @@ def into_event_stream(
             targets=targets,
             workers_num=workers_num,
             stateful=stateful,
-            stateful_recursion_limit=stateful_recursion_limit,
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
             probe_config=probes.ProbeConfig(

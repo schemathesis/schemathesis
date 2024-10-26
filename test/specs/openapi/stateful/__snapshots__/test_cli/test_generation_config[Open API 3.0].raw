@@ -4,20 +4,40 @@ Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: http://127.0.0.1/schema.yaml
 Base URL: http://127.0.0.1/api
-Specification version: Swagger 2.0
+Specification version: Open API 3.0.2
 Random seed: 42
-Workers: 2
+Workers: 1
 Collected API operations: 3
 Collected API links: 3
 API probing: SUCCESS
 Schema analysis: SKIP
 
-.....
+Stateful tests
+
+...
 
 =================================== SUMMARY ====================================
 
+Links                                                 2xx    4xx    5xx    Total
+
+POST /api/users/
+└── 201
+    ├── GET /api/users/{user_id}
+    └── PATCH /api/users/{user_id}
+
+GET /api/users/{user_id}
+└── 200
+    └── PATCH /api/users/{user_id}
+
 Performed checks:
     not_a_server_error                    N / N passed          PASSED 
+    use_after_free                        N / N passed          PASSED 
+
+Experimental Features:
+  - Stateful Only: Run only stateful tests
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
