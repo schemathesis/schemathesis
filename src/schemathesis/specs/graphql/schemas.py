@@ -14,7 +14,6 @@ from typing import (
     Iterator,
     Mapping,
     NoReturn,
-    Sequence,
     TypeVar,
     cast,
 )
@@ -50,7 +49,6 @@ if TYPE_CHECKING:
 
     from ...auths import AuthStorage
     from ...internal.checks import CheckFunction
-    from ...stateful import Stateful, StatefulTest
     from ...transports.responses import GenericResponse
 
 
@@ -269,11 +267,6 @@ class GraphQLSchema(BaseSchema):
     def get_strategies_from_examples(
         self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
     ) -> list[SearchStrategy[Case]]:
-        return []
-
-    def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
-    ) -> Sequence[StatefulTest]:
         return []
 
     def make_case(
