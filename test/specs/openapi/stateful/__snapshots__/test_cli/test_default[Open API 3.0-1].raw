@@ -12,6 +12,10 @@ Collected API links: 3
 API probing: SUCCESS
 Schema analysis: SKIP
 
+POST /api/users/ .                                                        [ 33%]
+GET /api/users/{user_id} .                                                [ 66%]
+PATCH /api/users/{user_id} .                                              [100%]
+
 Stateful tests
 
 ...
@@ -49,19 +53,11 @@ Performed checks:
     not_a_server_error                    N / N passed          FAILED 
     use_after_free                        N / N passed          PASSED 
 
-Experimental Features:
-  - Stateful Only: Run only stateful tests
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
-  - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 
 Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
+Compressed report size: XX KB
+Report is saved to /tmp/test_default_Open_API_3_0_1_0/file.tar.gz
 
-============================== 1 failed in 1.00s ===============================
+========================= 1 failed in 1.00s ====================================

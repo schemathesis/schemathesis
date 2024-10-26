@@ -18,7 +18,6 @@ from typing import (
     Iterator,
     Literal,
     NoReturn,
-    Sequence,
     Type,
     TypeVar,
     cast,
@@ -72,7 +71,6 @@ if TYPE_CHECKING:
     from .internal.checks import CheckFunction
     from .schemas import BaseSchema
     from .serializers import Serializer
-    from .stateful import Stateful, StatefulTest
     from .transports.responses import GenericResponse, WSGIResponse
 
 
@@ -797,9 +795,6 @@ class APIOperation(Generic[P, C]):
         """Get examples from the API operation."""
         return self.schema.get_strategies_from_examples(self, as_strategy_kwargs=as_strategy_kwargs)
 
-    def get_stateful_tests(self, response: GenericResponse, stateful: Stateful | None) -> Sequence[StatefulTest]:
-        return self.schema.get_stateful_tests(response, self, stateful)
-
     def get_parameter_serializer(self, location: str) -> Callable | None:
         """Get a function that serializes parameters for the given location.
 
@@ -841,23 +836,6 @@ class APIOperation(Generic[P, C]):
             cookies=fast_deepcopy(self.cookies),
             query=fast_deepcopy(self.query),
             body=fast_deepcopy(self.body),
-        )
-
-    def clone(self, **components: Any) -> APIOperation:
-        """Create a new instance of this API operation with updated components."""
-        return self.__class__(
-            path=self.path,
-            method=self.method,
-            verbose_name=self.verbose_name,
-            definition=self.definition,
-            schema=self.schema,
-            app=self.app,
-            base_url=self.base_url,
-            path_parameters=components["path_parameters"],
-            query=components["query"],
-            headers=components["headers"],
-            cookies=components["cookies"],
-            body=components["body"],
         )
 
     def make_case(

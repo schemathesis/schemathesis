@@ -12,7 +12,7 @@ Collected API links: 3
 API probing: SUCCESS
 Schema analysis: SKIP
 
-......
+...
 
 Stateful tests
 
@@ -52,17 +52,11 @@ Performed checks:
     not_a_server_error                    N / N passed          FAILED 
     use_after_free                        N / N passed          PASSED 
 
-Experimental Features:
-  - New Stateful Test Runner: State machine-based runner for stateful tests in CLI
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 
 Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
 
 Compressed report size: XX KB
-Report is saved to /tmp/test_new_stateful_runner_Open_1/file.tar.gz
+Report is saved to /tmp/test_default_Open_API_3_0_2_0/file.tar.gz
 
 ========================= 1 failed in 1.00s ====================================

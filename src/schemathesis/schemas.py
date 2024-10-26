@@ -13,7 +13,6 @@ from typing import (
     Iterable,
     Iterator,
     NoReturn,
-    Sequence,
     TypeVar,
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
@@ -52,7 +51,6 @@ if TYPE_CHECKING:
     from hypothesis.vendor.pretty import RepresentationPrinter
     from pyrate_limiter import Limiter
 
-    from .stateful import Stateful, StatefulTest
     from .stateful.state_machine import APIStateMachine
     from .transports import Transport
     from .transports.responses import GenericResponse
@@ -257,12 +255,6 @@ class BaseSchema(Mapping):
 
     def get_security_requirements(self, operation: APIOperation) -> list[str]:
         """Get applied security requirements for the given API operation."""
-        raise NotImplementedError
-
-    def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
-    ) -> Sequence[StatefulTest]:
-        """Get a list of additional tests, that should be executed after this response from the API operation."""
         raise NotImplementedError
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
