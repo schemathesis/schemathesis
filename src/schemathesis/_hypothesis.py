@@ -283,7 +283,7 @@ def _iter_coverage_cases(
     elif DataGenerationMethod.positive in data_generation_methods:
         case = operation.make_case(**template)
         case.data_generation_method = DataGenerationMethod.positive
-        case.meta = _make_meta()
+        case.meta = _make_meta(description="Default positive test case")
         yield case
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
@@ -378,7 +378,7 @@ def _iter_coverage_cases(
 
 def _make_meta(
     *,
-    description: str | None = None,
+    description: str,
     location: str | None = None,
     parameter: str | None = None,
     parameter_location: str | None = None,
