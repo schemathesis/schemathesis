@@ -513,7 +513,7 @@ import schemathesis
 
 @schemathesis.check
 def port_check(ctx, response, case):
-    value = re.findall("getByDate\(value: (\d+)\)", case.body)[0]
+    value = re.findall(r"getByDate\(value: (\d+)\)", case.body)[0]
     assert 1 <= int(value) <= 65535, "Invalid port"
 """
     )
