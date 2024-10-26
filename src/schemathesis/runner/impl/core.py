@@ -35,7 +35,6 @@ from ..._hypothesis import (
 from ...auths import unregister as unregister_auth
 from ...checks import _make_max_response_time_failure_message
 from ...constants import (
-    DEFAULT_STATEFUL_RECURSION_LIMIT,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SERIALIZERS_SUGGESTION_MESSAGE,
     USER_AGENT,
@@ -65,7 +64,7 @@ from ...runner import events
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
 from ...specs.openapi import formats
-from ...stateful import Feedback, Stateful
+from ...stateful import Stateful
 from ...stateful import events as stateful_events
 from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
@@ -116,7 +115,6 @@ class BaseRunner:
     unique_data: bool = False
     dry_run: bool = False
     stateful: Stateful | None = None
-    stateful_recursion_limit: int = DEFAULT_STATEFUL_RECURSION_LIMIT
     count_operations: bool = True
     count_links: bool = True
     service_client: ServiceClient | None = None
@@ -244,7 +242,7 @@ class BaseRunner:
 
     def _run_stateful_tests(self, ctx: RunnerContext) -> Generator[events.ExecutionEvent, None, None]:
         # Run new-style stateful tests
-        if self.stateful is not None and experimental.STATEFUL_TEST_RUNNER.is_enabled and self.schema.links_count > 0:
+        if self.stateful is not None and self.schema.links_count > 0:
             result = TestResult(
                 method="",
                 path="",
@@ -354,8 +352,6 @@ class BaseRunner:
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
         """Run tests and recursively run additional tests."""
-        if recursion_level > self.stateful_recursion_limit:
-            return
 
         def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
             kw = {}
@@ -376,10 +372,6 @@ class BaseRunner:
         ):
             if isinstance(result, Ok):
                 operation, test = result.ok()
-                if self.stateful is not None and not experimental.STATEFUL_TEST_RUNNER.is_enabled:
-                    feedback = Feedback(self.stateful, operation)
-                else:
-                    feedback = None
                 # Track whether `BeforeExecution` was already emitted.
                 # Schema error may happen before / after `BeforeExecution`, but it should be emitted only once
                 # and the `AfterExecution` event should have the same correlation id as previous `BeforeExecution`
@@ -389,7 +381,6 @@ class BaseRunner:
                         operation,
                         test,
                         ctx=ctx,
-                        feedback=feedback,
                         recursion_level=recursion_level,
                         data_generation_methods=self.schema.data_generation_methods,
                         headers=headers,
@@ -400,18 +391,6 @@ class BaseRunner:
                             before_execution_correlation_id = event.correlation_id
                         if isinstance(event, events.Interrupted):
                             return
-                    # Additional tests, generated via the `feedback` instance
-                    if feedback is not None:
-                        yield from self._run_tests(
-                            feedback.get_stateful_tests,
-                            test_func,
-                            settings=settings,
-                            generation_config=generation_config,
-                            recursion_level=recursion_level + 1,
-                            ctx=ctx,
-                            headers=headers,
-                            **kwargs,
-                        )
                 except OperationSchemaError as exc:
                     yield from handle_schema_error(
                         exc,
@@ -948,7 +927,6 @@ def network_test(
     request_config: RequestConfig,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -971,7 +949,6 @@ def network_test(
                 request_config,
                 store_interactions,
                 headers,
-                feedback,
                 max_response_time,
             )
             response = _network_test(case, *args)
@@ -990,7 +967,6 @@ def _network_test(
     request_config: RequestConfig,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback | None,
     max_response_time: int | None,
 ) -> requests.Response:
     check_results: list[Check] = []
@@ -1046,8 +1022,6 @@ def _network_test(
         status = Status.failure
         raise
     finally:
-        if feedback is not None:
-            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results, headers=headers, session=session)
     return response
@@ -1072,7 +1046,6 @@ def wsgi_test(
     auth_type: str | None,
     headers: dict[str, Any] | None,
     store_interactions: bool,
-    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -1090,7 +1063,6 @@ def wsgi_test(
                 result,
                 headers,
                 store_interactions,
-                feedback,
                 max_response_time,
             )
             response = _wsgi_test(case, *args)
@@ -1107,7 +1079,6 @@ def _wsgi_test(
     result: TestResult,
     headers: dict[str, Any],
     store_interactions: bool,
-    feedback: Feedback | None,
     max_response_time: int | None,
 ) -> WSGIResponse:
     from ...transports.responses import WSGIResponse
@@ -1143,8 +1114,6 @@ def _wsgi_test(
         status = Status.failure
         raise
     finally:
-        if feedback is not None:
-            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_wsgi_response(case, response, headers, response.elapsed.total_seconds(), status, check_results)
     return response
@@ -1159,7 +1128,6 @@ def asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback | None,
     max_response_time: int | None,
     data_generation_methods: list[DataGenerationMethod],
     dry_run: bool,
@@ -1179,7 +1147,6 @@ def asgi_test(
                 result,
                 store_interactions,
                 headers,
-                feedback,
                 max_response_time,
             )
             response = _asgi_test(case, *args)
@@ -1196,7 +1163,6 @@ def _asgi_test(
     result: TestResult,
     store_interactions: bool,
     headers: dict[str, Any] | None,
-    feedback: Feedback | None,
     max_response_time: int | None,
 ) -> requests.Response:
     hook_context = HookContext(operation=case.operation)
@@ -1228,8 +1194,6 @@ def _asgi_test(
         status = Status.failure
         raise
     finally:
-        if feedback is not None:
-            feedback.add_test_case(case, response)
         if store_interactions:
             result.store_requests_response(case, response, status, check_results, headers, session=None)
     return response
