@@ -19,7 +19,6 @@ from typing import (
     Iterator,
     Mapping,
     NoReturn,
-    Sequence,
     TypeVar,
     cast,
 )
@@ -50,7 +49,6 @@ from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...stateful import Stateful, StatefulTest
 from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
 from . import links, serialization
@@ -105,13 +103,6 @@ class BaseOpenAPISchema(BaseSchema):
     @property
     def spec_version(self) -> str:
         raise NotImplementedError
-
-    def get_stateful_tests(
-        self, response: GenericResponse, operation: APIOperation, stateful: Stateful | None
-    ) -> Sequence[StatefulTest]:
-        if stateful == Stateful.links:
-            return links.get_links(response, operation, field=self.links_field)
-        return []
 
     def __repr__(self) -> str:
         info = self.raw_schema["info"]

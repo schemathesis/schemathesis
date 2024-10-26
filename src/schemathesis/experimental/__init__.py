@@ -79,13 +79,6 @@ SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
     description="Analyzing API schemas via Schemathesis.io",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2056",
 )
-STATEFUL_TEST_RUNNER = GLOBAL_EXPERIMENTS.create_experiment(
-    name="stateful-test-runner",
-    verbose_name="New Stateful Test Runner",
-    env_var="STATEFUL_TEST_RUNNER",
-    description="State machine-based runner for stateful tests in CLI",
-    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
-)
 STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
     name="stateful-only",
     verbose_name="Stateful Only",

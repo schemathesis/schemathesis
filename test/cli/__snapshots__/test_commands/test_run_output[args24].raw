@@ -21,6 +21,7 @@ Options:
 Experimental options:
   --experimental                            Enable experimental features
                                             [possible values: openapi-3.1,
+<<<<<<< HEAD
                                             schema-analysis, stateful-test-
                                             runner, stateful-only, coverage-
                                             phase, positive_data_acceptance]
@@ -28,6 +29,15 @@ Experimental options:
                                             Comma-separated list of status codes
                                             expected for test cases with a
                                             missing required header
+||||||| parent of f5d11f16 (feat!: Replace stateful test runner)
+                                            schema-analysis, stateful-test-
+                                            runner, stateful-only, coverage-
+                                            phase, positive_data_acceptance]
+=======
+                                            schema-analysis, stateful-only,
+                                            coverage-phase,
+                                            positive_data_acceptance]
+>>>>>>> f5d11f16 (feat!: Replace stateful test runner)
   --experimental-positive-data-acceptance-allowed-statuses 
                                             Comma-separated list of status codes
                                             considered as successful responses

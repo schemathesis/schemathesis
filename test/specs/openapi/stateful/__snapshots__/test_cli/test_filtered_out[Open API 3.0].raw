@@ -7,21 +7,19 @@ Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
-Collected API operations: 3
-Collected API links: 3
+Collected API operations: 1
+Collected API links: 0
 API probing: SUCCESS
 Schema analysis: SKIP
 
-POST /api/users/ .                                                        [ 33%]
-GET /api/users/{user_id} .                                                [ 66%]
-PATCH /api/users/{user_id} .                                              [100%]
+GET /api/success .                                                        [100%]
 
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                    N / N passed          PASSED 
+    not_a_server_error                    1 / 1 passed          PASSED 
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-============================== in 1.00s ========================================
+============================== 1 passed in 1.00s ===============================

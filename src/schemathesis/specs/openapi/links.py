@@ -7,174 +7,20 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from difflib import get_close_matches
-from types import SimpleNamespace
-from typing import TYPE_CHECKING, Any, Generator, Literal, NoReturn, Sequence, TypedDict, Union, cast
+from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cast
 
 from ...constants import NOT_SET
-from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case, TransitionId
-from ...stateful import ParsedData, StatefulTest, UnresolvableLink
 from ...stateful.state_machine import Direction
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
-from .parameters import OpenAPI20Body, OpenAPI30Body, OpenAPIParameter
-from .references import RECURSION_DEPTH_LIMIT, Unresolvable
+from .references import RECURSION_DEPTH_LIMIT
 
 if TYPE_CHECKING:
     from hypothesis.vendor.pretty import RepresentationPrinter
     from jsonschema import RefResolver
 
-    from ...parameters import ParameterSet
-    from ...transports.responses import GenericResponse
     from ...types import NotSet
-
-
-@dataclass(repr=False)
-class Link(StatefulTest):
-    operation: APIOperation
-    parameters: dict[str, Any]
-    request_body: Any = NOT_SET
-    merge_body: bool = True
-
-    def __post_init__(self) -> None:
-        if self.request_body is not NOT_SET and not self.operation.body:
-            # Link defines `requestBody` for a parameter that does not accept one
-            raise ValueError(
-                f"Request body is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
-            )
-
-    @classmethod
-    def from_definition(cls, name: str, definition: dict[str, dict[str, Any]], source_operation: APIOperation) -> Link:
-        # Links can be behind a reference
-        _, definition = source_operation.schema.resolver.resolve_in_scope(  # type: ignore
-            definition, source_operation.definition.scope
-        )
-        if "operationId" in definition:
-            # source_operation.schema is `BaseOpenAPISchema` and has this method
-            operation = source_operation.schema.get_operation_by_id(definition["operationId"])  # type: ignore
-        else:
-            operation = source_operation.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
-        extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
-        return cls(
-            # Pylint can't detect that the API operation is always defined at this point
-            # E.g. if there is no matching operation or no operations at all, then a ValueError will be risen
-            name=name,
-            operation=operation,
-            parameters=definition.get("parameters", {}),
-            request_body=definition.get("requestBody", NOT_SET),  # `None` might be a valid value - `null`
-            merge_body=extension.get("merge_body", True) if extension is not None else True,
-        )
-
-    def parse(self, case: Case, response: GenericResponse) -> ParsedData:
-        """Parse data into a structure expected by links definition."""
-        context = expressions.ExpressionContext(case=case, response=response)
-        parameters = {}
-        for parameter, expression in self.parameters.items():
-            evaluated = expressions.evaluate(expression, context)
-            if isinstance(evaluated, Unresolvable):
-                raise UnresolvableLink(f"Unresolvable reference in the link: {expression}")
-            parameters[parameter] = evaluated
-        body = expressions.evaluate(self.request_body, context, evaluate_nested=True)
-        if self.merge_body:
-            body = merge_body(case.body, body)
-        return ParsedData(parameters=parameters, body=body)
-
-    def is_match(self) -> bool:
-        return self.operation.schema.filter_set.match(SimpleNamespace(operation=self.operation))
-
-    def make_operation(self, collected: list[ParsedData]) -> APIOperation:
-        """Create a modified version of the original API operation with additional data merged in."""
-        # We split the gathered data among all locations & store the original parameter
-        containers = {
-            location: {
-                parameter.name: {"options": [], "parameter": parameter}
-                for parameter in getattr(self.operation, container_name)
-            }
-            for location, container_name in LOCATION_TO_CONTAINER.items()
-        }
-        # There might be duplicates in the data
-        for item in set(collected):
-            for name, value in item.parameters.items():
-                container = self._get_container_by_parameter_name(name, containers)
-                container.append(value)
-            if "body" in containers["body"] and item.body is not NOT_SET:
-                containers["body"]["body"]["options"].append(item.body)
-        # These are the final `path_parameters`, `query`, and other API operation components
-        components: dict[str, ParameterSet] = {
-            container_name: getattr(self.operation, container_name).__class__()
-            for location, container_name in LOCATION_TO_CONTAINER.items()
-        }
-        # Here are all components that are filled with parameters
-        for location, parameters in containers.items():
-            for parameter_data in parameters.values():
-                parameter = parameter_data["parameter"]
-                if parameter_data["options"]:
-                    definition = fast_deepcopy(parameter.definition)
-                    if "schema" in definition:
-                        # The actual schema doesn't matter since we have a list of allowed values
-                        definition["schema"] = {"enum": parameter_data["options"]}
-                    else:
-                        # Other schema-related keywords will be ignored later, during the canonicalisation step
-                        # inside `hypothesis-jsonschema`
-                        definition["enum"] = parameter_data["options"]
-                    new_parameter: OpenAPIParameter
-                    if isinstance(parameter, OpenAPI30Body):
-                        new_parameter = parameter.__class__(
-                            definition, media_type=parameter.media_type, required=parameter.required
-                        )
-                    elif isinstance(parameter, OpenAPI20Body):
-                        new_parameter = parameter.__class__(definition, media_type=parameter.media_type)
-                    else:
-                        new_parameter = parameter.__class__(definition)
-                    components[LOCATION_TO_CONTAINER[location]].add(new_parameter)
-                else:
-                    # No options were gathered for this parameter - use the original one
-                    components[LOCATION_TO_CONTAINER[location]].add(parameter)
-        return self.operation.clone(**components)
-
-    def _get_container_by_parameter_name(self, full_name: str, templates: dict[str, dict[str, dict[str, Any]]]) -> list:
-        """Detect in what request part the parameters is defined."""
-        location: str | None
-        try:
-            # The parameter name is prefixed with its location. Example: `path.id`
-            location, name = full_name.split(".")
-        except ValueError:
-            location, name = None, full_name
-        if location:
-            try:
-                parameters = templates[location]
-            except KeyError:
-                self._unknown_parameter(full_name)
-        else:
-            for parameters in templates.values():
-                if name in parameters:
-                    break
-            else:
-                self._unknown_parameter(full_name)
-        if not parameters:
-            self._unknown_parameter(full_name)
-        return parameters[name]["options"]
-
-    def _unknown_parameter(self, name: str) -> NoReturn:
-        raise ValueError(
-            f"Parameter `{name}` is not defined in API operation {self.operation.method.upper()} {self.operation.path}"
-        )
-
-
-def get_links(response: GenericResponse, operation: APIOperation, field: str) -> Sequence[Link]:
-    """Get `x-links` / `links` definitions from the schema."""
-    responses = operation.definition.raw["responses"]
-    if str(response.status_code) in responses:
-        definition = responses[str(response.status_code)]
-    elif response.status_code in responses:
-        definition = responses[response.status_code]
-    else:
-        definition = responses.get("default", {})
-    if not definition:
-        return []
-    _, definition = operation.schema.resolver.resolve_in_scope(definition, operation.definition.scope)  # type: ignore[attr-defined]
-    links = definition.get(field, {})
-    return [Link.from_definition(name, definition, operation) for name, definition in links.items()]
 
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"

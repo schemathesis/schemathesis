@@ -464,30 +464,7 @@ Command Line Interface
 By default, stateful testing is enabled. You can disable it via the ``--stateful=none`` CLI option.
 Please, note that we plan to implement more different algorithms for stateful testing in the future.
 
-.. code:: bash
-
-    st run http://0.0.0.0/schema.yaml
-
-    ...
-
-    POST /api/users/ .                                     [ 33%]
-        -> GET /api/users/{user_id} .                      [ 50%]
-            -> PATCH /api/users/{user_id} .                [ 60%]
-        -> PATCH /api/users/{user_id} .                    [ 66%]
-    GET /api/users/{user_id} .                             [ 83%]
-        -> PATCH /api/users/{user_id} .                    [ 85%]
-    PATCH /api/users/{user_id} .                           [100%]
-
-    ...
-
-
-Each additional test will be indented and prefixed with ``->`` in the CLI output.
-You can specify recursive links if you want. The default recursion depth limit is **5** and can be changed with the
-``--stateful-recursion-limit=<N>`` CLI option.
-
-Schemathesis's CLI now supports the new approach to stateful testing based on state machines. 
-It is available as an experimental feature and can be enabled using the ``--experimental=stateful-test-runner`` CLI option or by setting the
-``SCHEMATHESIS_EXPERIMENTAL_STATEFUL_TEST_RUNNER=true`` environment variable. For more information, refer to the :ref:`stateful-test-runner` section.
+By default, state machines are executed until no new failures are found in a single iteration.
 
 .. code-block::
 
@@ -501,11 +478,6 @@ It is available as an experimental feature and can be enabled using the ``--expe
     GET /api/users/{user_id}
     └── 200
         └── PATCH /api/users/{user_id}                     513      0      0      513
-
-
-The old approach to stateful testing, not based on state machines, is still the default in the CLI. 
-However, we recommend using the new approach as it offers more effective testing. 
-In the future, the new approach will become the default in the CLI, and the old approach will be removed.
 
 Please note that the visual appearance and configuration options for stateful testing in the CLI may differ slightly from the in-code approach. 
 We are continuously working on improving the CLI experience and aligning it with the in-code approach.

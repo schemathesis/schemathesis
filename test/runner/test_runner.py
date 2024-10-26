@@ -1379,7 +1379,6 @@ STATEFUL_KWARGS = {
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_auth(any_app_schema):
-    experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()
     _, *_, after_execution, _ = from_schema(any_app_schema, auth=("admin", "password"), **STATEFUL_KWARGS).execute()
     interactions = after_execution.result.interactions
@@ -1391,7 +1390,6 @@ def test_stateful_auth(any_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_all_generation_methods(real_app_schema):
-    experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()
     method = DataGenerationMethod.negative
     real_app_schema.data_generation_methods = [method]
@@ -1406,7 +1404,6 @@ def test_stateful_all_generation_methods(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_seed(real_app_schema):
-    experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()
     requests = []
     for _ in range(3):
@@ -1423,7 +1420,6 @@ def test_stateful_seed(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_override(real_app_schema):
-    experimental.STATEFUL_TEST_RUNNER.enable()
     experimental.STATEFUL_ONLY.enable()
     _, *_, after_execution, _ = from_schema(
         real_app_schema,
@@ -1443,7 +1439,6 @@ def test_stateful_override(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "get_user", "create_user", "update_user")
 def test_stateful_exit_first(real_app_schema):
-    experimental.STATEFUL_TEST_RUNNER.enable()
     _, *ev, _ = from_schema(real_app_schema, exit_first=True, **STATEFUL_KWARGS).execute()
     assert not any(isinstance(event, events.StatefulEvent) for event in ev)
 

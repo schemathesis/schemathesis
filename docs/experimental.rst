@@ -212,35 +212,6 @@ Configure status codes:
 
     export SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES=4XX
 
-.. _stateful-test-runner:
-
-New Stateful Test Runner
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-This experimental feature enables a more effective way to run stateful tests in the CLI, along with a new display style. 
-It leverages state machines, which were previously available in the ``pytest`` integration, to generate more diverse test scenarios. 
-By default, state machines are executed until no new failures are found in a single iteration.
-
-.. important::
-
-   The new test runner does not yet support all configuration options available in the old one.
-
-In CLI
-~~~~~~
-
-.. code-block:: bash
-
-    st run https://example.schemathesis.io/openapi.json --experimental=stateful-test-runner
-
-Using Environment Variables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. code-block:: bash
-
-    export SCHEMATHESIS_EXPERIMENTAL_STATEFUL_TEST_RUNNER=true
-
-For more details, join the `GitHub Discussion #2262 <https://github.com/schemathesis/schemathesis/discussions/2262>`_.
-
 Schema Analysis
 ~~~~~~~~~~~~~~~
 
