@@ -49,6 +49,7 @@ from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import SearchStrategy
+    from hypothesis.vendor.pretty import RepresentationPrinter
     from pyrate_limiter import Limiter
 
     from .stateful import Stateful, StatefulTest
@@ -101,6 +102,9 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
+
+    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
+        return None
 
     def include(
         self,
