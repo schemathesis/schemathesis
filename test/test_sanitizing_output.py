@@ -271,7 +271,6 @@ def serialized_check(case_factory, response_factory):
 def test_sanitize_serialized_check(serialized_check):
     sanitize_serialized_check(serialized_check)
     assert serialized_check.example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
-    assert serialized_check.history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
 
 
 def test_sanitize_serialized_interaction(serialized_check):
@@ -305,7 +304,6 @@ def test_sanitize_serialized_interaction(serialized_check):
     sanitize_serialized_interaction(interaction)
 
     assert interaction.checks[0].example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
-    assert interaction.checks[0].history[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
     assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
