@@ -10,7 +10,8 @@ from ..targets import TargetMetricCollector
 from . import events
 
 if TYPE_CHECKING:
-    from ..models import Case, Check
+    from ..models import Case
+    from ..runner.models import Check
     from ..transports.responses import GenericResponse
     from ..types import NotSet
 

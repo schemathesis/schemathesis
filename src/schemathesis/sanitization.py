@@ -3,17 +3,13 @@ from __future__ import annotations
 import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
 from .constants import NOT_SET
 
 if TYPE_CHECKING:
-    from requests import PreparedRequest
-
-    from .models import Case, CaseSource, Request
-    from .runner.serialization import SerializedCase, SerializedCheck, SerializedInteraction
-    from .transports.responses import GenericResponse
+    from .models import Case
 
 # Exact keys to sanitize
 DEFAULT_KEYS_TO_SANITIZE = frozenset(
@@ -164,41 +160,6 @@ def sanitize_case(case: Case, *, config: Config | None = None) -> None:
         sanitize_value(case.query, config=config)
     if case.body not in (None, NOT_SET):
         sanitize_value(case.body, config=config)
-    if case.source is not None:
-        sanitize_history(case.source, config=config)
-
-
-def sanitize_history(source: CaseSource, *, config: Config | None = None) -> None:
-    """Recursively sanitize history of case/response pairs."""
-    current: CaseSource | None = source
-    while current is not None:
-        sanitize_case(current.case, config=config)
-        sanitize_response(current.response, config=config)
-        current = current.case.source
-
-
-def sanitize_response(response: GenericResponse, *, config: Config | None = None) -> None:
-    # Sanitize headers
-    sanitize_value(response.headers, config=config)
-
-
-def sanitize_request(request: PreparedRequest | Request, *, config: Config | None = None) -> None:
-    from requests import PreparedRequest
-
-    if isinstance(request, PreparedRequest) and request.url:
-        request.url = sanitize_url(request.url, config=config)
-    else:
-        request = cast("Request", request)
-        request.uri = sanitize_url(request.uri, config=config)
-    # Sanitize headers
-    sanitize_value(request.headers, config=config)
-
-
-def sanitize_output(case: Case, response: GenericResponse | None = None, *, config: Config | None = None) -> None:
-    sanitize_case(case, config=config)
-    if response is not None:
-        sanitize_response(response, config=config)
-        sanitize_request(response.request, config=config)
 
 
 def sanitize_url(url: str, *, config: Config | None = None) -> str:
@@ -224,26 +185,3 @@ def sanitize_url(url: str, *, config: Config | None = None) -> str:
     # Reconstruct the URL
     sanitized_url_parts = parsed._replace(netloc=netloc, query=sanitized_query)
     return urlunsplit(sanitized_url_parts)
-
-
-def sanitize_serialized_check(check: SerializedCheck, *, config: Config | None = None) -> None:
-    sanitize_request(check.request, config=config)
-    response = check.response
-    if response:
-        sanitize_value(response.headers, config=config)
-    sanitize_serialized_case(check.case, config=config)
-
-
-def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = None) -> None:
-    case.url = sanitize_url(case.url, config=config)
-    for value in (case.path_parameters, case.headers, case.cookies, case.query, case.extra_headers):
-        if value is not None:
-            sanitize_value(value, config=config)
-
-
-def sanitize_serialized_interaction(interaction: SerializedInteraction, *, config: Config | None = None) -> None:
-    sanitize_request(interaction.request, config=config)
-    if interaction.response is not None:
-        sanitize_value(interaction.response.headers, config=config)
-    for check in interaction.checks:
-        sanitize_serialized_check(check, config=config)

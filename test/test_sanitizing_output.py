@@ -1,15 +1,9 @@
 from urllib.parse import urlencode
 
 import pytest
-import requests
-from requests import Request, Response
+from requests import Request
 
 from schemathesis.constants import NOT_SET
-from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import CaseSource, Check, Status, TestPhase, TransitionId
-from schemathesis.models import Request as SerializedRequest
-from schemathesis.models import Response as SerializedResponse
-from schemathesis.runner.serialization import SerializedCheck, SerializedInteraction
 from schemathesis.sanitization import (
     DEFAULT_KEYS_TO_SANITIZE,
     DEFAULT_REPLACEMENT,
@@ -17,14 +11,8 @@ from schemathesis.sanitization import (
     Config,
     configure,
     sanitize_case,
-    sanitize_history,
-    sanitize_output,
-    sanitize_request,
-    sanitize_serialized_check,
-    sanitize_serialized_interaction,
     sanitize_url,
 )
-from schemathesis.transports import serialize_payload
 
 
 @pytest.fixture
@@ -99,103 +87,6 @@ def test_sanitize_case_body_variants(sanitized_case_factory_factory, body, expec
     assert sanitized_case_factory_factory(body=body).body == expected
 
 
-def test_sanitize_history(case_factory):
-    case3 = case_factory(headers={"Authorization": "Bearer token"})
-    source3 = CaseSource(
-        case=case3,
-        response=requests.Response(),
-        elapsed=0.3,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-
-    case2 = case_factory(headers={"X-API-Key": "12345"}, source=source3)
-    source2 = CaseSource(
-        case=case2,
-        response=requests.Response(),
-        elapsed=0.2,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-
-    case1 = case_factory(headers={"Password": "password"}, source=source2)
-    source1 = CaseSource(
-        case=case1,
-        response=requests.Response(),
-        elapsed=0.1,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-
-    sanitize_history(source1)
-
-    assert case1.headers == {"Password": "[Filtered]"}
-    assert case2.headers == {"X-API-Key": "[Filtered]"}
-    assert case3.headers == {"Authorization": "[Filtered]"}
-
-
-def test_sanitize_history_empty(case_factory):
-    case = case_factory(headers={"Password": "password"})
-    source = CaseSource(
-        case=case,
-        response=requests.Response(),
-        elapsed=0.1,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-
-    sanitize_history(source)
-
-    assert case.headers == {"Password": "[Filtered]"}
-
-
-@pytest.mark.parametrize(
-    ("headers", "expected"),
-    [
-        ({"Authorization": "Bearer token"}, {"Authorization": "[Filtered]"}),
-        ({"Custom-Token": "custom_token_value"}, {"Custom-Token": "[Filtered]"}),
-        ({"Content-Type": "application/json"}, {"Content-Type": "application/json"}),
-    ],
-)
-def test_sanitize_request(request_factory, headers, expected):
-    request = request_factory(headers=headers)
-    sanitize_request(request)
-    assert request.headers == {**expected, "Content-Length": "0"}
-
-
-def test_sanitize_request_url(request_factory):
-    request = request_factory(url="http://user:pass@127.0.0.1/path")
-    sanitize_request(request)
-    assert request.url == "http://[Filtered]@127.0.0.1/path"
-
-
-def test_sanitize_serialized_request():
-    request = SerializedRequest(
-        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}
-    )
-    sanitize_request(request)
-    assert request.uri == "http://[Filtered]@127.0.0.1/path"
-
-
-def test_sanitize_output(case_factory, request_factory):
-    response = Response()
-    response.headers = {"API-Key": "secret"}
-    response.request = request_factory(headers={"Custom-Token": "custom_token_value"})
-    case = case_factory(headers={"Authorization": "Bearer token"}, query={"api_key": "12345"})
-    sanitize_output(case, response=response)
-    assert case.headers == {"Authorization": "[Filtered]"}
-    assert case.query == {"api_key": "[Filtered]"}
-    assert response.headers == {"API-Key": "[Filtered]"}
-    assert response.request.headers == {"Custom-Token": "[Filtered]", "Content-Length": "0"}
-
-
-def test_sanitize_output_no_response(case_factory):
-    case = case_factory(headers={"Authorization": "Bearer token"}, query={"api_key": "12345"})
-    sanitize_output(case)
-    assert case.headers == {"Authorization": "[Filtered]"}
-    assert case.query == {"api_key": "[Filtered]"}
-
-
 URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=` character
 
 
@@ -246,86 +137,6 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
 )
 def test_sanitize_url(input_url, expected_url):
     assert sanitize_url(input_url) == expected_url
-
-
-@pytest.fixture
-def serialized_check(case_factory, response_factory):
-    root_case = case_factory()
-    value = "secret"
-    body = serialize_payload(b'{"id": 5}')
-    response = SerializedResponse(
-        status_code=201,
-        body=body,
-        body_size=len(body),
-        message="Created",
-        encoding="utf-8",
-        http_version="1.1",
-        elapsed=1.0,
-        headers={"Content-Type": ["application/json"], "X-Token": [value]},
-        verify=True,
-    )
-    root_case.source = CaseSource(
-        case=case_factory(),
-        response=response_factory.requests(headers={"X-Token": value}),
-        elapsed=1.0,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-    check = Check(
-        name="test",
-        value=Status.failure,
-        request=SerializedRequest(
-            method="POST",
-            uri="http://user:pass@127.0.0.1/path",
-            body=None,
-            body_size=None,
-            headers={"X-Token": "Secret"},
-        ),
-        response=response,
-        case=root_case,
-    )
-    return SerializedCheck.from_check(check)
-
-
-def test_sanitize_serialized_check(serialized_check):
-    sanitize_serialized_check(serialized_check)
-    assert serialized_check.case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
-
-
-def test_sanitize_serialized_interaction(serialized_check):
-    request = SerializedRequest(
-        method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={"X-Token": "Secret"}
-    )
-    response = SerializedResponse(
-        status_code=500,
-        message="Internal Server Error",
-        body=None,
-        body_size=None,
-        headers={"X-Token": ["Secret"]},
-        encoding=None,
-        http_version="1.1",
-        elapsed=1.0,
-        verify=True,
-    )
-    interaction = SerializedInteraction(
-        request=request,
-        response=response,
-        checks=[serialized_check],
-        status=Status.failure,
-        recorded_at="",
-        data_generation_method=DataGenerationMethod.positive,
-        phase=TestPhase.GENERATE,
-        description=None,
-        location=None,
-        parameter=None,
-        parameter_location=None,
-    )
-    sanitize_serialized_interaction(interaction)
-
-    assert interaction.checks[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
-    assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
-    assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
-    assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
 
 
 @pytest.fixture

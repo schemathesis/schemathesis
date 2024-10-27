@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..exceptions import format_exception
+from ..internal.exceptions import format_exception
 
 if TYPE_CHECKING:
     from . import ci
@@ -42,8 +42,8 @@ class Error(Event):
 
     exception: Exception
 
-    def get_message(self, include_traceback: bool = False) -> str:
-        return format_exception(self.exception, include_traceback=include_traceback)
+    def get_message(self, with_traceback: bool = False) -> str:
+        return format_exception(self.exception, with_traceback=with_traceback)
 
 
 @dataclass

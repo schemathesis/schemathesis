@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from . import events
 
 if TYPE_CHECKING:
-    from ..models import Check
+    from ..runner.models import Check
     from .statistic import TransitionStats
 
 

@@ -1,19 +1,21 @@
 from __future__ import annotations
 
 import enum
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from ..exceptions import RuntimeErrorType, SchemaError, SchemaErrorType, format_exception
+from ..exceptions import SchemaError, SchemaErrorType
+from ..internal.exceptions import format_exception
 from ..internal.result import Err, Ok, Result
-from .serialization import SerializedError, SerializedTestResult
+from .errors import EngineErrorInfo
 
 if TYPE_CHECKING:
-    from ..models import APIOperation, Status, TestResult, TestResultSet
+    from ..models import APIOperation
     from ..schemas import BaseSchema, Specification
     from ..service.models import AnalysisResult
     from ..stateful import events
     from . import probes
+    from .models import Status, TestResult, TestResultSet
 
 
 @dataclass
@@ -23,8 +25,12 @@ class ExecutionEvent:
     # Whether this event is expected to be the last one in the event stream
     is_terminal = False
 
+    def _asdict(self) -> dict[str, Any]:
+        return {}
+
     def asdict(self, **kwargs: Any) -> dict[str, Any]:
-        data = asdict(self, **kwargs)
+        data = self._asdict()
+        data.update(**kwargs)
         # An internal tag for simpler type identification
         data["event_type"] = self.__class__.__name__
         return data
@@ -72,6 +78,19 @@ class Initialized(ExecutionEvent):
             seed=seed,
         )
 
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "schema": self.schema,
+            "specification": self.specification.name,
+            "operations_count": self.operations_count,
+            "links_count": self.links_count,
+            "location": self.location,
+            "seed": self.seed,
+            "base_url": self.base_url,
+            "base_path": self.base_path,
+            "specification_name": self.specification_name,
+        }
+
 
 @dataclass
 class BeforeProbing(ExecutionEvent):
@@ -96,7 +115,7 @@ class BeforeAnalysis(ExecutionEvent):
 class AfterAnalysis(ExecutionEvent):
     analysis: Result[AnalysisResult, Exception] | None
 
-    def _serialize(self) -> dict[str, Any]:
+    def _asdict(self) -> dict[str, Any]:
         from ..service.models import AnalysisSuccess
 
         data = {}
@@ -108,11 +127,6 @@ class AfterAnalysis(ExecutionEvent):
                 data["error"] = result.message
         elif isinstance(self.analysis, Err):
             data["error"] = format_exception(self.analysis.err())
-        return data
-
-    def asdict(self, **kwargs: Any) -> dict[str, Any]:
-        data = self._serialize()
-        data["event_type"] = self.__class__.__name__
         return data
 
 
@@ -133,6 +147,9 @@ class BeforeExecution(ExecutionEvent):
     def from_operation(cls, operation: APIOperation, correlation_id: str) -> BeforeExecution:
         return cls(verbose_name=operation.verbose_name, correlation_id=correlation_id)
 
+    def _asdict(self) -> dict[str, Any]:
+        return {"verbose_name": self.verbose_name, "correlation_id": self.correlation_id}
+
 
 @dataclass
 class AfterExecution(ExecutionEvent):
@@ -143,7 +160,7 @@ class AfterExecution(ExecutionEvent):
 
     # APIOperation test status - success / failure / error
     status: Status
-    result: SerializedTestResult
+    result: TestResult
     # Test running time
     elapsed_time: float
     correlation_id: str
@@ -162,12 +179,22 @@ class AfterExecution(ExecutionEvent):
     ) -> AfterExecution:
         return cls(
             verbose_name=operation.verbose_name,
-            result=SerializedTestResult.from_test_result(result),
+            result=result,
             status=status,
             elapsed_time=elapsed_time,
             hypothesis_output=hypothesis_output,
             correlation_id=correlation_id,
         )
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "verbose_name": self.verbose_name,
+            "status": self.status.value,
+            "result": self.result.asdict(),
+            "elapsed_time": self.elapsed_time,
+            "correlation_id": self.correlation_id,
+            "hypothesis_output": self.hypothesis_output,
+        }
 
 
 @dataclass
@@ -236,7 +263,7 @@ class InternalError(ExecutionEvent):
     ) -> InternalError:
         exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
         exception = format_exception(exc)
-        exception_with_traceback = format_exception(exc, include_traceback=True)
+        exception_with_traceback = format_exception(exc, with_traceback=True)
         return cls(
             type=type_,
             subtype=subtype,
@@ -247,6 +274,18 @@ class InternalError(ExecutionEvent):
             exception=exception,
             exception_with_traceback=exception_with_traceback,
         )
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "type": self.type.value,
+            "subtype": self.subtype.value if self.subtype else None,
+            "title": self.title,
+            "message": self.message,
+            "extras": self.extras,
+            "exception_type": self.exception_type,
+            "exception": self.exception,
+            "exception_with_traceback": self.exception_with_traceback,
+        }
 
 
 @dataclass
@@ -266,8 +305,15 @@ class AfterStatefulExecution(ExecutionEvent):
     """Happens after the stateful test run."""
 
     status: Status
-    result: SerializedTestResult
+    result: TestResult
     elapsed_time: float
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "status": self.status.value,
+            "result": self.result.asdict(),
+            "elapsed_time": self.elapsed_time,
+        }
 
 
 @dataclass
@@ -288,7 +334,7 @@ class Finished(ExecutionEvent):
     has_errors: bool
     has_logs: bool
     is_empty: bool
-    generic_errors: list[SerializedError]
+    generic_errors: list[EngineErrorInfo]
     warnings: list[str]
 
     total: dict[str, dict[str | Status, int]]
@@ -308,16 +354,23 @@ class Finished(ExecutionEvent):
             has_logs=results.has_logs,
             is_empty=results.is_empty,
             total=results.total,
-            generic_errors=[
-                SerializedError.with_exception(
-                    type_=RuntimeErrorType.SCHEMA_GENERIC,
-                    exception=error,
-                    title=error.full_path,
-                    message=error.message,
-                    extras=[],
-                )
-                for error in results.generic_errors
-            ],
+            generic_errors=[EngineErrorInfo(error, title=error.full_path) for error in results.generic_errors],
             warnings=results.warnings,
             running_time=running_time,
         )
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "passed_count": self.passed_count,
+            "skipped_count": self.skipped_count,
+            "failed_count": self.failed_count,
+            "errored_count": self.errored_count,
+            "has_failures": self.has_failures,
+            "has_errors": self.has_errors,
+            "has_logs": self.has_logs,
+            "is_empty": self.is_empty,
+            "generic_errors": [error.asdict() for error in self.generic_errors],
+            "warnings": self.warnings,
+            "total": self.total,
+            "running_time": self.running_time,
+        }

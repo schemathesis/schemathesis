@@ -5,7 +5,8 @@ import sys
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO, TypeVar
 
-from .exceptions import SchemaError, SchemaErrorType, extract_requests_exception_details
+from .exceptions import SchemaError, SchemaErrorType
+from .internal.exceptions import get_request_error_extras, get_request_error_message
 
 if TYPE_CHECKING:
     import yaml
@@ -28,7 +29,8 @@ def load_schema_from_url(loader: Callable[[], R]) -> R:
             type_ = SchemaErrorType.CONNECTION_OTHER
         else:
             type_ = SchemaErrorType.NETWORK_OTHER
-        message, extras = extract_requests_exception_details(exc)
+        message = get_request_error_message(exc)
+        extras = get_request_error_extras(exc)
         raise SchemaError(message=message, type=type_, url=url, response=exc.response, extras=extras) from exc
     _raise_for_status(response)
     return response

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 import re
-import traceback
 from dataclasses import dataclass, field
 from hashlib import sha1
 from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
@@ -12,13 +11,11 @@ from .internal.output import truncate_json
 
 if TYPE_CHECKING:
     from json import JSONDecodeError
-    from types import TracebackType
 
     import hypothesis.errors
     from graphql.error import GraphQLFormattedError
     from jsonschema import RefResolutionError, ValidationError
     from jsonschema import SchemaError as JsonSchemaError
-    from requests import RequestException
 
     from .failures import FailureContext
     from .transports.responses import GenericResponse
@@ -40,19 +37,6 @@ class CheckFailed(AssertionError):
         super().__init__(*args)
         self.context = context
         self.causes = causes
-
-
-def make_unique_by_key(
-    check_name: str, check_message: str | None, context: FailureContext | None
-) -> tuple[str | None, ...]:
-    """A key to distinguish different failed checks.
-
-    It is not only based on `FailureContext`, because the end-user may raise plain `AssertionError` in their custom
-    checks, and those won't have any context attached.
-    """
-    if context is not None:
-        return context.unique_by_key(check_message)
-    return check_name, check_message
 
 
 def deduplicate_failed_checks(
@@ -336,44 +320,6 @@ class RecursiveReferenceError(Exception):
 
 
 @enum.unique
-class RuntimeErrorType(str, enum.Enum):
-    # Connection related issues
-    CONNECTION_SSL = "connection_ssl"
-    CONNECTION_OTHER = "connection_other"
-    NETWORK_OTHER = "network_other"
-
-    # Hypothesis issues
-    HYPOTHESIS_DEADLINE_EXCEEDED = "hypothesis_deadline_exceeded"
-    HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
-    HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR = "hypothesis_unsupported_graphql_scalar"
-    HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
-    HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH = "hypothesis_health_check_filter_too_much"
-    HYPOTHESIS_HEALTH_CHECK_TOO_SLOW = "hypothesis_health_check_too_slow"
-    HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
-
-    SCHEMA_BODY_IN_GET_REQUEST = "schema_body_in_get_request"
-    SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
-    SCHEMA_UNSUPPORTED = "schema_unsupported"
-    SCHEMA_GENERIC = "schema_generic"
-
-    SERIALIZATION_NOT_POSSIBLE = "serialization_not_possible"
-    SERIALIZATION_UNBOUNDED_PREFIX = "serialization_unbounded_prefix"
-
-    # Unclassified
-    UNCLASSIFIED = "unclassified"
-
-    @property
-    def has_useful_traceback(self) -> bool:
-        return self not in (
-            RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST,
-            RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION,
-            RuntimeErrorType.SCHEMA_UNSUPPORTED,
-            RuntimeErrorType.SCHEMA_GENERIC,
-            RuntimeErrorType.SERIALIZATION_NOT_POSSIBLE,
-        )
-
-
-@enum.unique
 class SchemaErrorType(str, enum.Enum):
     # Connection related issues
     CONNECTION_SSL = "connection_ssl"
@@ -509,63 +455,3 @@ def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
     else:
         exc.args = (title, message)
     return message
-
-
-def format_exception(error: Exception, include_traceback: bool = False) -> str:
-    """Format exception as text."""
-    error_type = type(error)
-    if include_traceback:
-        lines = traceback.format_exception(error_type, error, error.__traceback__)
-    else:
-        lines = traceback.format_exception_only(error_type, error)
-    return "".join(lines).strip()
-
-
-def extract_nth_traceback(trace: TracebackType | None, n: int) -> TracebackType | None:
-    depth = 0
-    while depth < n and trace is not None:
-        trace = trace.tb_next
-        depth += 1
-    return trace
-
-
-def remove_ssl_line_number(text: str) -> str:
-    return re.sub(r"\(_ssl\.c:\d+\)", "", text)
-
-
-def _clean_inner_request_message(message: Any) -> str:
-    if isinstance(message, str) and message.startswith("HTTPConnectionPool"):
-        return re.sub(r"HTTPConnectionPool\(.+?\): ", "", message).rstrip(".")
-    return str(message)
-
-
-def extract_requests_exception_details(exc: RequestException) -> tuple[str, list[str]]:
-    from requests.exceptions import ChunkedEncodingError, ConnectionError, SSLError
-    from urllib3.exceptions import MaxRetryError
-
-    if isinstance(exc, SSLError):
-        message = "SSL verification problem"
-        reason = str(exc.args[0].reason)
-        extra = [remove_ssl_line_number(reason).strip()]
-    elif isinstance(exc, ConnectionError):
-        message = "Connection failed"
-        inner = exc.args[0]
-        if isinstance(inner, MaxRetryError) and inner.reason is not None:
-            arg = inner.reason.args[0]
-            if isinstance(arg, str):
-                if ":" not in arg:
-                    reason = arg
-                else:
-                    _, reason = arg.split(":", maxsplit=1)
-            else:
-                reason = f"Max retries exceeded with url: {inner.url}"
-            extra = [reason.strip()]
-        else:
-            extra = [" ".join(map(_clean_inner_request_message, inner.args))]
-    elif isinstance(exc, ChunkedEncodingError):
-        message = "Connection broken. The server declared chunked encoding but sent an invalid chunk"
-        extra = [str(exc.args[0].args[1])]
-    else:
-        message = str(exc)
-        extra = []
-    return message, extra

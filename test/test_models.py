@@ -12,7 +12,8 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, UsageError
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import APIOperation, Case, CaseSource, Request, Response, TransitionId
+from schemathesis.models import APIOperation, Case, CaseSource, TransitionId
+from schemathesis.runner.models import Request, Response
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import WSGITransport, _merge_dict_to
 
@@ -446,7 +447,7 @@ def test_validate_response_schema_path(
 def test_response_from_requests(base_url):
     response = requests.get(f"{base_url}/cookies", timeout=1)
     serialized = Response.from_requests(response)
-    assert serialized.deserialize_body() == b""
+    assert serialized.body == b""
     assert serialized.status_code == 200
     assert serialized.http_version == "1.1"
     assert serialized.message == "OK"
@@ -465,7 +466,7 @@ def test_from_case(swagger_20, body, expected):
     )
     session = requests.Session()
     request = Request.from_case(case, session)
-    assert request.deserialize_body() == expected
+    assert request.body == expected
     assert request.uri == "http://127.0.0.1/api/v3/users/test"
 
 
@@ -484,16 +485,6 @@ def test_operation_path_suggestion(swagger_20, value, message):
 def test_method_suggestion(swagger_20):
     with pytest.raises(KeyError, match="Method `PUT` not found. Available methods: GET"):
         swagger_20["/users"]["PUT"]
-
-
-def test_deprecated_attribute(swagger_20):
-    operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(operation, generation_time=0.0)
-    with pytest.warns(Warning) as records:
-        assert case.endpoint == case.operation == operation
-    assert str(records[0].message) == (
-        "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
-    )
 
 
 @pytest.mark.parametrize("method", DataGenerationMethod.all())

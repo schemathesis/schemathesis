@@ -13,6 +13,7 @@ schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
+    case.operation.schema.sanitize_output = False
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
     assert command == f"curl -X GET{expected_headers} http://localhost/users"

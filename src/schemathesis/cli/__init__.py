@@ -3,13 +3,12 @@ from __future__ import annotations
 import base64
 import os
 import sys
-import traceback
 import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, Type, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 
 import click
@@ -30,13 +29,14 @@ from ..constants import (
     ISSUE_TRACKER_URL,
     WAIT_FOR_SCHEMA_ENV_VAR,
 )
-from ..exceptions import SchemaError, SchemaErrorType, extract_nth_traceback
+from ..exceptions import SchemaError, SchemaErrorType
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..internal.checks import CheckConfig
 from ..internal.datetime import current_datetime
+from ..internal.exceptions import format_exception
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
@@ -53,7 +53,6 @@ from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CsvChoice, CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt
-from .sanitization import SanitizationHandler
 
 if TYPE_CHECKING:
     import io
@@ -1219,6 +1218,7 @@ def run(
         override=override,
         headers=headers,
         request_timeout=request_timeout,
+        sanitize_output=sanitize_output,
         seed=hypothesis_seed,
         exit_first=exit_first,
         max_failures=max_failures,
@@ -1308,6 +1308,7 @@ class LoaderConfig:
     wait_for_schema: float | None
     rate_limit: str | None
     output_config: OutputConfig
+    sanitize_output: bool
     generation_config: generation.GenerationConfig
     # Network request parameters
     auth: tuple[str, str] | None
@@ -1344,6 +1345,7 @@ def into_event_stream(
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,
     output_config: OutputConfig,
+    sanitize_output: bool,
     seed: int | None,
     exit_first: bool,
     max_failures: int | None,
@@ -1372,6 +1374,7 @@ def into_event_stream(
             auth=auth,
             auth_type=auth_type,
             headers=headers,
+            sanitize_output=sanitize_output,
             output_config=output_config,
             generation_config=generation_config,
         )
@@ -1521,6 +1524,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
         "rate_limit": config.rate_limit,
         "output_config": config.output_config,
         "generation_config": config.generation_config,
+        "sanitize_output": config.sanitize_output,
     }
     if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
         kwargs["headers"] = config.headers
@@ -1608,9 +1612,7 @@ def load_hook(module_name: str) -> None:
             click.echo("\nEnsure the module name is correctly spelled and reachable from the current directory.")
         else:
             click.echo(f"\nAn error occurred while importing the module {formatted_module_name}. Traceback:")
-            trace = extract_nth_traceback(exc.__traceback__, 1)
-            lines = traceback.format_exception(type(exc), exc, trace)
-            message = "".join(lines).strip()
+            message = format_exception(exc, with_traceback=True, skip_frames=1)
             click.secho(f"\n{message}", fg="red")
         click.echo(f"\nFor more information on how to work with hooks, visit {EXTENSIONS_DOCUMENTATION_URL}")
         raise click.exceptions.Exit(1) from None
@@ -1698,14 +1700,15 @@ def execute(
         _open_file(cassette_path)
         handlers.append(
             cassettes.CassetteWriter(
-                cassette_path, format=cassette_format, preserve_exact_body_bytes=cassette_preserve_exact_body_bytes
+                cassette_path,
+                format=cassette_format,
+                sanitize_output=sanitize_output,
+                preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
             )
         )
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*ctx.args, **ctx.params))
     handlers.append(get_output_handler(workers_num))
-    if sanitize_output:
-        handlers.insert(0, SanitizationHandler())
     execution_context = ExecutionContext(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
@@ -1777,7 +1780,6 @@ def is_built_in_handler(handler: EventHandler) -> bool:
             DebugOutputHandler,
             cassettes.CassetteWriter,
             JunitXMLHandler,
-            SanitizationHandler,
         )
     )
 
@@ -1788,13 +1790,11 @@ def display_handler_error(handler: EventHandler, exc: Exception) -> None:
     if is_built_in:
         click.secho("Internal Error", fg="red", bold=True)
         click.secho("\nSchemathesis encountered an unexpected issue.")
-        trace = exc.__traceback__
+        message = format_exception(exc, with_traceback=True)
     else:
         click.secho("CLI Handler Error", fg="red", bold=True)
         click.echo(f"\nAn error occurred within your custom CLI handler `{bold(handler.__class__.__name__)}`.")
-        trace = extract_nth_traceback(exc.__traceback__, 1)
-    lines = traceback.format_exception(type(exc), exc, trace)
-    message = "".join(lines).strip()
+        message = format_exception(exc, with_traceback=True, skip_frames=1)
     click.secho(f"\n{message}", fg="red")
     if is_built_in:
         click.echo(

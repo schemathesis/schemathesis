@@ -27,7 +27,7 @@ def validate_response(
     from .._compat import MultipleFailures
     from ..checks import _make_max_response_time_failure_message
     from ..failures import ResponseTimeExceeded
-    from ..models import Check, Status, Response, Request
+    from ..runner.models import Check, Request, Response, Status
 
     exceptions: list[CheckFailed | AssertionError] = []
     check_results = runner_ctx.checks_for_step
