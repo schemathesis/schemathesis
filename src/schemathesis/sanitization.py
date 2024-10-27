@@ -232,9 +232,6 @@ def sanitize_serialized_check(check: SerializedCheck, *, config: Config | None =
     if response:
         sanitize_value(response.headers, config=config)
     sanitize_serialized_case(check.example, config=config)
-    for entry in check.history:
-        sanitize_serialized_case(entry.case, config=config)
-        sanitize_value(entry.response.headers, config=config)
 
 
 def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = None) -> None:
