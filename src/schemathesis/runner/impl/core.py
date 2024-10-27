@@ -150,7 +150,6 @@ class BaseRunner:
                 count_operations=self.count_operations,
                 count_links=self.count_links,
                 seed=ctx.seed,
-                start_time=start_time,
             )
             return initialized
 
@@ -337,7 +336,6 @@ class BaseRunner:
                 status=status,
                 result=SerializedTestResult.from_test_result(result),
                 elapsed_time=cast(float, test_elapsed_time),
-                data_generation_method=self.schema.data_generation_methods,
             )
 
     def _run_tests(
@@ -347,7 +345,6 @@ class BaseRunner:
         settings: hypothesis.settings,
         generation_config: GenerationConfig | None,
         ctx: RunnerContext,
-        recursion_level: int = 0,
         headers: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Generator[events.ExecutionEvent, None, None]:
@@ -381,7 +378,6 @@ class BaseRunner:
                         operation,
                         test,
                         ctx=ctx,
-                        recursion_level=recursion_level,
                         data_generation_methods=self.schema.data_generation_methods,
                         headers=headers,
                         **kwargs,
@@ -396,12 +392,11 @@ class BaseRunner:
                         exc,
                         ctx,
                         self.schema.data_generation_methods,
-                        recursion_level,
                         before_execution_correlation_id=before_execution_correlation_id,
                     )
             else:
                 # Schema errors
-                yield from handle_schema_error(result.err(), ctx, self.schema.data_generation_methods, recursion_level)
+                yield from handle_schema_error(result.err(), ctx, self.schema.data_generation_methods)
 
 
 def run_probes(schema: BaseSchema, config: probes.ProbeConfig) -> list[probes.ProbeRun]:
@@ -448,7 +443,6 @@ def handle_schema_error(
     error: OperationSchemaError,
     ctx: RunnerContext,
     data_generation_methods: Iterable[DataGenerationMethod],
-    recursion_level: int,
     *,
     before_execution_correlation_id: str | None = None,
 ) -> Generator[events.ExecutionEvent, None, None]:
@@ -470,23 +464,11 @@ def handle_schema_error(
             correlation_id = before_execution_correlation_id
         else:
             correlation_id = uuid.uuid4().hex
-            yield events.BeforeExecution(
-                method=method,
-                path=error.full_path,
-                verbose_name=verbose_name,
-                relative_path=error.path,
-                recursion_level=recursion_level,
-                data_generation_method=data_generation_methods,
-                correlation_id=correlation_id,
-            )
+            yield events.BeforeExecution(verbose_name=verbose_name, correlation_id=correlation_id)
         yield events.AfterExecution(
-            method=method,
-            path=error.full_path,
-            relative_path=error.path,
             verbose_name=verbose_name,
             status=Status.error,
             result=SerializedTestResult.from_test_result(result),
-            data_generation_method=data_generation_methods,
             elapsed_time=0.0,
             hypothesis_output=[],
             correlation_id=correlation_id,
@@ -506,7 +488,6 @@ def run_test(
     targets: Iterable[Target],
     ctx: RunnerContext,
     headers: dict[str, Any] | None,
-    recursion_level: int,
     **kwargs: Any,
 ) -> Generator[events.ExecutionEvent, None, None]:
     """A single test run with all error handling needed."""
@@ -519,12 +500,7 @@ def run_test(
     )
     # To simplify connecting `before` and `after` events in external systems
     correlation_id = uuid.uuid4().hex
-    yield events.BeforeExecution.from_operation(
-        operation=operation,
-        recursion_level=recursion_level,
-        data_generation_method=data_generation_methods,
-        correlation_id=correlation_id,
-    )
+    yield events.BeforeExecution.from_operation(operation=operation, correlation_id=correlation_id)
     hypothesis_output: list[str] = []
     errors: list[Exception] = []
     test_start_time = time.monotonic()
@@ -692,7 +668,6 @@ def run_test(
         elapsed_time=test_elapsed_time,
         hypothesis_output=hypothesis_output,
         operation=operation,
-        data_generation_method=data_generation_methods,
         correlation_id=correlation_id,
     )
 

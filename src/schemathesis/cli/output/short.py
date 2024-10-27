@@ -8,8 +8,7 @@ from . import default
 
 
 def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
-    if event.recursion_level > 0:
-        context.operations_count += 1  # type: ignore
+    pass
 
 
 def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:

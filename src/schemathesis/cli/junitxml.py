@@ -29,10 +29,7 @@ class JunitXMLHandler(EventHandler):
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
             event_: events.AfterExecution | events.AfterStatefulExecution = event
-            if isinstance(event_, events.AfterExecution):
-                name = f"{event_.result.method} {event_.result.path}"
-            else:
-                name = event_.result.verbose_name
+            name = event_.result.verbose_name
             test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
             if event_.status == Status.failure:
                 _add_failure(test_case, event_.result.checks, context)

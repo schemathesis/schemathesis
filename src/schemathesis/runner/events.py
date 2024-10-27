@@ -1,18 +1,14 @@
 from __future__ import annotations
 
 import enum
-import threading
-import time
 from dataclasses import asdict, dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..exceptions import RuntimeErrorType, SchemaError, SchemaErrorType, format_exception
-from ..internal.datetime import current_datetime
 from ..internal.result import Err, Ok, Result
 from .serialization import SerializedError, SerializedTestResult
 
 if TYPE_CHECKING:
-    from ..generation import DataGenerationMethod
     from ..models import APIOperation, Status, TestResult, TestResultSet
     from ..schemas import BaseSchema, Specification
     from ..service.models import AnalysisResult
@@ -53,12 +49,6 @@ class Initialized(ExecutionEvent):
     base_path: str
     # API schema specification name
     specification_name: str
-    # Monotonic clock value when the test run started. Used to properly calculate run duration, since this clock
-    # can't go backwards.
-    start_time: float = field(default_factory=time.monotonic)
-    # Datetime of the test run start
-    started_at: str = field(default_factory=current_datetime)
-    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_schema(
@@ -67,8 +57,6 @@ class Initialized(ExecutionEvent):
         schema: BaseSchema,
         count_operations: bool = True,
         count_links: bool = True,
-        start_time: float | None = None,
-        started_at: str | None = None,
         seed: int | None,
     ) -> Initialized:
         """Computes all needed data from a schema instance."""
@@ -80,8 +68,6 @@ class Initialized(ExecutionEvent):
             location=schema.location,
             base_url=schema.get_base_url(),
             base_path=schema.base_path,
-            start_time=start_time or time.monotonic(),
-            started_at=started_at or current_datetime(),
             specification_name=schema.verbose_name,
             seed=seed,
         )
@@ -130,77 +116,37 @@ class AfterAnalysis(ExecutionEvent):
         return data
 
 
-class CurrentOperationMixin:
-    method: str
-    path: str
-
-    @property
-    def current_operation(self) -> str:
-        return f"{self.method} {self.path}"
-
-
 @dataclass
-class BeforeExecution(CurrentOperationMixin, ExecutionEvent):
+class BeforeExecution(ExecutionEvent):
     """Happens before each tested API operation.
 
     It happens before a single hypothesis test, that may contain many examples inside.
     """
 
-    # HTTP method
-    method: str
-    # Full path, including the base path
-    path: str
     # Specification-specific operation name
     verbose_name: str
-    # Path without the base path
-    relative_path: str
-    # The current level of recursion during stateful testing
-    recursion_level: int
-    # The way data will be generated
-    data_generation_method: list[DataGenerationMethod]
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str
-    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
-    def from_operation(
-        cls,
-        operation: APIOperation,
-        recursion_level: int,
-        data_generation_method: list[DataGenerationMethod],
-        correlation_id: str,
-    ) -> BeforeExecution:
-        return cls(
-            method=operation.method.upper(),
-            path=operation.full_path,
-            verbose_name=operation.verbose_name,
-            relative_path=operation.path,
-            recursion_level=recursion_level,
-            data_generation_method=data_generation_method,
-            correlation_id=correlation_id,
-        )
+    def from_operation(cls, operation: APIOperation, correlation_id: str) -> BeforeExecution:
+        return cls(verbose_name=operation.verbose_name, correlation_id=correlation_id)
 
 
 @dataclass
-class AfterExecution(CurrentOperationMixin, ExecutionEvent):
+class AfterExecution(ExecutionEvent):
     """Happens after each tested API operation."""
 
-    method: str
-    path: str
-    relative_path: str
     # Specification-specific operation name
     verbose_name: str
 
     # APIOperation test status - success / failure / error
     status: Status
-    # The way data was generated
-    data_generation_method: list[DataGenerationMethod]
     result: SerializedTestResult
     # Test running time
     elapsed_time: float
     correlation_id: str
-    thread_id: int = field(default_factory=threading.get_ident)
     # Captured hypothesis stdout
     hypothesis_output: list[str] = field(default_factory=list)
 
@@ -212,19 +158,14 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
         elapsed_time: float,
         hypothesis_output: list[str],
         operation: APIOperation,
-        data_generation_method: list[DataGenerationMethod],
         correlation_id: str,
     ) -> AfterExecution:
         return cls(
-            method=operation.method.upper(),
-            path=operation.full_path,
-            relative_path=operation.path,
             verbose_name=operation.verbose_name,
             result=SerializedTestResult.from_test_result(result),
             status=status,
             elapsed_time=elapsed_time,
             hypothesis_output=hypothesis_output,
-            data_generation_method=data_generation_method,
             correlation_id=correlation_id,
         )
 
@@ -232,8 +173,6 @@ class AfterExecution(CurrentOperationMixin, ExecutionEvent):
 @dataclass
 class Interrupted(ExecutionEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
-
-    thread_id: int = field(default_factory=threading.get_ident)
 
 
 @enum.unique
@@ -262,8 +201,6 @@ class InternalError(ExecutionEvent):
     exception_type: str
     exception: str
     exception_with_traceback: str
-    # Auxiliary data
-    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_schema_error(cls, error: SchemaError) -> InternalError:
@@ -331,8 +268,6 @@ class AfterStatefulExecution(ExecutionEvent):
     status: Status
     result: SerializedTestResult
     elapsed_time: float
-    data_generation_method: list[DataGenerationMethod]
-    thread_id: int = field(default_factory=threading.get_ident)
 
 
 @dataclass
@@ -360,7 +295,6 @@ class Finished(ExecutionEvent):
 
     # Total test run execution time
     running_time: float
-    thread_id: int = field(default_factory=threading.get_ident)
 
     @classmethod
     def from_results(cls, results: TestResultSet, running_time: float) -> Finished:

@@ -196,9 +196,9 @@ def assert_invalid_schema(exc: SchemaError) -> NoReturn:
 
 def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if isinstance(event, events.AfterExecution):
-        assert not event.result.has_failures, event.current_operation
+        assert not event.result.has_failures, event.verbose_name
         failures = [check for check in event.result.checks if check.value == Status.failure]
-        assert not failures, event.current_operation
+        assert not failures, event.verbose_name
         check_no_errors(schema_id, event)
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.success, Status.skip, Status.error)
@@ -217,13 +217,13 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
     if event.result.has_errors:
-        assert event.result.errors, event.current_operation
+        assert event.result.errors, event.verbose_name
         for error in event.result.errors:
             if should_ignore_error(schema_id, error, event):
                 continue
-            raise AssertionError(f"{event.current_operation}: {error.exception_with_traceback}")
+            raise AssertionError(f"{event.verbose_name}: {error.exception_with_traceback}")
     else:
-        assert not event.result.errors, event.current_operation
+        assert not event.result.errors, event.verbose_name
 
 
 def should_ignore_error(schema_id: str, error: SerializedError, event: events.AfterExecution) -> bool:
@@ -255,6 +255,6 @@ def should_ignore_error(schema_id: str, error: SerializedError, event: events.Af
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in error.exception:
         return True
-    if (schema_id, event.current_operation) in KNOWN_ISSUES:
+    if (schema_id, event.verbose_name) in KNOWN_ISSUES:
         return True
     return False

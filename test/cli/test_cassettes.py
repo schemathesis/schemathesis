@@ -3,7 +3,6 @@ import io
 import json
 import platform
 import re
-import threading
 from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 from uuid import UUID
@@ -76,7 +75,6 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     else:
         assert interactions[0]["data_generation_method"] == data_generation_method
     assert interactions[0]["phase"] in ("explicit", "coverage", "generate")
-    assert interactions[0]["thread_id"] == threading.get_ident()
     correlation_id = interactions[0]["correlation_id"]
     UUID(correlation_id)
     assert float(interactions[0]["elapsed"]) >= 0
@@ -119,7 +117,6 @@ def test_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
     assert cassette["http_interactions"][0]["status"] == "SKIP"
     assert cassette["http_interactions"][0]["seed"] == "1"
     assert cassette["http_interactions"][0]["phase"] in ("explicit", "coverage", "generate")
-    assert cassette["http_interactions"][0]["thread_id"] == threading.get_ident()
     correlation_id = cassette["http_interactions"][0]["correlation_id"]
     UUID(correlation_id)
     assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
