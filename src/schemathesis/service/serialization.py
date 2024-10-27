@@ -40,11 +40,7 @@ def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | No
 
 
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
-    return {
-        "correlation_id": event.correlation_id,
-        "verbose_name": event.verbose_name,
-        "data_generation_method": event.data_generation_method,
-    }
+    return {"correlation_id": event.correlation_id, "verbose_name": event.verbose_name}
 
 
 def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:
@@ -53,7 +49,6 @@ def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | 
         "verbose_name": event.verbose_name,
         "status": event.status,
         "elapsed_time": event.elapsed_time,
-        "data_generation_method": event.data_generation_method,
         "result": {
             "checks": [_serialize_check(check) for check in event.result.checks],
             "errors": [asdict(error) for error in event.result.errors],
@@ -104,7 +99,6 @@ def _serialize_stateful_event(event: stateful_events.StatefulEvent) -> dict[str,
 def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> dict[str, Any] | None:
     return {
         "status": event.status,
-        "data_generation_method": event.data_generation_method,
         "result": asdict(event.result),
         "elapsed_time": event.elapsed_time,
     }
