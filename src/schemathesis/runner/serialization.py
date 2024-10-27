@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import re
 import textwrap
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, cast
 
 from ..code_samples import get_excluded_headers
@@ -119,8 +119,6 @@ class SerializedCheck:
     message: str | None = None
     # Failure-specific context
     context: FailureContext | None = None
-    # Cases & responses that were made before this one
-    history: list[SerializedHistoryEntry] = field(default_factory=list)
 
     @classmethod
     def from_check(cls, check: Check) -> SerializedCheck:
@@ -144,7 +142,6 @@ class SerializedCheck:
         else:
             response = None
         headers = _get_headers(request.headers)
-        history = get_serialized_history(check.example)
         return cls(
             name=check.name,
             value=check.value,
@@ -155,7 +152,6 @@ class SerializedCheck:
             request=request,
             response=response,
             context=check.context,
-            history=history,
         )
 
     @property
@@ -184,33 +180,6 @@ def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str
         for key, value in headers.items()
         if key not in get_excluded_headers()
     }
-
-
-@dataclass
-class SerializedHistoryEntry:
-    case: SerializedCase
-    response: Response
-
-
-def get_serialized_history(case: Case) -> list[SerializedHistoryEntry]:
-    import requests
-
-    history = []
-    while case.source is not None:
-        history_request = case.source.response.request
-        headers = _get_headers(history_request.headers)
-        if isinstance(case.source.response, requests.Response):
-            history_response = Response.from_requests(case.source.response)
-            verify = history_response.verify
-        else:
-            history_response = Response.from_wsgi(case.source.response, case.source.elapsed)
-            verify = True
-        entry = SerializedHistoryEntry(
-            case=SerializedCase.from_case(case.source.case, headers, verify=verify), response=history_response
-        )
-        history.append(entry)
-        case = case.source.case
-    return history
 
 
 @dataclass
@@ -512,10 +481,6 @@ def _serialize_check(check: SerializedCheck) -> dict[str, Any]:
         "example": _serialize_case(check.example),
         "message": check.message,
         "context": asdict(check.context) if check.context is not None else None,  # type: ignore
-        "history": [
-            {"case": _serialize_case(entry.case), "response": _serialize_response(entry.response)}
-            for entry in check.history
-        ],
     }
 
 
