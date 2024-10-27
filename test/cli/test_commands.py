@@ -361,6 +361,7 @@ def test_load_schema_arguments(cli, mocker, args, expected):
                 "output_config": OutputConfig(),
                 "generation_config": GenerationConfig(),
                 "force_schema_version": None,
+                "sanitize_output": True,
                 "request_tls_verify": True,
                 "request_proxy": None,
                 "request_cert": None,

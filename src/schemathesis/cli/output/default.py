@@ -22,25 +22,26 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SCHEMATHESIS_VERSION,
 )
-from ...exceptions import (
-    RuntimeErrorType,
-    extract_requests_exception_details,
-    format_exception,
-)
 from ...experimental import GLOBAL_EXPERIMENTS
+from ...internal.exceptions import (
+    format_exception,
+    get_request_error_extras,
+    get_request_error_message,
+    split_traceback,
+)
 from ...internal.output import prepare_response_payload
 from ...internal.result import Ok
-from ...models import Status
 from ...runner import events
+from ...runner.errors import EngineErrorInfo
 from ...runner.events import InternalErrorType, SchemaErrorType
+from ...runner.models import Status, TestResult
 from ...runner.probes import ProbeOutcome
-from ...runner.serialization import SerializedError, SerializedTestResult
 from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
 from ...stateful import events as stateful_events
 from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
-from ..reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
+from ..reporting import TEST_CASE_ID_TITLE, group_by_case
 
 if TYPE_CHECKING:
     from queue import Queue
@@ -63,7 +64,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     click.secho(message, **kwargs)
 
 
-def display_subsection(result: SerializedTestResult, color: str | None = "red") -> None:
+def display_subsection(result: TestResult, color: str | None = "red") -> None:
     display_section_name(result.verbose_name, "_", fg=color)
 
 
@@ -168,7 +169,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         display_section_name("API Probe errors", "_", fg="red")
         for probe in probes:
             if probe.error is not None:
-                error = SerializedError.from_exception(probe.error)
+                error = EngineErrorInfo(probe.error)
                 _display_error(context, error)
     if should_display_full_traceback_message and not context.show_trace:
         click.secho(
@@ -181,7 +182,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
     )
 
 
-def display_single_error(context: ExecutionContext, result: SerializedTestResult) -> bool:
+def display_single_error(context: ExecutionContext, result: TestResult) -> bool:
     display_subsection(result)
     should_display_full_traceback_message = False
     first = True
@@ -194,29 +195,26 @@ def display_single_error(context: ExecutionContext, result: SerializedTestResult
     return should_display_full_traceback_message
 
 
-def display_generic_errors(context: ExecutionContext, errors: list[SerializedError]) -> None:
+def display_generic_errors(context: ExecutionContext, errors: list[EngineErrorInfo]) -> None:
     for error in errors:
         display_section_name(error.title or "Generic error", "_", fg="red")
         _display_error(context, error)
 
 
-def display_full_traceback_message(error: SerializedError) -> bool:
+def display_full_traceback_message(error: EngineErrorInfo) -> bool:
     # Some errors should not trigger the message that suggests to show full tracebacks to the user
-    return (
-        not error.exception.startswith(
-            (
-                "DeadlineExceeded",
-                "OperationSchemaError",
-                "requests.exceptions",
-                "SerializationNotPossible",
-                "hypothesis.errors.FailedHealthCheck",
-                "hypothesis.errors.InvalidArgument: Scalar ",
-                "hypothesis.errors.InvalidArgument: min_size=",
-                "hypothesis.errors.Unsatisfiable",
-            )
+    return not str(error).startswith(
+        (
+            "DeadlineExceeded",
+            "OperationSchemaError",
+            "requests.exceptions",
+            "SerializationNotPossible",
+            "hypothesis.errors.FailedHealthCheck",
+            "hypothesis.errors.InvalidArgument: Scalar ",
+            "hypothesis.errors.InvalidArgument: min_size=",
+            "hypothesis.errors.Unsatisfiable",
         )
-        and "can never generate an example, because min_size is larger than Hypothesis supports." not in error.exception
-    )
+    ) and "can never generate an example, because min_size is larger than Hypothesis supports." not in str(error)
 
 
 def bold(option: str) -> str:
@@ -229,51 +227,8 @@ DISABLE_SCHEMA_VALIDATION_SUGGESTION = (
 )
 
 
-def _format_health_check_suggestion(label: str) -> str:
-    return f"Bypass this health check using {bold(f'`--hypothesis-suppress-health-check={label}`')}."
-
-
-RUNTIME_ERROR_SUGGESTIONS = {
-    RuntimeErrorType.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
-    RuntimeErrorType.HYPOTHESIS_DEADLINE_EXCEEDED: (
-        f"Adjust the deadline using {bold('`--hypothesis-deadline=MILLIS`')} or "
-        f"disable with {bold('`--hypothesis-deadline=None`')}."
-    ),
-    RuntimeErrorType.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
-    RuntimeErrorType.SCHEMA_BODY_IN_GET_REQUEST: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
-    RuntimeErrorType.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax.\n"
-    "For guidance, visit: https://docs.python.org/3/library/re.html",
-    RuntimeErrorType.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
-    "For guidance, visit: https://schemathesis.readthedocs.io/en/stable/graphql.html#custom-scalars",
-    RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE: _format_health_check_suggestion("data_too_large"),
-    RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH: _format_health_check_suggestion("filter_too_much"),
-    RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW: _format_health_check_suggestion("too_slow"),
-    RuntimeErrorType.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE: _format_health_check_suggestion("large_base_example"),
-}
-
-
-def _display_error(context: ExecutionContext, error: SerializedError) -> bool:
-    if error.title:
-        if error.type == RuntimeErrorType.SCHEMA_GENERIC:
-            click.secho("Schema Error", fg="red", bold=True)
-        else:
-            click.secho(error.title, fg="red", bold=True)
-        click.echo()
-        if error.message:
-            click.echo(error.message)
-    elif error.message:
-        click.echo(error.message)
-    else:
-        click.echo(error.exception)
-    if error.extras:
-        extras = error.extras
-    elif context.show_trace and error.type.has_useful_traceback:
-        extras = split_traceback(error.exception_with_traceback)
-    else:
-        extras = []
-    _display_extras(extras)
-    suggestion = get_runtime_error_suggestion(error.type)
-    _maybe_display_tip(suggestion)
+def _display_error(context: ExecutionContext, error: EngineErrorInfo) -> bool:
+    click.echo(error.format(show_trace=context.show_trace, bold=lambda x: click.style(x, bold=True)))
     return display_full_traceback_message(error)
 
 
@@ -303,7 +258,7 @@ else:
         click.secho(text, **kwargs)
 
 
-def display_failures_for_single_test(context: ExecutionContext, result: SerializedTestResult) -> None:
+def display_failures_for_single_test(context: ExecutionContext, result: TestResult) -> None:
     """Display a failure for a single method / path."""
     from ...transports.responses import get_reason
 
@@ -335,7 +290,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
                             encoding = check.response.encoding or "utf8"
                             try:
                                 # Checked that is not None
-                                body = cast(bytes, check.response.deserialize_body())
+                                body = cast(bytes, check.response.body)
                                 payload = body.decode(encoding)
                                 payload = prepare_response_payload(payload, config=context.output_config)
                                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
@@ -356,7 +311,7 @@ def display_application_logs(context: ExecutionContext, event: events.Finished) 
         display_single_log(result)
 
 
-def display_single_log(result: SerializedTestResult) -> None:
+def display_single_log(result: TestResult) -> None:
     display_subsection(result, None)
     click.echo("\n\n".join(result.logs))
 
@@ -420,11 +375,12 @@ def display_analysis(context: ExecutionContext) -> None:
             click.echo()
             return
         if isinstance(exception, requests.RequestException):
-            message, extras = extract_requests_exception_details(exception)
+            message = get_request_error_message(exception)
+            extras = get_request_error_extras(exception)
             suggestion = "Please check your network connection and try again."
             title = "Network Error"
         else:
-            traceback = format_exception(exception, True)
+            traceback = format_exception(exception, with_traceback=True)
             extras = split_traceback(traceback)
             title = "Internal Error"
             message = f"We apologize for the inconvenience. This appears to be an internal issue.\nPlease, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
@@ -619,7 +575,7 @@ def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: st
     from requests import RequestException
 
     # Likely an internal Schemathesis error
-    traceback = event.get_message(True)
+    traceback = event.get_message(with_traceback=True)
     if isinstance(event.exception, RequestException) and event.exception.response is not None:
         response = f"Response: {event.exception.response.text}\n"
     else:

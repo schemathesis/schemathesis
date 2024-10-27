@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any
 
 from ...constants import NOT_SET
 from ...internal.checks import CheckConfig
-from ...models import TestResult, TestResultSet
+from ..models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
     import threading
