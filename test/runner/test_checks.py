@@ -19,9 +19,9 @@ from schemathesis.checks import (
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.internal.checks import CheckContext
-from schemathesis.models import OperationDefinition, TestResult
+from schemathesis.models import OperationDefinition
 from schemathesis.runner.impl.core import run_checks
-from schemathesis.runner.serialization import deduplicate_failures
+from schemathesis.runner.models import TestResult, deduplicate_failures
 from schemathesis.specs.openapi.checks import _coerce_header_value
 
 if TYPE_CHECKING:

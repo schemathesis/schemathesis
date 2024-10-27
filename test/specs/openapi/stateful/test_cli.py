@@ -1,9 +1,9 @@
-import pytest
-import yaml
+import platform
 from xml.etree import ElementTree
 
+import pytest
+import yaml
 from _pytest.main import ExitCode
-import platform
 
 
 @pytest.mark.openapi_version("3.0")

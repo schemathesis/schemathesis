@@ -1,34 +1,13 @@
 from __future__ import annotations
 
 from enum import Enum
-from functools import lru_cache
 from shlex import quote
 from typing import TYPE_CHECKING
 
-from .constants import SCHEMATHESIS_TEST_CASE_HEADER
+from .transports import get_excluded_headers
 
 if TYPE_CHECKING:
-    from requests.structures import CaseInsensitiveDict
-
     from .types import Headers
-
-
-@lru_cache
-def get_excluded_headers() -> CaseInsensitiveDict:
-    from requests.structures import CaseInsensitiveDict
-    from requests.utils import default_headers
-
-    # These headers are added automatically by Schemathesis or `requests`.
-    # Do not show them in code samples to make them more readable
-
-    return CaseInsensitiveDict(
-        {
-            "Content-Length": None,
-            "Transfer-Encoding": None,
-            SCHEMATHESIS_TEST_CASE_HEADER: None,
-            **default_headers(),
-        }
-    )
 
 
 class CodeSampleStyle(str, Enum):

@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, TypeVar, cast
 
 from ..internal.transformation import merge_recursively
 from ..runner import events
-from ..runner.serialization import _serialize_check
 
 if TYPE_CHECKING:
     from ..stateful import events as stateful_events
@@ -36,7 +34,7 @@ def serialize_before_analysis(_: events.BeforeAnalysis) -> None:
 
 
 def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | None:
-    return event._serialize()
+    return event.asdict()
 
 
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
@@ -50,8 +48,8 @@ def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | 
         "status": event.status,
         "elapsed_time": event.elapsed_time,
         "result": {
-            "checks": [_serialize_check(check) for check in event.result.checks],
-            "errors": [asdict(error) for error in event.result.errors],
+            "checks": [check.asdict() for check in event.result.checks],
+            "errors": [error.asdict() for error in event.result.errors],
             "skip_reason": event.result.skip_reason,
         },
     }
@@ -75,17 +73,7 @@ def serialize_internal_error(event: events.InternalError) -> dict[str, Any] | No
 
 
 def serialize_finished(event: events.Finished) -> dict[str, Any] | None:
-    return {
-        "generic_errors": [
-            {
-                "exception": error.exception,
-                "exception_with_traceback": error.exception_with_traceback,
-                "title": error.title,
-            }
-            for error in event.generic_errors
-        ],
-        "running_time": event.running_time,
-    }
+    return {"running_time": event.running_time}
 
 
 def serialize_stateful_event(event: events.StatefulEvent) -> dict[str, Any] | None:
@@ -99,7 +87,7 @@ def _serialize_stateful_event(event: stateful_events.StatefulEvent) -> dict[str,
 def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> dict[str, Any] | None:
     return {
         "status": event.status,
-        "result": asdict(event.result),
+        "result": event.result.asdict(),
         "elapsed_time": event.elapsed_time,
     }
 
