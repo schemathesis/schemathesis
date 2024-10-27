@@ -1,12 +1,9 @@
-import io
 import os
 
 import click
 import hypothesis
 import pytest
-import requests
 from hypothesis.reporting import report
-from urllib3 import HTTPResponse
 
 import schemathesis
 import schemathesis.cli.context
@@ -15,9 +12,10 @@ from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import OperationDefinition
+from schemathesis.models import OperationDefinition, Request, Response
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.serialization import SerializedTestResult
+from schemathesis.transports import serialize_payload
 
 from ...utils import strip_style_win32
 
@@ -47,16 +45,18 @@ def operation(swagger_20):
 
 @pytest.fixture
 def response():
-    response = requests.Response()
-    response._content = b'{"id": 5}'
-    response.status_code = 201
-    response.headers["Content-Type"] = "application/json"
-    response.raw = HTTPResponse(
-        body=io.BytesIO(response._content), status=response.status_code, headers=response.headers
+    body = serialize_payload(b'{"id": 5}')
+    return Response(
+        status_code=201,
+        body=body,
+        body_size=len(body),
+        message="Created",
+        encoding="utf-8",
+        http_version="1.1",
+        elapsed=1.0,
+        headers={"Content-Type": ["application/json"]},
+        verify=True,
     )
-    response.request = requests.PreparedRequest()
-    response.request.prepare(method="POST", url="http://example.com", headers={"Content-Type": "application/json"})
-    return response
 
 
 @pytest.fixture
@@ -250,15 +250,15 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
     success = models.Check(
         "not_a_server_error",
         models.Status.success,
+        Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        0,
         models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
     failure = models.Check(
         "not_a_server_error",
         models.Status.failure,
+        Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        0,
         models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
     test_statistic = models.TestResult(
@@ -275,8 +275,8 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
             models.Check(
                 "different_check",
                 models.Status.success,
+                Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
                 response,
-                0,
                 models.Case(
                     operation,
                     generation_time=0.0,

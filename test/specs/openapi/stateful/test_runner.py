@@ -125,11 +125,11 @@ def test_find_independent_5xx(runner_factory, kwargs):
     if kwargs.get("exit_first") or kwargs.get("max_failures") == 1:
         # Then only the first one should be found
         assert len(result.failures) == 1
-        assert result.failures[0].example.operation.verbose_name in all_affected_operations
+        assert result.failures[0].case.operation.verbose_name in all_affected_operations
     elif kwargs.get("exit_first") is False or kwargs.get("max_failures") == 2:
         # Else, all of them should be found
         assert len(result.failures) == 2
-        assert {check.example.operation.verbose_name for check in result.failures} == all_affected_operations
+        assert {check.case.operation.verbose_name for check in result.failures} == all_affected_operations
     serialize_all_events(result.events)
     assert_linked_calls_followed(result)
 
