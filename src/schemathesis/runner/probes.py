@@ -10,15 +10,15 @@ from __future__ import annotations
 
 import enum
 import warnings
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from ..constants import USER_AGENT
-from ..exceptions import format_exception
-from ..models import Request, Response
-from ..sanitization import sanitize_request, sanitize_response
+from ..internal.exceptions import format_exception
+from ..sanitization import sanitize_url, sanitize_value
 from ..transports import RequestConfig
 from ..transports.auth import get_requests_auth
+from .models import Request, Response
 
 if TYPE_CHECKING:
     import requests
@@ -80,13 +80,14 @@ class ProbeRun:
         """Serialize probe results so it can be sent over the network."""
         if self.request:
             _request = Request.from_prepared_request(self.request)
-            sanitize_request(_request)
-            request = asdict(_request)
+            _request.uri = sanitize_url(_request.uri)
+            sanitize_value(_request.headers)
+            request = _request.asdict()
         else:
             request = None
         if self.response:
-            sanitize_response(self.response)
-            response = asdict(Response.from_requests(self.response))
+            sanitize_value(self.response.headers)
+            response = Response.from_requests(self.response).asdict()
         else:
             response = None
         if self.error:

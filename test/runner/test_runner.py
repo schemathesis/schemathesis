@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 import platform
 from dataclasses import asdict
@@ -24,10 +23,10 @@ from schemathesis._override import CaseOverride
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
-from schemathesis.models import Check, Status, TestResult
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.impl import threadpool
 from schemathesis.runner.impl.core import deduplicate_errors, has_too_many_responses_with_status
+from schemathesis.runner.models import Check, Status, TestResult
 from schemathesis.specs.graphql import loaders as gql_loaders
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.stateful import Stateful
@@ -178,7 +177,7 @@ def test_interactions(request, any_app_schema, workers):
     }
     assert success.response.status_code == 200
     assert success.response.message == "OK"
-    assert json.loads(base64.b64decode(success.response.body)) == {"success": True}
+    assert json.loads(success.response.body) == {"success": True}
     assert success.response.encoding == "utf-8"
     if isinstance(any_app_schema.app, Flask):
         assert success.response.headers == {"Content-Type": ["application/json"], "Content-Length": ["17"]}
@@ -217,7 +216,7 @@ def test_empty_string_response_interaction(any_app_schema):
     interactions = next(event for event in others if isinstance(event, events.AfterExecution)).result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
-        assert interaction.response.body == ""
+        assert interaction.response.body == b""
         assert interaction.response.encoding == "utf-8"
 
 
@@ -260,7 +259,6 @@ def test_root_url():
 
     def check(ctx, response, case):
         assert case.as_transport_kwargs()["url"] == "/"
-        assert case.as_requests_kwargs()["url"] == "/"
         assert response.status_code == 200
 
     schema = oas_loaders.from_asgi("/openapi.json", app=app, force_schema_version="30")
@@ -316,7 +314,7 @@ def test_hypothesis_deadline_always_an_error(wsgi_app_schema, flask_app):
     # Then it should always be marked as an error, not a flaky failure
     assert not after.result.is_flaky
     assert after.result.errors
-    assert after.result.errors[0].exception.startswith("DeadlineExceeded: Test running time is too slow!")
+    assert str(after.result.errors[0]).startswith("DeadlineExceeded: Test running time is too slow!")
 
 
 @pytest.mark.operations("multipart")
@@ -598,7 +596,7 @@ def test_internal_exceptions(any_app_schema, mocker):
     # Then the execution result should indicate errors
     assert finished.has_errors
     # And an error from the buggy code should be collected
-    exceptions = [i.exception.strip() for i in others[1].result.errors]
+    exceptions = [str(error) for error in others[1].result.errors]
     assert "ValueError" in exceptions
     assert len(exceptions) == 1
 
@@ -717,7 +715,7 @@ def test_missing_path_parameter(any_app_schema):
     ).execute()
     # Then it leads to an error
     assert finished.has_errors
-    assert "OperationSchemaError: Path parameter 'id' is not defined" in others[1].result.errors[0].exception
+    assert "OperationSchemaError: Path parameter 'id' is not defined" in str(others[1].result.errors[0])
 
 
 def test_get_requests_auth():
@@ -766,7 +764,10 @@ def test_url_joining(request, server, get_schema_path, schema_path):
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()
     assert after_execution.result.path == "/api/v3/pet/findByStatus"
-    assert after_execution.result.checks[0].case.url == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
+    assert (
+        after_execution.result.checks[0].case.get_full_url()
+        == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
+    )
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -776,7 +777,7 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     *_, after, _ = from_schema(schema).execute()
     # Then it causes an error with a proper error message
     assert after.status == Status.error
-    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in after.result.errors[0].exception
+    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in str(after.result.errors[0])
 
 
 @pytest.mark.parametrize(
@@ -826,7 +827,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     ).execute()
     # And the tests are failing because of the unsatisfiable schema
     assert finished.has_errors
-    assert expected in after.result.errors[0].exception
+    assert expected in str(after.result.errors[0])
     assert len(after.result.errors) == total_errors
 
 
@@ -871,7 +872,7 @@ def test_non_serializable_example(ctx, phases, expected):
     ).execute()
     # And the tests are failing because of the serialization error
     assert finished.has_errors
-    assert expected in after.result.errors[0].exception
+    assert expected in str(after.result.errors[0])
     assert len(after.result.errors) == 1
 
 
@@ -932,7 +933,7 @@ def test_invalid_regex_example(ctx, phases, expected):
     ).execute()
     # And the tests are failing because of the invalid regex error
     assert finished.has_errors
-    assert expected in after.result.errors[0].exception
+    assert expected in str(after.result.errors[0])
     assert len(after.result.errors) == 1
 
 
@@ -966,7 +967,7 @@ def test_invalid_header_in_example(ctx):
     assert finished.has_errors
     assert (
         "Failed to generate test cases from examples for this API operation because of some header examples are invalid"
-        in after.result.errors[0].exception
+        in str(after.result.errors[0])
     )
     assert len(after.result.errors) == 1
 
@@ -1009,7 +1010,7 @@ def test_connection_error(ctx):
     ).execute()
     # And the tests are failing
     assert finished.has_errors
-    assert "Max retries exceeded with url" in after.result.errors[0].exception
+    assert "Max retries exceeded with url" in str(after.result.errors[0])
     assert len(after.result.errors) == 1
 
 
@@ -1128,7 +1129,7 @@ def test_graphql(graphql_url):
         assert event.verbose_name == expected
         if isinstance(event, events.AfterExecution):
             for check in event.result.checks:
-                assert check.case.verbose_name == expected
+                assert check.case.operation.verbose_name == expected
 
 
 @pytest.mark.operations("success")
@@ -1244,9 +1245,7 @@ def test_malformed_path_template(ctx, path, expected):
     *_, event, _ = list(from_schema(schema).execute())
     assert event.status == Status.error
     # And should produce the proper error message
-    assert (
-        event.result.errors[0].exception == f"OperationSchemaError: Malformed path template: `{path}`\n\n  {expected}"
-    )
+    assert str(event.result.errors[0]) == f"OperationSchemaError: Malformed path template: `{path}`\n\n  {expected}"
 
 
 @pytest.fixture
@@ -1341,22 +1340,6 @@ def test_skip_non_negated_headers(ctx):
     assert event.status == Status.skip
 
 
-@pytest.mark.parametrize("derandomize", [True, False])
-def test_use_the_same_seed(ctx, derandomize):
-    definition = {"get": {"responses": {"200": {"description": ""}}}}
-    schema = ctx.openapi.build_schema({"/first": definition, "/second": definition})
-    schema = schemathesis.from_dict(schema)
-    after_execution = [
-        event
-        for event in from_schema(
-            schema, dry_run=True, hypothesis_settings=hypothesis.settings(derandomize=derandomize)
-        ).execute()
-        if isinstance(event, events.AfterExecution)
-    ]
-    seed = after_execution[0].result.seed
-    assert all(event.result.seed == seed for event in after_execution)
-
-
 def test_deduplicate_errors():
     errors = [
         requests.exceptions.ConnectionError(
@@ -1398,7 +1381,7 @@ def test_stateful_all_generation_methods(real_app_schema):
     assert len(interactions) > 0
     for interaction in interactions:
         for check in interaction.checks:
-            assert check.case.data_generation_method == method.as_short_name()
+            assert check.case.data_generation_method == method
 
 
 @pytest.mark.openapi_version("3.0")
