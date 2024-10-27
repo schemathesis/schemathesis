@@ -50,7 +50,6 @@ from ...exceptions import (
     RecursiveReferenceError,
     SerializationNotPossible,
     SkipTest,
-    format_exception,
     get_grouped_exception,
     maybe_set_assertion_message,
 )
@@ -58,8 +57,9 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, get_all_by_name
 from ...internal.checks import CheckConfig, CheckContext
 from ...internal.datetime import current_datetime
+from ...internal.exceptions import format_exception
 from ...internal.result import Err, Ok, Result
-from ...models import APIOperation, Case, Check, Request, Response, Status, TestResult
+from ...models import APIOperation, Case
 from ...runner import events
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
@@ -72,7 +72,7 @@ from ...transports import RequestConfig, RequestsTransport
 from ...transports.auth import get_requests_auth, prepare_wsgi_headers
 from ...utils import capture_hypothesis_output
 from .. import probes
-from ..serialization import SerializedTestResult
+from ..models import Check, Request, Response, Status, TestResult
 from .context import RunnerContext
 
 if TYPE_CHECKING:
@@ -246,7 +246,6 @@ class BaseRunner:
                 method="",
                 path="",
                 verbose_name="Stateful tests",
-                seed=ctx.seed,
                 data_generation_method=self.schema.data_generation_methods,
             )
             headers = self.headers or {}
@@ -334,7 +333,7 @@ class BaseRunner:
             ctx.add_result(result)
             yield events.AfterStatefulExecution(
                 status=status,
-                result=SerializedTestResult.from_test_result(result),
+                result=result,
                 elapsed_time=cast(float, test_elapsed_time),
             )
 
@@ -468,7 +467,7 @@ def handle_schema_error(
         yield events.AfterExecution(
             verbose_name=verbose_name,
             status=Status.error,
-            result=SerializedTestResult.from_test_result(result),
+            result=result,
             elapsed_time=0.0,
             hypothesis_output=[],
             correlation_id=correlation_id,
@@ -652,12 +651,6 @@ def run_test(
         status = Status.error
         result.add_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
-    # DEPRECATED: Seed is the same per test run
-    # Fetch seed value, hypothesis generates it during test execution
-    # It may be `None` if the `derandomize` config option is set to `True`
-    result.seed = getattr(test, "_hypothesis_internal_use_seed", None) or getattr(
-        test, "_hypothesis_internal_use_generated_seed", None
-    )
     ctx.add_result(result)
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result, status_code):
@@ -737,8 +730,8 @@ def group_errors(errors: list[Exception]) -> None:
         errors.append(SerializationNotPossible.from_media_types(*media_types))
 
 
-def canonicalize_error_message(error: Exception, include_traceback: bool = True) -> str:
-    message = format_exception(error, include_traceback)
+def canonicalize_error_message(error: Exception, with_traceback: bool = True) -> str:
+    message = format_exception(error, with_traceback=with_traceback)
     # Replace memory addresses with a fixed string
     message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
     return URL_IN_ERROR_MESSAGE_RE.sub("", message)
@@ -1069,6 +1062,9 @@ def wsgi_test(
             result.store_wsgi_response(case, None, headers, None, Status.skip, [])
 
 
+LOG_ENTRY_FORMATTER = logging.Formatter("[%(asctime)s] %(levelname)s in %(module)s: %(message)s")
+
+
 def _wsgi_test(
     case: Case,
     ctx: RunnerContext,
@@ -1088,7 +1084,7 @@ def _wsgi_test(
         response = cast(WSGIResponse, case.call(**kwargs))
     context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
     run_targets(targets, context)
-    result.logs.extend(recorded.records)
+    result.logs.extend([LOG_ENTRY_FORMATTER.format(record) for record in recorded.records])
     status = Status.success
     check_results: list[Check] = []
     check_ctx = CheckContext(

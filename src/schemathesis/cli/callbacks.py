@@ -5,7 +5,6 @@ import enum
 import operator
 import os
 import re
-import traceback
 from contextlib import contextmanager
 from functools import partial, reduce
 from typing import TYPE_CHECKING, Callable, Generator
@@ -16,8 +15,8 @@ import click
 from .. import exceptions, experimental, throttling
 from ..code_samples import CodeSampleStyle
 from ..constants import TRUE_VALUES
-from ..exceptions import extract_nth_traceback
 from ..generation import DataGenerationMethod
+from ..internal.exceptions import format_exception
 from ..internal.transformation import convert_boolean_string as _convert_boolean_string
 from ..internal.validation import file_exists, is_filename, is_illegal_surrogate
 from ..loaders import load_app
@@ -176,11 +175,9 @@ def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value
             message = APPLICATION_MISSING_MODULE_MESSAGE.format(module=formatted_module_name)
             click.echo(message)
         else:
-            trace = extract_nth_traceback(exc.__traceback__, 2)
-            lines = traceback.format_exception(type(exc), exc, trace)
-            traceback_message = "".join(lines).strip()
+            message = format_exception(exc, with_traceback=True, skip_frames=2)
             message = APPLICATION_IMPORT_ERROR_MESSAGE.format(
-                module=formatted_module_name, traceback=click.style(traceback_message, fg="red")
+                module=formatted_module_name, traceback=click.style(message, fg="red")
             )
             click.echo(message)
         raise click.exceptions.Exit(1) from None

@@ -57,7 +57,6 @@ def test_as_wsgi_kwargs(graphql_strategy):
         "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY, "Content-Type": "application/json"},
     }
     assert WSGITransport(None).serialize_case(case) == expected
-    assert case.as_werkzeug_kwargs() == expected
 
 
 @pytest.mark.parametrize(
