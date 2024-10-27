@@ -4,7 +4,6 @@ import datetime
 import inspect
 import textwrap
 from collections import Counter
-from contextlib import contextmanager
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import lru_cache, partial
@@ -13,7 +12,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Generator,
     Generic,
     Iterator,
     Literal,
@@ -25,7 +23,6 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from . import serializers
-from ._dependency_versions import IS_WERKZEUG_ABOVE_3
 from ._override import CaseOverride
 from .code_samples import CodeSampleStyle
 from .constants import (
@@ -61,7 +58,6 @@ if TYPE_CHECKING:
     from logging import LogRecord
 
     import requests.auth
-    import werkzeug
     from hypothesis import strategies as st
     from requests.structures import CaseInsensitiveDict
 
@@ -626,25 +622,6 @@ class Case:
         )
 
 
-@contextmanager
-def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generator[None, None, None]:
-    """Set cookies required for a call."""
-    if not cookies:
-        yield
-    else:
-        for key, value in cookies.items():
-            if IS_WERKZEUG_ABOVE_3:
-                client.set_cookie(key=key, value=value, domain="localhost")
-            else:
-                client.set_cookie("localhost", key=key, value=value)
-        yield
-        for key in cookies:
-            if IS_WERKZEUG_ABOVE_3:
-                client.delete_cookie(key=key, domain="localhost")
-            else:
-                client.delete_cookie("localhost", key=key)
-
-
 P = TypeVar("P", bound=Parameter)
 D = TypeVar("D", bound=dict)
 
@@ -906,13 +883,12 @@ class Check:
 
     name: str
     value: Status
-    response: GenericResponse | None
-    elapsed: float
-    example: Case
+    request: Request
+    response: Response | None
+    case: Case
     message: str | None = None
     # Failure-specific context
     context: FailureContext | None = None
-    request: requests.PreparedRequest | None = None
 
 
 @dataclass(repr=False)
@@ -939,6 +915,7 @@ class Request:
     @classmethod
     def from_prepared_request(cls, prepared: requests.PreparedRequest) -> Request:
         """A prepared request version is already stored in `requests.Response`."""
+        # TODO: Support httpx.Request
         body = prepared.body
 
         if isinstance(body, str):
@@ -978,6 +955,14 @@ class Response:
     http_version: str
     elapsed: float
     verify: bool
+
+    @classmethod
+    def from_generic(cls, *, response: GenericResponse) -> Response:
+        import requests
+
+        if isinstance(response, requests.Response):
+            return cls.from_requests(response)
+        return cls.from_wsgi(response, response.elapsed.total_seconds())
 
     @classmethod
     def from_requests(cls, response: requests.Response) -> Response:
@@ -1177,29 +1162,26 @@ class TestResult:
     def has_logs(self) -> bool:
         return bool(self.logs)
 
-    def add_success(self, name: str, example: Case, response: GenericResponse, elapsed: float) -> Check:
-        check = Check(
-            name=name, value=Status.success, response=response, elapsed=elapsed, example=example, request=None
-        )
+    def add_success(self, *, name: str, case: Case, request: Request, response: Response) -> Check:
+        check = Check(name=name, value=Status.success, request=request, response=response, case=case)
         self.checks.append(check)
         return check
 
     def add_failure(
         self,
+        *,
         name: str,
-        example: Case,
-        response: GenericResponse | None,
-        elapsed: float,
+        case: Case,
+        request: Request,
+        response: Response | None,
         message: str,
         context: FailureContext | None,
-        request: requests.PreparedRequest | None = None,
     ) -> Check:
         check = Check(
             name=name,
             value=Status.failure,
             response=response,
-            elapsed=elapsed,
-            example=example,
+            case=case,
             message=message,
             context=context,
             request=request,

@@ -15,7 +15,6 @@ from ..code_samples import get_excluded_headers
 from ..exceptions import (
     BodyInGetRequestError,
     DeadlineExceeded,
-    InternalError,
     InvalidRegularExpression,
     OperationSchemaError,
     RecursiveReferenceError,
@@ -114,7 +113,7 @@ class SerializedCheck:
     request: Request
     response: Response | None
     # Generated example
-    example: SerializedCase
+    case: SerializedCase
     # Message could be absent for plain `assert` statements
     message: str | None = None
     # Failure-specific context
@@ -122,35 +121,16 @@ class SerializedCheck:
 
     @classmethod
     def from_check(cls, check: Check) -> SerializedCheck:
-        import requests
-
-        from ..transports.responses import WSGIResponse
-
-        if check.response is not None:
-            request = Request.from_prepared_request(check.response.request)
-        elif check.request is not None:
-            # Response is not available, but it is not an error (only time-out behaves this way at the moment)
-            request = Request.from_prepared_request(check.request)
-        else:
-            raise InternalError("Can not find request data")
-
-        response: Response | None
-        if isinstance(check.response, requests.Response):
-            response = Response.from_requests(check.response)
-        elif isinstance(check.response, WSGIResponse):
-            response = Response.from_wsgi(check.response, check.elapsed)
-        else:
-            response = None
-        headers = _get_headers(request.headers)
+        headers = _get_headers(check.request.headers)
         return cls(
             name=check.name,
             value=check.value,
-            example=SerializedCase.from_case(
-                check.example, headers, verify=response.verify if response is not None else True
+            case=SerializedCase.from_case(
+                check.case, headers, verify=check.response.verify if check.response is not None else True
             ),
             message=check.message,
-            request=request,
-            response=response,
+            request=check.request,
+            response=check.response,
             context=check.context,
         )
 
@@ -478,7 +458,7 @@ def _serialize_check(check: SerializedCheck) -> dict[str, Any]:
             "headers": check.request.headers,
         },
         "response": _serialize_response(check.response) if check.response is not None else None,
-        "example": _serialize_case(check.example),
+        "example": _serialize_case(check.case),
         "message": check.message,
         "context": asdict(check.context) if check.context is not None else None,  # type: ignore
     }
