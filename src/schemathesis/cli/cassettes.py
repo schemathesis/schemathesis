@@ -84,7 +84,6 @@ class CassetteWriter(EventHandler):
             self.queue.put(
                 Process(
                     correlation_id=event.correlation_id,
-                    thread_id=event.thread_id,
                     interactions=event.result.interactions,
                 )
             )
@@ -93,7 +92,6 @@ class CassetteWriter(EventHandler):
                 Process(
                     # Correlation ID is not used in stateful testing
                     correlation_id="",
-                    thread_id=event.thread_id,
                     interactions=event.result.interactions,
                 )
             )
@@ -120,7 +118,6 @@ class Process:
     """A new chunk of data should be processed."""
 
     correlation_id: str
-    thread_id: int
     interactions: list[SerializedInteraction]
 
 
@@ -233,7 +230,6 @@ http_interactions:"""
                     f"""\n- id: '{current_id}'
   status: '{status}'
   seed: {seed}
-  thread_id: {item.thread_id}
   correlation_id: '{item.correlation_id}'
   data_generation_method: '{interaction.data_generation_method.value}'
   meta:
