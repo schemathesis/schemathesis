@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     import hypothesis
 
     from ..internal.result import Result
+    from ..runner.models import TestResult
     from ..runner.probes import ProbeRun
-    from ..runner.serialization import SerializedTestResult
     from ..service.models import AnalysisResult
     from ..stateful.sink import StateMachineSink
 
@@ -50,7 +50,7 @@ class ExecutionContext:
     seed: int | None = None
     current_line_length: int = 0
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
-    results: list[SerializedTestResult] = field(default_factory=list)
+    results: list[TestResult] = field(default_factory=list)
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     is_interrupted: bool = False

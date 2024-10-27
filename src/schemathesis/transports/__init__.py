@@ -6,22 +6,24 @@ import time
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import timedelta
+from functools import lru_cache
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar, cast
 from urllib.parse import urlparse
 
 from .. import failures
 from .._dependency_versions import IS_WERKZEUG_ABOVE_3
-from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET
+from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from ..exceptions import get_timeout_error
 from ..serializers import SerializerContext
-from ..types import Cookies, NotSet, RequestCert
+from ..types import Cookies, Headers, NotSet, RequestCert
 
 if TYPE_CHECKING:
     import requests
     import werkzeug
     from _typeshed.wsgi import WSGIApplication
     from hypothesis.vendor.pretty import RepresentationPrinter
+    from requests.structures import CaseInsensitiveDict
     from starlette_testclient._testclient import ASGI2App, ASGI3App
 
     from ..models import Case
@@ -359,3 +361,47 @@ def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generato
                 client.delete_cookie(key=key, domain="localhost")
             else:
                 client.delete_cookie("localhost", key=key)
+
+
+@lru_cache
+def get_request_signature() -> inspect.Signature:
+    import requests
+
+    return inspect.signature(requests.Request)
+
+
+@dataclass
+class PreparedRequestData:
+    method: str
+    url: str
+    body: str | bytes | None
+    headers: Headers
+
+
+def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
+    """Prepare request data for generating code samples."""
+    import requests
+
+    kwargs = {key: value for key, value in kwargs.items() if key in get_request_signature().parameters}
+    request = requests.Request(**kwargs).prepare()
+    return PreparedRequestData(
+        method=str(request.method), url=str(request.url), body=request.body, headers=dict(request.headers)
+    )
+
+
+@lru_cache
+def get_excluded_headers() -> CaseInsensitiveDict:
+    from requests.structures import CaseInsensitiveDict
+    from requests.utils import default_headers
+
+    # These headers are added automatically by Schemathesis or `requests`.
+    # Do not show them in code samples to make them more readable
+
+    return CaseInsensitiveDict(
+        {
+            "Content-Length": None,
+            "Transfer-Encoding": None,
+            SCHEMATHESIS_TEST_CASE_HEADER: None,
+            **default_headers(),
+        }
+    )

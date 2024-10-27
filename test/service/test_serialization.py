@@ -3,7 +3,6 @@ import pytest
 import schemathesis
 from schemathesis.runner import from_schema
 from schemathesis.runner.events import InternalError, Interrupted
-from schemathesis.runner.serialization import prepare_query, stringify_path_parameters
 from schemathesis.service.serialization import serialize_event
 
 
@@ -21,7 +20,7 @@ def test_serialize_event(schema_url):
     event = serialize_event(next(events))
     assert "interactions" not in event["AfterExecution"]["result"]
     assert "logs" not in event["AfterExecution"]["result"]
-    assert event["AfterExecution"]["result"]["checks"][0]["example"]["query"] == {"id": ["0"]}
+    assert event["AfterExecution"]["result"]["checks"][0]["example"]["query"] == {"id": 0}
 
 
 @pytest.mark.operations("success")
@@ -55,30 +54,6 @@ def test_serialize_internal_error():
                 "exception_with_traceback": event.exception_with_traceback,
             }
         }
-
-
-@pytest.mark.parametrize(
-    ("query", "expected"),
-    [
-        (None, {}),
-        ({"f": 1}, {"f": ["1"]}),
-        ({"f": "1"}, {"f": ["1"]}),
-        ({"f": [1]}, {"f": ["1"]}),
-    ],
-)
-def test_prepare_query(query, expected):
-    assert prepare_query(query) == expected
-
-
-@pytest.mark.parametrize(
-    ("query", "expected"),
-    [
-        (None, {}),
-        ({"f": 1}, {"f": "1"}),
-    ],
-)
-def test_stringify_path_parameters(query, expected):
-    assert stringify_path_parameters(query) == expected
 
 
 @pytest.mark.parametrize(

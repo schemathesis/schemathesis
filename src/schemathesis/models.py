@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import datetime
-import inspect
 import textwrap
-from collections import Counter
 from dataclasses import dataclass, field
 from enum import Enum
-from functools import lru_cache, partial
+from functools import partial
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
@@ -35,7 +32,6 @@ from .exceptions import (
     CheckFailed,
     OperationSchemaError,
     SerializationNotPossible,
-    SkipTest,
     UsageError,
     deduplicate_failed_checks,
     get_grouped_exception,
@@ -45,29 +41,24 @@ from .generation import DataGenerationMethod, GenerationConfig, generate_random_
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.checks import CheckContext
 from .internal.copy import fast_deepcopy
-from .internal.deprecation import deprecated_function, deprecated_property
 from .internal.diff import diff
 from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
-from .sanitization import sanitize_request, sanitize_response
-from .transports import ASGITransport, RequestsTransport, WSGITransport, deserialize_payload, serialize_payload
+from .sanitization import sanitize_url, sanitize_value
+from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
 from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
 
 if TYPE_CHECKING:
-    import unittest
-    from logging import LogRecord
-
     import requests.auth
     from hypothesis import strategies as st
     from hypothesis.vendor.pretty import RepresentationPrinter
     from requests.structures import CaseInsensitiveDict
 
     from .auths import AuthStorage
-    from .failures import FailureContext
     from .internal.checks import CheckFunction
     from .schemas import BaseSchema
     from .serializers import Serializer
-    from .transports.responses import GenericResponse, WSGIResponse
+    from .transports.responses import GenericResponse
 
 
 @dataclass
@@ -106,32 +97,6 @@ def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
     note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
     event(event_text)
     reject()  # type: ignore
-
-
-@lru_cache
-def get_request_signature() -> inspect.Signature:
-    import requests
-
-    return inspect.signature(requests.Request)
-
-
-@dataclass()
-class PreparedRequestData:
-    method: str
-    url: str
-    body: str | bytes | None
-    headers: Headers
-
-
-def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
-    """Prepare request data for generating code samples."""
-    import requests
-
-    kwargs = {key: value for key, value in kwargs.items() if key in get_request_signature().parameters}
-    request = requests.Request(**kwargs).prepare()
-    return PreparedRequestData(
-        method=str(request.method), url=str(request.url), body=request.body, headers=dict(request.headers)
-    )
 
 
 class TestPhase(str, Enum):
@@ -205,6 +170,18 @@ class Case:
         self._original_cookies = self.cookies.copy() if self.cookies else None
         self._original_query = self.query.copy() if self.query else None
 
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "generation_time": self.generation_time,
+            "verbose_name": self.operation.verbose_name,
+            "path_template": self.path,
+            "path_parameters": self.path_parameters,
+            "query": self.query,
+            "cookies": self.cookies,
+            "media_type": self.media_type,
+        }
+
     def _has_generated_component(self, name: str) -> bool:
         assert name in ["path_parameters", "headers", "cookies", "query"]
         if self.meta is None:
@@ -246,10 +223,6 @@ class Case:
 
     def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
         return None
-
-    @deprecated_property(removed_in="4.0", replacement="`operation`")
-    def endpoint(self) -> APIOperation:
-        return self.operation
 
     @property
     def path(self) -> str:
@@ -311,6 +284,13 @@ class Case:
     def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
         base_url = self.get_full_base_url()
         kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
+        if self.operation.schema.sanitize_output:
+            kwargs["url"] = sanitize_url(kwargs["url"])
+            sanitize_value(kwargs["headers"])
+            if kwargs["cookies"]:
+                sanitize_value(kwargs["cookies"])
+            if kwargs["params"]:
+                sanitize_value(kwargs["params"])
         return prepare_request_data(kwargs)
 
     def get_code_to_reproduce(
@@ -343,11 +323,14 @@ class Case:
     def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         request_data = self.prepare_code_sample_data(headers)
+        case_headers = None
+        if self.headers is not None:
+            case_headers = dict(self.headers)
         return CodeSampleStyle.curl.generate(
             method=request_data.method,
             url=request_data.url,
             body=request_data.body,
-            headers=dict(self.headers) if self.headers is not None else None,
+            headers=case_headers,
             verify=verify,
             extra_headers=request_data.headers,
         )
@@ -390,11 +373,6 @@ class Case:
     def _get_body(self) -> Body | NotSet:
         return self.body
 
-    @deprecated_function(removed_in="4.0", replacement="Case.as_transport_kwargs")
-    def as_requests_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        """Convert the case into a dictionary acceptable by requests."""
-        return RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
-
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the test case into a dictionary acceptable by the underlying transport call."""
         return self.operation.schema.transport.serialize_case(self, base_url=base_url, headers=headers)
@@ -413,51 +391,6 @@ class Case:
         response = self.operation.schema.transport.send(
             self, session=session, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
         )
-        dispatch("after_call", hook_context, self, response)
-        return response
-
-    @deprecated_function(removed_in="4.0", replacement="Case.as_transport_kwargs")
-    def as_werkzeug_kwargs(self, headers: dict[str, str] | None = None) -> dict[str, Any]:
-        """Convert the case into a dictionary acceptable by werkzeug.Client."""
-        return WSGITransport(self.app).serialize_case(self, headers=headers)
-
-    @deprecated_function(removed_in="4.0", replacement="Case.call")
-    def call_wsgi(
-        self,
-        app: Any = None,
-        headers: dict[str, str] | None = None,
-        query_string: dict[str, str] | None = None,
-        **kwargs: Any,
-    ) -> WSGIResponse:
-        application = app or self.app
-        if application is None:
-            raise RuntimeError(
-                "WSGI application instance is required. "
-                "Please, set `app` argument in the schema constructor or pass it to `call_wsgi`"
-            )
-        hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self)
-        response = WSGITransport(application).send(self, headers=headers, params=query_string, **kwargs)
-        dispatch("after_call", hook_context, self, response)
-        return response
-
-    @deprecated_function(removed_in="4.0", replacement="Case.call")
-    def call_asgi(
-        self,
-        app: Any = None,
-        base_url: str | None = None,
-        headers: dict[str, str] | None = None,
-        **kwargs: Any,
-    ) -> requests.Response:
-        application = app or self.app
-        if application is None:
-            raise RuntimeError(
-                "ASGI application instance is required. "
-                "Please, set `app` argument in the schema constructor or pass it to `call_asgi`"
-            )
-        hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self)
-        response = ASGITransport(application).send(self, base_url=base_url, headers=headers, **kwargs)
         dispatch("after_call", hook_context, self, response)
         return response
 
@@ -546,9 +479,6 @@ class Case:
                 else self.operation.schema.code_sample_style
             )
             verify = getattr(response, "verify", True)
-            if self.operation.schema.sanitize_output:
-                sanitize_request(response.request)
-                sanitize_response(response)
             code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
             raise exception_cls(
                 f"{formatted}\n\n" f"{code_message}",
@@ -865,434 +795,3 @@ class APIOperation(Generic[P, C]):
 
     def get_resolved_payload_schema(self, media_type: str) -> dict[str, Any] | None:
         return self.schema._get_payload_schema(self.definition.resolved, media_type)
-
-
-# backward-compatibility
-Endpoint = APIOperation
-
-
-class Status(str, Enum):
-    """Status of an action or multiple actions."""
-
-    success = "success"
-    failure = "failure"
-    error = "error"
-    skip = "skip"
-
-
-@dataclass(repr=False)
-class Check:
-    """Single check run result."""
-
-    name: str
-    value: Status
-    request: Request
-    response: Response | None
-    case: Case
-    message: str | None = None
-    # Failure-specific context
-    context: FailureContext | None = None
-
-
-@dataclass(repr=False)
-class Request:
-    """Request data extracted from `Case`."""
-
-    method: str
-    uri: str
-    body: str | None
-    body_size: int | None
-    headers: Headers
-
-    @classmethod
-    def from_case(cls, case: Case, session: requests.Session) -> Request:
-        """Create a new `Request` instance from `Case`."""
-        import requests
-
-        base_url = case.get_full_base_url()
-        kwargs = RequestsTransport().serialize_case(case, base_url=base_url)
-        request = requests.Request(**kwargs)
-        prepared = session.prepare_request(request)  # type: ignore
-        return cls.from_prepared_request(prepared)
-
-    @classmethod
-    def from_prepared_request(cls, prepared: requests.PreparedRequest) -> Request:
-        """A prepared request version is already stored in `requests.Response`."""
-        # TODO: Support httpx.Request
-        body = prepared.body
-
-        if isinstance(body, str):
-            # can be a string for `application/x-www-form-urlencoded`
-            body = body.encode("utf-8")
-
-        # these values have `str` type at this point
-        uri = cast(str, prepared.url)
-        method = cast(str, prepared.method)
-        return cls(
-            uri=uri,
-            method=method,
-            headers={key: [value] for (key, value) in prepared.headers.items()},
-            body=serialize_payload(body) if body is not None else body,
-            body_size=len(body) if body is not None else None,
-        )
-
-    def deserialize_body(self) -> bytes | None:
-        """Deserialize the request body.
-
-        `Request` should be serializable to JSON, therefore body is encoded as base64 string
-        to support arbitrary binary data.
-        """
-        return deserialize_payload(self.body)
-
-
-@dataclass(repr=False)
-class Response:
-    """Unified response data."""
-
-    status_code: int
-    message: str
-    headers: dict[str, list[str]]
-    body: str | None
-    body_size: int | None
-    encoding: str | None
-    http_version: str
-    elapsed: float
-    verify: bool
-
-    @classmethod
-    def from_generic(cls, *, response: GenericResponse) -> Response:
-        import requests
-
-        if isinstance(response, requests.Response):
-            return cls.from_requests(response)
-        return cls.from_wsgi(response, response.elapsed.total_seconds())
-
-    @classmethod
-    def from_requests(cls, response: requests.Response) -> Response:
-        """Create a response from requests.Response."""
-        raw = response.raw
-        raw_headers = raw.headers if raw is not None else {}
-        headers = {name: response.raw.headers.getlist(name) for name in raw_headers.keys()}
-        # Similar to http.client:319 (HTTP version detection in stdlib's `http` package)
-        version = raw.version if raw is not None else 10
-        http_version = "1.0" if version == 10 else "1.1"
-
-        def is_empty(_response: requests.Response) -> bool:
-            # Assume the response is empty if:
-            #   - no `Content-Length` header
-            #   - no chunks when iterating over its content
-            return "Content-Length" not in headers and list(_response.iter_content()) == []
-
-        body = None if is_empty(response) else serialize_payload(response.content)
-        return cls(
-            status_code=response.status_code,
-            message=response.reason,
-            body=body,
-            body_size=len(response.content) if body is not None else None,
-            encoding=response.encoding,
-            headers=headers,
-            http_version=http_version,
-            elapsed=response.elapsed.total_seconds(),
-            verify=getattr(response, "verify", True),
-        )
-
-    @classmethod
-    def from_wsgi(cls, response: WSGIResponse, elapsed: float) -> Response:
-        """Create a response from WSGI response."""
-        from .transports.responses import get_reason
-
-        message = get_reason(response.status_code)
-        headers = {name: response.headers.getlist(name) for name in response.headers.keys()}
-        # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
-        data = response.get_data()
-        body = None if response.response == [] else serialize_payload(data)
-        encoding: str | None
-        if body is not None:
-            # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
-            encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
-        else:
-            encoding = None
-        return cls(
-            status_code=response.status_code,
-            message=message,
-            body=body,
-            body_size=len(data) if body is not None else None,
-            encoding=encoding,
-            headers=headers,
-            http_version="1.1",
-            elapsed=elapsed,
-            verify=True,
-        )
-
-    def deserialize_body(self) -> bytes | None:
-        """Deserialize the response body.
-
-        `Response` should be serializable to JSON, therefore body is encoded as base64 string
-        to support arbitrary binary data.
-        """
-        return deserialize_payload(self.body)
-
-
-TIMEZONE = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
-
-
-@dataclass
-class Interaction:
-    """A single interaction with the target app."""
-
-    request: Request
-    response: Response | None
-    checks: list[Check]
-    status: Status
-    data_generation_method: DataGenerationMethod
-    phase: TestPhase | None
-    # `description` & `location` are related to metadata about this interaction
-    # NOTE: It will be better to keep it in a separate attribute
-    description: str | None
-    location: str | None
-    parameter: str | None
-    parameter_location: str | None
-    recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
-
-    @classmethod
-    def from_requests(
-        cls,
-        case: Case,
-        response: requests.Response | None,
-        status: Status,
-        checks: list[Check],
-        headers: dict[str, Any] | None,
-        session: requests.Session | None,
-    ) -> Interaction:
-        if response is not None:
-            prepared = response.request
-            request = Request.from_prepared_request(prepared)
-        else:
-            import requests
-
-            if session is None:
-                session = requests.Session()
-                session.headers.update(headers or {})
-            request = Request.from_case(case, session)
-        return cls(
-            request=request,
-            response=Response.from_requests(response) if response is not None else None,
-            status=status,
-            checks=checks,
-            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
-            phase=case.meta.phase if case.meta is not None else None,
-            description=case.meta.description if case.meta is not None else None,
-            location=case.meta.location if case.meta is not None else None,
-            parameter=case.meta.parameter if case.meta is not None else None,
-            parameter_location=case.meta.parameter_location if case.meta is not None else None,
-        )
-
-    @classmethod
-    def from_wsgi(
-        cls,
-        case: Case,
-        response: WSGIResponse | None,
-        headers: dict[str, Any],
-        elapsed: float | None,
-        status: Status,
-        checks: list[Check],
-    ) -> Interaction:
-        import requests
-
-        session = requests.Session()
-        session.headers.update(headers)
-        return cls(
-            request=Request.from_case(case, session),
-            response=Response.from_wsgi(response, elapsed) if response is not None and elapsed is not None else None,
-            status=status,
-            checks=checks,
-            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
-            phase=case.meta.phase if case.meta is not None else None,
-            description=case.meta.description if case.meta is not None else None,
-            location=case.meta.location if case.meta is not None else None,
-            parameter=case.meta.parameter if case.meta is not None else None,
-            parameter_location=case.meta.parameter_location if case.meta is not None else None,
-        )
-
-
-@dataclass(repr=False)
-class TestResult:
-    """Result of a single test."""
-
-    __test__ = False
-
-    method: str
-    path: str
-    verbose_name: str
-    data_generation_method: list[DataGenerationMethod]
-    checks: list[Check] = field(default_factory=list)
-    errors: list[Exception] = field(default_factory=list)
-    interactions: list[Interaction] = field(default_factory=list)
-    logs: list[LogRecord] = field(default_factory=list)
-    is_errored: bool = False
-    is_flaky: bool = False
-    is_skipped: bool = False
-    skip_reason: str | None = None
-    is_executed: bool = False
-    # DEPRECATED: Seed is the same per test run
-    seed: int | None = None
-
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
-
-    def mark_errored(self) -> None:
-        self.is_errored = True
-
-    def mark_flaky(self) -> None:
-        self.is_flaky = True
-
-    def mark_skipped(self, exc: SkipTest | unittest.case.SkipTest | None) -> None:
-        self.is_skipped = True
-        if exc is not None:
-            self.skip_reason = str(exc)
-
-    def mark_executed(self) -> None:
-        self.is_executed = True
-
-    @property
-    def has_errors(self) -> bool:
-        return bool(self.errors)
-
-    @property
-    def has_failures(self) -> bool:
-        return any(check.value == Status.failure for check in self.checks)
-
-    @property
-    def has_logs(self) -> bool:
-        return bool(self.logs)
-
-    def add_success(self, *, name: str, case: Case, request: Request, response: Response) -> Check:
-        check = Check(name=name, value=Status.success, request=request, response=response, case=case)
-        self.checks.append(check)
-        return check
-
-    def add_failure(
-        self,
-        *,
-        name: str,
-        case: Case,
-        request: Request,
-        response: Response | None,
-        message: str,
-        context: FailureContext | None,
-    ) -> Check:
-        check = Check(
-            name=name,
-            value=Status.failure,
-            response=response,
-            case=case,
-            message=message,
-            context=context,
-            request=request,
-        )
-        self.checks.append(check)
-        return check
-
-    def add_error(self, exception: Exception) -> None:
-        self.errors.append(exception)
-
-    def store_requests_response(
-        self,
-        case: Case,
-        response: requests.Response | None,
-        status: Status,
-        checks: list[Check],
-        headers: dict[str, Any] | None,
-        session: requests.Session | None,
-    ) -> None:
-        self.interactions.append(Interaction.from_requests(case, response, status, checks, headers, session))
-
-    def store_wsgi_response(
-        self,
-        case: Case,
-        response: WSGIResponse | None,
-        headers: dict[str, Any],
-        elapsed: float | None,
-        status: Status,
-        checks: list[Check],
-    ) -> None:
-        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status, checks))
-
-
-@dataclass(repr=False)
-class TestResultSet:
-    """Set of multiple test results."""
-
-    __test__ = False
-
-    seed: int | None
-    results: list[TestResult] = field(default_factory=list)
-    generic_errors: list[OperationSchemaError] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
-
-    def __iter__(self) -> Iterator[TestResult]:
-        return iter(self.results)
-
-    @property
-    def is_empty(self) -> bool:
-        """If the result set contains no results."""
-        return len(self.results) == 0 and len(self.generic_errors) == 0
-
-    @property
-    def has_failures(self) -> bool:
-        """If any result has any failures."""
-        return any(result.has_failures for result in self)
-
-    @property
-    def has_errors(self) -> bool:
-        """If any result has any errors."""
-        return self.errored_count > 0
-
-    @property
-    def has_logs(self) -> bool:
-        """If any result has any captured logs."""
-        return any(result.has_logs for result in self)
-
-    def _count(self, predicate: Callable) -> int:
-        return sum(1 for result in self if predicate(result))
-
-    @property
-    def passed_count(self) -> int:
-        return self._count(lambda result: not result.has_errors and not result.is_skipped and not result.has_failures)
-
-    @property
-    def skipped_count(self) -> int:
-        return self._count(lambda result: result.is_skipped)
-
-    @property
-    def failed_count(self) -> int:
-        return self._count(lambda result: result.has_failures and not result.is_errored)
-
-    @property
-    def errored_count(self) -> int:
-        return self._count(lambda result: result.has_errors or result.is_errored) + len(self.generic_errors)
-
-    @property
-    def total(self) -> dict[str, dict[str | Status, int]]:
-        """An aggregated statistic about test results."""
-        output: dict[str, dict[str | Status, int]] = {}
-        for item in self.results:
-            for check in item.checks:
-                output.setdefault(check.name, Counter())
-                output[check.name][check.value] += 1
-                output[check.name]["total"] += 1
-        # Avoid using Counter, since its behavior could harm in other places:
-        # `if not total["unknown"]:` - this will lead to the branch execution
-        # It is better to let it fail if there is a wrong key
-        return {key: dict(value) for key, value in output.items()}
-
-    def append(self, item: TestResult) -> None:
-        """Add a new item to the results list."""
-        self.results.append(item)
-
-    def add_warning(self, warning: str) -> None:
-        """Add a new warning to the warnings list."""
-        self.warnings.append(warning)

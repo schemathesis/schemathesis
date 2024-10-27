@@ -13,13 +13,14 @@ import schemathesis
 from schemathesis._hypothesis import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.exceptions import CheckFailed, SchemaError, UsageError, format_exception
+from schemathesis.exceptions import CheckFailed, SchemaError, UsageError
 from schemathesis.extra._flask import run_server
 from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.internal.exceptions import format_exception
 from schemathesis.internal.result import Err, Ok
 from schemathesis.models import Status
 from schemathesis.runner import events, from_schema
-from schemathesis.runner.serialization import SerializedError
+from schemathesis.runner.errors import EngineErrorInfo
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
 from schemathesis.service.models import AnalysisError, SuccessState
@@ -207,7 +208,7 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if VERIFY_SCHEMA_ANALYSIS and isinstance(event, events.AfterAnalysis):
         assert event.analysis is not None
         if isinstance(event.analysis, Err):
-            traceback = format_exception(event.analysis.err(), True)
+            traceback = format_exception(event.analysis.err(), with_traceback=True)
             raise AssertionError(f"Analysis failed: {traceback}")
         analysis = event.analysis.ok()
         assert not isinstance(analysis, AnalysisError)
@@ -221,39 +222,39 @@ def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
         for error in event.result.errors:
             if should_ignore_error(schema_id, error, event):
                 continue
-            raise AssertionError(f"{event.verbose_name}: {error.exception_with_traceback}")
+            raise AssertionError(f"{event.verbose_name}: {error.traceback}")
     else:
         assert not event.result.errors, event.verbose_name
 
 
-def should_ignore_error(schema_id: str, error: SerializedError, event: events.AfterExecution) -> bool:
+def should_ignore_error(schema_id: str, error: EngineErrorInfo, event: events.AfterExecution) -> bool:
     if (
         schema_id == "launchdarkly.com/3.10.0.json" or schema_id == "launchdarkly.com/5.3.0.json"
-    ) and "'<' not supported between instances" in error.exception:
+    ) and "'<' not supported between instances" in str(error):
         return True
     if (
-        "is not a 'regex'" in error.exception
-        or "Invalid regular expression" in error.exception
-        or "Invalid `pattern` value: expected a string" in error.exception
+        "is not a 'regex'" in str(error)
+        or "Invalid regular expression" in str(error)
+        or "Invalid `pattern` value: expected a string" in str(error)
     ):
         return True
-    if "Failed to generate test cases for this API operation" in error.exception:
+    if "Failed to generate test cases for this API operation" in str(error):
         return True
-    if "Failed to generate test cases from examples for this API operation" in error.exception:
+    if "Failed to generate test cases from examples for this API operation" in str(error):
         return True
-    if "FailedHealthCheck" in error.exception:
+    if "FailedHealthCheck" in str(error):
         return True
-    if "Schemathesis can't serialize data" in error.exception:
+    if "Schemathesis can't serialize data" in str(error):
         return True
-    if "Malformed media type" in error.exception:
+    if "Malformed media type" in str(error):
         return True
-    if "Path parameter" in error.exception and error.exception.endswith("is not defined"):
+    if "Path parameter" in str(error) and str(error).endswith("is not defined"):
         return True
-    if "Malformed path template" in error.exception:
+    if "Malformed path template" in str(error):
         return True
-    if "Unresolvable JSON pointer in the schema" in error.exception:
+    if "Unresolvable JSON pointer in the schema" in str(error):
         return True
-    if RECURSIVE_REFERENCE_ERROR_MESSAGE in error.exception:
+    if RECURSIVE_REFERENCE_ERROR_MESSAGE in str(error):
         return True
     if (schema_id, event.verbose_name) in KNOWN_ISSUES:
         return True

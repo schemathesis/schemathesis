@@ -7,17 +7,15 @@ from typing import TYPE_CHECKING, cast
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
-from ..exceptions import RuntimeErrorType
 from ..internal.output import prepare_response_payload
-from ..models import Status
 from ..runner import events
+from ..runner.models import Check, Status
 from .handlers import EventHandler
-from .reporting import TEST_CASE_ID_TITLE, get_runtime_error_suggestion, group_by_case, split_traceback
+from .reporting import TEST_CASE_ID_TITLE, group_by_case
 
 if TYPE_CHECKING:
     from click.utils import LazyFile
 
-    from ..runner.serialization import SerializedCheck, SerializedError
     from .context import ExecutionContext
 
 
@@ -34,7 +32,7 @@ class JunitXMLHandler(EventHandler):
             if event_.status == Status.failure:
                 _add_failure(test_case, event_.result.checks, context)
             elif event_.status == Status.error:
-                test_case.add_error_info(message=build_error_message(context, event_.result.errors[-1]))
+                test_case.add_error_info(message=event_.result.errors[-1].format(show_trace=context.show_trace))
             elif event_.status == Status.skip:
                 test_case.add_skipped_info(message=event_.result.skip_reason)
             self.test_cases.append(test_case)
@@ -43,13 +41,13 @@ class JunitXMLHandler(EventHandler):
             to_xml_report_file(file_descriptor=self.file_handle, test_suites=test_suites, prettyprint=True)
 
 
-def _add_failure(test_case: TestCase, checks: list[SerializedCheck], context: ExecutionContext) -> None:
+def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionContext) -> None:
     for idx, (code_sample, group) in enumerate(group_by_case(checks, context.code_sample_style), 1):
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
         test_case.add_failure_info(message=build_failure_message(context, idx, code_sample, checks))
 
 
-def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[SerializedCheck]) -> str:
+def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:
     from ..transports.responses import get_reason
 
     message = ""
@@ -72,7 +70,7 @@ def build_failure_message(context: ExecutionContext, idx: int, code_sample: str,
                         encoding = check.response.encoding or "utf8"
                         try:
                             # Checked that is not None
-                            body = cast(bytes, check.response.deserialize_body())
+                            body = cast(bytes, check.response.body)
                             payload = body.decode(encoding)
                             payload = prepare_response_payload(payload, config=context.output_config)
                             payload = textwrap.indent(f"\n`{payload}`\n", prefix="    ")
@@ -81,33 +79,4 @@ def build_failure_message(context: ExecutionContext, idx: int, code_sample: str,
                             message += "\n    <BINARY>\n"
 
     message += f"\nReproduce with: \n\n    {code_sample}"
-    return message
-
-
-def build_error_message(context: ExecutionContext, error: SerializedError) -> str:
-    message = ""
-    if error.title:
-        if error.type == RuntimeErrorType.SCHEMA_GENERIC:
-            message = "Schema Error\n"
-        else:
-            message = f"{error.title}\n"
-        if error.message:
-            message += f"\n{error.message}\n"
-    elif error.message:
-        message = error.message
-    else:
-        message = error.exception
-    if error.extras:
-        extras = error.extras
-    elif context.show_trace and error.type.has_useful_traceback:
-        extras = split_traceback(error.exception_with_traceback)
-    else:
-        extras = []
-    if extras:
-        message += "\n"
-    for extra in extras:
-        message += f"    {extra}\n"
-    suggestion = get_runtime_error_suggestion(error.type, bold=str)
-    if suggestion is not None:
-        message += f"\nTip: {suggestion}"
     return message
