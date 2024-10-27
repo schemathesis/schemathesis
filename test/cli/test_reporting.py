@@ -56,7 +56,6 @@ from schemathesis.runner.serialization import SerializedCase, SerializedCheck, S
                 )
             ),
             context=st.none(),
-            history=st.just([]),
         ),
     )
 )
