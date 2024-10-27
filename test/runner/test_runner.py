@@ -650,7 +650,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
     ).execute()
-    assert [check.example.path_parameters for check in after.result.checks] == [
+    assert [check.case.path_parameters for check in after.result.checks] == [
         {"itemId": "456789"},
         {"itemId": "123456"},
     ]
@@ -766,7 +766,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()
     assert after_execution.result.path == "/api/v3/pet/findByStatus"
-    assert after_execution.result.checks[0].example.url == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
+    assert after_execution.result.checks[0].case.url == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -1128,7 +1128,7 @@ def test_graphql(graphql_url):
         assert event.verbose_name == expected
         if isinstance(event, events.AfterExecution):
             for check in event.result.checks:
-                assert check.example.verbose_name == expected
+                assert check.case.verbose_name == expected
 
 
 @pytest.mark.operations("success")
@@ -1225,8 +1225,8 @@ def test_case_mutation(real_app_schema):
 
     *_, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
     # Then these mutations should not interfere
-    assert event.result.checks[0].example.headers["Foo"] == "BAR"
-    assert event.result.checks[1].example.headers["Foo"] == "BAZ"
+    assert event.result.checks[0].case.headers["Foo"] == "BAR"
+    assert event.result.checks[1].case.headers["Foo"] == "BAZ"
 
 
 @pytest.mark.parametrize(
@@ -1262,7 +1262,7 @@ def result():
 def make_check(status_code):
     response = requests.Response()
     response.status_code = status_code
-    return Check(name="not_a_server_error", value=Status.success, response=response, elapsed=0.1, example=None)
+    return Check(name="not_a_server_error", value=Status.success, request=None, response=response, case=None)
 
 
 def test_authorization_warning_no_checks(result):
@@ -1398,7 +1398,7 @@ def test_stateful_all_generation_methods(real_app_schema):
     assert len(interactions) > 0
     for interaction in interactions:
         for check in interaction.checks:
-            assert check.example.data_generation_method == method.as_short_name()
+            assert check.case.data_generation_method == method.as_short_name()
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1488,7 +1488,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
     for event in runner.execute():
         if isinstance(event, events.AfterExecution):
             for check in event.result.checks:
-                for header in check.example.headers.values():
+                for header in check.case.headers.values():
                     if header:
                         assert set(header) == {"a"}
             break
