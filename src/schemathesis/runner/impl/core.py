@@ -59,7 +59,7 @@ from ...hooks import HookContext, get_all_by_name
 from ...internal.checks import CheckConfig, CheckContext
 from ...internal.datetime import current_datetime
 from ...internal.result import Err, Ok, Result
-from ...models import APIOperation, Case, Check, Status, TestResult
+from ...models import APIOperation, Case, Check, Request, Response, Status, TestResult
 from ...runner import events
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
@@ -763,7 +763,6 @@ def run_checks(
     check_results: list[Check],
     result: TestResult,
     response: GenericResponse,
-    elapsed_time: float,
     max_response_time: int | None = None,
 ) -> None:
     errors = []
@@ -775,7 +774,16 @@ def run_checks(
             context = error.context
         else:
             context = None
-        check_results.append(result.add_failure(check_name, copied_case, response, elapsed_time, msg, context))
+        check_results.append(
+            result.add_failure(
+                name=check_name,
+                case=copied_case,
+                request=Request.from_prepared_request(response.request),
+                response=Response.from_generic(response=response),
+                message=msg,
+                context=context,
+            )
+        )
 
     for check in checks:
         check_name = check.__name__
@@ -783,7 +791,12 @@ def run_checks(
         try:
             skip_check = check(ctx, response, copied_case)
             if not skip_check:
-                check_result = result.add_success(check_name, copied_case, response, elapsed_time)
+                check_result = result.add_success(
+                    name=check_name,
+                    case=copied_case,
+                    request=Request.from_prepared_request(response.request),
+                    response=Response.from_generic(response=response),
+                )
                 check_results.append(check_result)
         except AssertionError as exc:
             add_single_failure(exc)
@@ -792,19 +805,25 @@ def run_checks(
                 add_single_failure(exception)
 
     if max_response_time:
-        if elapsed_time > max_response_time:
-            message = _make_max_response_time_failure_message(elapsed_time, max_response_time)
+        elapsed = response.elapsed.total_seconds() * 1000
+        if elapsed > max_response_time:
+            message = _make_max_response_time_failure_message(elapsed, max_response_time)
             errors.append(AssertionError(message))
             result.add_failure(
-                "max_response_time",
-                case,
-                response,
-                elapsed_time,
-                message,
-                failures.ResponseTimeExceeded(message=message, elapsed=elapsed_time, deadline=max_response_time),
+                name="max_response_time",
+                case=case,
+                request=Request.from_prepared_request(response.request),
+                response=Response.from_generic(response=response),
+                message=message,
+                context=failures.ResponseTimeExceeded(message=message, elapsed=elapsed, deadline=max_response_time),
             )
         else:
-            result.add_success("max_response_time", case, response, elapsed_time)
+            result.add_success(
+                name="max_response_time",
+                case=case,
+                request=Request.from_prepared_request(response.request),
+                response=Response.from_generic(response=response),
+            )
 
     if errors:
         raise get_grouped_exception(case.operation.verbose_name, *errors)(causes=tuple(errors))
@@ -966,7 +985,12 @@ def _network_test(
             float, request_config.prepared_timeout
         )  # It is defined and not empty, since the exception happened
         check_result = result.add_failure(
-            check_name, case, None, elapsed, f"Response timed out after {1000 * elapsed:.2f}ms", exc.context, request
+            name=check_name,
+            case=case,
+            request=Request.from_prepared_request(request),
+            response=None,
+            message=f"Response timed out after {1000 * elapsed:.2f}ms",
+            context=exc.context,
         )
         check_results.append(check_result)
         if store_interactions:
@@ -990,7 +1014,6 @@ def _network_test(
             check_results=check_results,
             result=result,
             response=response,
-            elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
         )
     except CheckFailed:
@@ -1082,7 +1105,6 @@ def _wsgi_test(
             check_results=check_results,
             result=result,
             response=response,
-            elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
         )
     except CheckFailed:
@@ -1162,7 +1184,6 @@ def _asgi_test(
             check_results=check_results,
             result=result,
             response=response,
-            elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
         )
     except CheckFailed:
