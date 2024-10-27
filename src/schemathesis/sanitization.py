@@ -231,7 +231,7 @@ def sanitize_serialized_check(check: SerializedCheck, *, config: Config | None =
     response = check.response
     if response:
         sanitize_value(response.headers, config=config)
-    sanitize_serialized_case(check.example, config=config)
+    sanitize_serialized_case(check.case, config=config)
 
 
 def sanitize_serialized_case(case: SerializedCase, *, config: Config | None = None) -> None:
