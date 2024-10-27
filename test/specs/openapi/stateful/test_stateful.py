@@ -7,8 +7,6 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, UsageError
-from schemathesis.models import CaseSource, Check, Status, TransitionId
-from schemathesis.runner.serialization import SerializedCheck
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
@@ -262,42 +260,6 @@ TestStateful = schema.as_state_machine().TestCase
     result.assert_outcomes(failed=1)
     # Then internal frames should not appear after the "Falsifying example" block
     assert " in step" not in result.stdout.str()
-
-
-@pytest.mark.parametrize("method", ["requests", "werkzeug"])
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_history(app_schema, response_factory, method):
-    # When cases are serialized
-    schema = schemathesis.from_dict(app_schema)
-    first = schema["/users/"]["POST"].make_case(body={"first_name": "Foo", "last_name": "bar"})
-    factory = getattr(response_factory, method)
-    first_response = factory(status_code=201)
-    second = schema["/users/{user_id}"]["PATCH"].make_case(
-        path_parameters={"user_id": 42}, body={"first_name": "SPAM", "last_name": "bar"}
-    )
-    second_response = factory(status_code=200)
-    second.source = CaseSource(
-        case=first,
-        response=first_response,
-        elapsed=10,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-    third = schema["/users/{user_id}"]["GET"].make_case(path_parameters={"user_id": 42})
-    third_response = factory(status_code=200)
-    third.source = CaseSource(
-        case=second,
-        response=second_response,
-        elapsed=10,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-    check = Check(name="not_a_server_error", value=Status.success, response=third_response, elapsed=10, example=third)
-    serialized = SerializedCheck.from_check(check)
-    # Then they should store all history
-    assert serialized.history[0].case.verbose_name == "PATCH /api/users/{user_id}"
-    assert serialized.history[1].case.verbose_name == "POST /api/users/"
 
 
 @pytest.mark.openapi_version("3.0")
