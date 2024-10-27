@@ -12,10 +12,9 @@ from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import OperationDefinition, Request, Response
+from schemathesis.models import Case, OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
-from schemathesis.runner.serialization import SerializedTestResult
-from schemathesis.transports import serialize_payload
+from schemathesis.runner.models import Check, Request, Response, Status, TestResult, TestResultSet
 
 from ...utils import strip_style_win32
 
@@ -45,7 +44,7 @@ def operation(swagger_20):
 
 @pytest.fixture
 def response():
-    body = serialize_payload(b'{"id": 5}')
+    body = b'{"id": 5}'
     return Response(
         status_code=201,
         body=body,
@@ -61,20 +60,20 @@ def response():
 
 @pytest.fixture
 def results_set(operation):
-    statistic = models.TestResult(
+    statistic = TestResult(
         operation.method,
         operation.full_path,
         data_generation_method=[DataGenerationMethod.default()],
         verbose_name=f"{operation.method} {operation.full_path}",
     )
-    return models.TestResultSet(seed=42, results=[statistic])
+    return TestResultSet(seed=42, results=[statistic])
 
 
 @pytest.fixture
 def after_execution(results_set, operation):
     return runner.events.AfterExecution.from_result(
         result=results_set.results[0],
-        status=models.Status.success,
+        status=Status.success,
         hypothesis_output=[],
         elapsed_time=1.0,
         operation=operation,
@@ -131,13 +130,9 @@ def test_handle_initialized(capsys, mocker, execution_context, swagger_20, verbo
 
 def test_display_statistic(capsys, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = models.Check(
-        "not_a_server_error", models.Status.success, response, 0, models.Case(operation, generation_time=0.0)
-    )
-    failure = models.Check(
-        "not_a_server_error", models.Status.failure, response, 0, models.Case(operation, generation_time=0.0)
-    )
-    single_test_statistic = models.TestResult(
+    success = Check("not_a_server_error", Status.success, response, 0, Case(operation, generation_time=0.0))
+    failure = Check("not_a_server_error", Status.failure, response, 0, Case(operation, generation_time=0.0))
+    single_test_statistic = TestResult(
         method=operation.method,
         path=operation.full_path,
         verbose_name=f"{operation.method} {operation.full_path}",
@@ -148,12 +143,10 @@ def test_display_statistic(capsys, execution_context, operation, response):
             success,
             failure,
             failure,
-            models.Check(
-                "different_check", models.Status.success, response, 0, models.Case(operation, generation_time=0.0)
-            ),
+            Check("different_check", Status.success, response, 0, Case(operation, generation_time=0.0)),
         ],
     )
-    results = models.TestResultSet(seed=42, results=[single_test_statistic])
+    results = TestResultSet(seed=42, results=[single_test_statistic])
     event = Finished.from_results(results, running_time=1.0)
     # When test results are displayed
     default.display_statistic(execution_context, event)
@@ -169,7 +162,7 @@ def test_display_statistic(capsys, execution_context, operation, response):
 
 
 def test_display_multiple_warnings(capsys, execution_context):
-    results = models.TestResultSet(seed=42, results=[])
+    results = TestResultSet(seed=42, results=[])
     results.add_warning("Foo")
     results.add_warning("Bar")
     event = Finished.from_results(results, running_time=1.0)
@@ -247,21 +240,21 @@ def test_display_hypothesis_output(capsys):
 def test_display_single_failure(capsys, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
     media_type = "application/json" if body is not NOT_SET else None
-    success = models.Check(
+    success = Check(
         "not_a_server_error",
-        models.Status.success,
+        Status.success,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
+        Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
-    failure = models.Check(
+    failure = Check(
         "not_a_server_error",
-        models.Status.failure,
+        Status.failure,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        models.Case(operation, generation_time=0.0, body=body, media_type=media_type),
+        Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
-    test_statistic = models.TestResult(
+    test_statistic = TestResult(
         method=operation.method,
         path=operation.full_path,
         data_generation_method=[DataGenerationMethod.default()],
@@ -272,12 +265,12 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
             success,
             failure,
             failure,
-            models.Check(
+            Check(
                 "different_check",
-                models.Status.success,
+                Status.success,
                 Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
                 response,
-                models.Case(
+                Case(
                     operation,
                     generation_time=0.0,
                     body=body,
@@ -287,7 +280,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
         ],
     )
     # When this failure is displayed
-    default.display_failures_for_single_test(execution_context, SerializedTestResult.from_test_result(test_statistic))
+    default.display_failures_for_single_test(execution_context, test_statistic)
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then the path is displayed as a subsection
@@ -296,7 +289,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
 
 @pytest.mark.parametrize(
     ("status", "expected_symbol", "color"),
-    [(models.Status.success, ".", "green"), (models.Status.failure, "F", "red"), (models.Status.error, "E", "red")],
+    [(Status.success, ".", "green"), (Status.failure, "F", "red"), (Status.error, "E", "red")],
 )
 def test_handle_after_execution(capsys, execution_context, after_execution, status, expected_symbol, color):
     # Given AfterExecution even with certain status

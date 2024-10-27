@@ -1,6 +1,5 @@
 import json
 import sys
-from base64 import b64decode
 from unittest.mock import Mock
 
 import pytest
@@ -14,8 +13,8 @@ import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.generation import GenerationConfig
 from schemathesis.internal.checks import CheckContext
-from schemathesis.models import Status
 from schemathesis.runner import from_schema
+from schemathesis.runner.models import Status
 from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_auth_from_case, ignored_auth
 
 
@@ -45,10 +44,10 @@ def test_auth_is_not_checked(with_generated, schema_url):
     assert check.name == "ignored_auth"
     if with_generated:
         assert "Authorization" in check.request.headers
-        assert json.loads(b64decode(check.response.body)) == {"has_auth": True}
+        assert json.loads(check.response.body) == {"has_auth": True}
     else:
         assert "Authorization" not in check.request.headers
-        assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
+        assert json.loads(check.response.body) == {"has_auth": False}
 
 
 @pytest.mark.operations("basic")
@@ -236,10 +235,10 @@ def test_wsgi(wsgi_app_schema, with_generated, headers):
     assert check.name == "ignored_auth"
     if with_generated and not headers:
         assert "Authorization" in check.request.headers
-        assert json.loads(b64decode(check.response.body)) == {"has_auth": True}
+        assert json.loads(check.response.body) == {"has_auth": True}
     else:
         assert "Authorization" not in check.request.headers
-        assert json.loads(b64decode(check.response.body)) == {"has_auth": False}
+        assert json.loads(check.response.body) == {"has_auth": False}
 
 
 @pytest.mark.openapi_version("3.0")

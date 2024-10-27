@@ -28,7 +28,7 @@ from schemathesis.cli.cassettes import (
 from schemathesis.cli.reporting import TEST_CASE_ID_TITLE
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import Request
+from schemathesis.runner.models import Request
 
 
 @pytest.fixture
@@ -359,9 +359,11 @@ async def test_replay(
 
 
 @pytest.mark.operations("__all__")
+@pytest.mark.parametrize("value", ["true", "false"])
 @pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
-def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args):
+def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args, value):
     cassette_path = cassette_path.with_suffix(".har")
+    auth = "secret"
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
@@ -370,6 +372,8 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
         "--hypothesis-seed=1",
         "--validate-schema=false",
         "--checks=all",
+        f"-H Authorization: {auth}",
+        f"--sanitize-output={value}",
         *args,
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -380,6 +384,13 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
     assert "log" in data
     assert "entries" in data["log"]
     assert len(data["log"]["entries"]) > 1
+    for entry in data["log"]["entries"]:
+        for header in entry["request"]["headers"]:
+            if header["name"] == "Authorization":
+                if value == "true":
+                    assert header["value"] != auth
+                else:
+                    assert header["value"] == auth
 
 
 @pytest.mark.operations("__all__")

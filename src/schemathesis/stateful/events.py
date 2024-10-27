@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import time
-from dataclasses import asdict as _asdict
 from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from ..exceptions import format_exception
+from ..internal.exceptions import format_exception
 
 if TYPE_CHECKING:
-    from ..models import Case, Check
+    from ..models import Case
+    from ..runner.models import Check
     from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine
 
@@ -32,7 +32,7 @@ class StatefulEvent:
     __slots__ = ("timestamp",)
 
     def asdict(self) -> dict[str, Any]:
-        return _asdict(self)
+        return {"timestamp": self.timestamp}
 
 
 @dataclass
@@ -67,6 +67,9 @@ class RunFinished(StatefulEvent):
     def __init__(self, *, status: RunStatus) -> None:
         self.status = status
         self.timestamp = time.monotonic()
+
+    def asdict(self) -> dict[str, Any]:
+        return {"timestamp": self.timestamp, "status": self.status}
 
 
 class SuiteStatus(str, Enum):
@@ -103,12 +106,10 @@ class SuiteFinished(StatefulEvent):
         self.timestamp = time.monotonic()
 
     def asdict(self) -> dict[str, Any]:
-        from ..runner.serialization import SerializedCheck, _serialize_check
-
         return {
             "timestamp": self.timestamp,
             "status": self.status,
-            "failures": [_serialize_check(SerializedCheck.from_check(failure)) for failure in self.failures],
+            "failures": [failure.asdict() for failure in self.failures],
         }
 
 
@@ -136,6 +137,9 @@ class ScenarioStarted(StatefulEvent):
         self.is_final = is_final
         self.timestamp = time.monotonic()
 
+    def asdict(self) -> dict[str, Any]:
+        return {"timestamp": self.timestamp, "is_final": self.is_final}
+
 
 @dataclass
 class ScenarioFinished(StatefulEvent):
@@ -151,6 +155,9 @@ class ScenarioFinished(StatefulEvent):
         self.status = status
         self.is_final = is_final
         self.timestamp = time.monotonic()
+
+    def asdict(self) -> dict[str, Any]:
+        return {"timestamp": self.timestamp, "is_final": self.is_final, "status": self.status}
 
 
 class StepStatus(str, Enum):
@@ -270,5 +277,5 @@ class Errored(StatefulEvent):
     def asdict(self) -> dict[str, Any]:
         return {
             "timestamp": self.timestamp,
-            "exception": format_exception(self.exception, True),
+            "exception": format_exception(self.exception, with_traceback=True),
         }

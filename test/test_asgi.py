@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 import schemathesis
 from schemathesis.generation import GenerationConfig
-from schemathesis.models import Case
 from schemathesis.specs.openapi.loaders import from_asgi
 
 
@@ -17,9 +16,8 @@ def schema(fastapi_app):
     return from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
 
 
-@pytest.mark.parametrize("method", ["call", "call_asgi"])
 @pytest.mark.hypothesis_nested
-def test_cookies(fastapi_app, method):
+def test_cookies(fastapi_app):
     @fastapi_app.get("/cookies")
     def cookies(token: str = Cookie(None)):
         return {"token": token}
@@ -52,7 +50,7 @@ def test_cookies(fastapi_app, method):
     @given(case=strategy)
     @settings(max_examples=3, suppress_health_check=[HealthCheck.filter_too_much], deadline=None)
     def test(case):
-        response = getattr(case, method)()
+        response = case.call()
         assert response.status_code == 200
         assert response.json() == {"token": "test"}
 
@@ -119,17 +117,6 @@ def test_null_byte_in_headers(fastapi_app):
         assert response.json() == {"success": True}
 
     test()
-
-
-def test_not_app_with_asgi(schema):
-    case = Case(schema["/users"]["GET"], generation_time=0.0)
-    case.operation.app = None
-    with pytest.raises(
-        RuntimeError,
-        match="ASGI application instance is required. "
-        "Please, set `app` argument in the schema constructor or pass it to `call_asgi`",
-    ):
-        case.call_asgi()
 
 
 def test_base_url():
