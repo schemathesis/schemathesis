@@ -48,7 +48,7 @@ def _run_task(
     if headers is not None:
         as_strategy_kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
 
-    def _run_tests(maker: Callable, recursion_level: int = 0) -> None:
+    def _run_tests(maker: Callable) -> None:
         for _result in maker(
             test_func,
             settings=settings,
@@ -65,7 +65,6 @@ def _run_task(
                 data_generation_methods,
                 targets,
                 ctx=ctx,
-                recursion_level=recursion_level,
                 headers=headers,
                 **kwargs,
             ):
@@ -97,7 +96,7 @@ def _run_task(
                 # This lambda ignores the input arguments to support the same interface for
                 _run_tests(lambda *_, **__: (items,))  # noqa: B023
             else:
-                for event in handle_schema_error(result.err(), ctx, data_generation_methods, 0):
+                for event in handle_schema_error(result.err(), ctx, data_generation_methods):
                     events_queue.put(event)
 
 
