@@ -317,7 +317,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: Serializ
 
         for check_idx, check in enumerate(checks):
             if check_idx == 0:
-                click.secho(f"{idx}. {TEST_CASE_ID_TITLE}: {check.example.id}", bold=True)
+                click.secho(f"{idx}. {TEST_CASE_ID_TITLE}: {check.case.id}", bold=True)
             click.secho(f"\n- {check.title}", fg="red", bold=True)
             message = check.formatted_message
             if message:

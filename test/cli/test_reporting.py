@@ -34,7 +34,7 @@ from schemathesis.runner.serialization import SerializedCase, SerializedCheck, S
                 verify=st.just(True),
             )
             | st.none(),
-            example=st.just(
+            case=st.just(
                 SerializedCase(
                     id="testid",
                     generation_time=0.0,

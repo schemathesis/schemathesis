@@ -613,7 +613,6 @@ def test_deduplication(ctx, response_factory):
             check_results=failures,
             result=result,
             response=response,
-            elapsed_time=0,
         )
     # Then the resulting output should be deduplicated
     assert len(deduplicate_failures(failures)) == 1

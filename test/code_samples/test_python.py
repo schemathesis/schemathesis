@@ -130,4 +130,4 @@ def test_reproduce_code_with_overridden_headers(any_app_schema):
     ).execute()
     assert finished.has_failures
     for key, value in headers.items():
-        assert after.result.checks[1].example.headers[key] == value
+        assert after.result.checks[1].case.headers[key] == value

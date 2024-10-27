@@ -26,12 +26,12 @@ def group_by_case(
 def _by_unique_key(check: SerializedCheck, code_sample_style: CodeSampleStyle) -> tuple[str, int, str]:
     return (
         code_sample_style.generate(
-            method=check.example.method,
-            url=check.example.url,
-            body=check.example.deserialize_body(),
-            headers=check.example.headers,
-            verify=check.example.verify,
-            extra_headers=check.example.extra_headers,
+            method=check.case.method,
+            url=check.case.url,
+            body=check.case.deserialize_body(),
+            headers=check.case.headers,
+            verify=check.case.verify,
+            extra_headers=check.case.extra_headers,
         ),
         0 if not check.response else check.response.status_code,
         "SCHEMATHESIS-INTERNAL-NO-RESPONSE"

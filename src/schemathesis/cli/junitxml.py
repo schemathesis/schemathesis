@@ -55,7 +55,7 @@ def build_failure_message(context: ExecutionContext, idx: int, code_sample: str,
     message = ""
     for check_idx, check in enumerate(checks):
         if check_idx == 0:
-            message += f"{idx}. {TEST_CASE_ID_TITLE}: {check.example.id}\n"
+            message += f"{idx}. {TEST_CASE_ID_TITLE}: {check.case.id}\n"
         message += f"\n- {check.title}\n"
         formatted_message = check.formatted_message
         if formatted_message:

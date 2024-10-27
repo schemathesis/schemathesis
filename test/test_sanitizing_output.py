@@ -24,6 +24,7 @@ from schemathesis.sanitization import (
     sanitize_serialized_interaction,
     sanitize_url,
 )
+from schemathesis.transports import serialize_payload
 
 
 @pytest.fixture
@@ -251,6 +252,18 @@ def test_sanitize_url(input_url, expected_url):
 def serialized_check(case_factory, response_factory):
     root_case = case_factory()
     value = "secret"
+    body = serialize_payload(b'{"id": 5}')
+    response = SerializedResponse(
+        status_code=201,
+        body=body,
+        body_size=len(body),
+        message="Created",
+        encoding="utf-8",
+        http_version="1.1",
+        elapsed=1.0,
+        headers={"Content-Type": ["application/json"], "X-Token": [value]},
+        verify=True,
+    )
     root_case.source = CaseSource(
         case=case_factory(),
         response=response_factory.requests(headers={"X-Token": value}),
@@ -261,16 +274,22 @@ def serialized_check(case_factory, response_factory):
     check = Check(
         name="test",
         value=Status.failure,
-        response=response_factory.requests(headers={"X-Token": value}),
-        elapsed=1.0,
-        example=root_case,
+        request=SerializedRequest(
+            method="POST",
+            uri="http://user:pass@127.0.0.1/path",
+            body=None,
+            body_size=None,
+            headers={"X-Token": "Secret"},
+        ),
+        response=response,
+        case=root_case,
     )
     return SerializedCheck.from_check(check)
 
 
 def test_sanitize_serialized_check(serialized_check):
     sanitize_serialized_check(serialized_check)
-    assert serialized_check.example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert serialized_check.case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
 
 
 def test_sanitize_serialized_interaction(serialized_check):
@@ -303,7 +322,7 @@ def test_sanitize_serialized_interaction(serialized_check):
     )
     sanitize_serialized_interaction(interaction)
 
-    assert interaction.checks[0].example.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
+    assert interaction.checks[0].case.extra_headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.request.uri == f"http://{DEFAULT_REPLACEMENT}@127.0.0.1/path"
     assert interaction.request.headers["X-Token"] == DEFAULT_REPLACEMENT
     assert interaction.response.headers["X-Token"] == [DEFAULT_REPLACEMENT]
