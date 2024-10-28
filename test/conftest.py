@@ -9,7 +9,6 @@ import shlex
 import warnings
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from importlib import metadata
 from pathlib import Path
 from textwrap import dedent
 from types import SimpleNamespace
@@ -21,7 +20,6 @@ import requests
 import yaml
 from click.testing import CliRunner, Result
 from hypothesis import settings
-from packaging import version
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from urllib3 import HTTPResponse
 
@@ -34,7 +32,6 @@ from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.specs.openapi import media_types
-from schemathesis.transports.responses import WSGIResponse
 
 from .apps import _graphql as graphql
 from .apps import openapi
@@ -1092,21 +1089,6 @@ app = create_app()
     return f"{module}:app"
 
 
-class SubtestsVersion:
-    """Helper to check the version of pytest-subtests."""
-
-    def __init__(self):
-        self.version = version.parse(metadata.version("pytest_subtests"))
-        self.below_0_6_0 = self.version < version.parse("0.6.0")
-        self.below_0_11_0 = self.version < version.parse("0.11.0")
-
-
-@pytest.fixture(scope="session")
-def is_older_subtests() -> SubtestsVersion:
-    # For compatibility needs
-    return SubtestsVersion()
-
-
 @pytest.fixture
 def response_factory():
     def httpx_factory(
@@ -1146,19 +1128,7 @@ def response_factory():
         response.request.prepare(method="POST", url="http://127.0.0.1", headers=headers)
         return response
 
-    def werkzeug_factory(*, status_code: int = 200, headers: dict[str, Any] | None = None):
-        response = WSGIResponse(response=b'{"some": "value"}', status=status_code)
-        response.request = requests.PreparedRequest()
-        response.request.prepare(
-            method="POST", url="http://example.com", headers={"Content-Type": "application/json", **(headers or {})}
-        )
-        return response
-
-    return SimpleNamespace(
-        httpx=httpx_factory,
-        requests=requests_factory,
-        werkzeug=werkzeug_factory,
-    )
+    return SimpleNamespace(httpx=httpx_factory, requests=requests_factory)
 
 
 @pytest.fixture

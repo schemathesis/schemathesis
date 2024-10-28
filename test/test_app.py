@@ -4,17 +4,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
-
-if IS_PYTEST_ABOVE_7:
-    from _pytest.pytester import Pytester
-
-    TimeoutExpired = Pytester.TimeoutExpired
-else:
-    from _pytest import pytester
-
-    TimeoutExpired = pytester.Testdir.TimeoutExpired
+from _pytest.pytester import Pytester
 
 HERE = Path(__file__).absolute().parent
 
@@ -32,7 +22,7 @@ def test_app(testdir, aiohttp_unused_port, framework):
         timeout = 3.0
     if os.getenv("COVERAGE_RUN") == "true":
         timeout *= 2
-    with pytest.raises(TimeoutExpired):
+    with pytest.raises(Pytester.TimeoutExpired):
         testdir.run(
             sys.executable, str(HERE / "apps/__init__.py"), str(port), f"--framework={framework}", timeout=timeout
         )

@@ -1,6 +1,5 @@
 import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
-from packaging import version
 
 import schemathesis
 from schemathesis.parameters import PayloadAlternatives
@@ -487,11 +486,7 @@ def test_(request, case):
     )
     result = testdir.runpytest()
     # Then collection phase should fail with error
-    if version.parse(pytest.__version__) >= version.parse("6.0.0"):
-        kwargs = {"errors": 1}
-    else:
-        kwargs = {"error": 1}
-    result.assert_outcomes(**kwargs)
+    result.assert_outcomes(errors=1)
     result.stdout.re_match_lines([r".*Error during collection$"])
 
 

@@ -41,7 +41,7 @@ def test_(case):
     result.stdout.re_match_lines(EXPECTED_OUTPUT_LINES)
 
 
-def test_in_pytest_subtests(testdir, is_older_subtests, open_api_3_schema_with_recoverable_errors):
+def test_in_pytest_subtests(testdir, open_api_3_schema_with_recoverable_errors):
     testdir.make_test(
         """
 lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
@@ -57,21 +57,8 @@ def test_(case):
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
     result.assert_outcomes(passed=1, failed=2)
-    if is_older_subtests.below_0_6_0:
-        expected = EXPECTED_OUTPUT_LINES
-    elif is_older_subtests.below_0_11_0:
-        expected = [
-            # Path-level error. no method is displayed
-            r".*test_\[/foo\] SUBFAIL",
-            # Valid operation
-            r".*test_\[GET /bar\] SUBPASS",
-            # Operation-level error
-            r".*test_\[POST /bar\] SUBFAIL",
-            # The error in both failing cases
-            ".*Unresolvable JSON pointer in the schema.*",
-        ]
-    else:
-        expected = [
+    result.stdout.re_match_lines(
+        [
             # Path-level error. no method is displayed
             r".*test_\[/foo\] \(path='/foo'\) SUBFAIL",
             # Valid operation
@@ -81,8 +68,7 @@ def test_(case):
             # The error in both failing cases
             ".*Unresolvable JSON pointer in the schema.*",
         ]
-
-    result.stdout.re_match_lines(expected)
+    )
 
 
 def test_jsonschema_error(testdir, openapi_3_schema_with_invalid_security):
