@@ -6,7 +6,7 @@ import pathlib
 import re
 from typing import IO, TYPE_CHECKING, Any, Callable, cast
 
-from ... import experimental, fixups
+from ... import experimental
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
@@ -276,11 +276,6 @@ def from_dict(
         raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
     hook_context = HookContext()
     is_openapi_31 = raw_schema.get("openapi", "").startswith("3.1")
-    is_fast_api_fixup_installed = fixups.is_installed("fast_api")
-    if is_fast_api_fixup_installed and is_openapi_31:
-        fixups.fast_api.uninstall()
-    elif _is_fast_api(app):
-        fixups.fast_api.adjust_schema(raw_schema)
     dispatch("before_load_schema", hook_context, raw_schema)
     rate_limiter: Limiter | None = None
     if rate_limit is not None:

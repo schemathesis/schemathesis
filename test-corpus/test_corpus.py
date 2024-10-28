@@ -1,16 +1,19 @@
 import os
 import pathlib
 import sys
+import threading
+from time import sleep
 from typing import NoReturn
 
 import hypothesis
 import pytest
+from aiohttp.test_utils import unused_port
 from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
 from jsonschema import RefResolutionError
 
 import schemathesis
-from schemathesis._hypothesis import _iter_coverage_cases
+from schemathesis._hypothesis._builder import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, SchemaError, UsageError
@@ -24,7 +27,6 @@ from schemathesis.service.client import ServiceClient
 from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
 from schemathesis.service.models import AnalysisError, SuccessState
 from schemathesis.specs.openapi import loaders
-from test.fixtures.app_runner import run_flask_app
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -44,6 +46,16 @@ SCHEMATHESIS_IO_TOKEN = os.getenv(TOKEN_ENV_VAR)
 
 
 app = Flask("test_app")
+
+
+def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) -> int:
+    if port is None:
+        port = unused_port()
+    server_thread = threading.Thread(target=app.run, kwargs={"port": port})
+    server_thread.daemon = True
+    server_thread.start()
+    sleep(timeout)
+    return port
 
 
 @app.route("/")
@@ -117,7 +129,6 @@ def app_port():
 
 
 def combined_check(ctx, response, case):
-    case.get_code_to_reproduce()
     case.as_curl_command()
     for check in ALL_CHECKS:
         try:
