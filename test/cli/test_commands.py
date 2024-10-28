@@ -20,9 +20,9 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 
 from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
-from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
-from schemathesis.cli.cassettes import CassetteFormat
+from schemathesis.cli import execute, get_exit_code, reset_checks
 from schemathesis.cli.constants import HealthCheck, Phase
+from schemathesis.cli.loaders import LoaderConfig
 from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.constants import (
     DEFAULT_DEADLINE,
@@ -32,7 +32,6 @@ from schemathesis.constants import (
 )
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.internal.checks import CheckConfig
-from schemathesis.internal.datetime import current_datetime
 from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import from_schema
@@ -275,7 +274,7 @@ SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
     ],
 )
 def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
-    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
 
     cli.run(SCHEMA_URI, *args)
@@ -333,7 +332,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
 )
 def test_load_schema_arguments(cli, mocker, args, expected):
     mocker.patch("schemathesis.runner.impl.SingleThreadRunner.execute", autospec=True)
-    load_schema = mocker.patch("schemathesis.cli.load_schema", autospec=True)
+    load_schema = mocker.patch("schemathesis.cli.loaders.load_schema", autospec=True)
 
     cli.run(SCHEMA_URI, *args)
     expected = LoaderConfig(
@@ -389,7 +388,7 @@ app = create_app()
     ],
 )
 def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, cls):
-    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     database = factory(request)
     if database:
@@ -424,14 +423,14 @@ def test_metadata(cli, schema_url):
 
 
 def test_all_checks(cli, mocker, swagger_20):
-    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=all")
     assert execute.call_args[1]["checks"] == ALL_CHECKS
 
 
 def test_comma_separated_checks(cli, mocker, swagger_20):
-    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=not_a_server_error,status_code_conformance")
     assert execute.call_args[1]["checks"] == (not_a_server_error, status_code_conformance)
@@ -439,7 +438,7 @@ def test_comma_separated_checks(cli, mocker, swagger_20):
 
 def test_comma_separated_exclude_checks(cli, mocker, swagger_20):
     excluded_checks = "not_a_server_error,status_code_conformance"
-    mocker.patch("schemathesis.cli.load_schema", return_value=swagger_20)
+    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=all", f"--exclude-checks={excluded_checks}")
     assert execute.call_args[1]["checks"] == tuple(
@@ -1736,23 +1735,15 @@ def assert_exit_code(event_stream, code):
             show_trace=False,
             wait_for_schema=None,
             validate_schema=False,
-            cassette_path=None,
-            cassette_format=CassetteFormat.VCR,
-            cassette_preserve_exact_body_bytes=False,
+            cassette_config=None,
             junit_xml=None,
             verbosity=0,
             code_sample_style=CodeSampleStyle.default(),
-            data_generation_methods=[DataGenerationMethod.default()],
             debug_output_file=None,
-            host_data=None,
             client=None,
-            api_name=None,
-            location="http://127.0.0.1",
-            base_url=None,
-            started_at=current_datetime(),
             report=None,
-            telemetry=False,
-            sanitize_output=False,
+            host_data=None,
+            report_config=None,
             output_config=None,
         )
     assert exc.value.code == code
