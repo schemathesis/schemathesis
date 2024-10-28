@@ -5,7 +5,7 @@ from hypothesis import Phase, settings
 
 import schemathesis
 from schemathesis import experimental
-from schemathesis._hypothesis import create_test
+from schemathesis._hypothesis._builder import create_test
 from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation._methods import DataGenerationMethod

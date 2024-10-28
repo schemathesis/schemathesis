@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Set, Tuple, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Tuple, Union
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -23,10 +23,6 @@ class NotSet:
 
 
 RequestCert = Union[str, Tuple[str, str]]
-
-
-# A filter for path / method
-Filter = Union[str, List[str], Tuple[str], Set[str], NotSet]
 
 Hook = Union[
     Callable[["SearchStrategy"], "SearchStrategy"], Callable[["SearchStrategy", "HookContext"], "SearchStrategy"]

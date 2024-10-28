@@ -1,5 +1,3 @@
-"""High-level API for creating Hypothesis tests."""
-
 from __future__ import annotations
 
 import asyncio
@@ -7,7 +5,7 @@ import json
 import warnings
 from functools import wraps
 from itertools import combinations
-from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
+from typing import Any, Callable, Generator, Mapping
 
 import hypothesis
 from hypothesis import Phase
@@ -15,21 +13,19 @@ from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
-from . import _patches
-from .auths import get_auth_storage_from_test
-from .constants import DEFAULT_DEADLINE, NOT_SET
-from .exceptions import OperationSchemaError, SerializationNotPossible
-from .experimental import COVERAGE_PHASE
-from .generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
-from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from .models import APIOperation, Case, GenerationMetadata, TestPhase
-from .parameters import ParameterSet
-from .transports.content_types import parse_content_type
-from .transports.headers import has_invalid_characters, is_latin_1_encodable
-from .types import NotSet
-
-if TYPE_CHECKING:
-    from .utils import GivenInput
+from .. import _patches
+from ..auths import get_auth_storage_from_test
+from ..constants import DEFAULT_DEADLINE, NOT_SET
+from ..exceptions import OperationSchemaError, SerializationNotPossible
+from ..experimental import COVERAGE_PHASE
+from ..generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
+from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
+from ..models import APIOperation, Case, GenerationMetadata, TestPhase
+from ..parameters import ParameterSet
+from ..transports.content_types import parse_content_type
+from ..transports.headers import has_invalid_characters, is_latin_1_encodable
+from ..types import NotSet
+from ._given import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
 # if e.g. Schemathesis CLI is used with multiple workers
@@ -221,8 +217,8 @@ def add_coverage(
 def _iter_coverage_cases(
     operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
 ) -> Generator[Case, None, None]:
-    from .specs.openapi.constants import LOCATION_TO_CONTAINER
-    from .specs.openapi.examples import find_in_responses, find_matching_in_responses
+    from ..specs.openapi.constants import LOCATION_TO_CONTAINER
+    from ..specs.openapi.examples import find_in_responses, find_matching_in_responses
 
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
