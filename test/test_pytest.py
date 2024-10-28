@@ -357,7 +357,7 @@ def test_checks_as_a_list(testdir, openapi3_base_url):
         f"""
 schema.base_url = "{openapi3_base_url}"
 
-def my_check(response, case):
+def my_check(ctx, response, case):
     note("CHECKING!")
 
 @schema.parametrize()

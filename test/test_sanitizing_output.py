@@ -1,7 +1,6 @@
 from urllib.parse import urlencode
 
 import pytest
-from requests import Request
 
 from schemathesis.constants import NOT_SET
 from schemathesis.sanitization import (
@@ -13,15 +12,6 @@ from schemathesis.sanitization import (
     sanitize_case,
     sanitize_url,
 )
-
-
-@pytest.fixture
-def request_factory():
-    def factory(url="http://127.0.0.1", headers=None):
-        request = Request(url=url, headers=headers or {})
-        return request.prepare()
-
-    return factory
 
 
 @pytest.fixture
