@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 from _pytest.main import ExitCode
 
@@ -91,7 +89,6 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     assert result.exit_code == ExitCode.TESTS_FAILED
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
 @pytest.mark.snapshot(replace_statistic=True)
 def test_deduplication_on_sanitized_header(ctx, cli, snapshot_cli):
     # See GH-2294

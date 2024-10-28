@@ -1,5 +1,6 @@
 import json
 import sys
+from typing import Annotated
 from unittest.mock import Mock
 
 import pytest
@@ -154,10 +155,7 @@ def test_remove_auth_from_case(schema_url, key, parameters):
 
 
 @pytest.mark.parametrize("ignores_auth", [True, False])
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
 def test_proper_session(ignores_auth):
-    from typing import Annotated
-
     app = FastAPI()
 
     @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})

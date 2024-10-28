@@ -1,5 +1,5 @@
-import sys
 from contextlib import asynccontextmanager
+from typing import Annotated
 
 import pytest
 from fastapi import Cookie, FastAPI, Header
@@ -88,11 +88,8 @@ def test_null_byte(fastapi_app):
     test()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")
 @pytest.mark.hypothesis_nested
 def test_null_byte_in_headers(fastapi_app):
-    from typing import Annotated
-
     schemathesis.experimental.OPEN_API_3_1.enable()
 
     @fastapi_app.post("/data")
