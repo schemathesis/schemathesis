@@ -5,7 +5,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
 from ..code_samples import CodeSampleStyle
-from ..internal.deprecation import deprecated_property
 from ..internal.output import OutputConfig
 
 if TYPE_CHECKING:
@@ -63,10 +62,6 @@ class ExecutionContext:
     state_machine_sink: StateMachineSink | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
-
-    @deprecated_property(removed_in="4.0", replacement="show_trace")
-    def show_errors_tracebacks(self) -> bool:
-        return self.show_trace
 
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)

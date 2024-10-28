@@ -15,22 +15,6 @@ In CLI:
 
     $ st run --contrib-unique-data https://example.schemathesis.io/openapi.json
 
-.. important::
-
-    The ``schemathesis.contrib.unique_data`` hook is **DEPRECATED**. The concept of this feature
-    does not fit the core principles of Hypothesis where strategies are configurable on a per-example basis but this feature implies
-    uniqueness across examples. This leads to cryptic error messages about external state and flaky test runs, therefore it will be removed in
-    Schemathesis 4.0
-
-In Python tests:
-
-.. code:: python
-
-    from schemathesis import contrib
-
-    # This is a global hook that will affect all the tests
-    contrib.unique_data.install()
-
 Uniqueness is determined by the following parts of the generated data:
 
 - ``media_type``

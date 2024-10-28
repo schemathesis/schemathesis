@@ -91,19 +91,6 @@ TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
 
 DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod] + ["all"])
 
-DEPRECATED_CASSETTE_PATH_OPTION_WARNING = (
-    "Warning: Option `--store-network-log` is deprecated and will be removed in Schemathesis 4.0. "
-    "Use `--cassette-path` instead."
-)
-DEPRECATED_PRE_RUN_OPTION_WARNING = (
-    "Warning: Option `--pre-run` is deprecated and will be removed in Schemathesis 4.0. "
-    f"Use the `{HOOKS_MODULE_ENV_VAR}` environment variable instead"
-)
-DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING = (
-    "Warning: Option `--show-errors-tracebacks` is deprecated and will be removed in Schemathesis 4.0. "
-    "Use `--show-trace` instead"
-)
-CASSETTES_PATH_INVALID_USAGE_MESSAGE = "Can't use `--store-network-log` and `--cassette-path` simultaneously"
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
 
@@ -123,17 +110,10 @@ def reset_targets() -> None:
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
-@click.option("--pre-run", help="[DEPRECATED] A module to execute before running the tests", type=str, hidden=True)
 @click.version_option()
-def schemathesis(pre_run: str | None = None) -> None:
+def schemathesis() -> None:
     """Property-based API testing for OpenAPI and GraphQL."""
-    # Don't use `envvar=HOOKS_MODULE_ENV_VAR` arg to raise a deprecation warning for hooks
-    hooks: str | None
-    if pre_run:
-        click.secho(DEPRECATED_PRE_RUN_OPTION_WARNING, fg="yellow")
-        hooks = pre_run
-    else:
-        hooks = os.getenv(HOOKS_MODULE_ENV_VAR)
+    hooks = os.getenv(HOOKS_MODULE_ENV_VAR)
     if hooks:
         load_hook(hooks)
 
@@ -485,55 +465,6 @@ REPORT_TO_SERVICE = ReportToService()
     default=False,
     show_default=True,
 )
-@grouped_option(
-    "--endpoint",
-    "-E",
-    "endpoints",
-    type=str,
-    multiple=True,
-    help=r"[DEPRECATED] API operation path pattern (e.g., users/\d+)",
-    callback=callbacks.validate_regex,
-    hidden=True,
-)
-@grouped_option(
-    "--method",
-    "-M",
-    "methods",
-    type=str,
-    multiple=True,
-    help="[DEPRECATED] HTTP method (e.g., GET, POST)",
-    callback=callbacks.validate_regex,
-    hidden=True,
-)
-@grouped_option(
-    "--tag",
-    "-T",
-    "tags",
-    type=str,
-    multiple=True,
-    help="[DEPRECATED] Schema tag pattern",
-    callback=callbacks.validate_regex,
-    hidden=True,
-)
-@grouped_option(
-    "--operation-id",
-    "-O",
-    "operation_ids",
-    type=str,
-    multiple=True,
-    help="[DEPRECATED] OpenAPI operationId pattern",
-    callback=callbacks.validate_regex,
-    hidden=True,
-)
-@grouped_option(
-    "--skip-deprecated-operations",
-    help="[DEPRECATED] Exclude deprecated API operations from testing",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
-    hidden=True,
-)
 @group("Output options")
 @grouped_option(
     "--junit-xml",
@@ -595,21 +526,6 @@ REPORT_TO_SERVICE = ReportToService()
     "--debug-output-file",
     help="Save debugging information in a JSONL format at the specified file path",
     type=click.File("w", encoding="utf-8"),
-)
-@grouped_option(
-    "--store-network-log",
-    help="[DEPRECATED] Save the test outcomes in a VCR-compatible format",
-    type=click.File("w", encoding="utf-8"),
-    hidden=True,
-)
-@grouped_option(
-    "--show-errors-tracebacks",
-    help="[DEPRECATED] Display complete traceback information for internal errors",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    hidden=True,
-    show_default=True,
 )
 @group("Data generation options")
 @grouped_option(
@@ -887,10 +803,6 @@ def run(
     include_by: str | None = None,
     exclude_by: str | None = None,
     exclude_deprecated: bool = False,
-    endpoints: tuple[str, ...] = (),
-    methods: tuple[str, ...] = (),
-    tags: tuple[str, ...] = (),
-    operation_ids: tuple[str, ...] = (),
     workers_num: int = DEFAULT_WORKERS,
     base_url: str | None = None,
     app: str | None = None,
@@ -900,16 +812,13 @@ def run(
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
     validate_schema: bool = True,
-    skip_deprecated_operations: bool = False,
     junit_xml: click.utils.LazyFile | None = None,
     debug_output_file: click.utils.LazyFile | None = None,
-    show_errors_tracebacks: bool = False,
     show_trace: bool = False,
     code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     cassette_path: click.utils.LazyFile | None = None,
     cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
-    store_network_log: click.utils.LazyFile | None = None,
     wait_for_schema: float | None = None,
     fixups: tuple[str] = (),  # type: ignore
     rate_limit: str | None = None,
@@ -963,10 +872,6 @@ def run(
             entry for health_check in hypothesis_suppress_health_check for entry in health_check.as_hypothesis()
         ]
 
-    if show_errors_tracebacks:
-        click.secho(DEPRECATED_SHOW_ERROR_TRACEBACKS_OPTION_WARNING, fg="yellow")
-        show_trace = show_errors_tracebacks
-
     # Enable selected experiments
     for experiment in experiments:
         experiment.enable()
@@ -996,20 +901,8 @@ def run(
     check_auth(auth, headers, override)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
-    if store_network_log and cassette_path:
-        raise click.UsageError(CASSETTES_PATH_INVALID_USAGE_MESSAGE)
-    if store_network_log is not None:
-        click.secho(DEPRECATED_CASSETTE_PATH_OPTION_WARNING, fg="yellow")
-        cassette_path = store_network_log
-
     output_config = OutputConfig(truncate=output_truncate)
 
-    deprecated_filters = {
-        "--method": "--include-method",
-        "--endpoint": "--include-path",
-        "--tag": "--include-tag",
-        "--operation-id": "--include-operation-id",
-    }
     for values, arg_name in (
         (include_path, "--include-path"),
         (include_method, "--include-method"),
@@ -1021,18 +914,7 @@ def run(
         (exclude_name, "--exclude-name"),
         (exclude_tag, "--exclude-tag"),
         (exclude_operation_id, "--exclude-operation-id"),
-        (methods, "--method"),
-        (endpoints, "--endpoint"),
-        (tags, "--tag"),
-        (operation_ids, "--operation-id"),
     ):
-        if values and arg_name in deprecated_filters:
-            replacement = deprecated_filters[arg_name]
-            click.secho(
-                f"Warning: Option `{arg_name}` is deprecated and will be removed in Schemathesis 4.0. "
-                f"Use `{replacement}` instead",
-                fg="yellow",
-            )
         _ensure_unique_filter(values, arg_name)
     include_by_function = _filter_by_expression_to_func(include_by, "--include-by")
     exclude_by_function = _filter_by_expression_to_func(exclude_by, "--exclude-by")
@@ -1044,24 +926,12 @@ def run(
         filter_set.include(name=name_)
     for method in include_method:
         filter_set.include(method=method)
-    if methods:
-        for method in methods:
-            filter_set.include(method_regex=method)
     for path in include_path:
         filter_set.include(path=path)
-    if endpoints:
-        for endpoint in endpoints:
-            filter_set.include(path_regex=endpoint)
     for tag in include_tag:
         filter_set.include(tag=tag)
-    if tags:
-        for tag in tags:
-            filter_set.include(tag_regex=tag)
     for operation_id in include_operation_id:
         filter_set.include(operation_id=operation_id)
-    if operation_ids:
-        for operation_id in operation_ids:
-            filter_set.include(operation_id_regex=operation_id)
     if (
         include_name_regex
         or include_method_regex
@@ -1102,7 +972,7 @@ def run(
             tag_regex=exclude_tag_regex,
             operation_id_regex=exclude_operation_id_regex,
         )
-    if exclude_deprecated or skip_deprecated_operations:
+    if exclude_deprecated:
         filter_set.exclude(is_deprecated)
 
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc

@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-no-phases': invalid choice(s): unknown. Choose from explicit, reuse, generate, target, shrink.
+Error: Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously
