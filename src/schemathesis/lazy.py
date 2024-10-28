@@ -25,7 +25,6 @@ from ._hypothesis._given import (
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
 from ._pytest.control_flow import fail_on_no_matches
 from .auths import AuthStorage
-from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
@@ -55,7 +54,6 @@ class LazySchema:
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET
     generation_config: GenerationConfig | NotSet = NOT_SET
     output_config: OutputConfig | NotSet = NOT_SET
-    code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
 
@@ -99,7 +97,6 @@ class LazySchema:
             data_generation_methods=self.data_generation_methods,
             generation_config=self.generation_config,
             output_config=self.output_config,
-            code_sample_style=self.code_sample_style,
             rate_limiter=self.rate_limiter,
             sanitize_output=self.sanitize_output,
             filter_set=filter_set,
@@ -151,7 +148,6 @@ class LazySchema:
             data_generation_methods=self.data_generation_methods,
             generation_config=self.generation_config,
             output_config=self.output_config,
-            code_sample_style=self.code_sample_style,
             rate_limiter=self.rate_limiter,
             sanitize_output=self.sanitize_output,
             filter_set=filter_set,
@@ -166,7 +162,6 @@ class LazySchema:
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
-        code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
@@ -174,10 +169,6 @@ class LazySchema:
             generation_config = self.generation_config
         if output_config is NOT_SET:
             output_config = self.output_config
-        if isinstance(code_sample_style, str):
-            _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
-        else:
-            _code_sample_style = self.code_sample_style
 
         def wrapper(test: Callable) -> Callable:
             if is_given_applied(test):
@@ -209,7 +200,6 @@ class LazySchema:
                     data_generation_methods=data_generation_methods,
                     generation_config=generation_config,
                     output_config=output_config,
-                    code_sample_style=_code_sample_style,
                     app=self.app,
                     rate_limiter=self.rate_limiter,
                     sanitize_output=self.sanitize_output,
@@ -413,7 +403,6 @@ def get_schema(
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
     output_config: OutputConfig | NotSet = NOT_SET,
-    code_sample_style: CodeSampleStyle,
     rate_limiter: Limiter | None,
     sanitize_output: bool,
 ) -> BaseSchema:
@@ -433,7 +422,6 @@ def get_schema(
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,
-        code_sample_style=code_sample_style,
         rate_limiter=rate_limiter,
         sanitize_output=sanitize_output,
     )

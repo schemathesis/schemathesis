@@ -304,8 +304,7 @@ def test(case):
     result.assert_outcomes(failed=1)
 
 
-@pytest.mark.parametrize("style", ["python", "curl"])
-def test_failure_reproduction_message(testdir, openapi3_base_url, style):
+def test_failure_reproduction_message(testdir, openapi3_base_url):
     # When a test fails
     testdir.make_test(
         f"""
@@ -313,25 +312,21 @@ schema.base_url = "{openapi3_base_url}"
 
 @schema.include(path_regex="failure").parametrize()
 def test(case):
-    case.call_and_validate(code_sample_style="{style}")
+    case.call_and_validate()
     """,
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
     )
     # Then there should be a helpful message in the output
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
-    if style == "python":
-        lines = [
-            r".+Reproduce with:",
-            rf".+requests.get\('{openapi3_base_url}/failure'",
-        ]
-    else:
-        lines = [
+    result.stdout.re_match_lines(
+        [
+            ".+1. Server error",
+            ".+2. Undocumented HTTP status code",
+            ".+Documented: 200",
             r".+Reproduce with:",
             rf".+curl -X GET {openapi3_base_url}/failure",
         ]
-    result.stdout.re_match_lines(
-        [".+1. Server error", ".+2. Undocumented HTTP status code", ".+Documented: 200", *lines]
     )
 
 

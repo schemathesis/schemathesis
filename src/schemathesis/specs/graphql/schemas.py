@@ -79,13 +79,12 @@ class GraphQLCase(Case):
         checks: tuple[CheckFunction, ...] = (),
         additional_checks: tuple[CheckFunction, ...] = (),
         excluded_checks: tuple[CheckFunction, ...] = (),
-        code_sample_style: str | None = None,
         headers: dict[str, Any] | None = None,
     ) -> None:
         checks = checks or (not_a_server_error,)
         checks += additional_checks
         checks = tuple(check for check in checks if check not in excluded_checks)
-        return super().validate_response(response, checks, code_sample_style=code_sample_style, headers=headers)
+        return super().validate_response(response, checks, headers=headers)
 
 
 C = TypeVar("C", bound=Case)

@@ -266,7 +266,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
     if result.is_flaky:
         click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
         click.echo()
-    for idx, (code_sample, group) in enumerate(group_by_case(result.checks, context.code_sample_style), 1):
+    for idx, (code_sample, group) in enumerate(group_by_case(result.checks), 1):
         # Make server errors appear first in the list of checks
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
 

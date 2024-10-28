@@ -19,9 +19,8 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
-from . import serializers
+from . import code_samples, serializers
 from ._override import CaseOverride
-from .code_samples import CodeSampleStyle
 from .constants import (
     NOT_SET,
     SCHEMATHESIS_TEST_CASE_HEADER,
@@ -292,40 +291,13 @@ class Case:
                 sanitize_value(kwargs["params"])
         return prepare_request_data(kwargs)
 
-    def get_code_to_reproduce(
-        self,
-        headers: dict[str, Any] | None = None,
-        request: requests.PreparedRequest | None = None,
-        verify: bool = True,
-    ) -> str:
-        """Construct a Python code to reproduce this case with `requests`."""
-        if request is not None:
-            request_data = prepare_request_data(
-                {
-                    "method": request.method,
-                    "url": request.url,
-                    "headers": request.headers,
-                    "data": request.body,
-                }
-            )
-        else:
-            request_data = self.prepare_code_sample_data(headers)
-        return CodeSampleStyle.python.generate(
-            method=request_data.method,
-            url=request_data.url,
-            body=request_data.body,
-            headers=dict(self.headers) if self.headers is not None else None,
-            verify=verify,
-            extra_headers=request_data.headers,
-        )
-
     def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         request_data = self.prepare_code_sample_data(headers)
         case_headers = None
         if self.headers is not None:
             case_headers = dict(self.headers)
-        return CodeSampleStyle.curl.generate(
+        return code_samples.generate(
             method=request_data.method,
             url=request_data.url,
             body=request_data.body,
@@ -399,7 +371,6 @@ class Case:
         checks: tuple[CheckFunction, ...] = (),
         additional_checks: tuple[CheckFunction, ...] = (),
         excluded_checks: tuple[CheckFunction, ...] = (),
-        code_sample_style: str | None = None,
         headers: dict[str, Any] | None = None,
     ) -> None:
         """Validate application response.
@@ -411,7 +382,6 @@ class Case:
         :param additional_checks: A tuple of additional checks that will be executed after ones from the ``checks``
             argument.
         :param excluded_checks: Checks excluded from the default ones.
-        :param code_sample_style: Controls the style of code samples for failure reproduction.
         """
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
@@ -462,28 +432,9 @@ class Case:
                 payload = prepare_response_payload(payload, config=self.operation.schema.output_config)
                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
                 formatted += f"\n{payload}"
-            code_sample_style = (
-                CodeSampleStyle.from_str(code_sample_style)
-                if code_sample_style is not None
-                else self.operation.schema.code_sample_style
-            )
             verify = getattr(response, "verify", True)
-            code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
-            raise exception_cls(
-                f"{formatted}\n\n" f"{code_message}",
-                causes=tuple(failed_checks),
-            )
-
-    def _get_code_message(
-        self, code_sample_style: CodeSampleStyle, request: requests.PreparedRequest, verify: bool
-    ) -> str:
-        if code_sample_style == CodeSampleStyle.python:
-            code = self.get_code_to_reproduce(request=request, verify=verify)
-        elif code_sample_style == CodeSampleStyle.curl:
-            code = self.as_curl_command(headers=dict(request.headers), verify=verify)
-        else:
-            raise ValueError(f"Unknown code sample style: {code_sample_style.name}")
-        return f"Reproduce with: \n\n    {code}\n"
+            code_sample = self.as_curl_command(headers=dict(response.request.headers), verify=verify)
+            raise exception_cls(f"{formatted}\n\nReproduce with:\n\n    {code_sample}\n", causes=tuple(failed_checks))
 
     def call_and_validate(
         self,
@@ -493,15 +444,13 @@ class Case:
         checks: tuple[CheckFunction, ...] = (),
         additional_checks: tuple[CheckFunction, ...] = (),
         excluded_checks: tuple[CheckFunction, ...] = (),
-        code_sample_style: str | None = None,
         **kwargs: Any,
-    ) -> requests.Response:
+    ) -> GenericResponse:
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(
             response,
             checks,
-            code_sample_style=code_sample_style,
             headers=headers,
             additional_checks=additional_checks,
             excluded_checks=excluded_checks,

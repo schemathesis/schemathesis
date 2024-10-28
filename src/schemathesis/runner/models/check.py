@@ -9,8 +9,6 @@ from .status import Status
 from .transport import Request, Response
 
 if TYPE_CHECKING:
-    from requests.structures import CaseInsensitiveDict
-
     from ...exceptions import FailureContext
     from ...models import Case
     from ...transports import PreparedRequestData
@@ -30,7 +28,7 @@ class Check:
     context: FailureContext | None = None
 
     def prepare_code_sample_data(self) -> PreparedRequestData:
-        headers = _get_headers(self.request.headers)
+        headers = {key: value[0] for key, value in self.request.headers.items() if key not in get_excluded_headers()}
         return self.case.prepare_code_sample_data(headers)
 
     @property
@@ -69,27 +67,6 @@ class Check:
         }
 
 
-def _get_headers(headers: dict[str, Any] | CaseInsensitiveDict) -> dict[str, str]:
-    return {
-        key: value[0] if isinstance(value, list) else value
-        for key, value in headers.items()
-        if key not in get_excluded_headers()
-    }
-
-
-def make_unique_by_key(
-    check_name: str, check_message: str | None, context: FailureContext | None
-) -> tuple[str | None, ...]:
-    """A key to distinguish different failed checks.
-
-    It is not only based on `FailureContext`, because the end-user may raise plain `AssertionError` in their custom
-    checks, and those won't have any context attached.
-    """
-    if context is not None:
-        return context.unique_by_key(check_message)
-    return check_name, check_message
-
-
 def deduplicate_failures(checks: list[Check]) -> list[Check]:
     """Return only unique checks that should be displayed in the output."""
     seen: set[tuple[str | None, ...]] = set()
@@ -97,7 +74,11 @@ def deduplicate_failures(checks: list[Check]) -> list[Check]:
     for check in reversed(checks):
         # There are also could be checks that didn't fail
         if check.value == Status.failure:
-            key = make_unique_by_key(check.name, check.message, check.context)
+            key: tuple
+            if check.context is not None:
+                key = check.context.unique_by_key(check.message)
+            else:
+                key = check.name, check.message
             if key not in seen:
                 unique_checks.append(check)
                 seen.add(key)

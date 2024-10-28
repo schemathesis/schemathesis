@@ -9,6 +9,22 @@ from test.apps.openapi._fastapi.app import app
 schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
 
 
+@pytest.fixture
+def loose_schema(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test/{key}": {
+                "post": {
+                    "parameters": [{"name": "key", "in": "path"}],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        },
+        version="2.0",
+    )
+    return schemathesis.from_dict(schema, base_url="http://127.0.0.1:1", validate_schema=False)
+
+
 @pytest.mark.parametrize("headers", [None, {"X-Key": "42"}])
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
@@ -53,7 +69,7 @@ def test_explicit_headers(curl):
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
 def test_cli_output(cli, base_url, schema_url, curl):
-    result = cli.run(schema_url, "--code-sample-style=curl")
+    result = cli.run(schema_url)
     lines = result.stdout.splitlines()
     assert "Reproduce with: " in lines
     line = f"    curl -X GET {base_url}/failure"
@@ -65,7 +81,7 @@ def test_cli_output(cli, base_url, schema_url, curl):
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
 def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
-    result = cli.run(schema_url, "--code-sample-style=curl", "--request-tls-verify=false")
+    result = cli.run(schema_url, "--request-tls-verify=false")
     lines = result.stdout.splitlines()
     line = f"    curl -X GET --insecure {base_url}/failure"
     assert line in lines
@@ -78,7 +94,7 @@ def test_pytest_subtests_output(testdir, openapi3_base_url, app_schema):
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema", code_sample_style="curl")
+lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(case):

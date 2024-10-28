@@ -4,7 +4,6 @@ import shutil
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
-from ..code_samples import CodeSampleStyle
 from ..internal.output import OutputConfig
 
 if TYPE_CHECKING:
@@ -54,7 +53,6 @@ class ExecutionContext:
     junit_xml_file: str | None = None
     is_interrupted: bool = False
     verbosity: int = 0
-    code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
     analysis: Result[AnalysisResult, Exception] | None = None

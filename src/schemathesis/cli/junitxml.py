@@ -42,9 +42,9 @@ class JunitXMLHandler(EventHandler):
 
 
 def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionContext) -> None:
-    for idx, (code_sample, group) in enumerate(group_by_case(checks, context.code_sample_style), 1):
+    for idx, (code, group) in enumerate(group_by_case(checks), 1):
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-        test_case.add_failure_info(message=build_failure_message(context, idx, code_sample, checks))
+        test_case.add_failure_info(message=build_failure_message(context, idx, code, checks))
 
 
 def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:

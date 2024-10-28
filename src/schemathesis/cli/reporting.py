@@ -1,27 +1,23 @@
 from __future__ import annotations
 
 from itertools import groupby
-from typing import TYPE_CHECKING, Generator, Iterator
+from typing import Generator, Iterator
 
+from .. import code_samples
 from ..runner.models import Check, deduplicate_failures
 from ..sanitization import sanitize_value
-
-if TYPE_CHECKING:
-    from ..code_samples import CodeSampleStyle
 
 TEST_CASE_ID_TITLE = "Test Case ID"
 
 
-def group_by_case(
-    checks: list[Check], code_sample_style: CodeSampleStyle
-) -> Generator[tuple[str, Iterator[Check]], None, None]:
+def group_by_case(checks: list[Check]) -> Generator[tuple[str, Iterator[Check]], None, None]:
     checks = deduplicate_failures(checks)
-    checks = sorted(checks, key=lambda c: _by_unique_key(c, code_sample_style))
-    for (sample, _, _), gen in groupby(checks, lambda c: _by_unique_key(c, code_sample_style)):
+    checks = sorted(checks, key=_by_unique_key)
+    for (sample, _, _), gen in groupby(checks, _by_unique_key):
         yield (sample, gen)
 
 
-def _by_unique_key(check: Check, code_sample_style: CodeSampleStyle) -> tuple[str, int, bytes]:
+def _by_unique_key(check: Check) -> tuple[str, int, bytes]:
     data = check.prepare_code_sample_data()
 
     headers = None
@@ -31,7 +27,7 @@ def _by_unique_key(check: Check, code_sample_style: CodeSampleStyle) -> tuple[st
             sanitize_value(headers)
 
     return (
-        code_sample_style.generate(
+        code_samples.generate(
             method=check.case.method,
             url=data.url,
             body=data.body,
