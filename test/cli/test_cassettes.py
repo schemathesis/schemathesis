@@ -16,7 +16,6 @@ from hypothesis import example, given
 from hypothesis import strategies as st
 from urllib3._collections import HTTPHeaderDict
 
-from schemathesis.cli import DEPRECATED_CASSETTE_PATH_OPTION_WARNING
 from schemathesis.cli.cassettes import (
     CassetteFormat,
     _cookie_to_har,
@@ -591,30 +590,6 @@ def test_filter_cassette(filters, expected):
         {"id": "3", "status": "FAILURE", "request": {"uri": "http://127.0.0.1/api/failure", "method": "PUT"}},
     ]
     assert list(filter_cassette(cassette, **filters)) == [item for item in cassette if item["id"] in expected]
-
-
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_use_deprecation(cli, schema_url, cassette_path):
-    result = cli.run(
-        schema_url,
-        f"--store-network-log={cassette_path}",
-    )
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert result.stdout.splitlines()[0] == DEPRECATED_CASSETTE_PATH_OPTION_WARNING
-
-
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_forbid_simultaneous_use_of_deprecated_and_new_options(cli, schema_url, cassette_path, snapshot_cli):
-    assert (
-        cli.run(
-            schema_url,
-            f"--store-network-log={cassette_path}",
-            f"--cassette-path={cassette_path}",
-        )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.openapi_version("3.0")

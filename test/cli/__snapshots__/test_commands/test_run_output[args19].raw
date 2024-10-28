@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-deadline': 0 is not in the range 1<=x<=300000.
+Error: Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io.

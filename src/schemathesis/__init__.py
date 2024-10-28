@@ -28,11 +28,6 @@ hook = hooks.register
 serializer = serializers.register
 target = targets.register
 
-# Backward compatibility
-register_check = checks.register
-register_target = targets.register
-register_string_format = openapi.format
-
 __all__ = [
     "auths",
     "checks",
@@ -62,9 +57,6 @@ __all__ = [
     "hook",
     "serializer",
     "target",
-    "register_check",
-    "register_target",
-    "register_string_format",
 ]
 
 
