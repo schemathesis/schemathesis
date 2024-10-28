@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from . import fast_api, utf8_bom
+from . import utf8_bom
 
-ALL_FIXUPS = {"fast_api": fast_api, "utf8_bom": utf8_bom}
+ALL_FIXUPS = {"utf8_bom": utf8_bom}
 ALL_FIXUP_NAMES = list(ALL_FIXUPS.keys())
 
 

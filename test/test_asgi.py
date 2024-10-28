@@ -140,48 +140,6 @@ def test_base_url():
     test()
 
 
-class FastAPIExtended(FastAPI):
-    pass
-
-
-@pytest.mark.parametrize("app_factory", [FastAPI, FastAPIExtended])
-@pytest.mark.parametrize("with_existing_fixup", [True, False])
-def test_automatic_fixup(ctx, with_existing_fixup, app_factory):
-    if with_existing_fixup:
-        # Install everything
-        schemathesis.fixups.install()
-    else:
-        assert not schemathesis.fixups.is_installed("fast_api")
-    # When it is possible to detect Fast API
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "data",
-                            "in": "body",
-                            "required": True,
-                            "schema": {"type": "integer", "exclusiveMaximum": 5},
-                        }
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        }
-    )
-
-    app = app_factory()
-
-    schema = schemathesis.from_dict(schema, app=app)
-    # Then its respective fixup is loaded automatically
-    assert schema.raw_schema["paths"]["/foo"]["get"]["parameters"][0]["schema"] == {
-        "type": "integer",
-        "exclusiveMaximum": True,
-        "maximum": 5,
-    }
-
-
 def with_lifespan(data: dict):
     @asynccontextmanager
     async def lifespan(_: FastAPI):

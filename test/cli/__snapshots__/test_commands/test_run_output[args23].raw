@@ -15,8 +15,8 @@ Options:
                   'auto' is specified  [default: 1][auto, 1-64]
   --dry-run       Simulate test execution without making any actual requests,
                   useful for validating data generation
-  --fixups        Apply compatibility adjustments [possible values: fast_api,
-                  utf8_bom, all]
+  --fixups        Apply compatibility adjustments [possible values: utf8_bom,
+                  all]
 
 Experimental options:
   --experimental                            Enable experimental features
