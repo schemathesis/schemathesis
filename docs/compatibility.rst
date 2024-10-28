@@ -31,29 +31,6 @@ If you're using FastAPI versions that generate OpenAPI 3.1 schemas, activate Sch
     # Globally enable OpenAPI 3.1 experimental feature
     schemathesis.experimental.OPEN_API_3_1.enable()
 
-For Older FastAPI Versions
-~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For older versions generating OpenAPI 3.0.x or 2.0, you may encounter compatibility issues. Schemathesis provides "fixups" to address these incompatibilities. Fixups are small adjustments that make these versions compatible with Schemathesis.
-
-**CLI**
-
-.. code:: bash
-
-    st run https://example.schemathesis.io/openapi.json --fixups=fast_api
-
-**Python**
-
-.. code:: python
-
-    import schemathesis
-
-    schemathesis.fixups.fast_api.install()
-
-.. note::
-
-    This fix-up is automatically loaded if you use the ASGI integration
-
 UTF-8 BOM
 ---------
 
