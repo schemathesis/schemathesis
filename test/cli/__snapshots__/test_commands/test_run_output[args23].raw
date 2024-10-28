@@ -134,8 +134,6 @@ Output options:
                                         values: vcr, har]
   --cassette-preserve-exact-body-bytes  Retain exact byte sequence of payloads
                                         in cassettes, encoded as base64
-  --code-sample-style                   Code sample style for reproducing
-                                        failures [possible values: python, curl]
   --sanitize-output BOOLEAN             Enable or disable automatic output
                                         sanitization to obscure sensitive data
                                         [default: True]
