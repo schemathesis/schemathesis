@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 
 AUTH_CLASS_NAME = "TokenAuth"
@@ -242,23 +240,13 @@ def test(case):
 @pytest.mark.operations("success", "text")
 def test_conditional(testdir, app_schema, openapi3_base_url):
     # When the user sets up multiple auths applied to different API operations
-    if sys.version_info < (3, 9):
-        dec1 = """
-auth = schema.auth()
-@auth.apply_to(method="GET", path="/text")"""
-        dec2 = """
-auth = schema.auth()
-@auth.apply_to(method="GET", path="/success")"""
-    else:
-        dec1 = '@schema.auth().apply_to(method="GET", path="/text")'
-        dec2 = '@schema.auth().apply_to(method="GET", path="/success")'
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
 
 TOKEN_1 = "ABC"
 
-{dec1}
+@schema.auth().apply_to(method="GET", path="/text")
 class TokenAuth1:
     def get(self, case, context):
         return TOKEN_1
@@ -269,7 +257,7 @@ class TokenAuth1:
 
 TOKEN_2 = "DEF"
 
-{dec2}
+@schema.auth().apply_to(method="GET", path="/success")
 class TokenAuth2:
     def get(self, case, context):
         return TOKEN_2

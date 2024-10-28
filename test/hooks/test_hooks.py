@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.constants import USER_AGENT
-from schemathesis.hooks import HookContext, HookDispatcher, HookScope
+from schemathesis.hooks import HookDispatcher, HookScope
 from schemathesis.utils import PARAMETRIZE_MARKER
 from test.utils import assert_requests_call, flaky
 
@@ -408,15 +408,6 @@ def test_b(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=2)
-
-
-def test_deprecated_attribute():
-    context = HookContext(1)
-    with pytest.warns(Warning) as records:
-        assert context.endpoint == context.operation == 1
-    assert str(records[0].message) == (
-        "Property `endpoint` is deprecated and will be removed in Schemathesis 4.0. Use `operation` instead."
-    )
 
 
 def test_before_init_operation(testdir, simple_openapi):
