@@ -365,7 +365,7 @@ def test_(case):
           "",
           "    <EMPTY>",
           "",
-          "Reproduce with: ",
+          "Reproduce with:",
           "",
           f"    curl -X GET http://localhost/v1/users",
           "",
