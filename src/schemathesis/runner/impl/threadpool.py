@@ -1,18 +1,17 @@
 from __future__ import annotations
 
-import ctypes
 import queue
 import threading
-import time
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, cast
+from types import TracebackType
+from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable
 
 from hypothesis.errors import HypothesisWarning
 
 from ..._hypothesis._builder import create_test
-from ...internal.result import Ok
+from ...internal.result import Ok, Result
 from ...transports.auth import get_requests_auth
 from .. import events
 from .._hypothesis import capture_hypothesis_output
@@ -23,17 +22,88 @@ if TYPE_CHECKING:
 
     from ...generation import DataGenerationMethod, GenerationConfig
     from ...internal.checks import CheckFunction
+    from ...schemas import BaseSchema
     from ...targets import Target
+    from ...transports import RequestConfig
     from ...types import RawAuth
     from .context import RunnerContext
 
 
-def _run_task(
+@dataclass
+class WorkerControl:
+    """Control structure for worker threads."""
+
+    should_stop: threading.Event = field(default_factory=threading.Event)
+    tasks_available: threading.Event = field(default_factory=threading.Event)
+    all_tasks_processed: threading.Event = field(default_factory=threading.Event)
+
+
+class TaskProducer:
+    """Manages task generation for workers."""
+
+    def __init__(self, schema: BaseSchema, generation_config: GenerationConfig | None) -> None:
+        self.tasks_generator = iter(schema.get_all_operations(generation_config=generation_config))
+        self.lock = threading.Lock()
+
+    def get_next_task(self) -> Result | None:
+        with self.lock:
+            try:
+                return next(self.tasks_generator)
+            except StopIteration:
+                return None
+
+
+class WorkerPool:
+    """Manages a pool of worker threads."""
+
+    def __init__(self, num_workers: int, producer: TaskProducer, worker_factory: Callable, worker_kwargs: dict):
+        self.num_workers = num_workers
+        self.producer = producer
+        self.worker_factory = worker_factory
+        self.worker_kwargs = worker_kwargs
+        self.workers: list[threading.Thread] = []
+        self.events_queue: Queue = Queue()
+        self.control = WorkerControl()
+
+    def start(self) -> None:
+        """Start all worker threads."""
+        for i in range(self.num_workers):
+            worker = threading.Thread(
+                target=self.worker_factory,
+                kwargs={
+                    **self.worker_kwargs,
+                    "worker_control": self.control,
+                    "events_queue": self.events_queue,
+                    "producer": self.producer,
+                },
+                name=f"schemathesis_{i}",
+                daemon=True,
+            )
+            self.workers.append(worker)
+            worker.start()
+
+    def stop(self) -> None:
+        """Stop all workers gracefully."""
+        self.control.should_stop.set()
+        for worker in self.workers:
+            worker.join()
+
+    def __enter__(self) -> WorkerPool:
+        self.start()
+        return self
+
+    def __exit__(
+        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
+    ) -> None:
+        self.stop()
+
+
+def worker_task(
     *,
-    test_func: Callable,
-    tasks_queue: Queue,
+    worker_control: WorkerControl,
     events_queue: Queue,
-    generator_done: threading.Event,
+    producer: TaskProducer,
+    test_func: Callable,
     checks: Iterable[CheckFunction],
     targets: Iterable[Target],
     data_generation_methods: Iterable[DataGenerationMethod],
@@ -43,43 +113,19 @@ def _run_task(
     headers: dict[str, Any] | None = None,
     **kwargs: Any,
 ) -> None:
+    """Generic worker task implementation."""
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
+
     as_strategy_kwargs = {}
     if headers is not None:
         as_strategy_kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
 
-    def _run_tests(maker: Callable) -> None:
-        for _result in maker(
-            test_func,
-            settings=settings,
-            generation_config=generation_config,
-            seed=ctx.seed,
-            as_strategy_kwargs=as_strategy_kwargs,
-        ):
-            # `result` is always `Ok` here
-            _operation, test = _result.ok()
-            for _event in run_test(
-                _operation,
-                test,
-                checks,
-                data_generation_methods,
-                targets,
-                ctx=ctx,
-                headers=headers,
-                **kwargs,
-            ):
-                events_queue.put(_event)
-
     with capture_hypothesis_output():
-        while True:
-            try:
-                result = tasks_queue.get(timeout=0.001)
-            except queue.Empty:
-                # The queue is empty & there will be no more tasks
-                if generator_done.is_set():
-                    break
-                # If there is a possibility for new tasks - try again
-                continue
+        while not worker_control.should_stop.is_set():
+            result = producer.get_next_task()
+            if result is None:
+                break
+
             if isinstance(result, Ok):
                 operation = result.ok()
                 test_function = create_test(
@@ -91,207 +137,77 @@ def _run_task(
                     generation_config=generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
                 )
-                items = Ok((operation, test_function))
-                # TODO: Simplify
-                # This lambda ignores the input arguments to support the same interface for
-                _run_tests(lambda *_, **__: (items,))  # noqa: B023
+
+                # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
+                # executing. However, as we set a stop event, it will be checked before the next network request.
+                # However, this is still suboptimal, as there could be slow requests and they will block for longer
+                for event in run_test(
+                    operation,
+                    test_function,
+                    checks,
+                    data_generation_methods,
+                    targets,
+                    ctx=ctx,
+                    headers=headers,
+                    **kwargs,
+                ):
+                    events_queue.put(event)
             else:
                 for event in handle_schema_error(result.err(), ctx, data_generation_methods):
                     events_queue.put(event)
 
 
-def thread_task(
-    tasks_queue: Queue,
-    events_queue: Queue,
-    generator_done: threading.Event,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    data_generation_methods: Iterable[DataGenerationMethod],
-    settings: hypothesis.settings,
-    generation_config: GenerationConfig,
-    auth: RawAuth | None,
-    auth_type: str | None,
-    headers: dict[str, Any] | None,
-    ctx: RunnerContext,
-    kwargs: Any,
-) -> None:
-    """A single task, that threads do.
-
-    Pretty similar to the default one-thread flow, but includes communication with the main thread via the events queue.
-    """
+def network_worker_task(*, auth: RawAuth | None, auth_type: str | None, **kwargs: Any) -> None:
+    """Network-specific worker implementation."""
     prepared_auth = get_requests_auth(auth, auth_type)
+
     with get_session(prepared_auth) as session:
-        _run_task(
-            test_func=network_test,
-            tasks_queue=tasks_queue,
-            events_queue=events_queue,
-            generator_done=generator_done,
-            checks=checks,
-            targets=targets,
-            data_generation_methods=data_generation_methods,
-            settings=settings,
-            generation_config=generation_config,
-            ctx=ctx,
-            session=session,
-            headers=headers,
-            **kwargs,
-        )
+        worker_task(test_func=network_test, session=session, **kwargs)
 
 
-def wsgi_thread_task(
-    tasks_queue: Queue,
-    events_queue: Queue,
-    generator_done: threading.Event,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    data_generation_methods: Iterable[DataGenerationMethod],
-    settings: hypothesis.settings,
-    generation_config: GenerationConfig,
-    ctx: RunnerContext,
-    kwargs: Any,
+def wsgi_worker_task(*, request_config: RequestConfig, **kwargs: Any) -> None:
+    """WSGI-specific worker implementation."""
+    worker_task(test_func=wsgi_test, **kwargs)
+
+
+def asgi_worker_task(
+    *, auth: RawAuth | None, auth_type: str | None, request_config: RequestConfig, **kwargs: Any
 ) -> None:
-    _run_task(
-        test_func=wsgi_test,
-        tasks_queue=tasks_queue,
-        events_queue=events_queue,
-        generator_done=generator_done,
-        checks=checks,
-        targets=targets,
-        data_generation_methods=data_generation_methods,
-        settings=settings,
-        generation_config=generation_config,
-        ctx=ctx,
-        **kwargs,
-    )
-
-
-def asgi_thread_task(
-    tasks_queue: Queue,
-    events_queue: Queue,
-    generator_done: threading.Event,
-    checks: Iterable[CheckFunction],
-    targets: Iterable[Target],
-    data_generation_methods: Iterable[DataGenerationMethod],
-    settings: hypothesis.settings,
-    generation_config: GenerationConfig,
-    headers: dict[str, Any] | None,
-    ctx: RunnerContext,
-    kwargs: Any,
-) -> None:
-    _run_task(
-        test_func=asgi_test,
-        tasks_queue=tasks_queue,
-        events_queue=events_queue,
-        generator_done=generator_done,
-        checks=checks,
-        targets=targets,
-        data_generation_methods=data_generation_methods,
-        settings=settings,
-        generation_config=generation_config,
-        ctx=ctx,
-        headers=headers,
-        **kwargs,
-    )
-
-
-def stop_worker(thread_id: int) -> None:
-    """Raise an error in a thread, so it is possible to asynchronously stop thread execution."""
-    ctypes.pythonapi.PyThreadState_SetAsyncExc(ctypes.c_long(thread_id), ctypes.py_object(SystemExit))
+    """ASGI-specific worker implementation."""
+    worker_task(test_func=asgi_test, **kwargs)
 
 
 @dataclass
 class ThreadPoolRunner(BaseRunner):
-    """Spread different tests among multiple worker threads."""
+    """Base thread pool runner implementation."""
 
     workers_num: int = 2
 
     def _execute(self, ctx: RunnerContext) -> Generator[events.ExecutionEvent, None, None]:
-        """All events come from a queue where different workers push their events."""
-        # Instead of generating all tests at once, we do it when there is a free worker to pick it up
-        # This is extremely important for memory consumption when testing large schemas
-        # IMPLEMENTATION NOTE:
-        # It would be better to have a separate producer thread and communicate via threading events.
-        # Though it is a bit more complex, so the current solution is suboptimal in terms of resources utilization,
-        # but good enough and easy enough to implement.
-        tasks_generator = iter(self.schema.get_all_operations(generation_config=self.generation_config))
-        generator_done = threading.Event()
-        tasks_queue: Queue = Queue()
-        # Add at least `workers_num` tasks first, so all workers are busy
-        for _ in range(self.workers_num):
+        producer = TaskProducer(self.schema, self.generation_config)
+
+        with WorkerPool(self.workers_num, producer, self._get_worker_task(), self._get_worker_kwargs(ctx)) as pool:
             try:
-                # SAFETY: Workers didn't start yet, direct modification is OK
-                tasks_queue.queue.append(next(tasks_generator))
-            except StopIteration:
-                generator_done.set()
-                break
-        # Events are pushed by workers via a separate queue
-        events_queue: Queue = Queue()
-        workers = self._init_workers(tasks_queue, events_queue, ctx, generator_done)
-
-        def stop_workers() -> None:
-            for worker in workers:
-                # workers are initialized at this point and `worker.ident` is set with an integer value
-                ident = cast(int, worker.ident)
-                stop_worker(ident)
-                worker.join()
-
-        is_finished = False
-        try:
-            while not is_finished:
-                # Sleep is needed for performance reasons
-                # each call to `is_alive` of an alive worker waits for a lock
-                # iterations without waiting are too frequent, and a lot of time will be spent on waiting for this locks
-                time.sleep(0.001)
-                is_finished = all(not worker.is_alive() for worker in workers)
-                while not events_queue.empty():
-                    event = events_queue.get()
-                    if ctx.is_stopped or isinstance(event, events.Interrupted) or self._should_stop(event):
-                        # We could still have events in the queue, but ignore them to keep the logic simple
-                        # for now, could be improved in the future to show more info in such corner cases
-                        stop_workers()
-                        is_finished = True
-                        if ctx.is_stopped:
-                            # Discard the event. The invariant is: the next event after `stream.stop()` is `Finished`
+                while True:
+                    try:
+                        event = pool.events_queue.get(timeout=0.1)
+                        if self._should_stop(event) or ctx.is_stopped:
                             break
-                    yield event
-                    # When we know that there are more tasks, put another task to the queue.
-                    # The worker might not actually finish the current one yet, but we put the new one now, so
-                    # the worker can immediately pick it up when the current one is done
-                    if isinstance(event, events.BeforeExecution) and not generator_done.is_set():
-                        try:
-                            tasks_queue.put(next(tasks_generator))
-                        except StopIteration:
-                            generator_done.set()
-        except KeyboardInterrupt:
-            stop_workers()
-            yield events.Interrupted()
+                        yield event
+                    except queue.Empty:
+                        if all(not worker.is_alive() for worker in pool.workers):
+                            break
+                        continue
 
-    def _init_workers(
-        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
-    ) -> list[threading.Thread]:
-        """Initialize & start workers that will execute tests."""
-        workers = [
-            threading.Thread(
-                target=self._get_task(),
-                kwargs=self._get_worker_kwargs(tasks_queue, events_queue, ctx, generator_done),
-                name=f"schemathesis_{num}",
-            )
-            for num in range(self.workers_num)
-        ]
-        for worker in workers:
-            worker.start()
-        return workers
+            except KeyboardInterrupt:
+                ctx.stop_event.set()
+                yield events.Interrupted()
 
-    def _get_task(self) -> Callable:
-        return thread_task
+    def _get_worker_task(self) -> Callable:
+        return network_worker_task
 
-    def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
-    ) -> dict[str, Any]:
+    def _get_worker_kwargs(self, ctx: RunnerContext) -> dict[str, Any]:
         return {
-            "tasks_queue": tasks_queue,
-            "events_queue": events_queue,
-            "generator_done": generator_done,
             "checks": self.checks,
             "targets": self.targets,
             "settings": self.hypothesis_settings,
@@ -301,64 +217,22 @@ class ThreadPoolRunner(BaseRunner):
             "headers": self.headers,
             "ctx": ctx,
             "data_generation_methods": self.schema.data_generation_methods,
-            "kwargs": {
-                "request_config": self.request_config,
-                "store_interactions": self.store_interactions,
-                "max_response_time": self.max_response_time,
-                "dry_run": self.dry_run,
-            },
+            "request_config": self.request_config,
+            "store_interactions": self.store_interactions,
+            "max_response_time": self.max_response_time,
+            "dry_run": self.dry_run,
         }
 
 
 class ThreadPoolWSGIRunner(ThreadPoolRunner):
-    def _get_task(self) -> Callable:
-        return wsgi_thread_task
+    """WSGI-specific thread pool runner."""
 
-    def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
-    ) -> dict[str, Any]:
-        return {
-            "tasks_queue": tasks_queue,
-            "events_queue": events_queue,
-            "generator_done": generator_done,
-            "checks": self.checks,
-            "targets": self.targets,
-            "settings": self.hypothesis_settings,
-            "generation_config": self.generation_config,
-            "ctx": ctx,
-            "data_generation_methods": self.schema.data_generation_methods,
-            "kwargs": {
-                "auth": self.auth,
-                "auth_type": self.auth_type,
-                "headers": self.headers,
-                "store_interactions": self.store_interactions,
-                "max_response_time": self.max_response_time,
-                "dry_run": self.dry_run,
-            },
-        }
+    def _get_worker_task(self) -> Callable:
+        return wsgi_worker_task
 
 
 class ThreadPoolASGIRunner(ThreadPoolRunner):
-    def _get_task(self) -> Callable:
-        return asgi_thread_task
+    """ASGI-specific thread pool runner."""
 
-    def _get_worker_kwargs(
-        self, tasks_queue: Queue, events_queue: Queue, ctx: RunnerContext, generator_done: threading.Event
-    ) -> dict[str, Any]:
-        return {
-            "tasks_queue": tasks_queue,
-            "events_queue": events_queue,
-            "generator_done": generator_done,
-            "checks": self.checks,
-            "targets": self.targets,
-            "settings": self.hypothesis_settings,
-            "generation_config": self.generation_config,
-            "headers": self.headers,
-            "ctx": ctx,
-            "data_generation_methods": self.schema.data_generation_methods,
-            "kwargs": {
-                "store_interactions": self.store_interactions,
-                "max_response_time": self.max_response_time,
-                "dry_run": self.dry_run,
-            },
-        }
+    def _get_worker_task(self) -> Callable:
+        return asgi_worker_task
