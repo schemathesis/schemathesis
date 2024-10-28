@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar, cast
 from urllib.parse import urlparse
 
 from .. import failures
-from .._dependency_versions import IS_WERKZEUG_ABOVE_3
 from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from ..exceptions import get_timeout_error
 from ..serializers import SerializerContext
@@ -349,16 +348,10 @@ def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generato
         yield
     else:
         for key, value in cookies.items():
-            if IS_WERKZEUG_ABOVE_3:
-                client.set_cookie(key=key, value=value, domain="localhost")
-            else:
-                client.set_cookie("localhost", key=key, value=value)
+            client.set_cookie(key=key, value=value, domain="localhost")
         yield
         for key in cookies:
-            if IS_WERKZEUG_ABOVE_3:
-                client.delete_cookie(key=key, domain="localhost")
-            else:
-                client.delete_cookie("localhost", key=key)
+            client.delete_cookie(key=key, domain="localhost")
 
 
 @lru_cache

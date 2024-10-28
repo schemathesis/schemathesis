@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any
 import tomli
 import tomli_w
 
+from ..internal.fs import ensure_parent
 from .constants import DEFAULT_HOSTNAME, DEFAULT_HOSTS_PATH, HOSTS_FORMAT_VERSION
 
 if TYPE_CHECKING:
@@ -53,13 +54,11 @@ def load(path: PathLike) -> dict[str, Any]:
 
     Return an empty dict if it doesn't exist.
     """
-    from ..utils import _ensure_parent
-
     try:
         with open(path, "rb") as fd:
             return tomli.load(fd)
     except FileNotFoundError:
-        _ensure_parent(path)
+        ensure_parent(path)
         return {}
     except tomli.TOMLDecodeError:
         return {}

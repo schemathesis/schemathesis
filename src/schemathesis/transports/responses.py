@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, NoReturn, Union
+from typing import TYPE_CHECKING, Any, Union
 
 from werkzeug.wrappers import Response as BaseResponse
-
-from .._compat import JSONMixin
 
 if TYPE_CHECKING:
     from datetime import timedelta
@@ -15,14 +13,10 @@ if TYPE_CHECKING:
     from requests import Response as requestsResponse
 
 
-class WSGIResponse(BaseResponse, JSONMixin):
+class WSGIResponse(BaseResponse):
     # We store "requests" request to build a reproduction code
     request: PreparedRequest
     elapsed: timedelta
-
-    def on_json_loading_failed(self, e: json.JSONDecodeError) -> NoReturn:
-        # We don't need a werkzeug-specific exception when JSON parsing error happens
-        raise e
 
 
 def get_payload(response: GenericResponse) -> str:

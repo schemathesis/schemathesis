@@ -18,7 +18,7 @@ from requests.auth import HTTPDigestAuth
 
 import schemathesis
 from schemathesis import experimental
-from schemathesis._hypothesis import add_examples
+from schemathesis._hypothesis._builder import add_examples
 from schemathesis._override import CaseOverride
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
@@ -658,7 +658,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
 async def test_explicit_example_disable(any_app, any_app_schema, mocker):
     # When API operation has an example specified
     # And the `explicit` phase is excluded
-    spy = mocker.patch("schemathesis._hypothesis.add_examples", wraps=add_examples)
+    spy = mocker.patch("schemathesis._hypothesis._builder.add_examples", wraps=add_examples)
     result = execute(
         any_app_schema, hypothesis_settings=hypothesis.settings(max_examples=1, phases=[Phase.generate], deadline=None)
     )
