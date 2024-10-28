@@ -6,7 +6,7 @@ from .utils import as_param
 def test_required_parameters(testdir):
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=20, suppress_health_check=[HealthCheck.data_too_large])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1

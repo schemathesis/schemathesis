@@ -18,8 +18,6 @@ from hypothesis.reporting import with_reporter
 from hypothesis.strategies import SearchStrategy
 
 from ._compat import InferType, get_signature
-
-# Backward-compat
 from .exceptions import SkipTest, UsageError
 
 if TYPE_CHECKING:
