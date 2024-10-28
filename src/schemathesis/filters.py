@@ -149,23 +149,6 @@ class FilterSet:
     def clone(self) -> FilterSet:
         return FilterSet(_includes=self._includes.copy(), _excludes=self._excludes.copy())
 
-    def merge(self, other: FilterSet) -> FilterSet:
-        def _merge(lhs: set[Filter], rhs: set[Filter]) -> set[Filter]:
-            result = lhs.copy()
-            for new in rhs:
-                for old in lhs:
-                    for new_matcher in new.matchers:
-                        for old_matcher in old.matchers:
-                            if "=" in new_matcher.label and "=" in old_matcher.label:
-                                if new_matcher.label.split("=")[0] == old_matcher.label.split("=")[0]:
-                                    result.remove(old)
-                result.add(new)
-            return result
-
-        return FilterSet(
-            _includes=_merge(self._includes, other._includes), _excludes=_merge(self._excludes, other._excludes)
-        )
-
     def apply_to(self, operations: list[APIOperation]) -> list[APIOperation]:
         """Get a filtered list of the given operations that match the filters."""
         return [operation for operation in operations if self.match(SimpleNamespace(operation=operation))]

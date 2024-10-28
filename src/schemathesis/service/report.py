@@ -30,6 +30,15 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class ReportConfig:
+    api_name: str | None
+    location: str
+    base_url: str | None
+    started_at: str
+    telemetry: bool
+
+
+@dataclass
 class ReportWriter:
     """Schemathesis.io test run report.
 
@@ -105,11 +114,7 @@ class BaseReportHandler(EventHandler):
 class ServiceReportHandler(BaseReportHandler):
     client: ServiceClient
     host_data: HostData
-    api_name: str | None
-    location: str
-    base_url: str | None
-    started_at: str
-    telemetry: bool
+    config: ReportConfig
     out_queue: Queue
     in_queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
@@ -120,13 +125,10 @@ class ServiceReportHandler(BaseReportHandler):
             kwargs={
                 "client": self.client,
                 "host_data": self.host_data,
-                "api_name": self.api_name,
-                "location": self.location,
-                "base_url": self.base_url,
-                "started_at": self.started_at,
+                "config": self.config,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
-                "usage_data": usage.collect() if self.telemetry else None,
+                "usage_data": usage.collect() if self.config.telemetry else None,
             },
         )
         self.worker.start()
@@ -156,10 +158,7 @@ def consume_events(writer: ReportWriter, in_queue: Queue) -> ConsumeResult:
 def write_remote(
     client: ServiceClient,
     host_data: HostData,
-    api_name: str | None,
-    location: str,
-    base_url: str | None,
-    started_at: str,
+    config: ReportConfig,
     in_queue: Queue,
     out_queue: Queue,
     usage_data: dict[str, Any] | None,
@@ -171,10 +170,10 @@ def write_remote(
             writer = ReportWriter(tar)
             ci_environment = ci.environment()
             writer.add_metadata(
-                api_name=api_name,
-                location=location,
-                base_url=base_url,
-                started_at=started_at,
+                api_name=config.api_name,
+                location=config.location,
+                base_url=config.base_url,
+                started_at=config.started_at,
                 metadata=Metadata(),
                 ci_environment=ci_environment,
                 usage_data=usage_data,
@@ -199,11 +198,7 @@ def write_remote(
 @dataclass
 class FileReportHandler(BaseReportHandler):
     file_handle: click.utils.LazyFile
-    api_name: str | None
-    location: str
-    base_url: str | None
-    started_at: str
-    telemetry: bool
+    config: ReportConfig
     out_queue: Queue
     in_queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
@@ -213,13 +208,10 @@ class FileReportHandler(BaseReportHandler):
             target=write_file,
             kwargs={
                 "file_handle": self.file_handle,
-                "api_name": self.api_name,
-                "location": self.location,
-                "base_url": self.base_url,
-                "started_at": self.started_at,
+                "config": self.config,
                 "in_queue": self.in_queue,
                 "out_queue": self.out_queue,
-                "usage_data": usage.collect() if self.telemetry else None,
+                "usage_data": usage.collect() if self.config.telemetry else None,
             },
         )
         self.worker.start()
@@ -227,10 +219,7 @@ class FileReportHandler(BaseReportHandler):
 
 def write_file(
     file_handle: click.utils.LazyFile,
-    api_name: str | None,
-    location: str,
-    base_url: str | None,
-    started_at: str,
+    config: ReportConfig,
     in_queue: Queue,
     out_queue: Queue,
     usage_data: dict[str, Any] | None,
@@ -239,10 +228,10 @@ def write_file(
         writer = ReportWriter(tar)
         ci_environment = ci.environment()
         writer.add_metadata(
-            api_name=api_name,
-            location=location,
-            base_url=base_url,
-            started_at=started_at,
+            api_name=config.api_name,
+            location=config.location,
+            base_url=config.base_url,
+            started_at=config.started_at,
             metadata=Metadata(),
             ci_environment=ci_environment,
             usage_data=usage_data,

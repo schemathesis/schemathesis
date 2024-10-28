@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
-from .._dependency_versions import HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS
 from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
 from ..exceptions import UsageError
 from ..internal.checks import CheckFunction
@@ -87,11 +86,9 @@ class APIStateMachine(RuleBasedStateMachine):
             return _print_case(value, kwargs)
         return super()._pretty_print(value)  # type: ignore
 
-    if HYPOTHESIS_HAS_STATEFUL_NAMING_IMPROVEMENTS:
-
-        def _new_name(self, target: str) -> str:
-            target = _normalize_name(target)
-            return super()._new_name(target)  # type: ignore
+    def _new_name(self, target: str) -> str:
+        target = _normalize_name(target)
+        return super()._new_name(target)  # type: ignore
 
     def _get_target_for_result(self, result: StepResult) -> str | None:
         raise NotImplementedError

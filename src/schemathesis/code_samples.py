@@ -16,13 +16,6 @@ class CodeSampleStyle(str, Enum):
     python = "python"
     curl = "curl"
 
-    @property
-    def verbose_name(self) -> str:
-        return {
-            self.curl: "cURL command",
-            self.python: "Python code",
-        }[self]
-
     @classmethod
     def default(cls) -> CodeSampleStyle:
         return cls.curl
