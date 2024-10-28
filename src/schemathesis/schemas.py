@@ -21,7 +21,6 @@ from ._hypothesis._builder import create_test
 from ._hypothesis._given import GivenInput, given_proxy
 from ._pytest.markers import has_schemathesis_handle, set_schemathesis_handle
 from .auths import AuthStorage
-from .code_samples import CodeSampleStyle
 from .constants import NOT_SET
 from .exceptions import OperationSchemaError, UsageError
 from .filters import (
@@ -90,7 +89,6 @@ class BaseSchema(Mapping):
     )
     generation_config: GenerationConfig = field(default_factory=GenerationConfig)
     output_config: OutputConfig = field(default_factory=OutputConfig)
-    code_sample_style: CodeSampleStyle = CodeSampleStyle.default()
     rate_limiter: Limiter | None = None
     sanitize_output: bool = True
 
@@ -293,12 +291,8 @@ class BaseSchema(Mapping):
         self,
         validate_schema: bool | NotSet = NOT_SET,
         data_generation_methods: Iterable[DataGenerationMethod] | NotSet = NOT_SET,
-        code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
-        _code_sample_style = (
-            CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
-        )
 
         def wrapper(func: GenericTest) -> GenericTest:
             if has_schemathesis_handle(func):
@@ -317,7 +311,6 @@ class BaseSchema(Mapping):
                 validate_schema=validate_schema,
                 data_generation_methods=data_generation_methods,
                 filter_set=self.filter_set,
-                code_sample_style=_code_sample_style,  # type: ignore
             )
             set_schemathesis_handle(func, cloned)
             return func
@@ -340,8 +333,7 @@ class BaseSchema(Mapping):
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
-        code_sample_style: CodeSampleStyle | NotSet = NOT_SET,
-        rate_limiter: Limiter | None = NOT_SET,
+        rate_limiter: Limiter | NotSet | None = NOT_SET,
         sanitize_output: bool | NotSet | None = NOT_SET,
         filter_set: FilterSet | None = None,
     ) -> BaseSchema:
@@ -363,8 +355,6 @@ class BaseSchema(Mapping):
             generation_config = self.generation_config
         if output_config is NOT_SET:
             output_config = self.output_config
-        if code_sample_style is NOT_SET:
-            code_sample_style = self.code_sample_style
         if rate_limiter is NOT_SET:
             rate_limiter = self.rate_limiter
         if sanitize_output is NOT_SET:
@@ -383,7 +373,6 @@ class BaseSchema(Mapping):
             data_generation_methods=data_generation_methods,  # type: ignore
             generation_config=generation_config,  # type: ignore
             output_config=output_config,  # type: ignore
-            code_sample_style=code_sample_style,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
             sanitize_output=sanitize_output,  # type: ignore
             filter_set=filter_set,  # type: ignore

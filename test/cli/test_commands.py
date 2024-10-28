@@ -23,7 +23,6 @@ from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import execute, get_exit_code, reset_checks
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.cli.loaders import LoaderConfig
-from schemathesis.code_samples import CodeSampleStyle
 from schemathesis.constants import (
     DEFAULT_DEADLINE,
     DEFAULT_RESPONSE_TIMEOUT,
@@ -1737,7 +1736,6 @@ def assert_exit_code(event_stream, code):
             cassette_config=None,
             junit_xml=None,
             verbosity=0,
-            code_sample_style=CodeSampleStyle.default(),
             debug_output_file=None,
             client=None,
             report=None,
