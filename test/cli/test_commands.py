@@ -18,7 +18,6 @@ from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
 from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
@@ -2111,7 +2110,6 @@ def test_long_payload(ctx, cli, snapshot_cli, openapi3_base_url):
 
 
 @flaky(max_runs=5, min_passes=1)
-@pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
 def test_multiple_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
@@ -2147,7 +2145,6 @@ def test_multiple_errors(ctx, cli, snapshot_cli):
 
 
 @flaky(max_runs=5, min_passes=1)
-@pytest.mark.skipif(not IS_PYTEST_ABOVE_7, reason="Multiple errors are not caught on older pytest versions")
 def test_group_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
         {
