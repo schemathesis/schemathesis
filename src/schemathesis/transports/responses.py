@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from typing import TYPE_CHECKING, Any, NoReturn, Union
 
 from werkzeug.wrappers import Response as BaseResponse
@@ -45,10 +44,6 @@ def get_json(response: GenericResponse) -> Any:
 
 
 def get_reason(status_code: int) -> str:
-    if sys.version_info < (3, 9) and status_code == 418:
-        # Python 3.8 does not have 418 status in the `HTTPStatus` enum
-        return "I'm a Teapot"
-
     import http.client
 
     return http.client.responses.get(status_code, "Unknown")

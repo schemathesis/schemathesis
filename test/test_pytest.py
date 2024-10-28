@@ -1,5 +1,4 @@
 import platform
-import sys
 
 import pytest
 
@@ -228,7 +227,7 @@ def test_given_with_explicit_examples(testdir):
     # When `schema.given` is used for a schema with explicit examples
     testdir.make_test(
         """
-@schema.parametrize(method="get")
+@schema.include(method="GET").parametrize()
 @schema.given(data=st.data())
 def test(case, data):
     pass
@@ -306,7 +305,6 @@ def test(case):
 
 
 @pytest.mark.parametrize("style", ["python", "curl"])
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_failure_reproduction_message(testdir, openapi3_base_url, style):
     # When a test fails
     testdir.make_test(
@@ -374,7 +372,6 @@ def test(case):
     assert "CHECKING!" in result.stdout.str()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_excluded_checks(testdir, openapi3_base_url):
     # When the user would like to exclude a check
     testdir.make_test(
@@ -482,9 +479,8 @@ def test_skip_impossible_to_negate(testdir):
         """
 schema = schemathesis.from_dict(
     raw_schema,
-    method="POST",
     data_generation_methods=DataGenerationMethod.negative
-)
+).include(method="POST")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -521,9 +517,8 @@ def test_do_not_skip_partially_negated(testdir):
         """
 schema = schemathesis.from_dict(
     raw_schema,
-    method="POST",
     data_generation_methods=DataGenerationMethod.negative
-)
+).include(method="POST")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -561,10 +556,8 @@ def test_path_parameters_allow_partial_negation(testdir, location):
         """
 schema = schemathesis.from_dict(
     raw_schema,
-    method="GET",
-    endpoint="/pets/{key}/",
     data_generation_methods=DataGenerationMethod.negative
-)
+).include(method="GET", path_regex="/pets/{key}/")
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -597,9 +590,10 @@ def test_many_path_parameters_allow_partial_negation(testdir):
         """
 schema = schemathesis.from_dict(
     raw_schema,
-    method="GET",
-    endpoint="/pets/{key}/{value}/",
     data_generation_methods=DataGenerationMethod.negative
+).include(
+    method="GET",
+    path_regex="/pets/{key}/{value}/",
 )
 
 @schema.parametrize()
@@ -668,7 +662,6 @@ def test(value):
 
 
 @pytest.mark.parametrize("value", [True, False])
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_output_sanitization(testdir, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
@@ -693,7 +686,6 @@ def test(case):
     assert expected in result.stdout.lines
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
@@ -743,7 +735,6 @@ def test(case):
     )
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
     ("phases", "expected"),
     [
@@ -805,7 +796,6 @@ def test(case):
     assert expected in result.stdout.str()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.parametrize(
     "phases",
     ["Phase.explicit", "Phase.explicit, Phase.generate"],
@@ -843,7 +833,6 @@ def test(case):
     assert "Failed to generate test cases from examples for this API" in result.stdout.str()
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_non_serializable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
@@ -883,7 +872,6 @@ def test(case):
     )
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 @pytest.mark.operations("path_variable", "custom_format")
 def test_override(testdir, openapi3_schema_url):
     testdir.make_test(
