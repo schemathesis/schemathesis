@@ -17,7 +17,6 @@ Fixups
 
 **Available fixups**:
 
-- fast_api
 - utf8_bom
 
 .. autofunction:: schemathesis.fixups.install
