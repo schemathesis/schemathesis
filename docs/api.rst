@@ -105,7 +105,6 @@ Custom scalars for GraphQL
 Loaders
 ~~~~~~~
 
-.. autofunction:: schemathesis.from_aiohttp
 .. autofunction:: schemathesis.from_asgi
 .. autofunction:: schemathesis.from_dict
 .. autofunction:: schemathesis.from_file

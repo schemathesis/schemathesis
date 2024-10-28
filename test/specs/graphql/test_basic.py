@@ -10,7 +10,6 @@ import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
 from schemathesis.exceptions import CheckFailed, SchemaError
-from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
@@ -116,7 +115,7 @@ def test_client_error(graphql_schema):
         case.call_and_validate()
 
 
-def test_server_error(graphql_path):
+def test_server_error(graphql_path, app_runner):
     @strawberry.type
     class Query:
         @strawberry.field
@@ -130,7 +129,7 @@ def test_server_error(graphql_path):
     gql_schema = strawberry.Schema(Query)
 
     app = graphql._flask.create_app(graphql_path, schema=gql_schema)
-    port = run_flask_server(app)
+    port = app_runner.run_flask_app(app)
     graphql_url = f"http://127.0.0.1:{port}{graphql_path}"
     graphql_schema = schemathesis.graphql.from_url(graphql_url)
 

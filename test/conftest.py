@@ -30,8 +30,6 @@ from schemathesis.cli import CUSTOM_HANDLERS, reset_checks
 from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
-from schemathesis.extra._aiohttp import run_server as run_aiohttp_server
-from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import loaders as oas_loaders
@@ -47,7 +45,13 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
     from syrupy.types import PropertyFilter, PropertyMatcher
 
-pytest_plugins = ["pytester", "aiohttp.pytest_plugin", "pytest_mock", "test.fixtures.ctx"]
+pytest_plugins = [
+    "pytester",
+    "aiohttp.pytest_plugin",
+    "pytest_mock",
+    "test.fixtures.ctx",
+    "test.fixtures.app_runner",
+]
 
 logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
@@ -187,9 +191,9 @@ def openapi_3_app(_app, reset_app):
 
 
 @pytest.fixture(scope="session")
-def server(_app):
+def server(_app, app_runner):
     """Run the app on an unused port."""
-    port = run_aiohttp_server(_app)
+    port = app_runner.run_aiohttp_app(_app)
     return {"port": port}
 
 
@@ -253,8 +257,8 @@ def graphql_app(graphql_path):
 
 
 @pytest.fixture
-def graphql_server(graphql_app):
-    port = run_flask_server(graphql_app)
+def graphql_server(graphql_app, app_runner):
+    port = app_runner.run_flask_app(graphql_app)
     return {"port": port}
 
 
@@ -1060,18 +1064,6 @@ from test.apps.openapi._flask import create_app
 app = create_app({operations})
 """,
         filename="flaskapp",
-    )
-    return f"{module}:app"
-
-
-@pytest.fixture
-def loadable_aiohttp_app(ctx, operations, openapi_version):
-    module = ctx.write_pymodule(
-        f"""
-from test.apps.openapi._aiohttp import create_app
-
-app = create_app({operations})
-"""
     )
     return f"{module}:app"
 
