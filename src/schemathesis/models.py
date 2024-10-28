@@ -417,21 +417,11 @@ class Case:
         from requests.structures import CaseInsensitiveDict
 
         from .checks import ALL_CHECKS
-        from .internal.checks import wrap_check
         from .transports.responses import get_payload, get_reason
 
-        if checks:
-            _checks = tuple(wrap_check(check) for check in checks)
-        else:
-            _checks = checks
-        if additional_checks:
-            _additional_checks = tuple(wrap_check(check) for check in additional_checks)
-        else:
-            _additional_checks = additional_checks
-
-        checks = _checks or ALL_CHECKS
+        checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
-        additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
+        additional_checks = tuple(check for check in additional_checks if check not in excluded_checks)
         failed_checks = []
         ctx = CheckContext(
             override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
