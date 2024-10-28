@@ -756,30 +756,6 @@ def simple_openapi():
 
 
 @pytest.fixture(scope="session")
-def fast_api_schema():
-    # This schema contains definitions from JSON Schema Draft 7
-    return {
-        "openapi": "3.0.2",
-        "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
-        "paths": {
-            "/query": {
-                "get": {
-                    "parameters": [
-                        {
-                            "name": "value",
-                            "in": "query",
-                            "required": True,
-                            "schema": {"type": "integer", "exclusiveMinimum": 0, "exclusiveMaximum": 10},
-                        },
-                    ],
-                    "responses": {"200": {"description": "OK"}},
-                }
-            }
-        },
-    }
-
-
-@pytest.fixture(scope="session")
 def schema_with_get_payload():
     return {
         "openapi": "3.0.2",
