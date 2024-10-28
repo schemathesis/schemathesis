@@ -5,7 +5,6 @@ import json
 import pathlib
 import re
 from typing import IO, TYPE_CHECKING, Any, Callable, cast
-from urllib.parse import urljoin
 
 from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
@@ -520,49 +519,7 @@ def get_loader_for_app(app: Any) -> Callable:
 
     if is_asgi_app(app):
         return from_asgi
-    if app.__class__.__module__.startswith("aiohttp."):
-        return from_aiohttp
     return from_wsgi
-
-
-def from_aiohttp(
-    schema_path: str,
-    app: Any,
-    *,
-    base_url: str | None = None,
-    validate_schema: bool = False,
-    force_schema_version: str | None = None,
-    data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
-    generation_config: GenerationConfig | None = None,
-    output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
-    rate_limit: str | None = None,
-    sanitize_output: bool = True,
-    **kwargs: Any,
-) -> BaseOpenAPISchema:
-    """Load Open API schema from an AioHTTP app.
-
-    :param str schema_path: An in-app relative URL to the schema.
-    :param app: An AioHTTP app instance.
-    """
-    from ...extra._aiohttp import run_server
-
-    port = run_server(app)
-    app_url = f"http://127.0.0.1:{port}/"
-    url = urljoin(app_url, schema_path)
-    return from_uri(
-        url,
-        base_url=base_url,
-        validate_schema=validate_schema,
-        force_schema_version=force_schema_version,
-        data_generation_methods=data_generation_methods,
-        generation_config=generation_config,
-        output_config=output_config,
-        code_sample_style=code_sample_style,
-        rate_limit=rate_limit,
-        sanitize_output=sanitize_output,
-        **kwargs,
-    )
 
 
 def from_asgi(

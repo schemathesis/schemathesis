@@ -12,7 +12,6 @@ from .specs import openapi
 __version__ = SCHEMATHESIS_VERSION
 
 # Default loaders
-from_aiohttp = openapi.from_aiohttp
 from_asgi = openapi.from_asgi
 from_dict = openapi.from_dict
 from_file = openapi.from_file
@@ -44,7 +43,6 @@ __all__ = [
     "Case",
     "openapi",
     "__version__",
-    "from_aiohttp",
     "from_asgi",
     "from_dict",
     "from_file",

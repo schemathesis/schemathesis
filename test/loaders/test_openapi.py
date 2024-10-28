@@ -8,7 +8,6 @@ from flask import Flask, Response
 
 import schemathesis
 from schemathesis.exceptions import SchemaError
-from schemathesis.extra._flask import run_server as run_flask_server
 from schemathesis.specs.openapi import loaders
 from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SCHEMA_LOADING_ERROR, SCHEMA_SYNTAX_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
@@ -191,14 +190,14 @@ YAML_ERROR = [
         ("openapi.yaml", "text/yaml", b'{"\x80": 1}', YAML_ERROR),
     ],
 )
-def test_parsing_errors_uri(schema_url, content_type, payload, expected):
+def test_parsing_errors_uri(schema_url, content_type, payload, expected, app_runner):
     app = Flask("test_app")
 
     @app.route(f"/{schema_url}")
     def schema():
         return Response(payload, content_type=content_type)
 
-    port = run_flask_server(app)
+    port = app_runner.run_flask_app(app)
 
     with pytest.raises(SchemaError) as exc:
         schemathesis.from_uri(f"http://127.0.0.1:{port}/{schema_url}")

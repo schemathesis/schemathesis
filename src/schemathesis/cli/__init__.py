@@ -1398,7 +1398,7 @@ def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
     }
     if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
         kwargs["headers"] = config.headers
-    if loader in (oas_loaders.from_uri, oas_loaders.from_aiohttp):
+    if loader is oas_loaders.from_uri:
         _add_requests_kwargs(kwargs, config)
     return kwargs
 

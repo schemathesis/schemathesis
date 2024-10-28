@@ -14,17 +14,17 @@ from schemathesis._hypothesis import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.exceptions import CheckFailed, SchemaError, UsageError
-from schemathesis.extra._flask import run_server
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.internal.exceptions import format_exception
 from schemathesis.internal.result import Err, Ok
-from schemathesis.models import Status
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.errors import EngineErrorInfo
+from schemathesis.runner.models import Status
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
 from schemathesis.service.models import AnalysisError, SuccessState
 from schemathesis.specs.openapi import loaders
+from test.fixtures.app_runner import run_flask_app
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -113,7 +113,7 @@ KNOWN_ISSUES = {
 
 @pytest.fixture(scope="session")
 def app_port():
-    return run_server(app)
+    return run_flask_app(app)
 
 
 def combined_check(ctx, response, case):

@@ -298,12 +298,6 @@ which is significantly faster since it doesn't involve the network.
 
 Both loaders expect the relative schema path and an application instance.
 
-Also, we support ``aiohttp`` by implicitly starting an application in a separate thread:
-
-.. code:: python
-
-    schema = schemathesis.from_aiohttp("/api/openapi.json", app)
-
 Lazy loading
 ~~~~~~~~~~~~
 
