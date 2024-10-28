@@ -9,7 +9,6 @@ import pytest
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
@@ -524,9 +523,9 @@ def test_targeted(runner_factory):
     assert calls > 0
 
 
-def test_external_link(ctx, app_factory):
+def test_external_link(ctx, app_factory, app_runner):
     remote_app = app_factory(independent_500=True)
-    remote_app_port = run_server(remote_app)
+    remote_app_port = app_runner.run_flask_app(remote_app)
     base_ref = f"http://127.0.0.1:{remote_app_port}/openapi.json#/paths/~1users~1{{userId}}"
     post_links = {
         "GetUser": {

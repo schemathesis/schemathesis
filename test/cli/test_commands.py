@@ -31,7 +31,6 @@ from schemathesis.constants import (
     FLAKY_FAILURE_MESSAGE,
     REPORT_SUGGESTION_ENV_VAR,
 )
-from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.internal.checks import CheckConfig
 from schemathesis.internal.datetime import current_datetime
@@ -1208,17 +1207,6 @@ app.config["internal_exception"] = True
         assert lines[61] == '    raise ZeroDivisionError("division by zero")'
 
 
-@pytest.mark.parametrize("args", [(), ("--base-url",)])
-def test_aiohttp_app(request, cli, loadable_aiohttp_app, args):
-    # When a URL is passed together with app
-    if args:
-        args += (request.getfixturevalue("base_url"),)
-    result = cli.run("/schema.yaml", "--app", loadable_aiohttp_app, *args)
-    # Then the schema should be loaded from that URL
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "1 passed, 1 failed in" in result.stdout
-
-
 def test_wsgi_app_remote_schema(cli, schema_url, loadable_flask_app):
     # When a URL is passed together with app
     result = cli.run(schema_url, "--app", loadable_flask_app)
@@ -1970,7 +1958,7 @@ def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url):
         ]
     ),
 )
-def test_wait_for_schema(cli, schema_path, app_factory):
+def test_wait_for_schema(cli, schema_path, app_factory, app_runner):
     # When Schemathesis is asked to wait for API schema to become available
     app = app_factory()
     original_run = app.run
@@ -1982,13 +1970,13 @@ def test_wait_for_schema(cli, schema_path, app_factory):
     app.run = run_with_delay
     port = unused_port()
     schema_url = f"http://127.0.0.1:{port}/{schema_path}"
-    run_server(app, port=port)
+    app_runner.run_flask_app(app, port=port)
     result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-def test_wait_for_schema_not_enough(cli, snapshot_cli):
+def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
     app = create_openapi_app(operations=("success",))
     original_run = app.run
 
@@ -1999,7 +1987,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli):
     app.run = run_with_delay
     port = unused_port()
     schema_url = f"http://127.0.0.1:{port}/schema.yaml"
-    run_server(app, port=port)
+    app_runner.run_flask_app(app, port=port)
 
     assert cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1") == snapshot_cli
 
