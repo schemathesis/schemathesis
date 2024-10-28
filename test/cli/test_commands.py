@@ -1418,19 +1418,6 @@ def test_filter_by(cli, schema_url, snapshot_cli, value):
     assert cli.run(schema_url, "--dry-run", "--hypothesis-max-examples=1", value) == snapshot_cli
 
 
-@pytest.mark.parametrize("fixup", ["all", "fast_api"])
-def test_fast_api_fixup(ctx, cli, base_url, fast_api_schema, hypothesis_max_examples, fixup):
-    # When schema contains Draft 7 definitions as ones from FastAPI may contain
-    schema_path = ctx.makefile(fast_api_schema)
-    result = cli.run(
-        str(schema_path),
-        f"--base-url={base_url}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        f"--fixups={fixup}",
-    )
-    assert result.exit_code == ExitCode.OK, result.stdout
-
-
 @pytest.mark.operations("success")
 def test_colon_in_headers(cli, schema_url, app):
     header = "X-FOO"

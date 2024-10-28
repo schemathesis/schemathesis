@@ -3,16 +3,13 @@ from hypothesis import Phase, given, settings
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
-from schemathesis import fixups, from_asgi, from_dict
+from schemathesis import from_asgi, from_dict
 from schemathesis.exceptions import CheckFailed, SchemaError
 from schemathesis.experimental import OPEN_API_3_1
 
 
-@pytest.mark.parametrize("with_fixup", [True, False])
-def test_works_with_fastapi(fastapi_app, with_fixup):
+def test_works_with_fastapi(fastapi_app):
     OPEN_API_3_1.enable()
-    if with_fixup:
-        fixups.fast_api.install()
 
     json_schema = {
         "type": "object",
