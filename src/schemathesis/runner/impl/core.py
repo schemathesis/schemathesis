@@ -26,7 +26,7 @@ from urllib3.exceptions import InsecureRequestWarning
 
 from ... import experimental, failures, hooks
 from ..._compat import MultipleFailures
-from ..._hypothesis import (
+from ..._hypothesis._builder import (
     get_invalid_example_headers_mark,
     get_invalid_regex_mark,
     get_non_serializable_mark,
@@ -70,8 +70,8 @@ from ...stateful import runner as stateful_runner
 from ...targets import Target, TargetContext
 from ...transports import RequestConfig, RequestsTransport
 from ...transports.auth import get_requests_auth, prepare_wsgi_headers
-from ...utils import capture_hypothesis_output
 from .. import probes
+from .._hypothesis import capture_hypothesis_output
 from ..models import Check, Request, Response, Status, TestResult
 from .context import RunnerContext
 

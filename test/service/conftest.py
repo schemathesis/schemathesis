@@ -13,6 +13,7 @@ from schemathesis.internal.datetime import current_datetime
 from schemathesis.service import FileReportHandler, ServiceReportHandler
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.hosts import HostData
+from schemathesis.service.report import ReportConfig
 
 # A token for a testing Schemathesis.io instance
 DEFAULT_SERVICE_TOKEN = "25f8ee2357da497d8d0d07be62df62a1"
@@ -185,11 +186,13 @@ def service_report_handler(service_client, hostname, hosts_file, openapi3_schema
     handler = ServiceReportHandler(
         service_client,
         host_data=HostData(hostname, hosts_file),
-        api_name="test",
-        location=openapi3_schema_url,
-        base_url=None,
-        started_at=current_datetime(),
-        telemetry=False,
+        config=ReportConfig(
+            api_name="test",
+            location=openapi3_schema_url,
+            base_url=None,
+            started_at=current_datetime(),
+            telemetry=False,
+        ),
         out_queue=Queue(),
         in_queue=Queue(),
     )
@@ -202,11 +205,13 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
     report_file = tmp_path / "report.tar.gz"
     handler = FileReportHandler(
         file_handle=click.utils.LazyFile(str(report_file), mode="wb"),
-        api_name=None,
-        location=openapi3_schema_url,
-        base_url=None,
-        started_at=current_datetime(),
-        telemetry=False,
+        config=ReportConfig(
+            api_name=None,
+            location=openapi3_schema_url,
+            base_url=None,
+            started_at=current_datetime(),
+            telemetry=False,
+        ),
         in_queue=Queue(),
         out_queue=Queue(),
     )

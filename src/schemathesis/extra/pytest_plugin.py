@@ -6,15 +6,23 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
 
 import pytest
-from _pytest import fixtures, nodes
+from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
 from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
-from .._dependency_versions import IS_PYTEST_ABOVE_8
+from .._hypothesis._given import (
+    get_given_args,
+    get_given_kwargs,
+    is_given_applied,
+    merge_given_args,
+    validate_given_args,
+)
 from .._override import get_override_from_mark
+from .._pytest.control_flow import fail_on_no_matches
+from .._pytest.markers import get_schemathesis_handle
 from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -29,21 +37,12 @@ from ..exceptions import (
     UsageError,
 )
 from ..internal.result import Ok, Result
-from ..utils import (
-    PARAMETRIZE_MARKER,
-    fail_on_no_matches,
-    get_given_args,
-    get_given_kwargs,
-    is_given_applied,
-    is_schemathesis_test,
-    merge_given_args,
-    validate_given_args,
-)
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
     from ..models import APIOperation
+    from ..schemas import BaseSchema
 
 
 class SchemathesisFunction(Function):
@@ -60,7 +59,7 @@ class SchemathesisFunction(Function):
 
 
 class SchemathesisCase(PyCollector):
-    def __init__(self, test_function: Callable, *args: Any, **kwargs: Any) -> None:
+    def __init__(self, test_function: Callable, schema: BaseSchema, *args: Any, **kwargs: Any) -> None:
         self.given_kwargs: dict[str, Any] | None
         given_args = get_given_args(test_function)
         given_kwargs = get_given_kwargs(test_function)
@@ -80,7 +79,7 @@ class SchemathesisCase(PyCollector):
                 _init_with_valid_test(test_function, given_args, given_kwargs)
         else:
             _init_with_valid_test(test_function, given_args, given_kwargs)
-        self.schemathesis_case = getattr(test_function, PARAMETRIZE_MARKER)
+        self.schema = schema
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation) -> str:
@@ -97,7 +96,7 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        from .._hypothesis import create_test
+        from .._hypothesis._builder import create_test
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -123,8 +122,8 @@ class SchemathesisCase(PyCollector):
                     operation=operation,
                     test=self.test_function,
                     _given_kwargs=self.given_kwargs,
-                    data_generation_methods=self.schemathesis_case.data_generation_methods,
-                    generation_config=self.schemathesis_case.generation_config,
+                    data_generation_methods=self.schema.data_generation_methods,
+                    generation_config=self.schema.generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
                     keep_async_fn=is_trio_test,
                 )
@@ -162,8 +161,6 @@ class SchemathesisCase(PyCollector):
                 originalname=self.name,
             )
         else:
-            if not IS_PYTEST_ABOVE_8:
-                fixtures.add_funcarg_pseudo_fixture_def(self.parent, metafunc, fixturemanager)  # type: ignore[arg-type]
             fixtureinfo.prune_dependency_tree()
             for callspec in metafunc._calls:
                 subname = f"{name}[{callspec.id}]"
@@ -201,7 +198,7 @@ class SchemathesisCase(PyCollector):
         try:
             items = [
                 item
-                for operation in self.schemathesis_case.get_all_operations(
+                for operation in self.schema.get_all_operations(
                     hooks=getattr(self.test_function, "_schemathesis_hooks", None)
                 )
                 for item in self._gen_items(operation)
@@ -217,8 +214,9 @@ class SchemathesisCase(PyCollector):
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
-    if is_schemathesis_test(obj):
-        outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name))
+    schema = get_schemathesis_handle(obj)
+    if schema is not None:
+        outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name, schema=schema))
     else:
         outcome.get_result()
 
@@ -251,7 +249,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-    from .._hypothesis import (
+    from .._hypothesis._builder import (
         get_invalid_example_headers_mark,
         get_invalid_regex_mark,
         get_non_serializable_mark,

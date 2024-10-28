@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.internal.output import OutputConfig
+from .internal.output import OutputConfig
 
 if TYPE_CHECKING:
     from json import JSONDecodeError

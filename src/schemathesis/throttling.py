@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
 from .exceptions import UsageError
 
 if TYPE_CHECKING:
@@ -51,11 +50,8 @@ def _get_max_delay(value: int, unit: Duration) -> int:
 
 
 def build_limiter(rate: str) -> Limiter:
-    from ._rate_limiter import Limiter, Rate
+    from pyrate_limiter import Limiter, Rate
 
     limit, interval = parse_units(rate)
     rate = Rate(limit, interval)
-    kwargs = {}
-    if IS_PYRATE_LIMITER_ABOVE_3:
-        kwargs["max_delay"] = _get_max_delay(limit, interval)
-    return Limiter(rate, **kwargs)
+    return Limiter(rate, max_delay=_get_max_delay(limit, interval))

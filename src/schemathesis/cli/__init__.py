@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import os
 import sys
-import warnings
 from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
@@ -29,7 +28,7 @@ from ..constants import (
     ISSUE_TRACKER_URL,
     WAIT_FOR_SCHEMA_ENV_VAR,
 )
-from ..exceptions import SchemaError, SchemaErrorType
+from ..exceptions import SchemaError
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
@@ -37,16 +36,14 @@ from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookSco
 from ..internal.checks import CheckConfig
 from ..internal.datetime import current_datetime
 from ..internal.exceptions import format_exception
+from ..internal.fs import ensure_parent
 from ..internal.output import OutputConfig
-from ..internal.validation import file_exists
 from ..loaders import load_app, load_yaml
-from ..runner import events, prepare_hypothesis_settings, probes
-from ..specs.graphql import loaders as gql_loaders
-from ..specs.openapi import loaders as oas_loaders
+from ..runner import events, probes
 from ..stateful import Stateful
 from ..transports import RequestConfig
-from ..transports.auth import get_requests_auth
-from . import callbacks, cassettes, output
+from . import callbacks, cassettes, loaders, output
+from ._hypothesis import prepare_settings
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
@@ -61,9 +58,7 @@ if TYPE_CHECKING:
     import requests
 
     from ..models import Case, CheckFunction
-    from ..schemas import BaseSchema
     from ..service.client import ServiceClient
-    from ..specs.graphql.schemas import GraphQLSchema
     from ..targets import Target
     from ..types import NotSet, PathLike, RequestCert
 
@@ -876,6 +871,14 @@ def run(
     for experiment in experiments:
         experiment.enable()
 
+    cassette_config = None
+    if cassette_path is not None:
+        cassette_config = cassettes.CassetteConfig(
+            path=cassette_path,
+            format=cassette_format,
+            sanitize_output=sanitize_output,
+            preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
+        )
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
 
     generation_config = generation.GenerationConfig(
@@ -1027,6 +1030,13 @@ def run(
 
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
     host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
+    report_config = service.ReportConfig(
+        api_name=api_name,
+        location=schema,
+        base_url=base_url,
+        started_at=started_at,
+        telemetry=schemathesis_io_telemetry,
+    )
 
     if "all" in checks:
         selected_checks = checks_module.ALL_CHECKS
@@ -1061,7 +1071,7 @@ def run(
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
 
-    hypothesis_settings = prepare_hypothesis_settings(
+    hypothesis_settings = prepare_settings(
         database=hypothesis_database,
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
@@ -1094,7 +1104,7 @@ def run(
         max_failures=max_failures,
         unique_data=contrib_unique_data,
         dry_run=dry_run,
-        store_interactions=cassette_path is not None,
+        store_interactions=cassette_config is not None,
         checks=selected_checks,
         max_response_time=max_response_time,
         targets=selected_targets,
@@ -1117,23 +1127,15 @@ def run(
         show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
-        cassette_path=cassette_path,
-        cassette_format=cassette_format,
-        cassette_preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
+        cassette_config=cassette_config,
         junit_xml=junit_xml,
         verbosity=verbosity,
         code_sample_style=code_sample_style,
-        data_generation_methods=data_generation_methods,
         debug_output_file=debug_output_file,
-        sanitize_output=sanitize_output,
-        host_data=host_data,
         client=client,
         report=report,
-        telemetry=schemathesis_io_telemetry,
-        api_name=api_name,
-        location=schema,
-        base_url=base_url,
-        started_at=started_at,
+        host_data=host_data,
+        report_config=report_config,
         output_config=output_config,
     )
 
@@ -1157,33 +1159,6 @@ def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | Non
     if cert is not None and key is not None:
         return cert, key
     return cert
-
-
-@dataclass
-class LoaderConfig:
-    """Container for API loader parameters.
-
-    The main goal is to avoid too many parameters in function signatures.
-    """
-
-    schema_or_location: str | dict[str, Any]
-    app: Any
-    base_url: str | None
-    validate_schema: bool
-    data_generation_methods: tuple[DataGenerationMethod, ...]
-    force_schema_version: str | None
-    request_tls_verify: bool | str
-    request_proxy: str | None
-    request_cert: RequestCert | None
-    wait_for_schema: float | None
-    rate_limit: str | None
-    output_config: OutputConfig
-    sanitize_output: bool
-    generation_config: generation.GenerationConfig
-    # Network request parameters
-    auth: tuple[str, str] | None
-    auth_type: str | None
-    headers: dict[str, str] | None
 
 
 def into_event_stream(
@@ -1229,7 +1204,7 @@ def into_event_stream(
     try:
         if app is not None:
             app = load_app(app)
-        config = LoaderConfig(
+        config = loaders.LoaderConfig(
             schema_or_location=schema_or_location,
             app=app,
             base_url=base_url,
@@ -1248,7 +1223,7 @@ def into_event_stream(
             output_config=output_config,
             generation_config=generation_config,
         )
-        schema = load_schema(config)
+        schema = loaders.load_schema(config)
         schema.filter_set = filter_set
         yield from runner.from_schema(
             schema,
@@ -1293,152 +1268,6 @@ def into_event_stream(
         yield events.InternalError.from_schema_error(error)
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
-
-
-def load_schema(config: LoaderConfig) -> BaseSchema:
-    """Automatically load API schema."""
-    first: Callable[[LoaderConfig], BaseSchema]
-    second: Callable[[LoaderConfig], BaseSchema]
-    if is_probably_graphql(config.schema_or_location):
-        # Try GraphQL first, then fallback to Open API
-        first, second = (_load_graphql_schema, _load_openapi_schema)
-    else:
-        # Try Open API first, then fallback to GraphQL
-        first, second = (_load_openapi_schema, _load_graphql_schema)
-    return _try_load_schema(config, first, second)
-
-
-def should_try_more(exc: SchemaError) -> bool:
-    import requests
-    from yaml.reader import ReaderError
-
-    if isinstance(exc.__cause__, ReaderError) and "characters are not allowed" in str(exc.__cause__):
-        return False
-
-    # We should not try other loaders for cases when we can't even establish connection
-    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.type not in (
-        SchemaErrorType.OPEN_API_INVALID_SCHEMA,
-        SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
-        SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
-        SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION,
-    )
-
-
-Loader = Callable[[LoaderConfig], "BaseSchema"]
-
-
-def _try_load_schema(config: LoaderConfig, first: Loader, second: Loader) -> BaseSchema:
-    from urllib3.exceptions import InsecureRequestWarning
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", InsecureRequestWarning)
-        try:
-            return first(config)
-        except SchemaError as exc:
-            if config.force_schema_version is None and should_try_more(exc):
-                try:
-                    return second(config)
-                except Exception as second_exc:
-                    if is_specific_exception(second, second_exc):
-                        raise second_exc
-            # Re-raise the original error
-            raise exc
-
-
-def is_specific_exception(loader: Loader, exc: Exception) -> bool:
-    return (
-        loader is _load_graphql_schema
-        and isinstance(exc, SchemaError)
-        and exc.type == SchemaErrorType.GRAPHQL_INVALID_SCHEMA
-        # In some cases it is not clear that the schema is even supposed to be GraphQL, e.g. an empty input
-        and "Syntax Error: Unexpected <EOF>." not in exc.extras
-    )
-
-
-def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
-    loader = detect_loader(config.schema_or_location, config.app, is_openapi=False)
-    kwargs = get_graphql_loader_kwargs(loader, config)
-    return loader(config.schema_or_location, **kwargs)
-
-
-def _load_openapi_schema(config: LoaderConfig) -> BaseSchema:
-    loader = detect_loader(config.schema_or_location, config.app, is_openapi=True)
-    kwargs = get_loader_kwargs(loader, config)
-    return loader(config.schema_or_location, **kwargs)
-
-
-def detect_loader(schema_or_location: str | dict[str, Any], app: Any, is_openapi: bool) -> Callable:
-    """Detect API schema loader."""
-    if isinstance(schema_or_location, str):
-        if file_exists(schema_or_location):
-            # If there is an existing file with the given name,
-            # then it is likely that the user wants to load API schema from there
-            return oas_loaders.from_path if is_openapi else gql_loaders.from_path  # type: ignore
-        if app is not None and not urlparse(schema_or_location).netloc:
-            # App is passed & location is relative
-            return oas_loaders.get_loader_for_app(app) if is_openapi else gql_loaders.get_loader_for_app(app)
-        # Default behavior
-        return oas_loaders.from_uri if is_openapi else gql_loaders.from_url  # type: ignore
-    return oas_loaders.from_dict if is_openapi else gql_loaders.from_dict  # type: ignore
-
-
-def get_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
-    """Detect the proper set of parameters for a loader."""
-    # These kwargs are shared by all loaders
-    kwargs = {
-        "app": config.app,
-        "base_url": config.base_url,
-        "validate_schema": config.validate_schema,
-        "force_schema_version": config.force_schema_version,
-        "data_generation_methods": config.data_generation_methods,
-        "rate_limit": config.rate_limit,
-        "output_config": config.output_config,
-        "generation_config": config.generation_config,
-        "sanitize_output": config.sanitize_output,
-    }
-    if loader not in (oas_loaders.from_path, oas_loaders.from_dict):
-        kwargs["headers"] = config.headers
-    if loader is oas_loaders.from_uri:
-        _add_requests_kwargs(kwargs, config)
-    return kwargs
-
-
-def get_graphql_loader_kwargs(
-    loader: Callable,
-    config: LoaderConfig,
-) -> dict[str, Any]:
-    """Detect the proper set of parameters for a loader."""
-    # These kwargs are shared by all loaders
-    kwargs = {
-        "app": config.app,
-        "base_url": config.base_url,
-        "data_generation_methods": config.data_generation_methods,
-        "rate_limit": config.rate_limit,
-    }
-    if loader not in (gql_loaders.from_path, gql_loaders.from_dict):
-        kwargs["headers"] = config.headers
-    if loader is gql_loaders.from_url:
-        _add_requests_kwargs(kwargs, config)
-    return kwargs
-
-
-def _add_requests_kwargs(kwargs: dict[str, Any], config: LoaderConfig) -> None:
-    kwargs["verify"] = config.request_tls_verify
-    if config.request_cert is not None:
-        kwargs["cert"] = config.request_cert
-    if config.auth is not None:
-        kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
-    if config.wait_for_schema is not None:
-        kwargs["wait_for_schema"] = config.wait_for_schema
-
-
-def is_probably_graphql(schema_or_location: str | dict[str, Any]) -> bool:
-    """Detect whether it is likely that the given location is a GraphQL endpoint."""
-    if isinstance(schema_or_location, str):
-        return schema_or_location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
-    return "__schema" in schema_or_location or (
-        "data" in schema_or_location and "__schema" in schema_or_location["data"]
-    )
 
 
 def check_auth(auth: tuple[str, str] | None, headers: dict[str, str], override: CaseOverride) -> None:
@@ -1505,23 +1334,15 @@ def execute(
     show_trace: bool,
     wait_for_schema: float | None,
     validate_schema: bool,
-    cassette_path: click.utils.LazyFile | None,
-    cassette_format: cassettes.CassetteFormat,
-    cassette_preserve_exact_body_bytes: bool,
+    cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
     verbosity: int,
     code_sample_style: CodeSampleStyle,
-    data_generation_methods: tuple[DataGenerationMethod, ...],
     debug_output_file: click.utils.LazyFile | None,
-    sanitize_output: bool,
-    host_data: service.hosts.HostData,
     client: ServiceClient | None,
     report: ReportToService | click.utils.LazyFile | None,
-    telemetry: bool,
-    api_name: str | None,
-    location: str,
-    base_url: str | None,
-    started_at: str,
+    host_data: service.hosts.HostData,
+    report_config: service.ReportConfig,
     output_config: OutputConfig,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
@@ -1534,48 +1355,24 @@ def execute(
         report_context = ServiceReportContext(queue=report_queue, service_base_url=client.base_url)
         handlers.append(
             service.ServiceReportHandler(
-                client=client,
-                host_data=host_data,
-                api_name=api_name,
-                location=location,
-                base_url=base_url,
-                started_at=started_at,
-                out_queue=report_queue,
-                telemetry=telemetry,
+                client=client, host_data=host_data, config=report_config, out_queue=report_queue
             )
         )
     elif isinstance(report, click.utils.LazyFile):
         _open_file(report)
         report_queue = Queue()
         report_context = FileReportContext(queue=report_queue, filename=report.name)
-        handlers.append(
-            service.FileReportHandler(
-                file_handle=report,
-                api_name=api_name,
-                location=location,
-                base_url=base_url,
-                started_at=started_at,
-                out_queue=report_queue,
-                telemetry=telemetry,
-            )
-        )
+        handlers.append(service.FileReportHandler(file_handle=report, config=report_config, out_queue=report_queue))
     if junit_xml is not None:
         _open_file(junit_xml)
         handlers.append(JunitXMLHandler(junit_xml))
     if debug_output_file is not None:
         _open_file(debug_output_file)
         handlers.append(DebugOutputHandler(debug_output_file))
-    if cassette_path is not None:
+    if cassette_config is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
-        _open_file(cassette_path)
-        handlers.append(
-            cassettes.CassetteWriter(
-                cassette_path,
-                format=cassette_format,
-                sanitize_output=sanitize_output,
-                preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
-            )
-        )
+        _open_file(cassette_config.path)
+        handlers.append(cassettes.CassetteWriter(config=cassette_config))
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*ctx.args, **ctx.params))
     handlers.append(get_output_handler(workers_num))
@@ -1586,7 +1383,7 @@ def execute(
         show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         validate_schema=validate_schema,
-        cassette_path=cassette_path.name if cassette_path is not None else None,
+        cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
         code_sample_style=code_sample_style,
@@ -1626,10 +1423,8 @@ def execute(
 
 
 def _open_file(file: click.utils.LazyFile) -> None:
-    from ..utils import _ensure_parent
-
     try:
-        _ensure_parent(file.name, fail_silently=False)
+        ensure_parent(file.name, fail_silently=False)
     except OSError as exc:
         raise click.BadParameter(f"'{file.name}': {exc.strerror}") from exc
     try:

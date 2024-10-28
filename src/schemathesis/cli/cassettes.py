@@ -50,29 +50,25 @@ class CassetteFormat(str, enum.Enum):
 
 
 @dataclass
+class CassetteConfig:
+    path: click.utils.LazyFile
+    format: CassetteFormat = CassetteFormat.VCR
+    preserve_exact_body_bytes: bool = False
+    sanitize_output: bool = True
+
+
+@dataclass
 class CassetteWriter(EventHandler):
-    """Write interactions in a YAML cassette.
+    """Write network interactions to a cassette."""
 
-    A low-level interface is used to write data to YAML file during the test run and reduce the delay at
-    the end of the test run.
-    """
-
-    file_handle: click.utils.LazyFile
-    format: CassetteFormat
-    sanitize_output: bool
-    preserve_exact_body_bytes: bool
+    config: CassetteConfig
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
     def __post_init__(self) -> None:
-        kwargs = {
-            "file_handle": self.file_handle,
-            "sanitize_output": self.sanitize_output,
-            "queue": self.queue,
-            "preserve_exact_body_bytes": self.preserve_exact_body_bytes,
-        }
+        kwargs = {"config": self.config, "queue": self.queue}
         writer: Callable
-        if self.format == CassetteFormat.HAR:
+        if self.config.format == CassetteFormat.HAR:
             writer = har_writer
         else:
             writer = vcr_writer
@@ -138,9 +134,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(
-    file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, sanitize_output: bool, queue: Queue
-) -> None:
+def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -151,12 +145,12 @@ def vcr_writer(
         providing tags, anchors to have incremental writing, with primitive types it is much simpler.
     """
     current_id = 1
-    stream = file_handle.open()
+    stream = config.path.open()
 
     def format_header_values(values: list[str]) -> str:
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
-    if sanitize_output:
+    if config.sanitize_output:
 
         def format_headers(headers: dict[str, list[str]]) -> str:
             headers = fast_deepcopy(headers)
@@ -182,7 +176,7 @@ def vcr_writer(
   checks:
 {items}"""
 
-    if preserve_exact_body_bytes:
+    if config.preserve_exact_body_bytes:
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.encoded_body is not None:
@@ -272,7 +266,7 @@ http_interactions:"""
                     write_double_quoted(stream, interaction.parameter_location)
                 else:
                     stream.write("null")
-                if sanitize_output:
+                if config.sanitize_output:
                     uri = sanitize_url(interaction.request.uri)
                 else:
                     uri = interaction.request.uri
@@ -312,7 +306,7 @@ http_interactions:"""
                 current_id += 1
         else:
             break
-    file_handle.close()
+    config.path.close()
 
 
 def write_double_quoted(stream: IO, text: str) -> None:
@@ -354,15 +348,13 @@ def write_double_quoted(stream: IO, text: str) -> None:
     stream.write('"')
 
 
-def har_writer(
-    file_handle: click.utils.LazyFile, preserve_exact_body_bytes: bool, sanitize_output: bool, queue: Queue
-) -> None:
-    with harfile.open(file_handle) as har:
+def har_writer(config: CassetteConfig, queue: Queue) -> None:
+    with harfile.open(config.path) as har:
         while True:
             item = queue.get()
             if isinstance(item, Process):
                 for interaction in item.interactions:
-                    if sanitize_output:
+                    if config.sanitize_output:
                         uri = sanitize_url(interaction.request.uri)
                     else:
                         uri = interaction.request.uri
@@ -371,7 +363,7 @@ def har_writer(
                         post_data = harfile.PostData(
                             mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                             text=interaction.request.encoded_body
-                            if preserve_exact_body_bytes
+                            if config.preserve_exact_body_bytes
                             else interaction.request.body.decode("utf-8", "replace"),
                         )
                     else:
@@ -382,16 +374,16 @@ def har_writer(
                             size=interaction.response.body_size or 0,
                             mimeType=content_type,
                             text=interaction.response.encoded_body
-                            if preserve_exact_body_bytes
+                            if config.preserve_exact_body_bytes
                             else interaction.response.body.decode("utf-8", "replace")
                             if interaction.response.body is not None
                             else None,
                             encoding="base64"
-                            if interaction.response.body is not None and preserve_exact_body_bytes
+                            if interaction.response.body is not None and config.preserve_exact_body_bytes
                             else None,
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"
-                        if sanitize_output:
+                        if config.sanitize_output:
                             headers = fast_deepcopy(interaction.response.headers)
                             sanitize_value(headers)
                         else:
@@ -413,7 +405,7 @@ def har_writer(
                         time = 0
                         http_version = ""
 
-                    if sanitize_output:
+                    if config.sanitize_output:
                         headers = fast_deepcopy(interaction.request.headers)
                         sanitize_value(headers)
                     else:

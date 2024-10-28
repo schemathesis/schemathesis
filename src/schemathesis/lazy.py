@@ -12,8 +12,18 @@ from hypothesis.internal.escalation import format_exception, get_trimmed_traceba
 from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests
 
-from ._compat import MultipleFailures, get_interesting_origin
+from ._compat import MultipleFailures
+from ._hypothesis._given import (
+    GivenInput,
+    get_given_args,
+    get_given_kwargs,
+    given_proxy,
+    is_given_applied,
+    merge_given_args,
+    validate_given_args,
+)
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
+from ._pytest.control_flow import fail_on_no_matches
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
@@ -22,16 +32,6 @@ from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_depreca
 from .hooks import HookDispatcher, HookScope
 from .internal.result import Ok
 from .schemas import BaseSchema
-from .utils import (
-    GivenInput,
-    fail_on_no_matches,
-    get_given_args,
-    get_given_kwargs,
-    given_proxy,
-    is_given_applied,
-    merge_given_args,
-    validate_given_args,
-)
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
@@ -357,9 +357,11 @@ def run_subtest(
             pytest.skip(exc.args[0])
         except (MultipleFailures, CheckFailed) as exc:
             # Hypothesis doesn't report the underlying failures in these circumstances, hence we display them manually
+            from hypothesis.internal.escalation import InterestingOrigin
+
             exc_class = get_exception_class()
             failures = "".join(f"{SEPARATOR} {failure.args[0]}" for failure in failed_checks.values())
-            unique_exceptions = {get_interesting_origin(exception): exception for exception in exceptions}
+            unique_exceptions = {InterestingOrigin.from_exception(exception): exception for exception in exceptions}
             total_problems = len(failed_checks) + len(unique_exceptions)
             if total_problems == 1:
                 raise

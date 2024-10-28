@@ -7,12 +7,13 @@ from hypothesis.reporting import report
 
 import schemathesis
 import schemathesis.cli.context
-from schemathesis import models, runner, utils
+from schemathesis import models, runner
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.constants import NOT_SET
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Case, OperationDefinition
+from schemathesis.runner._hypothesis import capture_hypothesis_output
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.models import Check, Request, Response, Status, TestResult, TestResultSet
 
@@ -194,7 +195,7 @@ def test_display_statistic_junitxml(capsys, execution_context, results_set):
 
 def test_capture_hypothesis_output():
     # When Hypothesis output us captured
-    with utils.capture_hypothesis_output() as hypothesis_output:
+    with capture_hypothesis_output() as hypothesis_output:
         value = "Some text"
         report(value)
         report(value)

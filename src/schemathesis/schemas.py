@@ -17,8 +17,9 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
-from ._dependency_versions import IS_PYRATE_LIMITER_ABOVE_3
-from ._hypothesis import create_test
+from ._hypothesis._builder import create_test
+from ._hypothesis._given import GivenInput, given_proxy
+from ._pytest.markers import has_schemathesis_handle, set_schemathesis_handle
 from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import NOT_SET
@@ -41,7 +42,6 @@ from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterab
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
-from .utils import PARAMETRIZE_MARKER, GivenInput, given_proxy
 
 if TYPE_CHECKING:
     import hypothesis
@@ -301,7 +301,7 @@ class BaseSchema(Mapping):
         )
 
         def wrapper(func: GenericTest) -> GenericTest:
-            if hasattr(func, PARAMETRIZE_MARKER):
+            if has_schemathesis_handle(func):
 
                 def wrapped_test(*_: Any, **__: Any) -> NoReturn:
                     raise UsageError(
@@ -319,7 +319,7 @@ class BaseSchema(Mapping):
                 filter_set=self.filter_set,
                 code_sample_style=_code_sample_style,  # type: ignore
             )
-            setattr(func, PARAMETRIZE_MARKER, cloned)
+            set_schemathesis_handle(func, cloned)
             return func
 
         return wrapper
@@ -463,10 +463,7 @@ class BaseSchema(Mapping):
         """Limit the rate of sending generated requests."""
         label = urlparse(self.base_url).netloc
         if self.rate_limiter is not None:
-            if IS_PYRATE_LIMITER_ABOVE_3:
-                self.rate_limiter.try_acquire(label)
-            else:
-                return self.rate_limiter.ratelimit(label, delay=True, max_delay=0)
+            self.rate_limiter.try_acquire(label)
         return nullcontext()
 
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:

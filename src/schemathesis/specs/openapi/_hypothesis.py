@@ -14,9 +14,9 @@ from requests.structures import CaseInsensitiveDict
 from requests.utils import to_key_val_list
 
 from ... import auths, serializers
-from ..._hypothesis import prepare_urlencoded
+from ..._hypothesis._builder import prepare_urlencoded
 from ...constants import NOT_SET
-from ...exceptions import BodyInGetRequestError, SerializationNotPossible
+from ...exceptions import BodyInGetRequestError, SerializationNotPossible, SkipTest
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
@@ -25,7 +25,6 @@ from ...models import APIOperation, Case, GenerationMetadata, TestPhase, cant_se
 from ...transports.content_types import parse_content_type
 from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
-from ...utils import skip
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES
@@ -157,7 +156,7 @@ def get_case_strategy(
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if skip_on_not_negated:
-            skip(operation.verbose_name)
+            raise SkipTest(f"It is not possible to generate negative test cases for `{operation.verbose_name}`")
         else:
             reject()
     instance = Case(
