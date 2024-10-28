@@ -48,10 +48,6 @@ SCHEMA = "http://127.0.0.1:/schema.json"
                 "used_headers": [],
             },
         ),
-        (
-            [SCHEMA, "-E", "a", "-E", "b"],
-            {"schema_kind": "URL", "parameters": {"endpoints": {"count": 2}}, "used_headers": []},
-        ),
     ],
 )
 def test_collect(args, expected):

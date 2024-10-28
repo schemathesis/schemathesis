@@ -51,12 +51,12 @@ def impl(request, case):
     assert_int(case.query["not_common_id"])
     assert_int(case.query["key"])
 
-@schema.parametrize(endpoint="/foo")
+@schema.include(path_regex="/foo").parametrize()
 @settings(max_examples=1)
 def test_a(request, case):
     impl(request, case)
 
-@schema.parametrize(endpoint="/foo")
+@schema.include(path_regex="/foo").parametrize()
 @settings(max_examples=1)
 def test_b(request, case):
     impl(request, case)

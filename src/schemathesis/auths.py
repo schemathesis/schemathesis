@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import inspect
 import threading
 import time
-import warnings
 from dataclasses import dataclass, field
 from typing import (
     TYPE_CHECKING,
@@ -111,7 +109,7 @@ class CachingAuthProvider(Generic[Auth]):
                     # Another thread updated the cache
                     return cache_entry.data
                 # We know that optional auth is possible only inside a higher-level wrapper
-                data: Auth = _provider_get(self.provider, case, context)  # type: ignore[assignment]
+                data: Auth = self.provider.get(case, context)  # type: ignore[assignment]
                 self._set_cache_entry(data, case, context)
                 return data
         return cache_entry.data
@@ -254,7 +252,7 @@ class SelectiveAuthProvider(Generic[Auth]):
 
     def get(self, case: Case, context: AuthContext) -> Auth | None:
         if self.filter_set.match(context):
-            return _provider_get(self.provider, case, context)
+            return self.provider.get(case, context)
         return None
 
     def set(self, case: Case, data: Auth, context: AuthContext) -> None:
@@ -447,30 +445,11 @@ class AuthStorage(Generic[Auth]):
         if not self.is_defined:
             raise UsageError("No auth provider is defined.")
         for provider in self.providers:
-            data: Auth | None = _provider_get(provider, case, context)
+            data: Auth | None = provider.get(case, context)
             if data is not None:
                 provider.set(case, data, context)
                 case._has_explicit_auth = True
                 break
-
-
-def _provider_get(auth_provider: AuthProvider, case: Case, context: AuthContext) -> Auth | None:
-    # A shim to provide a compatibility layer between previously used convention for `AuthProvider.get`
-    # where it used to accept a single `context` argument
-    method = auth_provider.get
-    parameters = inspect.signature(method).parameters
-    if len(parameters) == 1:
-        # Old calling convention
-        warnings.warn(
-            "The method 'get' of your AuthProvider is using the old calling convention, "
-            "which is deprecated and will be removed in Schemathesis 4.0. "
-            "Please update it to accept both 'case' and 'context' as arguments.",
-            DeprecationWarning,
-            stacklevel=1,
-        )
-        return method(context)  # type: ignore
-    # New calling convention
-    return method(case, context)
 
 
 def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | None) -> None:

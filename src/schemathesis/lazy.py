@@ -18,9 +18,8 @@ from .auths import AuthStorage
 from .code_samples import CodeSampleStyle
 from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
 from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
-from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, filter_set_from_components, is_deprecated
+from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from .hooks import HookDispatcher, HookScope
-from .internal.deprecation import warn_filtration_arguments
 from .internal.result import Ok
 from .schemas import BaseSchema
 from .utils import (
@@ -41,7 +40,7 @@ if TYPE_CHECKING:
     from .generation import DataGenerationMethodInput, GenerationConfig
     from .internal.output import OutputConfig
     from .models import APIOperation
-    from .types import Filter, GenericTest, NotSet
+    from .types import GenericTest, NotSet
 
 
 @dataclass
@@ -163,21 +162,12 @@ class LazySchema:
 
     def parametrize(
         self,
-        method: Filter | None = NOT_SET,
-        endpoint: Filter | None = NOT_SET,
-        tag: Filter | None = NOT_SET,
-        operation_id: Filter | None = NOT_SET,
         validate_schema: bool | NotSet = NOT_SET,
-        skip_deprecated_operations: bool | NotSet = NOT_SET,
         data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
         code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
-        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
-            value = locals()[name]
-            if value is not NOT_SET:
-                warn_filtration_arguments(name)
         if data_generation_methods is NOT_SET:
             data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
@@ -212,15 +202,10 @@ class LazySchema:
                     request=request,
                     name=self.fixture_name,
                     base_url=self.base_url,
-                    method=method,
-                    endpoint=endpoint,
-                    tag=tag,
-                    operation_id=operation_id,
                     hooks=self.hooks,
                     auth=self.auth if self.auth.providers is not None else NOT_SET,
                     test_function=test,
                     validate_schema=validate_schema,
-                    skip_deprecated_operations=skip_deprecated_operations,
                     data_generation_methods=data_generation_methods,
                     generation_config=generation_config,
                     output_config=output_config,
@@ -417,17 +402,12 @@ def get_schema(
     request: FixtureRequest,
     name: str,
     base_url: str | None | NotSet = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
     filter_set: FilterSet,
     app: Any = None,
     test_function: GenericTest,
     hooks: HookDispatcher,
     auth: AuthStorage | NotSet,
     validate_schema: bool | NotSet = NOT_SET,
-    skip_deprecated_operations: bool | NotSet = NOT_SET,
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
     output_config: OutputConfig | NotSet = NOT_SET,
@@ -440,15 +420,6 @@ def get_schema(
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
 
-    filter_set = filter_set_from_components(
-        include=True,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
-        parent=schema.filter_set.merge(filter_set),
-    )
     return schema.clone(
         base_url=base_url,
         filter_set=filter_set,

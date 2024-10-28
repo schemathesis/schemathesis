@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
 from packaging import version
@@ -116,7 +114,7 @@ def test_direct_schema(testdir):
     # When body has schema specified directly, not via $ref
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -153,7 +151,7 @@ def test_specified_example_body(testdir):
         """
 from hypothesis import Phase
 
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -388,7 +386,7 @@ def test_multiple_examples_same_location(testdir):
         """
 from hypothesis import Phase
 
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -425,7 +423,6 @@ def test(request, case):
     result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="Decorator syntax available from Python 3.9")
 def test_deselecting(testdir):
     # When pytest selecting is applied via "-k" option
     testdir.make_test(
@@ -447,51 +444,6 @@ def test_b(request, case):
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
     result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /v1/pets\]", r"Hypothesis calls: 2"])
-
-
-def test_skip_deprecated_operations(testdir):
-    # When the schema is loaded with `skip_deprecated_operations=True`
-    testdir.make_test(
-        """
-schema = schemathesis.from_dict(raw_schema, skip_deprecated_operations=True)
-
-@schema.parametrize()
-@settings(max_examples=1)
-def test_a(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-
-@schema.parametrize(skip_deprecated_operations=False)
-@settings(max_examples=1)
-def test_b(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    """,
-        paths={
-            "/users": {
-                "post": {
-                    "deprecated": True,
-                    "responses": {"200": {"description": "OK"}},
-                },
-                "patch": {
-                    "deprecated": False,
-                    "responses": {"200": {"description": "OK"}},
-                },
-            }
-        },
-    )
-    result = testdir.runpytest("-v", "-s")
-    # Then only not deprecated API operations should be tested
-    result.assert_outcomes(passed=5)
-    result.stdout.re_match_lines(
-        [
-            r".*test_a\[PATCH /v1/users\]",
-            r".*test_a\[GET /v1/users\]",
-            # Here POST is not skipped due to using skip_deprecated_operations=False in the `parametrize` call
-            r".*test_b\[POST /v1/users\]",
-            r".*test_b\[PATCH /v1/users\]",
-            r".*test_b\[GET /v1/users\]",
-            r"Hypothesis calls: 5",
-        ]
-    )
 
 
 @pytest.mark.parametrize(

@@ -288,7 +288,7 @@ def test_simple_dereference(testdir):
     # When a given parameter contains a JSON reference
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -323,7 +323,7 @@ def test_recursive_dereference(testdir):
     # When a given parameter contains a JSON reference, that reference an object with another reference
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -366,7 +366,7 @@ def test_inner_dereference(testdir):
     # When a given parameter contains a JSON reference inside a property of an object
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -405,7 +405,7 @@ def test_inner_dereference_with_lists(testdir):
     # When a given parameter contains a JSON reference inside a list in `allOf`
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
@@ -481,7 +481,7 @@ def test_(request, case):
 def test_nullable_properties(testdir):
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     assume(case.body["id"] is None)
@@ -519,7 +519,7 @@ def test_(request, case):
 def test_nullable_ref(testdir):
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1

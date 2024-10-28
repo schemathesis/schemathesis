@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--auth' / '-a': Expected KEY:VALUE format, received 123.
+Error: Invalid value for '--auth' / '-a': Username should not be empty.

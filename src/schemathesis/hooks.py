@@ -9,7 +9,6 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from .filters import FilterSet, attach_filter_chain
-from .internal.deprecation import deprecated_property
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
@@ -44,10 +43,6 @@ class HookContext:
     """
 
     operation: APIOperation | None = None
-
-    @deprecated_property(removed_in="4.0", replacement="`operation`")
-    def endpoint(self) -> APIOperation | None:
-        return self.operation
 
 
 def to_filterable_hook(dispatcher: HookDispatcher) -> Callable:

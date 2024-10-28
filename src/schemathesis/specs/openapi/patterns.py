@@ -21,7 +21,7 @@ IN = sre.IN
 MAXREPEAT = sre_parse.MAXREPEAT
 
 
-@lru_cache()
+@lru_cache
 def update_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
     """Update the quantifier of a regular expression based on given min and max lengths."""
     if not pattern or (min_length in (None, 0) and max_length is None):

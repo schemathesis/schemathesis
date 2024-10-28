@@ -948,9 +948,6 @@ def app_schema(openapi_version, operations):
 def testdir(testdir):
     def maker(
         content,
-        method=None,
-        path=None,
-        tag=None,
         pytest_plugins=("aiohttp.pytest_plugin",),
         validate_schema=True,
         sanitize_output=True,
@@ -978,9 +975,6 @@ def testdir(testdir):
 
         schema = schemathesis.from_dict(
             raw_schema,
-            method={method!r},
-            endpoint={path!r},
-            tag={tag!r},
             validate_schema={validate_schema!r},
             sanitize_output={sanitize_output!r}
         )

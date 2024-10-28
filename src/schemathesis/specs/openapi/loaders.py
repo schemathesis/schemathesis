@@ -11,7 +11,6 @@ from ... import experimental, fixups
 from ...code_samples import CodeSampleStyle
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
-from ...filters import filter_set_from_components
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -19,14 +18,13 @@ from ...generation import (
     GenerationConfig,
 )
 from ...hooks import HookContext, dispatch
-from ...internal.deprecation import warn_filtration_arguments
 from ...internal.output import OutputConfig
 from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url, load_yaml
 from ...throttling import build_limiter
 from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
-from ...types import Filter, NotSet, PathLike, Specification
+from ...types import NotSet, PathLike, Specification
 from . import definitions, validation
 
 if TYPE_CHECKING:
@@ -73,11 +71,6 @@ def from_path(
     *,
     app: Any = None,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -98,11 +91,6 @@ def from_path(
             fd,
             app=app,
             base_url=base_url,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
             validate_schema=validate_schema,
             force_schema_version=force_schema_version,
             data_generation_methods=data_generation_methods,
@@ -123,11 +111,6 @@ def from_uri(
     app: Any = None,
     base_url: str | None = None,
     port: int | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -174,11 +157,6 @@ def from_uri(
         response.text,
         app=app,
         base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,
@@ -220,11 +198,6 @@ def from_file(
     *,
     app: Any = None,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -267,11 +240,6 @@ def from_file(
         raw,
         app=app,
         base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,
@@ -296,11 +264,6 @@ def from_dict(
     *,
     app: Any = None,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -333,19 +296,6 @@ def from_dict(
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
 
-    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
-        value = locals()[name]
-        if value is not None:
-            warn_filtration_arguments(name)
-    filter_set = filter_set_from_components(
-        include=True,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
-    )
-
     def init_openapi_2() -> SwaggerV20:
         _maybe_validate_schema(raw_schema, definitions.SWAGGER_20_VALIDATOR, validate_schema)
         instance = SwaggerV20(
@@ -353,7 +303,6 @@ def from_dict(
             specification=Specification.OPENAPI,
             app=app,
             base_url=base_url,
-            filter_set=filter_set,
             validate_schema=validate_schema,
             data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             generation_config=generation_config or GenerationConfig(),
@@ -393,7 +342,6 @@ def from_dict(
             specification=Specification.OPENAPI,
             app=app,
             base_url=base_url,
-            filter_set=filter_set,
             validate_schema=validate_schema,
             data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
             generation_config=generation_config or GenerationConfig(),
@@ -479,11 +427,6 @@ def from_pytest_fixture(
     *,
     app: Any = NOT_SET,
     base_url: str | None | NotSet = NOT_SET,
-    method: Filter | None = NOT_SET,
-    endpoint: Filter | None = NOT_SET,
-    tag: Filter | None = NOT_SET,
-    operation_id: Filter | None = NOT_SET,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
@@ -513,23 +456,10 @@ def from_pytest_fixture(
     rate_limiter: Limiter | None = None
     if rate_limit is not None:
         rate_limiter = build_limiter(rate_limit)
-    for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
-        value = locals()[name]
-        if value is not None:
-            warn_filtration_arguments(name)
-    filter_set = filter_set_from_components(
-        include=True,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
-    )
     return LazySchema(
         fixture_name,
         app=app,
         base_url=base_url,
-        filter_set=filter_set,
         validate_schema=validate_schema,
         data_generation_methods=_data_generation_methods,
         generation_config=generation_config,
@@ -545,11 +475,6 @@ def from_wsgi(
     app: Any,
     *,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -577,11 +502,6 @@ def from_wsgi(
         response.data,
         app=app,
         base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,
@@ -610,11 +530,6 @@ def from_aiohttp(
     app: Any,
     *,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -638,11 +553,6 @@ def from_aiohttp(
     return from_uri(
         url,
         base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,
@@ -660,11 +570,6 @@ def from_asgi(
     app: Any,
     *,
     base_url: str | None = None,
-    method: Filter | None = None,
-    endpoint: Filter | None = None,
-    tag: Filter | None = None,
-    operation_id: Filter | None = None,
-    skip_deprecated_operations: bool | None = None,
     validate_schema: bool = False,
     force_schema_version: str | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
@@ -690,11 +595,6 @@ def from_asgi(
         response.text,
         app=app,
         base_url=base_url,
-        method=method,
-        endpoint=endpoint,
-        tag=tag,
-        operation_id=operation_id,
-        skip_deprecated_operations=skip_deprecated_operations,
         validate_schema=validate_schema,
         force_schema_version=force_schema_version,
         data_generation_methods=data_generation_methods,

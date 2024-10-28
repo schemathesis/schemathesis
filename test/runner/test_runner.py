@@ -279,7 +279,7 @@ def test_execute_with_headers(any_app, any_app_schema):
 
 
 def test_execute_filter_endpoint(app, schema_url):
-    schema = oas_loaders.from_uri(schema_url, endpoint=["success"])
+    schema = oas_loaders.from_uri(schema_url).include(path_regex="success")
     # When `endpoint` is passed in the `execute` call
     execute(schema)
 
@@ -290,7 +290,7 @@ def test_execute_filter_endpoint(app, schema_url):
 
 
 def test_execute_filter_method(app, schema_url):
-    schema = oas_loaders.from_uri(schema_url, method="POST")
+    schema = oas_loaders.from_uri(schema_url).include(method="POST")
     # When `method` corresponds to a method that is not defined in the app schema
     execute(schema)
     # Then runner will not make any requests
@@ -759,7 +759,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
     else:
         base_url = request.getfixturevalue("openapi3_base_url")
     path = get_schema_path(schema_path)
-    schema = oas_loaders.from_path(path, base_url=f"{base_url}/v3", endpoint="/pet/findByStatus")
+    schema = oas_loaders.from_path(path, base_url=f"{base_url}/v3").include(path_regex="/pet/findByStatus")
     *_, after_execution, _ = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()

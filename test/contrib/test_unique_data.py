@@ -1,17 +1,6 @@
 import platform
 
 import pytest
-from hypothesis import HealthCheck, Phase, given, settings
-
-import schemathesis
-from schemathesis import DataGenerationMethod, contrib
-
-
-@pytest.fixture
-def unique_data():
-    contrib.unique_data.install()
-    yield
-    contrib.unique_data.uninstall()
 
 
 @pytest.fixture(
@@ -77,32 +66,6 @@ def raw_schema(ctx, request):
             }
         )
     return schema
-
-
-@pytest.mark.hypothesis_nested
-@pytest.mark.xfail(True, reason="The `schemathesis.contrib.unique_data` hook is deprecated", strict=False)
-def test_python_tests(unique_data, raw_schema, hypothesis_max_examples):
-    schema = schemathesis.from_dict(raw_schema)
-    endpoint = schema["/data/{path_param}/"]["GET"]
-    seen = set()
-
-    @given(
-        case=endpoint.as_strategy(data_generation_method=DataGenerationMethod.positive)
-        | endpoint.as_strategy(data_generation_method=DataGenerationMethod.negative)
-    )
-    @settings(
-        max_examples=hypothesis_max_examples or 30,
-        suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much],
-        phases=[Phase.generate],
-        deadline=None,
-    )
-    def test(case):
-        # Check uniqueness by the generated cURL command as a different way to check it
-        command = case.as_curl_command({"X-Schemathesis-TestCaseId": "0"})
-        assert command not in seen, command
-        seen.add(command)
-
-    test()
 
 
 @pytest.fixture

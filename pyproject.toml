@@ -9,7 +9,7 @@ description = "Property-based testing framework for Open API and GraphQL based a
 keywords = ["pytest", "hypothesis", "openapi", "graphql", "testing"]
 authors = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
 maintainers = [{ name = "Dmitry Dygalo", email = "dmitry@dygalo.dev" }]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 license = "MIT"
 readme = "README.md"
 include = ["src/schemathesis/py.typed"]
@@ -22,7 +22,6 @@ classifiers = [
   "License :: OSI Approved :: MIT License",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.8",
   "Programming Language :: Python :: 3.9",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -37,8 +36,7 @@ dependencies = [
   "colorama>=0.4,<1.0",
   "harfile>=0.3.0,<1.0",
   "httpx>=0.22.0,<1.0",
-  "hypothesis>=6.103.4,<7; python_version > '3.8'",
-  "hypothesis[zoneinfo]>=6.103.4,<7; python_version == '3.8'",
+  "hypothesis>=6.103.4,<7",
   "hypothesis_graphql>=0.11.1,<1",
   "hypothesis_jsonschema>=0.23.1,<0.24",
   "jsonschema[format]>=4.18.0,<5.0",
@@ -118,7 +116,7 @@ exclude_lines = [
 
 [tool.ruff]
 line-length = 120
-target-version = "py38"
+target-version = "py39"
 
 [tool.ruff.lint]
 select = [

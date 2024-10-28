@@ -28,7 +28,6 @@ from .filters import (
     FilterValue,
     MatcherFunc,
     RegexValue,
-    filter_set_from_components,
     is_deprecated,
 )
 from .generation import (
@@ -39,7 +38,6 @@ from .generation import (
     combine_strategies,
 )
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
-from .internal.deprecation import warn_filtration_arguments
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
 from .models import APIOperation, Case
@@ -56,7 +54,6 @@ if TYPE_CHECKING:
     from .types import (
         Body,
         Cookies,
-        Filter,
         FormData,
         GenericTest,
         Headers,
@@ -294,33 +291,13 @@ class BaseSchema(Mapping):
 
     def parametrize(
         self,
-        method: Filter | None = NOT_SET,
-        endpoint: Filter | None = NOT_SET,
-        tag: Filter | None = NOT_SET,
-        operation_id: Filter | None = NOT_SET,
         validate_schema: bool | NotSet = NOT_SET,
-        skip_deprecated_operations: bool | NotSet = NOT_SET,
         data_generation_methods: Iterable[DataGenerationMethod] | NotSet = NOT_SET,
         code_sample_style: str | NotSet = NOT_SET,
     ) -> Callable:
         """Mark a test function as a parametrized one."""
         _code_sample_style = (
             CodeSampleStyle.from_str(code_sample_style) if isinstance(code_sample_style, str) else code_sample_style
-        )
-
-        for name in ("method", "endpoint", "tag", "operation_id", "skip_deprecated_operations"):
-            value = locals()[name]
-            if value is not NOT_SET:
-                warn_filtration_arguments(name)
-
-        filter_set = filter_set_from_components(
-            include=True,
-            method=method,
-            endpoint=endpoint,
-            tag=tag,
-            operation_id=operation_id,
-            skip_deprecated_operations=skip_deprecated_operations,
-            parent=self.filter_set,
         )
 
         def wrapper(func: GenericTest) -> GenericTest:
@@ -339,7 +316,7 @@ class BaseSchema(Mapping):
                 test_function=func,
                 validate_schema=validate_schema,
                 data_generation_methods=data_generation_methods,
-                filter_set=filter_set,
+                filter_set=self.filter_set,
                 code_sample_style=_code_sample_style,  # type: ignore
             )
             setattr(func, PARAMETRIZE_MARKER, cloned)

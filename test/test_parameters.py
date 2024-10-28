@@ -57,7 +57,7 @@ def test_body(testdir):
     # When parameter is specified for "body"
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=3, deadline=None)
 def test_(case):
     assert_int(case.body)
@@ -80,7 +80,7 @@ def test_path(testdir):
     # When parameter is specified for "path"
     testdir.make_test(
         """
-@schema.parametrize(endpoint="/users/{user_id}")
+@schema.include(path_regex="/users/{user_id}").parametrize()
 @settings(max_examples=3, deadline=None)
 def test_(case):
     assert_int(case.path_parameters["user_id"])
@@ -103,7 +103,7 @@ def test_multiple_path_variables(testdir):
     # When there are multiple parameters for "path"
     testdir.make_test(
         """
-@schema.parametrize(endpoint="/users/{user_id}/{event_id}")
+@schema.include(path_regex="/users/{user_id}/{event_id}").parametrize()
 @settings(max_examples=3, deadline=None)
 def test_(case):
     assert_int(case.path_parameters["user_id"])
@@ -130,7 +130,7 @@ def test_form_data(testdir):
     # When parameter is specified for "formData"
     testdir.make_test(
         """
-@schema.parametrize(method="POST")
+@schema.include(method="POST").parametrize()
 @settings(max_examples=1, deadline=None)
 def test_(case):
     assert_str(case.body["status"])

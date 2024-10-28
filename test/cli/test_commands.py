@@ -21,13 +21,7 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from schemathesis._dependency_versions import IS_PYTEST_ABOVE_7
 from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
-from schemathesis.cli import (
-    DEPRECATED_PRE_RUN_OPTION_WARNING,
-    LoaderConfig,
-    execute,
-    get_exit_code,
-    reset_checks,
-)
+from schemathesis.cli import LoaderConfig, execute, get_exit_code, reset_checks
 from schemathesis.cli.cassettes import CassetteFormat
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.code_samples import CodeSampleStyle
@@ -84,7 +78,6 @@ def test_run_as_module(testdir):
         (SIMPLE_PATH, "--base-url=127.0.0.1:8080"),
         ("http://127.0.0.1", "--request-timeout=-5"),
         ("http://127.0.0.1", "--request-timeout=0"),
-        ("http://127.0.0.1", "--method=+"),
         ("http://127.0.0.1", "--auth=123"),
         ("http://127.0.0.1", "--auth=:pass"),
         ("http://127.0.0.1", "--auth=тест:pass"),
@@ -334,7 +327,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         (["--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
         (["--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
         (
-            ["--method=POST", "--auth=test:test"],
+            ["--include-method=POST", "--auth=test:test"],
             {"auth": ("test", "test"), "auth_type": "basic"},
         ),
         (["--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
@@ -773,26 +766,14 @@ def digits_format(ctx):
     unregister_string_format("digits")
 
 
-@pytest.mark.parametrize(
-    "prepare_args_kwargs",
-    [
-        lambda module: (("--pre-run", module), {}),
-        lambda module: ((), {"hooks": module}),
-    ],
-)
 @pytest.mark.operations("custom_format")
-def test_hooks_valid(cli, schema_url, app, digits_format, prepare_args_kwargs):
+def test_hooks_valid(cli, schema_url, app, digits_format):
     # When a hook is passed to the CLI call
-    args, kwargs = prepare_args_kwargs(digits_format)
-    result = cli.main(*args, "run", "--hypothesis-suppress-health-check=filter_too_much", schema_url, **kwargs)
-
+    result = cli.main("run", "--hypothesis-suppress-health-check=filter_too_much", schema_url, hooks=digits_format)
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all registered new string format should produce digits as expected
     assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
-    # And the `--pre-run` version raises a deprecation warning
-    if args:
-        assert DEPRECATED_PRE_RUN_OPTION_WARNING in result.stdout
 
 
 def test_conditional_checks(ctx, cli, hypothesis_max_examples, schema_url):
@@ -1433,11 +1414,6 @@ def test_exclude_deprecated(ctx, cli, openapi3_base_url, options, expected):
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout.splitlines()
-
-
-@pytest.mark.openapi_version("3.0")
-def test_deprecated_filters(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--endpoint=success") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")

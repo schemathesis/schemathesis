@@ -1,5 +1,3 @@
-import sys
-
 import pytest
 from hypothesis import given, settings
 
@@ -22,7 +20,6 @@ def custom_name(context, path, methods):
 
 @pytest.mark.parametrize("dispatcher_factory", [lambda r: r.getfixturevalue("openapi_30"), lambda _: schemathesis])
 @pytest.mark.parametrize("register", [register_default, register_named])
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="This decorator syntax is not available in Python 3.8")
 def test_invalid_hook(request, dispatcher_factory, register):
     dispatcher = dispatcher_factory(request)
 
@@ -95,7 +92,6 @@ def map_body(context, body):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("payload")
 @pytest.mark.parametrize("hook", [multiple_skip_for, multiple_apply_to])
-@pytest.mark.skipif(sys.version_info < (3, 9), reason="This decorator syntax is not available in Python 3.8")
 def test_filter_combo(schema_url, hook):
     schema = schemathesis.from_uri(schema_url)
     hook(schema)

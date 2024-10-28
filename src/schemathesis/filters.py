@@ -10,8 +10,6 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
 
 from .exceptions import UsageError
-from .types import Filter as FilterType
-from .types import NotSet
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -356,74 +354,6 @@ def attach_filter_chain(
 
 def is_deprecated(ctx: HasAPIOperation) -> bool:
     return ctx.operation.definition.raw.get("deprecated") is True
-
-
-def filter_set_from_components(
-    *,
-    include: bool,
-    method: FilterType | None = None,
-    endpoint: FilterType | None = None,
-    tag: FilterType | None = None,
-    operation_id: FilterType | None = None,
-    skip_deprecated_operations: bool | None | NotSet = None,
-    parent: FilterSet | None = None,
-) -> FilterSet:
-    def _is_defined(x: FilterType | None) -> bool:
-        return x is not None and not isinstance(x, NotSet)
-
-    def _prepare_filter(filter_: FilterType | None) -> RegexValue | None:
-        if filter_ is None or isinstance(filter_, NotSet):
-            return None
-        if isinstance(filter_, str):
-            return filter_
-        return "|".join(f"({f})" for f in filter_)
-
-    new = FilterSet()
-
-    if _is_defined(method) or _is_defined(endpoint) or _is_defined(tag) or _is_defined(operation_id):
-        new._add_filter(
-            include,
-            method_regex=_prepare_filter(method),
-            path_regex=_prepare_filter(endpoint),
-            tag_regex=_prepare_filter(tag),
-            operation_id_regex=_prepare_filter(operation_id),
-        )
-    if skip_deprecated_operations is True and not any(
-        matcher.label == is_deprecated.__name__ for exclude_ in new._excludes for matcher in exclude_.matchers
-    ):
-        new.exclude(func=is_deprecated)
-    # Merge with the parent filter set
-    if parent is not None:
-        for include_ in parent._includes:
-            matchers = include_.matchers
-            ids = []
-            for idx, matcher in enumerate(matchers):
-                label = matcher.label
-                if (
-                    (not isinstance(method, NotSet) and label.startswith("method_regex="))
-                    or (not isinstance(endpoint, NotSet) and label.startswith("path_regex="))
-                    or (not isinstance(tag, NotSet) and matcher.label.startswith("tag_regex="))
-                    or (not isinstance(operation_id, NotSet) and matcher.label.startswith("operation_id_regex="))
-                ):
-                    ids.append(idx)
-            if ids:
-                matchers = tuple(matcher for idx, matcher in enumerate(matchers) if idx not in ids)
-            if matchers:
-                if new._includes:
-                    existing = new._includes.pop()
-                    matchers = existing.matchers + matchers
-                new._includes.add(Filter(matchers=matchers))
-        for exclude_ in parent._excludes:
-            matchers = exclude_.matchers
-            ids = []
-            for idx, matcher in enumerate(exclude_.matchers):
-                if skip_deprecated_operations is False and matcher.label == is_deprecated.__name__:
-                    ids.append(idx)
-            if ids:
-                matchers = tuple(matcher for idx, matcher in enumerate(matchers) if idx not in ids)
-            if matchers:
-                new._excludes.add(exclude_)
-    return new
 
 
 def parse_expression(expression: str) -> tuple[str, str, Any]:
