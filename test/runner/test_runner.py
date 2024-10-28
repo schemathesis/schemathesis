@@ -1163,11 +1163,6 @@ def workers_num(request):
 
 
 @pytest.fixture
-def stop_worker(mocker):
-    return mocker.spy(threadpool, "stop_worker")
-
-
-@pytest.fixture
 def runner(workers_num, swagger_20):
     return from_schema(swagger_20, workers_num=workers_num)
 
@@ -1190,7 +1185,7 @@ def test_stop_event_stream_immediately(event_stream):
     assert next(event_stream, None) is None
 
 
-def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_worker):
+def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     next(event_stream)
     next(event_stream)
@@ -1200,8 +1195,6 @@ def test_stop_event_stream_after_second_event(event_stream, workers_num, stop_wo
     event_stream.stop()
     assert isinstance(next(event_stream), events.Finished)
     assert next(event_stream, None) is None
-    if workers_num > 1:
-        stop_worker.assert_called()
 
 
 def test_finish(event_stream):

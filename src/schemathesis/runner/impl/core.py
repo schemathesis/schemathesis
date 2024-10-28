@@ -920,6 +920,8 @@ def network_test(
     errors: list[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
+    if ctx.is_stopped:
+        raise KeyboardInterrupt
     with ErrorCollector(errors):
         _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
@@ -1042,6 +1044,8 @@ def wsgi_test(
     dry_run: bool,
     errors: list[Exception],
 ) -> None:
+    if ctx.is_stopped:
+        raise KeyboardInterrupt
     with ErrorCollector(errors):
         _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
@@ -1127,6 +1131,8 @@ def asgi_test(
     errors: list[Exception],
 ) -> None:
     """A single test body will be executed against the target."""
+    if ctx.is_stopped:
+        raise KeyboardInterrupt
     with ErrorCollector(errors):
         _force_data_generation_method(data_generation_methods, case)
         result.mark_executed()
