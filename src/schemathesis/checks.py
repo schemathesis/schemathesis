@@ -70,11 +70,9 @@ def register(check: CheckFunction) -> CheckFunction:
             ...
     """
     from . import cli
-    from .internal.checks import wrap_check
 
-    _check = wrap_check(check)
     global ALL_CHECKS
 
-    ALL_CHECKS += (_check,)
-    cli.CHECKS_TYPE.choices += (_check.__name__,)  # type: ignore
+    ALL_CHECKS += (check,)
+    cli.CHECKS_TYPE.choices += (check.__name__,)  # type: ignore
     return check
