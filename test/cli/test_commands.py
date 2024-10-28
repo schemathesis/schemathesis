@@ -34,7 +34,6 @@ from schemathesis.internal.checks import CheckConfig
 from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import from_schema
-from schemathesis.runner.impl import threadpool
 from schemathesis.runner.probes import ProbeConfig
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
@@ -1033,7 +1032,9 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    original = time.sleep
+    from schemathesis.runner.impl.threadpool import TaskProducer
+
+    original = TaskProducer.get_next_task
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -1043,7 +1044,7 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.runner.impl.threadpool.time.sleep", autospec=True, wraps=mocked)
+    mocker.patch("schemathesis.runner.impl.threadpool.TaskProducer.get_next_task", wraps=mocked)
     result = cli.run(*cli_args, "--workers=2", "--hypothesis-derandomize")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
@@ -1484,10 +1485,9 @@ def test_max_response_time_valid(cli, schema_url):
 @pytest.mark.parametrize("workers_num", [1, 2])
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "success")
-def test_exit_first(cli, schema_url, workers_num, mocker):
+def test_exit_first(cli, schema_url, workers_num):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    stop_worker = mocker.spy(threadpool, "stop_worker")
     result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num))
     # Then tests are failed
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -1504,8 +1504,6 @@ def test_exit_first(cli, schema_url, workers_num, mocker):
         next_line = lines[idx + 1]
         assert next_line == ""
         assert "FAILURES" in lines[idx + 2]
-    else:
-        stop_worker.assert_called()
 
 
 @pytest.mark.openapi_version("3.0")
