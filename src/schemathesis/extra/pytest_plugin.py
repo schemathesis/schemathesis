@@ -13,7 +13,7 @@ from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
-from .._dependency_versions import IS_PYTEST_ABOVE_7, IS_PYTEST_ABOVE_8
+from .._dependency_versions import IS_PYTEST_ABOVE_8
 from .._override import get_override_from_mark
 from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
@@ -57,15 +57,6 @@ class SchemathesisFunction(Function):
         super().__init__(*args, **kwargs)
         self.test_function = test_func
         self.test_name = test_name
-
-    if not IS_PYTEST_ABOVE_7:
-        # On pytest 7, `self.obj` is already `partial`
-        def _getobj(self) -> partial:
-            """Tests defined as methods require `self` as the first argument.
-
-            This method is called only for this case.
-            """
-            return partial(self.obj, self.parent.obj)  # type: ignore
 
 
 class SchemathesisCase(PyCollector):
@@ -194,11 +185,8 @@ class SchemathesisCase(PyCollector):
     def _parametrize(self, cls: type | None, definition: FunctionDefinition, fixtureinfo: FuncFixtureInfo) -> Metafunc:
         parent = self.getparent(Module)
         module = parent.obj if parent is not None else parent
-        kwargs = {"cls": cls, "module": module}
-        if IS_PYTEST_ABOVE_7:
-            # Avoiding `Metafunc` is quite problematic for now, as there are quite a lot of internals we rely on
-            kwargs["_ispytest"] = True
-        metafunc = Metafunc(definition, fixtureinfo, self.config, **kwargs)
+        # Avoiding `Metafunc` is quite problematic for now, as there are quite a lot of internals we rely on
+        metafunc = Metafunc(definition, fixtureinfo, self.config, cls=cls, module=module, _ispytest=True)
         methods = []
         if module is not None and hasattr(module, "pytest_generate_tests"):
             methods.append(module.pytest_generate_tests)
