@@ -13,7 +13,6 @@ from urllib.parse import urlparse
 import click
 
 from .. import exceptions, experimental, throttling
-from ..code_samples import CodeSampleStyle
 from ..constants import TRUE_VALUES
 from ..generation import DataGenerationMethod
 from ..internal.exceptions import format_exception
@@ -381,10 +380,6 @@ def convert_status_codes(
             "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
         )
     return value
-
-
-def convert_code_sample_style(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CodeSampleStyle:
-    return CodeSampleStyle.from_str(value)
 
 
 def convert_cassette_format(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CassetteFormat:

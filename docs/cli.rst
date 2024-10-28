@@ -308,12 +308,6 @@ To reproduce test failures Schemathesis generates cURL commands:
 
     curl -X GET http://127.0.0.1:8081/api/failure
 
-You can control these samples via the ``--code-sample-style`` CLI option. For example, passing ``python`` will generate a Python snippet like this:
-
-.. code:: bash
-
-    requests.get("http://127.0.0.1:8081/api/failure")
-
 Output verbosity
 ----------------
 

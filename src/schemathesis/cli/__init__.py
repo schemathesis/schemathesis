@@ -17,7 +17,6 @@ from .. import contrib, experimental, generation, runner, service
 from .. import fixups as _fixups
 from .. import targets as targets_module
 from .._override import CaseOverride
-from ..code_samples import CodeSampleStyle
 from ..constants import (
     API_NAME_ENV_VAR,
     BASE_URL_ENV_VAR,
@@ -478,14 +477,6 @@ REPORT_TO_SERVICE = ReportToService()
     callback=callbacks.validate_preserve_exact_body_bytes,
 )
 @grouped_option(
-    "--code-sample-style",
-    help="Code sample style for reproducing failures",
-    type=click.Choice([item.name for item in CodeSampleStyle]),
-    default=CodeSampleStyle.default().name,
-    callback=callbacks.convert_code_sample_style,
-    metavar="",
-)
-@grouped_option(
     "--sanitize-output",
     type=bool,
     default=True,
@@ -800,7 +791,6 @@ def run(
     junit_xml: click.utils.LazyFile | None = None,
     debug_output_file: click.utils.LazyFile | None = None,
     show_trace: bool = False,
-    code_sample_style: CodeSampleStyle = CodeSampleStyle.default(),
     cassette_path: click.utils.LazyFile | None = None,
     cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
@@ -1115,7 +1105,6 @@ def run(
         cassette_config=cassette_config,
         junit_xml=junit_xml,
         verbosity=verbosity,
-        code_sample_style=code_sample_style,
         debug_output_file=debug_output_file,
         client=client,
         report=report,
@@ -1322,7 +1311,6 @@ def execute(
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
     verbosity: int,
-    code_sample_style: CodeSampleStyle,
     debug_output_file: click.utils.LazyFile | None,
     client: ServiceClient | None,
     report: ReportToService | click.utils.LazyFile | None,
@@ -1371,7 +1359,6 @@ def execute(
         cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         verbosity=verbosity,
-        code_sample_style=code_sample_style,
         report=report_context,
         output_config=output_config,
     )

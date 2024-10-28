@@ -6,7 +6,6 @@ from functools import lru_cache
 from json import JSONDecodeError
 from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, cast
 
-from ...code_samples import CodeSampleStyle
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
@@ -54,7 +53,6 @@ def from_path(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
     output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     encoding: str = "utf8",
     sanitize_output: bool = True,
@@ -70,7 +68,6 @@ def from_path(
             app=app,
             base_url=base_url,
             data_generation_methods=data_generation_methods,
-            code_sample_style=code_sample_style,
             generation_config=generation_config,
             output_config=output_config,
             location=pathlib.Path(path).absolute().as_uri(),
@@ -103,7 +100,6 @@ def from_url(
     port: int | None = None,
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
@@ -153,7 +149,6 @@ def from_url(
         base_url=base_url,
         app=app,
         data_generation_methods=data_generation_methods,
-        code_sample_style=code_sample_style,
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )
@@ -167,7 +162,6 @@ def from_file(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
     output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     location: str | None = None,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
@@ -206,7 +200,6 @@ def from_file(
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,
-        code_sample_style=code_sample_style,
         location=location,
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
@@ -230,7 +223,6 @@ def from_dict(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
     output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
 ) -> GraphQLSchema:
@@ -245,7 +237,6 @@ def from_dict(
     from ... import transports
     from .schemas import GraphQLSchema
 
-    _code_sample_style = CodeSampleStyle.from_str(code_sample_style)
     hook_context = HookContext()
     if "data" in raw_schema:
         raw_schema = raw_schema["data"]
@@ -262,7 +253,6 @@ def from_dict(
         data_generation_methods=DataGenerationMethod.ensure_list(data_generation_methods),
         generation_config=generation_config or GenerationConfig(),
         output_config=output_config or OutputConfig(),
-        code_sample_style=_code_sample_style,
         rate_limiter=rate_limiter,
         sanitize_output=sanitize_output,
         transport=transports.get(app),
@@ -279,7 +269,6 @@ def from_wsgi(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
     output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
@@ -309,7 +298,6 @@ def from_wsgi(
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,
-        code_sample_style=code_sample_style,
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )
@@ -323,7 +311,6 @@ def from_asgi(
     data_generation_methods: DataGenerationMethodInput = DEFAULT_DATA_GENERATION_METHODS,
     generation_config: GenerationConfig | None = None,
     output_config: OutputConfig | None = None,
-    code_sample_style: str = CodeSampleStyle.default().name,
     rate_limit: str | None = None,
     sanitize_output: bool = True,
     **kwargs: Any,
@@ -350,7 +337,6 @@ def from_asgi(
         data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,
-        code_sample_style=code_sample_style,
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )

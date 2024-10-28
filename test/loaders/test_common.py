@@ -29,14 +29,6 @@ def test_absolute_urls_for_apps(loader):
         loader("http://127.0.0.1:1/schema.json", app=None)  # actual app doesn't matter here
 
 
-@pytest.mark.parametrize(
-    "loader", [schemathesis.openapi.from_dict, schemathesis.openapi.from_pytest_fixture, schemathesis.graphql.from_dict]
-)
-def test_invalid_code_sample_style(loader):
-    with pytest.raises(ValueError, match="Invalid value for code sample style: ruby. Available styles: python, curl"):
-        loader({}, code_sample_style="ruby")
-
-
 @pytest.fixture
 def default_schema_url():
     return "http://127.0.0.1/schema.yaml"
