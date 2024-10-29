@@ -44,7 +44,6 @@ def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] 
 def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:
     return {
         "correlation_id": event.correlation_id,
-        "verbose_name": event.verbose_name,
         "status": event.status,
         "elapsed_time": event.elapsed_time,
         "result": {

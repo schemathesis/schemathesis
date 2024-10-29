@@ -16,17 +16,17 @@ POST /test E                                                              [100%]
 
 ==================================== ERRORS ====================================
 __________________________________ POST /test __________________________________
-Serialization not possible
-
-Schemathesis can't serialize data to application/zip 
-You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
-See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
-
 Network Error
 
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
+
+Serialization not possible
+
+Schemathesis can't serialize data to any of the defined media types: application/zip 
+You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
+See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
 _______________________________ API Probe errors _______________________________
 Network Error
 

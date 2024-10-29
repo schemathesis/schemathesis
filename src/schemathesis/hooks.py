@@ -397,15 +397,7 @@ def before_init_operation(context: HookContext, operation: APIOperation) -> None
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def add_case(context: HookContext, case: Case, response: GenericResponse) -> Case | None:
-    """Creates an additional test per API operation. If this hook returns None, no additional test created.
-
-    Called with a copy of the original case object and the server's response to the original case.
-    """
-
-
-@HookDispatcher.register_spec([HookScope.GLOBAL])
-def before_call(context: HookContext, case: Case) -> None:
+def before_call(context: HookContext, case: Case, **kwargs: Any) -> None:
     """Called before every network call in CLI tests.
 
     Use cases:

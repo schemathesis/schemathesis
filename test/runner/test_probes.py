@@ -5,21 +5,18 @@ from unittest.mock import ANY
 import pytest
 
 from schemathesis.constants import USER_AGENT
-from schemathesis.runner import probes
-from schemathesis.runner.impl.core import canonicalize_error_message
-from schemathesis.transports import RequestConfig
+from schemathesis.internal.exceptions import canonicalize_error_message
+from schemathesis.runner.config import NetworkConfig
+from schemathesis.runner.phases import probes
 
 
 @pytest.fixture
 def config_factory():
-    def inner(base_url, request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
-        return probes.ProbeConfig(
-            base_url=base_url,
-            request=RequestConfig(
-                proxy=request_proxy,
-                tls_verify=request_tls_verify,
-                cert=request_cert,
-            ),
+    def inner(request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
+        return NetworkConfig(
+            proxy=request_proxy,
+            tls_verify=request_tls_verify,
+            cert=request_cert,
             auth=auth,
             auth_type=None,
             headers=headers,
@@ -47,7 +44,8 @@ DEFAULT_HEADERS = {
     ],
 )
 def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url, kwargs, headers):
-    config = config_factory(base_url=openapi3_base_url, **kwargs)
+    config = config_factory(**kwargs)
+    openapi_30.base_url = openapi3_base_url
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(
@@ -75,7 +73,8 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
 
 
 def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_base_url, response_factory):
-    config = config_factory(base_url=openapi3_base_url)
+    config = config_factory()
+    openapi_30.base_url = openapi3_base_url
     result = probes.run(openapi_30, config)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
     assert result.serialize() == {
@@ -115,7 +114,8 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
 
 
 def test_detect_null_byte_error(openapi_30, config_factory):
-    config = config_factory(base_url="http://127.0.0.1:1")
+    config = config_factory()
+    openapi_30.base_url = "http://127.0.0.1:1"
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(
@@ -155,7 +155,7 @@ def test_detect_null_byte_error(openapi_30, config_factory):
 
 
 def test_detect_null_byte_skipped(openapi_30, config_factory):
-    config = config_factory(base_url=None)
+    config = config_factory()
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(

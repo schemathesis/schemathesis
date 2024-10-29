@@ -4,8 +4,21 @@ import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from ._hypothesis import add_single_example, combine_strategies, get_single_example
-from ._methods import DataGenerationMethod, DataGenerationMethodInput
+from ._hypothesis import (
+    add_single_example as add_single_example,
+)
+from ._hypothesis import (
+    combine_strategies as combine_strategies,
+)
+from ._hypothesis import (
+    get_single_example as get_single_example,
+)
+from ._methods import (
+    DataGenerationMethod as DataGenerationMethod,
+)
+from ._methods import (
+    DataGenerationMethodInput as DataGenerationMethodInput,
+)
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy

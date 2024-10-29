@@ -4,7 +4,7 @@ import io
 import json
 import pathlib
 import re
-from typing import IO, TYPE_CHECKING, Any, Callable, cast
+from typing import IO, TYPE_CHECKING, Any, cast
 
 from ... import experimental
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
@@ -242,13 +242,6 @@ def from_file(
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )
-
-
-def _is_fast_api(app: Any) -> bool:
-    for cls in app.__class__.__mro__:
-        if f"{cls.__module__}.{cls.__qualname__}" == "fastapi.applications.FastAPI":
-            return True
-    return False
 
 
 def from_dict(
@@ -491,14 +484,6 @@ def from_wsgi(
         sanitize_output=sanitize_output,
         __expects_json=_is_json_response(response),
     )
-
-
-def get_loader_for_app(app: Any) -> Callable:
-    from ...transports.asgi import is_asgi_app
-
-    if is_asgi_app(app):
-        return from_asgi
-    return from_wsgi
 
 
 def from_asgi(

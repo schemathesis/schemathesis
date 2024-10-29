@@ -229,33 +229,6 @@ class Interaction:
             parameter_location=case.meta.parameter_location if case.meta is not None else None,
         )
 
-    @classmethod
-    def from_wsgi(
-        cls,
-        case: Case,
-        response: WSGIResponse | None,
-        headers: dict[str, Any],
-        elapsed: float | None,
-        status: Status,
-        checks: list[Check],
-    ) -> Interaction:
-        import requests
-
-        session = requests.Session()
-        session.headers.update(headers)
-        return cls(
-            request=Request.from_case(case, session),
-            response=Response.from_wsgi(response, elapsed) if response is not None and elapsed is not None else None,
-            status=status,
-            checks=checks,
-            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
-            phase=case.meta.phase if case.meta is not None else None,
-            description=case.meta.description if case.meta is not None else None,
-            location=case.meta.location if case.meta is not None else None,
-            parameter=case.meta.parameter if case.meta is not None else None,
-            parameter_location=case.meta.parameter_location if case.meta is not None else None,
-        )
-
     def asdict(self) -> dict[str, Any]:
         return {
             "request": self.request.asdict(),

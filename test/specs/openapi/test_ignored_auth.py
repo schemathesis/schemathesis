@@ -15,6 +15,7 @@ from schemathesis.exceptions import CheckFailed
 from schemathesis.generation import GenerationConfig
 from schemathesis.internal.checks import CheckContext
 from schemathesis.runner import from_schema
+from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Status
 from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_auth_from_case, ignored_auth
 
@@ -24,7 +25,7 @@ def run(schema_url, headers=None, **loader_kwargs):
     _, _, _, _, _, _, event, *_ = from_schema(
         schema,
         checks=[ignored_auth],
-        headers=headers,
+        network=NetworkConfig(headers=headers),
         hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
     ).execute()
     return event
@@ -217,40 +218,6 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
         test()
 
 
-@pytest.mark.parametrize("headers", [{}, {"Authorization": "Foo"}])
-@pytest.mark.parametrize("with_generated", [True, False])
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("ignored_auth")
-def test_wsgi(wsgi_app_schema, with_generated, headers):
-    kwargs = {"headers": headers}
-    if not with_generated:
-        kwargs["generation_config"] = GenerationConfig(with_security_parameters=False)
-    _, _, _, _, _, _, event, *_ = from_schema(
-        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1), **kwargs
-    ).execute()
-    check = event.result.checks[-1]
-    assert check.value == Status.failure
-    assert check.name == "ignored_auth"
-    if with_generated and not headers:
-        assert "Authorization" in check.request.headers
-        assert json.loads(check.response.body) == {"has_auth": True}
-    else:
-        assert "Authorization" not in check.request.headers
-        assert json.loads(check.response.body) == {"has_auth": False}
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("ignored_auth")
-def test_explicit_auth(wsgi_app_schema):
-    kwargs = {"auth": ("foo", "bar")}
-    _, _, _, _, _, _, event, *_ = from_schema(
-        wsgi_app_schema, checks=[ignored_auth], hypothesis_settings=settings(max_examples=1), **kwargs
-    ).execute()
-    check = event.result.checks[-1]
-    assert check.value == Status.failure
-    assert check.name == "ignored_auth"
-
-
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("basic")
 def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
@@ -397,24 +364,6 @@ async def get_api_key(api_key: str = Security(api_key)):
 async def data(api_key: str = Depends(get_api_key)):
     return {{"message": "Authenticated"}}
         """
-
-
-@pytest.mark.parametrize("location", ["query", "cookie"])
-def test_auth_via_override_cli(ctx, cli, snapshot_cli, location):
-    # When auth is provided via `--set-*`
-    module = ctx.write_pymodule(make_app(location))
-    # Then it should counts during auth detection
-    assert (
-        cli.run(
-            "/openapi.json",
-            f"--app={module}:app",
-            "-c",
-            "ignored_auth",
-            "--experimental=openapi-3.1",
-            f"--set-{location}=api_key=42",
-        )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.parametrize("location", ["query", "cookie", "header"])
