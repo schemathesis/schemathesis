@@ -171,10 +171,5 @@ known-third-party = [
   "yarl",
 ]
 
-# Ignore `F401` (unused import) in all `__init__.py` & `_compat.py` files.
-[tool.ruff.lint.per-file-ignores]
-"__init__.py" = ["F401"]
-"_compat.py" = ["F401"]
-
 [tool.ruff.format]
 skip-magic-trailing-comma = false

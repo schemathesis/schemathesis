@@ -59,8 +59,6 @@ API validation options:
                                      [x>=1]
 
 Loader options:
-  --app TEXT                     Specify the WSGI/ASGI application under test,
-                                 provided as an importable Python path
   --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
                                  API schema to become available. Disabled by
                                  default  [x>=1.0]

@@ -7,7 +7,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator, Iterable, Literal, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 
 import click
@@ -37,10 +37,10 @@ from ..internal.datetime import current_datetime
 from ..internal.exceptions import format_exception
 from ..internal.fs import ensure_parent
 from ..internal.output import OutputConfig
-from ..loaders import load_app, load_yaml
-from ..runner import events, probes
+from ..loaders import load_yaml
+from ..runner import events
+from ..runner.config import NetworkConfig
 from ..stateful import Stateful
-from ..transports import RequestConfig
 from . import callbacks, cassettes, loaders, output
 from ._hypothesis import prepare_settings
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
@@ -56,7 +56,7 @@ if TYPE_CHECKING:
     import hypothesis
     import requests
 
-    from ..models import Case, CheckFunction
+    from ..models import CheckFunction
     from ..service.client import ServiceClient
     from ..targets import Target
     from ..types import NotSet, PathLike, RequestCert
@@ -357,12 +357,6 @@ REPORT_TO_SERVICE = ReportToService()
     show_default=True,
 )
 @group("Loader options")
-@grouped_option(
-    "--app",
-    help="Specify the WSGI/ASGI application under test, provided as an importable Python path",
-    type=str,
-    callback=callbacks.validate_app,
-)
 @grouped_option(
     "--wait-for-schema",
     help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default",
@@ -781,7 +775,6 @@ def run(
     exclude_deprecated: bool = False,
     workers_num: int = DEFAULT_WORKERS,
     base_url: str | None = None,
-    app: str | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
@@ -960,8 +953,8 @@ def run(
 
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
     token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
-    schema_kind = callbacks.parse_schema_kind(schema, app)
-    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, app=app, api_name=api_name)
+    schema_kind = callbacks.parse_schema_kind(schema)
+    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, api_name=api_name)
     client = None
     schema_or_location: str | dict[str, Any] = schema
     if schema_kind == callbacks.SchemaInputKind.NAME:
@@ -1056,11 +1049,11 @@ def run(
         suppress_health_check=_hypothesis_suppress_health_check,
         verbosity=hypothesis_verbosity,
     )
+    if exit_first:
+        max_failures = 1
     event_stream = into_event_stream(
         schema_or_location,
-        app=app,
         base_url=base_url,
-        started_at=started_at,
         validate_schema=validate_schema,
         data_generation_methods=data_generation_methods,
         force_schema_version=force_schema_version,
@@ -1075,11 +1068,9 @@ def run(
         request_timeout=request_timeout,
         sanitize_output=sanitize_output,
         seed=hypothesis_seed,
-        exit_first=exit_first,
         max_failures=max_failures,
         unique_data=contrib_unique_data,
         dry_run=dry_run,
-        store_interactions=cassette_config is not None,
         checks=selected_checks,
         max_response_time=max_response_time,
         targets=selected_targets,
@@ -1138,9 +1129,7 @@ def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | Non
 def into_event_stream(
     schema_or_location: str | dict[str, Any],
     *,
-    app: Any,
     base_url: str | None,
-    started_at: str,
     validate_schema: bool,
     data_generation_methods: tuple[DataGenerationMethod, ...],
     force_schema_version: str | None,
@@ -1166,33 +1155,32 @@ def into_event_stream(
     output_config: OutputConfig,
     sanitize_output: bool,
     seed: int | None,
-    exit_first: bool,
     max_failures: int | None,
     rate_limit: str | None,
     unique_data: bool,
     dry_run: bool,
-    store_interactions: bool,
     stateful: Stateful | None,
     service_client: ServiceClient | None,
-) -> Generator[events.ExecutionEvent, None, None]:
+) -> events.EventGenerator:
     try:
-        if app is not None:
-            app = load_app(app)
+        network = NetworkConfig(
+            auth=auth,
+            auth_type=auth_type,
+            headers=headers,
+            timeout=request_timeout,
+            tls_verify=request_tls_verify,
+            proxy=request_proxy,
+            cert=request_cert,
+        )
         config = loaders.LoaderConfig(
             schema_or_location=schema_or_location,
-            app=app,
             base_url=base_url,
             validate_schema=validate_schema,
             data_generation_methods=data_generation_methods,
             force_schema_version=force_schema_version,
-            request_proxy=request_proxy,
-            request_tls_verify=request_tls_verify,
-            request_cert=request_cert,
+            network=network,
             wait_for_schema=wait_for_schema,
             rate_limit=rate_limit,
-            auth=auth,
-            auth_type=auth_type,
-            headers=headers,
             sanitize_output=sanitize_output,
             output_config=output_config,
             generation_config=generation_config,
@@ -1201,21 +1189,11 @@ def into_event_stream(
         schema.filter_set = filter_set
         yield from runner.from_schema(
             schema,
-            auth=auth,
-            auth_type=auth_type,
             override=override,
-            headers=headers,
-            request_timeout=request_timeout,
-            request_tls_verify=request_tls_verify,
-            request_proxy=request_proxy,
-            request_cert=request_cert,
             seed=seed,
-            exit_first=exit_first,
             max_failures=max_failures,
-            started_at=started_at,
             unique_data=unique_data,
             dry_run=dry_run,
-            store_interactions=store_interactions,
             checks=checks,
             checks_config=checks_config,
             max_response_time=max_response_time,
@@ -1224,18 +1202,7 @@ def into_event_stream(
             stateful=stateful,
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
-            probe_config=probes.ProbeConfig(
-                base_url=config.base_url,
-                request=RequestConfig(
-                    timeout=request_timeout,
-                    tls_verify=config.request_tls_verify,
-                    proxy=config.request_proxy,
-                    cert=config.request_cert,
-                ),
-                auth=config.auth,
-                auth_type=config.auth_type,
-                headers=config.headers,
-            ),
+            network=network,
             service_client=service_client,
         ).execute()
     except SchemaError as error:
@@ -1299,7 +1266,7 @@ class OutputStyle(Enum):
 
 
 def execute(
-    event_stream: Generator[events.ExecutionEvent, None, None],
+    event_stream: events.EventGenerator,
     *,
     ctx: click.Context,
     hypothesis_settings: hypothesis.settings,
@@ -1459,7 +1426,7 @@ def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
 
 def get_exit_code(event: events.ExecutionEvent) -> int:
     if isinstance(event, events.Finished):
-        if event.has_failures or event.has_errors:
+        if event.results.has_failures or event.results.has_errors:
             return 1
         return 0
     # Practically not possible. May occur only if the output handler is broken - in this case we still will have the
@@ -1711,13 +1678,4 @@ def after_init_cli_run_handlers(
     """Called after CLI hooks are initialized.
 
     Might be used to add extra event handlers.
-    """
-
-
-@HookDispatcher.register_spec([HookScope.GLOBAL])
-def process_call_kwargs(context: HookContext, case: Case, kwargs: dict[str, Any]) -> None:
-    """Called before every network call in CLI tests.
-
-    Aims to modify the argument passed to `case.call`.
-    Note that you need to modify `kwargs` in-place.
     """
