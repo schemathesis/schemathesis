@@ -5,7 +5,6 @@ import pathlib
 import platform
 import sys
 import time
-from unittest.mock import ANY
 from urllib.parse import urljoin
 
 import hypothesis
@@ -22,24 +21,16 @@ from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import execute, get_exit_code, reset_checks
 from schemathesis.cli.constants import HealthCheck, Phase
-from schemathesis.cli.loaders import LoaderConfig
-from schemathesis.constants import (
-    DEFAULT_DEADLINE,
-    DEFAULT_RESPONSE_TIMEOUT,
-    FLAKY_FAILURE_MESSAGE,
-    REPORT_SUGGESTION_ENV_VAR,
-)
-from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.constants import DEFAULT_DEADLINE, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR
+from schemathesis.generation import GenerationConfig
 from schemathesis.internal.checks import CheckConfig
-from schemathesis.internal.output import OutputConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import from_schema
-from schemathesis.runner.probes import ProbeConfig
+from schemathesis.runner.config import NetworkConfig
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
 from schemathesis.targets import DEFAULT_TARGETS
-from schemathesis.transports import RequestConfig, WSGITransport
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
@@ -148,18 +139,18 @@ def test_certificate_only_key(cli, tmp_path, snapshot_cli):
 
 
 @pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion(cli, cli_args, snapshot_cli):
+def test_invalid_operation_suggestion(cli, schema_url, snapshot_cli):
     # When the app's schema contains errors
     # Then the whole Schemathesis run should fail
     # And there should be a suggestion to disable schema validation
-    assert cli.run(*cli_args, "--validate-schema=true") == snapshot_cli
+    assert cli.run(schema_url, "--validate-schema=true") == snapshot_cli
 
 
 @pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion_disabled(cli, cli_args):
+def test_invalid_operation_suggestion_disabled(cli, schema_url):
     # When the app's schema contains errors
     # And schema validation is disabled
-    result = cli.run(*cli_args, "--validate-schema=false")
+    result = cli.run(schema_url, "--validate-schema=false")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And there should be no suggestion
@@ -180,13 +171,6 @@ def test_schema_not_available(cli, workers, snapshot_cli):
     # Then the whole Schemathesis run should fail
     # And error message is displayed
     assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
-
-
-def test_schema_not_available_wsgi(cli, loadable_flask_app, snapshot_cli):
-    # When the given schema is unreachable
-    # Then the whole Schemathesis run should fail
-    # And error message is displayed
-    assert cli.run("unknown.yaml", f"--app={loadable_flask_app}") == snapshot_cli
 
 
 @pytest.mark.parametrize("args", [(), ("--force-schema-version=30",)])
@@ -233,7 +217,7 @@ SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
     ("args", "expected"),
     [
         ([], {}),
-        (["--exitfirst"], {"exit_first": True}),
+        (["--exitfirst"], {"max_failures": 1}),
         (["--workers=2"], {"workers_num": 2}),
         (["--hypothesis-seed=123"], {"seed": 123}),
         (
@@ -282,25 +266,15 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "checks_config": CheckConfig(),
         "targets": DEFAULT_TARGETS,
         "workers_num": 1,
-        "exit_first": False,
         "max_failures": None,
-        "started_at": ANY,
         "dry_run": False,
         "stateful": Stateful.links,
-        "auth": None,
-        "auth_type": "basic",
         "override": CaseOverride({}, {}, {}, {}),
-        "headers": {},
-        "request_timeout": DEFAULT_RESPONSE_TIMEOUT,
-        "request_tls_verify": True,
-        "request_proxy": None,
-        "request_cert": None,
-        "store_interactions": False,
         "seed": None,
         "unique_data": False,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
-        "probe_config": ProbeConfig(auth_type="basic", headers={}, request=RequestConfig(timeout=10000)),
+        "network": NetworkConfig(auth_type="basic", headers={}, timeout=10000),
         "service_client": None,
         **expected,
     }
@@ -311,69 +285,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         # Compare non-default Hypothesis settings as `hypothesis.settings` can't be compared
         assert executed_hypothesis_settings.show_changed() == hypothesis_settings.show_changed()
     assert call_kwargs == expected
-
-
-@pytest.mark.parametrize(
-    ("args", "expected"),
-    [
-        (["--auth=test:test"], {"auth": ("test", "test"), "auth_type": "basic"}),
-        (["--auth=test:test", "--auth-type=digest"], {"auth": ("test", "test"), "auth_type": "digest"}),
-        (["--auth=test:test", "--auth-type=DIGEST"], {"auth": ("test", "test"), "auth_type": "digest"}),
-        (["--header=Authorization:Bearer 123"], {"headers": {"Authorization": "Bearer 123"}}),
-        (["--header=Authorization:  Bearer 123 "], {"headers": {"Authorization": "Bearer 123 "}}),
-        (
-            ["--include-method=POST", "--auth=test:test"],
-            {"auth": ("test", "test"), "auth_type": "basic"},
-        ),
-        (["--base-url=https://example.com/api/v1test"], {"base_url": "https://example.com/api/v1test"}),
-    ],
-)
-def test_load_schema_arguments(cli, mocker, args, expected):
-    mocker.patch("schemathesis.runner.impl.SingleThreadRunner.execute", autospec=True)
-    load_schema = mocker.patch("schemathesis.cli.loaders.load_schema", autospec=True)
-
-    cli.run(SCHEMA_URI, *args)
-    expected = LoaderConfig(
-        SCHEMA_URI,
-        **{
-            **{
-                "app": None,
-                "base_url": None,
-                "wait_for_schema": None,
-                "rate_limit": None,
-                "auth": None,
-                "auth_type": "basic",
-                "headers": {},
-                "data_generation_methods": [DataGenerationMethod.default()],
-                "validate_schema": False,
-                "output_config": OutputConfig(),
-                "generation_config": GenerationConfig(),
-                "force_schema_version": None,
-                "sanitize_output": True,
-                "request_tls_verify": True,
-                "request_proxy": None,
-                "request_cert": None,
-            },
-            **expected,
-        },
-    )
-
-    assert load_schema.call_args[0][0] == expected
-
-
-def test_load_schema_arguments_headers_to_loader_for_app(ctx, cli, mocker):
-    from_wsgi = mocker.patch("schemathesis.specs.openapi.loaders.from_wsgi", autospec=True)
-
-    module = ctx.write_pymodule(
-        """
-from test.apps.openapi._flask import create_app
-
-app = create_app()
-"""
-    )
-    cli.run("/schema.yaml", "--app", f"{module}:app", "-H", "Authorization: Bearer 123")
-
-    assert from_wsgi.call_args[1]["headers"]["Authorization"] == "Bearer 123"
 
 
 @pytest.mark.parametrize(
@@ -464,8 +375,8 @@ def test_hypothesis_parameters(cli, schema_url):
 
 @pytest.mark.operations("success")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_output_success(cli, cli_args, workers):
-    result = cli.run(*cli_args, f"--workers={workers}")
+def test_cli_run_output_success(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert lines[5] == f"Workers: {workers}"
@@ -486,8 +397,8 @@ def test_cli_run_output_success(cli, cli_args, workers):
 
 @pytest.mark.operations("failure")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_only_failure(cli, cli_args, workers, snapshot_cli):
-    assert cli.run(*cli_args, f"--workers={workers}") == snapshot_cli
+def test_cli_run_only_failure(cli, schema_url, workers, snapshot_cli):
+    assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("upload_file")
@@ -503,8 +414,8 @@ def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
 
 @pytest.mark.operations
 @pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_output_empty(cli, cli_args, workers):
-    result = cli.run(*cli_args, f"--workers={workers}")
+def test_cli_run_output_empty(cli, schema_url, workers):
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
     assert " SUMMARY " in result.stdout
@@ -516,10 +427,10 @@ def test_cli_run_output_empty(cli, cli_args, workers):
 
 @pytest.mark.operations
 @pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_changed_base_url(cli, server, cli_args, workers):
+def test_cli_run_changed_base_url(cli, schema_url, server, workers):
     # When the CLI receives custom base URL
     base_url = f"http://127.0.0.1:{server['port']}/api"
-    result = cli.run(*cli_args, "--base-url", base_url, f"--workers={workers}")
+    result = cli.run(schema_url, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
     lines = result.stdout.strip().split("\n")
     assert lines[2] == f"Base URL: {base_url}"
@@ -544,11 +455,11 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.snapshot(replace_multi_worker_progress="??", replace_statistic=True)
-def test_hypothesis_failed_event(cli, cli_args, workers, snapshot_cli):
+def test_hypothesis_failed_event(cli, schema_url, workers, snapshot_cli):
     # When the Hypothesis deadline option is set manually, and it is smaller than the response time
     # Then the whole Schemathesis run should fail
     # And the proper error message should be displayed
-    assert cli.run(*cli_args, "--hypothesis-deadline=20", f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "--hypothesis-deadline=20", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("success", "slow")
@@ -580,9 +491,9 @@ def test_read_content_timeout(cli, mocker, schema_url, snapshot_cli):
 
 @pytest.mark.operations("success", "slow")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_default_hypothesis_settings(cli, cli_args, workers):
+def test_default_hypothesis_settings(cli, schema_url, workers):
     # When there is a slow operation and if it is faster than 15s
-    result = cli.run(*cli_args, f"--workers={workers}")
+    result = cli.run(schema_url, f"--workers={workers}")
     # Then the tests should pass, because of default 15s deadline
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
@@ -596,20 +507,20 @@ def test_default_hypothesis_settings(cli, cli_args, workers):
 
 @pytest.mark.operations("unsatisfiable")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_unsatisfiable(cli, cli_args, workers, snapshot_cli):
+def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
     # When the app's schema contains parameters that can't be generated
     # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
     # same time
     # And more clear error message is displayed instead of Hypothesis one
-    assert cli.run(*cli_args, f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("flaky")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_flaky(cli, cli_args, workers):
+def test_flaky(cli, schema_url, workers):
     # When the operation fails / succeeds randomly
     # Derandomize is needed for reproducible test results
-    result = cli.run(*cli_args, "--hypothesis-derandomize", f"--workers={workers}")
+    result = cli.run(schema_url, "--hypothesis-derandomize", f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
@@ -630,11 +541,11 @@ def test_flaky(cli, cli_args, workers):
 
 @pytest.mark.operations("invalid")
 @pytest.mark.parametrize("workers", [1])
-def test_invalid_operation(cli, cli_args, workers):
+def test_invalid_operation(cli, schema_url, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    result = cli.run(*cli_args, f"--workers={workers}", "--validate-schema=false")
+    result = cli.run(schema_url, f"--workers={workers}", "--validate-schema=false")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
@@ -658,17 +569,17 @@ Problematic definition:
 
 @pytest.mark.operations("teapot")
 @pytest.mark.parametrize("workers", [1, 2])
-def test_status_code_conformance(cli, cli_args, workers, snapshot_cli):
+def test_status_code_conformance(cli, schema_url, workers, snapshot_cli):
     # When operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
     # Then the whole Schemathesis run should fail
     # And this operation should be marked as failed in the progress line
-    assert cli.run(*cli_args, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "-c", "status_code_conformance", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("headers")
-def test_headers_conformance_valid(cli, cli_args):
-    result = cli.run(*cli_args, "-c", "response_headers_conformance", "-H", "X-Custom-Header: 42")
+def test_headers_conformance_valid(cli, schema_url):
+    result = cli.run(schema_url, "-c", "response_headers_conformance", "-H", "X-Custom-Header: 42")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
     assert "1. Received a response with missing headers: X-Custom-Header" not in lines
@@ -795,161 +706,6 @@ def conditional_check(ctx, response, case):
     assert "No checks were performed." in result.stdout
 
 
-def test_add_case(ctx, cli, hypothesis_max_examples, schema_url):
-    module = ctx.write_pymodule(
-        """
-import click
-
-@schemathesis.hook
-def add_case(context, case, response):
-    if not case.headers:
-        case.headers = {}
-    case.headers["copy"] = "this is a copied case"
-    return case
-
-@schemathesis.check
-def add_case_check(ctx, response, case):
-    if case.headers and case.headers.get("copy") == "this is a copied case":
-        # we will look for this output
-        click.echo("The case was added!")
-"""
-    )
-
-    result = cli.main(
-        "run",
-        "-c",
-        "add_case_check",
-        schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module,
-    )
-
-    assert result.exit_code == ExitCode.OK
-    # One additional case created for two API operations - /api/failure and /api/success.
-    assert result.stdout.count("The case was added!") == 2
-
-
-def test_add_case_returns_none(ctx, cli, hypothesis_max_examples, schema_url):
-    """Tests that no additional test case created when the add_case hook returns None."""
-    module = ctx.write_pymodule(
-        """
-import click
-
-@schemathesis.hook
-def add_case(context, case, response):
-    return None
-
-@schemathesis.check
-def add_case_check(ctx, response, case):
-    click.echo("Validating case.")
-"""
-    )
-
-    result = cli.main(
-        "run",
-        "-c",
-        "add_case_check",
-        schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module,
-    )
-
-    assert result.exit_code == ExitCode.OK
-    # with --hypothesis-max-examples=1 and 2 API operations, only two cases should be created and validated.
-    # If the count is greater than 2, additional test cases should not have been created but were created.
-    assert result.stdout.count("Validating case.") == 2
-
-
-def test_multiple_add_case_hooks(ctx, cli, hypothesis_max_examples, schema_url):
-    """add_case hooks that mutate the case in place should not affect other cases."""
-    module = ctx.write_pymodule(
-        """
-import click
-
-@schemathesis.hook("add_case")
-def add_first_header(context, case, response):
-    if not case.headers:
-        case.headers = {}
-    case.headers["first"] = "first header"
-    return case
-
-@schemathesis.hook("add_case")
-def add_second_header(context, case, response):
-    if not case.headers:
-        case.headers = {}
-    case.headers["second"] = "second header"
-    return case
-
-@schemathesis.check
-def add_case_check(ctx, response, case):
-    if case.headers and case.headers.get("first") == "first header":
-        # we will look for this output
-        click.echo("First case added!")
-    if case.headers and case.headers.get("second") == "second header":
-        # we will look for this output
-        click.echo("Second case added!")
-"""
-    )
-
-    result = cli.main(
-        "run",
-        "-c",
-        "add_case_check",
-        schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module,
-    )
-
-    assert result.exit_code == ExitCode.OK
-    # Each header should only be duplicated once for each API operation - /api/failure and /api/success.
-    assert result.stdout.count("First case added!") == 2
-    assert result.stdout.count("Second case added!") == 2
-
-
-def test_add_case_output(ctx, cli, hypothesis_max_examples, schema_url, snapshot_cli):
-    module = ctx.write_pymodule(
-        """
-import click
-
-@schemathesis.hook("add_case")
-def add_first_header(context, case, response):
-    if not case.headers:
-        case.headers = {}
-    case.headers["first"] = "first header"
-    return case
-
-@schemathesis.hook("add_case")
-def add_second_header(context, case, response):
-    if not case.headers:
-        case.headers = {}
-    case.headers["second"] = "second header"
-    return case
-
-@schemathesis.check
-def add_case_check(ctx, response, case):
-    if (
-        case.headers and
-        (
-            case.headers.get("second") == "second header"
-        )
-    ):
-        assert False, "failing cases from second add_case hook"
-"""
-    )
-
-    assert (
-        cli.main(
-            "run",
-            "-c",
-            "add_case_check",
-            schema_url,
-            f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-            hooks=module,
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.fixture(
     params=[
         'AssertionError("Custom check failed!")',
@@ -996,12 +752,9 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_20, workers):
+def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
-    if len(cli_args) == 2:
-        operation.app = flask_app
-        operation.schema.transport = WSGITransport(operation.app)
     original = Case(operation, generation_time=0.0).call
     counter = 0
 
@@ -1014,7 +767,7 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(*cli_args, f"--workers={workers}")
+    result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then execution stops, and a message about interruption is displayed
     lines = result.stdout.strip().split("\n")
@@ -1030,11 +783,11 @@ def test_keyboard_interrupt(cli, cli_args, base_url, mocker, flask_app, swagger_
 
 
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
+def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    from schemathesis.runner.impl.threadpool import TaskProducer
+    from schemathesis.runner.phases.unit import TaskProducer
 
-    original = TaskProducer.get_next_task
+    original = TaskProducer.next_operation
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -1044,8 +797,8 @@ def test_keyboard_interrupt_threaded(cli, cli_args, mocker):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.runner.impl.threadpool.TaskProducer.get_next_task", wraps=mocked)
-    result = cli.run(*cli_args, "--workers=2", "--hypothesis-derandomize")
+    mocker.patch("schemathesis.runner.phases.unit.TaskProducer.next_operation", wraps=mocked)
+    result = cli.run(schema_url, "--workers=2", "--hypothesis-derandomize")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
     # Then execution stops, and a message about interruption is displayed
@@ -1093,27 +846,6 @@ async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_exa
     payload = await openapi_2_app["incoming_requests"][0].json()
     assert isinstance(payload["name"], str)
     assert isinstance(payload["photoUrls"], list)
-
-
-def test_wsgi_app(ctx, cli):
-    module = ctx.write_pymodule(
-        """
-from test.apps.openapi._flask import create_app
-
-app = create_app()
-"""
-    )
-    result = cli.run("/schema.yaml", "--app", f"{module}:app")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "1 passed, 1 failed in" in result.stdout
-
-
-def test_wsgi_app_exception(ctx, cli):
-    module = ctx.write_pymodule("1 / 0")
-    result = cli.run("/schema.yaml", "--app", f"{module}:app", "--show-trace")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "Traceback (most recent call last):" in result.stdout
-    assert "ZeroDivisionError: division by zero" in result.stdout
 
 
 def test_no_useless_traceback(ctx, cli, snapshot_cli):
@@ -1172,53 +904,6 @@ def with_error(ctx, response, case):
 """
     )
     assert cli.main("run", schema_url, "-c", "with_error", "--show-trace", hooks=module) == snapshot_cli
-
-
-def test_wsgi_app_missing(ctx, cli):
-    module = ctx.write_pymodule("")
-    result = cli.run("/schema.yaml", "--app", f"{module}:app")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    lines = result.stdout.strip().split("\n")
-    assert "AttributeError: module 'module' has no attribute 'app'" in lines
-    assert "An error occurred while loading the application from 'module:app'." in lines
-
-
-def test_wsgi_app_internal_exception(ctx, cli):
-    module = ctx.write_pymodule(
-        """
-from test.apps.openapi._flask import create_app
-
-app = create_app()
-app.config["internal_exception"] = True
-"""
-    )
-    result = cli.run("/schema.yaml", "--app", f"{module}:app", "--hypothesis-derandomize")
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    lines = result.stdout.strip().split("\n")
-    assert "== APPLICATION LOGS ==" in lines[48], result.stdout.strip()
-    assert "ERROR in app: Exception on /api/success [GET]" in lines[50]
-    if sys.version_info >= (3, 13):
-        assert lines[63] == "ZeroDivisionError: division by zero"
-    elif sys.version_info >= (3, 11):
-        assert lines[66] == "ZeroDivisionError: division by zero"
-    else:
-        assert lines[61] == '    raise ZeroDivisionError("division by zero")'
-
-
-def test_wsgi_app_remote_schema(cli, schema_url, loadable_flask_app):
-    # When a URL is passed together with app
-    result = cli.run(schema_url, "--app", loadable_flask_app)
-    # Then the schema should be loaded from that URL
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert "1 passed, 1 failed in" in result.stdout
-
-
-def test_wsgi_app_path_schema(cli, loadable_flask_app):
-    # When an existing path to schema is passed together with app
-    result = cli.run(SIMPLE_PATH, "--app", loadable_flask_app)
-    # Then the schema should be loaded from that path
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert "1 passed in" in result.stdout
 
 
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
@@ -1351,18 +1036,18 @@ def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
 
 
 @pytest.mark.operations("form")
-def test_urlencoded_form(cli, cli_args):
+def test_urlencoded_form(cli, schema_url):
     # When the API operation accepts application/x-www-form-urlencoded
-    result = cli.run(*cli_args)
+    result = cli.run(schema_url)
     # Then Schemathesis should generate appropriate payload
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.operations("success")
-def test_targeted(mocker, cli, cli_args, workers):
+def test_targeted(mocker, cli, schema_url, workers):
     target = mocker.spy(hypothesis, "target")
-    result = cli.run(*cli_args, f"--workers={workers}", "--target=response_time")
+    result = cli.run(schema_url, f"--workers={workers}", "--target=response_time", "--show-trace")
     assert result.exit_code == ExitCode.OK, result.stdout
     target.assert_called_with(mocker.ANY, label="response_time")
 
@@ -1488,8 +1173,9 @@ def test_max_response_time_valid(cli, schema_url):
 def test_exit_first(cli, schema_url, workers_num):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num))
+    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num), "--show-trace")
     # Then tests are failed
+    print(result.stdout)
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if workers_num == 1:
         lines = result.stdout.split("\n")
@@ -1637,33 +1323,33 @@ def test_debug_output(tmp_path, cli, schema_url, hypothesis_max_examples):
     for line in lines:
         json.loads(line)
     # And statuses are encoded as strings
-    assert list(json.loads(lines[-1])["total"]["not_a_server_error"]) == ["success", "total", "failure"]
+    assert list(json.loads(lines[-1])["results"]["total"]["not_a_server_error"]) == ["success", "total", "failure"]
 
 
 @pytest.mark.operations("cp866")
-def test_response_payload_encoding(cli, cli_args, snapshot_cli):
+def test_response_payload_encoding(cli, schema_url, snapshot_cli):
     # See GH-1073
     # When the "failed" response has non UTF-8 encoding
     # Then it should be displayed according its actual encoding
-    assert cli.run(*cli_args, "--checks=all") == snapshot_cli
+    assert cli.run(schema_url, "--checks=all") == snapshot_cli
 
 
 @pytest.mark.operations("conformance")
-def test_response_schema_conformance_deduplication(cli, cli_args, snapshot_cli):
+def test_response_schema_conformance_deduplication(cli, schema_url, snapshot_cli):
     # See GH-907
     # When the "response_schema_conformance" check is present
     # And the app return different error messages caused by the same validator
     # Then the errors should be deduplicated
-    assert cli.run(*cli_args, "--checks=response_schema_conformance") == snapshot_cli
+    assert cli.run(schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("malformed_json")
-def test_malformed_json_deduplication(cli, cli_args, snapshot_cli):
+def test_malformed_json_deduplication(cli, schema_url, snapshot_cli):
     # See GH-1518
     # When responses are not JSON as expected and their content differ each time
     # Then the errors should be deduplicated
-    assert cli.run(*cli_args, "--checks=response_schema_conformance") == snapshot_cli
+    assert cli.run(schema_url, "--checks=response_schema_conformance") == snapshot_cli
 
 
 @pytest.mark.parametrize("kind", ["env_var", "arg"])
@@ -1701,11 +1387,6 @@ def test_force_color(cli, schema_url):
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
     assert cli.run(graphql_url, "--hypothesis-max-examples=5", "--show-trace", *args) == snapshot_cli
-
-
-def test_graphql_asgi(cli, loadable_graphql_fastapi_app, graphql_path, snapshot_cli):
-    # When the target API is GraphQL
-    assert cli.run(f"--app={loadable_graphql_fastapi_app}", "--hypothesis-max-examples=5", graphql_path) == snapshot_cli
 
 
 def assert_exit_code(event_stream, code):
@@ -1772,7 +1453,7 @@ def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snap
         events = [json.loads(line) for line in fd]
     assert events[5]["correlation_id"] == events[6]["correlation_id"]
     # And they should have the same "verbose_name"
-    assert events[5]["verbose_name"] == events[6]["verbose_name"]
+    assert events[5]["verbose_name"] == events[6]["result"]["verbose_name"]
 
 
 @pytest.mark.openapi_version("3.0")

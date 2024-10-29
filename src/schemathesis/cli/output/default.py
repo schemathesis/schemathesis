@@ -35,7 +35,6 @@ from ...runner import events
 from ...runner.errors import EngineErrorInfo
 from ...runner.events import InternalErrorType, SchemaErrorType
 from ...runner.models import Status, TestResult
-from ...runner.probes import ProbeOutcome
 from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
 from ...stateful import events as stateful_events
 from ...stateful.sink import StateMachineSink
@@ -105,16 +104,16 @@ def display_summary(event: events.Finished) -> None:
 
 def get_summary_message_parts(event: events.Finished) -> list[str]:
     parts = []
-    passed = event.passed_count
+    passed = event.results.passed_count
     if passed:
         parts.append(f"{passed} passed")
-    failed = event.failed_count
+    failed = event.results.failed_count
     if failed:
         parts.append(f"{failed} failed")
-    errored = event.errored_count
+    errored = event.results.errored_count
     if errored:
         parts.append(f"{errored} errored")
-    skipped = event.skipped_count
+    skipped = event.results.skipped_count
     if skipped:
         parts.append(f"{skipped} skipped")
     return parts
@@ -127,28 +126,22 @@ def get_summary_output(event: events.Finished) -> tuple[str, str]:
         color = "yellow"
     else:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-        if event.has_failures or event.has_errors:
+        if event.results.has_failures or event.results.has_errors:
             color = "red"
-        elif event.skipped_count > 0:
+        elif event.results.skipped_count > 0:
             color = "yellow"
         else:
             color = "green"
     return message, color
 
 
-def display_hypothesis_output(hypothesis_output: list[str]) -> None:
-    """Show falsifying examples from Hypothesis output if there are any."""
-    if hypothesis_output:
-        display_section_name("HYPOTHESIS OUTPUT")
-        output = "\n".join(hypothesis_output)
-        click.secho(output, fg="red")
-
-
 def display_errors(context: ExecutionContext, event: events.Finished) -> None:
     """Display all errors in the test run."""
+    from ...runner.phases.probes import ProbeOutcome
+
     probes = context.probes or []
     has_probe_errors = any(probe.outcome == ProbeOutcome.ERROR for probe in probes)
-    if not event.has_errors and not has_probe_errors:
+    if not event.results.has_errors and not has_probe_errors:
         return
 
     display_section_name("ERRORS")
@@ -163,8 +156,10 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
         if not result.has_errors:
             continue
         should_display_full_traceback_message |= display_single_error(context, result)
-    if event.generic_errors:
-        display_generic_errors(context, event.generic_errors)
+    if event.results.errors:
+        for error in event.results.errors:
+            display_section_name(error.title or "Schema error", "_", fg="red")
+            _display_error(context, error)
     if has_probe_errors:
         display_section_name("API Probe errors", "_", fg="red")
         for probe in probes:
@@ -193,12 +188,6 @@ def display_single_error(context: ExecutionContext, result: TestResult) -> bool:
             click.echo()
         should_display_full_traceback_message |= _display_error(context, error)
     return should_display_full_traceback_message
-
-
-def display_generic_errors(context: ExecutionContext, errors: list[EngineErrorInfo]) -> None:
-    for error in errors:
-        display_section_name(error.title or "Generic error", "_", fg="red")
-        _display_error(context, error)
 
 
 def display_full_traceback_message(error: EngineErrorInfo) -> bool:
@@ -234,7 +223,7 @@ def _display_error(context: ExecutionContext, error: EngineErrorInfo) -> bool:
 
 def display_failures(context: ExecutionContext, event: events.Finished) -> None:
     """Display all failures in the test run."""
-    if not event.has_failures:
+    if not event.results.has_failures:
         return
     relevant_results = [result for result in context.results if not result.is_errored]
     if not relevant_results:
@@ -298,22 +287,6 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
                             except UnicodeDecodeError:
                                 click.echo("\n    <BINARY>")
         _secho(f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n")
-
-
-def display_application_logs(context: ExecutionContext, event: events.Finished) -> None:
-    """Print logs captured during the application run."""
-    if not event.has_logs:
-        return
-    display_section_name("APPLICATION LOGS")
-    for result in context.results:
-        if not result.has_logs:
-            continue
-        display_single_log(result)
-
-
-def display_single_log(result: TestResult) -> None:
-    display_subsection(result, None)
-    click.echo("\n\n".join(result.logs))
 
 
 def display_analysis(context: ExecutionContext) -> None:
@@ -396,11 +369,11 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
-    total = event.total
+    total = event.results.total
     if context.state_machine_sink is not None:
         click.echo(context.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
         click.echo()
-    if event.is_empty or not total:
+    if event.results.is_empty or not total:
         click.secho("No checks were performed.", bold=True)
 
     if total:
@@ -416,15 +389,15 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {context.junit_xml_file}")
 
-    if event.warnings:
+    if event.results.warnings:
         click.echo()
-        if len(event.warnings) == 1:
+        if len(event.results.warnings) == 1:
             title = click.style("WARNING:", bold=True, fg="yellow")
-            warning = click.style(event.warnings[0], fg="yellow")
+            warning = click.style(event.results.warnings[0], fg="yellow")
             click.secho(f"{title} {warning}")
         else:
             click.secho("WARNINGS:", bold=True, fg="yellow")
-            for warning in event.warnings:
+            for warning in event.results.warnings:
                 click.secho(f"  - {warning}", fg="yellow")
 
     if len(GLOBAL_EXPERIMENTS.enabled) > 0:
@@ -438,7 +411,7 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             "Please visit the provided URL(s) to share your thoughts."
         )
 
-    if event.failed_count > 0:
+    if event.results.failed_count > 0:
         click.echo(
             f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
             "from failure messages with server logs for debugging."
@@ -742,6 +715,8 @@ def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing
 
 
 def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) -> None:
+    from ...runner.phases.probes import ProbeOutcome
+
     context.probes = event.probes
     status = "SKIP"
     if event.probes is not None:
@@ -798,10 +773,8 @@ def handle_after_execution(context: ExecutionContext, event: events.AfterExecuti
 def handle_finished(context: ExecutionContext, event: events.Finished) -> None:
     """Show the outcome of the whole testing session."""
     click.echo()
-    display_hypothesis_output(context.hypothesis_output)
     display_errors(context, event)
     display_failures(context, event)
-    display_application_logs(context, event)
     display_analysis(context)
     display_statistic(context, event)
     if context.summary_lines:
@@ -873,7 +846,6 @@ class DefaultOutputStyleHandler(EventHandler):
         elif isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         elif isinstance(event, events.AfterExecution):
-            context.hypothesis_output.extend(event.hypothesis_output)
             handle_after_execution(context, event)
         elif isinstance(event, events.Finished):
             handle_finished(context, event)

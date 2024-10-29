@@ -142,32 +142,6 @@ def test_store_timeout(cli, schema_url, cassette_path):
     assert cassette["http_interactions"][0]["response"] is None
 
 
-@pytest.mark.parametrize(
-    ("app_fixture", "schema_url"),
-    [
-        ("loadable_flask_app", "/schema.yaml"),
-        ("loadable_fastapi_app", "/openapi.json"),
-    ],
-)
-def test_dry_run_with_app(request, cli, app_fixture, schema_url, cassette_path):
-    app = request.getfixturevalue(app_fixture)
-    result = cli.run(
-        schema_url,
-        f"--app={app}",
-        f"--cassette-path={cassette_path}",
-        "--hypothesis-max-examples=1",
-        "--show-trace",
-        "--hypothesis-seed=1",
-        "--dry-run",
-        "--experimental=openapi-3.1",
-    )
-    assert result.exit_code == ExitCode.OK, result.stdout
-    cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["id"] == "1"
-    assert cassette["http_interactions"][0]["status"] == "SKIP"
-    assert cassette["http_interactions"][0]["response"] is None
-
-
 @pytest.mark.operations("flaky")
 def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, cassette_path):
     # See GH-695

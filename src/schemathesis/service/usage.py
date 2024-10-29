@@ -18,11 +18,10 @@ def collect(args: list[str] | None = None) -> dict[str, Any] | None:
         parameters_data: dict[str, dict[str, Any]] = {}
         used_headers: list[str] = []
         schema = parameters["schema"]
-        app = parameters.get("app")
         if not schema:
             schema_kind = None
         else:
-            schema_kind = cli.callbacks.parse_schema_kind(schema, app).name
+            schema_kind = cli.callbacks.parse_schema_kind(schema).name
         usage = {
             "schema_kind": schema_kind,
             "parameters": parameters_data,

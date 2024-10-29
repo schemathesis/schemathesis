@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
     from .._override import CaseOverride
     from ..models import CheckFunction
+    from ..runner.config import NetworkConfig
     from ..targets import Target
-    from ..transports import RequestConfig
     from ..types import RawAuth
 
 
@@ -42,10 +42,10 @@ def _default_hypothesis_settings_factory() -> hypothesis.settings:
     return hypothesis.settings(**_get_default_hypothesis_settings_kwargs())
 
 
-def _default_request_config_factory() -> RequestConfig:
-    from ..transports import RequestConfig
+def _default_request_config_factory() -> NetworkConfig:
+    from ..runner.config import NetworkConfig
 
-    return RequestConfig()
+    return NetworkConfig()
 
 
 @dataclass
@@ -56,10 +56,9 @@ class StatefulTestRunnerConfig:
     checks: tuple[CheckFunction, ...] = field(default_factory=_default_checks_factory)
     # Hypothesis settings for state machine execution
     hypothesis_settings: hypothesis.settings = field(default_factory=_default_hypothesis_settings_factory)
-    # Request-level configuration
-    request: RequestConfig = field(default_factory=_default_request_config_factory)
-    # Whether to stop the execution after the first failure
-    exit_first: bool = False
+    # Network-level configuration
+    network: NetworkConfig = field(default_factory=_default_request_config_factory)
+    # Whether to stop the execution after N failures
     max_failures: int | None = None
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
