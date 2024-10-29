@@ -1,5 +1,3 @@
-from types import SimpleNamespace
-
 import click
 import pytest
 from hypothesis import example, given, settings
@@ -15,15 +13,13 @@ from ..utils import SIMPLE_PATH
 @pytest.mark.parametrize("value", ["//test", "//ÿ["])
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
-        kind = callbacks.parse_schema_kind(value, app=None)
-        callbacks.validate_schema(value, kind, base_url=None, dry_run=False, app=None, api_name=None)
+        kind = callbacks.parse_schema_kind(value)
+        callbacks.validate_schema(value, kind, base_url=None, dry_run=False, api_name=None)
 
 
 def test_validate_schema_path_without_base_url():
     with pytest.raises(click.UsageError):
-        callbacks.validate_schema(
-            SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, app=None, api_name=None
-        )
+        callbacks.validate_schema(SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, api_name=None)
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))
@@ -34,13 +30,6 @@ def test_validate_schema_path_without_base_url():
 def test_validate_auth(value):
     with pytest.raises(click.BadParameter):
         callbacks.validate_auth(None, None, value)
-
-
-@given(value=st.text())
-@settings(deadline=None)
-def test_validate_app(value):
-    with pytest.raises(click.exceptions.Exit):
-        callbacks.validate_app(SimpleNamespace(params={"show_errors_tracebacks": False}), None, value)
 
 
 def is_invalid_header(header):

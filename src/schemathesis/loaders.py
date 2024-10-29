@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import sys
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, BinaryIO, Callable, TextIO, TypeVar
 
@@ -55,16 +54,6 @@ def _raise_for_status(response: GenericResponse) -> None:
     else:
         return
     raise SchemaError(message=message, type=type_, url=response.request.url, response=response, extras=[])
-
-
-def load_app(path: str) -> Any:
-    """Import an application from a string."""
-    path, name = ([*re.split(":(?![\\\\/])", path, maxsplit=1), ""])[:2]
-    __import__(path)
-    # accessing the module from sys.modules returns a proper module, while `__import__`
-    # may return a parent module (system dependent)
-    module = sys.modules[path]
-    return getattr(module, name)
 
 
 @lru_cache

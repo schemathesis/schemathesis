@@ -22,6 +22,7 @@ class OpenAPIParameter(Parameter):
     supported_jsonschema_keywords: ClassVar[tuple[str, ...]]
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
     @property
     def description(self) -> str | None:
         """A brief parameter description."""

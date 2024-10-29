@@ -3,7 +3,6 @@ import os
 import click
 import hypothesis
 import pytest
-from hypothesis.reporting import report
 
 import schemathesis
 import schemathesis.cli.context
@@ -11,9 +10,7 @@ from schemathesis import models, runner
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.constants import NOT_SET
-from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import Case, OperationDefinition
-from schemathesis.runner._hypothesis import capture_hypothesis_output
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.models import Check, Request, Response, Status, TestResult, TestResultSet
 
@@ -61,24 +58,14 @@ def response():
 
 @pytest.fixture
 def results_set(operation):
-    statistic = TestResult(
-        operation.method,
-        operation.full_path,
-        data_generation_method=[DataGenerationMethod.default()],
-        verbose_name=f"{operation.method} {operation.full_path}",
-    )
+    statistic = TestResult(verbose_name=f"{operation.method} {operation.full_path}")
     return TestResultSet(seed=42, results=[statistic])
 
 
 @pytest.fixture
-def after_execution(results_set, operation):
+def after_execution(results_set):
     return runner.events.AfterExecution.from_result(
-        result=results_set.results[0],
-        status=Status.success,
-        hypothesis_output=[],
-        elapsed_time=1.0,
-        operation=operation,
-        correlation_id="foo",
+        result=results_set.results[0], status=Status.success, elapsed_time=1.0, correlation_id="foo"
     )
 
 
@@ -134,10 +121,7 @@ def test_display_statistic(capsys, execution_context, operation, response):
     success = Check("not_a_server_error", Status.success, response, 0, Case(operation, generation_time=0.0))
     failure = Check("not_a_server_error", Status.failure, response, 0, Case(operation, generation_time=0.0))
     single_test_statistic = TestResult(
-        method=operation.method,
-        path=operation.full_path,
         verbose_name=f"{operation.method} {operation.full_path}",
-        data_generation_method=[DataGenerationMethod.default()],
         checks=[
             success,
             success,
@@ -193,16 +177,6 @@ def test_display_statistic_junitxml(capsys, execution_context, results_set):
     )
 
 
-def test_capture_hypothesis_output():
-    # When Hypothesis output us captured
-    with capture_hypothesis_output() as hypothesis_output:
-        value = "Some text"
-        report(value)
-        report(value)
-    # Then all calls to internal Hypothesis reporting will put its output to a list
-    assert hypothesis_output == [value, value]
-
-
 @pytest.mark.parametrize(
     ("position", "length", "expected"), [(1, 100, "[  1%]"), (20, 100, "[ 20%]"), (100, 100, "[100%]")]
 )
@@ -227,16 +201,6 @@ def test_display_percentage(
     assert out.strip() == strip_style_win32(click.style(percentage, fg="cyan"))
 
 
-def test_display_hypothesis_output(capsys):
-    # When Hypothesis output is displayed
-    default.display_hypothesis_output(["foo", "bar"])
-    lines = capsys.readouterr().out.split("\n")
-    # Then the relevant section title is displayed
-    assert " HYPOTHESIS OUTPUT" in lines[0]
-    # And the output is displayed as separate lines in red color
-    assert " ".join(lines[1:3]) == strip_style_win32(click.style("foo bar", fg="red"))
-
-
 @pytest.mark.parametrize("body", [{}, {"foo": "bar"}, NOT_SET])
 def test_display_single_failure(capsys, execution_context, operation, body, response):
     # Given a single test result with multiple successful & failed checks
@@ -256,9 +220,6 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
         Case(operation, generation_time=0.0, body=body, media_type=media_type),
     )
     test_statistic = TestResult(
-        method=operation.method,
-        path=operation.full_path,
-        data_generation_method=[DataGenerationMethod.default()],
         verbose_name=f"{operation.method} {operation.full_path}",
         checks=[
             success,
@@ -298,7 +259,7 @@ def test_handle_after_execution(capsys, execution_context, after_execution, stat
     # When this event is handled
     default.handle_after_execution(execution_context, after_execution)
 
-    assert after_execution.verbose_name == "GET /v1/success"
+    assert after_execution.result.verbose_name == "GET /v1/success"
 
     lines = capsys.readouterr().out.strip().split("\n")
     symbol, percentage = lines[0].split()
@@ -321,16 +282,16 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-@pytest.mark.parametrize("show_errors_tracebacks", [True, False])
-def test_display_internal_error(capsys, execution_context, show_errors_tracebacks):
-    execution_context.show_trace = show_errors_tracebacks
+@pytest.mark.parametrize("show_trace", [True, False])
+def test_display_internal_error(capsys, execution_context, show_trace):
+    execution_context.show_trace = show_trace
     try:
         raise ZeroDivisionError("division by zero")
     except ZeroDivisionError as exc:
         event = InternalError.from_exc(exc)
         display_internal_error(execution_context, event)
         out = capsys.readouterr().out.strip()
-        assert ("Traceback (most recent call last):" in out) is show_errors_tracebacks
+        assert ("Traceback (most recent call last):" in out) is show_trace
         assert "ZeroDivisionError: division by zero" in out
 
 

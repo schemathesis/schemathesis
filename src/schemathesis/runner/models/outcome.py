@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any, Callable, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence
 
+from ...internal.exceptions import deduplicate_errors
 from ..errors import EngineErrorInfo
 from .check import Check
 from .status import Status
@@ -13,12 +14,9 @@ if TYPE_CHECKING:
     import unittest
 
     import requests
-    from hypothesis.vendor.pretty import RepresentationPrinter
 
-    from ...exceptions import FailureContext, OperationSchemaError, SkipTest
-    from ...generation import DataGenerationMethod
+    from ...exceptions import FailureContext, SkipTest
     from ...models import Case
-    from ...transports.responses import WSGIResponse
 
 
 @dataclass(repr=False)
@@ -27,19 +25,32 @@ class TestResultSet:
 
     seed: int | None
     results: list[TestResult] = field(default_factory=list)
-    generic_errors: list[OperationSchemaError] = field(default_factory=list)
+    errors: list[EngineErrorInfo] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
 
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "passed_count": self.passed_count,
+            "skipped_count": self.skipped_count,
+            "failed_count": self.failed_count,
+            "errored_count": self.errored_count,
+            "has_failures": self.has_failures,
+            "has_errors": self.has_errors,
+            "is_empty": self.is_empty,
+            "errors": [error.asdict() for error in self.errors],
+            "warnings": self.warnings,
+            "total": self.total,
+        }
+
     @property
     def is_empty(self) -> bool:
         """If the result set contains no results."""
-        return len(self.results) == 0 and len(self.generic_errors) == 0
+        return len(self.results) == 0 and len(self.errors) == 0
 
     @property
     def has_failures(self) -> bool:
@@ -50,11 +61,6 @@ class TestResultSet:
     def has_errors(self) -> bool:
         """If any result has any errors."""
         return self.errored_count > 0
-
-    @property
-    def has_logs(self) -> bool:
-        """If any result has any captured logs."""
-        return any(result.has_logs for result in self)
 
     def _count(self, predicate: Callable) -> int:
         return sum(1 for result in self if predicate(result))
@@ -73,7 +79,7 @@ class TestResultSet:
 
     @property
     def errored_count(self) -> int:
-        return self._count(lambda result: result.has_errors or result.is_errored) + len(self.generic_errors)
+        return self._count(lambda result: result.has_errors or result.is_errored) + len(self.errors)
 
     @property
     def total(self) -> dict[str, dict[str | Status, int]]:
@@ -104,33 +110,24 @@ class TestResult:
 
     __test__ = False
 
-    method: str
-    path: str
     verbose_name: str
-    data_generation_method: list[DataGenerationMethod]
     checks: list[Check] = field(default_factory=list)
     errors: list[EngineErrorInfo] = field(default_factory=list)
     interactions: list[Interaction] = field(default_factory=list)
-    logs: list[str] = field(default_factory=list)
     is_errored: bool = False
     is_flaky: bool = False
     is_skipped: bool = False
     skip_reason: str | None = None
     is_executed: bool = False
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def asdict(self) -> dict[str, Any]:
         return {
-            "method": self.method,
-            "path": self.path,
             "verbose_name": self.verbose_name,
-            "data_generation_method": [method.as_short_name() for method in self.data_generation_method],
             "checks": [check.asdict() for check in self.checks],
             "errors": [error.asdict() for error in self.errors],
             "interactions": [interaction.asdict() for interaction in self.interactions],
-            "logs": self.logs,
             "is_errored": self.is_errored,
             "is_flaky": self.is_flaky,
             "is_skipped": self.is_skipped,
@@ -159,10 +156,6 @@ class TestResult:
     @property
     def has_failures(self) -> bool:
         return any(check.value == Status.failure for check in self.checks)
-
-    @property
-    def has_logs(self) -> bool:
-        return bool(self.logs)
 
     def add_success(self, *, name: str, case: Case, request: Request, response: Response) -> Check:
         check = Check(name=name, value=Status.success, request=request, response=response, case=case)
@@ -194,6 +187,10 @@ class TestResult:
     def add_error(self, exception: Exception) -> None:
         self.errors.append(EngineErrorInfo(exception))
 
+    def add_errors(self, errors: Sequence[Exception]) -> None:
+        for error in deduplicate_errors(errors):
+            self.add_error(error)
+
     def store_requests_response(
         self,
         case: Case,
@@ -204,14 +201,3 @@ class TestResult:
         session: requests.Session | None,
     ) -> None:
         self.interactions.append(Interaction.from_requests(case, response, status, checks, headers, session))
-
-    def store_wsgi_response(
-        self,
-        case: Case,
-        response: WSGIResponse | None,
-        headers: dict[str, Any],
-        elapsed: float | None,
-        status: Status,
-        checks: list[Check],
-    ) -> None:
-        self.interactions.append(Interaction.from_wsgi(case, response, headers, elapsed, status, checks))

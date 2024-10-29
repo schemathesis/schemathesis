@@ -5,7 +5,9 @@ from __future__ import annotations
 import re
 import traceback
 from types import TracebackType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterator, Sequence
+
+from ..exceptions import SerializationNotPossible
 
 if TYPE_CHECKING:
     from requests import RequestException
@@ -88,3 +90,36 @@ def _clean_inner_request_message(message: object) -> str:
     if isinstance(message, str) and message.startswith("HTTPConnectionPool"):
         return re.sub(r"HTTPConnectionPool\(.+?\): ", "", message).rstrip(".")
     return str(message)
+
+
+def deduplicate_errors(errors: Sequence[Exception]) -> Iterator[Exception]:
+    """Deduplicate a list of errors."""
+    seen = set()
+    serialization_media_types = []
+
+    for error in errors:
+        # Collect media types
+        if isinstance(error, SerializationNotPossible):
+            serialization_media_types.extend(error.media_types)
+            continue
+
+        message = canonicalize_error_message(error)
+        if message not in seen:
+            seen.add(message)
+            yield error
+
+    if serialization_media_types:
+        yield SerializationNotPossible.from_media_types(*serialization_media_types)
+
+
+MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
+URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
+
+
+def canonicalize_error_message(error: Exception, with_traceback: bool = True) -> str:
+    """Canonicalize error messages by removing dynamic components."""
+    message = format_exception(error, with_traceback=with_traceback)
+    # Replace memory addresses
+    message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
+    # Remove URL information
+    return URL_IN_ERROR_MESSAGE_RE.sub("", message)

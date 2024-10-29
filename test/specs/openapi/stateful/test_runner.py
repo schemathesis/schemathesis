@@ -87,8 +87,6 @@ def assert_linked_calls_followed(result: RunnerResult):
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"exit_first": False},
-        {"exit_first": True},
         {"max_failures": 1},
         {"max_failures": 2},
     ],
@@ -102,7 +100,7 @@ def test_find_independent_5xx(runner_factory, kwargs):
         "PATCH /users/{userId}",
     }
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
-    # There should be 2 or 1 final scenarios to reproduce failures depending on the `exit_first` setting
+    # There should be 2 or 1 final scenarios to reproduce failures depending on the `max_failures` setting
     scenarios = [
         event for event in result.events if isinstance(event, (events.ScenarioStarted, events.ScenarioFinished))
     ]
@@ -120,12 +118,11 @@ def test_find_independent_5xx(runner_factory, kwargs):
     )
     for event in result.events:
         assert event.timestamp is not None
-    # If `exit_first` is set
-    if kwargs.get("exit_first") or kwargs.get("max_failures") == 1:
+    if kwargs.get("max_failures") == 1:
         # Then only the first one should be found
         assert len(result.failures) == 1
         assert result.failures[0].case.operation.verbose_name in all_affected_operations
-    elif kwargs.get("exit_first") is False or kwargs.get("max_failures") == 2:
+    elif kwargs.get("max_failures") == 2:
         # Else, all of them should be found
         assert len(result.failures) == 2
         assert {check.case.operation.verbose_name for check in result.failures} == all_affected_operations
@@ -272,7 +269,7 @@ def test_distinct_assertions(runner_factory):
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"exit_first": False}, {"exit_first": True}],
+    [{}, {"max_failures": 1}],
 )
 def test_flaky_assertions(runner_factory, kwargs):
     counter = 0
@@ -296,7 +293,7 @@ def test_flaky_assertions(runner_factory, kwargs):
     )
     result = collect_result(runner)
     # Then all of them should be reported
-    if kwargs.get("exit_first"):
+    if "max_failures" in kwargs:
         assert len(result.failures) == 2
         assert {check.message for check in result.failures} == {"First", "Second"}
     else:
@@ -384,7 +381,7 @@ def test_failed_health_check(runner_factory):
 
 @pytest.mark.parametrize(
     "kwargs",
-    [{"exit_first": False}, {"exit_first": True}],
+    [{"max_failures": None}, {"max_failures": 1}],
 )
 def test_flaky(runner_factory, kwargs):
     found = False

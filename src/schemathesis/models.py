@@ -358,7 +358,7 @@ class Case:
         **kwargs: Any,
     ) -> GenericResponse:
         hook_context = HookContext(operation=self.operation)
-        dispatch("before_call", hook_context, self)
+        dispatch("before_call", hook_context, self, **kwargs)
         response = self.operation.schema.transport.send(
             self, session=session, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
         )

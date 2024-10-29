@@ -26,7 +26,7 @@ def test_serialize_event(schema_url):
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
 def test_serialize_interrupted(mocker, schema_url):
-    mocker.patch("schemathesis.runner.impl.solo.SingleThreadRunner._execute_impl", side_effect=KeyboardInterrupt)
+    mocker.patch("schemathesis.runner.phases.unit.single_threaded", side_effect=KeyboardInterrupt)
     schema = schemathesis.from_uri(schema_url)
     events = from_schema(schema).execute()
     next(events)

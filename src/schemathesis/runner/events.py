@@ -1,21 +1,22 @@
 from __future__ import annotations
 
 import enum
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Generator
 
 from ..exceptions import SchemaError, SchemaErrorType
 from ..internal.exceptions import format_exception
 from ..internal.result import Err, Ok, Result
-from .errors import EngineErrorInfo
 
 if TYPE_CHECKING:
     from ..models import APIOperation
     from ..schemas import BaseSchema, Specification
     from ..service.models import AnalysisResult
     from ..stateful import events
-    from . import probes
     from .models import Status, TestResult, TestResultSet
+    from .phases import probes
+
+EventGenerator = Generator["ExecutionEvent", None, None]
 
 
 @dataclass
@@ -57,20 +58,13 @@ class Initialized(ExecutionEvent):
     specification_name: str
 
     @classmethod
-    def from_schema(
-        cls,
-        *,
-        schema: BaseSchema,
-        count_operations: bool = True,
-        count_links: bool = True,
-        seed: int | None,
-    ) -> Initialized:
+    def from_schema(cls, *, schema: BaseSchema, seed: int | None) -> Initialized:
         """Computes all needed data from a schema instance."""
         return cls(
             schema=schema.raw_schema,
             specification=schema.specification,
-            operations_count=schema.operations_count if count_operations else None,
-            links_count=schema.links_count if count_links else None,
+            operations_count=schema.operations_count,
+            links_count=schema.links_count,
             location=schema.location,
             base_url=schema.get_base_url(),
             base_path=schema.base_path,
@@ -155,17 +149,12 @@ class BeforeExecution(ExecutionEvent):
 class AfterExecution(ExecutionEvent):
     """Happens after each tested API operation."""
 
-    # Specification-specific operation name
-    verbose_name: str
-
     # APIOperation test status - success / failure / error
     status: Status
     result: TestResult
     # Test running time
     elapsed_time: float
     correlation_id: str
-    # Captured hypothesis stdout
-    hypothesis_output: list[str] = field(default_factory=list)
 
     @classmethod
     def from_result(
@@ -173,27 +162,21 @@ class AfterExecution(ExecutionEvent):
         result: TestResult,
         status: Status,
         elapsed_time: float,
-        hypothesis_output: list[str],
-        operation: APIOperation,
         correlation_id: str,
     ) -> AfterExecution:
         return cls(
-            verbose_name=operation.verbose_name,
             result=result,
             status=status,
             elapsed_time=elapsed_time,
-            hypothesis_output=hypothesis_output,
             correlation_id=correlation_id,
         )
 
     def _asdict(self) -> dict[str, Any]:
         return {
-            "verbose_name": self.verbose_name,
             "status": self.status.value,
             "result": self.result.asdict(),
             "elapsed_time": self.elapsed_time,
             "correlation_id": self.correlation_id,
-            "hypothesis_output": self.hypothesis_output,
         }
 
 
@@ -324,53 +307,12 @@ class Finished(ExecutionEvent):
     """
 
     is_terminal = True
-
-    passed_count: int
-    skipped_count: int
-    failed_count: int
-    errored_count: int
-
-    has_failures: bool
-    has_errors: bool
-    has_logs: bool
-    is_empty: bool
-    generic_errors: list[EngineErrorInfo]
-    warnings: list[str]
-
-    total: dict[str, dict[str | Status, int]]
-
-    # Total test run execution time
+    results: TestResultSet
     running_time: float
 
     @classmethod
     def from_results(cls, results: TestResultSet, running_time: float) -> Finished:
-        return cls(
-            passed_count=results.passed_count,
-            skipped_count=results.skipped_count,
-            failed_count=results.failed_count,
-            errored_count=results.errored_count,
-            has_failures=results.has_failures,
-            has_errors=results.has_errors,
-            has_logs=results.has_logs,
-            is_empty=results.is_empty,
-            total=results.total,
-            generic_errors=[EngineErrorInfo(error, title=error.full_path) for error in results.generic_errors],
-            warnings=results.warnings,
-            running_time=running_time,
-        )
+        return cls(results=results, running_time=running_time)
 
     def _asdict(self) -> dict[str, Any]:
-        return {
-            "passed_count": self.passed_count,
-            "skipped_count": self.skipped_count,
-            "failed_count": self.failed_count,
-            "errored_count": self.errored_count,
-            "has_failures": self.has_failures,
-            "has_errors": self.has_errors,
-            "has_logs": self.has_logs,
-            "is_empty": self.is_empty,
-            "generic_errors": [error.asdict() for error in self.generic_errors],
-            "warnings": self.warnings,
-            "total": self.total,
-            "running_time": self.running_time,
-        }
+        return {"results": self.results.asdict(), "running_time": self.running_time}

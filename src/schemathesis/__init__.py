@@ -55,6 +55,8 @@ __all__ = [
     "hook",
     "serializer",
     "target",
+    "GenerationConfig",
+    "HeaderConfig",
 ]
 
 

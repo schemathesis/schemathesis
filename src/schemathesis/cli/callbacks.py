@@ -15,10 +15,8 @@ import click
 from .. import exceptions, experimental, throttling
 from ..constants import TRUE_VALUES
 from ..generation import DataGenerationMethod
-from ..internal.exceptions import format_exception
 from ..internal.transformation import convert_boolean_string as _convert_boolean_string
 from ..internal.validation import file_exists, is_filename, is_illegal_surrogate
-from ..loaders import load_app
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from ..transports.headers import has_invalid_characters, is_latin_1_encodable
@@ -44,26 +42,6 @@ INVALID_BASE_URL_MESSAGE = (
     "Make sure it is a properly formatted URL."
 )
 MISSING_BASE_URL_MESSAGE = "The `--base-url` option is required when specifying a schema via a file."
-WSGI_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/python.html#asgi-wsgi-support"
-APPLICATION_MISSING_MODULE_MESSAGE = f"""Unable to import application from {{module}}.
-
-The `--app` option should follow this format:
-
-    module_path:variable_name
-
-- `module_path`: A path to an importable Python module.
-- `variable_name`: The name of the application variable within that module.
-
-Example: `st run --app=your_module:app ...`
-
-For details on working with WSGI applications, visit {WSGI_DOCUMENTATION_URL}"""
-APPLICATION_IMPORT_ERROR_MESSAGE = f"""An error occurred while loading the application from {{module}}.
-
-Traceback:
-
-{{traceback}}
-
-For details on working with WSGI applications, visit {WSGI_DOCUMENTATION_URL}"""
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 
@@ -75,13 +53,11 @@ class SchemaInputKind(enum.Enum):
     URL = 1
     # Local path
     PATH = 2
-    # Relative path within a Python app
-    APP_PATH = 3
     # A name for API created in Schemathesis.io
-    NAME = 4
+    NAME = 3
 
 
-def parse_schema_kind(schema: str, app: str | None) -> SchemaInputKind:
+def parse_schema_kind(schema: str) -> SchemaInputKind:
     """Detect what kind the input schema is."""
     try:
         netloc = urlparse(schema).netloc
@@ -93,8 +69,6 @@ def parse_schema_kind(schema: str, app: str | None) -> SchemaInputKind:
         return SchemaInputKind.URL
     if file_exists(schema) or is_filename(schema):
         return SchemaInputKind.PATH
-    if app is not None:
-        return SchemaInputKind.APP_PATH
     # Assume NAME if it is not a URL or PATH or APP_PATH
     return SchemaInputKind.NAME
 
@@ -105,18 +79,16 @@ def validate_schema(
     *,
     base_url: str | None,
     dry_run: bool,
-    app: str | None,
     api_name: str | None,
 ) -> None:
     if kind == SchemaInputKind.URL:
         validate_url(schema)
     if kind == SchemaInputKind.PATH:
-        if app is None:
-            if not file_exists(schema):
-                raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)
-            # Base URL is required if it is not a dry run
-            if base_url is None and not dry_run:
-                raise click.UsageError(MISSING_BASE_URL_MESSAGE)
+        if not file_exists(schema):
+            raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)
+        # Base URL is required if it is not a dry run
+        if base_url is None and not dry_run:
+            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
     if kind == SchemaInputKind.NAME:
         if api_name is not None:
             raise click.UsageError(f"Got unexpected extra argument ({api_name})")
@@ -157,29 +129,6 @@ def validate_rate_limit(ctx: click.core.Context, param: click.core.Parameter, ra
         return raw_value
     except exceptions.UsageError as exc:
         raise click.UsageError(exc.args[0]) from exc
-
-
-def validate_app(ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None) -> str | None:
-    if raw_value is None:
-        return raw_value
-    try:
-        load_app(raw_value)
-        # String is returned instead of an app because it might be passed to a subprocess
-        # Since most app instances are not-transferable to another process, they are passed as strings and
-        # imported in a subprocess
-        return raw_value
-    except Exception as exc:
-        formatted_module_name = click.style(f"'{raw_value}'", bold=True)
-        if isinstance(exc, ModuleNotFoundError):
-            message = APPLICATION_MISSING_MODULE_MESSAGE.format(module=formatted_module_name)
-            click.echo(message)
-        else:
-            message = format_exception(exc, with_traceback=True, skip_frames=2)
-            message = APPLICATION_IMPORT_ERROR_MESSAGE.format(
-                module=formatted_module_name, traceback=click.style(message, fg="red")
-            )
-            click.echo(message)
-        raise click.exceptions.Exit(1) from None
 
 
 def validate_hypothesis_database(

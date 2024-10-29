@@ -10,32 +10,59 @@ from __future__ import annotations
 
 import enum
 import warnings
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ..constants import USER_AGENT
-from ..internal.exceptions import format_exception
-from ..sanitization import sanitize_url, sanitize_value
-from ..transports import RequestConfig
-from ..transports.auth import get_requests_auth
-from .models import Request, Response
+from ...constants import USER_AGENT
+from ...internal.exceptions import format_exception
+from ...sanitization import sanitize_url, sanitize_value
+from ...transports.auth import get_requests_auth
+from .. import events
+from ..models import Request, Response
 
 if TYPE_CHECKING:
     import requests
 
-    from ..schemas import BaseSchema
+    from ...schemas import BaseSchema
+    from ..config import NetworkConfig
+    from ..context import RunnerContext
+    from ..events import EventGenerator
+
+
+def execute(ctx: RunnerContext) -> EventGenerator:
+    """Discover capabilities of the tested app."""
+    from ..phases import PhaseKind
+
+    yield events.BeforeProbing()
+    results = None
+    if not ctx.config.execution.dry_run:
+        results = run(ctx.config.schema, ctx.config.network)
+        for result in results:
+            if isinstance(result.probe, NullByteInHeader) and result.is_failure:
+                from ...specs.openapi import formats
+                from ...specs.openapi.formats import HEADER_FORMAT, header_values
+
+                formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
+        ctx.phase_data.store(PhaseKind.PROBING, results)
+    yield events.AfterProbing(probes=results)
+
+
+def run(schema: BaseSchema, config: NetworkConfig) -> list[ProbeRun]:
+    """Run all probes against the given schema."""
+    from requests import Session
+
+    session = Session()
+    session.headers.update(config.headers or {})
+    session.verify = config.tls_verify
+    if config.cert is not None:
+        session.cert = config.cert
+    if config.auth is not None:
+        session.auth = get_requests_auth(config.auth, config.auth_type)
+
+    return [send(probe(), session, schema, config) for probe in PROBES]
 
 
 HEADER_NAME = "X-Schemathesis-Probe"
-
-
-@dataclass
-class ProbeConfig:
-    base_url: str | None = None
-    request: RequestConfig = field(default_factory=RequestConfig)
-    auth: tuple[str, str] | None = None
-    auth_type: str | None = None
-    headers: dict[str, str] | None = None
 
 
 @dataclass
@@ -45,7 +72,7 @@ class Probe:
     name: str
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: ProbeConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: NetworkConfig
     ) -> requests.PreparedRequest:
         raise NotImplementedError
 
@@ -110,10 +137,10 @@ class NullByteInHeader(Probe):
     name: str = "NULL_BYTE_IN_HEADER"
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: ProbeConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: NetworkConfig
     ) -> requests.PreparedRequest:
         request.method = "GET"
-        request.url = config.base_url or schema.get_base_url()
+        request.url = schema.get_base_url()
         request.headers = {"X-Schemathesis-Probe-Null": "\x00"}
         return session.prepare_request(request)
 
@@ -126,7 +153,7 @@ class NullByteInHeader(Probe):
 PROBES = (NullByteInHeader,)
 
 
-def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: ProbeConfig) -> ProbeRun:
+def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: NetworkConfig) -> ProbeRun:
     """Send the probe to the application."""
     from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
@@ -136,9 +163,9 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Pr
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
-        kwargs: dict[str, Any] = {"timeout": config.request.prepared_timeout or 2}
-        if config.request.proxy is not None:
-            kwargs["proxies"] = {"all": config.request.proxy}
+        kwargs: dict[str, Any] = {"timeout": config.prepared_timeout or 2}
+        if config.proxy is not None:
+            kwargs["proxies"] = {"all": config.proxy}
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
             response = session.send(request, **kwargs)
@@ -151,18 +178,3 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Pr
         return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
     result_type = probe.analyze_response(response)
     return ProbeRun(probe, result_type, request, response)
-
-
-def run(schema: BaseSchema, config: ProbeConfig) -> list[ProbeRun]:
-    """Run all probes against the given schema."""
-    from requests import Session
-
-    session = Session()
-    session.headers.update(config.headers or {})
-    session.verify = config.request.tls_verify
-    if config.request.cert is not None:
-        session.cert = config.request.cert
-    if config.auth is not None:
-        session.auth = get_requests_auth(config.auth, config.auth_type)
-
-    return [send(probe(), session, schema, config) for probe in PROBES]

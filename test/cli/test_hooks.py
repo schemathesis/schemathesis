@@ -1,6 +1,4 @@
 import pytest
-import requests
-import werkzeug
 from _pytest.main import ExitCode
 
 
@@ -39,19 +37,19 @@ def after_init_cli_run_handlers(
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_before_call(ctx, cli, cli_args):
+def test_before_call(ctx, cli, schema_url):
     # When the `before_call` hook is registered
     module = ctx.write_pymodule(
         """
 note = print  # To avoid linting error
 
 @schemathesis.hook
-def before_call(context, case):
+def before_call(context, case, **kwargs):
     note("\\nBefore!")
     case.query = {"q": "42"}
         """
     )
-    result = cli.main("run", *cli_args, hooks=module)
+    result = cli.main("run", schema_url, hooks=module)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should be called before each `case.call`
     assert "Before!" in result.stdout.splitlines()
@@ -59,7 +57,7 @@ def before_call(context, case):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_after_call(ctx, cli, cli_args, snapshot_cli):
+def test_after_call(ctx, cli, schema_url, snapshot_cli):
     # When the `after_call` hook is registered
     # And it modifies the response and making it incorrect
     module = ctx.write_pymodule(
@@ -76,33 +74,4 @@ def after_call(context, case, response):
         """
     )
     # Then the tests should fail
-    assert cli.main("run", *cli_args, "-c", "all", hooks=module) == snapshot_cli
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_process_call_kwargs(ctx, cli, cli_args, mocker, app_type):
-    # When the `process_call_kwargs` hook is registered
-    # And it modifies `kwargs` by adding a new key there
-    module = ctx.write_pymodule(
-        """
-import requests
-
-@schemathesis.hook
-def process_call_kwargs(context, case, kwargs):
-    if case.app is not None:
-        kwargs["follow_redirects"] = False
-    else:
-        kwargs["allow_redirects"] = False
-        """
-    )
-    if app_type == "real":
-        spy = mocker.spy(requests.Session, "request")
-    else:
-        spy = mocker.spy(werkzeug.Client, "open")
-    result = cli.main("run", *cli_args, hooks=module)
-    assert result.exit_code == ExitCode.OK, result.stdout
-    if app_type == "real":
-        assert spy.call_args[1]["allow_redirects"] is False
-    else:
-        assert spy.call_args[1]["follow_redirects"] is False
+    assert cli.main("run", schema_url, "-c", "all", hooks=module) == snapshot_cli

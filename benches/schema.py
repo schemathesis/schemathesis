@@ -193,8 +193,6 @@ def test_events():
     runner = from_schema(
         BBCI_SCHEMA,
         checks=(),
-        count_operations=False,
-        count_links=False,
         hypothesis_settings=hypothesis.settings(
             deadline=None,
             database=None,

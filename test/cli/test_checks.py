@@ -23,49 +23,6 @@ def test_register_returns_a_value(new_check):
     assert new_check is not None
 
 
-@pytest.mark.parametrize(
-    ("exclude_checks", "expected_exit_code", "expected_result"),
-    [
-        ("not_a_server_error", ExitCode.TESTS_FAILED, "1 passed, 1 failed in"),
-        ("not_a_server_error,status_code_conformance", ExitCode.OK, "2 passed in"),
-    ],
-)
-def test_exclude_checks(ctx, cli, exclude_checks, expected_exit_code, expected_result):
-    module = ctx.write_pymodule(
-        """
-from fastapi import FastAPI
-from fastapi import HTTPException
-
-app = FastAPI()
-
-@app.get("/api/success")
-async def success():
-    return {"success": True}
-
-@app.get("/api/failure")
-async def failure():
-    raise HTTPException(status_code=500)
-"""
-    )
-    result = cli.run(
-        "/openapi.json",
-        "--checks",
-        "all",
-        "--exclude-checks",
-        exclude_checks,
-        "--app",
-        f"{module}:app",
-        "--force-schema-version=30",
-    )
-
-    for check in exclude_checks.split(","):
-        assert check not in result.stdout
-
-    assert result.exit_code == expected_exit_code, result.stdout
-
-    assert expected_result in result.stdout
-
-
 def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
@@ -87,37 +44,6 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
         "--hypothesis-max-examples=5",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED
-
-
-@pytest.mark.snapshot(replace_statistic=True)
-def test_deduplication_on_sanitized_header(ctx, cli, snapshot_cli):
-    # See GH-2294
-    module = ctx.write_pymodule(
-        """
-from typing import Annotated
-
-from fastapi import FastAPI, HTTPException, Header
-
-app = FastAPI()
-
-@app.get("/users")
-def get_users(x_token: Annotated[str, Header()]):
-    if x_token:
-        raise HTTPException(status_code=500, detail="Internal server error")
-    raise HTTPException(status_code=400, detail="Bad header")
-        """
-    )
-    assert (
-        cli.run(
-            "/openapi.json",
-            "--checks",
-            "all",
-            "--app",
-            f"{module}:app",
-            "--force-schema-version=30",
-        )
-        == snapshot_cli
-    )
 
 
 @pytest.fixture

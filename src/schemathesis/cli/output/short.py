@@ -14,7 +14,6 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
 def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
     context.operations_processed += 1
     context.results.append(event.result)
-    context.hypothesis_output.extend(event.hypothesis_output)
     default.display_execution_result(context, event.status.value)
 
 

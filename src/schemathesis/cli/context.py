@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
     from ..internal.result import Result
     from ..runner.models import TestResult
-    from ..runner.probes import ProbeRun
+    from ..runner.phases.probes import ProbeRun
     from ..service.models import AnalysisResult
     from ..stateful.sink import StateMachineSink
 
@@ -36,7 +36,6 @@ class ExecutionContext:
     """Storage for the current context of the execution."""
 
     hypothesis_settings: hypothesis.settings
-    hypothesis_output: list[str] = field(default_factory=list)
     workers_num: int = 1
     rate_limit: str | None = None
     show_trace: bool = False

@@ -15,7 +15,7 @@ from .. import failures
 from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from ..exceptions import get_timeout_error
 from ..serializers import SerializerContext
-from ..types import Cookies, Headers, NotSet, RequestCert
+from ..types import Cookies, Headers, NotSet
 
 if TYPE_CHECKING:
     import requests
@@ -28,28 +28,8 @@ if TYPE_CHECKING:
     from .responses import WSGIResponse
 
 
-@dataclass
-class RequestConfig:
-    timeout: int | None = None
-    tls_verify: bool | str = True
-    proxy: str | None = None
-    cert: RequestCert | None = None
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    @property
-    def prepared_timeout(self) -> float | None:
-        return prepare_timeout(self.timeout)
-
-
 def serialize_payload(payload: bytes) -> str:
     return base64.b64encode(payload).decode()
-
-
-def deserialize_payload(data: str | None) -> bytes | None:
-    if data is None:
-        return None
-    return base64.b64decode(data)
 
 
 def get(app: Any) -> Transport:
@@ -206,14 +186,6 @@ def _merge_dict_to(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> 
     for key, value in new.items():
         original[key] = value
     data[data_key] = original
-
-
-def prepare_timeout(timeout: int | None) -> float | None:
-    """Request timeout is in milliseconds, but `requests` uses seconds."""
-    output: int | float | None = timeout
-    if timeout is not None:
-        output = timeout / 1000
-    return output
 
 
 def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:

@@ -39,8 +39,8 @@ Please, consider reporting the following details to our issue tracker:
   https://github.com/schemathesis/schemathesis/issues/new?labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D
 
     Traceback (most recent call last):
-      File "/package-root/runner/impl/core.py", line XXX, in _run_analysis
-        result = self.service_client.analyze_schema(_probes, self.schema.raw_schema)
+      File "/package-root/runner/phases/analysis.py", line XXX, in execute
+        result = ctx.config.service_client.analyze_schema(probes, ctx.config.schema.raw_schema)
       File "/package-root/service/client.py", line XXX, in analyze_schema
         return AnalysisSuccess.from_dict(response.json())
       File "/package-root/service/models.py", line XXX, in from_dict

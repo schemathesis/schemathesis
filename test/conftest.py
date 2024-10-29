@@ -1023,48 +1023,6 @@ def wsgi_app_schema(flask_app):
     return oas_loaders.from_wsgi("/schema.yaml", flask_app)
 
 
-@pytest.fixture(params=["real_app_schema", "wsgi_app_schema"])
-def any_app_schema(openapi_version, request):
-    return request.getfixturevalue(request.param)
-
-
-@pytest.fixture
-def loadable_flask_app(ctx, operations):
-    module = ctx.write_pymodule(
-        f"""
-from test.apps.openapi._flask import create_app
-
-app = create_app({operations})
-""",
-        filename="flaskapp",
-    )
-    return f"{module}:app"
-
-
-@pytest.fixture
-def loadable_graphql_fastapi_app(ctx, graphql_path):
-    module = ctx.write_pymodule(
-        f"""
-from test.apps._graphql._fastapi import create_app
-
-app = create_app('{graphql_path}')
-"""
-    )
-    return f"{module}:app"
-
-
-@pytest.fixture
-def loadable_fastapi_app(ctx):
-    module = ctx.write_pymodule(
-        """
-from test.apps.openapi._fastapi import create_app
-
-app = create_app()
-"""
-    )
-    return f"{module}:app"
-
-
 @pytest.fixture
 def response_factory():
     def httpx_factory(

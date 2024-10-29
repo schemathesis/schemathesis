@@ -4,7 +4,7 @@ import json
 import pathlib
 from functools import lru_cache
 from json import JSONDecodeError
-from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, cast
+from typing import IO, TYPE_CHECKING, Any, Dict, NoReturn, cast
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
@@ -340,11 +340,3 @@ def from_asgi(
         rate_limit=rate_limit,
         sanitize_output=sanitize_output,
     )
-
-
-def get_loader_for_app(app: Any) -> Callable:
-    from ...transports.asgi import is_asgi_app
-
-    if is_asgi_app(app):
-        return from_asgi
-    return from_wsgi

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterable
 
 if TYPE_CHECKING:
     from .models import Case
@@ -19,11 +19,19 @@ class TargetContext:
 
     case: Case
     response: GenericResponse
-    response_time: float
+
+
+def run(targets: Iterable[Callable], case: Case, response: GenericResponse) -> None:
+    import hypothesis
+
+    context = TargetContext(case=case, response=response)
+    for target in targets:
+        value = target(context)
+        hypothesis.target(value, label=target.__name__)
 
 
 def response_time(context: TargetContext) -> float:
-    return context.response_time
+    return context.response.elapsed.total_seconds()
 
 
 Target = Callable[[TargetContext], float]
@@ -49,7 +57,7 @@ class TargetMetricCollector:
 
     def store(self, case: Case, response: GenericResponse) -> None:
         """Calculate target metrics & store them."""
-        context = TargetContext(case=case, response=response, response_time=response.elapsed.total_seconds())
+        context = TargetContext(case=case, response=response)
         for target in self.targets:
             self.observations[target.__name__].append(target(context))
 
