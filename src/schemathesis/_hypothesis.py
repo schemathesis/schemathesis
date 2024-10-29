@@ -23,6 +23,7 @@ from .experimental import COVERAGE_PHASE
 from .generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from .models import APIOperation, Case, GenerationMetadata, TestPhase
+from .parameters import ParameterSet
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .types import NotSet
@@ -356,16 +357,44 @@ def _iter_coverage_cases(
             )
             return case
 
+        def _combination_schema(
+            combination: dict[str, Any], _required: set[str], _parameter_set: ParameterSet
+        ) -> dict[str, Any]:
+            return {
+                "properties": {
+                    parameter.name: parameter.as_json_schema(operation)
+                    for parameter in _parameter_set
+                    if parameter.name in combination
+                },
+                "required": list(_required),
+                "additionalProperties": False,
+            }
+
+        def _yield_negative(
+            subschema: dict[str, Any], _location: str, _container_name: str
+        ) -> Generator[Case, None, None]:
+            for more in coverage.cover_schema_iter(
+                coverage.CoverageContext(data_generation_methods=[DataGenerationMethod.negative]),
+                subschema,
+            ):
+                yield make_case(more.value, more.description, _location, _container_name)
+
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
             yield make_case(only_required, "Only required properties", location, container_name)
+            if DataGenerationMethod.negative in data_generation_methods:
+                subschema = _combination_schema(only_required, required, parameter_set)
+                yield from _yield_negative(subschema, location, container_name)
 
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container:
                 yield make_case(combo, f"All required properties and optional '{opt_param}'", location, container_name)
+                if DataGenerationMethod.negative in data_generation_methods:
+                    subschema = _combination_schema(combo, required, parameter_set)
+                    yield from _yield_negative(subschema, location, container_name)
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if len(optional) > 1:

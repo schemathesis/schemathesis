@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.3...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Generate more negative combinations during the coverage phase.
+
 .. _v3.38.3:
 
 :version:`3.38.3 <v3.38.2...v3.38.3>` - 2024-10-26
