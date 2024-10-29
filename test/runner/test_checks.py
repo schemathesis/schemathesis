@@ -7,7 +7,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis import DataGenerationMethod, models
+from schemathesis import models
 from schemathesis._compat import MultipleFailures
 from schemathesis.checks import (
     content_type_conformance,
@@ -20,8 +20,8 @@ from schemathesis.exceptions import CheckFailed, OperationSchemaError
 from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition
-from schemathesis.runner.impl.core import run_checks
 from schemathesis.runner.models import TestResult, deduplicate_failures
+from schemathesis.runner.phases.unit._executor import run_checks
 from schemathesis.specs.openapi.checks import _coerce_header_value
 
 if TYPE_CHECKING:
@@ -597,12 +597,7 @@ def test_deduplication(ctx, response_factory):
     operation = schema["/data"]["GET"]
     case = operation.make_case()
     response = response_factory.requests()
-    result = TestResult(
-        method=operation.method.upper(),
-        path=operation.full_path,
-        verbose_name=operation.verbose_name,
-        data_generation_method=DataGenerationMethod.positive,
-    )
+    result = TestResult(verbose_name=operation.verbose_name)
     failures = []
     # When there are two checks that raise the same failure
     with pytest.raises(CheckFailed):

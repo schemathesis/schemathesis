@@ -9,7 +9,6 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Union
-from urllib.parse import urlparse
 
 from ..exceptions import SchemaError, SchemaErrorType
 from ..generation import DataGenerationMethod, GenerationConfig
@@ -19,9 +18,9 @@ from ..specs import graphql, openapi
 from ..transports.auth import get_requests_auth
 
 if TYPE_CHECKING:
+    from ..runner.config import NetworkConfig
     from ..schemas import BaseSchema
     from ..specs.graphql.schemas import GraphQLSchema
-    from ..types import RequestCert
 
 SchemaLocation = Union[str, dict[str, Any]]
 Loader = Callable[["LoaderConfig"], "BaseSchema"]
@@ -35,23 +34,16 @@ class LoaderConfig:
     """
 
     schema_or_location: SchemaLocation
-    app: Any
     base_url: str | None
     validate_schema: bool
     data_generation_methods: tuple[DataGenerationMethod, ...]
     force_schema_version: str | None
-    request_tls_verify: bool | str
-    request_proxy: str | None
-    request_cert: RequestCert | None
+    network: NetworkConfig
     wait_for_schema: float | None
     rate_limit: str | None
     output_config: OutputConfig
     sanitize_output: bool
     generation_config: GenerationConfig
-    # Network request parameters
-    auth: tuple[str, str] | None
-    auth_type: str | None
-    headers: dict[str, str] | None
 
 
 def load_schema(config: LoaderConfig) -> BaseSchema:
@@ -96,27 +88,24 @@ def is_specific_exception(loader: Loader, exc: Exception) -> bool:
 
 
 def _load_graphql_schema(config: LoaderConfig) -> GraphQLSchema:
-    loader = detect_loader(config.schema_or_location, config.app, is_openapi=False)
+    loader = detect_loader(config.schema_or_location, is_openapi=False)
     kwargs = get_graphql_loader_kwargs(loader, config)
     return loader(config.schema_or_location, **kwargs)
 
 
 def _load_openapi_schema(config: LoaderConfig) -> BaseSchema:
-    loader = detect_loader(config.schema_or_location, config.app, is_openapi=True)
+    loader = detect_loader(config.schema_or_location, is_openapi=True)
     kwargs = get_openapi_loader_kwargs(loader, config)
     return loader(config.schema_or_location, **kwargs)
 
 
-def detect_loader(schema_or_location: str | dict[str, Any], app: Any, is_openapi: bool) -> Callable:
+def detect_loader(schema_or_location: str | dict[str, Any], is_openapi: bool) -> Callable:
     """Detect API schema loader."""
     if isinstance(schema_or_location, str):
         if file_exists(schema_or_location):
             # If there is an existing file with the given name,
             # then it is likely that the user wants to load API schema from there
             return openapi.loaders.from_path if is_openapi else graphql.loaders.from_path  # type: ignore
-        if app is not None and not urlparse(schema_or_location).netloc:
-            # App is passed & location is relative
-            return openapi.loaders.get_loader_for_app(app) if is_openapi else graphql.loaders.get_loader_for_app(app)
         # Default behavior
         return openapi.loaders.from_uri if is_openapi else graphql.loaders.from_url  # type: ignore
     return openapi.loaders.from_dict if is_openapi else graphql.loaders.from_dict  # type: ignore
@@ -144,8 +133,7 @@ def _try_load_schema(config: LoaderConfig, first: Loader, second: Loader) -> Bas
 def get_openapi_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
     """Get appropriate keyword arguments for OpenAPI schema loader."""
     # These kwargs are shared by all loaders
-    kwargs = {
-        "app": config.app,
+    kwargs: dict[str, Any] = {
         "base_url": config.base_url,
         "validate_schema": config.validate_schema,
         "force_schema_version": config.force_schema_version,
@@ -156,7 +144,7 @@ def get_openapi_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[st
         "sanitize_output": config.sanitize_output,
     }
     if loader not in (openapi.loaders.from_path, openapi.loaders.from_dict):
-        kwargs["headers"] = config.headers
+        kwargs["headers"] = config.network.headers
     if loader is openapi.loaders.from_uri:
         _add_requests_kwargs(kwargs, config)
     return kwargs
@@ -165,25 +153,24 @@ def get_openapi_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[st
 def get_graphql_loader_kwargs(loader: Callable, config: LoaderConfig) -> dict[str, Any]:
     """Get appropriate keyword arguments for GraphQL schema loader."""
     # These kwargs are shared by all loaders
-    kwargs = {
-        "app": config.app,
+    kwargs: dict[str, Any] = {
         "base_url": config.base_url,
         "data_generation_methods": config.data_generation_methods,
         "rate_limit": config.rate_limit,
     }
     if loader not in (graphql.loaders.from_path, graphql.loaders.from_dict):
-        kwargs["headers"] = config.headers
+        kwargs["headers"] = config.network.headers
     if loader is graphql.loaders.from_url:
         _add_requests_kwargs(kwargs, config)
     return kwargs
 
 
 def _add_requests_kwargs(kwargs: dict[str, Any], config: LoaderConfig) -> None:
-    kwargs["verify"] = config.request_tls_verify
-    if config.request_cert is not None:
-        kwargs["cert"] = config.request_cert
-    if config.auth is not None:
-        kwargs["auth"] = get_requests_auth(config.auth, config.auth_type)
+    kwargs["verify"] = config.network.tls_verify
+    if config.network.cert is not None:
+        kwargs["cert"] = config.network.cert
+    if config.network.auth is not None:
+        kwargs["auth"] = get_requests_auth(config.network.auth, config.network.auth_type)
     if config.wait_for_schema is not None:
         kwargs["wait_for_schema"] = config.wait_for_schema
 

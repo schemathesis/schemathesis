@@ -122,11 +122,11 @@ def _execute_state_machine_loop(
 
     call_kwargs: dict[str, Any] = {"headers": config.headers}
     if isinstance(state_machine.schema.transport, RequestsTransport):
-        call_kwargs["timeout"] = config.request.prepared_timeout
-        call_kwargs["verify"] = config.request.tls_verify
-        call_kwargs["cert"] = config.request.cert
-        if config.request.proxy is not None:
-            call_kwargs["proxies"] = {"all": config.request.proxy}
+        call_kwargs["timeout"] = config.network.prepared_timeout
+        call_kwargs["verify"] = config.network.tls_verify
+        call_kwargs["cert"] = config.network.cert
+        if config.network.proxy is not None:
+            call_kwargs["proxies"] = {"all": config.network.proxy}
         session = requests.Session()
         if config.auth is not None:
             session.auth = config.auth
@@ -255,7 +255,7 @@ def _execute_state_machine_loop(
         InstrumentedStateMachine = _InstrumentedStateMachine
 
     def should_stop() -> bool:
-        return config.exit_first or (config.max_failures is not None and ctx.failures_count >= config.max_failures)
+        return config.max_failures is not None and ctx.failures_count >= config.max_failures
 
     while True:
         # This loop is running until no new failures are found in a single iteration

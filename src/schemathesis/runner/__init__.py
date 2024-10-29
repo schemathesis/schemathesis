@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from random import Random
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Iterable
 
-from ..constants import DEFAULT_DEADLINE, HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
+from ..constants import DEFAULT_DEADLINE
 from ..generation import GenerationConfig
 from ..internal.checks import CheckConfig
-from ..internal.datetime import current_datetime
 from ..targets import DEFAULT_TARGETS, Target
-from ..transports import RequestConfig
-from ..types import NotSet, RawAuth, RequestCert
-from .probes import ProbeConfig
+from .config import EngineConfig, ExecutionConfig, NetworkConfig
 
 if TYPE_CHECKING:
     import hypothesis
@@ -20,7 +17,7 @@ if TYPE_CHECKING:
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..stateful import Stateful
-    from .impl import BaseRunner
+    from .core import Engine
 
 
 def from_schema(
@@ -33,213 +30,46 @@ def from_schema(
     workers_num: int = 1,
     hypothesis_settings: hypothesis.settings | None = None,
     generation_config: GenerationConfig | None = None,
-    auth: RawAuth | None = None,
-    auth_type: str | None = None,
-    headers: dict[str, Any] | None = None,
-    request_timeout: int | None = None,
-    request_tls_verify: bool | str = True,
-    request_proxy: str | None = None,
-    request_cert: RequestCert | None = None,
     seed: int | None = None,
-    exit_first: bool = False,
     max_failures: int | None = None,
-    started_at: str | None = None,
     unique_data: bool = False,
     dry_run: bool = False,
-    store_interactions: bool = False,
     stateful: Stateful | None = None,
-    count_operations: bool = True,
-    count_links: bool = True,
-    probe_config: ProbeConfig | None = None,
+    network: NetworkConfig | None = None,
     checks_config: CheckConfig | None = None,
     service_client: ServiceClient | None = None,
-) -> BaseRunner:
+) -> Engine:
     import hypothesis
 
     from ..checks import DEFAULT_CHECKS
-    from ..transports.asgi import is_asgi_app
-    from .impl import (
-        SingleThreadASGIRunner,
-        SingleThreadRunner,
-        SingleThreadWSGIRunner,
-        ThreadPoolASGIRunner,
-        ThreadPoolRunner,
-        ThreadPoolWSGIRunner,
-    )
+    from .core import Engine
 
     checks = checks or DEFAULT_CHECKS
     checks_config = checks_config or CheckConfig()
-    probe_config = probe_config or ProbeConfig()
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
-    request_config = RequestConfig(
-        timeout=request_timeout,
-        tls_verify=request_tls_verify,
-        proxy=request_proxy,
-        cert=request_cert,
-    )
 
     # Use the same seed for all tests unless `derandomize=True` is used
     if seed is None and not hypothesis_settings.derandomize:
         seed = Random().getrandbits(128)
-
-    started_at = started_at or current_datetime()
-    if workers_num > 1:
-        if not schema.app:
-            return ThreadPoolRunner(
-                schema=schema,
-                checks=checks,
-                max_response_time=max_response_time,
-                targets=targets,
-                hypothesis_settings=hypothesis_settings,
-                generation_config=generation_config,
-                auth=auth,
-                auth_type=auth_type,
-                override=override,
-                headers=headers,
-                seed=seed,
-                workers_num=workers_num,
-                request_config=request_config,
-                exit_first=exit_first,
-                max_failures=max_failures,
-                started_at=started_at,
-                unique_data=unique_data,
-                dry_run=dry_run,
-                store_interactions=store_interactions,
-                stateful=stateful,
-                count_operations=count_operations,
-                count_links=count_links,
-                probe_config=probe_config,
-                checks_config=checks_config,
-                service_client=service_client,
-            )
-        if is_asgi_app(schema.app):
-            return ThreadPoolASGIRunner(
-                schema=schema,
-                checks=checks,
-                max_response_time=max_response_time,
-                targets=targets,
-                hypothesis_settings=hypothesis_settings,
-                generation_config=generation_config,
-                auth=auth,
-                auth_type=auth_type,
-                override=override,
-                headers=headers,
-                seed=seed,
-                exit_first=exit_first,
-                max_failures=max_failures,
-                started_at=started_at,
-                unique_data=unique_data,
-                dry_run=dry_run,
-                store_interactions=store_interactions,
-                stateful=stateful,
-                count_operations=count_operations,
-                count_links=count_links,
-                probe_config=probe_config,
-                checks_config=checks_config,
-                service_client=service_client,
-            )
-        return ThreadPoolWSGIRunner(
-            schema=schema,
-            checks=checks,
-            max_response_time=max_response_time,
-            targets=targets,
-            hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
-            auth=auth,
-            auth_type=auth_type,
-            override=override,
-            headers=headers,
-            seed=seed,
-            workers_num=workers_num,
-            exit_first=exit_first,
-            max_failures=max_failures,
-            started_at=started_at,
-            unique_data=unique_data,
-            dry_run=dry_run,
-            store_interactions=store_interactions,
-            stateful=stateful,
-            count_operations=count_operations,
-            count_links=count_links,
-            probe_config=probe_config,
-            checks_config=checks_config,
-            service_client=service_client,
-        )
-    if not schema.app:
-        return SingleThreadRunner(
-            schema=schema,
-            checks=checks,
-            max_response_time=max_response_time,
-            targets=targets,
-            hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
-            auth=auth,
-            auth_type=auth_type,
-            override=override,
-            headers=headers,
-            seed=seed,
-            request_config=request_config,
-            exit_first=exit_first,
-            max_failures=max_failures,
-            started_at=started_at,
-            unique_data=unique_data,
-            dry_run=dry_run,
-            store_interactions=store_interactions,
-            stateful=stateful,
-            count_operations=count_operations,
-            count_links=count_links,
-            probe_config=probe_config,
-            checks_config=checks_config,
-            service_client=service_client,
-        )
-    if is_asgi_app(schema.app):
-        return SingleThreadASGIRunner(
-            schema=schema,
-            checks=checks,
-            max_response_time=max_response_time,
-            targets=targets,
-            hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
-            auth=auth,
-            auth_type=auth_type,
-            override=override,
-            headers=headers,
-            seed=seed,
-            exit_first=exit_first,
-            max_failures=max_failures,
-            started_at=started_at,
-            unique_data=unique_data,
-            dry_run=dry_run,
-            store_interactions=store_interactions,
-            stateful=stateful,
-            count_operations=count_operations,
-            count_links=count_links,
-            probe_config=probe_config,
-            checks_config=checks_config,
-            service_client=service_client,
-        )
-    return SingleThreadWSGIRunner(
+    config = EngineConfig(
         schema=schema,
-        checks=checks,
-        max_response_time=max_response_time,
-        targets=targets,
-        hypothesis_settings=hypothesis_settings,
-        generation_config=generation_config,
-        auth=auth,
-        auth_type=auth_type,
+        execution=ExecutionConfig(
+            checks=checks,
+            targets=targets,
+            hypothesis_settings=hypothesis_settings,
+            max_response_time=max_response_time,
+            generation_config=generation_config,
+            max_failures=max_failures,
+            unique_data=unique_data,
+            dry_run=dry_run,
+            seed=seed,
+            stateful=stateful,
+            workers_num=workers_num,
+        ),
+        network=network or NetworkConfig(),
         override=override,
-        headers=headers,
-        seed=seed,
-        exit_first=exit_first,
-        max_failures=max_failures,
-        started_at=started_at,
-        unique_data=unique_data,
-        dry_run=dry_run,
-        store_interactions=store_interactions,
-        stateful=stateful,
-        count_operations=count_operations,
-        count_links=count_links,
-        probe_config=probe_config,
         checks_config=checks_config,
         service_client=service_client,
     )
+    return Engine(config=config)
