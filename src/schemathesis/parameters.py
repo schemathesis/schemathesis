@@ -9,8 +9,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Generic, TypeVar
 
 if TYPE_CHECKING:
-    from hypothesis.vendor.pretty import RepresentationPrinter
-
     from .models import APIOperation
 
 
@@ -57,8 +55,7 @@ class ParameterSet(Generic[P]):
 
     items: list[P] = field(default_factory=list)
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def add(self, parameter: P) -> None:
         """Add a new parameter."""

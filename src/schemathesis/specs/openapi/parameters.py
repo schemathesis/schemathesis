@@ -9,8 +9,6 @@ from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 if TYPE_CHECKING:
-    from hypothesis.vendor.pretty import RepresentationPrinter
-
     from ...models import APIOperation
 
 
@@ -23,9 +21,7 @@ class OpenAPIParameter(Parameter):
     nullable_field: ClassVar[str]
     supported_jsonschema_keywords: ClassVar[tuple[str, ...]]
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
-
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
     @property
     def description(self) -> str | None:
         """A brief parameter description."""

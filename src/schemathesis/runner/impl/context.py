@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ...constants import NOT_SET
 from ...internal.checks import CheckConfig
@@ -9,8 +9,6 @@ from ...models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
     import threading
-
-    from hypothesis.vendor.pretty import RepresentationPrinter
 
     from ..._override import CaseOverride
     from ...exceptions import OperationSchemaError
@@ -52,8 +50,7 @@ class RunnerContext:
         self.checks_config = checks_config
         self.override = override
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     @property
     def is_stopped(self) -> bool:

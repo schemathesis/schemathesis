@@ -13,7 +13,6 @@ from .internal.deprecation import deprecated_property
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
-    from hypothesis.vendor.pretty import RepresentationPrinter
 
     from .models import APIOperation, Case
     from .schemas import BaseSchema
@@ -33,8 +32,7 @@ class RegisteredHook:
     signature: inspect.Signature
     scopes: list[HookScope]
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 @dataclass
