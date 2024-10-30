@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.4...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Compatibility with Hypothesis > 6.115.6. :issue:`2565`
+
 .. _v3.38.4:
 
 :version:`3.38.4 <v3.38.3...v3.38.4>` - 2024-10-29

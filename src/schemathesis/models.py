@@ -64,7 +64,6 @@ if TYPE_CHECKING:
     import requests.auth
     import werkzeug
     from hypothesis import strategies as st
-    from hypothesis.vendor.pretty import RepresentationPrinter
     from requests.structures import CaseInsensitiveDict
 
     from .auths import AuthStorage
@@ -250,8 +249,7 @@ class Case:
             cookies=self._get_diff("cookies"),
         )
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     @deprecated_property(removed_in="4.0", replacement="`operation`")
     def endpoint(self) -> APIOperation:
@@ -668,8 +666,7 @@ class OperationDefinition(Generic[D]):
 
     __slots__ = ("raw", "resolved", "scope")
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
 
 C = TypeVar("C", bound=Case)
@@ -1174,8 +1171,7 @@ class TestResult:
     # DEPRECATED: Seed is the same per test run
     seed: int | None = None
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def mark_errored(self) -> None:
         self.is_errored = True
@@ -1270,8 +1266,7 @@ class TestResultSet:
     generic_errors: list[OperationSchemaError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
 
-    def _repr_pretty_(self, printer: RepresentationPrinter, cycle: bool) -> None:
-        return None
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def __iter__(self) -> Iterator[TestResult]:
         return iter(self.results)
