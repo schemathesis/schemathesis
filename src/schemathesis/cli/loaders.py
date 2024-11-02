@@ -72,7 +72,6 @@ def should_try_more(exc: SchemaError) -> bool:
         SchemaErrorType.OPEN_API_INVALID_SCHEMA,
         SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
         SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
-        SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION,
     )
 
 

@@ -5,7 +5,6 @@ from hypothesis import Phase, settings
 from requests import Request
 
 import schemathesis
-from schemathesis import experimental
 from schemathesis._hypothesis._builder import create_test
 from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
@@ -462,7 +461,6 @@ def test_with_response_example_openapi_3(ctx):
 
 
 def test_with_examples_openapi_3_1():
-    experimental.OPEN_API_3_1.enable()
     schema = {
         "openapi": "3.1.0",
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},

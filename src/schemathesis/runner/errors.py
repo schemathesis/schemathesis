@@ -21,7 +21,7 @@ __all__ = ["EngineErrorInfo"]
 
 
 class EngineErrorInfo:
-    """Extended information about errors that happen during a test run.
+    """Extended information about errors that happen during engine execution.
 
     It serves as a caching wrapper around exceptions to avoid repeated computations.
     """

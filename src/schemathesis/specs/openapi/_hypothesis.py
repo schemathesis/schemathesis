@@ -11,7 +11,8 @@ from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
-from requests.utils import to_key_val_list
+
+from schemathesis.core.generator.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths, serializers
 from ..._hypothesis._builder import prepare_urlencoded
@@ -20,10 +21,8 @@ from ...exceptions import BodyInGetRequestError, SerializationNotPossible, SkipT
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
-from ...internal.validation import is_illegal_surrogate
 from ...models import APIOperation, Case, GenerationMetadata, TestPhase, cant_serialize
 from ...transports.content_types import parse_content_type
-from ...transports.headers import has_invalid_characters, is_latin_1_encodable
 from ...types import NotSet
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
@@ -35,38 +34,6 @@ from .utils import is_header_location
 
 SLASH = "/"
 StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationConfig], st.SearchStrategy]
-
-
-def is_valid_header(headers: dict[str, Any]) -> bool:
-    """Verify if the generated headers are valid."""
-    for name, value in headers.items():
-        if not is_latin_1_encodable(value):
-            return False
-        if has_invalid_characters(name, value):
-            return False
-    return True
-
-
-def is_valid_query(query: dict[str, Any]) -> bool:
-    """Surrogates are not allowed in a query string.
-
-    `requests` and `werkzeug` will fail to send it to the application.
-    """
-    for name, value in query.items():
-        if is_illegal_surrogate(name) or is_illegal_surrogate(value):
-            return False
-    return True
-
-
-def is_valid_urlencoded(data: Any) -> bool:
-    if data is NOT_SET:
-        return True
-    try:
-        for _, __ in to_key_val_list(data):  # type: ignore[no-untyped-call]
-            pass
-        return True
-    except (TypeError, ValueError):
-        return False
 
 
 @st.composite  # type: ignore
@@ -477,29 +444,6 @@ DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY = {
 }
 
 
-def is_valid_path(parameters: dict[str, Any]) -> bool:
-    """Empty strings ("") are excluded from path by urllib3.
-
-    A path containing to "/" or "%2F" will lead to ambiguous path resolution in
-    many frameworks and libraries, such behaviour have been observed in both
-    WSGI and ASGI applications.
-
-    In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
-    Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
-    """
-    disallowed_values = (SLASH, "")
-
-    return not any(
-        (
-            value in disallowed_values
-            or is_illegal_surrogate(value)
-            or isinstance(value, str)
-            and (SLASH in value or "}" in value or "{" in value)
-        )
-        for value in parameters.values()
-    )
-
-
 def quote_all(parameters: dict[str, Any]) -> dict[str, Any]:
     """Apply URL quotation for all values in a dictionary."""
     # Even though, "." is an unreserved character, it has a special meaning in "." and ".." strings.
@@ -529,8 +473,3 @@ def apply_hooks(
     """Apply all hooks related to the given location."""
     container = LOCATION_TO_CONTAINER[location]
     return apply_to_all_dispatchers(operation, context, hooks, strategy, container)
-
-
-def clear_cache() -> None:
-    _PARAMETER_STRATEGIES_CACHE.clear()
-    _BODY_STRATEGIES_CACHE.clear()

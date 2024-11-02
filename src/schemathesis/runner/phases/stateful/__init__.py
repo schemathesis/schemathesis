@@ -6,11 +6,11 @@ from ... import events
 from ...models import Status, TestResult
 
 if TYPE_CHECKING:
-    from ...context import RunnerContext
+    from ...context import EngineContext
     from ...events import EventGenerator
 
 
-def execute(ctx: RunnerContext) -> EventGenerator:
+def execute(ctx: EngineContext) -> EventGenerator:
     import requests
 
     from ....stateful import events as stateful_events

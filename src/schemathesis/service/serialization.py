@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, TypeVar
 
-from ..internal.transformation import merge_recursively
 from ..runner import events
 
 if TYPE_CHECKING:
@@ -91,7 +90,7 @@ def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> 
     }
 
 
-SERIALIZER_MAP = {
+SERIALIZER_MAP: dict[type[events.ExecutionEvent], SerializeFunc] = {
     events.Initialized: serialize_initialized,
     events.BeforeProbing: serialize_before_probing,
     events.AfterProbing: serialize_after_probing,
@@ -109,46 +108,8 @@ SERIALIZER_MAP = {
 
 def serialize_event(
     event: events.ExecutionEvent,
-    *,
-    on_initialized: SerializeFunc | None = None,
-    on_before_probing: SerializeFunc | None = None,
-    on_after_probing: SerializeFunc | None = None,
-    on_before_analysis: SerializeFunc | None = None,
-    on_after_analysis: SerializeFunc | None = None,
-    on_before_execution: SerializeFunc | None = None,
-    on_after_execution: SerializeFunc | None = None,
-    on_interrupted: SerializeFunc | None = None,
-    on_internal_error: SerializeFunc | None = None,
-    on_stateful_event: SerializeFunc | None = None,
-    on_after_stateful_execution: SerializeFunc | None = None,
-    on_finished: SerializeFunc | None = None,
-    extra: dict[str, Any] | None = None,
 ) -> dict[str, dict[str, Any] | None]:
     """Turn an event into JSON-serializable structure."""
-    # Use the explicitly provided serializer for this event and fallback to default one if it is not provided
-    serializer = {
-        events.Initialized: on_initialized,
-        events.BeforeProbing: on_before_probing,
-        events.AfterProbing: on_after_probing,
-        events.BeforeAnalysis: on_before_analysis,
-        events.AfterAnalysis: on_after_analysis,
-        events.BeforeExecution: on_before_execution,
-        events.AfterExecution: on_after_execution,
-        events.Interrupted: on_interrupted,
-        events.InternalError: on_internal_error,
-        events.StatefulEvent: on_stateful_event,
-        events.AfterStatefulExecution: on_after_stateful_execution,
-        events.Finished: on_finished,
-    }.get(event.__class__)
-    if serializer is None:
-        serializer = cast(SerializeFunc, SERIALIZER_MAP[event.__class__])
-    data = serializer(event)
-    if extra is not None:
-        # If `extra` is present, then merge it with the serialized data. If serialized data is empty, then replace it
-        # with `extra` value
-        if data is None:
-            data = extra
-        else:
-            data = merge_recursively(data, extra)
+    serializer = SERIALIZER_MAP[event.__class__]
     # Externally tagged structure
-    return {event.__class__.__name__: data}
+    return {event.__class__.__name__: serializer(event)}

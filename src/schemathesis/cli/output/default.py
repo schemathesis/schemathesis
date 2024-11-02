@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import platform
 import shutil
 import textwrap
 import time
-from importlib import metadata
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
@@ -20,7 +18,6 @@ from ...constants import (
     ISSUE_TRACKER_URL,
     REPORT_SUGGESTION_ENV_VAR,
     SCHEMATHESIS_TEST_CASE_HEADER,
-    SCHEMATHESIS_VERSION,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...internal.exceptions import (
@@ -625,7 +622,6 @@ SCHEMA_ERROR_SUGGESTIONS = {
     # OpenAPI specification issues
     SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
     SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
-    SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION: f"Proceed with {bold('`--experimental=openapi-3.1`. Caution: May not be fully supported.')}",
     SchemaErrorType.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
     # YAML specific issues
     SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
@@ -680,18 +676,6 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     context.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
     context.seed = event.seed
     display_section_name("Schemathesis test session starts")
-    if context.verbosity > 0:
-        versions = (
-            f"platform {platform.system()} -- "
-            f"Python {platform.python_version()}, "
-            f"schemathesis-{SCHEMATHESIS_VERSION}, "
-            f"hypothesis-{metadata.version('hypothesis')}, "
-            f"hypothesis_jsonschema-{metadata.version('hypothesis_jsonschema')}, "
-            f"jsonschema-{metadata.version('jsonschema')}"
-        )
-        click.echo(versions)
-        click.echo(f"rootdir: {os.getcwd()}")
-        click.echo(f"Hypothesis: {context.hypothesis_settings.show_changed()}")
     if event.location is not None:
         click.secho(f"Schema location: {event.location}", bold=True)
     click.secho(f"Base URL: {event.base_url}", bold=True)

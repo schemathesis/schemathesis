@@ -51,7 +51,6 @@ class ExecutionContext:
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     is_interrupted: bool = False
-    verbosity: int = 0
     report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
     analysis: Result[AnalysisResult, Exception] | None = None

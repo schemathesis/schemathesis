@@ -7,13 +7,13 @@ from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
     from ....internal.result import Result
-    from ...context import RunnerContext
+    from ...context import EngineContext
 
 
 class TaskProducer:
     """Produces test tasks for workers to execute."""
 
-    def __init__(self, ctx: RunnerContext) -> None:
+    def __init__(self, ctx: EngineContext) -> None:
         self.operations = ctx.config.schema.get_all_operations(generation_config=ctx.config.execution.generation_config)
         self.lock = threading.Lock()
 
@@ -26,7 +26,7 @@ class TaskProducer:
 class WorkerPool:
     """Manages a pool of worker threads."""
 
-    def __init__(self, workers_num: int, producer: TaskProducer, worker_factory: Callable, ctx: RunnerContext) -> None:
+    def __init__(self, workers_num: int, producer: TaskProducer, worker_factory: Callable, ctx: EngineContext) -> None:
         self.workers_num = workers_num
         self.producer = producer
         self.worker_factory = worker_factory
