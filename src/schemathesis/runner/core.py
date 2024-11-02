@@ -1,15 +1,14 @@
 from __future__ import annotations
 
 import threading
-import warnings
 from dataclasses import dataclass
 from typing import Sequence
 
 from .. import experimental
 from ..auths import unregister as unregister_auth
-from . import events, phases
+from . import events
 from .config import EngineConfig
-from .context import RunnerContext
+from .context import EngineContext
 from .events import EventGenerator
 from .phases import Phase, PhaseKind
 
@@ -24,7 +23,7 @@ class Engine:
         if self.config.network.auth is not None:
             unregister_auth()
 
-        ctx = RunnerContext(stop_event=threading.Event(), config=self.config)
+        ctx = EngineContext(stop_event=threading.Event(), config=self.config)
         plan = self._create_execution_plan()
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
@@ -48,22 +47,22 @@ class ExecutionPlan:
 
     phases: Sequence[Phase]
 
-    def execute(self, ctx: RunnerContext) -> EventGenerator:
+    def execute(self, ctx: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
         try:
             if ctx.is_stopped:
                 yield from self._finish(ctx)
                 return
             # Initialize
-            yield from self._run_initialization(ctx)
+            yield events.Initialized.from_schema(schema=ctx.config.schema, seed=ctx.config.execution.seed)
             if ctx.is_stopped:
                 yield from self._finish(ctx)  # type: ignore[unreachable]
                 return
 
             # Run main phases
             for phase in self.phases:
-                if phase.should_run(ctx):
-                    yield from self._run_phase(phase, ctx)
+                if phase.should_execute(ctx):
+                    yield from phase.execute(ctx)
                 if ctx.is_stopped:
                     break  # type: ignore[unreachable]
 
@@ -74,31 +73,11 @@ class ExecutionPlan:
         # Always finish
         yield from self._finish(ctx)
 
-    def _run_initialization(self, ctx: RunnerContext) -> EventGenerator:
-        """Initialize the test run."""
-        yield events.Initialized.from_schema(schema=ctx.config.schema, seed=ctx.config.execution.seed)
-
-    def _finish(self, ctx: RunnerContext) -> EventGenerator:
+    def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
         if ctx.has_all_not_found:
             ctx.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
         yield events.Finished.from_results(results=ctx.data, running_time=ctx.running_time)
-
-    def _run_phase(self, phase: Phase, ctx: RunnerContext) -> EventGenerator:
-        """Execute a single phase."""
-        from urllib3.exceptions import InsecureRequestWarning
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", InsecureRequestWarning)
-
-            if phase.kind == PhaseKind.PROBING:
-                yield from phases.probes.execute(ctx)
-            elif phase.kind == PhaseKind.ANALYSIS:
-                yield from phases.analysis.execute(ctx)
-            elif phase.kind == PhaseKind.UNIT_TESTING:
-                yield from phases.unit.execute(ctx)
-            elif phase.kind == PhaseKind.STATEFUL_TESTING:
-                yield from phases.stateful.execute(ctx)
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
