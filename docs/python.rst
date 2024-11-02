@@ -546,9 +546,6 @@ Using Schemathesis with a FastAPI application (ASGI):
     from fastapi import FastAPI
     import schemathesis
 
-    # Enable the experimental Open API 3.1 support
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
     app = FastAPI()
 
 

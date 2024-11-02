@@ -17,7 +17,6 @@ from schemathesis.checks import (
     status_code_conformance,
 )
 from schemathesis.exceptions import CheckFailed, OperationSchemaError
-from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition
 from schemathesis.runner.models import TestResult, deduplicate_failures
@@ -403,7 +402,6 @@ def test_response_schema_conformance_openapi_31_boolean(openapi_30, response_fac
             }
         },
     )
-    OPEN_API_3_1.enable()
     openapi_30.raw_schema["openapi"] = "3.1.0"
     assert response_schema_conformance(CTX, response, case) is None
     assert case.operation.is_response_valid(response)

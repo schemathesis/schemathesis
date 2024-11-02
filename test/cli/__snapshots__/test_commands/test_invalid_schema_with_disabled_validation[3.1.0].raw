@@ -40,12 +40,6 @@ Need more help?
 
 No checks were performed.
 
-Experimental Features:
-  - OpenAPI 3.1: Support for response validation
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/1822
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 

@@ -5,12 +5,9 @@ from starlette.responses import JSONResponse
 
 from schemathesis import from_asgi, from_dict
 from schemathesis.exceptions import CheckFailed, SchemaError
-from schemathesis.experimental import OPEN_API_3_1
 
 
 def test_works_with_fastapi(fastapi_app):
-    OPEN_API_3_1.enable()
-
     json_schema = {
         "type": "object",
         "properties": {
@@ -83,7 +80,6 @@ def test_openapi_3_1_schema_validation():
 
 
 def test_openapi_3_1_regression_path_ref():
-    OPEN_API_3_1.enable()
     raw_schema = {
         "openapi": "3.1.0",
         "info": {"title": "Test correct validation of spec using $ref in pathItem", "version": "0.0.1"},

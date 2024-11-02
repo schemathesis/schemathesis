@@ -9,7 +9,6 @@ from requests import Response
 from schemathesis import DataGenerationMethod
 from schemathesis.cli import ALL_CHECKS_NAMES, ALL_TARGETS_NAMES
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
-from schemathesis.fixups import ALL_FIXUPS
 from schemathesis.runner.events import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.stateful import Stateful
 
@@ -76,7 +75,6 @@ def csv_strategy(enum, exclude=()):
             "auth-type": st.sampled_from(["basic", "digest", "BASIC", "DIGEST"]),
             "data-generation-method": st.sampled_from([item.name for item in DataGenerationMethod]),
             "target": st.sampled_from((*ALL_TARGETS_NAMES, "all")),
-            "fixups": st.sampled_from([*ALL_FIXUPS, "all"]),
             "stateful": st.sampled_from([item.name for item in Stateful]),
             "force-schema-version": st.sampled_from(["20", "30"]),
             "workers": st.integers(min_value=1, max_value=64),

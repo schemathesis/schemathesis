@@ -53,8 +53,6 @@ def test_cookies(fastapi_app):
 
 @pytest.mark.hypothesis_nested
 def test_null_byte(fastapi_app):
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
     class Payload(BaseModel):
         name: str
 
@@ -84,8 +82,6 @@ def test_null_byte(fastapi_app):
 
 @pytest.mark.hypothesis_nested
 def test_null_byte_in_headers(fastapi_app):
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
     @fastapi_app.post("/data")
     def operation(x_header: Annotated[str, Header()], x_cookie: Annotated[str, Cookie()]):
         assert "\x00" not in x_header

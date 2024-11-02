@@ -11,7 +11,7 @@ from .models.status import Status
 
 @dataclass
 class ExecutionControl:
-    """Controls test execution flow and tracks failures."""
+    """Controls engine execution flow and tracks failures."""
 
     stop_event: threading.Event
     max_failures: int | None
@@ -45,6 +45,7 @@ class ExecutionControl:
 
     @property
     def remaining_failures(self) -> int | None:
+        """How many failures may happen before the engine is halted."""
         if self.max_failures is None:
             return None
         return self.max_failures - self._failures_counter

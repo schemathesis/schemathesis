@@ -29,13 +29,7 @@ from ...checks import not_a_server_error
 from ...constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from ...exceptions import OperationNotFound, OperationSchemaError
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...hooks import (
-    GLOBAL_HOOK_DISPATCHER,
-    HookContext,
-    HookDispatcher,
-    apply_to_all_dispatchers,
-    should_skip_operation,
-)
+from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -188,7 +182,7 @@ class GraphQLSchema(BaseSchema):
         return 0
 
     def get_all_operations(
-        self, hooks: HookDispatcher | None = None, generation_config: GenerationConfig | None = None
+        self, generation_config: GenerationConfig | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
@@ -200,13 +194,6 @@ class GraphQLSchema(BaseSchema):
             for field_name, field_ in operation_type.fields.items():
                 operation = self._build_operation(root_type, operation_type, field_name, field_)
                 if self._should_skip(operation):
-                    continue
-                context = HookContext(operation=operation)
-                if (
-                    should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
-                    or should_skip_operation(self.hooks, context)
-                    or (hooks and should_skip_operation(hooks, context))
-                ):
                     continue
                 yield Ok(operation)
 

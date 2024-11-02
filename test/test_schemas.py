@@ -2,7 +2,6 @@ import pytest
 
 import schemathesis
 from schemathesis.exceptions import OperationNotFound, OperationSchemaError, SchemaError
-from schemathesis.experimental import OPEN_API_3_1
 from schemathesis.internal.result import Err, Ok
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
@@ -150,7 +149,6 @@ def test_no_paths_on_openapi_3_1():
         "openapi": "3.1.0",
         "info": {"title": "Test", "version": "0.1.0"},
     }
-    OPEN_API_3_1.enable()
     schema = schemathesis.from_dict(raw_schema)
     assert list(schema.get_all_operations()) == []
 
@@ -248,7 +246,6 @@ def test_get_operation_by_id_no_paths_on_openapi_3_1():
         "openapi": "3.1.0",
         "info": {"title": "Test", "version": "0.1.0"},
     }
-    OPEN_API_3_1.enable()
     schema = schemathesis.from_dict(raw_schema)
     with pytest.raises(OperationNotFound):
         schema.get_operation_by_id("getFoo")

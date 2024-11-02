@@ -65,13 +65,6 @@ class ExperimentSet:
 ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
 
-OPEN_API_3_1 = GLOBAL_EXPERIMENTS.create_experiment(
-    name="openapi-3.1",
-    verbose_name="OpenAPI 3.1",
-    env_var="OPENAPI_3_1",
-    description="Support for response validation",
-    discussion_url="https://github.com/schemathesis/schemathesis/discussions/1822",
-)
 SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
     name="schema-analysis",
     verbose_name="Schema Analysis",

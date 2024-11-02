@@ -17,8 +17,6 @@ from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
     get_case_strategy,
-    is_valid_path,
-    is_valid_query,
     jsonify_python_specific_types,
     make_positive_strategy,
     quote_all,
@@ -432,19 +430,6 @@ def test_optional_form_data(ctx, openapi3_base_url):
     inner()
 
 
-@pytest.mark.parametrize(
-    ("value", "expected"),
-    [({"key": "1"}, True), ({"key": 1}, True), ({"key": "\udcff"}, False), ({"key": ["1", "abc", "\udcff"]}, False)],
-)
-def test_is_valid_query(value, expected):
-    assert is_valid_query(value) == expected
-
-
-@pytest.mark.parametrize("value", ["/", "\udc9b"])
-def test_filter_path_parameters(value):
-    assert not is_valid_path({"foo": value})
-
-
 @pytest.mark.parametrize(("value", "expected"), [(".", "%2E"), ("..", "%2E%2E"), (".foo", ".foo")])
 def test_path_parameters_quotation(value, expected):
     # See GH-1036
@@ -484,18 +469,6 @@ def test_parameters_jsonified(ctx, expected):
         # Then they should be converted to their JSON equivalents
         assume(case.path_parameters["param_path"] == expected)
         assume(case.query["param_query"] == expected)
-
-    test()
-
-
-@pytest.mark.hypothesis_nested
-def test_is_valid_query_strategy():
-    strategy = st.sampled_from([{"key": "1"}, {"key": "\udcff"}]).filter(is_valid_query)
-
-    @given(strategy)
-    @settings(max_examples=10)
-    def test(value):
-        assert value == {"key": "1"}
 
     test()
 

@@ -68,50 +68,6 @@ This will enable the OpenAPI 3.1 experimental feature for any Schemathesis runs 
 Current Experimental Features
 -----------------------------
 
-.. _experimental-openapi-31:
-
-Open API 3.1
-~~~~~~~~~~~~
-
-Provides partial support for OpenAPI 3.1. This includes compatible JSON Schema validation for API responses.
-Note that data generation is still compatible only with OpenAPI 3.0.
-
-Enabling this feature also automatically enables UUID format support.
-
-.. _openapi-31-cli:
-
-In CLI
-~~~~~~
-
-.. code-block:: bash
-
-   st run https://example.schemathesis.io/openapi.json --experimental=openapi-3.1
-
-.. _openapi-31-python:
-
-In Python Tests
-~~~~~~~~~~~~~~~
-
-.. code-block:: python
-
-    import schemathesis
-
-    # Globally enable OpenAPI 3.1 experimental feature
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
-.. _openapi-31-env-vars:
-
-Using Environment Variables
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-To enable OpenAPI 3.1 support via environment variables, you can set:
-
-.. code-block:: bash
-
-    export SCHEMATHESIS_EXPERIMENTAL_OPENAPI_3_1=true
-
-For more details, join the `GitHub Discussion #1822 <https://github.com/schemathesis/schemathesis/discussions/1822>`_.
-
 .. _coverage-phase:
 
 Coverage phase

@@ -166,8 +166,6 @@ def test_proper_session(ignores_auth):
 
         return {"message": "Hello world"}
 
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
     schema = schemathesis.from_asgi("/openapi.json", app)
 
     @given(case=schema["/"]["GET"].as_strategy())
@@ -199,8 +197,6 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
                 detail="Authorization header is missing",
             )
         return {"message": "Hello world"}
-
-    schemathesis.experimental.OPEN_API_3_1.enable()
 
     schema = schemathesis.from_asgi("/openapi.json", app)
 
@@ -312,8 +308,6 @@ def test_custom_auth():
             )
         return {"message": "Hello world"}
 
-    schemathesis.experimental.OPEN_API_3_1.enable()
-
     schema = schemathesis.from_asgi("/openapi.json", app)
 
     @schema.auth()
@@ -382,7 +376,6 @@ def test_auth_via_setitem(testdir, location):
 {app}
 from hypothesis import settings
 import schemathesis
-schemathesis.experimental.OPEN_API_3_1.enable()
 
 schema = schemathesis.from_asgi("/openapi.json", app)
 

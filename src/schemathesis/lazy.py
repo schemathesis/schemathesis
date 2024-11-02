@@ -224,11 +224,7 @@ class LazySchema:
 
                 tests = list(
                     schema.get_all_tests(
-                        test,
-                        settings,
-                        hooks=self.hooks,
-                        as_strategy_kwargs=as_strategy_kwargs,
-                        _given_kwargs=given_kwargs,
+                        test, settings, as_strategy_kwargs=as_strategy_kwargs, _given_kwargs=given_kwargs
                     )
                 )
                 if not tests:

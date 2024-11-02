@@ -12,7 +12,6 @@ from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
 from jsonschema import RefResolutionError
 
-import schemathesis
 from schemathesis._hypothesis._builder import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
@@ -39,7 +38,6 @@ CORPUS_FILE_NAMES = (
     "openapi-3.1",
 )
 CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
-schemathesis.experimental.OPEN_API_3_1.enable()
 VERIFY_SCHEMA_ANALYSIS = os.getenv("VERIFY_SCHEMA_ANALYSIS", "false").lower() in ("true", "1")
 SCHEMATHESIS_IO_URL = os.getenv(URL_ENV_VAR)
 SCHEMATHESIS_IO_TOKEN = os.getenv(TOKEN_ENV_VAR)

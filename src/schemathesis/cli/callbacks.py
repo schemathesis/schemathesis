@@ -14,12 +14,12 @@ import click
 
 from .. import exceptions, experimental, throttling
 from ..constants import TRUE_VALUES
+from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from ..generation import DataGenerationMethod
 from ..internal.transformation import convert_boolean_string as _convert_boolean_string
-from ..internal.validation import file_exists, is_filename, is_illegal_surrogate
+from ..internal.validation import file_exists, is_filename
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
-from ..transports.headers import has_invalid_characters, is_latin_1_encodable
 from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
 
@@ -178,7 +178,7 @@ def _validate_and_build_multiple_options(
 
 
 def _validate_set_query(_: str, value: str) -> None:
-    if is_illegal_surrogate(value):
+    if contains_unicode_surrogate_pair(value):
         raise click.BadParameter("Query parameter value should not contain surrogates.")
 
 
@@ -201,7 +201,7 @@ def validate_set_cookie(
 
 
 def _validate_set_path(_: str, value: str) -> None:
-    if is_illegal_surrogate(value):
+    if contains_unicode_surrogate_pair(value):
         raise click.BadParameter("Path parameter value should not contain surrogates.")
 
 

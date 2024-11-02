@@ -9,7 +9,6 @@ import pytest
 
 import schemathesis
 from schemathesis.cli import ExecutionContext
-from schemathesis.internal.datetime import current_datetime
 from schemathesis.runner import events
 from schemathesis.service import ci, metadata, report
 
@@ -51,7 +50,7 @@ def test_metadata(read_report):
             location="http://127.0.0.1",
             base_url="http://127.0.0.1",
             metadata=metadata.Metadata(),
-            started_at=current_datetime(),
+            started_at="",
             ci_environment=ci.environment(),
             usage_data=None,
         )

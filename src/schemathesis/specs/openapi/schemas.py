@@ -28,7 +28,7 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from ... import experimental, failures
+from ... import failures
 from ..._compat import MultipleFailures
 from ..._override import CaseOverride, check_no_override_mark, set_override_mark
 from ...constants import HTTP_METHODS, NOT_SET
@@ -43,7 +43,7 @@ from ...exceptions import (
     get_schema_validation_error,
 )
 from ...generation import DataGenerationMethod, GenerationConfig
-from ...hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, should_skip_operation
+from ...hooks import HookContext, HookDispatcher
 from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
 from ...internal.result import Err, Ok, Result
@@ -244,7 +244,7 @@ class BaseOpenAPISchema(BaseSchema):
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
     def get_all_operations(
-        self, hooks: HookDispatcher | None = None, generation_config: GenerationConfig | None = None
+        self, generation_config: GenerationConfig | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         """Iterate over all operations defined in the API.
 
@@ -281,7 +281,6 @@ class BaseOpenAPISchema(BaseSchema):
         should_skip = self._should_skip
         collect_parameters = self.collect_parameters
         make_operation = self.make_operation
-        hooks = self.hooks
         for path, path_item in paths.items():
             method = None
             try:
@@ -310,13 +309,6 @@ class BaseOpenAPISchema(BaseSchema):
                                 if generation_config
                                 else None,
                             )
-                            context = HookContext(operation=operation)
-                            if (
-                                should_skip_operation(GLOBAL_HOOK_DISPATCHER, context)
-                                or should_skip_operation(hooks, context)
-                                or (hooks and should_skip_operation(hooks, context))
-                            ):
-                                continue
                             yield Ok(operation)
                         except SCHEMA_PARSING_ERRORS as exc:
                             yield self._into_err(exc, path, method)
@@ -634,7 +626,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     @property
     def validator_cls(self) -> type[jsonschema.Validator]:
-        if self.spec_version.startswith("3.1") and experimental.OPEN_API_3_1.is_enabled:
+        if self.spec_version.startswith("3.1"):
             return jsonschema.Draft202012Validator
         return jsonschema.Draft4Validator
 

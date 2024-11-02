@@ -54,7 +54,7 @@ class PhaseStorage:
 
 
 @dataclass
-class RunnerContext:
+class EngineContext:
     """Holds context shared for a test run."""
 
     data: TestResultSet

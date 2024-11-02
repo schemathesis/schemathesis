@@ -302,19 +302,12 @@ def apply_to_all_dispatchers(
     return strategy
 
 
-def should_skip_operation(dispatcher: HookDispatcher, context: HookContext) -> bool:
-    for hook in dispatcher.get_all_by_name("filter_operations"):
-        if not hook(context):
-            return True
-    return False
-
-
 def validate_filterable_hook(hook: str | Callable) -> None:
     if callable(hook):
         name = hook.__name__
     else:
         name = hook
-    if name in ("before_process_path", "before_load_schema", "after_load_schema", "after_init_cli_run_handlers"):
+    if name in ("before_process_path", "before_load_schema", "after_load_schema"):
         raise ValueError(f"Filters are not applicable to this hook: `{name}`")
 
 
@@ -366,11 +359,6 @@ def before_generate_case(context: HookContext, strategy: st.SearchStrategy[Case]
 @all_scopes
 def before_process_path(context: HookContext, path: str, methods: dict[str, Any]) -> None:
     """Called before API path is processed."""
-
-
-@all_scopes
-def filter_operations(context: HookContext) -> bool | None:
-    """Decide whether testing of this particular API operation should be skipped or not."""
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
