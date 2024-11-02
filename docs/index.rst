@@ -90,7 +90,6 @@ It generally follows the operational workflow of Schemathesis, detailing steps f
    contrib
    stateful
    sanitizing
-   compatibility
    examples
    graphql
    targeted

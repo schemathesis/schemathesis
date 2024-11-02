@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from . import auths, checks, contrib, experimental, fixups, graphql, hooks, runner, serializers, targets
+from . import auths, checks, contrib, experimental, graphql, hooks, runner, serializers, targets
 from ._lazy_import import lazy_import
 from .constants import SCHEMATHESIS_VERSION
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
@@ -32,7 +32,6 @@ __all__ = [
     "checks",
     "experimental",
     "contrib",
-    "fixups",
     "graphql",
     "hooks",
     "runner",

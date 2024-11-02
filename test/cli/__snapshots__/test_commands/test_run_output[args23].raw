@@ -15,14 +15,11 @@ Options:
                   'auto' is specified  [default: 1][auto, 1-64]
   --dry-run       Simulate test execution without making any actual requests,
                   useful for validating data generation
-  --fixups        Apply compatibility adjustments [possible values: utf8_bom,
-                  all]
 
 Experimental options:
   --experimental                            Enable experimental features
-                                            [possible values: openapi-3.1,
-                                            schema-analysis, stateful-only,
-                                            coverage-phase,
+                                            [possible values: schema-analysis,
+                                            stateful-only, coverage-phase,
                                             positive_data_acceptance]
   --experimental-positive-data-acceptance-allowed-statuses 
                                             Comma-separated list of status codes
@@ -165,8 +162,6 @@ Data generation options:
                                             queries  [default: true]
   --contrib-unique-data                     Force the generation of unique test
                                             cases
-  --contrib-openapi-formats-uuid            Enable support for the 'uuid' string
-                                            format in OpenAPI
   --contrib-openapi-fill-missing-examples   Enable generation of random examples
                                             for API operations that do not have
                                             explicit examples
@@ -245,7 +240,6 @@ Schemathesis.io options:
                                     auth configuration
 
 Global options:
-  -v, --verbosity  Increase verbosity of the output
-  --no-color       Disable ANSI color escape codes
-  --force-color    Explicitly tells to enable ANSI color escape codes
-  -h, --help       Show this message and exit.
+  --no-color     Disable ANSI color escape codes
+  --force-color  Explicitly tells to enable ANSI color escape codes
+  -h, --help     Show this message and exit.

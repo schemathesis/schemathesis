@@ -25,11 +25,11 @@ if TYPE_CHECKING:
 
     from ...schemas import BaseSchema
     from ..config import NetworkConfig
-    from ..context import RunnerContext
+    from ..context import EngineContext
     from ..events import EventGenerator
 
 
-def execute(ctx: RunnerContext) -> EventGenerator:
+def execute(ctx: EngineContext) -> EventGenerator:
     """Discover capabilities of the tested app."""
     from ..phases import PhaseKind
 

@@ -28,12 +28,12 @@ if TYPE_CHECKING:
 
     from ....schemas import APIOperation
     from ....types import RawAuth
-    from ...context import RunnerContext
+    from ...context import EngineContext
 
 WORKER_TIMEOUT = 0.1
 
 
-def execute(ctx: RunnerContext) -> EventGenerator:
+def execute(ctx: EngineContext) -> EventGenerator:
     """Run a set of unit tests."""
     if ctx.config.execution.workers_num > 1:
         yield from multi_threaded(ctx)
@@ -41,7 +41,7 @@ def execute(ctx: RunnerContext) -> EventGenerator:
         yield from single_threaded(ctx)
 
 
-def single_threaded(ctx: RunnerContext) -> EventGenerator:
+def single_threaded(ctx: EngineContext) -> EventGenerator:
     from ._executor import run_test
 
     with network_test_function(ctx) as test_func:
@@ -69,7 +69,7 @@ def single_threaded(ctx: RunnerContext) -> EventGenerator:
                 yield from on_schema_error(exc=result.err(), ctx=ctx)
 
 
-def multi_threaded(ctx: RunnerContext) -> EventGenerator:
+def multi_threaded(ctx: EngineContext) -> EventGenerator:
     """Execute tests in multiple threads.
 
     Implemented as a producer-consumer pattern via a task queue.
@@ -98,7 +98,7 @@ def multi_threaded(ctx: RunnerContext) -> EventGenerator:
             yield events.Interrupted()
 
 
-def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: RunnerContext) -> None:
+def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
     from hypothesis.errors import HypothesisWarning
 
     from ...._hypothesis._builder import create_test
@@ -135,7 +135,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: RunnerConte
 
 
 def on_schema_error(
-    *, exc: OperationSchemaError, ctx: RunnerContext, correlation_id: str | None = None
+    *, exc: OperationSchemaError, ctx: EngineContext, correlation_id: str | None = None
 ) -> EventGenerator:
     """Handle schema-related errors during test execution."""
     if exc.method is not None:
@@ -174,7 +174,7 @@ def get_session(auth: HTTPDigestAuth | RawAuth | None = None) -> Generator[Sessi
 
 
 @contextmanager
-def network_test_function(ctx: RunnerContext) -> Generator[Callable, None, None]:
+def network_test_function(ctx: EngineContext) -> Generator[Callable, None, None]:
     from ....transports.auth import get_requests_auth
     from ._executor import network_test
 
@@ -183,7 +183,7 @@ def network_test_function(ctx: RunnerContext) -> Generator[Callable, None, None]
         yield partial(network_test, session=session)
 
 
-def get_strategy_kwargs(ctx: RunnerContext, operation: APIOperation) -> dict[str, Any]:
+def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
     if ctx.config.override is not None:
         for location, entry in ctx.config.override.for_operation(operation).items():

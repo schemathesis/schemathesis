@@ -3,7 +3,7 @@ import threading
 import pytest
 from pytest import ExitCode
 
-from schemathesis.experimental import ENV_PREFIX, OPEN_API_3_1, ExperimentSet
+from schemathesis.experimental import COVERAGE_PHASE, ENV_PREFIX, ExperimentSet
 
 
 def test_experiments():
@@ -22,8 +22,8 @@ def test_experiments():
 @pytest.mark.parametrize(
     ("args", "kwargs"),
     [
-        ((f"--experimental={OPEN_API_3_1.name}",), {}),
-        ((), {"env": {OPEN_API_3_1.env_var: "true"}}),
+        ((f"--experimental={COVERAGE_PHASE.name}",), {}),
+        ((), {"env": {COVERAGE_PHASE.env_var: "true"}}),
     ],
 )
 @pytest.mark.openapi_version("3.0")
@@ -32,25 +32,7 @@ def test_enable_via_cli(cli, schema_url, args, kwargs):
     result = cli.run(schema_url, *args, **kwargs)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "Experimental Features:" in result.stdout
-    assert OPEN_API_3_1.is_enabled
-
-
-def test_not_enabled(ctx, cli, snapshot_cli):
-    schema_path = ctx.openapi.write_schema(
-        {
-            "/users": {
-                "get": {
-                    "summary": "Root",
-                    "operationId": "root_users_get",
-                    "responses": {
-                        "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
-                    },
-                }
-            }
-        },
-        version="3.1.0",
-    )
-    assert cli.run(str(schema_path), "--base-url=http://127.0.0.1:1") == snapshot_cli
+    assert COVERAGE_PHASE.is_enabled
 
 
 def test_enable_via_env_var(monkeypatch):

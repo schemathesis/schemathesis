@@ -236,7 +236,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def get_all_operations(
-        self, hooks: HookDispatcher | None = None, generation_config: GenerationConfig | None = None
+        self, generation_config: GenerationConfig | None = None
     ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
         raise NotImplementedError
 
@@ -261,11 +261,10 @@ class BaseSchema(Mapping):
         generation_config: GenerationConfig | None = None,
         seed: int | None = None,
         as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
-        hooks: HookDispatcher | None = None,
         _given_kwargs: dict[str, GivenInput] | None = None,
     ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
         """Generate all operations and Hypothesis tests for them."""
-        for result in self.get_all_operations(hooks=hooks, generation_config=generation_config):
+        for result in self.get_all_operations(generation_config=generation_config):
             if isinstance(result, Ok):
                 operation = result.ok()
                 _as_strategy_kwargs: dict[str, Any] | None
@@ -475,7 +474,7 @@ class BaseSchema(Mapping):
                 generation_config=generation_config,
                 **kwargs,
             )
-            for operation in self.get_all_operations(hooks=hooks)
+            for operation in self.get_all_operations()
             if isinstance(operation, Ok)
         ]
         return combine_strategies(strategies)

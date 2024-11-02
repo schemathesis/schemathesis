@@ -6,7 +6,6 @@ import pathlib
 import re
 from typing import IO, TYPE_CHECKING, Any, cast
 
-from ... import experimental
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
@@ -295,16 +294,7 @@ def from_dict(
 
     def init_openapi_3(forced: bool) -> OpenApi30:
         version = raw_schema["openapi"]
-        if (
-            not (is_openapi_31 and experimental.OPEN_API_3_1.is_enabled)
-            and not forced
-            and not OPENAPI_30_VERSION_RE.match(version)
-        ):
-            if is_openapi_31:
-                raise SchemaError(
-                    SchemaErrorType.OPEN_API_EXPERIMENTAL_VERSION,
-                    f"The provided schema uses Open API {version}, which is currently not fully supported.",
-                )
+        if not is_openapi_31 and not forced and not OPENAPI_30_VERSION_RE.match(version):
             raise SchemaError(
                 SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",

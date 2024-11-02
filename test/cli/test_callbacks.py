@@ -5,7 +5,7 @@ from hypothesis import strategies as st
 
 from schemathesis.cli import callbacks
 from schemathesis.cli.callbacks import SchemaInputKind
-from schemathesis.transports.headers import is_latin_1_encodable
+from schemathesis.core.validation import is_latin_1_encodable
 
 from ..utils import SIMPLE_PATH
 

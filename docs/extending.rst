@@ -345,35 +345,6 @@ Conditions:
 
 In this example, the ``item_id`` path parameter is synchronized with the ``id`` value from the request body, but only for test cases targeting ``PATCH /items/{item_id}/``.
 
-Filtering API Operations
-~~~~~~~~~~~~~~~~~~~~~~~~
-
-Schemathesis provides a ``filter_operations`` hook that allows you to selectively test specific API operations based on their attributes.
-This hook can help you focus your tests on the most relevant parts of your API.
-
-The hook should return a boolean value:
-- Return ``True`` to include the operation in the tests
-- Return ``False`` to skip the operation
-
-Here's an Open API example that includes all operations except those using the POST method:
-
-.. code:: python
-
-    @schemathesis.hook
-    def filter_operations(context):
-        return context.operation.method != "POST"
-
-Here's a GraphQL example that includes all queries:
-
-.. code:: python
-
-    @graphql_schema.hook
-    def filter_operations(context):
-        return context.operation.definition.is_query
-
-In these examples, the ``filter_operations`` hook skips all ``POST`` methods in Open API and all mutations in GraphQL.
-You can implement any custom logic within the ``filter_operations`` function to include or exclude specific API operations.
-
 Extending CLI
 ~~~~~~~~~~~~~
 
@@ -518,42 +489,6 @@ With this hook, you can add additional test cases that will be executed in Hypot
         examples: List[Case],
     ) -> None:
         examples.append(Case(operation=context.operation, query={"foo": "bar"}))
-
-``after_init_cli_run_handlers``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-This hook allows you to extend or redefine a list of CLI handlers that will be used to process runner events:
-
-.. code:: python
-
-    import click
-    import schemathesis
-    from schemathesis.cli.handlers import EventHandler
-    from schemathesis.cli.context import ExecutionContext
-    from schemathesis.runner import events
-    from typing import List
-
-
-    class SimpleHandler(EventHandler):
-        def handle_event(self, context, event):
-            if isinstance(event, events.Finished):
-                click.echo("Done!")
-
-
-    @schemathesis.hook
-    def after_init_cli_run_handlers(
-        context: HookContext,
-        handlers: List[EventHandler],
-        execution_context: ExecutionContext,
-    ) -> None:
-        handlers[:] = [SimpleHandler()]
-
-With this simple handler, only ``Done!`` will be displayed at the end of the test run. For example, you can use this hook to:
-
-- Send events over the network
-- Store logs in a custom format
-- Change the output visual style
-- Display additional information in the output
 
 .. _hooks_before_call:
 

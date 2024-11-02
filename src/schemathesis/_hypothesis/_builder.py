@@ -16,6 +16,7 @@ from jsonschema.exceptions import SchemaError
 from .. import _patches
 from ..auths import get_auth_storage_from_test
 from ..constants import DEFAULT_DEADLINE, NOT_SET
+from ..core.validation import has_invalid_characters, is_latin_1_encodable
 from ..exceptions import OperationSchemaError, SerializationNotPossible
 from ..experimental import COVERAGE_PHASE
 from ..generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
@@ -23,7 +24,6 @@ from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ..models import APIOperation, Case, GenerationMetadata, TestPhase
 from ..parameters import ParameterSet
 from ..transports.content_types import parse_content_type
-from ..transports.headers import has_invalid_characters, is_latin_1_encodable
 from ..types import NotSet
 from ._given import GivenInput
 

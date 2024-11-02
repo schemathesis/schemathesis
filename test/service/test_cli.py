@@ -17,7 +17,7 @@ from schemathesis.service.constants import (
 )
 from schemathesis.service.hosts import load_for_host
 
-from ..utils import flaky, strip_style_win32
+from ..utils import strip_style_win32
 
 
 def get_stdout_lines(stdout):
@@ -79,47 +79,6 @@ def test_server_error(cli, schema_url, service):
     lines = get_stdout_lines(result.stdout)
     assert "Upload: ERROR" in lines
     assert "Please, try again in 30 minutes" in lines
-
-
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-@flaky(max_runs=3, min_passes=1)
-def test_error_in_another_handler(ctx, cli, schema_url, service, snapshot_cli):
-    # When a non-Schemathesis.io handler fails
-    module = ctx.write_pymodule(
-        """
-import click
-import schemathesis
-from schemathesis.cli.handlers import EventHandler
-from schemathesis.runner import events
-
-class FailingHandler(EventHandler):
-
-    def handle_event(self, context, event):
-        raise ZeroDivisionError
-
-@schemathesis.hook
-def after_init_cli_run_handlers(
-    context,
-    handlers,
-    execution_context
-):
-    handlers.append(FailingHandler())
-"""
-    )
-    # And all handlers are shutdown forcefully
-    # And the run fails
-    assert (
-        cli.main(
-            "run",
-            schema_url,
-            "my-api",
-            f"--schemathesis-io-token={service.token}",
-            f"--schemathesis-io-url={service.base_url}",
-            hooks=module,
-        )
-        == snapshot_cli
-    )
 
 
 @pytest.mark.operations("success")

@@ -9,7 +9,6 @@ import click
 import pytest
 from pytest_httpserver.pytest_plugin import PluginHTTPServer
 
-from schemathesis.internal.datetime import current_datetime
 from schemathesis.service import FileReportHandler, ServiceReportHandler
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.hosts import HostData
@@ -190,7 +189,7 @@ def service_report_handler(service_client, hostname, hosts_file, openapi3_schema
             api_name="test",
             location=openapi3_schema_url,
             base_url=None,
-            started_at=current_datetime(),
+            started_at="",
             telemetry=False,
         ),
         out_queue=Queue(),
@@ -209,7 +208,7 @@ def file_report_handler(service_client, hostname, hosts_file, openapi3_schema_ur
             api_name=None,
             location=openapi3_schema_url,
             base_url=None,
-            started_at=current_datetime(),
+            started_at="",
             telemetry=False,
         ),
         in_queue=Queue(),
