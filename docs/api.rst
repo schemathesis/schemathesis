@@ -12,15 +12,6 @@ Data Generation
 .. autoclass:: schemathesis.GenerationConfig
    :members:
 
-Fixups
-~~~~~~
-
-**Available fixups**:
-
-- utf8_bom
-
-.. autofunction:: schemathesis.fixups.install
-.. autofunction:: schemathesis.fixups.uninstall
 
 Authentication
 ~~~~~~~~~~~~~~

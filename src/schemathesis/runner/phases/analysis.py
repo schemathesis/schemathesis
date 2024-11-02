@@ -4,11 +4,11 @@ from ...internal.result import Err, Ok, Result
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
 from .. import events
-from ..context import RunnerContext
+from ..context import EngineContext
 from ..events import EventGenerator
 
 
-def execute(ctx: RunnerContext) -> EventGenerator:
+def execute(ctx: EngineContext) -> EventGenerator:
     from ..phases import PhaseKind
 
     yield events.BeforeAnalysis()

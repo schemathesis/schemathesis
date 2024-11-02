@@ -309,28 +309,6 @@ def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, 
     assert isinstance(hypothesis_settings.database, cls)
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_hypothesis_database_report(cli, schema_url):
-    result = cli.run(schema_url, "--hypothesis-database=:memory:", "-v")
-    assert result.exit_code == ExitCode.OK, result.stdout
-    lines = result.stdout.split("\n")
-    assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_metadata(cli, schema_url):
-    # When the verbose mode is enabled
-    result = cli.run(schema_url, "-v")
-    assert result.exit_code == ExitCode.OK, result.stdout
-    lines = result.stdout.split("\n")
-    # Then there should be metadata displayed
-    assert lines[1].startswith("platform")
-    assert lines[2].startswith("rootdir")
-    assert lines[3].startswith("Hypothesis")
-
-
 def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
@@ -1175,7 +1153,6 @@ def test_exit_first(cli, schema_url, workers_num):
     # And a failure occurs
     result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num), "--show-trace")
     # Then tests are failed
-    print(result.stdout)
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if workers_num == 1:
         lines = result.stdout.split("\n")
@@ -1220,7 +1197,6 @@ def test_long_operation_output(ctx, cli):
     result = cli.run(str(schema_path), "--dry-run")
     # Then this operation name should be truncated
     assert result.exit_code == ExitCode.OK
-    print(result.stdout)
     assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [ 50%]" in result.stdout
     assert "GET /aaaaaaaaaa .                                                         [100%]" in result.stdout
 
@@ -1402,7 +1378,6 @@ def assert_exit_code(event_stream, code):
             validate_schema=False,
             cassette_config=None,
             junit_xml=None,
-            verbosity=0,
             debug_output_file=None,
             client=None,
             report=None,
@@ -1671,7 +1646,7 @@ def test_invalid_schema_with_disabled_validation(
     schema_path = ctx.makefile(openapi_3_schema_with_invalid_security)
     # And the validation is disabled (default)
     # Then we should show an error message derived from JSON Schema
-    assert cli.run(str(schema_path), "--dry-run", "--experimental=openapi-3.1") == snapshot_cli
+    assert cli.run(str(schema_path), "--dry-run") == snapshot_cli
 
 
 def test_unresolvable_reference_with_disabled_validation(

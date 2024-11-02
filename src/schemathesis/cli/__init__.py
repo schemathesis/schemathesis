@@ -5,6 +5,7 @@ import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import Enum
 from queue import Queue
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, NoReturn, Sequence, cast
@@ -14,7 +15,6 @@ import click
 
 from .. import checks as checks_module
 from .. import contrib, experimental, generation, runner, service
-from .. import fixups as _fixups
 from .. import targets as targets_module
 from .._override import CaseOverride
 from ..constants import (
@@ -29,11 +29,8 @@ from ..constants import (
 )
 from ..exceptions import SchemaError
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
-from ..fixups import ALL_FIXUPS
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
-from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope
 from ..internal.checks import CheckConfig
-from ..internal.datetime import current_datetime
 from ..internal.exceptions import format_exception
 from ..internal.fs import ensure_parent
 from ..internal.output import OutputConfig
@@ -269,13 +266,6 @@ REPORT_TO_SERVICE = ReportToService()
     default=False,
     help="Simulate test execution without making any actual requests, useful for validating data generation",
 )
-@grouped_option(
-    "--fixups",
-    help="Apply compatibility adjustments",
-    multiple=True,
-    type=click.Choice([*ALL_FIXUPS, "all"]),
-    metavar="",
-)
 @group("Experimental options")
 @grouped_option(
     "--experimental",
@@ -283,7 +273,6 @@ REPORT_TO_SERVICE = ReportToService()
     help="Enable experimental features",
     type=click.Choice(
         [
-            experimental.OPEN_API_3_1.name,
             experimental.SCHEMA_ANALYSIS.name,
             experimental.STATEFUL_ONLY.name,
             experimental.COVERAGE_PHASE.name,
@@ -559,14 +548,6 @@ REPORT_TO_SERVICE = ReportToService()
     show_default=True,
 )
 @grouped_option(
-    "--contrib-openapi-formats-uuid",
-    "contrib_openapi_formats_uuid",
-    help="Enable support for the 'uuid' string format in OpenAPI",
-    is_flag=True,
-    default=False,
-    show_default=True,
-)
-@grouped_option(
     "--contrib-openapi-fill-missing-examples",
     "contrib_openapi_fill_missing_examples",
     help="Enable generation of random examples for API operations that do not have explicit examples",
@@ -724,7 +705,6 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 )
 @with_hosts_file
 @group("Global options")
-@grouped_option("--verbosity", "-v", help="Increase verbosity of the output", count=True)
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
 @click.pass_context
@@ -788,14 +768,12 @@ def run(
     cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
     wait_for_schema: float | None = None,
-    fixups: tuple[str] = (),  # type: ignore
     rate_limit: str | None = None,
     stateful: Stateful | None = None,
     force_schema_version: str | None = None,
     sanitize_output: bool = True,
     output_truncate: bool = True,
     contrib_unique_data: bool = False,
-    contrib_openapi_formats_uuid: bool = False,
     contrib_openapi_fill_missing_examples: bool = False,
     hypothesis_database: str | None = None,
     hypothesis_deadline: int | NotSet | None = None,
@@ -807,7 +785,6 @@ def run(
     hypothesis_suppress_health_check: list[HealthCheck] | None = None,
     hypothesis_seed: int | None = None,
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
-    verbosity: int = 0,
     no_color: bool = False,
     report_value: str | None = None,
     generation_allow_x00: bool = True,
@@ -868,7 +845,7 @@ def run(
         report = click.utils.LazyFile(report_value, mode="wb")
     else:
         report = REPORT_TO_SERVICE
-    started_at = current_datetime()
+    started_at = datetime.now(timezone.utc).astimezone().isoformat()
 
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
@@ -1028,14 +1005,6 @@ def run(
 
     selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
 
-    if fixups:
-        if "all" in fixups:
-            _fixups.install()
-        else:
-            _fixups.install(fixups)
-
-    if contrib_openapi_formats_uuid:
-        contrib.openapi.formats.uuid.install()
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
 
@@ -1095,7 +1064,6 @@ def run(
         validate_schema=validate_schema,
         cassette_config=cassette_config,
         junit_xml=junit_xml,
-        verbosity=verbosity,
         debug_output_file=debug_output_file,
         client=client,
         report=report,
@@ -1277,7 +1245,6 @@ def execute(
     validate_schema: bool,
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
-    verbosity: int,
     debug_output_file: click.utils.LazyFile | None,
     client: ServiceClient | None,
     report: ReportToService | click.utils.LazyFile | None,
@@ -1325,7 +1292,6 @@ def execute(
         validate_schema=validate_schema,
         cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
-        verbosity=verbosity,
         report=report_context,
         output_config=output_config,
     )
@@ -1334,7 +1300,6 @@ def execute(
         for _handler in handlers:
             _handler.shutdown()
 
-    GLOBAL_HOOK_DISPATCHER.dispatch("after_init_cli_run_handlers", HookContext(), handlers, execution_context)
     event = None
     try:
         for event in event_stream:
@@ -1669,13 +1634,3 @@ def handler() -> Callable[[type], None]:
         CUSTOM_HANDLERS.append(cls)
 
     return _wrapper
-
-
-@HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_init_cli_run_handlers(
-    context: HookContext, handlers: list[EventHandler], execution_context: ExecutionContext
-) -> None:
-    """Called after CLI hooks are initialized.
-
-    Might be used to add extra event handlers.
-    """

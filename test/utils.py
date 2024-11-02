@@ -14,7 +14,6 @@ from syrupy import SnapshotAssertion
 import schemathesis
 from schemathesis.exceptions import CheckFailed
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.internal.transformation import merge_recursively
 from schemathesis.loaders import load_yaml
 
 if TYPE_CHECKING:
@@ -34,6 +33,19 @@ SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseSchema:
     schema = make_schema(schema_name, **kwargs)
     return schemathesis.from_dict(schema)
+
+
+def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
+    """Merge two dictionaries recursively."""
+    for key in b:
+        if key in a:
+            if isinstance(a[key], dict) and isinstance(b[key], dict):
+                merge_recursively(a[key], b[key])
+            else:
+                a[key] = b[key]
+        else:
+            a[key] = b[key]
+    return a
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:

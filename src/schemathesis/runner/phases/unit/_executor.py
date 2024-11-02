@@ -43,7 +43,7 @@ from ....internal.exceptions import deduplicate_errors
 from ....transports import RequestsTransport
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
-from ...context import RunnerContext
+from ...context import EngineContext
 from ...models.check import Check
 from ...models.outcome import TestResult
 from ...models.status import Status
@@ -57,7 +57,7 @@ if TYPE_CHECKING:
     from ....transports.responses import GenericResponse
 
 
-def run_test(*, operation: APIOperation, test_function: Callable, ctx: RunnerContext) -> events.EventGenerator:
+def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineContext) -> events.EventGenerator:
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
@@ -370,7 +370,7 @@ class ErrorCollector:
 
 
 def cached_test_func(f: Callable) -> Callable:
-    def wrapped(*, ctx: RunnerContext, case: Case, errors: list[Exception], result: TestResult, **kwargs: Any) -> None:
+    def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], result: TestResult, **kwargs: Any) -> None:
         with ErrorCollector(errors):
             if ctx.is_stopped:
                 raise KeyboardInterrupt
@@ -398,7 +398,7 @@ def cached_test_func(f: Callable) -> Callable:
 
 
 @cached_test_func
-def network_test(*, ctx: RunnerContext, case: Case, result: TestResult, session: requests.Session) -> None:
+def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session: requests.Session) -> None:
     headers = ctx.config.network.headers
     if not ctx.config.execution.dry_run:
         _network_test(case, ctx, result, session, headers)
@@ -407,7 +407,7 @@ def network_test(*, ctx: RunnerContext, case: Case, result: TestResult, session:
 
 
 def _network_test(
-    case: Case, ctx: RunnerContext, result: TestResult, session: requests.Session, headers: dict[str, Any] | None
+    case: Case, ctx: EngineContext, result: TestResult, session: requests.Session, headers: dict[str, Any] | None
 ) -> requests.Response:
     import requests
 

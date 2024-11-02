@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from io import StringIO
 from typing import Any, Dict, List, Union
-from xml.etree import ElementTree
+
+from schemathesis.core.generator.filters import is_valid_xml
 
 from .exceptions import UnboundPrefixError
 from .internal.copy import fast_deepcopy
@@ -37,17 +38,6 @@ def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict
 
         reject()
     return {"data": data.encode("utf8")}
-
-
-_from_string = ElementTree.fromstring
-
-
-def is_valid_xml(data: str) -> bool:
-    try:
-        _from_string(f"<root xmlns:smp='{NAMESPACE_URL}'>{data}</root>")
-        return True
-    except ElementTree.ParseError:
-        return False
 
 
 def _get_xml_tag(raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None) -> str:

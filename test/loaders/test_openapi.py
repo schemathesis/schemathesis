@@ -45,7 +45,6 @@ def test_force_open_api_version(version, schema, expected):
 @pytest.mark.parametrize(
     ("version", "expected"),
     [
-        ("3.1.0", "The provided schema uses Open API 3.1.0, which is currently not fully supported."),
         ("3.2.0", "The provided schema uses Open API 3.2.0, which is currently not supported."),
     ],
 )
