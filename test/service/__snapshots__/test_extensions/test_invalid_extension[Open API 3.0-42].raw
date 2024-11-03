@@ -58,7 +58,7 @@ Tip: Please update your CLI to the latest version and try again.
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                    1 / 3 passed          FAILED 
+    not_a_server_error                    1 / 2 passed          FAILED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

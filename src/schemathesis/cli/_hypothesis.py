@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from schemathesis.core import NotSet
+
 from ..constants import DEFAULT_DEADLINE, HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
-from ..types import NotSet
 
 if TYPE_CHECKING:
     import hypothesis

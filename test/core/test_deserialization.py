@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.loaders import load_yaml
+from schemathesis.core.deserialization import deserialize_yaml
 
 
 @pytest.mark.parametrize(
@@ -13,5 +13,5 @@ from schemathesis.loaders import load_yaml
     ],
     ids=["string-key-string-value", "int-key-string-value", "int-key-int-value", "bool-key-bool-value"],
 )
-def test_parse(value, expected):
-    assert load_yaml(value) == expected
+def test_deserialize_yaml(value, expected):
+    assert deserialize_yaml(value) == expected

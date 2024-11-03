@@ -8,14 +8,14 @@ from dataclasses import dataclass
 from datetime import timedelta
 from functools import lru_cache
 from inspect import iscoroutinefunction
-from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar
 from urllib.parse import urlparse
 
-from .. import failures
-from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
-from ..exceptions import get_timeout_error
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.failures import Failure
+
+from ..constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER
 from ..serializers import SerializerContext
-from ..types import Cookies, Headers, NotSet
 
 if TYPE_CHECKING:
     import requests
@@ -26,6 +26,19 @@ if TYPE_CHECKING:
 
     from ..models import Case
     from .responses import WSGIResponse
+
+
+class RequestTimeout(Failure):
+    """Request took longer than timeout."""
+
+    timeout: int
+    message: str
+    title: str = "Response timeout"
+    code: str = "request_timeout"
+
+    @property
+    def _unique_key(self) -> str:
+        return str(self.timeout)
 
 
 def serialize_payload(payload: bytes) -> str:
@@ -133,11 +146,10 @@ class RequestsTransport:
         **kwargs: Any,
     ) -> requests.Response:
         import requests
-        from urllib3.exceptions import ReadTimeoutError
 
         data = self.serialize_case(case, base_url=base_url, headers=headers, params=params, cookies=cookies)
         data.update(kwargs)
-        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
+        data.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
         if session is None:
             validate_vanilla_requests_kwargs(data)
             session = requests.Session()
@@ -145,35 +157,8 @@ class RequestsTransport:
         else:
             close_session = False
         verify = data.get("verify", True)
-        try:
-            with case.operation.schema.ratelimit():
-                response = session.request(**data)  # type: ignore
-        except (requests.Timeout, requests.ConnectionError) as exc:
-            if isinstance(exc, requests.ConnectionError):
-                if not isinstance(exc.args[0], ReadTimeoutError):
-                    raise
-                req = requests.Request(
-                    method=data["method"].upper(),
-                    url=data["url"],
-                    headers=data["headers"],
-                    files=data.get("files"),
-                    data=data.get("data") or {},
-                    json=data.get("json"),
-                    params=data.get("params") or {},
-                    auth=data.get("auth"),
-                    cookies=data["cookies"],
-                    hooks=data.get("hooks"),
-                )
-                request = session.prepare_request(req)
-            else:
-                request = cast(requests.PreparedRequest, exc.request)
-            timeout = 1000 * data["timeout"]  # It is defined and not empty, since the exception happened
-            code_sample = case.as_curl_command(dict(request.headers), verify=verify)
-            message = f"The server failed to respond within the specified limit of {timeout:.2f}ms"
-            raise get_timeout_error(case.operation.verbose_name, timeout)(
-                f"\n\n1. {failures.RequestTimeout.title}\n\n{message}\n\n{code_sample}",
-                context=failures.RequestTimeout(message=message, timeout=timeout),
-            ) from None
+        with case.operation.schema.ratelimit():
+            response = session.request(**data)  # type: ignore
         response.verify = verify  # type: ignore[attr-defined]
         response._session = session  # type: ignore[attr-defined]
         if close_session:
@@ -314,7 +299,7 @@ class WSGITransport:
 
 
 @contextmanager
-def cookie_handler(client: werkzeug.Client, cookies: Cookies | None) -> Generator[None, None, None]:
+def cookie_handler(client: werkzeug.Client, cookies: dict[str, Any] | None) -> Generator[None, None, None]:
     """Set cookies required for a call."""
     if not cookies:
         yield
@@ -338,7 +323,7 @@ class PreparedRequestData:
     method: str
     url: str
     body: str | bytes | None
-    headers: Headers
+    headers: dict[str, Any]
 
 
 def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:

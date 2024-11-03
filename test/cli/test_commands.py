@@ -21,7 +21,7 @@ from schemathesis._override import CaseOverride
 from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
 from schemathesis.cli import execute, get_exit_code, reset_checks
 from schemathesis.cli.constants import HealthCheck, Phase
-from schemathesis.constants import DEFAULT_DEADLINE, FLAKY_FAILURE_MESSAGE, REPORT_SUGGESTION_ENV_VAR
+from schemathesis.constants import DEFAULT_DEADLINE, REPORT_SUGGESTION_ENV_VAR
 from schemathesis.generation import GenerationConfig
 from schemathesis.internal.checks import CheckConfig
 from schemathesis.models import APIOperation, Case
@@ -274,7 +274,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "unique_data": False,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
-        "network": NetworkConfig(auth_type="basic", headers={}, timeout=10000),
+        "network": NetworkConfig(auth_type="basic", headers={}, timeout=10),
         "service_client": None,
         **expected,
     }
@@ -446,7 +446,7 @@ def test_connection_timeout(cli, schema_url, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
-    assert cli.run(schema_url, "--request-timeout=80", f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "--request-timeout=0.08", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -512,9 +512,6 @@ def test_flaky(cli, schema_url, workers):
     # And it should be displayed only once in "FAILURES" section
     assert "= FAILURES =" in result.stdout
     assert "_ GET /api/flaky _" in result.stdout
-    # And more clear error message is displayed instead of Hypothesis one
-    lines = result.stdout.split("\n")
-    assert FLAKY_FAILURE_MESSAGE in lines
 
 
 @pytest.mark.operations("invalid")

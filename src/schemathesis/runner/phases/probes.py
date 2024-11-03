@@ -13,7 +13,8 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from ...constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
+
 from ...internal.exceptions import format_exception
 from ...sanitization import sanitize_url, sanitize_value
 from ...transports.auth import get_requests_auth
@@ -163,7 +164,7 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
-        kwargs: dict[str, Any] = {"timeout": config.prepared_timeout or 2}
+        kwargs: dict[str, Any] = {"timeout": config.timeout or 2}
         if config.proxy is not None:
             kwargs["proxies"] = {"all": config.proxy}
         with warnings.catch_warnings():

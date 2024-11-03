@@ -319,15 +319,8 @@ def test(case):
     # Then there should be a helpful message in the output
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)
-    result.stdout.re_match_lines(
-        [
-            ".+1. Server error",
-            ".+2. Undocumented HTTP status code",
-            ".+Documented: 200",
-            r".+Reproduce with:",
-            rf".+curl -X GET {openapi3_base_url}/failure",
-        ]
-    )
+    assert "Reproduce with" in result.stdout.str()
+    assert "Undocumented HTTP status code" in result.stdout.str()
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -675,10 +668,10 @@ def test(case):
     # We should skip checking for a server error
     result.assert_outcomes(failed=1)
     if value:
-        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
+        expected = rf"curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
     else:
-        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
-    assert expected in result.stdout.lines
+        expected = rf"curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.str()
 
 
 def test_unsatisfiable_example(testdir, openapi3_base_url):

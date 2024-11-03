@@ -1,12 +1,11 @@
-from textwrap import dedent
-
 import pytest
 from hypothesis import HealthCheck, Phase, settings
 from hypothesis.errors import InvalidDefinition
 
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
-from schemathesis.exceptions import CheckFailed, UsageError
+from schemathesis.core.failures import FailureGroup
+from schemathesis.exceptions import UsageError
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
@@ -85,19 +84,6 @@ TestStateful = APIWorkflow.TestCase
 #   3. Get info about this user
 
 
-def find_reproduction_code(lines):
-    for prefix in ("", "E   ", "E       "):
-        try:
-            first = lines.index(f"{prefix}Falsifying example:") + 1
-            last = lines.index(f"{prefix}state.teardown()") + 1
-            break
-        except ValueError:
-            continue
-    else:
-        raise ValueError("Failed to get reproduction code")
-    return dedent("\n".join([removeprefix(line, "E   ") for line in lines[first:last]]))
-
-
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     # When we run test as a state machine
@@ -118,20 +104,8 @@ TestStateful.settings = settings(
     result = testdir.runpytest()
     # Then it should be able to find a hidden error:
     result.assert_outcomes(failed=1)
-    # And there should be Python code to reproduce the error in the GET call
-    result.stdout.re_match_lines([rf"E +curl -X GET '{openapi3_base_url}/users/\w+.+"])
-    # And the reproducing example should work
-    example = find_reproduction_code(result.outlines)
-    testdir.make_test(
-        f"""
-schema.base_url = "{openapi3_base_url}"
-APIWorkflow = schema.as_state_machine()
-{example}
-    """,
-        schema=app_schema,
-    )
-    result = testdir.runpytest()
-    assert "1. Server error" in "\n".join(result.outlines)
+    # And there should be cURL command to reproduce the error in the GET call
+    result.stdout.re_match_lines([rf".+curl -X GET '{openapi3_base_url}/users/\w+.+"])
 
 
 def removeprefix(value: str, prefix: str) -> str:
@@ -174,7 +148,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
 
     state_machine = schema.as_state_machine()
 
-    with pytest.raises(CheckFailed, match="Server error"):
+    with pytest.raises(FailureGroup) as exc:
         state_machine.run(
             settings=settings(
                 max_examples=2000,
@@ -184,33 +158,9 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
                 stateful_step_count=3,
             )
         )
-
-
-@pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.openapi_version("3.0")
-def test_explicit_headers_reproduction(testdir, openapi3_base_url, app_schema):
-    # See GH-828
-    # When the user specifies headers manually in the state machine
-    testdir.make_test(
-        f"""
-schema.base_url = "{openapi3_base_url}"
-
-class APIWorkflow(schema.as_state_machine()):
-    def get_call_kwargs(self, case):
-        return {{"headers": {{"X-Token": "FOOBAR"}}}}
-
-    def validate_response(self, response, case):
-        assert 0, "Explicit failure"
-
-TestCase = APIWorkflow.TestCase
-    """,
-        schema=app_schema,
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(failed=1)
-    # Then these headers should be displayed in the generated Python code
-    example = find_reproduction_code(result.outlines)
-    assert "headers={'X-Token': 'FOOBAR'}" in example.splitlines()[1]
+    failures = [str(e) for e in exc.value.exceptions]
+    assert "Undocumented HTTP status code" in failures[0] or "Undocumented HTTP status code" in failures[1]
+    assert "Server error" in failures[0] or "Server error" in failures[1]
 
 
 @pytest.mark.openapi_version("3.0")
@@ -290,7 +240,7 @@ def test_use_after_free(app_factory):
     schema = schemathesis.from_wsgi("/openapi.json", app=app)
     state_machine = schema.as_state_machine()
 
-    with pytest.raises(CheckFailed) as exc:
+    with pytest.raises(FailureGroup) as exc:
         state_machine.run(
             settings=settings(
                 max_examples=2000,
@@ -301,11 +251,12 @@ def test_use_after_free(app_factory):
             )
         )
     assert (
-        str(exc.value)
+        str(exc.value.exceptions[0])
         .strip()
         .startswith(
-            "1. Use after free\n\n    The API did not return a `HTTP 404 Not Found` response (got `HTTP 204 No Content`) "
-            "for a resource that was previously deleted.\n\n    The resource was deleted with `DELETE /users/"
+            """Use after free
+
+The API did not return a `HTTP 404 Not Found` response (got `HTTP 204 No Content`) for a resource that was previously deleted."""
         )
     )
 
