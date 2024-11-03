@@ -108,14 +108,6 @@ The ``case`` object that is injected in each test can be modified, assuming your
     def test_api(case):
         case.path_parameters["user_id"] = 42
 
-Why does Schemathesis fail to parse my API schema generate by FastAPI?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-`FastAPI <https://github.com/tiangolo/fastapi>`_ uses `pydantic <https://github.com/samuelcolvin/pydantic>`_, which in turn uses JSON Schema Draft 7.
-This can lead to compatibility issues as OpenAPI 2.0 and 3.0.x use earlier versions of JSON Schema.
-
-For detailed solutions, please refer to the :ref:`Compatibility section <compatibility-fastapi>`.
-
 Why Schemathesis generates uniform data for my API schema?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -263,21 +255,6 @@ To prevent this situation you might use ``required`` and ``additionalProperties`
 By adding these keywords, any ``Cat`` instance will always require the ``hunts`` and ``age`` properties to be present.
 
 As an alternative, you could use the ``anyOf`` keyword instead.
-
-Why Schemathesis does not generate UUIDs for Open API 2.0 / 3.0 even if ``format: uuid`` is specified?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Open API 2.0 / 3.0 do not declare the ``uuid`` format as built-in. You have two options to enable UUID generation:
-
-1. Use an extension:
-
-.. code:: python
-
-    from schemathesis.contrib.openapi import formats
-
-    formats.uuid.install()
-
-2. Enable experimental support for OpenAPI 3.1, which also activates UUID generation. See the :ref:`Experimental Features <experimental-openapi-31>` section for details.
 
 Why is Schemathesis slower on Windows when using ``localhost``?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

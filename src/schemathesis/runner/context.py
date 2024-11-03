@@ -4,7 +4,8 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar
 
-from ..constants import NOT_SET
+from schemathesis.core import NOT_SET, NotSet
+
 from .control import ExecutionControl
 from .errors import EngineErrorInfo
 from .models import TestResult, TestResultSet
@@ -14,7 +15,6 @@ if TYPE_CHECKING:
 
     from ..exceptions import OperationSchemaError
     from ..models import Case
-    from ..types import NotSet
     from . import events
     from .config import EngineConfig
     from .phases import PhaseKind
@@ -95,12 +95,11 @@ class EngineContext:
         has_not_found = False
         for entry in self.data.results:
             for check in entry.checks:
-                if check.response is not None:
-                    if check.response.status_code == 404:
-                        has_not_found = True
-                    else:
-                        # There are non-404 responses, no reason to check any other response
-                        return False
+                if check.response.status_code == 404:
+                    has_not_found = True
+                else:
+                    # There are non-404 responses, no reason to check any other response
+                    return False
         # Only happens if all responses are 404, or there are no responses at all.
         # In the first case, it returns True, for the latter - False
         return has_not_found

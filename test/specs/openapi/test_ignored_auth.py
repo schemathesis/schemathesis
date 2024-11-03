@@ -11,13 +11,18 @@ from hypothesis import Phase, given, settings
 from starlette_testclient import TestClient
 
 import schemathesis
-from schemathesis.exceptions import CheckFailed
+from schemathesis.core.failures import FailureGroup
 from schemathesis.generation import GenerationConfig
 from schemathesis.internal.checks import CheckContext
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Status
-from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_auth_from_case, ignored_auth
+from schemathesis.specs.openapi.checks import (
+    AuthKind,
+    _contains_auth,
+    _remove_auth_from_case,
+    ignored_auth,
+)
 
 
 def run(schema_url, headers=None, **loader_kwargs):
@@ -175,8 +180,9 @@ def test_proper_session(ignores_auth):
         case.call_and_validate(session=client)
 
     if ignores_auth:
-        with pytest.raises(CheckFailed, match="with invalid auth"):
+        with pytest.raises(FailureGroup) as exc:
             test()
+        assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced for this operation")
     else:
         test()
 
@@ -206,12 +212,9 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
         client = TestClient(app)
         case.call_and_validate(session=client, headers={"x-api-key": "INCORRECT"})
 
-    if ignores_auth:
-        matches = "with any auth"
-    else:
-        matches = "that requires authentication"
-    with pytest.raises(CheckFailed, match=matches):
+    with pytest.raises(FailureGroup) as exc:
         test()
+    assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced for this operation")
 
 
 @pytest.mark.openapi_version("3.0")

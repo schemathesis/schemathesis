@@ -9,7 +9,8 @@ from dataclasses import dataclass, field
 from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cast
 
-from ...constants import NOT_SET
+from schemathesis.core import NOT_SET, NotSet
+
 from ...models import APIOperation, Case, TransitionId
 from ...stateful.state_machine import Direction
 from . import expressions
@@ -19,8 +20,6 @@ from .references import RECURSION_DEPTH_LIMIT
 if TYPE_CHECKING:
     from hypothesis.vendor.pretty import RepresentationPrinter
     from jsonschema import RefResolver
-
-    from ...types import NotSet
 
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"

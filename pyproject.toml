@@ -32,7 +32,7 @@ classifiers = [
 ]
 dependencies = [
   "backoff>=2.1.2,<3.0",
-  "click>=7.0,<9.0",
+  "click>=8.0,<9.0",
   "colorama>=0.4,<1.0",
   "harfile>=0.3.0,<1.0",
   "httpx>=0.22.0,<1.0",
@@ -127,6 +127,7 @@ select = [
   "B", # flake8-bugbear
   "D", # pydocstyle
   "T201",
+  "I",
 ]
 ignore = [
   "E501", # Line too long

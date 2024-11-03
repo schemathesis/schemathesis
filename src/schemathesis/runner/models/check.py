@@ -1,17 +1,18 @@
 from __future__ import annotations
 
-import textwrap
 from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any
+from functools import cached_property
+from itertools import groupby
+from typing import TYPE_CHECKING, Any, Generator, Iterator
+
+from schemathesis.core.failures import Failure
 
 from ...transports import get_excluded_headers
 from .status import Status
 from .transport import Request, Response
 
 if TYPE_CHECKING:
-    from ...exceptions import FailureContext
     from ...models import Case
-    from ...transports import PreparedRequestData
 
 
 @dataclass(repr=False)
@@ -21,34 +22,33 @@ class Check:
     name: str
     value: Status
     request: Request
-    response: Response | None
+    response: Response
     case: Case
-    message: str | None = None
-    # Failure-specific context
-    context: FailureContext | None = None
+    failure: Failure | None = None
 
-    def prepare_code_sample_data(self) -> PreparedRequestData:
-        headers = {key: value[0] for key, value in self.request.headers.items() if key not in get_excluded_headers()}
-        return self.case.prepare_code_sample_data(headers)
+    @cached_property
+    def code_sample(self) -> str:
+        from schemathesis import code_samples
+        from schemathesis.sanitization import sanitize_value
 
-    @property
-    def title(self) -> str:
-        if self.context is not None:
-            return self.context.title
-        return f"Custom check failed: `{self.name}`"
+        data = self.case.prepare_code_sample_data(
+            {key: value[0] for key, value in self.request.headers.items() if key not in get_excluded_headers()},
+        )
 
-    @property
-    def formatted_message(self) -> str | None:
-        if self.context is not None:
-            if self.context.message:
-                message = self.context.message
-            else:
-                message = None
-        else:
-            message = self.message
-        if message is not None:
-            message = textwrap.indent(message, prefix="    ")
-        return message
+        headers = None
+        if self.case.headers is not None:
+            headers = dict(self.case.headers)
+            if self.case.operation.schema.sanitize_output:
+                sanitize_value(headers)
+
+        return code_samples.generate(
+            method=self.case.method,
+            url=data.url,
+            body=data.body,
+            headers=headers,
+            verify=self.response.verify,
+            extra_headers=data.headers,
+        )
 
     def asdict(self) -> dict[str, Any]:
         return {
@@ -60,26 +60,22 @@ class Check:
                 "body": self.request.encoded_body,
                 "headers": self.request.headers,
             },
-            "response": self.response.asdict() if self.response is not None else None,
-            "example": self.case.asdict(),
-            "message": self.message,
-            "context": asdict(self.context) if self.context is not None else None,  # type: ignore
+            "response": self.response.asdict(),
+            "case": self.case.asdict(),
+            "failure": asdict(self.failure) if self.failure is not None else None,  # type: ignore
         }
 
 
-def deduplicate_failures(checks: list[Check]) -> list[Check]:
-    """Return only unique checks that should be displayed in the output."""
-    seen: set[tuple[str | None, ...]] = set()
-    unique_checks = []
-    for check in reversed(checks):
-        # There are also could be checks that didn't fail
-        if check.value == Status.failure:
-            key: tuple
-            if check.context is not None:
-                key = check.context.unique_by_key(check.message)
-            else:
-                key = check.name, check.message
-            if key not in seen:
-                unique_checks.append(check)
-                seen.add(key)
-    return unique_checks
+def group_failures_by_code_sample(checks: list[Check]) -> Generator[tuple[str, Iterator[Check]], None, None]:
+    deduplicated = {check.failure: check for check in checks if check.failure is not None}
+    failures = sorted(deduplicated.values(), key=_by_unique_key)
+    for (sample, _, _), gen in groupby(failures, _by_unique_key):
+        yield (sample, gen)
+
+
+def _by_unique_key(check: Check) -> tuple[str, int, bytes]:
+    return (
+        check.code_sample,
+        check.response.status_code,
+        check.response.body or b"SCHEMATHESIS-INTERNAL-EMPTY-BODY",
+    )

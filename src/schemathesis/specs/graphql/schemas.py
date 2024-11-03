@@ -24,16 +24,18 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.core import NOT_SET, NotSet
+
 from ... import auths
 from ...checks import not_a_server_error
-from ...constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
+from ...constants import SCHEMATHESIS_TEST_CASE_HEADER
 from ...exceptions import OperationNotFound, OperationSchemaError
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...types import Body, Cookies, Headers, NotSet, PathParameters, Query
+from ...types import Body
 from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
@@ -56,6 +58,8 @@ class RootType(enum.Enum):
 class GraphQLCase(Case):
     def __hash__(self) -> int:
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
+
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     def _get_url(self, base_url: str | None) -> str:
         base_url = self._get_base_url(base_url)
@@ -84,11 +88,13 @@ class GraphQLCase(Case):
 C = TypeVar("C", bound=Case)
 
 
-@dataclass
+@dataclass(repr=False)
 class GraphQLOperationDefinition(OperationDefinition):
     field_name: str
     type_: graphql.GraphQLType
     root_type: RootType
+
+    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
     @property
     def is_query(self) -> bool:
@@ -260,10 +266,10 @@ class GraphQLSchema(BaseSchema):
         *,
         case_cls: type[C],
         operation: APIOperation,
-        path_parameters: PathParameters | None = None,
-        headers: Headers | None = None,
-        cookies: Cookies | None = None,
-        query: Query | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
         body: Body | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:

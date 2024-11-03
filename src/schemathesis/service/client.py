@@ -10,7 +10,8 @@ from urllib.parse import urljoin
 import requests
 from requests.adapters import HTTPAdapter, Retry
 
-from ..constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
+
 from .constants import CI_PROVIDER_HEADER, REPORT_CORRELATION_ID_HEADER, REQUEST_TIMEOUT, UPLOAD_SOURCE_HEADER
 from .metadata import Metadata, collect_dependency_versions
 from .models import (

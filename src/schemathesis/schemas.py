@@ -17,11 +17,12 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
+from schemathesis.core import NOT_SET, NotSet
+
 from ._hypothesis._builder import create_test
 from ._hypothesis._given import GivenInput, given_proxy
 from ._pytest.markers import has_schemathesis_handle, set_schemathesis_handle
 from .auths import AuthStorage
-from .constants import NOT_SET
 from .exceptions import OperationSchemaError, UsageError
 from .filters import (
     FilterSet,
@@ -50,17 +51,7 @@ if TYPE_CHECKING:
     from .stateful.state_machine import APIStateMachine
     from .transports import Transport
     from .transports.responses import GenericResponse
-    from .types import (
-        Body,
-        Cookies,
-        FormData,
-        GenericTest,
-        Headers,
-        NotSet,
-        PathParameters,
-        Query,
-        Specification,
-    )
+    from .types import Body, Specification
 
 
 C = TypeVar("C", bound=Case)
@@ -82,7 +73,7 @@ class BaseSchema(Mapping):
     app: Any = None
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
-    test_function: GenericTest | None = None
+    test_function: Callable | None = None
     validate_schema: bool = True
     data_generation_methods: list[DataGenerationMethod] = field(
         default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
@@ -293,7 +284,7 @@ class BaseSchema(Mapping):
     ) -> Callable:
         """Mark a test function as a parametrized one."""
 
-        def wrapper(func: GenericTest) -> GenericTest:
+        def wrapper(func: Callable) -> Callable:
             if has_schemathesis_handle(func):
 
                 def wrapped_test(*_: Any, **__: Any) -> NoReturn:
@@ -324,7 +315,7 @@ class BaseSchema(Mapping):
         self,
         *,
         base_url: str | None | NotSet = NOT_SET,
-        test_function: GenericTest | None = None,
+        test_function: Callable | None = None,
         app: Any = NOT_SET,
         hooks: HookDispatcher | NotSet = NOT_SET,
         auth: AuthStorage | NotSet = NOT_SET,
@@ -395,7 +386,7 @@ class BaseSchema(Mapping):
             local_dispatcher.dispatch(name, context, *args, **kwargs)
 
     def prepare_multipart(
-        self, form_data: FormData, operation: APIOperation
+        self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         """Split content of `form_data` into files & data.
 
@@ -411,10 +402,10 @@ class BaseSchema(Mapping):
         *,
         case_cls: type[C],
         operation: APIOperation,
-        path_parameters: PathParameters | None = None,
-        headers: Headers | None = None,
-        cookies: Cookies | None = None,
-        query: Query | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
         body: Body | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:

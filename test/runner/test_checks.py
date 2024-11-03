@@ -8,7 +8,6 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import models
-from schemathesis._compat import MultipleFailures
 from schemathesis.checks import (
     content_type_conformance,
     not_a_server_error,
@@ -16,10 +15,12 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from schemathesis.exceptions import CheckFailed, OperationSchemaError
+from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.exceptions import OperationSchemaError
 from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition
-from schemathesis.runner.models import TestResult, deduplicate_failures
+from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
+from schemathesis.runner.models import TestResult
 from schemathesis.runner.phases.unit._executor import run_checks
 from schemathesis.specs.openapi.checks import _coerce_header_value
 
@@ -233,7 +234,7 @@ def test_not_a_server_error(value, swagger_20, response_factory):
     case = make_case(swagger_20, {})
     with pytest.raises(AssertionError) as exc_info:
         not_a_server_error(CTX, response, case)
-    assert exc_info.type.__name__ == "CheckFailed"
+    assert exc_info.type.__name__ == "ServerError"
 
 
 @pytest.mark.parametrize("value", [400, 405])
@@ -249,9 +250,8 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     response = response_factory.requests()
     response.status_code = value
     case = make_case(swagger_20, {"responses": {"5XX"}})
-    with pytest.raises(AssertionError) as exc_info:
+    with pytest.raises(UndefinedStatusCode):
         status_code_conformance(CTX, response, case)
-    assert exc_info.type.__name__ == "CheckFailed"
 
 
 @pytest.mark.parametrize("spec", ["swagger", "openapi"], indirect=["spec"])
@@ -261,12 +261,9 @@ def test_status_code_conformance_invalid(value, swagger_20, response_factory):
     indirect=["response", "case"],
 )
 def test_content_type_conformance_invalid(spec, response, case):
-    with pytest.raises(AssertionError, match="Undocumented Content-Type") as exc_info:
+    with pytest.raises(UndefinedContentType, match="Undocumented Content-Type") as exc_info:
         content_type_conformance(CTX, response, case)
-    assert exc_info.type.__name__ == "CheckFailed"
-    assert (
-        exc_info.value.context.message == f"Received: {response.headers['Content-Type']}\nDocumented: application/json"
-    )
+    assert exc_info.value.message == f"Received: {response.headers['Content-Type']}\nDocumented: application/json"
 
 
 def test_invalid_schema_on_content_type_check(response_factory):
@@ -291,7 +288,7 @@ def test_missing_content_type_header(case, response_factory):
     # When the response has no `Content-Type` header
     response = response_factory.requests(content_type=None)
     # Then an error should be risen
-    with pytest.raises(CheckFailed, match="Missing Content-Type header"):
+    with pytest.raises(Failure, match="Missing Content-Type header"):
         content_type_conformance(CTX, response, case)
 
 
@@ -455,8 +452,39 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
     # And no "Content-Type" header in the received response
     response = response_factory.requests(content_type=None, status_code=200)
     # Then the check should fail
-    with pytest.raises(MultipleFailures, match="Missing Content-Type header"):
+    with pytest.raises(FailureGroup) as exc:
         response_schema_conformance(CTX, response, case)
+    assert (
+        str(exc.value.exceptions[0])
+        == """Missing Content-Type header
+
+The following media types are documented in the schema:
+- `application/json`"""
+    )
+    assert (
+        str(exc.value.exceptions[1])
+        == """Response violates schema
+
+'success' is a required property
+
+Schema:
+
+    {
+        "type": "object",
+        "properties": {
+            "success": {
+                "type": "boolean"
+            }
+        },
+        "required": [
+            "success"
+        ]
+    }
+
+Value:
+
+    {}"""
+    )
 
 
 @pytest.mark.parametrize(
@@ -470,10 +498,9 @@ def test_response_conformance_no_content_type(request, spec, response_factory):
 def test_response_schema_conformance_invalid_swagger(swagger_20, content, definition, response_factory):
     response = response_factory.requests(content=content)
     case = make_case(swagger_20, definition)
-    with pytest.raises(AssertionError) as exc_info:
+    with pytest.raises(JsonSchemaError):
         response_schema_conformance(CTX, response, case)
     assert not case.operation.is_response_valid(response)
-    assert exc_info.type.__name__ == "CheckFailed"
 
 
 @pytest.mark.parametrize(
@@ -557,7 +584,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
     @settings(max_examples=3, deadline=None)
     def test(case):
         response = response_factory.requests(content=json.dumps({"foo": 1}).encode())
-        with pytest.raises(AssertionError):
+        with pytest.raises(FailureGroup):
             case.validate_response(response)
         assert not case.operation.is_response_valid(response)
 
@@ -596,19 +623,19 @@ def test_deduplication(ctx, response_factory):
     case = operation.make_case()
     response = response_factory.requests()
     result = TestResult(verbose_name=operation.verbose_name)
-    failures = []
+    checks = []
     # When there are two checks that raise the same failure
-    with pytest.raises(CheckFailed):
+    with pytest.raises(FailureGroup):
         run_checks(
             case=case,
             ctx=CTX,
             checks=(content_type_conformance, response_schema_conformance),
-            check_results=failures,
+            check_results=checks,
             result=result,
             response=response,
         )
     # Then the resulting output should be deduplicated
-    assert len(deduplicate_failures(failures)) == 1
+    assert len([check for check in checks if check.failure is not None]) == 1
 
 
 @pytest.fixture(params=["2.0", "3.0"])
@@ -771,8 +798,42 @@ def test_header_conformance_multiple_invalid_headers(ctx, response_factory):
     schema = schemathesis.from_dict(raw_schema, validate_schema=True)
     case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150", "X-RateLimit-Reset": "Invalid"})
-    with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
+    with pytest.raises(FailureGroup) as exc:
         response_headers_conformance(CTX, response, case)
+    assert (
+        str(exc.value.exceptions[0])
+        == """Response header does not conform to the schema
+
+150 is greater than the maximum of 100
+
+Schema:
+
+    {
+        "type": "integer",
+        "maximum": 100
+    }
+
+Value:
+
+    150"""
+    )
+    assert (
+        str(exc.value.exceptions[1])
+        == """Response header does not conform to the schema
+
+'Invalid' is not a 'date-time'
+
+Schema:
+
+    {
+        "type": "string",
+        "format": "date-time"
+    }
+
+Value:
+
+    "Invalid\""""
+    )
 
 
 def test_header_conformance_missing_and_invalid(ctx, response_factory):
@@ -780,8 +841,32 @@ def test_header_conformance_missing_and_invalid(ctx, response_factory):
     schema = schemathesis.from_dict(raw_schema, validate_schema=True)
     case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150"})
-    with pytest.raises(MultipleFailures, match="Response header does not conform to the schema"):
+    with pytest.raises(FailureGroup) as exc:
         response_headers_conformance(CTX, response, case)
+    assert (
+        str(exc.value.exceptions[0])
+        == """Missing required headers
+
+The following required headers are missing from the response:
+- `X-RateLimit-Reset`"""
+    )
+    assert (
+        str(exc.value.exceptions[1])
+        == """Response header does not conform to the schema
+
+150 is greater than the maximum of 100
+
+Schema:
+
+    {
+        "type": "integer",
+        "maximum": 100
+    }
+
+Value:
+
+    150"""
+    )
 
 
 @pytest.mark.parametrize(

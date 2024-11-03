@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
+from schemathesis.runner.models import group_failures_by_code_sample
+
 from ... import experimental, service
 from ...constants import (
     DISCORD_LINK,
@@ -37,7 +39,6 @@ from ...stateful import events as stateful_events
 from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext, FileReportContext, ServiceReportContext
 from ..handlers import EventHandler
-from ..reporting import TEST_CASE_ID_TITLE, group_by_case
 
 if TYPE_CHECKING:
     from queue import Queue
@@ -252,37 +253,37 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
     if result.is_flaky:
         click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
         click.echo()
-    for idx, (code_sample, group) in enumerate(group_by_case(result.checks), 1):
+    for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(result.checks), 1):
         # Make server errors appear first in the list of checks
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
 
         for check_idx, check in enumerate(checks):
             if check_idx == 0:
-                click.secho(f"{idx}. {TEST_CASE_ID_TITLE}: {check.case.id}", bold=True)
-            click.secho(f"\n- {check.title}", fg="red", bold=True)
-            message = check.formatted_message
+                click.secho(f"{idx}. Test Case ID: {check.case.id}", bold=True)
+            assert check.failure is not None
+            click.secho(f"\n- {check.failure.title}", fg="red", bold=True)
+            message = textwrap.indent(check.failure.message, prefix="    ")
             if message:
                 _secho(f"\n{message}", fg="red")
             if check_idx + 1 == len(checks):
-                if check.response is not None:
-                    status_code = check.response.status_code
-                    reason = get_reason(status_code)
-                    response = bold(f"[{check.response.status_code}] {reason}")
-                    click.echo(f"\n{response}:")
-                    if check.response.body is not None:
-                        if not check.response.body:
-                            click.echo("\n    <EMPTY>")
-                        else:
-                            encoding = check.response.encoding or "utf8"
-                            try:
-                                # Checked that is not None
-                                body = cast(bytes, check.response.body)
-                                payload = body.decode(encoding)
-                                payload = prepare_response_payload(payload, config=context.output_config)
-                                payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
-                                click.echo(payload)
-                            except UnicodeDecodeError:
-                                click.echo("\n    <BINARY>")
+                status_code = check.response.status_code
+                reason = get_reason(status_code)
+                response = bold(f"[{check.response.status_code}] {reason}")
+                click.echo(f"\n{response}:")
+                if check.response.body is not None:
+                    if not check.response.body:
+                        click.echo("\n    <EMPTY>")
+                    else:
+                        encoding = check.response.encoding or "utf8"
+                        try:
+                            # Checked that is not None
+                            body = cast(bytes, check.response.body)
+                            payload = body.decode(encoding)
+                            payload = prepare_response_payload(payload, config=context.output_config)
+                            payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
+                            click.echo(payload)
+                        except UnicodeDecodeError:
+                            click.echo("\n    <BINARY>")
         _secho(f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n")
 
 

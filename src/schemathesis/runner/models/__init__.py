@@ -1,4 +1,4 @@
-from .check import Check, deduplicate_failures
+from .check import Check, group_failures_by_code_sample
 from .outcome import TestResult, TestResultSet
 from .status import Status
 from .transport import Interaction, Request, Response
@@ -11,5 +11,5 @@ __all__ = [
     "Request",
     "Response",
     "Interaction",
-    "deduplicate_failures",
+    "group_failures_by_code_sample",
 ]

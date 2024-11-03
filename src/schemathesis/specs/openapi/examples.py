@@ -222,7 +222,7 @@ def extract_inner_examples(
 @lru_cache
 def load_external_example(url: str) -> bytes:
     """Load examples the `externalValue` keyword."""
-    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
+    response = requests.get(url, timeout=DEFAULT_RESPONSE_TIMEOUT)
     response.raise_for_status()
     return response.content
 

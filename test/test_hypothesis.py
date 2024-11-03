@@ -7,7 +7,7 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.constants import NOT_SET
+from schemathesis.core import NOT_SET
 from schemathesis.exceptions import OperationSchemaError
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.generation._hypothesis import get_single_example

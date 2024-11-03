@@ -7,7 +7,7 @@ from _pytest.main import ExitCode
 from requests import Timeout
 
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
-from schemathesis.constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.service import ci, events
 from schemathesis.service.constants import (
     CI_PROVIDER_HEADER,

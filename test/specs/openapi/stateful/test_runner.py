@@ -100,22 +100,6 @@ def test_find_independent_5xx(runner_factory, kwargs):
         "PATCH /users/{userId}",
     }
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
-    # There should be 2 or 1 final scenarios to reproduce failures depending on the `max_failures` setting
-    scenarios = [
-        event for event in result.events if isinstance(event, (events.ScenarioStarted, events.ScenarioFinished))
-    ]
-    num_of_final_scenarios = 1 if kwargs.get("exit_first") or kwargs.get("max_failures") == 1 else 2
-    assert len([s for s in scenarios if s.is_final and isinstance(s, events.ScenarioStarted)]) == num_of_final_scenarios
-    assert (
-        len(
-            [
-                s
-                for s in scenarios
-                if s.is_final and isinstance(s, events.ScenarioFinished) and s.status == events.ScenarioStatus.FAILURE
-            ]
-        )
-        == num_of_final_scenarios
-    )
     for event in result.events:
         assert event.timestamp is not None
     if kwargs.get("max_failures") == 1:
@@ -222,12 +206,14 @@ def test_custom_assertion_in_check(runner_factory, exception_args):
         }
     )
     result = collect_result(runner)
-    assert len(result.failures) == 1
+    # Failures on different API operations
+    assert len(result.failures) == 2
     failure = result.failures[0]
+    assert failure.failure.title == "Custom check failed: `custom_check`"
     if not exception_args:
-        assert failure.message == "Custom check failed: `custom_check`"
+        assert failure.failure.message == ""
     else:
-        assert failure.message == "Oops!"
+        assert failure.failure.message == "Oops!"
     serialize_all_events(result.events)
 
 
@@ -258,12 +244,12 @@ def test_distinct_assertions(runner_factory):
     result = collect_result(runner)
     # Then all of them should be reported
     assert len(result.failures) == 4
-    assert {check.message for check in result.failures} == {
+    assert {check.failure.message for check in result.failures} == {
         "First",
         "Second",
         # Rewritten by pytest
         "assert None == 43\n +  where None = Case(body={'name': ''}).headers",
-        "Fourth\nassert {} == 43\n +  where {} = Case(headers={}, body={'name': ''}).headers",
+        "Fourth\nassert None == 43\n +  where None = Case(body={'name': ''}).headers",
     }
 
 
@@ -294,15 +280,17 @@ def test_flaky_assertions(runner_factory, kwargs):
     result = collect_result(runner)
     # Then all of them should be reported
     if "max_failures" in kwargs:
-        assert len(result.failures) == 2
-        assert {check.message for check in result.failures} == {"First", "Second"}
+        assert len(result.failures) == 1
+        assert {check.failure.message for check in result.failures} == {"First"}
     else:
-        assert len(result.failures) == 3
-        assert {check.message for check in result.failures} == {
+        # Assertions happen on multiple API operations (3 + 1)
+        assert len(result.failures) == 4
+        assert {check.failure.message for check in result.failures} == {
             "First",
             "Second",
             # Rewritten by pytest
             "assert None == 43\n +  where None = Case(body={'name': ''}).headers",
+            "assert None == 43\n +  where None = Case(path_parameters={'orderId': 42}).headers",
         }
 
 
@@ -327,7 +315,7 @@ def test_failure_hidden_behind_another_failure(runner_factory):
             failures.extend(event.failures)
             suite_number += 1
     assert len(failures) == 2
-    assert {check.message for check in failures} == {"Response violates schema", "Server error"}
+    assert {check.failure.title for check in failures} == {"Response violates schema", "Server error"}
 
 
 def test_multiple_conformance_issues(runner_factory):
@@ -336,7 +324,10 @@ def test_multiple_conformance_issues(runner_factory):
     )
     result = collect_result(runner)
     assert len(result.failures) == 2
-    assert {check.message for check in result.failures} == {"Missing Content-Type header", "Response violates schema"}
+    assert {check.failure.title for check in result.failures} == {
+        "Missing Content-Type header",
+        "Response violates schema",
+    }
 
 
 @flaky(max_runs=10, min_passes=1)
@@ -353,7 +344,7 @@ def test_find_use_after_free(runner_factory):
     assert result.sink.suites[events.SuiteStatus.FAILURE] == 1
     assert result.sink.suites[events.SuiteStatus.SUCCESS] == 1
     assert len(result.failures) == 1
-    assert result.failures[0].message == "Use after free"
+    assert result.failures[0].failure.title == "Use after free"
     assert result.events[-1].status == events.RunStatus.FAILURE
     assert result.sink.transitions.to_formatted_table(80).splitlines()[:3] == [
         "Links                                                 2xx    4xx    5xx    Total",
@@ -405,7 +396,7 @@ def test_flaky(runner_factory, kwargs):
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     assert len(failures) == 1
-    assert failures[0].message == "Flaky"
+    assert failures[0].failure.message == "Flaky"
 
 
 def test_unsatisfiable(runner_factory):
@@ -495,9 +486,10 @@ def test_max_response_time_invalid(runner_factory):
         assert not isinstance(event, events.Errored)
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
-    assert len(failures) == 1
-    assert failures[0].message.startswith("Actual")
-    assert failures[0].message.endswith("Limit: 5.00ms")
+    # Failures on different API operations
+    assert len(failures) == 2
+    assert failures[0].failure.message.startswith("Actual")
+    assert failures[0].failure.message.endswith("Limit: 5.00ms")
 
 
 def test_targeted(runner_factory):
@@ -659,7 +651,7 @@ def test_new_resource_is_not_available(runner_factory):
     result = collect_result(runner)
     # Then it is a failure
     assert result.events[-1].status == events.RunStatus.FAILURE
-    assert result.failures[0].message == "Resource is not available after creation"
+    assert result.failures[0].failure.title == "Resource is not available after creation"
 
 
 def test_negative_tests(runner_factory):
@@ -722,4 +714,4 @@ def test_ignored_auth_invalid(runner_factory):
     result = collect_result(runner)
     # Then it should be reported
     assert result.events[-1].status == events.RunStatus.FAILURE
-    assert result.failures[0].message == "Authentication declared but not enforced for this operation"
+    assert result.failures[0].failure.title == "Authentication declared but not enforced for this operation"

@@ -31,13 +31,13 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                              0 / 2 passed          FAILED 
-    status_code_conformance                         2 / 2 passed          PASSED 
-    content_type_conformance                        2 / 2 passed          PASSED 
-    response_headers_conformance                    2 / 2 passed          PASSED 
-    response_schema_conformance                     2 / 2 passed          PASSED 
-    negative_data_rejection                         2 / 2 passed          PASSED 
-    ignored_auth                                    2 / 2 passed          PASSED 
+    not_a_server_error                              0 / 1 passed          FAILED 
+    status_code_conformance                         1 / 1 passed          PASSED 
+    content_type_conformance                        1 / 1 passed          PASSED 
+    response_headers_conformance                    1 / 1 passed          PASSED 
+    response_schema_conformance                     1 / 1 passed          PASSED 
+    negative_data_rejection                         1 / 1 passed          PASSED 
+    ignored_auth                                    1 / 1 passed          PASSED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

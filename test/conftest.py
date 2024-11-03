@@ -25,7 +25,6 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis.cli import CUSTOM_HANDLERS, reset_checks
-from schemathesis.cli.output.default import TEST_CASE_ID_TITLE
 from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.models import Case
@@ -407,9 +406,9 @@ class CliSnapshotConfig:
         if self.replace_test_case_id:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
-                if re.match(rf"\d+\. {TEST_CASE_ID_TITLE}", line):
+                if re.match(r"\d+\. Test Case ID", line):
                     sequential_id = lines[idx].split(".")[0]
-                    lines[idx] = f"{sequential_id}. {TEST_CASE_ID_TITLE}: <PLACEHOLDER>"
+                    lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"
         if self.replace_uuid:
             data = re.sub(r"\b[0-9a-fA-F]{32}\b", EXAMPLE_UUID, data)
@@ -938,7 +937,7 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from schemathesis.stateful import Stateful
-        from schemathesis.constants import NOT_SET
+        from schemathesis.core import NOT_SET
         from schemathesis.generation import DataGenerationMethod
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed

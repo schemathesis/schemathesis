@@ -14,7 +14,8 @@ from urllib.parse import parse_qsl, urlparse
 
 import harfile
 
-from ..constants import SCHEMATHESIS_VERSION
+from schemathesis.core.version import SCHEMATHESIS_VERSION
+
 from ..internal.copy import fast_deepcopy
 from ..runner import events
 from ..sanitization import sanitize_url, sanitize_value
@@ -169,7 +170,7 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
         if not checks:
             return "  checks: []"
         items = "\n".join(
-            f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.message)}"
+            f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.failure.title if check.failure else None)}"
             for check in checks
         )
         return f"""

@@ -143,14 +143,14 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
 
 @pytest.mark.operations("slow")
 @pytest.mark.openapi_version("3.0")
-def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples, server_host):
+def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     xml_path = tmp_path / "junit.xml"
     cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
-        "--request-timeout=10",
+        "--request-timeout=0.01",
         "--checks=all",
     )
     tree = ElementTree.parse(xml_path)
@@ -158,12 +158,9 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples, server_host
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
     assert testcases[0].attrib["name"] == "GET /api/slow"
-    assert testcases[0][0].tag == "failure"
-    assert testcases[0][0].attrib["type"] == "failure"
-    assert (
-        extract_message(testcases[0][0], server_host)
-        == "1. Test Case ID: <PLACEHOLDER>  - Response timeout      The server failed to respond within the specified limit of 10.00ms  Reproduce with:       curl -X GET http://localhost/api/slow"
-    )
+    assert testcases[0][0].tag == "error"
+    assert testcases[0][0].attrib["type"] == "error"
+    assert "Read timed out after 0.01 seconds" in testcases[0][0].attrib["message"]
 
 
 @pytest.mark.operations("success")

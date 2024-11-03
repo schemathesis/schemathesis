@@ -7,12 +7,10 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Type
 
 import pytest
 from hypothesis.core import HypothesisHandle
-from hypothesis.errors import Flaky
-from hypothesis.internal.escalation import format_exception, get_trimmed_traceback
-from hypothesis.internal.reflection import impersonate
 from pytest_subtests import SubTests
 
-from ._compat import MultipleFailures
+from schemathesis.core import NOT_SET
+
 from ._hypothesis._given import (
     GivenInput,
     get_given_args,
@@ -25,8 +23,7 @@ from ._hypothesis._given import (
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
 from ._pytest.control_flow import fail_on_no_matches
 from .auths import AuthStorage
-from .constants import FLAKY_FAILURE_MESSAGE, NOT_SET
-from .exceptions import CheckFailed, OperationSchemaError, SkipTest, get_grouped_exception
+from .exceptions import OperationSchemaError
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from .hooks import HookDispatcher, HookScope
 from .internal.result import Ok
@@ -36,10 +33,11 @@ if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
     from pyrate_limiter import Limiter
 
+    from schemathesis.core import NotSet
+
     from .generation import DataGenerationMethodInput, GenerationConfig
     from .internal.output import OutputConfig
     from .models import APIOperation
-    from .types import GenericTest, NotSet
 
 
 @dataclass
@@ -235,7 +233,7 @@ class LazySchema:
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        subtests.item._nodeid = _get_node_name(node_id, operation)
+                        subtests.item._nodeid = f"{node_id}[{operation.method.upper()} {operation.full_path}]"
                         run_subtest(operation, fixtures, sub_test, subtests)
                     else:
                         _schema_error(subtests, result.err(), node_id)
@@ -262,10 +260,10 @@ class LazySchema:
         headers: dict[str, str] | None = None,
         cookies: dict[str, str] | None = None,
         path_parameters: dict[str, str] | None = None,
-    ) -> Callable[[GenericTest], GenericTest]:
+    ) -> Callable[[Callable], Callable]:
         """Override Open API parameters with fixed values."""
 
-        def _add_override(test: GenericTest) -> GenericTest:
+        def _add_override(test: Callable) -> Callable:
             check_no_override_mark(test)
             override = CaseOverride(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
@@ -289,84 +287,12 @@ def _get_capturemanager(request: FixtureRequest) -> Generator | Type[nullcontext
     return nullcontext
 
 
-def _get_node_name(node_id: str, operation: APIOperation) -> str:
-    """Make a test node name. For example: test_api[GET /users]."""
-    return f"{node_id}[{operation.method.upper()} {operation.full_path}]"
-
-
-def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
-    """Make a test node name for failing tests caused by schema errors."""
-    name = node_id
-    if "method" in kwargs:
-        name += f"[{kwargs['method']} {kwargs['path']}]"
-    else:
-        name += f"[{kwargs['path']}]"
-    return name
-
-
-def run_subtest(
-    operation: APIOperation,
-    fixtures: dict[str, Any],
-    sub_test: Callable,
-    subtests: SubTests,
-) -> None:
+def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Callable, subtests: SubTests) -> None:
     """Run the given subtest with pytest fixtures."""
     __tracebackhide__ = True
 
-    # Deduplicate found checks in case of Hypothesis finding multiple of them
-    failed_checks = {}
-    exceptions = []
-    inner_test = sub_test.hypothesis.inner_test  # type: ignore
-
-    @impersonate(inner_test)  # type: ignore
-    def collecting_wrapper(*args: Any, **kwargs: Any) -> None:
-        __tracebackhide__ = True
-        try:
-            inner_test(*args, **kwargs)
-        except CheckFailed as failed:
-            failed_checks[failed.__class__] = failed
-            raise failed
-        except Exception as exception:
-            # Deduplicate it later, as it is more costly than for `CheckFailed`
-            exceptions.append(exception)
-            raise
-
-    def get_exception_class() -> type[CheckFailed]:
-        return get_grouped_exception("Lazy", *failed_checks.values())
-
-    sub_test.hypothesis.inner_test = collecting_wrapper  # type: ignore
-
     with subtests.test(verbose_name=operation.verbose_name):
-        try:
-            sub_test(**fixtures)
-        except SkipTest as exc:
-            pytest.skip(exc.args[0])
-        except (MultipleFailures, CheckFailed) as exc:
-            # Hypothesis doesn't report the underlying failures in these circumstances, hence we display them manually
-            from hypothesis.internal.escalation import InterestingOrigin
-
-            exc_class = get_exception_class()
-            failures = "".join(f"{SEPARATOR} {failure.args[0]}" for failure in failed_checks.values())
-            unique_exceptions = {InterestingOrigin.from_exception(exception): exception for exception in exceptions}
-            total_problems = len(failed_checks) + len(unique_exceptions)
-            if total_problems == 1:
-                raise
-            message = f"Schemathesis found {total_problems} distinct sets of failures.{failures}"
-            for exception in unique_exceptions.values():
-                # Non-check exceptions
-                message += f"{SEPARATOR}\n\n"
-                tb = get_trimmed_traceback(exception)
-                message += format_exception(exception, tb)
-            raise exc_class(message, causes=tuple(failed_checks.values())).with_traceback(exc.__traceback__) from None
-        except Flaky as exc:
-            exc_class = get_exception_class()
-            failure = next(iter(failed_checks.values()))
-            message = f"{FLAKY_FAILURE_MESSAGE}{failure}"
-            # The outer frame is the one for user's test function, take it as the root one
-            traceback = exc.__traceback__.tb_next
-            # The next one comes from Hypothesis internals - remove it
-            traceback.tb_next = None
-            raise exc_class(message, causes=tuple(failed_checks.values())).with_traceback(traceback) from None
+        sub_test(**fixtures)
 
 
 SEPARATOR = "\n===================="
@@ -385,6 +311,16 @@ def _schema_error(subtests: SubTests, error: OperationSchemaError, node_id: str)
         sub_test()
 
 
+def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
+    """Make a test node name for failing tests caused by schema errors."""
+    name = node_id
+    if "method" in kwargs:
+        name += f"[{kwargs['method']} {kwargs['path']}]"
+    else:
+        name += f"[{kwargs['path']}]"
+    return name
+
+
 def get_schema(
     *,
     request: FixtureRequest,
@@ -392,7 +328,7 @@ def get_schema(
     base_url: str | None | NotSet = None,
     filter_set: FilterSet,
     app: Any = None,
-    test_function: GenericTest,
+    test_function: Callable,
     hooks: HookDispatcher,
     auth: AuthStorage | NotSet,
     validate_schema: bool | NotSet = NOT_SET,

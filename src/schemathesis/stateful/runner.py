@@ -11,7 +11,8 @@ import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
-from ..exceptions import CheckFailed
+from schemathesis.core.failures import Failure, FailureGroup
+
 from ..internal.checks import CheckContext
 from ..targets import TargetMetricCollector
 from . import events
@@ -122,7 +123,7 @@ def _execute_state_machine_loop(
 
     call_kwargs: dict[str, Any] = {"headers": config.headers}
     if isinstance(state_machine.schema.transport, RequestsTransport):
-        call_kwargs["timeout"] = config.network.prepared_timeout
+        call_kwargs["timeout"] = config.network.timeout
         call_kwargs["verify"] = config.network.tls_verify
         call_kwargs["cert"] = config.network.cert
         if config.network.proxy is not None:
@@ -178,7 +179,13 @@ def _execute_state_machine_loop(
                         return None
                 result = super().step(case, previous)
                 ctx.step_succeeded()
-            except CheckFailed as exc:
+            except FailureGroup as exc:
+                if config.unique_data:
+                    for failure in exc.exceptions:
+                        ctx.store_step_outcome(case, failure)
+                ctx.step_failed()
+                raise
+            except Failure as exc:
                 if config.unique_data:
                     ctx.store_step_outcome(case, exc)
                 ctx.step_failed()
@@ -274,14 +281,15 @@ def _execute_state_machine_loop(
             stop_event.set()
             suite_status = events.SuiteStatus.INTERRUPTED
             break
-        except CheckFailed as exc:
+        except FailureGroup as exc:
             # When a check fails, the state machine is stopped
             # The failure is already sent to the queue by the state machine
             # Here we need to either exit or re-run the state machine with this failure marked as known
             suite_status = events.SuiteStatus.FAILURE
             if should_stop():
                 break
-            ctx.mark_as_seen_in_run(exc)
+            for failure in exc.exceptions:
+                ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
             suite_status = events.SuiteStatus.FAILURE

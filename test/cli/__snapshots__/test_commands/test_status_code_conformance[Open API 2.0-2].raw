@@ -34,7 +34,7 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    status_code_conformance                    0 / 2 passed          FAILED 
+    status_code_conformance                    0 / 1 passed          FAILED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

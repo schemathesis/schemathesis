@@ -9,7 +9,7 @@ from requests import Response
 from yarl import URL
 
 import schemathesis
-from schemathesis.constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.exceptions import SchemaError
 
 

@@ -46,14 +46,6 @@ class NetworkConfig:
     proxy: str | None = None
     cert: RequestCert | None = None
 
-    @property
-    def prepared_timeout(self) -> float | None:
-        # FIXME: It should be in different units in CLI
-        output: int | float | None = self.timeout
-        if self.timeout is not None:
-            output = self.timeout / 1000
-        return output
-
 
 @dataclass
 class EngineConfig:

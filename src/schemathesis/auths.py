@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     import requests.auth
 
     from .models import APIOperation, Case
-    from .types import GenericTest
 
 DEFAULT_REFRESH_INTERVAL = 300
 AUTH_STORAGE_ATTRIBUTE_NAME = "_schemathesis_auth"
@@ -183,7 +182,7 @@ class FilterableRegisterAuth(Protocol):
 class FilterableApplyAuth(Protocol):
     """Protocol that adds filters to the return value of `apply`."""
 
-    def __call__(self, test: GenericTest) -> GenericTest:
+    def __call__(self, test: Callable) -> Callable:
         pass
 
     def apply_to(
@@ -416,7 +415,7 @@ class AuthStorage(Generic[Auth]):
         """
         filter_set = FilterSet()
 
-        def wrapper(test: GenericTest) -> GenericTest:
+        def wrapper(test: Callable) -> Callable:
             auth_storage = self.add_auth_storage(test)
             auth_storage._set_provider(
                 provider_class=provider_class,
@@ -432,7 +431,7 @@ class AuthStorage(Generic[Auth]):
         return wrapper  # type: ignore[return-value]
 
     @classmethod
-    def add_auth_storage(cls, test: GenericTest) -> AuthStorage:
+    def add_auth_storage(cls, test: Callable) -> AuthStorage:
         """Attach a new auth storage instance to the test if it is not already present."""
         if not hasattr(test, AUTH_STORAGE_ATTRIBUTE_NAME):
             setattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, cls())
@@ -465,7 +464,7 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
         GLOBAL_AUTH_STORAGE.set(case, context)
 
 
-def get_auth_storage_from_test(test: GenericTest) -> AuthStorage | None:
+def get_auth_storage_from_test(test: Callable) -> AuthStorage | None:
     """Extract the currently attached auth storage from a test function."""
     return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, None)
 

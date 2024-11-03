@@ -4,6 +4,8 @@ from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence
 
+from schemathesis.core.failures import Failure
+
 from ...internal.exceptions import deduplicate_errors
 from ..errors import EngineErrorInfo
 from .check import Check
@@ -15,7 +17,7 @@ if TYPE_CHECKING:
 
     import requests
 
-    from ...exceptions import FailureContext, SkipTest
+    from ...exceptions import SkipTest
     from ...models import Case
 
 
@@ -162,24 +164,14 @@ class TestResult:
         self.checks.append(check)
         return check
 
-    def add_failure(
-        self,
-        *,
-        name: str,
-        case: Case,
-        request: Request,
-        response: Response | None,
-        message: str,
-        context: FailureContext | None,
-    ) -> Check:
+    def add_failure(self, *, name: str, case: Case, request: Request, response: Response, failure: Failure) -> Check:
         check = Check(
             name=name,
             value=Status.failure,
-            response=response,
             case=case,
-            message=message,
-            context=context,
             request=request,
+            response=response,
+            failure=failure,
         )
         self.checks.append(check)
         return check

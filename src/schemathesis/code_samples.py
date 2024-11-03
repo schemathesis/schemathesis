@@ -1,12 +1,9 @@
 from __future__ import annotations
 
 from shlex import quote
-from typing import TYPE_CHECKING
+from typing import Any
 
 from .transports import get_excluded_headers
-
-if TYPE_CHECKING:
-    from .types import Headers
 
 
 def generate(
@@ -14,9 +11,9 @@ def generate(
     method: str,
     url: str,
     body: str | bytes | None,
-    headers: Headers | None,
+    headers: dict[str, Any] | None,
     verify: bool,
-    extra_headers: Headers | None = None,
+    extra_headers: dict[str, Any] | None = None,
 ) -> str:
     """Generate a code snippet for making HTTP requests."""
     headers = _filter_headers(headers, extra_headers)
@@ -33,7 +30,7 @@ def generate(
     return f"{command} {quote(url)}"
 
 
-def _filter_headers(headers: Headers | None, extra: Headers | None = None) -> Headers:
+def _filter_headers(headers: dict[str, Any] | None, extra: dict[str, Any] | None = None) -> dict[str, Any]:
     headers = headers.copy() if headers else {}
     if extra is not None:
         for key, value in extra.items():

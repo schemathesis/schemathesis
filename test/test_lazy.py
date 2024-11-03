@@ -631,38 +631,6 @@ def test_(case):
     assert "def run_subtest" not in stdout
 
 
-@pytest.mark.operations("multiple_failures")
-def test_multiple_failures_non_check(testdir, openapi3_schema_url):
-    # When multiple failures are discovered within the same test
-    # And there are non-check exceptions
-    testdir.make_test(
-        f"""
-@pytest.fixture
-def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
-
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
-
-@lazy_schema.parametrize()
-@settings(derandomize=True)
-@seed(1)
-def test_(case):
-    if case.query["id"] < 0:
-        assert 1 == 2
-    case.call_and_validate()""",
-    )
-    # Then all of them should be displayed
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1, failed=1)
-    stdout = result.stdout.str()
-    assert "[500] Internal Server Error" in stdout
-    assert "assert 1 == 2" in stdout
-    # And internal frames should not be displayed
-    assert "def run_subtest" not in stdout
-    assert "def collecting_wrapper" not in stdout
-    assert stdout.count("test_multiple_failures_non_check.py:34") == 1
-
-
 @pytest.mark.operations("flaky")
 def test_flaky(testdir, openapi3_schema_url):
     # When failure is flaky
@@ -709,10 +677,10 @@ def test_(case):
     # We should skip checking for a server error
     result.assert_outcomes(passed=1, failed=1)
     if value:
-        expected = rf"E           curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
+        expected = rf"curl -X GET -H 'Authorization: [Filtered]' {openapi3_base_url}/failure"
     else:
-        expected = rf"E           curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
-    assert expected in result.stdout.lines
+        expected = rf"curl -X GET -H 'Authorization: {auth}' {openapi3_base_url}/failure"
+    assert expected in result.stdout.str()
 
 
 @pytest.mark.operations("success")

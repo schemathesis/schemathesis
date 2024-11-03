@@ -6,7 +6,10 @@ import pathlib
 import re
 from typing import IO, TYPE_CHECKING, Any, cast
 
-from ...constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET, WAIT_FOR_SCHEMA_INTERVAL
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.deserialization import deserialize_yaml
+
+from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
 from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
@@ -17,11 +20,11 @@ from ...generation import (
 from ...hooks import HookContext, dispatch
 from ...internal.output import OutputConfig
 from ...internal.validation import require_relative_url
-from ...loaders import load_schema_from_url, load_yaml
+from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
-from ...types import NotSet, PathLike, Specification
+from ...types import PathLike, Specification
 from . import definitions, validation
 
 if TYPE_CHECKING:
@@ -145,7 +148,7 @@ def from_uri(
     else:
         _load_schema = requests.get
 
-    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
+    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
     response = load_schema_from_url(lambda: _load_schema(uri, **kwargs))
     return from_file(
         response.text,
@@ -173,7 +176,7 @@ def _load_yaml(data: str, include_details_on_error: bool = False) -> dict[str, A
     import yaml
 
     try:
-        return load_yaml(data)
+        return deserialize_yaml(data)
     except yaml.YAMLError as exc:
         if include_details_on_error:
             type_ = SchemaErrorType.SYNTAX_ERROR

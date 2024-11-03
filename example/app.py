@@ -1,8 +1,8 @@
 import os
 import time
 
-from flask import Flask, jsonify, request, Response
 import sqlalchemy.exc
+from flask import Flask, Response, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)

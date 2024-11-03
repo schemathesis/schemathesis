@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--request-timeout': -5 is not in the range x>=1.
+Error: Invalid value for '--request-timeout': -5.0 is not in the range x>0.0.

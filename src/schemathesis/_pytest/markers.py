@@ -2,15 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Callable
 
-from ..types import GenericTest
-
 if TYPE_CHECKING:
     from ..schemas import BaseSchema
 
 HANDLE_MARKER = "_schemathesis_handle"
 
 
-def get_schemathesis_handle(func: GenericTest) -> BaseSchema | None:
+def get_schemathesis_handle(func: Callable) -> BaseSchema | None:
     from ..schemas import BaseSchema
 
     try:

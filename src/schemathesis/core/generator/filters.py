@@ -1,7 +1,7 @@
 from collections.abc import Mapping
 from xml.etree import ElementTree
 
-from schemathesis.constants import NOT_SET
+from schemathesis.core import NOT_SET
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 
 __all__ = [

@@ -2,7 +2,7 @@ from urllib.parse import urlencode
 
 import pytest
 
-from schemathesis.constants import NOT_SET
+from schemathesis.core import NOT_SET
 from schemathesis.sanitization import (
     DEFAULT_KEYS_TO_SANITIZE,
     DEFAULT_REPLACEMENT,

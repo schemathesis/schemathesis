@@ -14,18 +14,18 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
-from .... import failures, targets
-from ...._compat import MultipleFailures
+from schemathesis.core.failures import Failure, FailureGroup, ResponseTimeExceeded
+
+from .... import targets
+from ...._compat import BaseExceptionGroup
 from ...._hypothesis._builder import (
     get_invalid_example_headers_mark,
     get_invalid_regex_mark,
     get_non_serializable_mark,
     has_unsatisfied_example_mark,
 )
-from ....checks import _make_max_response_time_failure_message
 from ....constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
 from ....exceptions import (
-    CheckFailed,
     DeadlineExceeded,
     InternalError,
     InvalidHeadersExample,
@@ -35,12 +35,9 @@ from ....exceptions import (
     RecursiveReferenceError,
     SerializationNotPossible,
     SkipTest,
-    get_grouped_exception,
-    maybe_set_assertion_message,
 )
 from ....internal.checks import CheckContext
 from ....internal.exceptions import deduplicate_errors
-from ....transports import RequestsTransport
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
 from ...context import EngineContext
@@ -103,7 +100,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         # Newer Hypothesis versions raise this exception if no tests were executed
         status = Status.skip
         result.mark_skipped(exc)
-    except CheckFailed:
+    except (FailureGroup, Failure):
         status = Status.failure
     except NonCheckError:
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
@@ -113,9 +110,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             result.add_error(error)
     except hypothesis.errors.Flaky as exc:
         status = _on_flaky(exc)
-    except MultipleFailures:
-        # Schemathesis may detect multiple errors that come from different check results
-        # They raise different "grouped" exceptions
+    except BaseExceptionGroup:
         if errors:
             status = Status.error
             result.add_errors(errors)
@@ -229,10 +224,9 @@ def has_too_many_responses_with_status(result: TestResult, status_code: int) -> 
     unauthorized_count = 0
     total = 0
     for check in result.checks:
-        if check.response is not None:
-            if check.response.status_code == status_code:
-                unauthorized_count += 1
-            total += 1
+        if check.response.status_code == status_code:
+            unauthorized_count += 1
+        total += 1
     if not total:
         return False
     return unauthorized_count / total >= TOO_MANY_RESPONSES_THRESHOLD
@@ -269,23 +263,17 @@ def run_checks(
     response: GenericResponse,
     max_response_time: int | None = None,
 ) -> None:
-    errors = []
+    failures = set()
 
-    def add_single_failure(error: AssertionError) -> None:
-        msg = maybe_set_assertion_message(error, check_name)
-        errors.append(error)
-        if isinstance(error, CheckFailed):
-            context = error.context
-        else:
-            context = None
+    def add_single_failure(failure: Failure) -> None:
+        failures.add(failure)
         check_results.append(
             result.add_failure(
                 name=check_name,
                 case=copied_case,
                 request=Request.from_prepared_request(response.request),
                 response=Response.from_requests(response=response),
-                message=msg,
-                context=context,
+                failure=failure,
             )
         )
 
@@ -302,24 +290,34 @@ def run_checks(
                     response=Response.from_requests(response=response),
                 )
                 check_results.append(check_result)
+        except Failure as failure:
+            add_single_failure(failure)
         except AssertionError as exc:
-            add_single_failure(exc)
-        except MultipleFailures as exc:
-            for exception in exc.exceptions:
-                add_single_failure(exception)
+            add_single_failure(
+                Failure.from_assertion(
+                    name=check_name,
+                    operation=case.operation.verbose_name,
+                    exc=exc,
+                )
+            )
+        except FailureGroup as group:
+            for e in group.exceptions:
+                add_single_failure(e)
 
     if max_response_time:
         elapsed = response.elapsed.total_seconds() * 1000
         if elapsed > max_response_time:
-            message = _make_max_response_time_failure_message(elapsed, max_response_time)
-            errors.append(AssertionError(message))
+            message = f"Actual: {elapsed:.2f}ms\nLimit: {max_response_time}.00ms"
+            fail = ResponseTimeExceeded(
+                operation=case.operation.verbose_name, message=message, elapsed=elapsed, deadline=max_response_time
+            )
+            failures.add(fail)
             result.add_failure(
                 name="max_response_time",
                 case=case,
                 request=Request.from_prepared_request(response.request),
                 response=Response.from_requests(response=response),
-                message=message,
-                context=failures.ResponseTimeExceeded(message=message, elapsed=elapsed, deadline=max_response_time),
+                failure=fail,
             )
         else:
             result.add_success(
@@ -329,8 +327,8 @@ def run_checks(
                 response=Response.from_requests(response=response),
             )
 
-    if errors:
-        raise get_grouped_exception(case.operation.verbose_name, *errors)(causes=tuple(errors))
+    if failures:
+        raise FailureGroup(list(failures)) from None
 
 
 @dataclass
@@ -358,7 +356,7 @@ class ErrorCollector:
         #   - Tests are successful
         #   - Checks failed
         #   - The testing process is interrupted
-        if not exc_type or issubclass(exc_type, CheckFailed) or not issubclass(exc_type, Exception):
+        if not exc_type or issubclass(exc_type, Failure) or not issubclass(exc_type, Exception):
             return False
         # These exceptions are needed for control flow on the Hypothesis side. E.g. rejecting unsatisfiable examples
         if isinstance(exc_val, HypothesisException):
@@ -412,34 +410,20 @@ def _network_test(
     import requests
 
     check_results: list[Check] = []
+    kwargs: dict[str, Any] = {
+        "session": session,
+        "headers": headers,
+        "timeout": ctx.config.network.timeout,
+        "verify": ctx.config.network.tls_verify,
+        "cert": ctx.config.network.cert,
+    }
+    if ctx.config.network.proxy is not None:
+        kwargs["proxies"] = {"all": ctx.config.network.proxy}
     try:
-        kwargs: dict[str, Any] = {
-            "session": session,
-            "headers": headers,
-            "timeout": ctx.config.network.prepared_timeout,
-            "verify": ctx.config.network.tls_verify,
-            "cert": ctx.config.network.cert,
-        }
-        if ctx.config.network.proxy is not None:
-            kwargs["proxies"] = {"all": ctx.config.network.proxy}
         response = case.call(**kwargs)
-    except CheckFailed as exc:
-        check_name = "request_timeout"
-        requests_kwargs = RequestsTransport().serialize_case(case, base_url=case.get_full_base_url(), headers=headers)
-        request = requests.Request(**requests_kwargs).prepare()
-        # It is defined and not empty, since the exception happened
-        elapsed = cast(float, ctx.config.network.prepared_timeout)
-        check_result = result.add_failure(
-            name=check_name,
-            case=case,
-            request=Request.from_prepared_request(request),
-            response=None,
-            message=f"Response timed out after {1000 * elapsed:.2f}ms",
-            context=exc.context,
-        )
-        check_results.append(check_result)
-        result.store_requests_response(case, None, Status.failure, [check_result], headers=headers, session=session)
-        raise exc
+    except (requests.Timeout, requests.ConnectionError):
+        result.store_requests_response(case, None, Status.failure, [], headers=headers, session=session)
+        raise
     targets.run(ctx.config.execution.targets, case=case, response=response)
     status = Status.success
 
@@ -459,7 +443,7 @@ def _network_test(
             response=response,
             max_response_time=ctx.config.execution.max_response_time,
         )
-    except CheckFailed:
+    except FailureGroup:
         status = Status.failure
         raise
     finally:

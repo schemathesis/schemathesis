@@ -45,8 +45,11 @@ def extract_nth_traceback(trace: TracebackType | None, n: int) -> TracebackType 
 
 def get_request_error_message(exc: RequestException) -> str:
     """Extract user-facing message from a request exception."""
-    from requests.exceptions import ChunkedEncodingError, ConnectionError, SSLError
+    from requests.exceptions import ChunkedEncodingError, ConnectionError, ReadTimeout, SSLError
 
+    if isinstance(exc, ReadTimeout):
+        _, duration = exc.args[0].args[0][:-1].split("read timeout=")
+        return f"Read timed out after {duration} seconds"
     if isinstance(exc, SSLError):
         return "SSL verification problem"
     if isinstance(exc, ConnectionError):

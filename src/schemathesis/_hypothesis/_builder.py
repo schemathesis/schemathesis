@@ -13,9 +13,11 @@ from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.core import NOT_SET, NotSet
+
 from .. import _patches
 from ..auths import get_auth_storage_from_test
-from ..constants import DEFAULT_DEADLINE, NOT_SET
+from ..constants import DEFAULT_DEADLINE
 from ..core.validation import has_invalid_characters, is_latin_1_encodable
 from ..exceptions import OperationSchemaError, SerializationNotPossible
 from ..experimental import COVERAGE_PHASE
@@ -24,7 +26,6 @@ from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ..models import APIOperation, Case, GenerationMetadata, TestPhase
 from ..parameters import ParameterSet
 from ..transports.content_types import parse_content_type
-from ..types import NotSet
 from ._given import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it

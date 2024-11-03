@@ -8,7 +8,6 @@ from uuid import uuid4
 import jsonschema
 from aiohttp import web
 
-from schemathesis.constants import BOM_MARK
 from schemathesis.internal.output import MAX_PAYLOAD_SIZE
 from schemathesis.transports.content_types import parse_content_type
 
@@ -27,8 +26,6 @@ async def expect_content_type(request: web.Request, value: str):
 
 
 async def success(request: web.Request) -> web.Response:
-    if request.app["config"]["prefix_with_bom"]:
-        return web.Response(body=(BOM_MARK + '{"success": true}').encode(), content_type="application/json")
     return web.json_response({"success": True})
 
 

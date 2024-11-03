@@ -12,9 +12,8 @@ import urllib3
 from syrupy import SnapshotAssertion
 
 import schemathesis
-from schemathesis.exceptions import CheckFailed
+from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.internal.copy import fast_deepcopy
-from schemathesis.loaders import load_yaml
 
 if TYPE_CHECKING:
     from schemathesis.models import Case
@@ -57,7 +56,7 @@ def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict
 def load_schema(schema_name: str) -> dict[str, Any]:
     path = get_schema_path(schema_name)
     with open(path) as fd:
-        return load_yaml(fd)
+        return deserialize_yaml(fd)
 
 
 def integer(**kwargs: Any) -> dict[str, Any]:
@@ -91,7 +90,7 @@ def assert_list(value: Any, predicate: Callable = noop) -> None:
 
 def assert_requests_call(case: Case):
     """Verify that all generated input parameters are usable by requests."""
-    with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError, CheckFailed)):
+    with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
         # On Windows it may take time to get the connection error, hence we set a timeout
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
 

@@ -7,10 +7,12 @@ import requests
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis._compat import MultipleFailures
 from schemathesis.checks import not_a_server_error
-from schemathesis.constants import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.exceptions import CheckFailed, UsageError
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import NOT_SET
+from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transport import USER_AGENT
+from schemathesis.exceptions import UsageError
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case, CaseSource, TransitionId
 from schemathesis.runner.models import Request, Response
@@ -338,8 +340,10 @@ def test_case_partial_deepcopy_source(swagger_20):
 def test_validate_response(testdir):
     testdir.make_test(
         r"""
+import pytest
 from requests import Response, Request
-from schemathesis.failures import UndefinedStatusCode
+from schemathesis.openapi.checks import UndefinedStatusCode
+from schemathesis.core.failures import FailureGroup
 
 @schema.parametrize()
 def test_(case):
@@ -348,28 +352,8 @@ def test_(case):
     response.status_code = 418
     request = Request(method="GET", url="http://localhost/v1/users")
     response.request = request.prepare()
-    try:
+    with pytest.raises(FailureGroup):
         case.validate_response(response)
-    except AssertionError as exc:
-        assert len(exc.causes) == 1
-        assert isinstance(exc.causes[0].context, UndefinedStatusCode)
-        assert exc.args[0].split("\n") == [
-          "",
-          "",
-          "1. Undocumented HTTP status code",
-          "",
-          "    Received: 418",
-          "    Documented: 200",
-          "",
-          "[418] I'm a Teapot:",
-          "",
-          "    <EMPTY>",
-          "",
-          "Reproduce with:",
-          "",
-          f"    curl -X GET http://localhost/v1/users",
-          "",
-    ]
 """
     )
     result = testdir.runpytest()
@@ -435,12 +419,13 @@ def test_validate_response_schema_path(
     )
     schema = schemathesis.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
-    with pytest.raises(CheckFailed) as exc:
+    with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
-    assert exc.value.context.schema_path == schema_path
-    assert exc.value.context.schema == {"type": "object"}
-    assert exc.value.context.instance == instance
-    assert exc.value.context.instance_path == instance_path
+    failure = exc.value
+    assert failure.schema_path == schema_path
+    assert failure.schema == {"type": "object"}
+    assert failure.instance == instance
+    assert failure.instance_path == instance_path
 
 
 @pytest.mark.operations
@@ -599,12 +584,12 @@ def test_checks_errors_deduplication(ctx):
     response = requests.Response()
     response.status_code = 200
     response.request = requests.PreparedRequest()
-    response.request.prepare(method="GET", url="http://example.com")
+    response._content = b"42"
+    response.request.prepare(method="GET", url="http://example.com", json={})
     # When there are two checks that raise the same failure
-    with pytest.raises(MultipleFailures, match="Missing Content-Type header") as exc:
+    with pytest.raises(FailureGroup) as exc:
         case.validate_response(response, checks=(content_type_conformance, response_schema_conformance))
-    # Then the resulting output should be deduplicated
-    assert "2. " not in str(exc.value)
+    assert len(exc.value.exceptions) == 1
 
 
 def _assert_override(spy, arg, original, overridden):

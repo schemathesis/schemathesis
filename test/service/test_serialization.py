@@ -20,7 +20,7 @@ def test_serialize_event(schema_url):
     event = serialize_event(next(events))
     assert "interactions" not in event["AfterExecution"]["result"]
     assert "logs" not in event["AfterExecution"]["result"]
-    assert event["AfterExecution"]["result"]["checks"][0]["example"]["query"] == {"id": 0}
+    assert event["AfterExecution"]["result"]["checks"][0]["case"]["query"] == {"id": 0}
 
 
 @pytest.mark.operations("success")

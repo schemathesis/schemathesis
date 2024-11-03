@@ -13,6 +13,8 @@ from urllib.parse import urlparse
 
 import click
 
+from schemathesis.core.deserialization import deserialize_yaml
+
 from .. import checks as checks_module
 from .. import contrib, experimental, generation, runner, service
 from .. import targets as targets_module
@@ -34,7 +36,6 @@ from ..internal.checks import CheckConfig
 from ..internal.exceptions import format_exception
 from ..internal.fs import ensure_parent
 from ..internal.output import OutputConfig
-from ..loaders import load_yaml
 from ..runner import events
 from ..runner.config import NetworkConfig
 from ..stateful import Stateful
@@ -53,10 +54,12 @@ if TYPE_CHECKING:
     import hypothesis
     import requests
 
+    from schemathesis.core import NotSet
+
     from ..models import CheckFunction
     from ..service.client import ServiceClient
     from ..targets import Target
-    from ..types import NotSet, PathLike, RequestCert
+    from ..types import PathLike, RequestCert
 
 
 __all__ = [
@@ -380,8 +383,8 @@ REPORT_TO_SERVICE = ReportToService()
 )
 @grouped_option(
     "--request-timeout",
-    help="Timeout limit, in milliseconds, for each network request during tests",
-    type=click.IntRange(1),
+    help="Timeout limit, in seconds, for each network request during tests",
+    type=click.FloatRange(min=0.0, min_open=True),
     default=DEFAULT_RESPONSE_TIMEOUT,
 )
 @with_request_proxy
@@ -1454,7 +1457,7 @@ def replay(
 
     click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
     with open(cassette_path, "rb") as fd:
-        cassette = load_yaml(fd)
+        cassette = deserialize_yaml(fd)
     click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
     for replayed in cassettes.replay(
         cassette,

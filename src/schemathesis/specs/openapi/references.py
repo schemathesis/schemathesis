@@ -10,9 +10,10 @@ import jsonschema
 import requests
 from jsonschema.exceptions import RefResolutionError
 
+from schemathesis.core.deserialization import deserialize_yaml
+
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...internal.copy import fast_deepcopy
-from ...loaders import load_yaml
 from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
 from .utils import get_type
@@ -24,7 +25,7 @@ RECURSION_DEPTH_LIMIT = 100
 def load_file_impl(location: str, opener: Callable) -> dict[str, Any]:
     """Load a schema from the given file."""
     with opener(location) as fd:
-        return load_yaml(fd)
+        return deserialize_yaml(fd)
 
 
 @lru_cache
@@ -41,8 +42,8 @@ def load_file_uri(location: str) -> dict[str, Any]:
 
 def load_remote_uri(uri: str) -> Any:
     """Load the resource and parse it as YAML / JSON."""
-    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT / 1000)
-    return load_yaml(response.content)
+    response = requests.get(uri, timeout=DEFAULT_RESPONSE_TIMEOUT)
+    return deserialize_yaml(response.content)
 
 
 JSONType = Union[None, bool, float, str, list, Dict[str, Any]]

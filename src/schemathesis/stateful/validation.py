@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from ..exceptions import CheckFailed, get_grouped_exception
+from schemathesis.core.failures import Failure, FailureGroup
+
 from ..internal.checks import CheckContext
 
 if TYPE_CHECKING:
-    from ..failures import FailureContext
     from ..internal.checks import CheckFunction
     from ..models import Case
     from ..transports.responses import GenericResponse
@@ -24,30 +24,28 @@ def validate_response(
     max_response_time: int | None = None,
 ) -> None:
     """Validate the response against the provided checks."""
-    from .._compat import MultipleFailures
-    from ..checks import _make_max_response_time_failure_message
-    from ..failures import ResponseTimeExceeded
+    from schemathesis.core.failures import ResponseTimeExceeded
+
     from ..runner.models import Check, Request, Response, Status
 
-    exceptions: list[CheckFailed | AssertionError] = []
+    failures: list[Failure] = []
     check_results = runner_ctx.checks_for_step
 
-    def _on_failure(exc: CheckFailed | AssertionError, message: str, context: FailureContext | None) -> None:
-        exceptions.append(exc)
-        if runner_ctx.is_seen_in_suite(exc):
+    def _on_failure(failure: Failure, _name: str) -> None:
+        failures.append(failure)
+        if runner_ctx.is_seen_in_suite(failure):
             return
         failed_check = Check(
-            name=name,
+            name=_name,
             value=Status.failure,
             request=Request.from_prepared_request(response.request),
             response=Response.from_generic(response=response),
             case=copied_case,
-            message=message,
-            context=context,
+            failure=failure,
         )
         runner_ctx.add_failed_check(failed_check)
         check_results.append(failed_check)
-        runner_ctx.mark_as_seen_in_suite(exc)
+        runner_ctx.mark_as_seen_in_suite(failure)
 
     def _on_passed(_name: str, _case: Case) -> None:
         passed_check = Check(
@@ -66,33 +64,33 @@ def validate_response(
             skip_check = check(check_ctx, response, copied_case)
             if not skip_check:
                 _on_passed(name, copied_case)
-        except CheckFailed as exc:
+        except Failure as exc:
             if runner_ctx.is_seen_in_run(exc):
                 continue
-            _on_failure(exc, str(exc), exc.context)
+            _on_failure(exc, name)
         except AssertionError as exc:
-            if runner_ctx.is_seen_in_run(exc):
+            failure = Failure.from_assertion(name=name, operation=case.operation.verbose_name, exc=exc)
+            if runner_ctx.is_seen_in_run(failure):
                 continue
-            _on_failure(exc, str(exc) or f"Custom check failed: `{name}`", None)
-        except MultipleFailures as exc:
+            _on_failure(failure, name)
+        except FailureGroup as exc:
             for subexc in exc.exceptions:
                 if runner_ctx.is_seen_in_run(subexc):
                     continue
-                _on_failure(subexc, str(subexc), subexc.context)
+                _on_failure(subexc, name)
 
     if max_response_time:
         elapsed_time = response.elapsed.total_seconds() * 1000
         if elapsed_time > max_response_time:
-            message = _make_max_response_time_failure_message(elapsed_time, max_response_time)
-            context = ResponseTimeExceeded(message=message, elapsed=elapsed_time, deadline=max_response_time)
-            try:
-                raise AssertionError(message)
-            except AssertionError as _exc:
-                if not runner_ctx.is_seen_in_run(_exc):
-                    _on_failure(_exc, message, context)
+            message = f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
+            failure = ResponseTimeExceeded(
+                operation=case.operation.verbose_name, message=message, elapsed=elapsed_time, deadline=max_response_time
+            )
+            if not runner_ctx.is_seen_in_run(failure):
+                _on_failure(failure, "max_response_time")
         else:
             _on_passed("max_response_time", case)
 
     # Raise a grouped exception so Hypothesis can properly deduplicate it against the other failures
-    if exceptions:
-        raise get_grouped_exception(case.operation.verbose_name, *exceptions)(causes=tuple(exceptions))
+    if failures:
+        raise FailureGroup(failures) from None

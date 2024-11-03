@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from schemathesis.core.version import SCHEMATHESIS_VERSION
+
 from . import auths, checks, contrib, experimental, graphql, hooks, runner, serializers, targets
 from ._lazy_import import lazy_import
-from .constants import SCHEMATHESIS_VERSION
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from .models import Case
 from .specs import openapi
@@ -38,7 +39,6 @@ __all__ = [
     "serializers",
     "targets",
     "DataGenerationMethod",
-    "SCHEMATHESIS_VERSION",
     "Case",
     "openapi",
     "__version__",

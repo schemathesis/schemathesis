@@ -104,7 +104,7 @@ def test_(case):
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1, failed=1)
-    result.stdout.re_match_lines([r"E +Reproduce with:", rf"E + curl -X GET {openapi3_base_url}/failure"])
+    result.stdout.re_match_lines([".+ Reproduce with:", f".+ curl -X GET {openapi3_base_url}/failure"])
 
 
 @pytest.mark.hypothesis_nested

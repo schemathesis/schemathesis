@@ -1,22 +1,10 @@
-from importlib import metadata
-
-from .types import NotSet
-
-try:
-    SCHEMATHESIS_VERSION = metadata.version(__package__)
-except metadata.PackageNotFoundError:
-    # Local run without installation
-    SCHEMATHESIS_VERSION = "dev"
-
-NOT_SET = NotSet()
-USER_AGENT = f"schemathesis/{SCHEMATHESIS_VERSION}"
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
 GITHUB_APP_LINK = "https://github.com/apps/schemathesis"
 # Maximum test running time
 DEFAULT_DEADLINE = 15000
-DEFAULT_RESPONSE_TIMEOUT = 10000
+DEFAULT_RESPONSE_TIMEOUT = 10
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "Currently, Schemathesis can't generate data for this operation due to "

@@ -1,5 +1,5 @@
 import platform
-from unittest.mock import ANY
+from unittest.mock import ANY, Mock
 
 import pytest
 import requests
@@ -8,8 +8,10 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
-from schemathesis.exceptions import CheckFailed, SchemaError
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transport import USER_AGENT
+from schemathesis.exceptions import SchemaError
 from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
@@ -105,14 +107,15 @@ def test_make_case(graphql_schema, kwargs):
 def test_response_validation(graphql_schema, response_factory, kwargs, expected):
     response = response_factory.requests(status_code=200, **kwargs)
     case = graphql_schema["Query"]["getBooks"].make_case(body="Q")
-    with pytest.raises(CheckFailed, match=expected):
+    with pytest.raises(Failure, match=expected):
         not_a_server_error(None, response, case)
 
 
 def test_client_error(graphql_schema):
     case = graphql_schema["Query"]["getBooks"].make_case(body="invalid query")
-    with pytest.raises(CheckFailed, match="Syntax Error: Unexpected Name 'invalid'"):
+    with pytest.raises(FailureGroup) as exc:
         case.call_and_validate()
+    assert "Syntax Error: Unexpected Name 'invalid'." in str(exc.value.exceptions[0])
 
 
 def test_server_error(graphql_path, app_runner):
@@ -138,8 +141,9 @@ def test_server_error(graphql_path, app_runner):
     def test(case):
         case.call_and_validate()
 
-    with pytest.raises(CheckFailed, match="Hidden 1 / 0 bug"):
+    with pytest.raises(FailureGroup) as exc:
         test()
+    assert "Hidden 1 / 0 bug" in str(exc.value.exceptions[0])
 
 
 def test_multiple_server_error():
@@ -151,11 +155,10 @@ def test_multiple_server_error():
             {"message": "Third bug", "path": ["showBug2"]},
         ],
     }
+    with pytest.raises(Failure, match="GraphQL server error") as exc:
+        validate_graphql_response(Mock(operation=Mock(verbose_name="GET/ foo")), payload)
 
-    with pytest.raises(CheckFailed, match="GraphQL server error") as exc:
-        validate_graphql_response(payload)
-
-    assert exc.value.context.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
+    assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 
 
 def test_no_query(graphql_url):

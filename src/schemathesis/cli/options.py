@@ -4,12 +4,10 @@ from typing import TYPE_CHECKING, Any, NoReturn
 
 import click
 
-from ..constants import NOT_SET
+from schemathesis.core import NOT_SET, NotSet
 
 if TYPE_CHECKING:
     from enum import Enum
-
-    from ..types import NotSet
 
 
 class CustomHelpMessageChoice(click.Choice):
@@ -29,7 +27,7 @@ class BaseCsvChoice(click.Choice):
         invalid_options = set(selected) - set(self.choices)
         return selected, invalid_options
 
-    def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:
+    def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:  # type: ignore[misc]
         # Sort to keep the error output consistent with the passed values
         sorted_options = ", ".join(sorted(invalid_options, key=selected.index))
         available_options = ", ".join(self.choices)

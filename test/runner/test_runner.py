@@ -20,7 +20,8 @@ from schemathesis import experimental
 from schemathesis._hypothesis._builder import add_examples
 from schemathesis._override import CaseOverride
 from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
@@ -88,13 +89,12 @@ def test_execute(app, real_app_schema):
     assert_schema_requests_num(app, 1)
     schema_requests = app["schema_requests"]
     assert schema_requests[0].headers.get("User-Agent") == headers["User-Agent"]
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(app, 2)
     assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_request(app, 1, "GET", "/api/success", headers)
 
     # And statistic is showing the breakdown of cases types
-    assert stats.results.total == {"not_a_server_error": {Status.success: 1, Status.failure: 2, "total": 3}}
+    assert stats.results.total == {"not_a_server_error": {Status.success: 1, Status.failure: 1, "total": 2}}
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -105,7 +105,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     interactions = next(
         event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.failure
     ).result.interactions
-    assert len(interactions) == 2
+    assert len(interactions) == 1
     failure = interactions[0]
     assert asdict(failure.request) == {
         "uri": f"{openapi3_base_url}/failure",
@@ -190,11 +190,10 @@ def test_auth(app, real_app_schema):
     execute(real_app_schema, network=NetworkConfig(auth=("test", "test")))
 
     # Then each request should contain corresponding basic auth header
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(app, 2)
     headers = {"Authorization": "Basic dGVzdDp0ZXN0"}
     assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_request(app, 1, "GET", "/api/success", headers)
 
 
 @pytest.mark.parametrize("converter", [lambda x: x, lambda x: x + "/"])
@@ -205,10 +204,9 @@ def test_base_url(openapi3_base_url, schema_url, app, converter):
     execute(schema)
 
     # Then each request should reach the app in both cases
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(app, 2)
     assert_request(app, 0, "GET", "/api/failure")
-    assert_request(app, 1, "GET", "/api/failure")
-    assert_request(app, 2, "GET", "/api/success")
+    assert_request(app, 1, "GET", "/api/success")
 
 
 # @pytest.mark.openapi_version("3.0")
@@ -237,10 +235,9 @@ def test_execute_with_headers(app, real_app_schema):
     execute(real_app_schema, network=NetworkConfig(headers=headers))
 
     # Then each request should contain these headers
-    assert_incoming_requests_num(app, 3)
+    assert_incoming_requests_num(app, 2)
     assert_request(app, 0, "GET", "/api/failure", headers)
-    assert_request(app, 1, "GET", "/api/failure", headers)
-    assert_request(app, 2, "GET", "/api/success", headers)
+    assert_request(app, 1, "GET", "/api/success", headers)
 
 
 def test_execute_filter_endpoint(app, schema_url):
@@ -327,9 +324,9 @@ def test_unknown_response_code(real_app_schema):
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.value == Status.failure
-    assert check.context.status_code == 418
-    assert check.context.allowed_status_codes == [200]
-    assert check.context.defined_status_codes == ["200"]
+    assert check.failure.status_code == 418
+    assert check.failure.allowed_status_codes == [200]
+    assert check.failure.defined_status_codes == ["200"]
 
 
 @pytest.mark.operations("failure")
@@ -362,8 +359,8 @@ def test_unknown_content_type(real_app_schema):
     check = others[1].result.checks[0]
     assert check.name == "content_type_conformance"
     assert check.value == Status.failure
-    assert check.context.content_type == "text/plain"
-    assert check.context.defined_content_types == ["application/json"]
+    assert check.failure.content_type == "text/plain"
+    assert check.failure.defined_content_types == ["application/json"]
 
 
 @pytest.mark.operations("success")
@@ -391,9 +388,9 @@ def test_response_conformance_invalid(real_app_schema):
     # Then there should be a failure
     assert finished.results.has_failures
     check = others[1].result.checks[-1]
-    assert check.message == "Response violates schema"
+    assert check.failure.title == "Response violates schema"
     assert (
-        check.context.message
+        check.failure.message
         == """'success' is a required property
 
 Schema:
@@ -416,15 +413,15 @@ Value:
         "random": "key"
     }"""
     )
-    assert check.context.instance == {"random": "key"}
-    assert check.context.instance_path == []
-    assert check.context.schema == {
+    assert check.failure.instance == {"random": "key"}
+    assert check.failure.instance_path == []
+    assert check.failure.schema == {
         "properties": {"success": {"type": "boolean"}},
         "required": ["success"],
         "type": "object",
     }
-    assert check.context.schema_path == ["required"]
-    assert check.context.validation_message == "'success' is a required property"
+    assert check.failure.schema_path == ["required"]
+    assert check.failure.validation_message == "'success' is a required property"
 
 
 @pytest.mark.operations("success")
@@ -482,9 +479,9 @@ def test_response_conformance_malformed_json(real_app_schema):
     assert finished.results.has_failures
     assert not finished.results.has_errors
     check = others[1].result.checks[-1]
-    assert check.message == "JSON deserialization error"
-    assert check.context.validation_message == "Expecting property name enclosed in double quotes"
-    assert check.context.position == 1
+    assert check.failure.title == "JSON deserialization error"
+    assert check.failure.validation_message == "Expecting property name enclosed in double quotes"
+    assert check.failure.position == 1
 
 
 @pytest.fixture

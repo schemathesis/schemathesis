@@ -7,7 +7,8 @@ import platform
 from dataclasses import dataclass, field
 from importlib import metadata
 
-from ..constants import SCHEMATHESIS_VERSION
+from schemathesis.core.version import SCHEMATHESIS_VERSION
+
 from .constants import DOCKER_IMAGE_ENV_VAR
 
 

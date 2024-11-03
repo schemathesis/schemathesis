@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
-from ....constants import NOT_SET
+from schemathesis.core import NOT_SET, NotSet
+
 from ....generation import DataGenerationMethod, combine_strategies
 from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
-from ....types import NotSet
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code

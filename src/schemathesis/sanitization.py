@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from .constants import NOT_SET
+from schemathesis.core import NOT_SET
 
 if TYPE_CHECKING:
     from .models import Case
