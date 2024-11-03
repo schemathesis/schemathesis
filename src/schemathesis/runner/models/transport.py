@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 from ...generation import DataGenerationMethod
 from ...transports import RequestsTransport, serialize_payload
-from ...types import Headers
 from .status import Status
 
 if TYPE_CHECKING:
@@ -26,7 +25,7 @@ class Request:
     uri: str
     body: bytes | None
     body_size: int | None
-    headers: Headers
+    headers: dict[str, Any]
 
     @classmethod
     def from_case(cls, case: Case, session: requests.Session) -> Request:

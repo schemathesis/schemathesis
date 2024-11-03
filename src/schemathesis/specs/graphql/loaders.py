@@ -140,7 +140,7 @@ def from_url(
     else:
         _load_schema = requests.post
 
-    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT / 1000)
+    kwargs.setdefault("timeout", DEFAULT_RESPONSE_TIMEOUT)
     response = load_schema_from_url(lambda: _load_schema(url, **kwargs))
     raw_schema = extract_schema_from_response(response)
     return from_dict(

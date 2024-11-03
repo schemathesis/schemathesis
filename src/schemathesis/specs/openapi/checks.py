@@ -6,20 +6,21 @@ from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
-from ... import failures
-from ...exceptions import (
-    get_ensure_resource_availability_error,
-    get_headers_error,
-    get_ignored_auth_error,
-    get_malformed_media_type_error,
-    get_missing_content_type_error,
-    get_negative_rejection_error,
-    get_positive_acceptance_error,
-    get_response_type_error,
-    get_schema_validation_error,
-    get_status_code_error,
-    get_use_after_free_error,
+from schemathesis.core.failures import Failure
+from schemathesis.openapi.checks import (
+    AcceptedNegativeData,
+    EnsureResourceAvailability,
+    IgnoredAuth,
+    JsonSchemaError,
+    MalformedMediaType,
+    MissingContentType,
+    MissingHeaders,
+    RejectedPositiveData,
+    UndefinedContentType,
+    UndefinedStatusCode,
+    UseAfterFree,
 )
+
 from ...internal.transformation import convert_boolean_string
 from ...transports.content_types import parse_content_type
 from .utils import expand_status_code, expand_status_codes
@@ -45,15 +46,12 @@ def status_code_conformance(ctx: CheckContext, response: GenericResponse, case: 
     if response.status_code not in allowed_status_codes:
         defined_status_codes = list(map(str, responses))
         responses_list = ", ".join(defined_status_codes)
-        exc_class = get_status_code_error(case.operation.verbose_name, response.status_code)
-        raise exc_class(
-            failures.UndefinedStatusCode.title,
-            context=failures.UndefinedStatusCode(
-                message=f"Received: {response.status_code}\nDocumented: {responses_list}",
-                status_code=response.status_code,
-                defined_status_codes=defined_status_codes,
-                allowed_status_codes=allowed_status_codes,
-            ),
+        raise UndefinedStatusCode(
+            operation=case.operation.verbose_name,
+            status_code=response.status_code,
+            defined_status_codes=defined_status_codes,
+            allowed_status_codes=allowed_status_codes,
+            message=f"Received: {response.status_code}\nDocumented: {responses_list}",
         )
     return None  # explicitly return None for mypy
 
@@ -73,23 +71,21 @@ def content_type_conformance(ctx: CheckContext, response: GenericResponse, case:
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
-        formatted_content_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
-        raise get_missing_content_type_error(case.operation.verbose_name)(
-            failures.MissingContentType.title,
-            context=failures.MissingContentType(
-                message=f"The following media types are documented in the schema:{''.join(formatted_content_types)}",
-                media_types=documented_content_types,
-            ),
+        media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
+        raise MissingContentType(
+            operation=case.operation.verbose_name,
+            message=f"The following media types are documented in the schema:{''.join(media_types)}",
+            media_types=documented_content_types,
         )
     for option in documented_content_types:
         try:
             expected_main, expected_sub = parse_content_type(option)
-        except ValueError as exc:
-            _reraise_malformed_media_type(case, exc, "Schema", option, option)
+        except ValueError:
+            _reraise_malformed_media_type(case, "Schema", option, option)
         try:
             received_main, received_sub = parse_content_type(content_type)
-        except ValueError as exc:
-            _reraise_malformed_media_type(case, exc, "Response", content_type, option)
+        except ValueError:
+            _reraise_malformed_media_type(case, "Response", content_type, option)
         if (
             (expected_main == "*" and expected_sub == "*")
             or (expected_main == received_main and expected_sub == "*")
@@ -97,25 +93,21 @@ def content_type_conformance(ctx: CheckContext, response: GenericResponse, case:
             or (expected_main == received_main and expected_sub == received_sub)
         ):
             return None
-    exc_class = get_response_type_error(
-        case.operation.verbose_name, f"{expected_main}_{expected_sub}", f"{received_main}_{received_sub}"
-    )
-    raise exc_class(
-        failures.UndefinedContentType.title,
-        context=failures.UndefinedContentType(
-            message=f"Received: {content_type}\nDocumented: {', '.join(documented_content_types)}",
-            content_type=content_type,
-            defined_content_types=documented_content_types,
-        ),
+    raise UndefinedContentType(
+        operation=case.operation.verbose_name,
+        message=f"Received: {content_type}\nDocumented: {', '.join(documented_content_types)}",
+        content_type=content_type,
+        defined_content_types=documented_content_types,
     )
 
 
-def _reraise_malformed_media_type(case: Case, exc: ValueError, location: str, actual: str, defined: str) -> NoReturn:
-    message = f"Media type for {location} is incorrect\n\nReceived: {actual}\nDocumented: {defined}"
-    raise get_malformed_media_type_error(case.operation.verbose_name, message)(
-        failures.MalformedMediaType.title,
-        context=failures.MalformedMediaType(message=message, actual=actual, defined=defined),
-    ) from exc
+def _reraise_malformed_media_type(case: Case, location: str, actual: str, defined: str) -> NoReturn:
+    raise MalformedMediaType(
+        operation=case.operation.verbose_name,
+        message=f"Media type for {location} is incorrect\n\nReceived: {actual}\nDocumented: {defined}",
+        actual=actual,
+        defined=defined,
+    )
 
 
 def response_headers_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
@@ -138,18 +130,13 @@ def response_headers_conformance(ctx: CheckContext, response: GenericResponse, c
         for header, definition in defined_headers.items()
         if header not in response.headers and definition.get(case.operation.schema.header_required_field, False)
     ]
-    errors = []
+    errors: list[Failure] = []
     if missing_headers:
         formatted_headers = [f"\n- `{header}`" for header in missing_headers]
         message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
-        exc_class = get_headers_error(case.operation.verbose_name, message)
-        try:
-            raise exc_class(
-                failures.MissingHeaders.title,
-                context=failures.MissingHeaders(message=message, missing_headers=missing_headers),
-            )
-        except Exception as exc:
-            errors.append(exc)
+        errors.append(
+            MissingHeaders(operation=case.operation.verbose_name, message=message, missing_headers=missing_headers)
+        )
     for name, definition in defined_headers.items():
         value = response.headers.get(name)
         if value is not None:
@@ -173,14 +160,14 @@ def response_headers_conformance(ctx: CheckContext, response: GenericResponse, c
                         format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
                     )
                 except jsonschema.ValidationError as exc:
-                    exc_class = get_schema_validation_error(case.operation.verbose_name, exc)
-                    error_ctx = failures.ValidationErrorContext.from_exception(
-                        exc, output_config=case.operation.schema.output_config
+                    errors.append(
+                        JsonSchemaError.from_exception(
+                            title="Response header does not conform to the schema",
+                            operation=case.operation.verbose_name,
+                            exc=exc,
+                            output_config=case.operation.schema.output_config,
+                        )
                     )
-                    try:
-                        raise exc_class("Response header does not conform to the schema", context=error_ctx) from exc
-                    except Exception as exc:
-                        errors.append(exc)
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
 
 
@@ -229,15 +216,11 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
-        message = f"Allowed statuses: {', '.join(config.allowed_statuses)}"
-        exc_class = get_negative_rejection_error(case.operation.verbose_name, response.status_code)
-        raise exc_class(
-            failures.AcceptedNegativeData.title,
-            context=failures.AcceptedNegativeData(
-                message=message,
-                status_code=response.status_code,
-                allowed_statuses=config.allowed_statuses,
-            ),
+        raise AcceptedNegativeData(
+            operation=case.operation.verbose_name,
+            message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
+            status_code=response.status_code,
+            allowed_statuses=config.allowed_statuses,
         )
     return None
 
@@ -256,15 +239,11 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
         and case.data_generation_method.is_positive
         and response.status_code not in allowed_statuses
     ):
-        message = f"Allowed statuses: {', '.join(config.allowed_statuses)}"
-        exc_class = get_positive_acceptance_error(case.operation.verbose_name, response.status_code)
-        raise exc_class(
-            failures.RejectedPositiveData.title,
-            context=failures.RejectedPositiveData(
-                message=message,
-                status_code=response.status_code,
-                allowed_statuses=config.allowed_statuses,
-            ),
+        raise RejectedPositiveData(
+            operation=case.operation.verbose_name,
+            message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
+            status_code=response.status_code,
+            allowed_statuses=config.allowed_statuses,
         )
     return None
 
@@ -330,19 +309,15 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
             ):
                 free = f"{case.operation.method.upper()} {case.formatted_path}"
                 usage = f"{original.operation.method} {original.formatted_path}"
-                exc_class = get_use_after_free_error(case.operation.verbose_name)
                 reason = get_reason(response.status_code)
-                message = (
-                    "The API did not return a `HTTP 404 Not Found` response "
-                    f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
-                )
-                raise exc_class(
-                    failures.UseAfterFree.title,
-                    context=failures.UseAfterFree(
-                        message=message,
-                        free=free,
-                        usage=usage,
+                raise UseAfterFree(
+                    operation=case.operation.verbose_name,
+                    message=(
+                        "The API did not return a `HTTP 404 Not Found` response "
+                        f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
                     ),
+                    free=free,
+                    usage=usage,
                 )
         if case.source is None:
             break
@@ -369,18 +344,16 @@ def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, o
     ):
         created_with = original.source.case.operation.verbose_name
         not_available_with = original.operation.verbose_name
-        exc_class = get_ensure_resource_availability_error(created_with)
         reason = get_reason(response.status_code)
-        message = (
-            f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
-            f"Created with      : `{created_with}`\n"
-            f"Not available with: `{not_available_with}`"
-        )
-        raise exc_class(
-            failures.EnsureResourceAvailability.title,
-            context=failures.EnsureResourceAvailability(
-                message=message, created_with=created_with, not_available_with=not_available_with
+        raise EnsureResourceAvailability(
+            operation=created_with,
+            message=(
+                f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
+                f"Created with      : `{created_with}`\n"
+                f"Not available with: `{not_available_with}`"
             ),
+            created_with=created_with,
+            not_available_with=not_available_with,
         )
     return None
 
@@ -438,12 +411,10 @@ def _update_response(old: GenericResponse, new: GenericResponse) -> None:
 def _raise_no_auth_error(response: GenericResponse, operation: str, suffix: str) -> NoReturn:
     from ...transports.responses import get_reason
 
-    exc_class = get_ignored_auth_error(operation)
     reason = get_reason(response.status_code)
-    message = f"The API returned `{response.status_code} {reason}` for `{operation}` {suffix}."
-    raise exc_class(
-        failures.IgnoredAuth.title,
-        context=failures.IgnoredAuth(message=message),
+    raise IgnoredAuth(
+        operation=operation,
+        message=f"The API returned `{response.status_code} {reason}` for `{operation}` {suffix}.",
     )
 
 

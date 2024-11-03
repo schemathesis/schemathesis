@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from . import failures
-from .exceptions import get_response_parsing_error, get_server_error
+from schemathesis.core.failures import MalformedJson, ServerError
+
 from .specs.openapi.checks import (
     content_type_conformance,
     ignored_auth,
@@ -28,21 +28,14 @@ def not_a_server_error(ctx: CheckContext, response: GenericResponse, case: Case)
 
     status_code = response.status_code
     if status_code >= 500:
-        exc_class = get_server_error(case.operation.verbose_name, status_code)
-        raise exc_class(failures.ServerError.title, context=failures.ServerError(status_code=status_code))
+        raise ServerError(operation=case.operation.verbose_name, status_code=status_code)
     if isinstance(case, GraphQLCase):
         try:
             data = get_json(response)
-            validate_graphql_response(data)
+            validate_graphql_response(case, data)
         except json.JSONDecodeError as exc:
-            exc_class = get_response_parsing_error(case.operation.verbose_name, exc)
-            context = failures.JSONDecodeErrorContext.from_exception(exc)
-            raise exc_class(context.title, context=context) from exc
+            raise MalformedJson.from_exception(operation=case.operation.verbose_name, exc=exc) from None
     return None
-
-
-def _make_max_response_time_failure_message(elapsed_time: float, max_response_time: int) -> str:
-    return f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
 
 
 DEFAULT_CHECKS: tuple[CheckFunction, ...] = (not_a_server_error,)

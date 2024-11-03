@@ -6,7 +6,7 @@ from requests import Request
 
 import schemathesis
 from schemathesis._hypothesis._builder import create_test
-from schemathesis.constants import NOT_SET
+from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.models import TestPhase

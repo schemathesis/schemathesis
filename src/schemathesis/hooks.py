@@ -16,7 +16,6 @@ if TYPE_CHECKING:
     from .models import APIOperation, Case
     from .schemas import BaseSchema
     from .transports.responses import GenericResponse
-    from .types import GenericTest
 
 
 @unique
@@ -170,7 +169,7 @@ class HookDispatcher:
         else:
             hook_name = name
 
-        def decorator(func: GenericTest) -> GenericTest:
+        def decorator(func: Callable) -> Callable:
             dispatcher = self.add_dispatcher(func)
             dispatcher.register_hook_with_name(hook, hook_name)
             return func
@@ -178,7 +177,7 @@ class HookDispatcher:
         return decorator
 
     @classmethod
-    def add_dispatcher(cls, func: GenericTest) -> HookDispatcher:
+    def add_dispatcher(cls, func: Callable) -> HookDispatcher:
         """Attach a new dispatcher instance to the test if it is not already present."""
         if not hasattr(func, "_schemathesis_hooks"):
             func._schemathesis_hooks = cls(scope=HookScope.TEST)  # type: ignore
