@@ -31,7 +31,7 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    new_check                    0 / 2 passed          FAILED 
+    new_check                    0 / 1 passed          FAILED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

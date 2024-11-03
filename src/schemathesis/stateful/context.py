@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import traceback
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Tuple, Type, Union
+from typing import TYPE_CHECKING
 
-from ..constants import NOT_SET
-from ..exceptions import CheckFailed
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.failures import Failure
+
 from ..targets import TargetMetricCollector
 from . import events
 
@@ -13,24 +13,6 @@ if TYPE_CHECKING:
     from ..models import Case
     from ..runner.models import Check
     from ..transports.responses import GenericResponse
-    from ..types import NotSet
-
-FailureKey = Union[Type[CheckFailed], Tuple[str, int]]
-
-
-def _failure_cache_key(exc: CheckFailed | AssertionError) -> FailureKey:
-    """Create a key to identify unique failures."""
-    from hypothesis.internal.escalation import get_trimmed_traceback
-
-    # For CheckFailed, we already have all distinctive information about the failure, which is contained
-    # in the exception type itself.
-    if isinstance(exc, CheckFailed):
-        return exc.__class__
-
-    # Assertion come from the user's code and we may try to group them by location
-    tb = get_trimmed_traceback(exc)
-    filename, lineno, *_ = traceback.extract_tb(tb)[-1]
-    return (filename, lineno)
 
 
 @dataclass
@@ -38,9 +20,9 @@ class RunnerContext:
     """Mutable context for state machine execution."""
 
     # All seen failure keys, both grouped and individual ones
-    seen_in_run: set[FailureKey] = field(default_factory=set)
+    seen_in_run: set[Failure] = field(default_factory=set)
     # Failures keys seen in the current suite
-    seen_in_suite: set[FailureKey] = field(default_factory=set)
+    seen_in_suite: set[Failure] = field(default_factory=set)
     # Unique failures collected in the current suite
     failures_for_suite: list[Check] = field(default_factory=list)
     # All checks executed in the current run
@@ -90,28 +72,20 @@ class RunnerContext:
     def step_interrupted(self) -> None:
         self.current_step_status = events.StepStatus.INTERRUPTED
 
-    def mark_as_seen_in_run(self, exc: CheckFailed) -> None:
-        key = _failure_cache_key(exc)
-        self.seen_in_run.add(key)
-        causes = exc.causes or ()
-        for cause in causes:
-            key = _failure_cache_key(cause)
-            self.seen_in_run.add(key)
+    def mark_as_seen_in_run(self, exc: Failure) -> None:
+        self.seen_in_run.add(exc)
 
-    def mark_as_seen_in_suite(self, exc: CheckFailed | AssertionError) -> None:
-        key = _failure_cache_key(exc)
-        self.seen_in_suite.add(key)
+    def mark_as_seen_in_suite(self, exc: Failure) -> None:
+        self.seen_in_suite.add(exc)
 
     def mark_current_suite_as_seen_in_run(self) -> None:
         self.seen_in_run.update(self.seen_in_suite)
 
-    def is_seen_in_run(self, exc: CheckFailed | AssertionError) -> bool:
-        key = _failure_cache_key(exc)
-        return key in self.seen_in_run
+    def is_seen_in_run(self, exc: Failure) -> bool:
+        return exc in self.seen_in_run
 
-    def is_seen_in_suite(self, exc: CheckFailed | AssertionError) -> bool:
-        key = _failure_cache_key(exc)
-        return key in self.seen_in_suite
+    def is_seen_in_suite(self, exc: Failure) -> bool:
+        return exc in self.seen_in_suite
 
     def add_failed_check(self, check: Check) -> None:
         self.failures_for_suite.append(check)

@@ -63,34 +63,33 @@ Loader options:
                                  enable or 'false' to disable  [default: False]
 
 Network requests options:
-  -b, --base-url TEXT              Base URL of the API, required when schema is
-                                   provided as a file
-  --request-timeout INTEGER RANGE  Timeout limit, in milliseconds, for each
-                                   network request during tests  [x>=1]
-  --request-proxy TEXT             Set the proxy for all network requests
-  --request-tls-verify TEXT        Configures TLS certificate verification for
-                                   server requests. Can specify path to
-                                   CA_BUNDLE for custom certs  [default: true]
-  --request-cert PATH              File path of unencrypted client certificate
-                                   for authentication. The certificate can be
-                                   bundled with a private key (e.g. PEM) or the
-                                   private key can be provided with the
-                                   --request-cert-key argument
-  --request-cert-key PATH          Specify the file path of the private key for
-                                   the client certificate
-  --rate-limit TEXT                Specify a rate limit for test requests in
-                                   '<limit>/<duration>' format. Example -
-                                   `100/m` for 100 requests per minute
-  -H, --header TEXT                Add a custom HTTP header to all API requests.
-                                   Format: 'Header-Name: Value'
-  -a, --auth TEXT                  Provide the server authentication details in
-                                   the 'USER:PASSWORD' format
-  -A, --auth-type                  Specify the authentication method. For custom
-                                   authentication methods, see our
-                                   Authentication documentation: https://schemat
-                                   hesis.readthedocs.io/en/stable/auth.html#cust
-                                   om-auth  [default: basic] [possible values:
-                                   basic, digest]
+  -b, --base-url TEXT            Base URL of the API, required when schema is
+                                 provided as a file
+  --request-timeout FLOAT RANGE  Timeout limit, in seconds, for each network
+                                 request during tests  [x>0.0]
+  --request-proxy TEXT           Set the proxy for all network requests
+  --request-tls-verify TEXT      Configures TLS certificate verification for
+                                 server requests. Can specify path to CA_BUNDLE
+                                 for custom certs  [default: true]
+  --request-cert PATH            File path of unencrypted client certificate for
+                                 authentication. The certificate can be bundled
+                                 with a private key (e.g. PEM) or the private
+                                 key can be provided with the --request-cert-key
+                                 argument
+  --request-cert-key PATH        Specify the file path of the private key for
+                                 the client certificate
+  --rate-limit TEXT              Specify a rate limit for test requests in
+                                 '<limit>/<duration>' format. Example - `100/m`
+                                 for 100 requests per minute
+  -H, --header TEXT              Add a custom HTTP header to all API requests.
+                                 Format: 'Header-Name: Value'
+  -a, --auth TEXT                Provide the server authentication details in
+                                 the 'USER:PASSWORD' format
+  -A, --auth-type                Specify the authentication method. For custom
+                                 authentication methods, see our Authentication
+                                 documentation: https://schemathesis.readthedocs
+                                 .io/en/stable/auth.html#custom-auth  [default:
+                                 basic] [possible values: basic, digest]
 
 Filtering options:
   --include-path TEXT                Path to include in testing.

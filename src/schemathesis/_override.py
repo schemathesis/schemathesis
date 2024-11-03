@@ -1,14 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from .exceptions import UsageError
 
 if TYPE_CHECKING:
     from .models import APIOperation
     from .parameters import ParameterSet
-    from .types import GenericTest
 
 
 @dataclass
@@ -37,14 +36,14 @@ def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[s
     return output
 
 
-def get_override_from_mark(test: GenericTest) -> CaseOverride | None:
+def get_override_from_mark(test: Callable) -> CaseOverride | None:
     return getattr(test, "_schemathesis_override", None)
 
 
-def set_override_mark(test: GenericTest, override: CaseOverride) -> None:
+def set_override_mark(test: Callable, override: CaseOverride) -> None:
     test._schemathesis_override = override  # type: ignore[attr-defined]
 
 
-def check_no_override_mark(test: GenericTest) -> None:
+def check_no_override_mark(test: Callable) -> None:
     if hasattr(test, "_schemathesis_override"):
         raise UsageError(f"`{test.__name__}` has already been decorated with `override`.")

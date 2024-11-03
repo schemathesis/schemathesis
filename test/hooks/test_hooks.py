@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis._pytest.markers import get_schemathesis_handle
-from schemathesis.constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.hooks import HookDispatcher, HookScope
 from test.utils import assert_requests_call, flaky
 

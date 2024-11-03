@@ -3,177 +3,17 @@ from __future__ import annotations
 import enum
 import re
 from dataclasses import dataclass, field
-from hashlib import sha1
-from typing import TYPE_CHECKING, Any, Callable, Generator, NoReturn
+from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
 from .constants import SERIALIZERS_SUGGESTION_MESSAGE
 from .internal.output import truncate_json
 
 if TYPE_CHECKING:
-    from json import JSONDecodeError
-
     import hypothesis.errors
-    from graphql.error import GraphQLFormattedError
     from jsonschema import RefResolutionError, ValidationError
     from jsonschema import SchemaError as JsonSchemaError
 
-    from .failures import FailureContext
     from .transports.responses import GenericResponse
-
-
-class CheckFailed(AssertionError):
-    """Custom error type to distinguish from arbitrary AssertionError that may happen in the dependent libraries."""
-
-    __module__ = "builtins"
-    context: FailureContext | None
-    causes: tuple[CheckFailed | AssertionError, ...] | None
-
-    def __init__(
-        self,
-        *args: Any,
-        context: FailureContext | None = None,
-        causes: tuple[CheckFailed | AssertionError, ...] | None = None,
-    ):
-        super().__init__(*args)
-        self.context = context
-        self.causes = causes
-
-
-def deduplicate_failed_checks(
-    checks: list[CheckFailed | AssertionError],
-) -> Generator[CheckFailed | AssertionError, None, None]:
-    """Keep only unique failed checks."""
-    seen = set()
-    for check in checks:
-        check_message = check.args[0]
-        if isinstance(check, CheckFailed) and check.context is not None:
-            key = check.context.unique_by_key(check_message)
-        else:
-            key = check_message
-        if key not in seen:
-            yield check
-            seen.add(key)
-
-
-CACHE: dict[str | int, type[CheckFailed]] = {}
-
-
-def get_exception(name: str) -> type[CheckFailed]:
-    """Create a new exception class with provided name or fetch one from the cache."""
-    if name in CACHE:
-        exception_class = CACHE[name]
-    else:
-        exception_class = type(name, (CheckFailed,), {})
-        exception_class.__qualname__ = CheckFailed.__name__
-        exception_class.__name__ = CheckFailed.__name__
-        CACHE[name] = exception_class
-    return exception_class
-
-
-def _get_hashed_exception(prefix: str, message: str) -> type[CheckFailed]:
-    """Give different exceptions for different error messages."""
-    messages_digest = sha1(message.encode("utf-8")).hexdigest()
-    name = f"{prefix}{messages_digest}"
-    return get_exception(name)
-
-
-def get_grouped_exception(prefix: str, *exceptions: AssertionError) -> type[CheckFailed]:
-    # The prefix is needed to distinguish multiple operations with the same error messages
-    # that are coming from different operations
-    messages = [exception.args[0] for exception in exceptions]
-    message = "".join(messages)
-    return _get_hashed_exception("GroupedException", f"{prefix}{message}")
-
-
-def get_server_error(prefix: str, status_code: int) -> type[CheckFailed]:
-    """Return new exception for the Internal Server Error cases."""
-    name = f"ServerError{prefix}{status_code}"
-    return get_exception(name)
-
-
-def get_status_code_error(prefix: str, status_code: int) -> type[CheckFailed]:
-    """Return new exception for an unexpected status code."""
-    name = f"StatusCodeError{prefix}{status_code}"
-    return get_exception(name)
-
-
-def get_response_type_error(prefix: str, expected: str, received: str) -> type[CheckFailed]:
-    """Return new exception for an unexpected response type."""
-    name = f"SchemaValidationError{prefix}{expected}_{received}"
-    return get_exception(name)
-
-
-def get_malformed_media_type_error(prefix: str, media_type: str) -> type[CheckFailed]:
-    name = f"MalformedMediaType{prefix}{media_type}"
-    return get_exception(name)
-
-
-def get_missing_content_type_error(prefix: str) -> type[CheckFailed]:
-    """Return new exception for a missing Content-Type header."""
-    return get_exception(f"MissingContentTypeError{prefix}")
-
-
-def get_schema_validation_error(prefix: str, exception: ValidationError) -> type[CheckFailed]:
-    """Return new exception for schema validation error."""
-    return _get_hashed_exception(f"SchemaValidationError{prefix}", str(exception))
-
-
-def get_response_parsing_error(prefix: str, exception: JSONDecodeError) -> type[CheckFailed]:
-    """Return new exception for response parsing error."""
-    return _get_hashed_exception(f"ResponseParsingError{prefix}", str(exception))
-
-
-def get_headers_error(prefix: str, message: str) -> type[CheckFailed]:
-    """Return new exception for missing headers."""
-    return _get_hashed_exception(f"MissingHeadersError{prefix}", message)
-
-
-def get_negative_rejection_error(prefix: str, status: int) -> type[CheckFailed]:
-    return _get_hashed_exception(f"AcceptedNegativeDataError{prefix}", str(status))
-
-
-def get_positive_acceptance_error(prefix: str, status: int) -> type[CheckFailed]:
-    return _get_hashed_exception(f"RejectedPositiveDataError{prefix}", str(status))
-
-
-def get_use_after_free_error(free: str) -> type[CheckFailed]:
-    return _get_hashed_exception("UseAfterFreeError", free)
-
-
-def get_ensure_resource_availability_error(operation: str) -> type[CheckFailed]:
-    return _get_hashed_exception("EnsureResourceAvailabilityError", operation)
-
-
-def get_ignored_auth_error(operation: str) -> type[CheckFailed]:
-    return _get_hashed_exception("IgnoredAuthError", operation)
-
-
-def get_timeout_error(prefix: str, deadline: float | int) -> type[CheckFailed]:
-    """Request took too long."""
-    return _get_hashed_exception(f"TimeoutError{prefix}", str(deadline))
-
-
-def get_unexpected_graphql_response_error(type_: type) -> type[CheckFailed]:
-    """When GraphQL response is not a JSON object."""
-    return get_exception(f"UnexpectedGraphQLResponseError:{type_}")
-
-
-def get_grouped_graphql_error(errors: list[GraphQLFormattedError]) -> type[CheckFailed]:
-    # Canonicalize GraphQL errors by serializing them uniformly and sorting the outcomes
-    entries = []
-    for error in errors:
-        message = error["message"]
-        if "locations" in error:
-            message += ";locations:"
-            for location in sorted(error["locations"]):
-                message += f"({location['line'], location['column']})"
-        if "path" in error:
-            message += ";path:"
-            for chunk in error["path"]:
-                message += str(chunk)
-        entries.append(message)
-    entries.sort()
-    return _get_hashed_exception("GraphQLErrors", "".join(entries))
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
@@ -444,13 +284,3 @@ class SerializationNotPossible(SerializationError):
 
 class UsageError(Exception):
     """Incorrect usage of Schemathesis functions."""
-
-
-def maybe_set_assertion_message(exc: AssertionError, check_name: str) -> str:
-    message = str(exc)
-    title = f"Custom check failed: `{check_name}`"
-    if not message:
-        exc.args = (title, None)
-    else:
-        exc.args = (title, message)
-    return message

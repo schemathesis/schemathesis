@@ -16,7 +16,8 @@ from hypothesis_jsonschema import from_schema
 from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
-from ..constants import NOT_SET
+from schemathesis.core import NOT_SET
+
 from ..internal.copy import fast_deepcopy
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies

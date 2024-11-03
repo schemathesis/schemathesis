@@ -16,8 +16,6 @@ GET /api/flaky F                                                          [100%]
 
 =================================== FAILURES ===================================
 ________________________________ GET /api/flaky ________________________________
-[FLAKY] Schemathesis was not able to reliably reproduce this failure
-
 1. Test Case ID: <PLACEHOLDER>
 
 - Server error
