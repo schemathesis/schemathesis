@@ -12,9 +12,15 @@ Collected API links: 0
 API probing: ERROR
 Schema analysis: SKIP
 
-GET /api/success F                                                        [100%]
+GET /api/success E                                                        [100%]
 
 ==================================== ERRORS ====================================
+_______________________________ GET /api/success _______________________________
+Network Error
+
+Connection failed
+
+    Read timed out
 _______________________________ API Probe errors _______________________________
 Network Error
 
@@ -24,28 +30,11 @@ Connection failed
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
-=================================== FAILURES ===================================
-_______________________________ GET /api/success _______________________________
-1. Test Case ID: <PLACEHOLDER>
-
-- Response timeout
-
-    The server failed to respond within the specified limit of 10000.00ms
-
-Reproduce with: 
-
-    curl -X GET http://127.0.0.1/api/success
-
 =================================== SUMMARY ====================================
 
-Performed checks:
-    request_timeout                    0 / 2 passed          FAILED 
-
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
-
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+No checks were performed.
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-============================== 1 failed in 1.00s ===============================
+============================== 1 errored in 1.00s ==============================

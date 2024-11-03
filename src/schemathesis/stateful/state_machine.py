@@ -9,7 +9,9 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
-from ..constants import NO_LINKS_ERROR_MESSAGE, NOT_SET
+from schemathesis.core import NOT_SET
+
+from ..constants import NO_LINKS_ERROR_MESSAGE
 from ..exceptions import UsageError
 from ..internal.checks import CheckFunction
 from ..models import APIOperation, Case
@@ -269,7 +271,7 @@ class APIStateMachine(RuleBasedStateMachine):
         :param response: Response from the application under test.
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
         :param additional_checks: A list of checks that will be run together with the default ones.
-        :raises CheckFailed: If any of the supplied checks failed.
+        :raises FailureGroup: If any of the supplied checks failed.
 
         If you need to change the default checks or provide custom validation rules, you can do it here.
 

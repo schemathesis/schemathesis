@@ -7,7 +7,7 @@ import schemathesis.cli.context
 from schemathesis import models, runner
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
-from schemathesis.constants import NOT_SET
+from schemathesis.core import NOT_SET
 from schemathesis.models import Case, OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.models import Check, Request, Response, Status, TestResult, TestResultSet

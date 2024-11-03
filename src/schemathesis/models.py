@@ -19,23 +19,17 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transport import USER_AGENT
+
 from . import code_samples, serializers
 from ._override import CaseOverride
 from .constants import (
-    NOT_SET,
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
-    USER_AGENT,
 )
-from .exceptions import (
-    CheckFailed,
-    OperationSchemaError,
-    SerializationNotPossible,
-    UsageError,
-    deduplicate_failed_checks,
-    get_grouped_exception,
-    maybe_set_assertion_message,
-)
+from .exceptions import OperationSchemaError, SerializationNotPossible, UsageError
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.checks import CheckContext
@@ -45,7 +39,7 @@ from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_url, sanitize_value
 from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
-from .types import Body, Cookies, FormData, Headers, NotSet, PathParameters, Query
+from .types import Body
 
 if TYPE_CHECKING:
     import requests.auth
@@ -144,10 +138,10 @@ class Case:
     generation_time: float
     # Unique test case identifier
     id: str = field(default_factory=generate_random_case_id, compare=False)
-    path_parameters: PathParameters | None = None
+    path_parameters: dict[str, Any] | None = None
     headers: CaseInsensitiveDict | None = None
-    cookies: Cookies | None = None
-    query: Query | None = None
+    cookies: dict[str, Any] | None = None
+    query: dict[str, Any] | None = None
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
     body: Body | NotSet = NOT_SET
@@ -391,7 +385,7 @@ class Case:
         checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
         additional_checks = tuple(check for check in additional_checks if check not in excluded_checks)
-        failed_checks = []
+        failures: set[Failure] = set()
         ctx = CheckContext(
             override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
         )
@@ -399,41 +393,34 @@ class Case:
             copied_case = self.partial_deepcopy()
             try:
                 check(ctx, response, copied_case)
+            except Failure as f:
+                # Tracebacks are not relevant here
+                failures.add(f.with_traceback(None))
             except AssertionError as exc:
-                maybe_set_assertion_message(exc, check.__name__)
-                failed_checks.append(exc)
-        failed_checks = list(deduplicate_failed_checks(failed_checks))
-        if failed_checks:
-            exception_cls = get_grouped_exception(self.operation.verbose_name, *failed_checks)
-            formatted = ""
-            for idx, failed in enumerate(failed_checks, 1):
-                if isinstance(failed, CheckFailed) and failed.context is not None:
-                    title = failed.context.title
-                    if failed.context.message:
-                        message = failed.context.message
-                    else:
-                        message = None
-                else:
-                    title, message = failed.args
-                formatted += "\n\n"
-                formatted += f"{idx}. {title}"
-                if message is not None:
-                    formatted += "\n\n"
-                    formatted += textwrap.indent(message, prefix="    ")
-
-            status_code = response.status_code
-            reason = get_reason(status_code)
-            formatted += f"\n\n[{response.status_code}] {reason}:"
+                failures.add(
+                    Failure.from_assertion(
+                        name=check.__name__,
+                        operation=self.operation.verbose_name,
+                        exc=exc,
+                    )
+                )
+        if failures:
+            message = f"Schemathesis found {len(failures)} distinct failure"
+            if len(failures) > 1:
+                message += "s"
+            reason = get_reason(response.status_code)
+            message += f".\n\n[{response.status_code}] {reason}:"
             payload = get_payload(response)
             if not payload:
-                formatted += "\n\n    <EMPTY>"
+                message += "\n\n    <EMPTY>"
             else:
                 payload = prepare_response_payload(payload, config=self.operation.schema.output_config)
                 payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
-                formatted += f"\n{payload}"
+                message += f"\n{payload}"
             verify = getattr(response, "verify", True)
             code_sample = self.as_curl_command(headers=dict(response.request.headers), verify=verify)
-            raise exception_cls(f"{formatted}\n\nReproduce with:\n\n    {code_sample}\n", causes=tuple(failed_checks))
+            message += f"\n\nReproduce with:\n\n    {code_sample}\n\n"
+            raise FailureGroup(list(failures), message) from None
 
     def call_and_validate(
         self,
@@ -495,7 +482,7 @@ P = TypeVar("P", bound=Parameter)
 D = TypeVar("D", bound=dict)
 
 
-@dataclass
+@dataclass(repr=False)
 class OperationDefinition(Generic[D]):
     """A wrapper to store not resolved API operation definitions.
 
@@ -646,7 +633,7 @@ class APIOperation(Generic[P, C]):
         """
         return self.schema.get_parameter_serializer(self, location)
 
-    def prepare_multipart(self, form_data: FormData) -> tuple[list | None, dict[str, Any] | None]:
+    def prepare_multipart(self, form_data: dict[str, Any]) -> tuple[list | None, dict[str, Any] | None]:
         return self.schema.prepare_multipart(form_data, self)
 
     def get_request_payload_content_types(self) -> list[str]:
@@ -684,10 +671,10 @@ class APIOperation(Generic[P, C]):
     def make_case(
         self,
         *,
-        path_parameters: PathParameters | None = None,
-        headers: Headers | None = None,
-        cookies: Cookies | None = None,
-        query: Query | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
         body: Body | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:
@@ -714,7 +701,7 @@ class APIOperation(Generic[P, C]):
     def validate_response(self, response: GenericResponse) -> bool | None:
         """Validate API response for conformance.
 
-        :raises CheckFailed: If the response does not conform to the API schema.
+        :raises FailureGroup: If the response does not conform to the API schema.
         """
         return self.schema.validate_response(self, response)
 
@@ -723,7 +710,7 @@ class APIOperation(Generic[P, C]):
         try:
             self.validate_response(response)
             return True
-        except CheckFailed:
+        except AssertionError:
             return False
 
     def get_raw_payload_schema(self, media_type: str) -> dict[str, Any] | None:

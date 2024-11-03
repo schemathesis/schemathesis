@@ -73,7 +73,6 @@ def create_app(
     app["config"] = {
         "should_fail": True,
         "schema_data": make_openapi_schema(operations, version),
-        "prefix_with_bom": False,
         "chunked": False,
     }
     return app
@@ -92,7 +91,6 @@ def reset_app(
         {
             "should_fail": True,
             "schema_data": make_openapi_schema(operations, version),
-            "prefix_with_bom": False,
             "chunked": False,
         }
     )

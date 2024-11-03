@@ -4,7 +4,8 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from schemathesis import from_asgi, from_dict
-from schemathesis.exceptions import CheckFailed, SchemaError
+from schemathesis.core.failures import FailureGroup
+from schemathesis.exceptions import SchemaError
 
 
 def test_works_with_fastapi(fastapi_app):
@@ -52,9 +53,9 @@ def test_works_with_fastapi(fastapi_app):
     @given(case=schema["/address/"]["GET"].as_strategy())
     @settings(phases=[Phase.generate], deadline=None)
     def test(case):
-        with pytest.raises(CheckFailed) as exc:
+        with pytest.raises(FailureGroup) as exc:
             case.call_and_validate()
-        assert "Unevaluated properties are not allowed ('department' was unexpected)" in str(exc.value)
+        assert "Unevaluated properties are not allowed ('department' was unexpected)" in str(exc.value.exceptions[0])
 
     test()
 

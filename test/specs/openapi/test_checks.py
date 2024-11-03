@@ -1,7 +1,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.exceptions import CheckFailed
+from schemathesis.core.failures import Failure
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.internal.checks import CheckConfig, CheckContext, PositiveDataAcceptanceConfig
 from schemathesis.models import Case, GenerationMetadata, TestPhase
@@ -222,8 +222,8 @@ def test_positive_data_acceptance(
     )
 
     if should_raise:
-        with pytest.raises(CheckFailed) as exc_info:
+        with pytest.raises(Failure) as exc_info:
             positive_data_acceptance(ctx, response, case)
-        assert "Rejected positive data" in str(exc_info.value)
+        assert "Rejected positive data" in exc_info.value.title
     else:
         assert positive_data_acceptance(ctx, response, case) is None

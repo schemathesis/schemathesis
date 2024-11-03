@@ -28,19 +28,18 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from ... import failures
-from ..._compat import MultipleFailures
+from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+
 from ..._override import CaseOverride, check_no_override_mark, set_override_mark
-from ...constants import HTTP_METHODS, NOT_SET
+from ...constants import HTTP_METHODS
 from ...exceptions import (
     InternalError,
     OperationNotFound,
     OperationSchemaError,
     SchemaError,
     SchemaErrorType,
-    get_missing_content_type_error,
-    get_response_parsing_error,
-    get_schema_validation_error,
 )
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
@@ -81,7 +80,7 @@ if TYPE_CHECKING:
     from ...auths import AuthStorage
     from ...stateful.state_machine import APIStateMachine
     from ...transports.responses import GenericResponse
-    from ...types import Body, Cookies, FormData, GenericTest, Headers, NotSet, PathParameters, Query
+    from ...types import Body
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
@@ -212,10 +211,10 @@ class BaseOpenAPISchema(BaseSchema):
         headers: dict[str, str] | None = None,
         cookies: dict[str, str] | None = None,
         path_parameters: dict[str, str] | None = None,
-    ) -> Callable[[GenericTest], GenericTest]:
+    ) -> Callable[[Callable], Callable]:
         """Override Open API parameters with fixed values."""
 
-        def _add_override(test: GenericTest) -> GenericTest:
+        def _add_override(test: Callable) -> Callable:
             check_no_override_mark(test)
             override = CaseOverride(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
@@ -645,31 +644,22 @@ class BaseOpenAPISchema(BaseSchema):
             # No schema to check against
             return None
         content_type = response.headers.get("Content-Type")
-        errors = []
+        failures: list[Failure] = []
         if content_type is None:
             media_types = self.get_content_types(operation, response)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
-            try:
-                raise get_missing_content_type_error(operation.verbose_name)(
-                    failures.MissingContentType.title,
-                    context=failures.MissingContentType(message=message, media_types=media_types),
-                )
-            except Exception as exc:
-                errors.append(exc)
+            failures.append(
+                MissingContentType(operation=operation.verbose_name, message=message, media_types=media_types)
+            )
         if content_type and not is_json_media_type(content_type):
-            _maybe_raise_one_or_more(errors)
+            _maybe_raise_one_or_more(failures)
             return None
         try:
             data = get_json(response)
         except JSONDecodeError as exc:
-            exc_class = get_response_parsing_error(operation.verbose_name, exc)
-            context = failures.JSONDecodeErrorContext.from_exception(exc)
-            try:
-                raise exc_class(context.title, context=context) from exc
-            except Exception as exc:
-                errors.append(exc)
-                _maybe_raise_one_or_more(errors)
+            failures.append(MalformedJson.from_exception(operation=operation.verbose_name, exc=exc))
+            _maybe_raise_one_or_more(failures)
         with self._validating_response(scopes) as resolver:
             try:
                 jsonschema.validate(
@@ -681,13 +671,14 @@ class BaseOpenAPISchema(BaseSchema):
                     format_checker=jsonschema.Draft202012Validator.FORMAT_CHECKER,
                 )
             except jsonschema.ValidationError as exc:
-                exc_class = get_schema_validation_error(operation.verbose_name, exc)
-                ctx = failures.ValidationErrorContext.from_exception(exc, output_config=operation.schema.output_config)
-                try:
-                    raise exc_class(ctx.title, context=ctx) from exc
-                except Exception as exc:
-                    errors.append(exc)
-        _maybe_raise_one_or_more(errors)
+                failures.append(
+                    JsonSchemaError.from_exception(
+                        operation=operation.verbose_name,
+                        exc=exc,
+                        output_config=operation.schema.output_config,
+                    )
+                )
+        _maybe_raise_one_or_more(failures)
         return None  # explicitly return None for mypy
 
     @contextmanager
@@ -788,12 +779,12 @@ class BaseOpenAPISchema(BaseSchema):
         return schema
 
 
-def _maybe_raise_one_or_more(errors: list[Exception]) -> None:
-    if not errors:
+def _maybe_raise_one_or_more(failures: list[Failure]) -> None:
+    if not failures:
         return
-    if len(errors) == 1:
-        raise errors[0]
-    raise MultipleFailures("\n\n".join(str(error) for error in errors), errors)
+    if len(failures) == 1:
+        raise failures[0] from None
+    raise FailureGroup(failures) from None
 
 
 def _make_reference_key(scopes: list[str], reference: str) -> str:
@@ -983,7 +974,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return serialization.serialize_swagger2_parameters(definitions)
 
     def prepare_multipart(
-        self, form_data: FormData, operation: APIOperation
+        self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         """Prepare form data for sending with `requests`.
 
@@ -1026,10 +1017,10 @@ class SwaggerV20(BaseOpenAPISchema):
         *,
         case_cls: type[C],
         operation: APIOperation,
-        path_parameters: PathParameters | None = None,
-        headers: Headers | None = None,
-        cookies: Cookies | None = None,
-        query: Query | None = None,
+        path_parameters: dict[str, Any] | None = None,
+        headers: dict[str, Any] | None = None,
+        cookies: dict[str, Any] | None = None,
+        query: dict[str, Any] | None = None,
         body: Body | NotSet = NOT_SET,
         media_type: str | None = None,
         generation_time: float = 0.0,
@@ -1148,7 +1139,7 @@ class OpenApi30(SwaggerV20):
         return list(request_body["content"])
 
     def prepare_multipart(
-        self, form_data: FormData, operation: APIOperation
+        self, form_data: dict[str, Any], operation: APIOperation
     ) -> tuple[list | None, dict[str, Any] | None]:
         """Prepare form data for sending with `requests`.
 

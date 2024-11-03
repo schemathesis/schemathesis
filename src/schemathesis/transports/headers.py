@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from ..constants import USER_AGENT
+from schemathesis.core.transport import USER_AGENT
 
 
 def setup_default_headers(kwargs: dict[str, Any]) -> None:

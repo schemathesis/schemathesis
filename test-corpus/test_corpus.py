@@ -15,7 +15,8 @@ from jsonschema import RefResolutionError
 from schemathesis._hypothesis._builder import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.exceptions import CheckFailed, SchemaError, UsageError
+from schemathesis.core.failures import Failure
+from schemathesis.exceptions import SchemaError, UsageError
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.internal.exceptions import format_exception
 from schemathesis.internal.result import Err, Ok
@@ -131,7 +132,7 @@ def combined_check(ctx, response, case):
     for check in ALL_CHECKS:
         try:
             check(ctx, response, case)
-        except CheckFailed:
+        except Failure:
             pass
 
 

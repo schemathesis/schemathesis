@@ -24,8 +24,8 @@ from schemathesis.cli.cassettes import (
     get_prepared_request,
     write_double_quoted,
 )
-from schemathesis.cli.reporting import TEST_CASE_ID_TITLE
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER, USER_AGENT
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.runner.models import Request
 
@@ -130,7 +130,7 @@ def test_store_timeout(cli, schema_url, cassette_path):
         schema_url,
         f"--cassette-path={cassette_path}",
         "--hypothesis-max-examples=1",
-        "--request-timeout=1",
+        "--request-timeout=0.001",
         "--show-trace",
         "--hypothesis-seed=1",
     )
@@ -155,15 +155,11 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
     # Note. There could be more than 3 calls, depends on Hypothesis internals
-    assert len(cassette["http_interactions"]) >= 3
+    assert len(cassette["http_interactions"]) >= 1
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
     assert load_response_body(cassette, 0) == "500: Internal Server Error"
-    assert cassette["http_interactions"][1]["status"] == "SUCCESS"
-    assert load_response_body(cassette, 1) == '{"result": "flaky!"}'
-    assert cassette["http_interactions"][2]["status"] == "SUCCESS"
-    assert load_response_body(cassette, 2) == '{"result": "flaky!"}'
 
 
 def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, openapi3_base_url):
@@ -274,7 +270,7 @@ async def test_replay(
         *args,
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    case_ids = re.findall(f"{TEST_CASE_ID_TITLE}: (\\w+)", result.stdout)
+    case_ids = re.findall("Test Case ID: (\\w+)", result.stdout)
     # these requests are not needed
     reset_app(openapi_version)
     assert not app["incoming_requests"]

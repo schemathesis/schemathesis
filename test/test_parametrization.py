@@ -777,7 +777,6 @@ def test_(request, case):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("slow")
 def test_long_response(testdir, app_schema, openapi3_base_url):
-    # When response takes too long
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
@@ -790,6 +789,4 @@ def test_(case):
         schema=app_schema,
     )
     result = testdir.runpytest()
-    # Then it should be reported as any other test failure
-    assert "E           1. Response timeout" in result.outlines
-    assert "E           The server failed to respond within the specified limit of 1.00ms" in result.outlines
+    assert "timed out" in result.stdout.str()

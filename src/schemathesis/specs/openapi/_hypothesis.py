@@ -12,18 +12,17 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.generator.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths, serializers
 from ..._hypothesis._builder import prepare_urlencoded
-from ...constants import NOT_SET
 from ...exceptions import BodyInGetRequestError, SerializationNotPossible, SkipTest
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case, GenerationMetadata, TestPhase, cant_serialize
 from ...transports.content_types import parse_content_type
-from ...types import NotSet
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES
