@@ -340,7 +340,7 @@ def test_custom_auth():
 
     @app.get("/", responses={200: {"model": {}}, 401: {"model": {}}, 403: {"model": {}}})
     async def root(
-        credentials: HTTPAuthorizationCredentials = Security(APIKeyHeader(name="x-api-key")),
+        credentials: HTTPAuthorizationCredentials = Security(APIKeyHeader(name="x-api-key", auto_error=False)),
     ):
         if credentials != token:
             raise HTTPException(
@@ -395,7 +395,7 @@ api_key = {cls}(name=API_KEY_NAME, auto_error=False)
 async def get_api_key(api_key: str = Security(api_key)):
     if api_key == API_KEY:
         return api_key
-    raise HTTPException(status_code=403, detail="Could not validate credentials")
+    raise HTTPException(status_code=401, detail="Could not validate credentials")
 
 @app.get("/data")
 async def data(api_key: str = Depends(get_api_key)):
