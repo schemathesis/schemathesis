@@ -391,14 +391,14 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
             # Check if invalid auth will give an error
             _remove_auth_from_case(case, security_parameters)
             new_response = case.operation.schema.transport.send(case)
-            if 200 <= new_response.status_code < 300:
+            if new_response.status_code != 401:
                 _update_response(response, new_response)
                 _raise_no_auth_error(new_response, case.operation.verbose_name, "that requires authentication")
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 _set_auth_for_case(case, parameter)
                 new_response = case.operation.schema.transport.send(case)
-                if 200 <= new_response.status_code < 300:
+                if new_response.status_code != 401:
                     _update_response(response, new_response)
                     _raise_no_auth_error(new_response, case.operation.verbose_name, "with any auth")
                 _remove_auth_from_case(case, security_parameters)

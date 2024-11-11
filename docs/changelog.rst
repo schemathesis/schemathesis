@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.5...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Make the ``ignored_auth`` stricter by always checking for the 401 status exactly instead of any non-200.
+
 .. _v3.38.5:
 
 :version:`3.38.5 <v3.38.4...v3.38.5>` - 2024-10-30
