@@ -44,19 +44,36 @@ def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, m
         if parsed[0][0] == ANCHOR:
             # Starts with an anchor
             op, value = parsed[1]
-            leading_anchor = pattern[0]
-            return leading_anchor + _update_quantifier(op, value, pattern[1:], min_length, max_length)
+            anchor_length = _get_anchor_length(parsed[0][1])
+            leading_anchor = pattern[:anchor_length]
+            return leading_anchor + _update_quantifier(op, value, pattern[anchor_length:], min_length, max_length)
         if parsed[1][0] == ANCHOR:
             # Ends with an anchor
             op, value = parsed[0]
-            trailing_anchor = pattern[-1]
-            return _update_quantifier(op, value, pattern[:-1], min_length, max_length) + trailing_anchor
+            anchor_length = _get_anchor_length(parsed[1][1])
+            trailing_anchor = pattern[-anchor_length:]
+            return _update_quantifier(op, value, pattern[:-anchor_length], min_length, max_length) + trailing_anchor
     elif len(parsed) == 3 and parsed[0][0] == ANCHOR and parsed[2][0] == ANCHOR:
         op, value = parsed[1]
-        leading_anchor = pattern[0]
-        trailing_anchor = pattern[-1]
-        return leading_anchor + _update_quantifier(op, value, pattern[1:-1], min_length, max_length) + trailing_anchor
+        leading_anchor_length = _get_anchor_length(parsed[0][1])
+        trailing_anchor_length = _get_anchor_length(parsed[2][1])
+        leading_anchor = pattern[:leading_anchor_length]
+        trailing_anchor = pattern[-trailing_anchor_length:]
+        return (
+            leading_anchor
+            + _update_quantifier(
+                op, value, pattern[leading_anchor_length:-trailing_anchor_length], min_length, max_length
+            )
+            + trailing_anchor
+        )
     return pattern
+
+
+def _get_anchor_length(node_type: int) -> int:
+    """Determine the length of the anchor based on its type."""
+    if node_type in {sre.AT_BEGINNING_STRING, sre.AT_END_STRING, sre.AT_BOUNDARY, sre.AT_NON_BOUNDARY}:
+        return 2  # \A, \Z, \b, or \B
+    return 1  # ^ or $ or their multiline/locale/unicode variants
 
 
 def _update_quantifier(op: int, value: tuple, pattern: str, min_length: int | None, max_length: int | None) -> str:
@@ -113,7 +130,7 @@ def _strip_quantifier(pattern: str) -> str:
         return pattern[:-2]
     if pattern.endswith(("?", "*", "+")):
         pattern = pattern[:-1]
-    if pattern.endswith("}"):
+    if pattern.endswith("}") and "{" in pattern:
         # Find the start of the exact quantifier and drop everything since that index
         idx = pattern.rfind("{")
         pattern = pattern[:idx]
