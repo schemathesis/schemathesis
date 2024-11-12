@@ -4,9 +4,17 @@ Changelog
 :version:`Unreleased <v3.38.5...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Support arrays for headers & path parameters during the coverage phase.
+
 **Changed**
 
 - Make the ``ignored_auth`` stricter by always checking for the 401 status exactly instead of any non-200.
+
+**Fixed**
+
+- Missed generating booleans in some cases during the coverage phase.
 
 .. _v3.38.5:
 
