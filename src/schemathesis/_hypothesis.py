@@ -347,7 +347,9 @@ def _iter_coverage_cases(
         optional = sorted(all_params - required)
 
         # Helper function to create and yield a case
-        def make_case(container_values: dict, description: str, _location: str, _container_name: str) -> Case:
+        def make_case(
+            container_values: dict, description: str, _location: str, _container_name: str, _parameter: str | None
+        ) -> Case:
             if _location in ("header", "cookie", "path"):
                 container = {
                     name: _stringify_value(val) if not isinstance(val, str) else val
@@ -361,6 +363,7 @@ def _iter_coverage_cases(
             case.meta = _make_meta(
                 description=description,
                 location=_location,
+                parameter=_parameter,
                 parameter_location=_location,
             )
             return case
@@ -385,12 +388,12 @@ def _iter_coverage_cases(
                 coverage.CoverageContext(data_generation_methods=[DataGenerationMethod.negative]),
                 subschema,
             ):
-                yield make_case(more.value, more.description, _location, _container_name)
+                yield make_case(more.value, more.description, _location, _container_name, more.parameter)
 
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            yield make_case(only_required, "Only required properties", location, container_name)
+            yield make_case(only_required, "Only required properties", location, container_name, None)
             if DataGenerationMethod.negative in data_generation_methods:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 yield from _yield_negative(subschema, location, container_name)
@@ -399,7 +402,9 @@ def _iter_coverage_cases(
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container:
-                yield make_case(combo, f"All required properties and optional '{opt_param}'", location, container_name)
+                yield make_case(
+                    combo, f"All required properties and optional '{opt_param}'", location, container_name, None
+                )
                 if DataGenerationMethod.negative in data_generation_methods:
                     subschema = _combination_schema(combo, required, parameter_set)
                     yield from _yield_negative(subschema, location, container_name)
@@ -410,7 +415,9 @@ def _iter_coverage_cases(
                 for combination in combinations(optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
                     if combo != base_container:
-                        yield make_case(combo, f"All required and {size} optional properties", location, container_name)
+                        yield make_case(
+                            combo, f"All required and {size} optional properties", location, container_name, None
+                        )
 
 
 def _make_meta(
