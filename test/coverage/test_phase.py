@@ -34,43 +34,48 @@ NEGATIVE_CASES = [
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": {}}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": []}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": [None, None]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": None}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": False}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": 4, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": {}, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": [], "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": [None, None], "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "", "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": None, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": False, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0000"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "{}"}, "body": 0},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "[]"}, "body": 0},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "null"}, "body": 0},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "null,null"}, "body": 0},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "null"}, "body": False},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "false"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "6", "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "{}", "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "[]", "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "null,null", "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "", "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "null", "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": "false", "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": {}}},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": []}},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": [None, None]}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": None}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": 0}},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": []},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"x-prop": 0}},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": [None, None]},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": ""},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": False},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": {}}},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": []}},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": [None, None]}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": ""}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": None}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": False}},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": {"j-prop": ANY}},
-    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": []},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": [None, None]},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": ""},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}},
+    {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": False},
     {"query": {"q1": ANY, "q2": 0}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
 ]
 MIXED_CASES = [
@@ -80,13 +85,14 @@ MIXED_CASES = [
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": {}}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": []}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": [None, None]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": None}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": 0}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": False}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 4, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": {}, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": [], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": [None, None], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": None, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": False, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -94,13 +100,14 @@ MIXED_CASES = [
     {"query": {"q1": 6, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "0000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "{}"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "[]"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "null,null"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "null"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "false"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "0"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "00"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "6", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "{}", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "[]", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "null,null", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "null", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "false", "h2": "000"}, "body": {"j-prop": 0}},
@@ -108,24 +115,27 @@ MIXED_CASES = [
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "4", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": {}}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": []}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": [None, None]}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": None}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": False}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": 0}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": []},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": [None, None]},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": ""},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": False},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"x-prop": ""}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": {}}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": []}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": [None, None]}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": ""}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": None}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": False}},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": ANY}},
-    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": []},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": [None, None]},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": ""},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}},
+    {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": False},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": 0},
     {"query": {"q1": 5, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
 ]
@@ -695,7 +705,7 @@ def test_negative_patterns(ctx):
             },
             {
                 "body": {
-                    "name": [],
+                    "name": [None, None],
                 },
             },
             {
@@ -705,20 +715,122 @@ def test_negative_patterns(ctx):
             },
             {
                 "body": {
+                    "name": False,
+                },
+            },
+            {
+                "body": {
                     "name": 0,
                 },
             },
             {
-                "body": [],
+                "body": [None, None],
             },
             {
                 "body": "",
             },
             {},
             {
+                "body": False,
+            },
+            {
                 "body": 0,
             },
         ],
+    )
+
+
+def test_array_in_header_path_query(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo/{bar}": {
+                "post": {
+                    "parameters": [
+                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "key", "in": "query", "required": True, "schema": {"type": "string"}},
+                        {"name": "bar", "in": "path", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
+                "query": {},
+            },
+            {
+                "headers": {},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": {}},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": [None, None]},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": None},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": False},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "null"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+                "path_parameters": {"bar": "0"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "{}"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "null,null"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "null"},
+                "query": {"key": 0},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "false"},
+                "query": {"key": 0},
+            },
+        ],
+        path=("/foo/{bar}", "post"),
     )
 
 
@@ -750,19 +862,25 @@ def test_required_header(ctx):
                 "headers": {"X-API-Key-1": "0", "X-API-Key-2": "{}"},
             },
             {
-                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "[]"},
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null,null"},
             },
             {
                 "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null"},
             },
             {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "false"},
+            },
+            {
                 "headers": {"X-API-Key-1": "{}", "X-API-Key-2": "0"},
             },
             {
-                "headers": {"X-API-Key-1": "[]", "X-API-Key-2": "0"},
+                "headers": {"X-API-Key-1": "null,null", "X-API-Key-2": "0"},
             },
             {
                 "headers": {"X-API-Key-1": "null", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false", "X-API-Key-2": "0"},
             },
         ],
     )
@@ -787,17 +905,22 @@ def test_path_parameter(ctx):
         [
             {
                 "path_parameters": {
-                    "id": {},
+                    "id": "{}",
                 },
             },
             {
                 "path_parameters": {
-                    "id": [],
+                    "id": "null,null",
                 },
             },
             {
                 "path_parameters": {
-                    "id": None,
+                    "id": "null",
+                },
+            },
+            {
+                "path_parameters": {
+                    "id": "false",
                 },
             },
         ],

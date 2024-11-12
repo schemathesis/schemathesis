@@ -39,7 +39,7 @@ NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
     st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(), json_recursive_strategy
 )
-ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY)
+ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY, min_size=2)
 OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
 
 
@@ -218,11 +218,11 @@ def _encode(o: Any) -> str:
     return "".join(_iterencode(o, 0))
 
 
-def _to_hashable_key(value: T, _encode: Callable = _encode) -> T | tuple[type, str]:
+def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
     if isinstance(value, (dict, list)):
         serialized = _encode(value)
         return (type(value), serialized)
-    return value
+    return (type(value), value)
 
 
 def _cover_positive_for_type(
@@ -425,7 +425,8 @@ def cover_schema_iter(
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
-                        yield from cover_schema_iter(nctx, value[0], seen)
+                        with nctx.location(0):
+                            yield from cover_schema_iter(nctx, value[0], seen)
                     else:
                         with _ignore_unfixable():
                             canonical = canonicalish(schema)
