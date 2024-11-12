@@ -16,6 +16,7 @@ Changelog
 
 - Missed generating booleans in some cases during the coverage phase.
 - Populate ``meta.parameter`` in more cases during the coverage phase.
+- Incorrect quantifiers merging for some regex patterns.
 
 .. _v3.38.5:
 
