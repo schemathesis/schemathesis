@@ -15,6 +15,7 @@ Changelog
 **Fixed**
 
 - Missed generating booleans in some cases during the coverage phase.
+- Populate ``meta.parameter`` in more cases during the coverage phase.
 
 .. _v3.38.5:
 

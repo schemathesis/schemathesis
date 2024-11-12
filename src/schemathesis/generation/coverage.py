@@ -63,23 +63,31 @@ class GeneratedValue:
     value: Any
     data_generation_method: DataGenerationMethod
     description: str
+    parameter: str | None
     location: str | None
 
-    __slots__ = ("value", "data_generation_method", "description", "location")
+    __slots__ = ("value", "data_generation_method", "description", "parameter", "location")
 
     @classmethod
     def with_positive(cls, value: Any, *, description: str) -> GeneratedValue:
         return cls(
-            value=value, data_generation_method=DataGenerationMethod.positive, description=description, location=None
+            value=value,
+            data_generation_method=DataGenerationMethod.positive,
+            description=description,
+            location=None,
+            parameter=None,
         )
 
     @classmethod
-    def with_negative(cls, value: Any, *, description: str, location: str) -> GeneratedValue:
+    def with_negative(
+        cls, value: Any, *, description: str, location: str, parameter: str | None = None
+    ) -> GeneratedValue:
         return cls(
             value=value,
             data_generation_method=DataGenerationMethod.negative,
             description=description,
             location=location,
+            parameter=parameter,
         )
 
 
@@ -756,6 +764,7 @@ def _negative_properties(
                     {**template, key: value.value},
                     description=f"Object with invalid '{key}' value: {value.description}",
                     location=nctx.current_location,
+                    parameter=key,
                 )
 
 
