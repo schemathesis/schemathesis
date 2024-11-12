@@ -224,6 +224,12 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
 
+    def _stringify_value(val: Any) -> str:
+        if isinstance(val, list):
+            # use comma-separated values style for arrays
+            return ",".join(json.dumps(sub) for sub in val)
+        return json.dumps(val)
+
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
     responses = find_in_responses(operation)
@@ -240,8 +246,8 @@ def _iter_coverage_cases(
         location = parameter.location
         name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        if location in ("header", "cookie") and not isinstance(value.value, str):
-            container[name] = json.dumps(value.value)
+        if location in ("header", "cookie", "path") and not isinstance(value.value, str):
+            container[name] = _stringify_value(value.value)
         else:
             container[name] = value.value
         generators[(location, name)] = gen
@@ -286,12 +292,13 @@ def _iter_coverage_cases(
         case.data_generation_method = DataGenerationMethod.positive
         case.meta = _make_meta(description="Default positive test case")
         yield case
+
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
         container = template[container_name]
         for value in gen:
-            if location in ("header", "cookie") and not isinstance(value.value, str):
-                generated = json.dumps(value.value)
+            if location in ("header", "cookie", "path") and not isinstance(value.value, str):
+                generated = _stringify_value(value.value)
             else:
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
@@ -341,9 +348,10 @@ def _iter_coverage_cases(
 
         # Helper function to create and yield a case
         def make_case(container_values: dict, description: str, _location: str, _container_name: str) -> Case:
-            if _location in ("header", "cookie"):
+            if _location in ("header", "cookie", "path"):
                 container = {
-                    name: json.dumps(val) if not isinstance(val, str) else val for name, val in container_values.items()
+                    name: _stringify_value(val) if not isinstance(val, str) else val
+                    for name, val in container_values.items()
                 }
             else:
                 container = container_values
