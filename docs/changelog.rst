@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.6...HEAD>` - TBD
 --------------------------------------------
 
+**Added**
+
+- Generating duplicate query parameters during the coverage phase.
+
 **Fixed**
 
 - Not sending negated query parameters in some cases during the coverage phase.
