@@ -853,6 +853,7 @@ def _negative_required(
             {k: v for k, v in template.items() if k != key},
             description=f"Missing required property: {key}",
             location=ctx.current_location,
+            parameter=key,
         )
 
 
