@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Not sending negated query parameters in some cases during the coverage phase.
+- Incorrect ``data_generation_method`` reported during the coverage phase in some cases.
 
 .. _v3.38.6:
 
