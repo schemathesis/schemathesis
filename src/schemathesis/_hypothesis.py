@@ -313,8 +313,22 @@ def _iter_coverage_cases(
                 parameter_location=location,
             )
             yield case
-    # Generate missing required parameters
     if DataGenerationMethod.negative in data_generation_methods:
+        # Generate duplicate query parameters
+        if operation.query:
+            container = template["query"]
+            for parameter in operation.query:
+                value = container[parameter.name]
+                case = operation.make_case(**{**template, "query": {**container, parameter.name: [value, value]}})
+                case.data_generation_method = DataGenerationMethod.negative
+                case.meta = _make_meta(
+                    description=f"Duplicate `{parameter.name}` query parameter",
+                    location=None,
+                    parameter=parameter.name,
+                    parameter_location="query",
+                )
+                yield case
+        # Generate missing required parameters
         for parameter in operation.iter_parameters():
             if parameter.is_required and parameter.location != "path":
                 name = parameter.name
