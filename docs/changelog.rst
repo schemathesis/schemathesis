@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.6...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Not sending negated query parameters in some cases during the coverage phase.
+
 .. _v3.38.6:
 
 :version:`3.38.6 <v3.38.5...v3.38.6>` - 2024-11-12
