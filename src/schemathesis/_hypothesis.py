@@ -327,7 +327,7 @@ def _iter_coverage_cases(
                 case.data_generation_method = DataGenerationMethod.negative
                 case.meta = _make_meta(
                     description=f"Missing `{name}` at {location}",
-                    location=parameter.location,
+                    location=None,
                     parameter=name,
                     parameter_location=location,
                 )
@@ -351,7 +351,12 @@ def _iter_coverage_cases(
 
         # Helper function to create and yield a case
         def make_case(
-            container_values: dict, description: str, _location: str, _container_name: str, _parameter: str | None
+            container_values: dict,
+            description: str,
+            _location: str,
+            _container_name: str,
+            _parameter: str | None,
+            _data_generation_method: DataGenerationMethod,
         ) -> Case:
             if _location in ("header", "cookie", "path", "query"):
                 container = {
@@ -362,10 +367,10 @@ def _iter_coverage_cases(
                 container = container_values
 
             case = operation.make_case(**{**template, _container_name: container})
-            case.data_generation_method = DataGenerationMethod.positive
+            case.data_generation_method = _data_generation_method
             case.meta = _make_meta(
                 description=description,
-                location=_location,
+                location=None,
                 parameter=_parameter,
                 parameter_location=_location,
             )
@@ -391,12 +396,21 @@ def _iter_coverage_cases(
                 coverage.CoverageContext(data_generation_methods=[DataGenerationMethod.negative]),
                 subschema,
             ):
-                yield make_case(more.value, more.description, _location, _container_name, more.parameter)
+                yield make_case(
+                    more.value,
+                    more.description,
+                    _location,
+                    _container_name,
+                    more.parameter,
+                    DataGenerationMethod.negative,
+                )
 
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            yield make_case(only_required, "Only required properties", location, container_name, None)
+            yield make_case(
+                only_required, "Only required properties", location, container_name, None, DataGenerationMethod.positive
+            )
             if DataGenerationMethod.negative in data_generation_methods:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 yield from _yield_negative(subschema, location, container_name)
@@ -406,7 +420,12 @@ def _iter_coverage_cases(
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container:
                 yield make_case(
-                    combo, f"All required properties and optional '{opt_param}'", location, container_name, None
+                    combo,
+                    f"All required properties and optional '{opt_param}'",
+                    location,
+                    container_name,
+                    None,
+                    DataGenerationMethod.positive,
                 )
                 if DataGenerationMethod.negative in data_generation_methods:
                     subschema = _combination_schema(combo, required, parameter_set)
@@ -419,7 +438,12 @@ def _iter_coverage_cases(
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
                     if combo != base_container:
                         yield make_case(
-                            combo, f"All required and {size} optional properties", location, container_name, None
+                            combo,
+                            f"All required and {size} optional properties",
+                            location,
+                            container_name,
+                            None,
+                            DataGenerationMethod.positive,
                         )
 
 
