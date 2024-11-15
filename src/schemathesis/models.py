@@ -203,6 +203,7 @@ class Case:
     data_generation_method: DataGenerationMethod | None = None
     _auth: requests.auth.AuthBase | None = None
     _has_explicit_auth: bool = False
+    _explicit_method: str | None = None
 
     def __post_init__(self) -> None:
         self._original_path_parameters = self.path_parameters.copy() if self.path_parameters else None
@@ -265,7 +266,7 @@ class Case:
 
     @property
     def method(self) -> str:
-        return self.operation.method.upper()
+        return self._explicit_method.upper() if self._explicit_method else self.operation.method.upper()
 
     @property
     def base_url(self) -> str | None:

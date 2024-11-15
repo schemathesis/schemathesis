@@ -968,6 +968,8 @@ def test_negative_query_parameter(ctx):
     def test(case):
         if case.meta.phase != TestPhase.COVERAGE:
             return
+        if case.meta.description.startswith("Unspecified"):
+            return
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
         request = Request(**kwargs).prepare()
         urls.append(request.url)
@@ -991,6 +993,44 @@ def test_negative_query_parameter(ctx):
     ]
 
 
+def test_unspecified_http_methods(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "responses": {"200": {"description": "OK"}},
+                },
+                "get": {
+                    "responses": {"200": {"description": "OK"}},
+                },
+            }
+        }
+    )
+
+    schema = schemathesis.from_dict(schema, validate_schema=True)
+
+    methods = set()
+    operation = schema["/foo"]["post"]
+
+    def test(case):
+        if case.meta.phase != TestPhase.COVERAGE:
+            return
+        if not case.meta.description.startswith("Unspecified"):
+            return
+        methods.add(case.method)
+
+    test_func = create_test(
+        operation=operation,
+        test=test,
+        data_generation_methods=[DataGenerationMethod.negative],
+        settings=settings(phases=[Phase.explicit]),
+    )
+
+    test_func()
+
+    assert methods == {"HEAD", "PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+
+
 def assert_coverage(schema, methods, expected, path=None):
     schema = schemathesis.from_dict(schema, validate_schema=True)
 
@@ -999,6 +1039,8 @@ def assert_coverage(schema, methods, expected, path=None):
 
     def test(case):
         if case.meta.phase != TestPhase.COVERAGE:
+            return
+        if case.meta.description.startswith("Unspecified"):
             return
         assert_requests_call(case)
         if len(methods) == 1:
