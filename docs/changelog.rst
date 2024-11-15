@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Generating duplicate query parameters during the coverage phase.
+- Generating cases with arbitrary HTTP methods during the coverage phase.
 
 **Fixed**
 

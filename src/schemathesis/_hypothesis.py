@@ -314,6 +314,16 @@ def _iter_coverage_cases(
             )
             yield case
     if DataGenerationMethod.negative in data_generation_methods:
+        # Generate HTTP methods that are not specified in the spec
+        methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"} - set(
+            operation.schema[operation.path]
+        )
+        for method in methods:
+            case = operation.make_case(**template)
+            case._explicit_method = method
+            case.data_generation_method = DataGenerationMethod.negative
+            case.meta = _make_meta(description=f"Unspecified HTTP method: {method}")
+            yield case
         # Generate duplicate query parameters
         if operation.query:
             container = template["query"]
