@@ -224,8 +224,11 @@ def _iter_coverage_cases(
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
 
-    def _stringify_value(val: Any) -> str:
+    def _stringify_value(val: Any, location: str) -> str | list[str]:
         if isinstance(val, list):
+            if location == "query":
+                # Having a list here ensures there will be multiple query parameters wit the same name
+                return [json.dumps(item) for item in val]
             # use comma-separated values style for arrays
             return ",".join(json.dumps(sub) for sub in val)
         return json.dumps(val)
@@ -246,8 +249,8 @@ def _iter_coverage_cases(
         location = parameter.location
         name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        if location in ("header", "cookie", "path") and not isinstance(value.value, str):
-            container[name] = _stringify_value(value.value)
+        if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
+            container[name] = _stringify_value(value.value, location)
         else:
             container[name] = value.value
         generators[(location, name)] = gen
@@ -297,8 +300,8 @@ def _iter_coverage_cases(
         container_name = LOCATION_TO_CONTAINER[location]
         container = template[container_name]
         for value in gen:
-            if location in ("header", "cookie", "path") and not isinstance(value.value, str):
-                generated = _stringify_value(value.value)
+            if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
+                generated = _stringify_value(value.value, location)
             else:
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
@@ -350,9 +353,9 @@ def _iter_coverage_cases(
         def make_case(
             container_values: dict, description: str, _location: str, _container_name: str, _parameter: str | None
         ) -> Case:
-            if _location in ("header", "cookie", "path"):
+            if _location in ("header", "cookie", "path", "query"):
                 container = {
-                    name: _stringify_value(val) if not isinstance(val, str) else val
+                    name: _stringify_value(val, _location) if not isinstance(val, str) else val
                     for name, val in container_values.items()
                 }
             else:

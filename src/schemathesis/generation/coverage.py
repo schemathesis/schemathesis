@@ -324,9 +324,9 @@ def cover_schema_iter(
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.location(key):
                 if key == "enum":
-                    yield from _negative_enum(ctx, value)
+                    yield from _negative_enum(ctx, value, seen)
                 elif key == "const":
-                    for value_ in _negative_enum(ctx, [value]):
+                    for value_ in _negative_enum(ctx, [value], seen):
                         k = _to_hashable_key(value_.value)
                         if k not in seen:
                             yield value_
@@ -744,13 +744,20 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
         yield next(combinations(optional, size))
 
 
-def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
+def _negative_enum(
+    ctx: CoverageContext, value: list, seen: set[Any | tuple[type, str]]
+) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
-        return x not in value
+        if x in value:
+            return False
+        _hashed = _to_hashable_key(x)
+        return _hashed not in seen
 
-    strategy = JSON_STRATEGY.filter(is_not_in_value)
-    # The exact negative value is not important here
-    yield NegativeValue(ctx.generate_from(strategy), description="Invalid enum value", location=ctx.current_location)
+    strategy = (st.none() | st.booleans() | NUMERIC_STRATEGY | st.text()).filter(is_not_in_value)
+    value = ctx.generate_from(strategy)
+    yield NegativeValue(value, description="Invalid enum value", location=ctx.current_location)
+    hashed = _to_hashable_key(value)
+    seen.add(hashed)
 
 
 def _negative_properties(

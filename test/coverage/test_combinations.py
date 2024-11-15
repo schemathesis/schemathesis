@@ -17,11 +17,6 @@ PATTERN = "^\\d+$"
 
 
 def cover_schema(ctx: CoverageContext, schema: dict) -> list:
-    output = []
-    for value in cover_schema_iter(ctx, schema):
-        print(value)
-        output.append(value.value)
-    return output
     return [value.value for value in cover_schema_iter(ctx, schema)]
 
 
@@ -994,6 +989,7 @@ def test_negative_pattern_with_incompatible_length(nctx):
                 # The first item could be `{}` or `[]`, so it will prevent the same value at the end
                 [ANY, "00000000000", 0, False, None, ANY, ANY],
                 [ANY, "00000000000", 0, False, None, ANY],
+                [False, "00000000000", 0, None, [None, None], {}],
             ),
         ),
         (
@@ -1015,6 +1011,7 @@ def test_negative_combinators(nctx, schema, expected):
             assert_not_conform(covered, schema)
             break
     else:
+        print(covered)
         pytest.fail("Expected value didn't match")
 
 
