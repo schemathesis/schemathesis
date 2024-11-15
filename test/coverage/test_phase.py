@@ -33,6 +33,8 @@ NEGATIVE_CASES = [
     {"query": {"q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h1": ANY}, "body": 0},
     {"query": {"q1": ANY, "q2": "0"}, "headers": {"h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "{}"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": ["null", "null"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
@@ -84,6 +86,8 @@ MIXED_CASES = [
     {"query": {"q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h1": "5"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "000"}, "headers": {"h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "5", "q2": ["000", "000"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": ["5", "5"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "{}"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": ["null", "null"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -773,6 +777,11 @@ def test_array_in_header_path_query(ctx):
             {
                 "headers": {"X-API-Key-1": "0"},
                 "path_parameters": {"bar": "0"},
+                "query": {"key": ["0", "0"]},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+                "path_parameters": {"bar": "0"},
                 "query": {"key": "{}"},
             },
             {
@@ -973,6 +982,7 @@ def test_negative_query_parameter(ctx):
     test_func()
 
     assert urls == [
+        "http://127.0.0.1/foo?q=0&q=0",
         ANY,
         "http://127.0.0.1/foo?q=%7B%7D",
         "http://127.0.0.1/foo?q=null&q=null",
