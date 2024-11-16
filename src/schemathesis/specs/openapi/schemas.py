@@ -29,18 +29,12 @@ from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, check_no_override_mark, set_override_mark
 from ...constants import HTTP_METHODS
-from ...exceptions import (
-    InternalError,
-    OperationNotFound,
-    OperationSchemaError,
-    SchemaError,
-    SchemaErrorType,
-)
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
 from ...internal.copy import fast_deepcopy
@@ -244,7 +238,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_all_operations(
         self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -314,12 +308,12 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS as exc:
                 yield self._into_err(exc, path, method)
 
-    def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[OperationSchemaError]:
+    def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True
         try:
             full_path = self.get_full_path(path) if isinstance(path, str) else None
             self._raise_invalid_schema(error, full_path, path, method)
-        except OperationSchemaError as exc:
+        except InvalidSchema as exc:
             return Err(exc)
 
     def _raise_invalid_schema(
@@ -331,16 +325,14 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> NoReturn:
         __tracebackhide__ = True
         if isinstance(error, jsonschema.exceptions.RefResolutionError):
-            raise OperationSchemaError.from_reference_resolution_error(
+            raise InvalidSchema.from_reference_resolution_error(
                 error, path=path, method=method, full_path=full_path
             ) from None
         try:
             self.validate()
         except jsonschema.ValidationError as exc:
-            raise OperationSchemaError.from_jsonschema_error(
-                exc, path=path, method=method, full_path=full_path
-            ) from None
-        raise OperationSchemaError(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
+            raise InvalidSchema.from_jsonschema_error(exc, path=path, method=method, full_path=full_path) from None
+        raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
 
     def validate(self) -> None:
         with suppress(TypeError):
@@ -563,8 +555,8 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             return create_state_machine(self)
         except OperationNotFound as exc:
-            raise SchemaError(
-                type=SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+            raise LoaderError(
+                kind=LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
                 message=f"Invalid Open API link definition: Operation `{exc.item}` not found",
             ) from exc
 
@@ -736,8 +728,8 @@ class BaseOpenAPISchema(BaseSchema):
                         pointer = reference[1:]
                         resolved = resolve_pointer(self.rewritten_components, pointer)
                         if resolved is UNRESOLVABLE:
-                            raise SchemaError(
-                                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+                            raise LoaderError(
+                                LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
                                 message=f"Unresolvable JSON pointer in the schema: {pointer}",
                             )
                         if isinstance(resolved, dict):
@@ -873,12 +865,12 @@ class MethodMap(Mapping):
     def __getitem__(self, item: str) -> APIOperation:
         try:
             return self._init_operation(item)
-        except KeyError as exc:
+        except LookupError as exc:
             available_methods = ", ".join(map(str.upper, self))
             message = f"Method `{item.upper()}` not found."
             if available_methods:
                 message += f" Available methods: {available_methods}"
-            raise KeyError(message) from exc
+            raise LookupError(message) from exc
 
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"

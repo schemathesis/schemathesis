@@ -3,7 +3,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.graphql import nodes
 from schemathesis.specs.graphql.scalars import CUSTOM_SCALARS
 
@@ -84,5 +84,5 @@ type Query {
     ],
 )
 def test_invalid_strategy(name, value, expected):
-    with pytest.raises(UsageError, match=expected):
+    with pytest.raises(IncorrectUsage, match=expected):
         schemathesis.graphql.scalar(name, value)

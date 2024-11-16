@@ -1,38 +1,48 @@
+"""Base error handling that is not tied to any specific API specification or execution context."""
+
 from __future__ import annotations
 
 import enum
 import re
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
-from .constants import SERIALIZERS_SUGGESTION_MESSAGE
-from .internal.output import truncate_json
+from schemathesis.constants import SERIALIZERS_SUGGESTION_MESSAGE
 
 if TYPE_CHECKING:
-    import hypothesis.errors
     from jsonschema import RefResolutionError, ValidationError
     from jsonschema import SchemaError as JsonSchemaError
 
-    from .transports.responses import GenericResponse
+    from schemathesis.transports.responses import GenericResponse
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
 
 
-@dataclass
-class OperationSchemaError(Exception):
-    """Schema associated with an API operation contains an error."""
+class SchemathesisError(Exception):
+    """Base exception class for all Schemathesis errors."""
 
-    __module__ = "builtins"
-    message: str | None = None
-    path: str | None = None
-    method: str | None = None
-    full_path: str | None = None
+
+class InvalidSchema(SchemathesisError):
+    """Indicates errors in API schema validation or processing."""
+
+    def __init__(
+        self,
+        message: str | None = None,
+        path: str | None = None,
+        method: str | None = None,
+        full_path: str | None = None,
+    ) -> None:
+        self.message = message
+        self.path = path
+        self.method = method
+        self.full_path = full_path
 
     @classmethod
     def from_jsonschema_error(
         cls, error: ValidationError, path: str | None, method: str | None, full_path: str | None
-    ) -> OperationSchemaError:
+    ) -> InvalidSchema:
+        from schemathesis.internal.output import truncate_json
+
         if error.absolute_path:
             part = error.absolute_path[-1]
             if isinstance(part, int) and len(error.absolute_path) > 1:
@@ -58,7 +68,7 @@ class OperationSchemaError(Exception):
     @classmethod
     def from_reference_resolution_error(
         cls, error: RefResolutionError, path: str | None, method: str | None, full_path: str | None
-    ) -> OperationSchemaError:
+    ) -> InvalidSchema:
         notes = getattr(error, "__notes__", [])
         # Some exceptions don't have the actual reference in them, hence we add it manually via notes
         pointer = f"'{notes[0]}'"
@@ -82,35 +92,22 @@ class OperationSchemaError(Exception):
         return actual_test
 
 
-@dataclass
-class BodyInGetRequestError(OperationSchemaError):
-    __module__ = "builtins"
+class InvalidRegexType(InvalidSchema):
+    """Raised when an invalid type is used where a regex pattern is expected."""
 
 
-@dataclass
-class OperationNotFound(KeyError):
-    message: str
-    item: str
-    __module__ = "builtins"
-
-    def __str__(self) -> str:
-        return self.message
-
-
-@dataclass
-class InvalidRegularExpression(OperationSchemaError):
-    is_valid_type: bool = True
-    __module__ = "builtins"
+class InvalidRegexPattern(InvalidSchema):
+    """Raised when a string pattern is not a valid regular expression."""
 
     @classmethod
-    def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegularExpression:
+    def from_hypothesis_jsonschema_message(cls, message: str) -> InvalidRegexPattern:
         match = re.search(r"pattern='(.*?)'.*?\((.*?)\)", message)
         if match:
             message = f"Invalid regular expression. Pattern `{match.group(1)}` is not recognized - `{match.group(2)}`"
         return cls(message)
 
     @classmethod
-    def from_schema_error(cls, error: JsonSchemaError, *, from_examples: bool) -> InvalidRegularExpression:
+    def from_schema_error(cls, error: JsonSchemaError, *, from_examples: bool) -> InvalidRegexPattern:
         if from_examples:
             message = (
                 "Failed to generate test cases from examples for this API operation because of "
@@ -124,9 +121,7 @@ class InvalidRegularExpression(OperationSchemaError):
         return cls(message)
 
 
-class InvalidHeadersExample(OperationSchemaError):
-    __module__ = "builtins"
-
+class InvalidHeadersExample(InvalidSchema):
     @classmethod
     def from_headers(cls, headers: dict[str, str]) -> InvalidHeadersExample:
         message = (
@@ -139,28 +134,97 @@ class InvalidHeadersExample(OperationSchemaError):
         return cls(message)
 
 
-class DeadlineExceeded(Exception):
-    """Test took too long to run."""
+class IncorrectUsage(SchemathesisError):
+    """Indicates incorrect usage of Schemathesis' public API."""
 
-    __module__ = "builtins"
 
-    @classmethod
-    def from_exc(cls, exc: hypothesis.errors.DeadlineExceeded) -> DeadlineExceeded:
-        runtime = exc.runtime.total_seconds() * 1000
-        deadline = exc.deadline.total_seconds() * 1000
-        return cls(
-            f"Test running time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
+class InvalidRateLimit(IncorrectUsage):
+    """Incorrect input for rate limiting."""
+
+    def __init__(self, value: str) -> None:
+        super().__init__(
+            f"Invalid rate limit value: `{value}`. Should be in form `limit/interval`. "
+            "Example: `10/m` for 10 requests per minute."
         )
 
 
-class RecursiveReferenceError(Exception):
-    """Recursive reference is impossible to resolve due to current limitations."""
+class InternalError(SchemathesisError):
+    """Internal error in Schemathesis."""
 
-    __module__ = "builtins"
+
+class SerializationError(SchemathesisError):
+    """Can't serialize request payload."""
+
+
+NAMESPACE_DEFINITION_URL = "https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#xmlNamespace"
+UNBOUND_PREFIX_MESSAGE_TEMPLATE = (
+    "Unbound prefix: `{prefix}`. "
+    "You need to define this namespace in your API schema via the `xml.namespace` keyword. "
+    f"See more at {NAMESPACE_DEFINITION_URL}"
+)
+
+
+class UnboundPrefix(SerializationError):
+    """XML serialization error.
+
+    It happens when the schema does not define a namespace that is used by some of its parts.
+    """
+
+    def __init__(self, prefix: str):
+        super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
+
+
+SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
+    f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
+)
+SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
+    f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
+)
+
+
+class SerializationNotPossible(SerializationError):
+    """Not possible to serialize data to specified media type(s).
+
+    This error occurs in two scenarios:
+    1. When attempting to serialize to a specific media type that isn't supported
+    2. When none of the available media types can be used for serialization
+    """
+
+    def __init__(self, message: str, media_types: list[str]) -> None:
+        self.message = message
+        self.media_types = media_types
+
+    def __str__(self) -> str:
+        return self.message
+
+    @classmethod
+    def from_media_types(cls, *media_types: str) -> SerializationNotPossible:
+        """Create error when no available media type can be used."""
+        return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)), media_types=list(media_types))
+
+    @classmethod
+    def for_media_type(cls, media_type: str) -> SerializationNotPossible:
+        """Create error when a specific required media type isn't supported."""
+        return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type), media_types=[media_type])
+
+
+class OperationNotFound(LookupError, SchemathesisError):
+    """Raised when an API operation cannot be found in the schema.
+
+    This error typically occurs during schema access in user code when trying to
+    reference a non-existent operation.
+    """
+
+    def __init__(self, message: str, item: str) -> None:
+        self.message = message
+        self.item = item
+
+    def __str__(self) -> str:
+        return self.message
 
 
 @enum.unique
-class SchemaErrorType(str, enum.Enum):
+class LoaderErrorKind(str, enum.Enum):
     # Connection related issues
     CONNECTION_SSL = "connection_ssl"
     CONNECTION_OTHER = "connection_other"
@@ -190,97 +254,22 @@ class SchemaErrorType(str, enum.Enum):
     UNCLASSIFIED = "unclassified"
 
 
-@dataclass
-class SchemaError(RuntimeError):
+class LoaderError(SchemathesisError):
     """Failed to load an API schema."""
 
-    type: SchemaErrorType
-    message: str
-    url: str | None = None
-    response: GenericResponse | None = None
-    extras: list[str] = field(default_factory=list)
+    def __init__(
+        self,
+        kind: LoaderErrorKind,
+        message: str,
+        url: str | None = None,
+        response: GenericResponse | None = None,
+        extras: list[str] | None = None,
+    ) -> None:
+        self.kind = kind
+        self.message = message
+        self.url = url
+        self.response = response
+        self.extras = extras or []
 
     def __str__(self) -> str:
         return self.message
-
-
-class NonCheckError(Exception):
-    """An error happened in side the runner, but is not related to failed checks.
-
-    Used primarily to not let Hypothesis consider the test as flaky or detect multiple failures as we handle it
-    on our side.
-    """
-
-    __module__ = "builtins"
-
-
-class InternalError(Exception):
-    """Internal error in Schemathesis."""
-
-    __module__ = "builtins"
-
-
-class SkipTest(BaseException):
-    """Raises when a test should be skipped and return control to the execution engine (own Schemathesis' or pytest)."""
-
-    __module__ = "builtins"
-
-
-SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
-    f"Schemathesis can't serialize data to any of the defined media types: {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
-)
-NAMESPACE_DEFINITION_URL = "https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#xmlNamespace"
-UNBOUND_PREFIX_MESSAGE_TEMPLATE = (
-    "Unbound prefix: `{prefix}`. "
-    "You need to define this namespace in your API schema via the `xml.namespace` keyword. "
-    f"See more at {NAMESPACE_DEFINITION_URL}"
-)
-
-SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
-    f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
-)
-
-
-class SerializationError(Exception):
-    """Serialization can not be done."""
-
-    __module__ = "builtins"
-
-
-class UnboundPrefixError(SerializationError):
-    """XML serialization error.
-
-    It happens when the schema does not define a namespace that is used by some of its parts.
-    """
-
-    def __init__(self, prefix: str):
-        super().__init__(UNBOUND_PREFIX_MESSAGE_TEMPLATE.format(prefix=prefix))
-
-
-@dataclass
-class SerializationNotPossible(SerializationError):
-    """Not possible to serialize to any of the media types defined for some API operation.
-
-    Usually, there is still `application/json` along with less common ones, but this error happens when there is no
-    media type that Schemathesis knows how to serialize data to.
-    """
-
-    message: str
-    media_types: list[str]
-
-    __module__ = "builtins"
-
-    def __str__(self) -> str:
-        return self.message
-
-    @classmethod
-    def from_media_types(cls, *media_types: str) -> SerializationNotPossible:
-        return cls(SERIALIZATION_NOT_POSSIBLE_MESSAGE.format(", ".join(media_types)), media_types=list(media_types))
-
-    @classmethod
-    def for_media_type(cls, media_type: str) -> SerializationNotPossible:
-        return cls(SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE.format(media_type), media_types=[media_type])
-
-
-class UsageError(Exception):
-    """Incorrect usage of Schemathesis functions."""

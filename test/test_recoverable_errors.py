@@ -20,7 +20,7 @@ EXPECTED_OUTPUT_LINES = [
     # Operation-level error
     r".*test_\[POST /bar\] FAILED",
     # The error in both failing cases
-    ".*OperationSchemaError: Unresolvable JSON pointer in the schema.*",
+    ".*InvalidSchema: Unresolvable JSON pointer in the schema.*",
 ]
 
 
@@ -90,7 +90,7 @@ def test_(case):
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            ".*OperationSchemaError: Invalid `bearerAuth` definition.*",
+            ".*InvalidSchema: Invalid `bearerAuth` definition.*",
             ".*Ensure that the definition complies with the OpenAPI specification.*",
         ]
     )

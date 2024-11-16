@@ -4,7 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
-from schemathesis.exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.models import Case
 from schemathesis.runner import from_schema
 
@@ -74,7 +74,7 @@ def test_register_invalid(auth_storage):
 def test_apply_twice(openapi3_schema, auth_provider_class):
     # When auth is registered twice
     # Then it is an error
-    with pytest.raises(UsageError, match="`test` has already been decorated with `apply`"):
+    with pytest.raises(IncorrectUsage, match="`test` has already been decorated with `apply`"):
 
         @openapi3_schema.auth(auth_provider_class)
         @openapi3_schema.auth(auth_provider_class)
@@ -101,7 +101,7 @@ def test_register_cached(auth_storage, auth_provider_class):
 
 def test_set_noop(auth_storage, mocker):
     # When `AuthStorage.set` is called without `provider`
-    with pytest.raises(UsageError, match="No auth provider is defined."):
+    with pytest.raises(IncorrectUsage, match="No auth provider is defined."):
         auth_storage.set(mocker.create_autospec(Case), mocker.create_autospec(AuthContext))
     # This normally should not happen, as it is checked before.
 

@@ -10,7 +10,8 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable, Union
 
-from ..exceptions import SchemaError, SchemaErrorType
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
+
 from ..generation import DataGenerationMethod, GenerationConfig
 from ..internal.output import OutputConfig
 from ..internal.validation import file_exists
@@ -59,7 +60,7 @@ def load_schema(config: LoaderConfig) -> BaseSchema:
     return _try_load_schema(config, first, second)
 
 
-def should_try_more(exc: SchemaError) -> bool:
+def should_try_more(exc: LoaderError) -> bool:
     """Determine if alternative schema loading should be attempted."""
     import requests
     from yaml.reader import ReaderError
@@ -68,10 +69,10 @@ def should_try_more(exc: SchemaError) -> bool:
         return False
 
     # We should not try other loaders for cases when we can't even establish connection
-    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.type not in (
-        SchemaErrorType.OPEN_API_INVALID_SCHEMA,
-        SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
-        SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
+    return not isinstance(exc.__cause__, requests.exceptions.ConnectionError) and exc.kind not in (
+        LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
+        LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
+        LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
     )
 
 
@@ -79,8 +80,8 @@ def is_specific_exception(loader: Loader, exc: Exception) -> bool:
     """Determine if alternative schema loading should be attempted."""
     return (
         loader is _load_graphql_schema
-        and isinstance(exc, SchemaError)
-        and exc.type == SchemaErrorType.GRAPHQL_INVALID_SCHEMA
+        and isinstance(exc, LoaderError)
+        and exc.kind == LoaderErrorKind.GRAPHQL_INVALID_SCHEMA
         # In some cases it is not clear that the schema is even supposed to be GraphQL, e.g. an empty input
         and "Syntax Error: Unexpected <EOF>." not in exc.extras
     )
@@ -118,7 +119,7 @@ def _try_load_schema(config: LoaderConfig, first: Loader, second: Loader) -> Bas
         warnings.simplefilter("ignore", InsecureRequestWarning)
         try:
             return first(config)
-        except SchemaError as exc:
+        except LoaderError as exc:
             if config.force_schema_version is None and should_try_more(exc):
                 try:
                     return second(config)

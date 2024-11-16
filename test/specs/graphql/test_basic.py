@@ -9,9 +9,9 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.exceptions import SchemaError
 from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
@@ -71,7 +71,7 @@ def test_as_wsgi_kwargs(graphql_strategy):
 def test_custom_base_url(graphql_url, kwargs, base_path, expected):
     # When a custom Base URL is specified
     if "port" in kwargs:
-        with pytest.raises(SchemaError) as exc:
+        with pytest.raises(LoaderError) as exc:
             schemathesis.graphql.from_url(graphql_url, **kwargs)
         if platform.system() == "Windows":
             detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
@@ -187,7 +187,7 @@ def test_data_key(graphql_url, with_data_key):
 def test_malformed_response(graphql_url):
     response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     response._content += b"42"
-    with pytest.raises(SchemaError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
+    with pytest.raises(LoaderError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
         extract_schema_from_response(response)
 
 
@@ -291,7 +291,7 @@ def filter_body(context, body):
 
 
 def test_unknown_type_name(graphql_schema):
-    with pytest.raises(KeyError, match="`Qwery` type not found. Did you mean `Query`?"):
+    with pytest.raises(LookupError, match="`Qwery` type not found. Did you mean `Query`?"):
         graphql_schema["Qwery"]["getBooks"]
 
 
@@ -303,7 +303,7 @@ def test_unknown_type_name(graphql_schema):
     ],
 )
 def test_unknown_field_name(graphql_schema, name, expected):
-    with pytest.raises(KeyError, match=expected):
+    with pytest.raises(LookupError, match=expected):
         graphql_schema["Query"][name]
 
 

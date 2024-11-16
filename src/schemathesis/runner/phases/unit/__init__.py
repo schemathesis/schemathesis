@@ -13,7 +13,8 @@ from functools import partial
 from queue import Queue
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
-from ....exceptions import OperationSchemaError
+from schemathesis.core.errors import InvalidSchema
+
 from ....internal.result import Ok
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
@@ -63,7 +64,7 @@ def single_threaded(ctx: EngineContext) -> EventGenerator:
                             correlation_id = event.correlation_id
                         if isinstance(event, events.Interrupted) or ctx.is_stopped:
                             return
-                except OperationSchemaError as error:
+                except InvalidSchema as error:
                     yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
             else:
                 yield from on_schema_error(exc=result.err(), ctx=ctx)
@@ -134,9 +135,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     events_queue.put(event)
 
 
-def on_schema_error(
-    *, exc: OperationSchemaError, ctx: EngineContext, correlation_id: str | None = None
-) -> EventGenerator:
+def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: str | None = None) -> EventGenerator:
     """Handle schema-related errors during test execution."""
     if exc.method is not None:
         assert exc.path is not None
