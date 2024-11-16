@@ -20,6 +20,7 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
 
@@ -29,7 +30,6 @@ from .constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
     SERIALIZERS_SUGGESTION_MESSAGE,
 )
-from .exceptions import OperationSchemaError, SerializationNotPossible, UsageError
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.checks import CheckContext
@@ -260,10 +260,10 @@ class Case:
             # This may happen when a path template has a placeholder for variable "X", but parameter "X" is not defined
             # in the parameters list.
             # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
-            raise OperationSchemaError(f"Path parameter {exc} is not defined") from exc
+            raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
         except (IndexError, ValueError) as exc:
             # A single unmatched `}` inside the path template may cause this
-            raise OperationSchemaError(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
+            raise InvalidSchema(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 
     def get_full_base_url(self) -> str | None:
         """Create a full base url, adding "localhost" for WSGI apps."""
@@ -648,7 +648,7 @@ class APIOperation(Generic[P, C]):
             # The only available option
             return media_types[0]
         media_types_repr = ", ".join(media_types)
-        raise UsageError(
+        raise IncorrectUsage(
             "Can not detect appropriate media type. "
             "You can either specify one of the defined media types "
             f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"

@@ -32,7 +32,7 @@ from ...internal.output import prepare_response_payload
 from ...internal.result import Ok
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
-from ...runner.events import InternalErrorType, SchemaErrorType
+from ...runner.events import InternalErrorType, LoaderErrorKind
 from ...runner.models import Status, TestResult
 from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
 from ...stateful import events as stateful_events
@@ -192,10 +192,10 @@ def display_full_traceback_message(error: EngineErrorInfo) -> bool:
     # Some errors should not trigger the message that suggests to show full tracebacks to the user
     return not str(error).startswith(
         (
-            "DeadlineExceeded",
-            "OperationSchemaError",
             "requests.exceptions",
-            "SerializationNotPossible",
+            "schemathesis.runner.errors.DeadlineExceeded",
+            "schemathesis.core.errors.InvalidSchema",
+            "schemathesis.core.errors.SerializationNotPossible",
             "hypothesis.errors.FailedHealthCheck",
             "hypothesis.errors.InvalidArgument: Scalar ",
             "hypothesis.errors.InvalidArgument: min_size=",
@@ -611,29 +611,29 @@ def display_check_result(check_name: str, results: dict[str | Status, int], temp
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema"
 
 
-SCHEMA_ERROR_SUGGESTIONS = {
+LOADER_ERROR_SUGGESTIONS = {
     # SSL-specific connection issue
-    SchemaErrorType.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
+    LoaderErrorKind.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
     # Other connection problems
-    SchemaErrorType.CONNECTION_OTHER: f"Use {bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
+    LoaderErrorKind.CONNECTION_OTHER: f"Use {bold('`--wait-for-schema=NUM`')} to wait up to NUM seconds for schema availability.",
     # Response issues
-    SchemaErrorType.UNEXPECTED_CONTENT_TYPE: VERIFY_URL_SUGGESTION,
-    SchemaErrorType.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
-    SchemaErrorType.HTTP_NOT_FOUND: VERIFY_URL_SUGGESTION,
+    LoaderErrorKind.UNEXPECTED_CONTENT_TYPE: VERIFY_URL_SUGGESTION,
+    LoaderErrorKind.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
+    LoaderErrorKind.HTTP_NOT_FOUND: VERIFY_URL_SUGGESTION,
     # OpenAPI specification issues
-    SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
-    SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
-    SchemaErrorType.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
+    LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
+    LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
+    LoaderErrorKind.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
     # YAML specific issues
-    SchemaErrorType.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
-    SchemaErrorType.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
+    LoaderErrorKind.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
+    LoaderErrorKind.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",
     # Unclassified
-    SchemaErrorType.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can:\n\n  {ISSUE_TRACKER_URL}",
+    LoaderErrorKind.UNCLASSIFIED: f"If you suspect this is a Schemathesis issue and the schema is valid, please report it and include the schema if you can:\n\n  {ISSUE_TRACKER_URL}",
 }
 
 
 def should_skip_suggestion(context: ExecutionContext, event: events.InternalError) -> bool:
-    return event.subtype == SchemaErrorType.CONNECTION_OTHER and context.wait_for_schema is not None
+    return event.subtype == LoaderErrorKind.CONNECTION_OTHER and context.wait_for_schema is not None
 
 
 def _display_extras(extras: list[str]) -> None:
@@ -661,8 +661,8 @@ def display_internal_error(context: ExecutionContext, event: events.InternalErro
         extras = [event.exception]
     _display_extras(extras)
     if not should_skip_suggestion(context, event):
-        if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, SchemaErrorType):
-            suggestion = SCHEMA_ERROR_SUGGESTIONS.get(event.subtype)
+        if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, LoaderErrorKind):
+            suggestion = LOADER_ERROR_SUGGESTIONS.get(event.subtype)
         elif context.show_trace:
             suggestion = (
                 f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."

@@ -4,8 +4,8 @@ from hypothesis.errors import InvalidDefinition
 
 import schemathesis
 from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
-from schemathesis.exceptions import UsageError
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
@@ -218,7 +218,7 @@ def test_no_transitions_error(app_schema):
     schema = schemathesis.from_dict(app_schema)
     state_machine_cls = schema.as_state_machine()
 
-    with pytest.raises(UsageError, match=NO_LINKS_ERROR_MESSAGE):
+    with pytest.raises(IncorrectUsage, match=NO_LINKS_ERROR_MESSAGE):
         state_machine_cls()
 
 

@@ -13,6 +13,15 @@ from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.core.control import SkipTest
+from schemathesis.core.errors import (
+    IncorrectUsage,
+    InvalidHeadersExample,
+    InvalidRegexPattern,
+    InvalidSchema,
+    SerializationNotPossible,
+)
+
 from .._hypothesis._given import (
     get_given_args,
     get_given_kwargs,
@@ -27,14 +36,6 @@ from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SERIALIZERS_SUGGESTION_MESSAGE,
-)
-from ..exceptions import (
-    InvalidHeadersExample,
-    InvalidRegularExpression,
-    OperationSchemaError,
-    SerializationNotPossible,
-    SkipTest,
-    UsageError,
 )
 from ..internal.result import Ok, Result
 
@@ -85,9 +86,7 @@ class SchemathesisCase(PyCollector):
     def _get_test_name(self, operation: APIOperation) -> str:
         return f"{self.name}[{operation.verbose_name}]"
 
-    def _gen_items(
-        self, result: Result[APIOperation, OperationSchemaError]
-    ) -> Generator[SchemathesisFunction, None, None]:
+    def _gen_items(self, result: Result[APIOperation, InvalidSchema]) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.
 
         Could produce more than one test item if
@@ -257,8 +256,8 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
                 yield
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
-                raise UsageError(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
-            raise OperationSchemaError(exc.args[0]) from None
+                raise IncorrectUsage(GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE) from None
+            raise InvalidSchema(exc.args[0]) from None
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
@@ -274,13 +273,13 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
                 ) from None
             invalid_regex = get_invalid_regex_mark(pyfuncitem.obj)
             if invalid_regex is not None:
-                raise InvalidRegularExpression.from_schema_error(invalid_regex, from_examples=True) from None
+                raise InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True) from None
             invalid_headers = get_invalid_example_headers_mark(pyfuncitem.obj)
             if invalid_headers is not None:
                 raise InvalidHeadersExample.from_headers(invalid_headers) from None
             pytest.skip(exc.args[0])
         except SchemaError as exc:
-            raise InvalidRegularExpression.from_schema_error(exc, from_examples=False) from exc
+            raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
         except Exception as exc:
             if hasattr(exc, "__notes__"):
                 exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore
