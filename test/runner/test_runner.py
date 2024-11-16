@@ -323,7 +323,7 @@ def test_unknown_response_code(real_app_schema):
     assert finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
-    assert check.value == Status.failure
+    assert check.status == Status.failure
     assert check.failure.status_code == 418
     assert check.failure.allowed_status_codes == [200]
     assert check.failure.defined_status_codes == ["200"]
@@ -342,7 +342,7 @@ def test_unknown_response_code_with_default(real_app_schema):
     assert not finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
-    assert check.value == Status.success
+    assert check.status == Status.success
 
 
 @pytest.mark.operations("text")
@@ -358,7 +358,7 @@ def test_unknown_content_type(real_app_schema):
     assert finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "content_type_conformance"
-    assert check.value == Status.failure
+    assert check.status == Status.failure
     assert check.failure.content_type == "text/plain"
     assert check.failure.defined_content_types == ["application/json"]
 
@@ -650,7 +650,7 @@ def test_missing_path_parameter(real_app_schema):
     ).execute()
     # Then it leads to an error
     assert finished.results.has_errors
-    assert "OperationSchemaError: Path parameter 'id' is not defined" in str(others[1].result.errors[0])
+    assert "InvalidSchema: Path parameter 'id' is not defined" in str(others[1].result.errors[0])
 
 
 def test_get_requests_auth():
@@ -1141,7 +1141,10 @@ def test_malformed_path_template(ctx, path, expected):
     *_, event, _ = list(from_schema(schema).execute())
     assert event.status == Status.error
     # And should produce the proper error message
-    assert str(event.result.errors[0]) == f"OperationSchemaError: Malformed path template: `{path}`\n\n  {expected}"
+    assert (
+        str(event.result.errors[0])
+        == f"schemathesis.core.errors.InvalidSchema: Malformed path template: `{path}`\n\n  {expected}"
+    )
 
 
 @pytest.fixture
@@ -1152,7 +1155,7 @@ def result():
 def make_check(status_code):
     response = requests.Response()
     response.status_code = status_code
-    return Check(name="not_a_server_error", value=Status.success, request=None, response=response, case=None)
+    return Check(name="not_a_server_error", status=Status.success, request=None, response=response, case=None)
 
 
 def test_authorization_warning_no_checks(result):

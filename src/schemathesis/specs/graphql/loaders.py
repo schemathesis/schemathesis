@@ -6,8 +6,9 @@ from functools import lru_cache
 from json import JSONDecodeError
 from typing import IO, TYPE_CHECKING, Any, Dict, NoReturn, cast
 
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
+
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
-from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -85,8 +86,8 @@ def extract_schema_from_response(response: GenericResponse) -> dict[str, Any]:
         else:
             decoded = response.json
     except JSONDecodeError as exc:
-        raise SchemaError(
-            SchemaErrorType.UNEXPECTED_CONTENT_TYPE,
+        raise LoaderError(
+            LoaderErrorKind.UNEXPECTED_CONTENT_TYPE,
             "Received unsupported content while expecting a JSON payload for GraphQL",
         ) from exc
     return decoded
@@ -207,8 +208,8 @@ def from_file(
 
 
 def _on_invalid_schema(exc: Exception, extras: list[str] | None = None) -> NoReturn:
-    raise SchemaError(
-        SchemaErrorType.GRAPHQL_INVALID_SCHEMA,
+    raise LoaderError(
+        LoaderErrorKind.GRAPHQL_INVALID_SCHEMA,
         "The provided API schema does not appear to be a valid GraphQL schema",
         extras=extras or [],
     ) from exc

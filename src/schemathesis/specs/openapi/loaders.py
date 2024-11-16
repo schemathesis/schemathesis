@@ -8,9 +8,9 @@ from typing import IO, TYPE_CHECKING, Any, cast
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
-from ...exceptions import SchemaError, SchemaErrorType
 from ...generation import (
     DEFAULT_DATA_GENERATION_METHODS,
     DataGenerationMethod,
@@ -179,14 +179,14 @@ def _load_yaml(data: str, include_details_on_error: bool = False) -> dict[str, A
         return deserialize_yaml(data)
     except yaml.YAMLError as exc:
         if include_details_on_error:
-            type_ = SchemaErrorType.SYNTAX_ERROR
+            kind = LoaderErrorKind.SYNTAX_ERROR
             message = SCHEMA_SYNTAX_ERROR
             extras = [entry for entry in str(exc).splitlines() if entry]
         else:
-            type_ = SchemaErrorType.UNEXPECTED_CONTENT_TYPE
+            kind = LoaderErrorKind.UNEXPECTED_CONTENT_TYPE
             message = SCHEMA_LOADING_ERROR
             extras = []
-        raise SchemaError(type_, message, extras=extras) from exc
+        raise LoaderError(kind, message, extras=extras) from exc
 
 
 def from_file(
@@ -223,9 +223,9 @@ def from_file(
             # This is a rare case, and it will be slower but trying JSON first improves a more common use case
             try:
                 raw = _load_yaml(data)
-            except SchemaError:
-                raise SchemaError(
-                    SchemaErrorType.SYNTAX_ERROR,
+            except LoaderError:
+                raise LoaderError(
+                    LoaderErrorKind.SYNTAX_ERROR,
                     SCHEMA_SYNTAX_ERROR,
                     extras=[entry for entry in str(exc).splitlines() if entry],
                 ) from exc
@@ -268,7 +268,7 @@ def from_dict(
     from .schemas import OpenApi30, SwaggerV20
 
     if not isinstance(raw_schema, dict):
-        raise SchemaError(SchemaErrorType.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
+        raise LoaderError(LoaderErrorKind.OPEN_API_INVALID_SCHEMA, SCHEMA_INVALID_ERROR)
     hook_context = HookContext()
     is_openapi_31 = raw_schema.get("openapi", "").startswith("3.1")
     dispatch("before_load_schema", hook_context, raw_schema)
@@ -298,8 +298,8 @@ def from_dict(
     def init_openapi_3(forced: bool) -> OpenApi30:
         version = raw_schema["openapi"]
         if not is_openapi_31 and not forced and not OPENAPI_30_VERSION_RE.match(version):
-            raise SchemaError(
-                SchemaErrorType.OPEN_API_UNSUPPORTED_VERSION,
+            raise LoaderError(
+                LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",
             )
         if is_openapi_31:
@@ -332,8 +332,8 @@ def from_dict(
         return init_openapi_2()
     if "openapi" in raw_schema:
         return init_openapi_3(forced=False)
-    raise SchemaError(
-        SchemaErrorType.OPEN_API_UNSPECIFIED_VERSION,
+    raise LoaderError(
+        LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
         "Unable to determine the Open API version as it's not specified in the document.",
     )
 
@@ -377,15 +377,15 @@ def _maybe_validate_schema(
                 status_codes = validation.find_numeric_http_status_codes(instance)
                 if status_codes:
                     message = _format_status_codes(status_codes)
-                    raise SchemaError(
-                        SchemaErrorType.YAML_NUMERIC_STATUS_CODES, f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}"
+                    raise LoaderError(
+                        LoaderErrorKind.YAML_NUMERIC_STATUS_CODES, f"{NUMERIC_STATUS_CODES_MESSAGE}\n{message}"
                     ) from exc
                 # Some other pattern error
-                raise SchemaError(SchemaErrorType.YAML_NON_STRING_KEYS, NON_STRING_OBJECT_KEY_MESSAGE) from exc
-            raise SchemaError(SchemaErrorType.UNCLASSIFIED, "Unknown error") from exc
+                raise LoaderError(LoaderErrorKind.YAML_NON_STRING_KEYS, NON_STRING_OBJECT_KEY_MESSAGE) from exc
+            raise LoaderError(LoaderErrorKind.UNCLASSIFIED, "Unknown error") from exc
         except ValidationError as exc:
-            raise SchemaError(
-                SchemaErrorType.OPEN_API_INVALID_SCHEMA,
+            raise LoaderError(
+                LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
                 SCHEMA_INVALID_ERROR,
                 extras=[entry for entry in str(exc).splitlines() if entry],
             ) from exc

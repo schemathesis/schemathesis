@@ -15,8 +15,8 @@ from jsonschema import RefResolutionError
 from schemathesis._hypothesis._builder import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from schemathesis.core.errors import IncorrectUsage, LoaderError
 from schemathesis.core.failures import Failure
-from schemathesis.exceptions import SchemaError, UsageError
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.internal.exceptions import format_exception
 from schemathesis.internal.result import Err, Ok
@@ -140,7 +140,7 @@ def test_default(corpus, filename, app_port):
     schema = _load_schema(corpus, filename, app_port)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, UsageError, SchemaError):
+    except (RefResolutionError, IncorrectUsage, LoaderError):
         pass
 
     service_client = None
@@ -187,11 +187,11 @@ def _load_schema(corpus, filename, app_port=None):
             validate_schema=False,
             base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None,
         )
-    except SchemaError as exc:
+    except LoaderError as exc:
         assert_invalid_schema(exc)
 
 
-def assert_invalid_schema(exc: SchemaError) -> NoReturn:
+def assert_invalid_schema(exc: LoaderError) -> NoReturn:
     error = str(exc.__cause__)
     if (
         "while scanning a block scalar" in error
@@ -206,7 +206,7 @@ def assert_invalid_schema(exc: SchemaError) -> NoReturn:
 def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if isinstance(event, events.AfterExecution):
         assert not event.result.has_failures, event.result.verbose_name
-        failures = [check for check in event.result.checks if check.value == Status.failure]
+        failures = [check for check in event.result.checks if check.status == Status.failure]
         assert not failures, event.result.verbose_name
         check_no_errors(schema_id, event)
         # Errors are checked above and unknown ones cause a test failure earlier

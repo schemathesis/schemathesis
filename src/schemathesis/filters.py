@@ -9,7 +9,7 @@ from functools import partial
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
 
-from .exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -265,17 +265,17 @@ class FilterSet:
         ):
             if expected is not None and regex is not None:
                 # To match anything the regex should match the expected value, hence passing them together is useless
-                raise UsageError(ERROR_EXPECTED_AND_REGEX)
+                raise IncorrectUsage(ERROR_EXPECTED_AND_REGEX)
             if expected is not None:
                 matchers.append(Matcher.for_value(attribute, expected))
             if regex is not None:
                 matchers.append(Matcher.for_regex(attribute, regex))
 
         if not matchers:
-            raise UsageError(ERROR_EMPTY_FILTER)
+            raise IncorrectUsage(ERROR_EMPTY_FILTER)
         filter_ = Filter(matchers=tuple(matchers))
         if filter_ in self._includes or filter_ in self._excludes:
-            raise UsageError(ERROR_FILTER_EXISTS)
+            raise IncorrectUsage(ERROR_FILTER_EXISTS)
         if include:
             self._includes.add(filter_)
         else:
