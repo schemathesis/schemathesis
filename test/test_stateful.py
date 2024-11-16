@@ -3,7 +3,7 @@ import re
 import pytest
 
 import schemathesis
-from schemathesis.exceptions import SchemaError
+from schemathesis.core.errors import LoaderError
 from schemathesis.specs.openapi import expressions
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
@@ -153,7 +153,7 @@ def test_add_link_unknown_operation(schema_url, change, message):
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
     change(source)
-    with pytest.raises(KeyError, match=re.escape(message)):
+    with pytest.raises(LookupError, match=re.escape(message)):
         # Then there should be an error about it.
         schema.add_link(source=source, target="#/paths/~1users~1{user_id}/get", status_code="201", request_body="#/foo")
 
@@ -250,6 +250,6 @@ def test_missing_operation(ctx, operation_id, expected):
 
     schema = schemathesis.from_dict(schema)
 
-    with pytest.raises(SchemaError) as exc:
+    with pytest.raises(LoaderError) as exc:
         schema.as_state_machine()
     assert str(exc.value.__cause__) == expected

@@ -7,7 +7,7 @@ import traceback
 from types import TracebackType
 from typing import TYPE_CHECKING, Iterator, Sequence
 
-from ..exceptions import SerializationNotPossible
+from schemathesis.core.errors import SerializationNotPossible
 
 if TYPE_CHECKING:
     from requests import RequestException

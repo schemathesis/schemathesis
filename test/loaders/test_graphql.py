@@ -7,7 +7,7 @@ import graphql
 import pytest
 from hypothesis import given, settings
 
-from schemathesis.exceptions import SchemaError
+from schemathesis.core.errors import LoaderError
 from schemathesis.specs.graphql import loaders
 
 RAW_SCHEMA = """
@@ -94,5 +94,5 @@ def test_from_json_file(tmp_path):
 def test_from_invalid_json_file(tmp_path, data):
     path = tmp_path / "schema.json"
     path.write_text(data)
-    with pytest.raises(SchemaError, match="The provided API schema does not appear to be a valid GraphQL schema"):
+    with pytest.raises(LoaderError, match="The provided API schema does not appear to be a valid GraphQL schema"):
         loaders.from_path(str(path))

@@ -10,9 +10,9 @@ import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.exceptions import UsageError
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case, CaseSource, TransitionId
 from schemathesis.runner.models import Request, Response
@@ -94,7 +94,7 @@ def test_make_case_missing_media_type(ctx):
     schema = schemathesis.from_dict(schema)
     # And the `media_type` argument is not passed to `make_case`
     # Then there should be a usage error
-    with pytest.raises(UsageError):
+    with pytest.raises(IncorrectUsage):
         schema["/data"]["POST"].make_case(body="foo")
 
 
@@ -463,12 +463,12 @@ def test_from_case(swagger_20, body, expected):
     ],
 )
 def test_operation_path_suggestion(swagger_20, value, message):
-    with pytest.raises(KeyError, match=re.escape(message)):
+    with pytest.raises(LookupError, match=re.escape(message)):
         swagger_20[value]["POST"]
 
 
 def test_method_suggestion(swagger_20):
-    with pytest.raises(KeyError, match="Method `PUT` not found. Available methods: GET"):
+    with pytest.raises(LookupError, match="Method `PUT` not found. Available methods: GET"):
         swagger_20["/users"]["PUT"]
 
 

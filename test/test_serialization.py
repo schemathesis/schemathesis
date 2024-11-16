@@ -10,11 +10,10 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import serializers
-from schemathesis.exceptions import (
+from schemathesis.core.errors import (
     SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE,
     SerializationError,
     SerializationNotPossible,
-    UnboundPrefixError,
 )
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.transports import RequestsTransport, WSGITransport
@@ -455,7 +454,7 @@ def test_serialize_xml_hypothesis(data, schema_object, media_type):
 
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
-    with suppress(SerializationError, UnboundPrefixError):
+    with suppress(SerializationError):
         for transport in (RequestsTransport(), WSGITransport(app=None)):
             serialized_data = transport.serialize_case(case)["data"].decode("utf8")
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")

@@ -11,13 +11,42 @@ import re
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, cast
 
-from .. import exceptions
+from schemathesis import errors
+from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+
 from ..internal.exceptions import format_exception, get_request_error_extras, get_request_error_message, split_traceback
 
 if TYPE_CHECKING:
     import hypothesis.errors
 
-__all__ = ["EngineErrorInfo"]
+__all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnsupportedRecursiveReference", "UnexpectedError"]
+
+
+class DeadlineExceeded(errors.SchemathesisError):
+    """Test took too long to run."""
+
+    @classmethod
+    def from_exc(cls, exc: hypothesis.errors.DeadlineExceeded) -> DeadlineExceeded:
+        runtime = exc.runtime.total_seconds() * 1000
+        deadline = exc.deadline.total_seconds() * 1000
+        return cls(
+            f"Test running time is too slow! It took {runtime:.2f}ms, which exceeds the deadline of {deadline:.2f}ms.\n"
+        )
+
+
+class UnsupportedRecursiveReference(errors.SchemathesisError):
+    """Recursive reference is impossible to resolve due to current limitations."""
+
+    def __init__(self) -> None:
+        super().__init__(RECURSIVE_REFERENCE_ERROR_MESSAGE)
+
+
+class UnexpectedError(errors.SchemathesisError):
+    """An unexpected error during the engine execution.
+
+    Used primarily to not let Hypothesis consider the test as flaky or detect multiple failures as we handle it
+    on our side.
+    """
 
 
 class EngineErrorInfo:
@@ -67,7 +96,6 @@ class EngineErrorInfo:
             return "Failed Health Check"
 
         if self._kind in (
-            RuntimeErrorKind.SCHEMA_BODY_IN_GET_REQUEST,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
@@ -115,7 +143,6 @@ class EngineErrorInfo:
             return f"{self._error}. Possible reasons:"
 
         if self._kind in (
-            RuntimeErrorKind.SCHEMA_BODY_IN_GET_REQUEST,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_GENERIC,
         ):
@@ -147,7 +174,6 @@ class EngineErrorInfo:
     @property
     def has_useful_traceback(self) -> bool:
         return self._kind not in (
-            RuntimeErrorKind.SCHEMA_BODY_IN_GET_REQUEST,
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_UNSUPPORTED,
             RuntimeErrorKind.SCHEMA_GENERIC,
@@ -228,7 +254,6 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
             f"disable with {bold('`--hypothesis-deadline=None`')}."
         ),
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
-        RuntimeErrorKind.SCHEMA_BODY_IN_GET_REQUEST: f"Bypass validation using {bold('`--validate-schema=false`')}. Caution: May cause unexpected errors.",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax.\n"
         "For guidance, visit: https://docs.python.org/3/library/re.html",
         RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
@@ -282,7 +307,6 @@ class RuntimeErrorKind(str, enum.Enum):
     HYPOTHESIS_HEALTH_CHECK_TOO_SLOW = "hypothesis_health_check_too_slow"
     HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
 
-    SCHEMA_BODY_IN_GET_REQUEST = "schema_body_in_get_request"
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
     SCHEMA_UNSUPPORTED = "schema_unsupported"
     SCHEMA_GENERIC = "schema_generic"
@@ -326,24 +350,22 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
                 HealthCheck.large_base_example: RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
             }[health_check]
         return RuntimeErrorKind.UNCLASSIFIED
-    if isinstance(error, exceptions.DeadlineExceeded):
+    if isinstance(error, DeadlineExceeded):
         return RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED
     if isinstance(error, hypothesis.errors.InvalidArgument) and str(error).startswith("Scalar "):
         # Comes from `hypothesis-graphql`
         return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR
 
     # Schema errors
-    if isinstance(error, exceptions.OperationSchemaError):
-        if isinstance(error, exceptions.BodyInGetRequestError):
-            return RuntimeErrorKind.SCHEMA_BODY_IN_GET_REQUEST
-        if isinstance(error, exceptions.InvalidRegularExpression) and error.is_valid_type:
+    if isinstance(error, errors.InvalidSchema):
+        if isinstance(error, errors.InvalidRegexPattern):
             return RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION
         return RuntimeErrorKind.SCHEMA_GENERIC
-    if isinstance(error, exceptions.RecursiveReferenceError):
+    if isinstance(error, UnsupportedRecursiveReference):
         # Recursive references are not supported right now
         return RuntimeErrorKind.SCHEMA_UNSUPPORTED
-    if isinstance(error, exceptions.SerializationError):
-        if isinstance(error, exceptions.UnboundPrefixError):
+    if isinstance(error, errors.SerializationError):
+        if isinstance(error, errors.UnboundPrefix):
             return RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX
         return RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE
     return RuntimeErrorKind.UNCLASSIFIED

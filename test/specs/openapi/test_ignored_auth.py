@@ -47,7 +47,7 @@ def test_auth_is_not_checked(with_generated, schema_url):
     event = run(schema_url, **kwargs)
     # Then it is a failure
     check = event.result.checks[-1]
-    assert check.value == Status.failure
+    assert check.status == Status.failure
     assert check.name == "ignored_auth"
     if with_generated:
         assert "Authorization" in check.request.headers

@@ -25,11 +25,11 @@ from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import InvalidSchema, OperationNotFound
 
 from ... import auths
 from ...checks import not_a_server_error
 from ...constants import SCHEMATHESIS_TEST_CASE_HEADER
-from ...exceptions import OperationNotFound, OperationSchemaError
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.result import Ok, Result
@@ -189,7 +189,7 @@ class GraphQLSchema(BaseSchema):
 
     def get_all_operations(
         self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),

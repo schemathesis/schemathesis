@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from .exceptions import UsageError
+from schemathesis.core.errors import InvalidRateLimit
 
 if TYPE_CHECKING:
     from pyrate_limiter import Duration, Limiter
@@ -20,17 +20,10 @@ def parse_units(rate: str) -> tuple[int, int]:
             "d": Duration.DAY,
         }.get(interval_text)
         if interval is None:
-            raise invalid_rate(rate)
+            raise InvalidRateLimit(rate)
         return int(limit), interval
     except ValueError as exc:
-        raise invalid_rate(rate) from exc
-
-
-def invalid_rate(value: str) -> UsageError:
-    return UsageError(
-        f"Invalid rate limit value: `{value}`. Should be in form `limit/interval`. "
-        "Example: `10/m` for 10 requests per minute."
-    )
+        raise InvalidRateLimit(rate) from exc
 
 
 def _get_max_delay(value: int, unit: Duration) -> int:

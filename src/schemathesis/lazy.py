@@ -10,6 +10,7 @@ from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import InvalidSchema
 
 from ._hypothesis._given import (
     GivenInput,
@@ -23,7 +24,6 @@ from ._hypothesis._given import (
 from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
 from ._pytest.control_flow import fail_on_no_matches
 from .auths import AuthStorage
-from .exceptions import OperationSchemaError
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from .hooks import HookDispatcher, HookScope
 from .internal.result import Ok
@@ -298,7 +298,7 @@ def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Cal
 SEPARATOR = "\n===================="
 
 
-def _schema_error(subtests: SubTests, error: OperationSchemaError, node_id: str) -> None:
+def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
     # `full_path` is always available in this case

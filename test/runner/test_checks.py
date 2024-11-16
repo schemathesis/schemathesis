@@ -15,8 +15,8 @@ from schemathesis.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.exceptions import OperationSchemaError
 from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
@@ -280,7 +280,7 @@ def test_invalid_schema_on_content_type_check(response_factory):
     case = models.Case(operation, generation_time=0.0)
     response = response_factory.requests(content_type="application/json")
     # Then an error should be risen
-    with pytest.raises(OperationSchemaError):
+    with pytest.raises(InvalidSchema):
         content_type_conformance(CTX, response, case)
 
 

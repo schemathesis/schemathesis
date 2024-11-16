@@ -14,7 +14,17 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.core.control import SkipTest
+from schemathesis.core.errors import (
+    InternalError,
+    InvalidHeadersExample,
+    InvalidRegexPattern,
+    InvalidRegexType,
+    InvalidSchema,
+    SerializationNotPossible,
+)
 from schemathesis.core.failures import Failure, FailureGroup, ResponseTimeExceeded
+from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, UnsupportedRecursiveReference
 
 from .... import targets
 from ...._compat import BaseExceptionGroup
@@ -24,18 +34,7 @@ from ...._hypothesis._builder import (
     get_non_serializable_mark,
     has_unsatisfied_example_mark,
 )
-from ....constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
-from ....exceptions import (
-    DeadlineExceeded,
-    InternalError,
-    InvalidHeadersExample,
-    InvalidRegularExpression,
-    NonCheckError,
-    OperationSchemaError,
-    RecursiveReferenceError,
-    SerializationNotPossible,
-    SkipTest,
-)
+from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
 from ....internal.checks import CheckContext
 from ....internal.exceptions import deduplicate_errors
 from ... import events
@@ -102,7 +101,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         result.mark_skipped(exc)
     except (FailureGroup, Failure):
         status = Status.failure
-    except NonCheckError:
+    except UnexpectedError:
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
         status = Status.error
         result.mark_errored()
@@ -139,7 +138,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             except InternalError as exc:
                 error = exc
         except ValidationError as exc:
-            error = OperationSchemaError.from_jsonschema_error(
+            error = InvalidSchema.from_jsonschema_error(
                 exc,
                 path=operation.path,
                 method=operation.method,
@@ -148,13 +147,13 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         result.add_error(error)
     except HypothesisRefResolutionError:
         status = Status.error
-        result.add_error(RecursiveReferenceError(RECURSIVE_REFERENCE_ERROR_MESSAGE))
+        result.add_error(UnsupportedRecursiveReference())
     except InvalidArgument as error:
         status = Status.error
         message = get_invalid_regular_expression_message(warnings)
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            result.add_error(InvalidRegularExpression.from_hypothesis_jsonschema_message(message))
+            result.add_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
         else:
             result.add_error(error)
     except hypothesis.errors.DeadlineExceeded as error:
@@ -162,16 +161,15 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         result.add_error(DeadlineExceeded.from_exc(error))
     except JsonSchemaError as error:
         status = Status.error
-        result.add_error(InvalidRegularExpression.from_schema_error(error, from_examples=False))
+        result.add_error(InvalidRegexPattern.from_schema_error(error, from_examples=False))
     except Exception as error:
         status = Status.error
         # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
         if str(error) == "first argument must be string or compiled pattern":
             result.add_error(
-                InvalidRegularExpression(
+                InvalidRegexType(
                     "Invalid `pattern` value: expected a string. "
                     "If your schema is in YAML, ensure `pattern` values are quoted",
-                    is_valid_type=False,
                 )
             )
         else:
@@ -195,7 +193,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     invalid_regex = get_invalid_regex_mark(test_function)
     if invalid_regex is not None and status != Status.error:
         status = Status.error
-        result.add_error(InvalidRegularExpression.from_schema_error(invalid_regex, from_examples=True))
+        result.add_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
     invalid_headers = get_invalid_example_headers_mark(test_function)
     if invalid_headers:
         status = Status.error
@@ -364,7 +362,7 @@ class ErrorCollector:
         # Exception value is not `None` and is a subclass of `Exception` at this point
         exc_val = cast(Exception, exc_val)
         self.errors.append(exc_val.with_traceback(exc_tb))
-        raise NonCheckError from None
+        raise UnexpectedError from None
 
 
 def cached_test_func(f: Callable) -> Callable:

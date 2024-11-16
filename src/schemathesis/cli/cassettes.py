@@ -170,7 +170,7 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
         if not checks:
             return "  checks: []"
         items = "\n".join(
-            f"    - name: '{check.name}'\n      status: '{check.value.name.upper()}'\n      message: {format_check_message(check.failure.title if check.failure else None)}"
+            f"    - name: '{check.name}'\n      status: '{check.status.name.upper()}'\n      message: {format_check_message(check.failure.title if check.failure else None)}"
             for check in checks
         )
         return f"""

@@ -14,6 +14,7 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.errors import LoaderError
 
 from .. import checks as checks_module
 from .. import contrib, experimental, generation, runner, service
@@ -29,7 +30,6 @@ from ..constants import (
     ISSUE_TRACKER_URL,
     WAIT_FOR_SCHEMA_ENV_VAR,
 )
-from ..exceptions import SchemaError
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..internal.checks import CheckConfig
@@ -1191,7 +1191,7 @@ def into_event_stream(
             network=network,
             service_client=service_client,
         ).execute()
-    except SchemaError as error:
+    except LoaderError as error:
         yield events.InternalError.from_schema_error(error)
     except Exception as exc:
         yield events.InternalError.from_exc(exc)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from inspect import getfullargspec
 from typing import TYPE_CHECKING, Any, Callable, NoReturn, Union
 
-from ..exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -38,7 +38,7 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[Callable],
         if hasattr(func, GIVEN_ARGS_MARKER):
 
             def wrapped_test(*_: Any, **__: Any) -> NoReturn:
-                raise UsageError(
+                raise IncorrectUsage(
                     f"You have applied `given` to the `{func.__name__}` test more than once, which "
                     "overrides the previous decorator. You need to pass all arguments to the same `given` call."
                 )

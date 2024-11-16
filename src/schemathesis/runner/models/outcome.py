@@ -17,7 +17,8 @@ if TYPE_CHECKING:
 
     import requests
 
-    from ...exceptions import SkipTest
+    from schemathesis.core.control import SkipTest
+
     from ...models import Case
 
 
@@ -90,7 +91,7 @@ class TestResultSet:
         for item in self.results:
             for check in item.checks:
                 output.setdefault(check.name, Counter())
-                output[check.name][check.value] += 1
+                output[check.name][check.status] += 1
                 output[check.name]["total"] += 1
         # Avoid using Counter, since its behavior could harm in other places:
         # `if not total["unknown"]:` - this will lead to the branch execution
@@ -157,17 +158,17 @@ class TestResult:
 
     @property
     def has_failures(self) -> bool:
-        return any(check.value == Status.failure for check in self.checks)
+        return any(check.status == Status.failure for check in self.checks)
 
     def add_success(self, *, name: str, case: Case, request: Request, response: Response) -> Check:
-        check = Check(name=name, value=Status.success, request=request, response=response, case=case)
+        check = Check(name=name, status=Status.success, request=request, response=response, case=case)
         self.checks.append(check)
         return check
 
     def add_failure(self, *, name: str, case: Case, request: Request, response: Response, failure: Failure) -> Check:
         check = Check(
             name=name,
-            value=Status.failure,
+            status=Status.failure,
             case=case,
             request=request,
             response=response,

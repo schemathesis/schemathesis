@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
-from .exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -46,4 +46,4 @@ def set_override_mark(test: Callable, override: CaseOverride) -> None:
 
 def check_no_override_mark(test: Callable) -> None:
     if hasattr(test, "_schemathesis_override"):
-        raise UsageError(f"`{test.__name__}` has already been decorated with `override`.")
+        raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `override`.")

@@ -8,7 +8,6 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.exceptions import OperationSchemaError
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.generation._hypothesis import get_single_example
 from schemathesis.models import APIOperation, Case, OperationDefinition
@@ -103,64 +102,6 @@ def test_no_body_in_get(swagger_20):
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
     assert strategies[0].example().body is NOT_SET
-
-
-@pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_invalid_body_in_get(swagger_20):
-    swagger_20.validate_schema = True
-    operation = APIOperation(
-        path="/foo",
-        method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
-        schema=swagger_20,
-        body=PayloadAlternatives(
-            [
-                OpenAPI20Body(
-                    {
-                        "name": "attributes",
-                        "in": "body",
-                        "required": True,
-                        "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
-                    },
-                    media_type="application/json",
-                )
-            ]
-        ),
-    )
-    with pytest.raises(OperationSchemaError, match=r"^GET requests should not contain body parameters."):
-        get_case_strategy(operation).example()
-
-
-@pytest.mark.hypothesis_nested
-def test_invalid_body_in_get_disable_validation(simple_schema):
-    schema = schemathesis.from_dict(simple_schema, validate_schema=False)
-    operation = APIOperation(
-        path="/foo",
-        method="GET",
-        definition=OperationDefinition({}, {}, "foo"),
-        schema=schema,
-        body=PayloadAlternatives(
-            [
-                OpenAPI20Body(
-                    {
-                        "name": "attributes",
-                        "in": "body",
-                        "required": True,
-                        "schema": {"required": ["foo"], "type": "object", "properties": {"foo": {"type": "string"}}},
-                    },
-                    media_type="application/json",
-                )
-            ]
-        ),
-    )
-    strategy = get_case_strategy(operation)
-
-    @given(strategy)
-    @settings(max_examples=1)
-    def test(case):
-        assert case.body is not None
-
-    test()
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

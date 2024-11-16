@@ -37,7 +37,11 @@ Generally, Schemathesis' generators try to create data without using filters to 
 
 ### `core/errors`
 
-Working with API errors, formatting, hydration, etc.
+Base error handling that is not tied to any specific API specification or execution context. Contains fundamental error types for:
+
+- Schema processing
+- Data serialization
+- Generic validation
 
 ### `core/checks`
 

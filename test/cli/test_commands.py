@@ -1088,19 +1088,6 @@ def test_colon_in_headers(cli, schema_url, app):
     assert app["incoming_requests"][0].headers[header] == value
 
 
-def test_get_request_with_body(ctx, cli, base_url, hypothesis_max_examples, schema_with_get_payload, snapshot_cli):
-    schema_path = ctx.makefile(schema_with_get_payload)
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--base-url={base_url}",
-            f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-            "--validate-schema=true",
-        )
-        == snapshot_cli
-    )
-
-
 @pytest.mark.openapi_version("3.0")
 def test_yaml_parsing_of_floats(cli, testdir, base_url, snapshot_cli):
     schema = """info:

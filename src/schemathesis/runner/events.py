@@ -4,7 +4,8 @@ import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
-from ..exceptions import SchemaError, SchemaErrorType
+from schemathesis.core.errors import LoaderError, LoaderErrorKind
+
 from ..internal.exceptions import format_exception
 from ..internal.result import Err, Ok, Result
 
@@ -202,7 +203,7 @@ class InternalError(ExecutionEvent):
 
     # Main error info
     type: InternalErrorType
-    subtype: SchemaErrorType | None
+    subtype: LoaderErrorKind | None
     title: str
     message: str
     extras: list[str]
@@ -213,11 +214,11 @@ class InternalError(ExecutionEvent):
     exception_with_traceback: str
 
     @classmethod
-    def from_schema_error(cls, error: SchemaError) -> InternalError:
+    def from_schema_error(cls, error: LoaderError) -> InternalError:
         return cls.with_exception(
             error,
             type_=InternalErrorType.SCHEMA,
-            subtype=error.type,
+            subtype=error.kind,
             title="Schema Loading Error",
             message=error.message,
             extras=error.extras,
@@ -239,7 +240,7 @@ class InternalError(ExecutionEvent):
         cls,
         exc: Exception,
         type_: InternalErrorType,
-        subtype: SchemaErrorType | None,
+        subtype: LoaderErrorKind | None,
         title: str,
         message: str,
         extras: list[str],

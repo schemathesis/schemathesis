@@ -8,7 +8,7 @@ from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.validators import Draft4Validator
 
 import schemathesis
-from schemathesis.exceptions import SchemaError
+from schemathesis.core.errors import LoaderError
 
 from .utils import as_param, get_schema, integer
 
@@ -772,7 +772,7 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
     def test(case):
         pass
 
-    with pytest.raises(SchemaError, match="Unresolvable JSON pointer in the schema: /components/schemas/Key8"):
+    with pytest.raises(LoaderError, match="Unresolvable JSON pointer in the schema: /components/schemas/Key8"):
         test()
 
 

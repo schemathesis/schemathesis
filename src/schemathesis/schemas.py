@@ -18,12 +18,12 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 
 from ._hypothesis._builder import create_test
 from ._hypothesis._given import GivenInput, given_proxy
 from ._pytest.markers import has_schemathesis_handle, set_schemathesis_handle
 from .auths import AuthStorage
-from .exceptions import OperationSchemaError, UsageError
 from .filters import (
     FilterSet,
     FilterValue,
@@ -228,7 +228,7 @@ class BaseSchema(Mapping):
 
     def get_all_operations(
         self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, OperationSchemaError], None, None]:
+    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(
@@ -253,7 +253,7 @@ class BaseSchema(Mapping):
         seed: int | None = None,
         as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
         _given_kwargs: dict[str, GivenInput] | None = None,
-    ) -> Generator[Result[tuple[APIOperation, Callable], OperationSchemaError], None, None]:
+    ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
         """Generate all operations and Hypothesis tests for them."""
         for result in self.get_all_operations(generation_config=generation_config):
             if isinstance(result, Ok):
@@ -288,7 +288,7 @@ class BaseSchema(Mapping):
             if has_schemathesis_handle(func):
 
                 def wrapped_test(*_: Any, **__: Any) -> NoReturn:
-                    raise UsageError(
+                    raise IncorrectUsage(
                         f"You have applied `parametrize` to the `{func.__name__}` test more than once, which "
                         "overrides the previous decorator. "
                         "The `parametrize` decorator could be applied to the same function at most once."

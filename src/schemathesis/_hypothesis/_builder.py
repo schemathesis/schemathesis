@@ -14,12 +14,12 @@ from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 
 from .. import _patches
 from ..auths import get_auth_storage_from_test
 from ..constants import DEFAULT_DEADLINE
 from ..core.validation import has_invalid_characters, is_latin_1_encodable
-from ..exceptions import OperationSchemaError, SerializationNotPossible
 from ..experimental import COVERAGE_PHASE
 from ..generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
@@ -163,7 +163,7 @@ def add_examples(
             for strategy in operation.get_strategies_from_examples(as_strategy_kwargs=as_strategy_kwargs)
         ]
     except (
-        OperationSchemaError,
+        InvalidSchema,
         HypothesisRefResolutionError,
         Unsatisfiable,
         SerializationNotPossible,

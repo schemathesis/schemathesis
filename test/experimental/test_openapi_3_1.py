@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
 from schemathesis import from_asgi, from_dict
+from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import FailureGroup
-from schemathesis.exceptions import SchemaError
 
 
 def test_works_with_fastapi(fastapi_app):
@@ -76,7 +76,7 @@ def test_openapi_3_1_schema_validation():
             }
         },
     }
-    with pytest.raises(SchemaError):
+    with pytest.raises(LoaderError):
         from_dict(raw_schema, validate_schema=True, force_schema_version="30")
 
 

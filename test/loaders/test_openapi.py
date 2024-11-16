@@ -7,7 +7,7 @@ import pytest
 from flask import Flask, Response
 
 import schemathesis
-from schemathesis.exceptions import SchemaError
+from schemathesis.core.errors import LoaderError
 from schemathesis.specs.openapi import loaders
 from schemathesis.specs.openapi.loaders import NON_STRING_OBJECT_KEY_MESSAGE, SCHEMA_LOADING_ERROR, SCHEMA_SYNTAX_ERROR
 from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
@@ -49,7 +49,7 @@ def test_force_open_api_version(version, schema, expected):
     ],
 )
 def test_unsupported_openapi_version(version, expected):
-    with pytest.raises(SchemaError, match=expected):
+    with pytest.raises(LoaderError, match=expected):
         loaders.from_dict({"openapi": version}, validate_schema=False)
 
 
@@ -88,7 +88,7 @@ def test_number_deserializing(testdir):
 def test_unsupported_type():
     # When Schemathesis can't detect the Open API spec version
     with pytest.raises(
-        SchemaError, match="Unable to determine the Open API version as it's not specified in the document."
+        LoaderError, match="Unable to determine the Open API version as it's not specified in the document."
     ):
         # Then it raises an error
         loaders.from_dict({})
@@ -126,7 +126,7 @@ def test_invalid_content_type(httpserver, content_type, expected: str):
     schema_url = httpserver.url_for(path)
     # And loading cause an error
     # Then it should be suggested to the user that they should provide JSON or YAML
-    with pytest.raises(SchemaError, match=expected):
+    with pytest.raises(LoaderError, match=expected):
         schemathesis.from_uri(schema_url)
 
 
@@ -159,7 +159,7 @@ def test_numeric_status_codes(ctx):
     )
     # And schema validation is enabled
     # Then Schemathesis reports an error about numeric status codes
-    with pytest.raises(SchemaError, match="Numeric HTTP status codes detected in your YAML schema") as exc:
+    with pytest.raises(LoaderError, match="Numeric HTTP status codes detected in your YAML schema") as exc:
         schemathesis.from_dict(schema, validate_schema=True)
     # And shows all locations of these keys
     assert " - 200 at schema['paths']['/foo']['get']['responses']" in exc.value.message
@@ -171,7 +171,7 @@ def test_non_string_keys(ctx):
     schema = ctx.openapi.build_schema({})
     schema[True] = 42
     # Then it should be reported with a proper message
-    with pytest.raises(SchemaError, match=NON_STRING_OBJECT_KEY_MESSAGE):
+    with pytest.raises(LoaderError, match=NON_STRING_OBJECT_KEY_MESSAGE):
         schemathesis.from_dict(schema, validate_schema=True)
 
 
@@ -198,7 +198,7 @@ def test_parsing_errors_uri(schema_url, content_type, payload, expected, app_run
 
     port = app_runner.run_flask_app(app)
 
-    with pytest.raises(SchemaError) as exc:
+    with pytest.raises(LoaderError) as exc:
         schemathesis.from_uri(f"http://127.0.0.1:{port}/{schema_url}")
     assert exc.value.extras == expected
 
@@ -214,7 +214,7 @@ def test_parsing_errors_path(testdir, schema_path, payload, expected):
     name, ext = schema_path.split(".")
     schema_file = testdir.makefile(f".{ext}", **{name: payload})
 
-    with pytest.raises(SchemaError) as exc:
+    with pytest.raises(LoaderError) as exc:
         schemathesis.from_path(str(schema_file))
 
     assert exc.value.extras == expected

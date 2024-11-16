@@ -13,11 +13,12 @@ from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.control import SkipTest
+from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.generator.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths, serializers
 from ..._hypothesis._builder import prepare_urlencoded
-from ...exceptions import BodyInGetRequestError, SerializationNotPossible, SkipTest
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.copy import fast_deepcopy
@@ -117,8 +118,6 @@ def get_case_strategy(
             raise SerializationNotPossible.from_media_types(*all_media_types)
         body_ = ValueContainer(value=body, location="body", generator=None)
 
-    if operation.schema.validate_schema and operation.method.upper() == "GET" and operation.body:
-        raise BodyInGetRequestError("GET requests should not contain body parameters.")
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if skip_on_not_negated:

@@ -10,9 +10,9 @@ from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.errors import IncorrectUsage
 
 from ..constants import NO_LINKS_ERROR_MESSAGE
-from ..exceptions import UsageError
 from ..internal.checks import CheckFunction
 from ..models import APIOperation, Case
 from .config import _default_hypothesis_settings_factory
@@ -60,7 +60,7 @@ class APIStateMachine(RuleBasedStateMachine):
             super().__init__()  # type: ignore
         except InvalidDefinition as exc:
             if "defines no rules" in str(exc):
-                raise UsageError(NO_LINKS_ERROR_MESSAGE) from None
+                raise IncorrectUsage(NO_LINKS_ERROR_MESSAGE) from None
             raise
         self.setup()
 

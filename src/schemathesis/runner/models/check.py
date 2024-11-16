@@ -20,7 +20,7 @@ class Check:
     """Single check run result."""
 
     name: str
-    value: Status
+    status: Status
     request: Request
     response: Response
     case: Case
@@ -53,7 +53,7 @@ class Check:
     def asdict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "value": self.value,
+            "status": self.status,
             "request": {
                 "method": self.request.method,
                 "uri": self.request.uri,

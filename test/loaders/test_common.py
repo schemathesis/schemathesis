@@ -9,8 +9,8 @@ from requests import Response
 from yarl import URL
 
 import schemathesis
+from schemathesis.core.errors import LoaderError
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.exceptions import SchemaError
 
 
 @pytest.mark.parametrize(
@@ -45,7 +45,7 @@ def default_schema_url():
 def test_port_override(request, loader, url_fixture, expected):
     url = request.getfixturevalue(url_fixture)
     # When the user overrides `port`
-    with pytest.raises(SchemaError) as exc:
+    with pytest.raises(LoaderError) as exc:
         loader(url, port=8081)
     if platform.system() == "Windows":
         detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
