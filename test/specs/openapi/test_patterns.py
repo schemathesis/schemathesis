@@ -19,6 +19,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("a", None, 3, "(a){1,3}"),
         ("a", 3, 3, "(a){3}"),
         ("a", 0, 3, "(a){1,3}"),
+        ("}?", 1, None, "(}){1}"),
         # Simple quantifiers on a simple group
         (".*", None, 3, "(.){0,3}"),
         (".*", 0, 3, "(.){0,3}"),
@@ -63,6 +64,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("[a-z]*$", 3, 5, "([a-z]){3,5}$"),
         ("[a-z]+$", 0, 5, "([a-z]){1,5}$"),
         (r"\d*", 1, None, r"(\d){1,}"),
+        (r"0\A", 1, None, r"(0){1,}\A"),
         # Noop
         ("abc*def*", 1, 3, "abc*def*"),
         ("[bc]*[de]*", 1, 3, "[bc]*[de]*"),
@@ -72,6 +74,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("b", 0, 0, "b"),
         ("b$", None, None, "b$"),
         ("b$", 0, None, "b$"),
+        ("}?", 0, None, "}?"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):

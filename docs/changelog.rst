@@ -1,8 +1,42 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.38.5...HEAD>` - TBD
+:version:`Unreleased <v3.38.7...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.38.7:
+
+:version:`3.38.7 <v3.38.6...v3.38.7>` - 2024-11-16
+--------------------------------------------------
+
+**Added**
+
+- Generating duplicate query parameters during the coverage phase.
+- Generating cases with arbitrary HTTP methods during the coverage phase.
+
+**Fixed**
+
+- Not sending negated query parameters in some cases during the coverage phase.
+- Incorrect ``data_generation_method`` reported during the coverage phase in some cases.
+
+.. _v3.38.6:
+
+:version:`3.38.6 <v3.38.5...v3.38.6>` - 2024-11-12
+--------------------------------------------------
+
+**Added**
+
+- Support arrays for headers & path parameters during the coverage phase.
+
+**Changed**
+
+- Make the ``ignored_auth`` stricter by always checking for the 401 status exactly instead of any non-200.
+
+**Fixed**
+
+- Missed generating booleans in some cases during the coverage phase.
+- Populate ``meta.parameter`` in more cases during the coverage phase.
+- Incorrect quantifiers merging for some regex patterns.
 
 .. _v3.38.5:
 

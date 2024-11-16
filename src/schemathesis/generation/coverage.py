@@ -40,7 +40,7 @@ NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
     st.none() | st.booleans() | NUMERIC_STRATEGY | st.text(), json_recursive_strategy
 )
-ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY)
+ARRAY_STRATEGY: st.SearchStrategy = st.lists(JSON_STRATEGY, min_size=2)
 OBJECT_STRATEGY: st.SearchStrategy = st.dictionaries(st.text(), JSON_STRATEGY)
 
 
@@ -64,23 +64,31 @@ class GeneratedValue:
     value: Any
     data_generation_method: DataGenerationMethod
     description: str
+    parameter: str | None
     location: str | None
 
-    __slots__ = ("value", "data_generation_method", "description", "location")
+    __slots__ = ("value", "data_generation_method", "description", "parameter", "location")
 
     @classmethod
     def with_positive(cls, value: Any, *, description: str) -> GeneratedValue:
         return cls(
-            value=value, data_generation_method=DataGenerationMethod.positive, description=description, location=None
+            value=value,
+            data_generation_method=DataGenerationMethod.positive,
+            description=description,
+            location=None,
+            parameter=None,
         )
 
     @classmethod
-    def with_negative(cls, value: Any, *, description: str, location: str) -> GeneratedValue:
+    def with_negative(
+        cls, value: Any, *, description: str, location: str, parameter: str | None = None
+    ) -> GeneratedValue:
         return cls(
             value=value,
             data_generation_method=DataGenerationMethod.negative,
             description=description,
             location=location,
+            parameter=parameter,
         )
 
 
@@ -219,11 +227,11 @@ def _encode(o: Any) -> str:
     return "".join(_iterencode(o, 0))
 
 
-def _to_hashable_key(value: T, _encode: Callable = _encode) -> T | tuple[type, str]:
+def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str | T]:
     if isinstance(value, (dict, list)):
         serialized = _encode(value)
         return (type(value), serialized)
-    return value
+    return (type(value), value)
 
 
 def _cover_positive_for_type(
@@ -317,9 +325,9 @@ def cover_schema_iter(
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.location(key):
                 if key == "enum":
-                    yield from _negative_enum(ctx, value)
+                    yield from _negative_enum(ctx, value, seen)
                 elif key == "const":
-                    for value_ in _negative_enum(ctx, [value]):
+                    for value_ in _negative_enum(ctx, [value], seen):
                         k = _to_hashable_key(value_.value)
                         if k not in seen:
                             yield value_
@@ -426,7 +434,8 @@ def cover_schema_iter(
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
-                        yield from cover_schema_iter(nctx, value[0], seen)
+                        with nctx.location(0):
+                            yield from cover_schema_iter(nctx, value[0], seen)
                     else:
                         with _ignore_unfixable():
                             canonical = canonicalish(schema)
@@ -736,13 +745,20 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
         yield next(combinations(optional, size))
 
 
-def _negative_enum(ctx: CoverageContext, value: list) -> Generator[GeneratedValue, None, None]:
+def _negative_enum(
+    ctx: CoverageContext, value: list, seen: set[Any | tuple[type, str]]
+) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
-        return x not in value
+        if x in value:
+            return False
+        _hashed = _to_hashable_key(x)
+        return _hashed not in seen
 
-    strategy = JSON_STRATEGY.filter(is_not_in_value)
-    # The exact negative value is not important here
-    yield NegativeValue(ctx.generate_from(strategy), description="Invalid enum value", location=ctx.current_location)
+    strategy = (st.none() | st.booleans() | NUMERIC_STRATEGY | st.text()).filter(is_not_in_value)
+    value = ctx.generate_from(strategy)
+    yield NegativeValue(value, description="Invalid enum value", location=ctx.current_location)
+    hashed = _to_hashable_key(value)
+    seen.add(hashed)
 
 
 def _negative_properties(
@@ -756,6 +772,7 @@ def _negative_properties(
                     {**template, key: value.value},
                     description=f"Object with invalid '{key}' value: {value.description}",
                     location=nctx.current_location,
+                    parameter=key,
                 )
 
 
@@ -837,6 +854,7 @@ def _negative_required(
             {k: v for k, v in template.items() if k != key},
             description=f"Missing required property: {key}",
             location=ctx.current_location,
+            parameter=key,
         )
 
 

@@ -221,6 +221,15 @@ def _iter_coverage_cases(
     from ..specs.openapi.constants import LOCATION_TO_CONTAINER
     from ..specs.openapi.examples import find_in_responses, find_matching_in_responses
 
+    def _stringify_value(val: Any, location: str) -> str | list[str]:
+        if isinstance(val, list):
+            if location == "query":
+                # Having a list here ensures there will be multiple query parameters wit the same name
+                return [json.dumps(item) for item in val]
+            # use comma-separated values style for arrays
+            return ",".join(json.dumps(sub) for sub in val)
+        return json.dumps(val)
+
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
     template: dict[str, Any] = {}
     responses = find_in_responses(operation)
@@ -237,8 +246,8 @@ def _iter_coverage_cases(
         location = parameter.location
         name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        if location in ("header", "cookie") and not isinstance(value.value, str):
-            container[name] = json.dumps(value.value)
+        if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
+            container[name] = _stringify_value(value.value, location)
         else:
             container[name] = value.value
         generators[(location, name)] = gen
@@ -283,12 +292,13 @@ def _iter_coverage_cases(
         case.data_generation_method = DataGenerationMethod.positive
         case.meta = _make_meta(description="Default positive test case")
         yield case
+
     for (location, name), gen in generators.items():
         container_name = LOCATION_TO_CONTAINER[location]
         container = template[container_name]
         for value in gen:
-            if location in ("header", "cookie") and not isinstance(value.value, str):
-                generated = json.dumps(value.value)
+            if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
+                generated = _stringify_value(value.value, location)
             else:
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
@@ -300,8 +310,32 @@ def _iter_coverage_cases(
                 parameter_location=location,
             )
             yield case
-    # Generate missing required parameters
     if DataGenerationMethod.negative in data_generation_methods:
+        # Generate HTTP methods that are not specified in the spec
+        methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"} - set(
+            operation.schema[operation.path]
+        )
+        for method in methods:
+            case = operation.make_case(**template)
+            case._explicit_method = method
+            case.data_generation_method = DataGenerationMethod.negative
+            case.meta = _make_meta(description=f"Unspecified HTTP method: {method}")
+            yield case
+        # Generate duplicate query parameters
+        if operation.query:
+            container = template["query"]
+            for parameter in operation.query:
+                value = container[parameter.name]
+                case = operation.make_case(**{**template, "query": {**container, parameter.name: [value, value]}})
+                case.data_generation_method = DataGenerationMethod.negative
+                case.meta = _make_meta(
+                    description=f"Duplicate `{parameter.name}` query parameter",
+                    location=None,
+                    parameter=parameter.name,
+                    parameter_location="query",
+                )
+                yield case
+        # Generate missing required parameters
         for parameter in operation.iter_parameters():
             if parameter.is_required and parameter.location != "path":
                 name = parameter.name
@@ -314,7 +348,7 @@ def _iter_coverage_cases(
                 case.data_generation_method = DataGenerationMethod.negative
                 case.meta = _make_meta(
                     description=f"Missing `{name}` at {location}",
-                    location=parameter.location,
+                    location=None,
                     parameter=name,
                     parameter_location=location,
                 )
@@ -337,19 +371,28 @@ def _iter_coverage_cases(
         optional = sorted(all_params - required)
 
         # Helper function to create and yield a case
-        def make_case(container_values: dict, description: str, _location: str, _container_name: str) -> Case:
-            if _location in ("header", "cookie"):
+        def make_case(
+            container_values: dict,
+            description: str,
+            _location: str,
+            _container_name: str,
+            _parameter: str | None,
+            _data_generation_method: DataGenerationMethod,
+        ) -> Case:
+            if _location in ("header", "cookie", "path", "query"):
                 container = {
-                    name: json.dumps(val) if not isinstance(val, str) else val for name, val in container_values.items()
+                    name: _stringify_value(val, _location) if not isinstance(val, str) else val
+                    for name, val in container_values.items()
                 }
             else:
                 container = container_values
 
             case = operation.make_case(**{**template, _container_name: container})
-            case.data_generation_method = DataGenerationMethod.positive
+            case.data_generation_method = _data_generation_method
             case.meta = _make_meta(
                 description=description,
-                location=_location,
+                location=None,
+                parameter=_parameter,
                 parameter_location=_location,
             )
             return case
@@ -374,12 +417,21 @@ def _iter_coverage_cases(
                 coverage.CoverageContext(data_generation_methods=[DataGenerationMethod.negative]),
                 subschema,
             ):
-                yield make_case(more.value, more.description, _location, _container_name)
+                yield make_case(
+                    more.value,
+                    more.description,
+                    _location,
+                    _container_name,
+                    more.parameter,
+                    DataGenerationMethod.negative,
+                )
 
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            yield make_case(only_required, "Only required properties", location, container_name)
+            yield make_case(
+                only_required, "Only required properties", location, container_name, None, DataGenerationMethod.positive
+            )
             if DataGenerationMethod.negative in data_generation_methods:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 yield from _yield_negative(subschema, location, container_name)
@@ -388,7 +440,14 @@ def _iter_coverage_cases(
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
             if combo != base_container:
-                yield make_case(combo, f"All required properties and optional '{opt_param}'", location, container_name)
+                yield make_case(
+                    combo,
+                    f"All required properties and optional '{opt_param}'",
+                    location,
+                    container_name,
+                    None,
+                    DataGenerationMethod.positive,
+                )
                 if DataGenerationMethod.negative in data_generation_methods:
                     subschema = _combination_schema(combo, required, parameter_set)
                     yield from _yield_negative(subschema, location, container_name)
@@ -399,7 +458,14 @@ def _iter_coverage_cases(
                 for combination in combinations(optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
                     if combo != base_container:
-                        yield make_case(combo, f"All required and {size} optional properties", location, container_name)
+                        yield make_case(
+                            combo,
+                            f"All required and {size} optional properties",
+                            location,
+                            container_name,
+                            None,
+                            DataGenerationMethod.positive,
+                        )
 
 
 def _make_meta(

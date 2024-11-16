@@ -89,7 +89,9 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     assert len(interactions[1]["checks"]) == 1
     for interaction in interactions:
         if interaction["phase"] == "coverage":
-            if interaction["data_generation_method"] == "negative":
+            if interaction["data_generation_method"] == "negative" and not interaction["meta"][
+                "description"
+            ].startswith("Unspecified"):
                 assert interaction["meta"]["location"] is not None
                 assert interaction["meta"]["parameter"] is not None
                 assert interaction["meta"]["parameter_location"] is not None
