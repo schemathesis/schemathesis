@@ -4,7 +4,8 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable
 
-from ...exceptions import OperationSchemaError
+from schemathesis.core.errors import InvalidSchema
+
 from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
@@ -369,7 +370,7 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
     # In Open API 3.0, there could be "schema" or "content" field. They are mutually exclusive.
     if "schema" in data:
         if not isinstance(data["schema"], dict):
-            raise OperationSchemaError(
+            raise InvalidSchema(
                 INVALID_SCHEMA_MESSAGE.format(
                     location=data.get("in", ""), name=data.get("name", "<UNKNOWN>"), schema=data["schema"]
                 ),
@@ -383,7 +384,7 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
     try:
         content = data["content"]
     except KeyError as exc:
-        raise OperationSchemaError(
+        raise InvalidSchema(
             MISSING_SCHEMA_OR_CONTENT_MESSAGE.format(location=data.get("in", ""), name=data.get("name", "<UNKNOWN>")),
             path=operation.path,
             method=operation.method,

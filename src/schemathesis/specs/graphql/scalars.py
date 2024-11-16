@@ -3,7 +3,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from ...exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 
 if TYPE_CHECKING:
     import graphql
@@ -21,9 +21,11 @@ def scalar(name: str, strategy: st.SearchStrategy[graphql.ValueNode]) -> None:
     from hypothesis.strategies import SearchStrategy
 
     if not isinstance(name, str):
-        raise UsageError(f"Scalar name {name!r} must be a string")
+        raise IncorrectUsage(f"Scalar name {name!r} must be a string")
     if not isinstance(strategy, SearchStrategy):
-        raise UsageError(f"{strategy!r} must be a Hypothesis strategy which generates AST nodes matching this scalar")
+        raise IncorrectUsage(
+            f"{strategy!r} must be a Hypothesis strategy which generates AST nodes matching this scalar"
+        )
     CUSTOM_SCALARS[name] = strategy
 
 

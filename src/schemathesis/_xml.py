@@ -5,9 +5,9 @@ from __future__ import annotations
 from io import StringIO
 from typing import Any, Dict, List, Union
 
+from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.generator.filters import is_valid_xml
 
-from .exceptions import UnboundPrefixError
 from .internal.copy import fast_deepcopy
 
 Primitive = Union[str, int, float, bool, None]
@@ -68,7 +68,7 @@ def _validate_prefix(options: dict[str, Any], namespace_stack: list[str]) -> Non
     try:
         prefix = options["prefix"]
         if prefix not in namespace_stack:
-            raise UnboundPrefixError(prefix)
+            raise UnboundPrefix(prefix)
     except KeyError:
         pass
 

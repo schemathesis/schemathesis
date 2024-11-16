@@ -17,7 +17,8 @@ from typing import (
     runtime_checkable,
 )
 
-from .exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
+
 from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 
 if TYPE_CHECKING:
@@ -436,13 +437,13 @@ class AuthStorage(Generic[Auth]):
         if not hasattr(test, AUTH_STORAGE_ATTRIBUTE_NAME):
             setattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, cls())
         else:
-            raise UsageError(f"`{test.__name__}` has already been decorated with `apply`.")
+            raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `apply`.")
         return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME)
 
     def set(self, case: Case, context: AuthContext) -> None:
         """Set authentication data on a generated test case."""
         if not self.is_defined:
-            raise UsageError("No auth provider is defined.")
+            raise IncorrectUsage("No auth provider is defined.")
         for provider in self.providers:
             data: Auth | None = provider.get(case, context)
             if data is not None:

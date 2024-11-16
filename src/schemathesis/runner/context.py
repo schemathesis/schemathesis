@@ -13,7 +13,8 @@ from .models import TestResult, TestResultSet
 if TYPE_CHECKING:
     import threading
 
-    from ..exceptions import OperationSchemaError
+    from schemathesis.core.errors import InvalidSchema
+
     from ..models import Case
     from . import events
     from .config import EngineConfig
@@ -107,7 +108,7 @@ class EngineContext:
     def add_result(self, result: TestResult) -> None:
         self.data.append(result)
 
-    def add_error(self, error: OperationSchemaError) -> None:
+    def add_error(self, error: InvalidSchema) -> None:
         self.data.errors.append(EngineErrorInfo(error, title=error.full_path))
 
     def add_warning(self, message: str) -> None:

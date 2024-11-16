@@ -1011,7 +1011,6 @@ def test_negative_combinators(nctx, schema, expected):
             assert_not_conform(covered, schema)
             break
     else:
-        print(covered)
         pytest.fail("Expected value didn't match")
 
 

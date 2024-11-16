@@ -4,7 +4,7 @@ import pytest
 
 import schemathesis
 from schemathesis import filters
-from schemathesis.exceptions import UsageError
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.models import APIOperation
 
 RAW_SCHEMA = {
@@ -206,7 +206,7 @@ def test_exclude_custom(args, kwargs, expected):
 
 
 def test_sanity_checks():
-    with pytest.raises(UsageError, match=filters.ERROR_EMPTY_FILTER):
+    with pytest.raises(IncorrectUsage, match=filters.ERROR_EMPTY_FILTER):
         filters.FilterSet().include()
 
 
@@ -237,11 +237,11 @@ def test_repeating_filter(method, kwargs):
     # Adding the same filter twice is an error
     filter_set = filters.FilterSet()
     filter_set.include(**kwargs)
-    with pytest.raises(UsageError, match=filters.ERROR_FILTER_EXISTS):
+    with pytest.raises(IncorrectUsage, match=filters.ERROR_FILTER_EXISTS):
         method(filter_set, **kwargs)
 
 
 def test_forbid_value_and_auth():
     filter_set = filters.FilterSet()
-    with pytest.raises(UsageError, match=filters.ERROR_EXPECTED_AND_REGEX):
+    with pytest.raises(IncorrectUsage, match=filters.ERROR_EXPECTED_AND_REGEX):
         filter_set.include(method="POST", method_regex="GET")

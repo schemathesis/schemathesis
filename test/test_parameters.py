@@ -5,7 +5,7 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis.errors import NoSuchExample
 
 import schemathesis
-from schemathesis.exceptions import OperationSchemaError
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 
@@ -407,22 +407,6 @@ def test_date_deserializing(ctx):
     test()
 
 
-def test_get_request_with_body(testdir, schema_with_get_payload):
-    # When schema defines a payload for GET request
-    # And schema validation is turned on
-    testdir.make_test(
-        """
-@schema.parametrize()
-def test_(case):
-    pass
-        """,
-        schema=schema_with_get_payload,
-    )
-    # Then an error should be propagated with a relevant error message
-    result = testdir.run_and_assert(failed=1)
-    result.stdout.re_match_lines([r"E +BodyInGetRequestError: GET requests should not contain body parameters."])
-
-
 def test_json_media_type(testdir):
     # When API operation expects a JSON-compatible media type
     testdir.make_test(
@@ -612,7 +596,7 @@ def test_missing_content_and_schema(ctx, location):
 
     # Then the proper error should be shown
     with pytest.raises(
-        OperationSchemaError,
+        InvalidSchema,
         match=f'Can not generate data for {location} parameter "X-Foo"! '
         "It should have either `schema` or `content` keywords defined",
     ):

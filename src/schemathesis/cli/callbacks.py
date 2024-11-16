@@ -12,7 +12,9 @@ from urllib.parse import urlparse
 
 import click
 
-from .. import exceptions, experimental, throttling
+from schemathesis import errors
+
+from .. import experimental, throttling
 from ..constants import TRUE_VALUES
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from ..generation import DataGenerationMethod
@@ -127,7 +129,7 @@ def validate_rate_limit(ctx: click.core.Context, param: click.core.Parameter, ra
     try:
         throttling.parse_units(raw_value)
         return raw_value
-    except exceptions.UsageError as exc:
+    except errors.IncorrectUsage as exc:
         raise click.UsageError(exc.args[0]) from exc
 
 
