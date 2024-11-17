@@ -40,19 +40,16 @@ class Mark(Generic[T]):
 
     def get(self, func: Callable) -> T | None:
         """Get marker value if it's set."""
-        try:
-            metadata = getattr(func, METADATA_ATTR, None)
-            if metadata is None:
-                return self._get_default()
-            value = getattr(metadata, self.attr_name, NOT_SET)
-            if value is NOT_SET:
-                return self._get_default()
-            assert not isinstance(value, NotSet)
-            if self._check_value(value):
-                return value
+        metadata = getattr(func, METADATA_ATTR, None)
+        if metadata is None:
             return self._get_default()
-        except Exception:
+        value = getattr(metadata, self.attr_name, NOT_SET)
+        if value is NOT_SET:
             return self._get_default()
+        assert not isinstance(value, NotSet)
+        if self._check_value(value):
+            return value
+        return self._get_default()
 
     def set(self, func: Callable, value: T) -> None:
         """Set marker value, creating metadata if needed."""
@@ -63,10 +60,7 @@ class Mark(Generic[T]):
 
     def is_set(self, func: Callable) -> bool:
         """Check if function has metadata with this marker set."""
-        try:
-            metadata = getattr(func, METADATA_ATTR, None)
-            if metadata is None:
-                return False
-            return hasattr(metadata, self.attr_name)
-        except Exception:
+        metadata = getattr(func, METADATA_ATTR, None)
+        if metadata is None:
             return False
+        return hasattr(metadata, self.attr_name)

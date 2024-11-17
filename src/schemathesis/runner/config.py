@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..service.client import ServiceClient
     from ..stateful import Stateful
     from ..targets import Target
-    from ..types import RawAuth, RequestCert
 
 
 @dataclass
@@ -38,13 +37,13 @@ class ExecutionConfig:
 class NetworkConfig:
     """Network-related configuration."""
 
-    auth: RawAuth | None = None
+    auth: tuple[str, str] | None = None
     auth_type: str | None = None
     headers: dict[str, Any] | None = None
     timeout: int | None = None
     tls_verify: bool | str = True
     proxy: str | None = None
-    cert: RequestCert | None = None
+    cert: str | tuple[str, str] | None = None
 
 
 @dataclass

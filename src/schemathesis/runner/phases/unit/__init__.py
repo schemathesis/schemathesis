@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from requests.auth import HTTPDigestAuth
 
     from ....schemas import APIOperation
-    from ....types import RawAuth
     from ...context import EngineContext
 
 WORKER_TIMEOUT = 0.1
@@ -163,7 +162,7 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
 
 
 @contextmanager
-def get_session(auth: HTTPDigestAuth | RawAuth | None = None) -> Generator[Session, None, None]:
+def get_session(auth: HTTPDigestAuth | tuple[str, str] | None = None) -> Generator[Session, None, None]:
     from requests import Session
 
     with Session() as session:

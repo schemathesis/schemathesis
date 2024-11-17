@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import io
 import json
-import pathlib
 import re
+from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, cast
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 
@@ -24,7 +24,6 @@ from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...transports.content_types import is_json_media_type, is_yaml_media_type
 from ...transports.headers import setup_default_headers
-from ...types import PathLike, Specification
 from . import definitions, validation
 
 if TYPE_CHECKING:
@@ -44,13 +43,13 @@ def _is_json_response(response: GenericResponse) -> bool:
     return False
 
 
-def _has_suffix(path: PathLike, suffix: str) -> bool:
+def _has_suffix(path: Path | str, suffix: str) -> bool:
     if isinstance(path, str):
         return path.endswith(suffix)
     return path.suffix == suffix
 
 
-def _is_json_path(path: PathLike) -> bool:
+def _is_json_path(path: Path | str) -> bool:
     return _has_suffix(path, ".json")
 
 
@@ -62,12 +61,12 @@ def _is_yaml_response(response: GenericResponse) -> bool:
     return False
 
 
-def _is_yaml_path(path: PathLike) -> bool:
+def _is_yaml_path(path: Path | str) -> bool:
     return _has_suffix(path, ".yaml") or _has_suffix(path, ".yml")
 
 
 def from_path(
-    path: PathLike,
+    path: Path | str,
     *,
     app: Any = None,
     base_url: str | None = None,
@@ -95,7 +94,7 @@ def from_path(
             data_generation_methods=data_generation_methods,
             generation_config=generation_config,
             output_config=output_config,
-            location=pathlib.Path(path).absolute().as_uri(),
+            location=Path(path).absolute().as_uri(),
             rate_limit=rate_limit,
             sanitize_output=sanitize_output,
             __expects_json=_is_json_path(path),
