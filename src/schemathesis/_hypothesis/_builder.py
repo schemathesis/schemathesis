@@ -13,11 +13,13 @@ from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.auths import AuthStorageMark
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
+from schemathesis.core.marks import Mark
+from schemathesis.hooks import HookDispatcherMark
 
 from .. import _patches
-from ..auths import get_auth_storage_from_test
 from ..constants import DEFAULT_DEADLINE
 from ..core.validation import has_invalid_characters, is_latin_1_encodable
 from ..experimental import COVERAGE_PHASE
@@ -50,8 +52,8 @@ def create_test(
     _given_kwargs: dict[str, GivenInput] | None = None,
 ) -> Callable:
     """Create a Hypothesis test."""
-    hook_dispatcher = getattr(test, "_schemathesis_hooks", None)
-    auth_storage = get_auth_storage_from_test(test)
+    hook_dispatcher = HookDispatcherMark.get(test)
+    auth_storage = AuthStorageMark.get(test)
     strategies = []
     skip_on_not_negated = len(data_generation_methods) == 1 and DataGenerationMethod.negative in data_generation_methods
     as_strategy_kwargs = as_strategy_kwargs or {}
@@ -179,11 +181,11 @@ def add_examples(
         # Still, we allow running user-defined hooks
         examples = []
         if isinstance(exc, Unsatisfiable):
-            add_unsatisfied_example_mark(test, exc)
+            UnsatisfiableExampleMark.set(test, exc)
         if isinstance(exc, SerializationNotPossible):
-            add_non_serializable_mark(test, exc)
+            NonSerializableMark.set(test, exc)
         if isinstance(exc, SchemaError):
-            add_invalid_regex_mark(test, exc)
+            InvalidRegexMark.set(test, exc)
     context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
     operation.schema.hooks.dispatch("before_add_examples", context, examples)
@@ -194,7 +196,7 @@ def add_examples(
         if example.headers is not None:
             invalid_headers = dict(find_invalid_headers(example.headers))
             if invalid_headers:
-                add_invalid_example_header_mark(original_test, invalid_headers)
+                InvalidHeadersExampleMark.set(original_test, invalid_headers)
                 continue
         if example.media_type is not None:
             try:
@@ -517,33 +519,7 @@ def prepare_urlencoded(data: Any) -> Any:
     return data
 
 
-def add_unsatisfied_example_mark(test: Callable, exc: Unsatisfiable) -> None:
-    test._schemathesis_unsatisfied_example = exc  # type: ignore
-
-
-def has_unsatisfied_example_mark(test: Callable) -> bool:
-    return hasattr(test, "_schemathesis_unsatisfied_example")
-
-
-def add_non_serializable_mark(test: Callable, exc: SerializationNotPossible) -> None:
-    test._schemathesis_non_serializable = exc  # type: ignore
-
-
-def get_non_serializable_mark(test: Callable) -> SerializationNotPossible | None:
-    return getattr(test, "_schemathesis_non_serializable", None)
-
-
-def get_invalid_regex_mark(test: Callable) -> SchemaError | None:
-    return getattr(test, "_schemathesis_invalid_regex", None)
-
-
-def add_invalid_regex_mark(test: Callable, exc: SchemaError) -> None:
-    test._schemathesis_invalid_regex = exc  # type: ignore
-
-
-def get_invalid_example_headers_mark(test: Callable) -> dict[str, str] | None:
-    return getattr(test, "_schemathesis_invalid_example_headers", None)
-
-
-def add_invalid_example_header_mark(test: Callable, headers: dict[str, str]) -> None:
-    test._schemathesis_invalid_example_headers = headers  # type: ignore
+UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")
+NonSerializableMark = Mark[SerializationNotPossible](attr_name="non_serializable")
+InvalidRegexMark = Mark[SchemaError](attr_name="invalid_regex")
+InvalidHeadersExampleMark = Mark[dict[str, str]](attr_name="invalid_example_header")
