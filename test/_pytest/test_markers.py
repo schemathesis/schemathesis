@@ -1,4 +1,4 @@
-from schemathesis._pytest.markers import has_schemathesis_handle
+from schemathesis.extra.pytest_plugin import SchemaHandleMark
 
 
 def test_is_schemathesis_test(swagger_20):
@@ -9,4 +9,4 @@ def test_is_schemathesis_test(swagger_20):
         pass
 
     # Then it should be recognized as a schemathesis test
-    assert has_schemathesis_handle(test)
+    assert SchemaHandleMark.is_set(test)

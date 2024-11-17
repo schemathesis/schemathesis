@@ -5,9 +5,9 @@ from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis._pytest.markers import get_schemathesis_handle
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.hooks import HookDispatcher, HookScope
+from schemathesis.extra.pytest_plugin import SchemaHandleMark
+from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
 from test.utils import assert_requests_call, flaky
 
 
@@ -213,7 +213,7 @@ def test_save_test_function(wsgi_app_schema):
     def test(case):
         pass
 
-    assert get_schemathesis_handle(test).test_function is test
+    assert SchemaHandleMark.get(test).test_function is test
 
 
 @pytest.mark.parametrize("apply_first", [True, False])
@@ -247,14 +247,17 @@ def test_local_dispatcher(wsgi_app_schema, apply_first):
         pass
 
     # Then a hook dispatcher instance is attached to the test function
-    assert isinstance(test._schemathesis_hooks, HookDispatcher)
-    assert test._schemathesis_hooks.scope == HookScope.TEST
+    hook_dispatcher = HookDispatcherMark.get(test)
+    assert isinstance(hook_dispatcher, HookDispatcher)
+    assert hook_dispatcher.scope == HookScope.TEST
     # And this dispatcher contains only local hooks
-    assert test._schemathesis_hooks.get_all_by_name("map_cookies") == [local_hook]
-    assert test._schemathesis_hooks.get_all_by_name("map_query") == []
+    assert hook_dispatcher.get_all_by_name("map_cookies") == [local_hook]
+    assert hook_dispatcher.get_all_by_name("map_query") == []
     # And the schema-level dispatcher still contains only schema-level hooks
-    assert get_schemathesis_handle(test).hooks.get_all_by_name("map_query") == [schema_hook]
-    assert get_schemathesis_handle(test).hooks.get_all_by_name("map_cookies") == []
+    handle = SchemaHandleMark.get(test)
+    assert handle is not None
+    assert handle.hooks.get_all_by_name("map_query") == [schema_hook]
+    assert handle.hooks.get_all_by_name("map_cookies") == []
 
 
 @flaky(max_runs=3, min_passes=1)

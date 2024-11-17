@@ -19,10 +19,10 @@ from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
+from schemathesis.hooks import HookDispatcherMark
 
 from ._hypothesis._builder import create_test
 from ._hypothesis._given import GivenInput, given_proxy
-from ._pytest.markers import has_schemathesis_handle, set_schemathesis_handle
 from .auths import AuthStorage
 from .filters import (
     FilterSet,
@@ -285,7 +285,9 @@ class BaseSchema(Mapping):
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
-            if has_schemathesis_handle(func):
+            from schemathesis.extra.pytest_plugin import SchemaHandleMark
+
+            if SchemaHandleMark.is_set(func):
 
                 def wrapped_test(*_: Any, **__: Any) -> NoReturn:
                     raise IncorrectUsage(
@@ -302,7 +304,7 @@ class BaseSchema(Mapping):
                 data_generation_methods=data_generation_methods,
                 filter_set=self.filter_set,
             )
-            set_schemathesis_handle(func, cloned)
+            SchemaHandleMark.set(func, cloned)
             return func
 
         return wrapper
@@ -374,7 +376,7 @@ class BaseSchema(Mapping):
         # It might be not present when it is used without pytest via `APIOperation.as_strategy()`
         if self.test_function is not None:
             # Might be missing it in case of `LazySchema` usage
-            return getattr(self.test_function, "_schemathesis_hooks", None)  # type: ignore
+            return HookDispatcherMark.get(self.test_function)
         return None
 
     def dispatch_hook(self, name: str, context: HookContext, *args: Any, **kwargs: Any) -> None:

@@ -18,6 +18,7 @@ from typing import (
 )
 
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.marks import Mark
 
 from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 
@@ -27,7 +28,7 @@ if TYPE_CHECKING:
     from .models import APIOperation, Case
 
 DEFAULT_REFRESH_INTERVAL = 300
-AUTH_STORAGE_ATTRIBUTE_NAME = "_schemathesis_auth"
+AuthStorageMark = Mark["AuthStorage"](attr_name="auth_storage")
 Auth = TypeVar("Auth")
 
 
@@ -417,7 +418,10 @@ class AuthStorage(Generic[Auth]):
         filter_set = FilterSet()
 
         def wrapper(test: Callable) -> Callable:
-            auth_storage = self.add_auth_storage(test)
+            if AuthStorageMark.is_set(test):
+                raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `apply`.")
+            auth_storage = self.__class__()
+            AuthStorageMark.set(test, auth_storage)
             auth_storage._set_provider(
                 provider_class=provider_class,
                 refresh_interval=refresh_interval,
@@ -430,15 +434,6 @@ class AuthStorage(Generic[Auth]):
         attach_filter_chain(wrapper, "skip_for", filter_set.exclude)
 
         return wrapper  # type: ignore[return-value]
-
-    @classmethod
-    def add_auth_storage(cls, test: Callable) -> AuthStorage:
-        """Attach a new auth storage instance to the test if it is not already present."""
-        if not hasattr(test, AUTH_STORAGE_ATTRIBUTE_NAME):
-            setattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, cls())
-        else:
-            raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `apply`.")
-        return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME)
 
     def set(self, case: Case, context: AuthContext) -> None:
         """Set authentication data on a generated test case."""
@@ -463,11 +458,6 @@ def set_on_case(case: Case, context: AuthContext, auth_storage: AuthStorage | No
         case.operation.schema.auth.set(case, context)
     elif GLOBAL_AUTH_STORAGE.is_defined:
         GLOBAL_AUTH_STORAGE.set(case, context)
-
-
-def get_auth_storage_from_test(test: Callable) -> AuthStorage | None:
-    """Extract the currently attached auth storage from a test function."""
-    return getattr(test, AUTH_STORAGE_ATTRIBUTE_NAME, None)
 
 
 # Global auth API
