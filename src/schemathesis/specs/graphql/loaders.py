@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 from functools import lru_cache
 from json import JSONDecodeError
 from typing import IO, TYPE_CHECKING, Any, Dict, NoReturn, cast
 
+from schemathesis.core import Specification
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT, WAIT_FOR_SCHEMA_INTERVAL
@@ -21,7 +23,6 @@ from ...internal.validation import require_relative_url
 from ...loaders import load_schema_from_url
 from ...throttling import build_limiter
 from ...transports.headers import setup_default_headers
-from ...types import PathLike, Specification
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
@@ -47,7 +48,7 @@ def get_introspection_query_ast() -> DocumentNode:
 
 
 def from_path(
-    path: PathLike,
+    path: os.PathLike | str,
     *,
     app: Any = None,
     base_url: str | None = None,

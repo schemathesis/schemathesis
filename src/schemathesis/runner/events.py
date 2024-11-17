@@ -10,8 +10,10 @@ from ..internal.exceptions import format_exception
 from ..internal.result import Err, Ok, Result
 
 if TYPE_CHECKING:
+    from schemathesis.core import Specification
+
     from ..models import APIOperation
-    from ..schemas import BaseSchema, Specification
+    from ..schemas import BaseSchema
     from ..service.models import AnalysisResult
     from ..stateful import events
     from .models import Status, TestResult, TestResultSet

@@ -74,7 +74,6 @@ if TYPE_CHECKING:
     from ...auths import AuthStorage
     from ...stateful.state_machine import APIStateMachine
     from ...transports.responses import GenericResponse
-    from ...types import Body
 
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
@@ -1013,7 +1012,7 @@ class SwaggerV20(BaseOpenAPISchema):
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: Body | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         generation_time: float = 0.0,
     ) -> C:
