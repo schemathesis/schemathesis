@@ -48,10 +48,11 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
     from pyrate_limiter import Limiter
 
+    from schemathesis.core import Specification
+
     from .stateful.state_machine import APIStateMachine
     from .transports import Transport
     from .transports.responses import GenericResponse
-    from .types import Body, Specification
 
 
 C = TypeVar("C", bound=Case)
@@ -408,7 +409,7 @@ class BaseSchema(Mapping):
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: Body | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:
         raise NotImplementedError
