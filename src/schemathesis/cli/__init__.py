@@ -59,7 +59,6 @@ if TYPE_CHECKING:
     from ..models import CheckFunction
     from ..service.client import ServiceClient
     from ..targets import Target
-    from ..types import PathLike, RequestCert
 
 
 __all__ = [
@@ -807,7 +806,7 @@ def run(
     schemathesis_io_token: str | None = None,
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_telemetry: bool = True,
-    hosts_file: PathLike = service.DEFAULT_HOSTS_PATH,
+    hosts_file: os.PathLike = service.DEFAULT_HOSTS_PATH,
     force_color: bool = False,
     **__kwargs,
 ) -> None:
@@ -1106,7 +1105,7 @@ def _filter_by_expression_to_func(value: str | None, arg_name: str) -> Callable 
     return None
 
 
-def prepare_request_cert(cert: str | None, key: str | None) -> RequestCert | None:
+def prepare_request_cert(cert: str | None, key: str | None) -> str | tuple[str, str] | None:
     if cert is not None and key is not None:
         return cert, key
     return cert
@@ -1121,7 +1120,7 @@ def into_event_stream(
     force_schema_version: str | None,
     request_tls_verify: bool | str,
     request_proxy: str | None,
-    request_cert: RequestCert | None,
+    request_cert: str | tuple[str, str] | None,
     # Network request parameters
     auth: tuple[str, str] | None,
     auth_type: str | None,
@@ -1508,7 +1507,7 @@ def replay(
 @with_hosts_file
 def upload(
     report: io.BufferedReader,
-    hosts_file: str,
+    hosts_file: os.PathLike,
     request_tls_verify: bool = True,
     schemathesis_io_url: str = service.DEFAULT_URL,
     schemathesis_io_token: str | None = None,
@@ -1559,7 +1558,7 @@ def auth() -> None:
 )
 @with_request_tls_verify
 @with_hosts_file
-def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls_verify: bool = True) -> None:
+def login(token: str, hostname: str, hosts_file: os.PathLike, protocol: str, request_tls_verify: bool = True) -> None:
     """Authenticate with a Schemathesis.io host."""
     import requests
 
@@ -1583,7 +1582,7 @@ def login(token: str, hostname: str, hosts_file: str, protocol: str, request_tls
     envvar=service.HOSTNAME_ENV_VAR,
 )
 @with_hosts_file
-def logout(hostname: str, hosts_file: str) -> None:
+def logout(hostname: str, hosts_file: os.PathLike) -> None:
     """Remove authentication for a Schemathesis.io host."""
     result = service.hosts.remove(hostname, hosts_file)
     if result == service.hosts.RemoveAuth.success:

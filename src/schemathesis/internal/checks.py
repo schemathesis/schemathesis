@@ -10,7 +10,6 @@ if TYPE_CHECKING:
     from .._override import CaseOverride
     from ..models import Case
     from ..transports.responses import GenericResponse
-    from ..types import RawAuth
 
 
 CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[bool]]
@@ -47,6 +46,6 @@ class CheckContext:
     """
 
     override: CaseOverride | None
-    auth: HTTPDigestAuth | RawAuth | None
+    auth: HTTPDigestAuth | tuple[str, str] | None
     headers: CaseInsensitiveDict | None
     config: CheckConfig = field(default_factory=CheckConfig)

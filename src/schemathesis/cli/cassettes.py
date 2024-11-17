@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     import requests
 
     from ..runner.models import Check, Interaction, Request, Response
-    from ..types import RequestCert
     from .context import ExecutionContext
 
 # Wait until the worker terminates
@@ -484,7 +483,7 @@ def replay(
     uri: str | None = None,
     method: str | None = None,
     request_tls_verify: bool = True,
-    request_cert: RequestCert | None = None,
+    request_cert: str | tuple[str, str] | None = None,
     request_proxy: str | None = None,
 ) -> Generator[Replayed, None, None]:
     """Replay saved interactions."""

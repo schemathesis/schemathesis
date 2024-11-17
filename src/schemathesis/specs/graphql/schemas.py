@@ -35,7 +35,6 @@ from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...types import Body
 from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
@@ -68,7 +67,7 @@ class GraphQLCase(Case):
         parts[2] = self.formatted_path
         return urlunsplit(parts)
 
-    def _get_body(self) -> Body | NotSet:
+    def _get_body(self) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
         return self.body if isinstance(self.body, (NotSet, bytes)) else {"query": self.body}
 
     def validate_response(
@@ -270,7 +269,7 @@ class GraphQLSchema(BaseSchema):
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: Body | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:
         return case_cls(

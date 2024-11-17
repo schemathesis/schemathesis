@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar
 from urllib.parse import urlparse
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.core.failures import Failure
 
 from ..constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER
 from ..serializers import SerializerContext
@@ -26,19 +25,6 @@ if TYPE_CHECKING:
 
     from ..models import Case
     from .responses import WSGIResponse
-
-
-class RequestTimeout(Failure):
-    """Request took longer than timeout."""
-
-    timeout: int
-    message: str
-    title: str = "Response timeout"
-    code: str = "request_timeout"
-
-    @property
-    def _unique_key(self) -> str:
-        return str(self.timeout)
 
 
 def serialize_payload(payload: bytes) -> str:

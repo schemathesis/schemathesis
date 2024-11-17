@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..models import CheckFunction
     from ..runner.config import NetworkConfig
     from ..targets import Target
-    from ..types import RawAuth
 
 
 def _default_checks_factory() -> tuple[CheckFunction, ...]:
@@ -62,7 +61,7 @@ class StatefulTestRunnerConfig:
     max_failures: int | None = None
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
-    auth: HTTPDigestAuth | RawAuth | None = None
+    auth: HTTPDigestAuth | tuple[str, str] | None = None
     seed: int | None = None
     override: CaseOverride | None = None
     max_response_time: int | None = None

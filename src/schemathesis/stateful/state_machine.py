@@ -81,13 +81,6 @@ class APIStateMachine(RuleBasedStateMachine):
         StateMachineTestCase.__qualname__ = cls.__qualname__ + ".TestCase"
         return StateMachineTestCase
 
-    def _pretty_print(self, value: Any) -> str:
-        if isinstance(value, Case):
-            # State machines suppose to be reproducible, hence it is OK to get kwargs here
-            kwargs = self.get_call_kwargs(value)
-            return _print_case(value, kwargs)
-        return super()._pretty_print(value)  # type: ignore
-
     def _new_name(self, target: str) -> str:
         target = _normalize_name(target)
         return super()._new_name(target)  # type: ignore
