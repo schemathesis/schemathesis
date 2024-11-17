@@ -39,7 +39,6 @@ from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_url, sanitize_value
 from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
-from .types import Body
 
 if TYPE_CHECKING:
     import requests.auth
@@ -144,7 +143,7 @@ class Case:
     query: dict[str, Any] | None = None
     # By default, there is no body, but we can't use `None` as the default value because it clashes with `null`
     # which is a valid payload.
-    body: Body | NotSet = NOT_SET
+    body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET
     # The media type for cases with a payload. For example, "application/json"
     media_type: str | None = None
     source: CaseSource | None = None
@@ -335,7 +334,7 @@ class Case:
             return cls()
         return None
 
-    def _get_body(self) -> Body | NotSet:
+    def _get_body(self) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
         return self.body
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
@@ -677,7 +676,7 @@ class APIOperation(Generic[P, C]):
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
-        body: Body | NotSet = NOT_SET,
+        body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
     ) -> C:
         """Create a new example for this API operation.

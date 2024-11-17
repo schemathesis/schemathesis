@@ -219,10 +219,11 @@ class SchemathesisCase(PyCollector):
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
-    schema = SchemaHandleMark.get(obj)
-    if schema is not None:
+    try:
+        schema = SchemaHandleMark.get(obj)
+        assert schema is not None
         outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name, schema=schema))
-    else:
+    except Exception:
         outcome.get_result()
 
 

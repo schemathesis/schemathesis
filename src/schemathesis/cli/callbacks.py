@@ -29,7 +29,6 @@ if TYPE_CHECKING:
     import hypothesis
     from click.types import LazyFile  # type: ignore[attr-defined]
 
-    from ..types import PathLike
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
@@ -345,7 +344,7 @@ def convert_data_generation_method(
     return [DataGenerationMethod[value]]
 
 
-def _is_usable_dir(path: PathLike) -> bool:
+def _is_usable_dir(path: os.PathLike) -> bool:
     if os.path.isfile(path):
         path = os.path.dirname(path)
     while not os.path.exists(path):
@@ -353,7 +352,7 @@ def _is_usable_dir(path: PathLike) -> bool:
     return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK | os.X_OK)
 
 
-def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: PathLike) -> PathLike:
+def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: os.PathLike) -> os.PathLike | str:
     if not _is_usable_dir(value):
         path = get_temporary_hosts_file()
         click.secho(
