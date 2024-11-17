@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable
 
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.marks import Mark
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -36,14 +37,9 @@ def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[s
     return output
 
 
-def get_override_from_mark(test: Callable) -> CaseOverride | None:
-    return getattr(test, "_schemathesis_override", None)
-
-
-def set_override_mark(test: Callable, override: CaseOverride) -> None:
-    test._schemathesis_override = override  # type: ignore[attr-defined]
+OverrideMark = Mark[CaseOverride](attr_name="override")
 
 
 def check_no_override_mark(test: Callable) -> None:
-    if hasattr(test, "_schemathesis_override"):
+    if OverrideMark.is_set(test):
         raise IncorrectUsage(f"`{test.__name__}` has already been decorated with `override`.")
