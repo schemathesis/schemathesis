@@ -33,7 +33,7 @@ from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, 
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
-from ..._override import CaseOverride, check_no_override_mark, set_override_mark
+from ..._override import CaseOverride, OverrideMark, check_no_override_mark
 from ...constants import HTTP_METHODS
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
@@ -213,7 +213,7 @@ class BaseOpenAPISchema(BaseSchema):
             override = CaseOverride(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
             )
-            set_override_mark(test, override)
+            OverrideMark.set(test, override)
             return test
 
         return _add_override

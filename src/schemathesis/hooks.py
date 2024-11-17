@@ -8,6 +8,8 @@ from enum import Enum, unique
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
+from schemathesis.core.marks import Mark
+
 from .filters import FilterSet, attach_filter_chain
 
 if TYPE_CHECKING:
@@ -16,6 +18,8 @@ if TYPE_CHECKING:
     from .models import APIOperation, Case
     from .schemas import BaseSchema
     from .transports.responses import GenericResponse
+
+HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 
 
 @unique
@@ -179,9 +183,11 @@ class HookDispatcher:
     @classmethod
     def add_dispatcher(cls, func: Callable) -> HookDispatcher:
         """Attach a new dispatcher instance to the test if it is not already present."""
-        if not hasattr(func, "_schemathesis_hooks"):
-            func._schemathesis_hooks = cls(scope=HookScope.TEST)  # type: ignore
-        return func._schemathesis_hooks  # type: ignore
+        if not HookDispatcherMark.is_set(func):
+            HookDispatcherMark.set(func, cls(scope=HookScope.TEST))
+        dispatcher = HookDispatcherMark.get(func)
+        assert dispatcher is not None
+        return dispatcher
 
     def register_hook_with_name(self, hook: Callable, name: str) -> Callable:
         """A helper for hooks registration."""

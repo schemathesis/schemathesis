@@ -6,36 +6,30 @@ from inspect import getfullargspec
 from typing import TYPE_CHECKING, Any, Callable, NoReturn, Union
 
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.marks import Mark
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 
-__all__ = ["get_given_args", "get_given_kwargs", "is_given_applied", "given_proxy", "merge_given_args", "GivenInput"]
+__all__ = ["is_given_applied", "given_proxy", "merge_given_args", "GivenInput", "GivenArgsMark", "GivenKwargsMark"]
 
 EllipsisType = type(...)
 GivenInput = Union["SearchStrategy", EllipsisType]  # type: ignore[valid-type]
-GIVEN_ARGS_MARKER = "_schemathesis_given_args"
-GIVEN_KWARGS_MARKER = "_schemathesis_given_kwargs"
 
-
-def get_given_args(func: Callable) -> tuple:
-    return getattr(func, GIVEN_ARGS_MARKER, ())
-
-
-def get_given_kwargs(func: Callable) -> dict[str, Any]:
-    return getattr(func, GIVEN_KWARGS_MARKER, {})
+GivenArgsMark = Mark[tuple](attr_name="given_args", default=())
+GivenKwargsMark = Mark[dict[str, Any]](attr_name="given_kwargs", default=dict)
 
 
 def is_given_applied(func: Callable) -> bool:
-    return hasattr(func, GIVEN_ARGS_MARKER) or hasattr(func, GIVEN_KWARGS_MARKER)
+    return GivenArgsMark.is_set(func) or GivenKwargsMark.is_set(func)
 
 
 def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[Callable], Callable]:
     """Proxy Hypothesis strategies to ``hypothesis.given``."""
 
     def wrapper(func: Callable) -> Callable:
-        if hasattr(func, GIVEN_ARGS_MARKER):
+        if is_given_applied(func):
 
             def wrapped_test(*_: Any, **__: Any) -> NoReturn:
                 raise IncorrectUsage(
@@ -45,8 +39,8 @@ def given_proxy(*args: GivenInput, **kwargs: GivenInput) -> Callable[[Callable],
 
             return wrapped_test
 
-        setattr(func, GIVEN_ARGS_MARKER, args)
-        setattr(func, GIVEN_KWARGS_MARKER, kwargs)
+        GivenArgsMark.set(func, args)
+        GivenKwargsMark.set(func, kwargs)
         return func
 
     return wrapper

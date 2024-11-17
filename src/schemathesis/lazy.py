@@ -11,17 +11,18 @@ from pytest_subtests import SubTests
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.hooks import HookDispatcherMark
 
 from ._hypothesis._given import (
+    GivenArgsMark,
     GivenInput,
-    get_given_args,
-    get_given_kwargs,
+    GivenKwargsMark,
     given_proxy,
     is_given_applied,
     merge_given_args,
     validate_given_args,
 )
-from ._override import CaseOverride, check_no_override_mark, get_override_from_mark, set_override_mark
+from ._override import CaseOverride, OverrideMark, check_no_override_mark
 from ._pytest.control_flow import fail_on_no_matches
 from .auths import AuthStorage
 from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
@@ -172,8 +173,10 @@ class LazySchema:
             if is_given_applied(test):
                 # The user wrapped the test function with `@schema.given`
                 # These args & kwargs go as extra to the underlying test generator
-                given_args = get_given_args(test)
-                given_kwargs = get_given_kwargs(test)
+                given_args = GivenArgsMark.get(test)
+                given_kwargs = GivenKwargsMark.get(test)
+                assert given_args is not None
+                assert given_kwargs is not None
                 test_function = validate_given_args(test, given_args, given_kwargs)
                 if test_function is not None:
                     return test_function
@@ -185,8 +188,9 @@ class LazySchema:
             def wrapped_test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True
-                if hasattr(wrapped_test, "_schemathesis_hooks"):
-                    test._schemathesis_hooks = wrapped_test._schemathesis_hooks  # type: ignore
+                parent_dispatcher = HookDispatcherMark.get(wrapped_test)
+                if parent_dispatcher is not None:
+                    HookDispatcherMark.set(test, parent_dispatcher)
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
@@ -210,7 +214,7 @@ class LazySchema:
 
                 as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None
 
-                override = get_override_from_mark(test)
+                override = OverrideMark.get(test)
                 if override is not None:
 
                     def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
@@ -268,7 +272,7 @@ class LazySchema:
             override = CaseOverride(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
             )
-            set_override_mark(test, override)
+            OverrideMark.set(test, override)
             return test
 
         return _add_override

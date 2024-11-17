@@ -21,17 +21,17 @@ from schemathesis.core.errors import (
     InvalidSchema,
     SerializationNotPossible,
 )
+from schemathesis.core.marks import Mark
 
 from .._hypothesis._given import (
-    get_given_args,
-    get_given_kwargs,
+    GivenArgsMark,
+    GivenKwargsMark,
     is_given_applied,
     merge_given_args,
     validate_given_args,
 )
-from .._override import get_override_from_mark
+from .._override import OverrideMark
 from .._pytest.control_flow import fail_on_no_matches
-from .._pytest.markers import get_schemathesis_handle
 from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -44,6 +44,15 @@ if TYPE_CHECKING:
 
     from ..models import APIOperation
     from ..schemas import BaseSchema
+
+
+def _is_schema(value: object) -> bool:
+    from schemathesis.schemas import BaseSchema
+
+    return isinstance(value, BaseSchema)
+
+
+SchemaHandleMark = Mark["BaseSchema"](attr_name="schema", check=_is_schema)
 
 
 class SchemathesisFunction(Function):
@@ -62,8 +71,11 @@ class SchemathesisFunction(Function):
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, schema: BaseSchema, *args: Any, **kwargs: Any) -> None:
         self.given_kwargs: dict[str, Any] | None
-        given_args = get_given_args(test_function)
-        given_kwargs = get_given_kwargs(test_function)
+        given_args = GivenArgsMark.get(test_function)
+        given_kwargs = GivenKwargsMark.get(test_function)
+
+        assert given_args is not None
+        assert given_kwargs is not None
 
         def _init_with_valid_test(_test_function: Callable, _args: tuple, _kwargs: dict[str, Any]) -> None:
             self.test_function = _test_function
@@ -108,7 +120,7 @@ class SchemathesisCase(PyCollector):
             if self.is_invalid_test:
                 funcobj = self.test_function
             else:
-                override = get_override_from_mark(self.test_function)
+                override = OverrideMark.get(self.test_function)
                 as_strategy_kwargs: dict | None
                 if override is not None:
                     as_strategy_kwargs = {}
@@ -207,7 +219,7 @@ class SchemathesisCase(PyCollector):
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
-    schema = get_schemathesis_handle(obj)
+    schema = SchemaHandleMark.get(obj)
     if schema is not None:
         outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name, schema=schema))
     else:
@@ -242,11 +254,11 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-    from .._hypothesis._builder import (
-        get_invalid_example_headers_mark,
-        get_invalid_regex_mark,
-        get_non_serializable_mark,
-        has_unsatisfied_example_mark,
+    from schemathesis._hypothesis._builder import (
+        InvalidHeadersExampleMark,
+        InvalidRegexMark,
+        NonSerializableMark,
+        UnsatisfiableExampleMark,
     )
 
     __tracebackhide__ = True
@@ -261,9 +273,9 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
         except HypothesisRefResolutionError:
             pytest.skip(RECURSIVE_REFERENCE_ERROR_MESSAGE)
         except (SkipTest, unittest.SkipTest) as exc:
-            if has_unsatisfied_example_mark(pyfuncitem.obj):
+            if UnsatisfiableExampleMark.is_set(pyfuncitem.obj):
                 raise Unsatisfiable("Failed to generate test cases from examples for this API operation") from None
-            non_serializable = get_non_serializable_mark(pyfuncitem.obj)
+            non_serializable = NonSerializableMark.get(pyfuncitem.obj)
             if non_serializable is not None:
                 media_types = ", ".join(non_serializable.media_types)
                 raise SerializationNotPossible(
@@ -271,10 +283,10 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
                     f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
                     media_types=non_serializable.media_types,
                 ) from None
-            invalid_regex = get_invalid_regex_mark(pyfuncitem.obj)
+            invalid_regex = InvalidRegexMark.get(pyfuncitem.obj)
             if invalid_regex is not None:
                 raise InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True) from None
-            invalid_headers = get_invalid_example_headers_mark(pyfuncitem.obj)
+            invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
             if invalid_headers is not None:
                 raise InvalidHeadersExample.from_headers(invalid_headers) from None
             pytest.skip(exc.args[0])
@@ -284,7 +296,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             if hasattr(exc, "__notes__"):
                 exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore
             raise
-        invalid_headers = get_invalid_example_headers_mark(pyfuncitem.obj)
+        invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
         if invalid_headers is not None:
             raise InvalidHeadersExample.from_headers(invalid_headers) from None
     else:
