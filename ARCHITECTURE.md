@@ -43,6 +43,10 @@ Base error handling that is not tied to any specific API specification or execut
 - Data serialization
 - Generic validation
 
+### `core/marks`
+
+A mechanism for attaching Schemathesis-specific metadata to test functions. Since Schemathesis integrates with external testing frameworks (Hypothesis, pytest) that primarily operate on test functions, we need a way to associate additional context with these functions.
+
 ### `core/checks`
 
 Tools to check API responses.

@@ -14,6 +14,12 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis._hypothesis._builder import (
+    InvalidHeadersExampleMark,
+    InvalidRegexMark,
+    NonSerializableMark,
+    UnsatisfiableExampleMark,
+)
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     InternalError,
@@ -28,12 +34,6 @@ from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, Unsupp
 
 from .... import targets
 from ...._compat import BaseExceptionGroup
-from ...._hypothesis._builder import (
-    get_invalid_example_headers_mark,
-    get_invalid_regex_mark,
-    get_non_serializable_mark,
-    has_unsatisfied_example_mark,
-)
 from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
 from ....internal.checks import CheckContext
 from ....internal.exceptions import deduplicate_errors
@@ -174,12 +174,12 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             )
         else:
             result.add_error(error)
-    if has_unsatisfied_example_mark(test_function):
+    if UnsatisfiableExampleMark.is_set(test_function):
         status = Status.error
         result.add_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
         )
-    non_serializable = get_non_serializable_mark(test_function)
+    non_serializable = NonSerializableMark.get(test_function)
     if non_serializable is not None and status != Status.error:
         status = Status.error
         media_types = ", ".join(non_serializable.media_types)
@@ -190,11 +190,11 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
                 media_types=non_serializable.media_types,
             )
         )
-    invalid_regex = get_invalid_regex_mark(test_function)
+    invalid_regex = InvalidRegexMark.get(test_function)
     if invalid_regex is not None and status != Status.error:
         status = Status.error
         result.add_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
-    invalid_headers = get_invalid_example_headers_mark(test_function)
+    invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:
         status = Status.error
         result.add_error(InvalidHeadersExample.from_headers(invalid_headers))
