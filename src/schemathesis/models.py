@@ -33,7 +33,6 @@ from .constants import (
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .internal.checks import CheckContext
-from .internal.copy import fast_deepcopy
 from .internal.diff import diff
 from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
@@ -69,15 +68,6 @@ class CaseSource:
     elapsed: float
     overrides_all_parameters: bool
     transition_id: TransitionId
-
-    def partial_deepcopy(self) -> CaseSource:
-        return self.__class__(
-            case=self.case.partial_deepcopy(),
-            response=self.response,
-            elapsed=self.elapsed,
-            overrides_all_parameters=self.overrides_all_parameters,
-            transition_id=self.transition_id,
-        )
 
 
 def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
@@ -390,9 +380,8 @@ class Case:
             override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
         )
         for check in chain(checks, additional_checks):
-            copied_case = self.partial_deepcopy()
             try:
-                check(ctx, response, copied_case)
+                check(ctx, response, self)
             except Failure as f:
                 # Tracebacks are not relevant here
                 failures.add(f.with_traceback(None))
@@ -459,24 +448,6 @@ class Case:
         request = requests.Request(**kwargs)
         prepared = requests.Session().prepare_request(request)  # type: ignore
         return cast(str, prepared.url)
-
-    def partial_deepcopy(self) -> Case:
-        return self.__class__(
-            operation=self.operation.partial_deepcopy(),
-            data_generation_method=self.data_generation_method,
-            media_type=self.media_type,
-            source=self.source if self.source is None else self.source.partial_deepcopy(),
-            path_parameters=fast_deepcopy(self.path_parameters),
-            headers=fast_deepcopy(self.headers),
-            cookies=fast_deepcopy(self.cookies),
-            query=fast_deepcopy(self.query),
-            body=fast_deepcopy(self.body),
-            meta=self.meta,
-            generation_time=self.generation_time,
-            id=self.id,
-            _auth=self._auth,
-            _has_explicit_auth=self._has_explicit_auth,
-        )
 
 
 P = TypeVar("P", bound=Parameter)
@@ -651,22 +622,6 @@ class APIOperation(Generic[P, C]):
             "Can not detect appropriate media type. "
             "You can either specify one of the defined media types "
             f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
-        )
-
-    def partial_deepcopy(self) -> APIOperation:
-        return self.__class__(
-            path=self.path,  # string, immutable
-            method=self.method,  # string, immutable
-            definition=fast_deepcopy(self.definition),
-            schema=self.schema.clone(),  # shallow copy
-            verbose_name=self.verbose_name,  # string, immutable
-            app=self.app,  # not deepcopyable
-            base_url=self.base_url,  # string, immutable
-            path_parameters=fast_deepcopy(self.path_parameters),
-            headers=fast_deepcopy(self.headers),
-            cookies=fast_deepcopy(self.cookies),
-            query=fast_deepcopy(self.query),
-            body=fast_deepcopy(self.body),
         )
 
     def make_case(

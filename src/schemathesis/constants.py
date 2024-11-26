@@ -5,15 +5,10 @@ GITHUB_APP_LINK = "https://github.com/apps/schemathesis"
 # Maximum test running time
 DEFAULT_DEADLINE = 15000
 DEFAULT_RESPONSE_TIMEOUT = 10
-HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 RECURSIVE_REFERENCE_ERROR_MESSAGE = (
     "Currently, Schemathesis can't generate data for this operation due to "
     "recursive references in the operation definition. See more information in "
     "this issue - https://github.com/schemathesis/schemathesis/issues/947"
-)
-GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
-    "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "
-    "function. Separate these tests into distinct functions to avoid conflicts."
 )
 SERIALIZERS_SUGGESTION_MESSAGE = (
     "You can register your own serializer with `schemathesis.serializer` "
@@ -31,8 +26,6 @@ ISSUE_TRACKER_URL = (
     "labels=Status%3A%20Needs%20Triage%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D"
 )
 FLAKY_FAILURE_MESSAGE = "[FLAKY] Schemathesis was not able to reliably reproduce this failure"
-BOM_MARK = "\ufeff"
-WAIT_FOR_SCHEMA_INTERVAL = 0.05
 HOOKS_MODULE_ENV_VAR = "SCHEMATHESIS_HOOKS"
 API_NAME_ENV_VAR = "SCHEMATHESIS_API_NAME"
 BASE_URL_ENV_VAR = "SCHEMATHESIS_BASE_URL"

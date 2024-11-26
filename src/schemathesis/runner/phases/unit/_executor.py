@@ -268,7 +268,7 @@ def run_checks(
         check_results.append(
             result.add_failure(
                 name=check_name,
-                case=copied_case,
+                case=case,
                 request=Request.from_prepared_request(response.request),
                 response=Response.from_requests(response=response),
                 failure=failure,
@@ -277,13 +277,12 @@ def run_checks(
 
     for check in checks:
         check_name = check.__name__
-        copied_case = case.partial_deepcopy()
         try:
-            skip_check = check(ctx, response, copied_case)
+            skip_check = check(ctx, response, case)
             if not skip_check:
                 check_result = result.add_success(
                     name=check_name,
-                    case=copied_case,
+                    case=case,
                     request=Request.from_prepared_request(response.request),
                     response=Response.from_requests(response=response),
                 )

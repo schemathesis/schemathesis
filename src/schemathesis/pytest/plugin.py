@@ -32,11 +32,7 @@ from .._hypothesis._given import (
     validate_given_args,
 )
 from .._override import OverrideMark
-from ..constants import (
-    GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
-    RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    SERIALIZERS_SUGGESTION_MESSAGE,
-)
+from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
 from ..internal.result import Ok, Result
 
 if TYPE_CHECKING:
@@ -44,6 +40,11 @@ if TYPE_CHECKING:
 
     from ..models import APIOperation
     from ..schemas import BaseSchema
+
+GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
+    "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "
+    "function. Separate these tests into distinct functions to avoid conflicts."
+)
 
 
 def _is_schema(value: object) -> bool:

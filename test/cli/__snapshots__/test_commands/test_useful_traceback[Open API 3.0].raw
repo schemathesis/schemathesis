@@ -28,7 +28,7 @@ division by zero
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
         run_checks(
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in run_checks
-        skip_check = check(ctx, response, copied_case)
+        skip_check = check(ctx, response, case)
       File "/tmp/module.py", line XXX, in with_error
         1 / 0
     ZeroDivisionError: division by zero
