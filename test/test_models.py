@@ -14,7 +14,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import APIOperation, Case, CaseSource, TransitionId
+from schemathesis.models import APIOperation, Case
 from schemathesis.runner.models import Request, Response
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import _merge_dict_to
@@ -269,72 +269,6 @@ def test_call_and_validate_for_asgi(fastapi_app):
             case.call_and_validate()
 
     test()
-
-
-def test_case_partial_deepcopy(swagger_20):
-    operation = APIOperation("/example/path", "GET", {}, swagger_20)
-    media_type = "application/json"
-    original_case = Case(
-        operation=operation,
-        generation_time=0.0,
-        media_type=media_type,
-        path_parameters={"test": "test"},
-        headers={"Content-Type": "application/json"},
-        cookies={"TOKEN": "secret"},
-        query={"a": 1},
-        body={"b": 1},
-    )
-
-    copied_case = original_case.partial_deepcopy()
-    copied_case.operation.path = "/overwritten/path"
-    copied_case.path_parameters["test"] = "overwritten"
-    copied_case.headers["Content-Type"] = "overwritten"
-    copied_case.cookies["TOKEN"] = "overwritten"
-    copied_case.query["a"] = "overwritten"
-    copied_case.body["b"] = "overwritten"
-    assert copied_case.media_type == media_type
-
-    assert original_case.operation.path == "/example/path"
-    assert original_case.path_parameters["test"] == "test"
-    assert original_case.headers["Content-Type"] == "application/json"
-    assert original_case.cookies["TOKEN"] == "secret"
-    assert original_case.query["a"] == 1
-    assert original_case.body["b"] == 1
-
-
-def test_case_partial_deepcopy_same_generated_code(swagger_20):
-    operation = APIOperation("/example/path", "GET", {}, swagger_20)
-    original_case = Case(
-        operation=operation,
-        generation_time=0.0,
-        media_type="application/json",
-        path_parameters={"test": "test"},
-        headers={"Content-Type": "application/json"},
-        cookies={"TOKEN": "secret"},
-        query={"a": 1},
-        body={"b": 1},
-    )
-    copied_case = original_case.partial_deepcopy()
-    assert original_case.as_curl_command().replace(
-        f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {original_case.id}'", ""
-    ) == copied_case.as_curl_command().replace(f" -H '{SCHEMATHESIS_TEST_CASE_HEADER}: {copied_case.id}'", "")
-
-
-def test_case_partial_deepcopy_source(swagger_20):
-    operation = APIOperation("/example/path", "GET", {}, swagger_20)
-    original_case = Case(operation=operation, generation_time=0.0)
-    response = requests.Response()
-    response.status_code = 500
-    original_case.source = CaseSource(
-        case=Case(operation=operation, generation_time=0.0, query={"first": 1}),
-        response=response,
-        elapsed=1.0,
-        overrides_all_parameters=True,
-        transition_id=TransitionId(name="CustomLink", status_code="201"),
-    )
-    copied_case = original_case.partial_deepcopy()
-    assert copied_case.source.case.query == original_case.source.case.query
-    assert copied_case.source.response.status_code == original_case.source.response.status_code
 
 
 def test_validate_response(testdir):

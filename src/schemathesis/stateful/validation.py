@@ -40,7 +40,7 @@ def validate_response(
             status=Status.failure,
             request=Request.from_prepared_request(response.request),
             response=Response.from_generic(response=response),
-            case=copied_case,
+            case=case,
             failure=failure,
         )
         runner_ctx.add_failed_check(failed_check)
@@ -59,11 +59,10 @@ def validate_response(
 
     for check in tuple(checks) + tuple(additional_checks):
         name = check.__name__
-        copied_case = case.partial_deepcopy()
         try:
-            skip_check = check(check_ctx, response, copied_case)
+            skip_check = check(check_ctx, response, case)
             if not skip_check:
-                _on_passed(name, copied_case)
+                _on_passed(name, case)
         except Failure as exc:
             if runner_ctx.is_seen_in_run(exc):
                 continue

@@ -1108,25 +1108,6 @@ def test_finish(event_stream):
     assert next(event_stream, None) is None
 
 
-@pytest.mark.operations("success")
-@pytest.mark.openapi_version("3.0")
-def test_case_mutation(real_app_schema):
-    # When two checks mutate the case
-
-    def check1(ctx, response, case):
-        case.headers = {"Foo": "BAR"}
-        raise AssertionError("Bar!")
-
-    def check2(ctx, response, case):
-        case.headers = {"Foo": "BAZ"}
-        raise AssertionError("Baz!")
-
-    *_, event, _ = from_schema(real_app_schema, checks=[check1, check2]).execute()
-    # Then these mutations should not interfere
-    assert event.result.checks[0].case.headers["Foo"] == "BAR"
-    assert event.result.checks[1].case.headers["Foo"] == "BAZ"
-
-
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
