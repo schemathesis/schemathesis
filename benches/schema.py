@@ -19,15 +19,15 @@ CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
 CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
 # Small size (~2k lines in YAML)
 BBCI = load_from_corpus("bbci.co.uk/1.0.json", CORPUS_OPENAPI_30)
-BBCI_SCHEMA = schemathesis.from_dict(BBCI)
+BBCI_SCHEMA = schemathesis.openapi.from_dict(BBCI)
 BBCI_OPERATIONS = list(BBCI_SCHEMA.get_all_operations())
 # Medium size (~8k lines in YAML)
 VMWARE = load_from_corpus("vmware.local/vrni/1.0.0.json", CORPUS_OPENAPI_30)
-VMWARE_SCHEMA = schemathesis.from_dict(VMWARE)
+VMWARE_SCHEMA = schemathesis.openapi.from_dict(VMWARE)
 VMWARE_OPERATIONS = list(VMWARE_SCHEMA.get_all_operations())
 # Large size (~92k lines in YAML)
 STRIPE = load_from_corpus("stripe.com/2022-11-15.json", CORPUS_OPENAPI_30)
-STRIPE_SCHEMA = schemathesis.from_dict(STRIPE)
+STRIPE_SCHEMA = schemathesis.openapi.from_dict(STRIPE)
 # Medium GraphQL schema (~6k lines)
 UNIVERSE = load_from_corpus("universe.json", "graphql")
 UNIVERSE_SCHEMA = schemathesis.graphql.from_dict(UNIVERSE)
@@ -43,14 +43,14 @@ AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWA
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
-        (BBCI, schemathesis.from_dict),
-        (VMWARE, schemathesis.from_dict),
+        (BBCI, schemathesis.openapi.from_dict),
+        (VMWARE, schemathesis.openapi.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
-        (APPVEYOR, schemathesis.from_dict),
-        (EVETECH, schemathesis.from_dict),
-        (OSISOFT, schemathesis.from_dict),
-        (ML_WEBSERVICES, schemathesis.from_dict),
-        (AZURE_NETWORK, schemathesis.from_dict),
+        (APPVEYOR, schemathesis.openapi.from_dict),
+        (EVETECH, schemathesis.openapi.from_dict),
+        (OSISOFT, schemathesis.openapi.from_dict),
+        (ML_WEBSERVICES, schemathesis.openapi.from_dict),
+        (AZURE_NETWORK, schemathesis.openapi.from_dict),
     ],
     ids=("bbci", "vmware", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
@@ -65,15 +65,15 @@ def test_iter_operations(raw_schema, loader):
 @pytest.mark.parametrize(
     "raw_schema, loader",
     [
-        (BBCI, schemathesis.from_dict),
-        (VMWARE, schemathesis.from_dict),
-        (STRIPE, schemathesis.from_dict),
+        (BBCI, schemathesis.openapi.from_dict),
+        (VMWARE, schemathesis.openapi.from_dict),
+        (STRIPE, schemathesis.openapi.from_dict),
         (UNIVERSE, schemathesis.graphql.from_dict),
-        (APPVEYOR, schemathesis.from_dict),
-        (EVETECH, schemathesis.from_dict),
-        (OSISOFT, schemathesis.from_dict),
-        (ML_WEBSERVICES, schemathesis.from_dict),
-        (AZURE_NETWORK, schemathesis.from_dict),
+        (APPVEYOR, schemathesis.openapi.from_dict),
+        (EVETECH, schemathesis.openapi.from_dict),
+        (OSISOFT, schemathesis.openapi.from_dict),
+        (ML_WEBSERVICES, schemathesis.openapi.from_dict),
+        (AZURE_NETWORK, schemathesis.openapi.from_dict),
     ],
     ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
@@ -85,11 +85,11 @@ def test_length(raw_schema, loader):
 # Schemas with pre-populated cache
 BBCI_OPERATION_ID = "Get_Categories_"
 BBCI_OPERATION_KEY = ("/categories", "get")
-BBCI_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(BBCI)
+BBCI_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.openapi.from_dict(BBCI)
 BBCI_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(BBCI_OPERATION_ID)
 VMWARE_OPERATION_ID = "listProblemEvents"
 VMWARE_OPERATION_KEY = ("/entities/problems", "get")
-VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.from_dict(VMWARE)
+VMWARE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.openapi.from_dict(VMWARE)
 VMWARE_SCHEMA_WITH_OPERATIONS_CACHE.get_operation_by_id(VMWARE_OPERATION_ID)
 UNIVERSE_OPERATION_KEY = ("Query", "manageTickets")
 UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.graphql.from_dict(UNIVERSE)
@@ -100,8 +100,8 @@ UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE[UNIVERSE_OPERATION_KEY[0]][UNIVERSE_OPERAT
 @pytest.mark.parametrize(
     "raw_schema, key, loader",
     [
-        (BBCI, BBCI_OPERATION_KEY, schemathesis.from_dict),
-        (VMWARE, VMWARE_OPERATION_KEY, schemathesis.from_dict),
+        (BBCI, BBCI_OPERATION_KEY, schemathesis.openapi.from_dict),
+        (VMWARE, VMWARE_OPERATION_KEY, schemathesis.openapi.from_dict),
         (UNIVERSE, UNIVERSE_OPERATION_KEY, schemathesis.graphql.from_dict),
     ],
     ids=("bbci", "vmware", "universe"),
@@ -136,7 +136,7 @@ def test_get_operation_repeatedly(schema, key):
     ids=("bbci", "vmware"),
 )
 def test_get_operation_by_id_single(raw_schema, key):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     _ = schema.get_operation_by_id(key)
 
 
@@ -163,7 +163,7 @@ def test_get_operation_by_id_repeatedly(schema, key):
     ids=("bbci", "vmware"),
 )
 def test_get_operation_by_reference_single(raw_schema, key):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     _ = schema.get_operation_by_reference(key)
 
 
@@ -210,7 +210,7 @@ def test_events():
 @pytest.mark.benchmark
 @pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
 def test_rewritten_components(raw_schema):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     _ = schema.rewritten_components
 
@@ -218,7 +218,7 @@ def test_rewritten_components(raw_schema):
 @pytest.mark.benchmark
 @pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
 def test_links_count(raw_schema):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     _ = schema.links_count
 

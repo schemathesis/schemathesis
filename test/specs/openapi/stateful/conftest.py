@@ -355,9 +355,9 @@ def app_factory(ctx):
 
 @pytest.fixture
 def runner_factory(app_factory):
-    def _runner_factory(*, app_kwargs=None, config_kwargs=None, loader_kwargs=None):
+    def _runner_factory(*, app_kwargs=None, config_kwargs=None, configuration=None):
         app = app_factory(**(app_kwargs or {}))
-        schema = schemathesis.from_wsgi("/openapi.json", app=app, **(loader_kwargs or {}))
+        schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app).configure(**(configuration or {}))
         state_machine = schema.as_state_machine()
         config_kwargs = config_kwargs or {}
         config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))

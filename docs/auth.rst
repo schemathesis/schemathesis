@@ -33,7 +33,7 @@ For Python tests you can set a header, cookie or a query parameter inside your t
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
@@ -63,7 +63,7 @@ You can pass the authentication credentials using the ``auth`` arguments of the 
     import schemathesis
     from requests.auth import HTTPDigestAuth
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
@@ -164,7 +164,7 @@ The following example shows how to use auth only tests generated via the ``schem
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.auth()
@@ -178,7 +178,7 @@ And this one shows auth applied only to the ``test_api`` function:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     class MyAuth:
@@ -211,7 +211,7 @@ Here is how you can apply auth to all API operations with the ``/users/`` path, 
         ...
 
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.auth(MyAuth).apply_to(path="/users/").skip_for(method="POST")
@@ -248,7 +248,7 @@ Here are some examples for ``path``, other conditions works the same:
     import re
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     # Only `/users/`
@@ -280,7 +280,7 @@ To use a custom function with ``apply_to`` or ``skip_for``, simply pass it as th
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     def is_deprecated(ctx):
@@ -347,7 +347,7 @@ It could be done by using the ``context`` to get the application instance:
     from myapp import app
     from starlette_testclient import TestClient
 
-    schema = schemathesis.from_asgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
 
     TOKEN_ENDPOINT = "/auth/token/"
     USERNAME = "demo"
@@ -374,7 +374,7 @@ It could be done by using the ``context`` to get the application instance:
     from myapp import app
     import werkzeug
 
-    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
 
     TOKEN_ENDPOINT = "/auth/token/"
     USERNAME = "demo"
@@ -476,7 +476,7 @@ For Python tests it works similarly:
     import schemathesis
     from requests_ntlm import HttpNtlmAuth
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
     schema.auth.set_from_requests(HttpNtlmAuth("domain\\username", "password"))
 
@@ -495,7 +495,7 @@ Sometimes you need to reuse the same test client across multiple tests to share 
     from myapp import app
     from starlette_testclient import TestClient
 
-    schema = schemathesis.from_asgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
 
 
     @schema.parametrize()

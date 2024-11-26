@@ -120,7 +120,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
     app = factory(operations=("create_user", "get_user", "update_user"), version=open_api_3)
 
     if factory_name == "asgi_app_factory":
-        schema = schemathesis.from_asgi("/openapi.json", app=app, force_schema_version="30")
+        schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
         schema.add_link(
             source=schema["/users/"]["POST"],
             target=schema["/users/{user_id}"]["GET"],
@@ -144,7 +144,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
             request_body={"first_name": "foo", "last_name": "bar"},
         )
     else:
-        schema = schemathesis.from_wsgi("/schema.yaml", app=app)
+        schema = schemathesis.openapi.from_wsgi("/schema.yaml", app=app)
 
     state_machine = schema.as_state_machine()
 
@@ -215,7 +215,7 @@ TestStateful = schema.as_state_machine().TestCase
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_no_transitions_error(app_schema):
-    schema = schemathesis.from_dict(app_schema)
+    schema = schemathesis.openapi.from_dict(app_schema)
     state_machine_cls = schema.as_state_machine()
 
     with pytest.raises(IncorrectUsage, match=NO_LINKS_ERROR_MESSAGE):
@@ -225,7 +225,7 @@ def test_no_transitions_error(app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_settings_error(app_schema):
-    schema = schemathesis.from_dict(app_schema)
+    schema = schemathesis.openapi.from_dict(app_schema)
 
     class Workflow(schema.as_state_machine()):
         settings = settings(max_examples=5)
@@ -237,7 +237,7 @@ def test_settings_error(app_schema):
 @flaky(max_runs=10, min_passes=1)
 def test_use_after_free(app_factory):
     app = app_factory(use_after_free=True)
-    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
     state_machine = schema.as_state_machine()
 
     with pytest.raises(FailureGroup) as exc:
@@ -264,7 +264,7 @@ The API did not return a `HTTP 404 Not Found` response (got `HTTP 204 No Content
 @pytest.mark.parametrize("merge_body", [True, False])
 def test_dynamic_body(merge_body, app_factory):
     app = app_factory(merge_body=merge_body)
-    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
     state_machine = schema.as_state_machine()
 
     state_machine.run(
@@ -280,7 +280,7 @@ def test_dynamic_body(merge_body, app_factory):
 
 def test_custom_config_in_test_case(app_factory):
     app = app_factory()
-    schema = schemathesis.from_wsgi("/openapi.json", app=app)
+    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
     kwargs = _get_default_hypothesis_settings_kwargs()
     settings = schema.as_state_machine().TestCase.settings
     for key, value in kwargs.items():
@@ -290,7 +290,7 @@ def test_custom_config_in_test_case(app_factory):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_format_rules(app_schema):
-    schema = schemathesis.from_dict(app_schema)
+    schema = schemathesis.openapi.from_dict(app_schema)
 
     for status_code in (200, 201):
         schema.add_link(

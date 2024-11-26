@@ -27,8 +27,6 @@ from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
-from schemathesis.specs.graphql import loaders as gql_loaders
-from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.stateful import Stateful
 from schemathesis.transports.auth import get_requests_auth
 
@@ -72,7 +70,7 @@ def assert_schema_requests_num(app, number):
 
 def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    schema = oas_loaders.from_uri(schema_url, base_url=f"{openapi3_base_url}/404/")
+    schema = schemathesis.openapi.from_url(schema_url).configure(base_url=f"{openapi3_base_url}/404/")
     execute(schema)
     # Then the runner should use this base
     # And they will not reach the application
@@ -152,7 +150,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
 
 @pytest.mark.operations("root")
 def test_asgi_interactions(fastapi_app):
-    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
+    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     _, _, _, _, _, *ev, _ = from_schema(schema).execute()
     interaction = ev[1].result.interactions[0]
     assert interaction.status == Status.success
@@ -200,7 +198,7 @@ def test_auth(app, real_app_schema):
 def test_base_url(openapi3_base_url, schema_url, app, converter):
     base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    schema = oas_loaders.from_uri(schema_url, base_url=base_url)
+    schema = schemathesis.openapi.from_url(schema_url).configure(base_url=base_url)
     execute(schema)
 
     # Then each request should reach the app in both cases
@@ -209,7 +207,6 @@ def test_base_url(openapi3_base_url, schema_url, app, converter):
     assert_request(app, 1, "GET", "/api/success")
 
 
-# @pytest.mark.openapi_version("3.0")
 def test_root_url():
     app = FastAPI(
         title="Silly",
@@ -224,7 +221,7 @@ def test_root_url():
         assert case.as_transport_kwargs()["url"] == "/"
         assert response.status_code == 200
 
-    schema = oas_loaders.from_asgi("/openapi.json", app=app, force_schema_version="30")
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
     finished = execute(schema, checks=(check,))
     assert not finished.results.has_failures
 
@@ -241,7 +238,7 @@ def test_execute_with_headers(app, real_app_schema):
 
 
 def test_execute_filter_endpoint(app, schema_url):
-    schema = oas_loaders.from_uri(schema_url).include(path_regex="success")
+    schema = schemathesis.openapi.from_url(schema_url).include(path_regex="success")
     # When `endpoint` is passed in the `execute` call
     execute(schema)
 
@@ -252,7 +249,7 @@ def test_execute_filter_endpoint(app, schema_url):
 
 
 def test_execute_filter_method(app, schema_url):
-    schema = oas_loaders.from_uri(schema_url).include(method="POST")
+    schema = schemathesis.openapi.from_url(schema_url).include(method="POST")
     # When `method` corresponds to a method that is not defined in the app schema
     execute(schema)
     # Then runner will not make any requests
@@ -279,14 +276,14 @@ def test_form_data(app, real_app_schema):
 
     # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    finiished = execute(
+    finished = execute(
         real_app_schema,
         checks=(is_ok, check_content),
         hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None),
     )
     # And there should be no errors or failures
-    assert not finiished.results.has_errors
-    assert not finiished.results.has_failures
+    assert not finished.results.has_errors
+    assert not finished.results.has_failures
     # And the application should receive 3 requests as specified in `max_examples`
     assert_incoming_requests_num(app, 3)
     # And the Content-Type of incoming requests should be `multipart/form-data`
@@ -515,15 +512,15 @@ def test_path_parameters_encoding(real_app_schema):
 
 
 @pytest.mark.parametrize(
-    ("loader_options", "from_schema_options"),
+    ("configuration", "from_schema_options"),
     [
         ({"base_url": "http://127.0.0.1:1/"}, {}),
         ({}, {"hypothesis_settings": hypothesis.settings(deadline=1)}),
     ],
 )
 @pytest.mark.operations("slow")
-def test_exceptions(schema_url, app, loader_options, from_schema_options):
-    schema = oas_loaders.from_uri(schema_url, **loader_options)
+def test_exceptions(schema_url, configuration, from_schema_options):
+    schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     results = from_schema(schema, **from_schema_options).execute()
     assert any(event.status == Status.error for event in results if isinstance(event, events.AfterExecution))
 
@@ -584,7 +581,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         },
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
-    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
     *_, after, _ = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
@@ -635,7 +632,7 @@ def test_plain_text_body(app, real_app_schema):
 def test_invalid_path_parameter(schema_url):
     # When a path parameter is marked as not required
     # And schema validation is disabled
-    schema = oas_loaders.from_uri(schema_url, validate_schema=False)
+    schema = schemathesis.openapi.from_url(schema_url)
     *_, finished = from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)).execute()
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
@@ -674,7 +671,11 @@ def test_url_joining(request, server, get_schema_path, schema_path):
     else:
         base_url = request.getfixturevalue("openapi3_base_url")
     path = get_schema_path(schema_path)
-    schema = oas_loaders.from_path(path, base_url=f"{base_url}/v3").include(path_regex="/pet/findByStatus")
+    schema = (
+        schemathesis.openapi.from_path(path)
+        .configure(base_url=f"{base_url}/v3")
+        .include(path_regex="/pet/findByStatus")
+    )
     *_, after_execution, _ = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()
@@ -688,7 +689,7 @@ def test_url_joining(request, server, get_schema_path, schema_path):
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
-    schema = oas_loaders.from_dict(schema_with_recursive_references)
+    schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
     *_, after, _ = from_schema(schema).execute()
     # Then it causes an error with a proper error message
     assert after.status == Status.error
@@ -736,7 +737,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
@@ -781,7 +782,7 @@ def test_non_serializable_example(ctx, phases, expected):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
@@ -841,7 +842,7 @@ def test_invalid_regex_example(ctx, phases, expected):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases),
@@ -872,7 +873,7 @@ def test_invalid_header_in_example(ctx):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = oas_loaders.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -910,7 +911,7 @@ def test_dry_run_asgi(fastapi_app):
         called = True
 
     # When the user passes `dry_run=True`
-    schema = oas_loaders.from_asgi("/openapi.json", fastapi_app, force_schema_version="30")
+    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     execute(schema, checks=(check,), dry_run=True)
     # Then no requests should be sent & no responses checked
     assert not called
@@ -918,7 +919,7 @@ def test_dry_run_asgi(fastapi_app):
 
 def test_connection_error(ctx):
     schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
-    schema = oas_loaders.from_dict(schema, base_url="http://127.0.0.1:1")
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1:1")
     *_, after, finished = from_schema(
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
@@ -975,7 +976,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     )
 
     max_examples = 10
-    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
     *_, after, finished = from_schema(
         schema, hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None)
     ).execute()
@@ -1010,7 +1011,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
             }
         }
     )
-    schema = oas_loaders.from_dict(schema, base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
     *_, after, finished = from_schema(schema).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
@@ -1020,7 +1021,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
 
 
 def test_graphql(graphql_url):
-    schema = gql_loaders.from_url(graphql_url)
+    schema = schemathesis.graphql.from_url(graphql_url)
     initialized, _, _, _, _, *other, finished = list(
         from_schema(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     )
@@ -1136,7 +1137,7 @@ def test_case_mutation(real_app_schema):
 def test_malformed_path_template(ctx, path, expected):
     # When schema contains a malformed path template
     schema = ctx.openapi.build_schema({path: {"get": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     # Then it should not cause a fatal error
     *_, event, _ = list(from_schema(schema).execute())
     assert event.status == Status.error
@@ -1196,7 +1197,9 @@ def test_explicit_header_negative(ctx, parameters, expected):
         },
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
-    schema = schemathesis.from_dict(schema, data_generation_methods=DataGenerationMethod.negative)
+    schema = schemathesis.openapi.from_dict(schema).configure(
+        generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    )
     *_, event, finished = list(
         from_schema(
             schema,
@@ -1221,7 +1224,9 @@ def test_skip_non_negated_headers(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema, data_generation_methods=DataGenerationMethod.negative)
+    schema = schemathesis.openapi.from_dict(schema).configure(
+        generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    )
     *_, event, finished = list(
         from_schema(
             schema,
@@ -1258,7 +1263,7 @@ def test_stateful_auth(real_app_schema):
 def test_stateful_all_generation_methods(real_app_schema):
     experimental.STATEFUL_ONLY.enable()
     method = DataGenerationMethod.negative
-    real_app_schema.data_generation_methods = [method]
+    real_app_schema.generation_config.methods = [method]
     _, *_, after_execution, _ = from_schema(real_app_schema, **STATEFUL_KWARGS).execute()
     interactions = after_execution.result.interactions
     assert len(interactions) > 0
@@ -1334,7 +1339,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         },
         version="2.0",
     )
-    schema = schemathesis.from_dict(schema, base_url=openapi2_base_url)
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi2_base_url)
     runner = schemathesis.runner.from_schema(
         schema,
         hypothesis_settings=settings(max_examples=10),

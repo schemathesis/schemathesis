@@ -14,6 +14,7 @@ MAX_WIDTH = 80
 class OutputConfig:
     """Options for configuring various aspects of Schemathesis output."""
 
+    sanitize: bool = True
     truncate: bool = True
     max_payload_size: int = MAX_PAYLOAD_SIZE
     max_lines: int = MAX_LINES

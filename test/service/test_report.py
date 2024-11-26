@@ -14,7 +14,7 @@ from schemathesis.service import ci, metadata, report
 
 
 def test_add_events(openapi3_schema_url, read_report):
-    schema = schemathesis.from_uri(openapi3_schema_url, validate_schema=False)
+    schema = schemathesis.openapi.from_url(openapi3_schema_url)
     payload = BytesIO()
     with tarfile.open(mode="w:gz", fileobj=payload) as tar:
         writer = report.ReportWriter(tar)
@@ -61,7 +61,7 @@ def test_metadata(read_report):
 
 
 def generate_events(schema_url):
-    schema = schemathesis.from_uri(schema_url, validate_schema=False)
+    schema = schemathesis.openapi.from_url(schema_url)
     yield from schemathesis.runner.from_schema(schema).execute()
 
 
