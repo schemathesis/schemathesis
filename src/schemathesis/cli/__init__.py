@@ -364,13 +364,6 @@ REPORT_TO_SERVICE = ReportToService()
     default=None,
     envvar=WAIT_FOR_SCHEMA_ENV_VAR,
 )
-@grouped_option(
-    "--validate-schema",
-    help="Validate input API schema. Set to 'true' to enable or 'false' to disable",
-    type=bool,
-    default=False,
-    show_default=True,
-)
 @group("Network requests options")
 @grouped_option(
     "--base-url",
@@ -579,12 +572,6 @@ REPORT_TO_SERVICE = ReportToService()
 )
 @group("Open API options")
 @grouped_option(
-    "--force-schema-version",
-    help="Force the schema to be interpreted as a particular OpenAPI version",
-    type=click.Choice(["20", "30"]),
-    metavar="",
-)
-@grouped_option(
     "--set-query",
     "set_query",
     help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
@@ -772,7 +759,6 @@ def run(
     request_cert: str | None = None,
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
-    validate_schema: bool = True,
     junit_xml: click.utils.LazyFile | None = None,
     debug_output_file: click.utils.LazyFile | None = None,
     show_trace: bool = False,
@@ -782,7 +768,6 @@ def run(
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
     stateful: Stateful | None = None,
-    force_schema_version: str | None = None,
     sanitize_output: bool = True,
     output_truncate: bool = True,
     contrib_unique_data: bool = False,
@@ -844,6 +829,7 @@ def run(
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
 
     generation_config = generation.GenerationConfig(
+        methods=list(data_generation_methods),
         allow_x00=generation_allow_x00,
         graphql_allow_null=generation_graphql_allow_null,
         codec=generation_codec,
@@ -865,8 +851,6 @@ def run(
 
     check_auth(auth, headers, override)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
-
-    output_config = OutputConfig(truncate=output_truncate)
 
     for values, arg_name in (
         (include_path, "--include-path"),
@@ -1037,22 +1021,28 @@ def run(
     )
     if exit_first:
         max_failures = 1
-    event_stream = into_event_stream(
-        schema_or_location,
-        base_url=base_url,
-        validate_schema=validate_schema,
-        data_generation_methods=data_generation_methods,
-        force_schema_version=force_schema_version,
-        request_tls_verify=request_tls_verify,
-        request_proxy=request_proxy,
-        request_cert=prepare_request_cert(request_cert, request_cert_key),
-        wait_for_schema=wait_for_schema,
+    network_config = NetworkConfig(
         auth=auth,
         auth_type=auth_type,
-        override=override,
         headers=headers,
-        request_timeout=request_timeout,
-        sanitize_output=sanitize_output,
+        timeout=request_timeout,
+        tls_verify=request_tls_verify,
+        proxy=request_proxy,
+        cert=prepare_request_cert(request_cert, request_cert_key),
+    )
+    output_config = OutputConfig(sanitize=sanitize_output, truncate=output_truncate)
+    loader_config = loaders.AutodetectConfig(
+        schema_or_location=schema_or_location,
+        network=network_config,
+        wait_for_schema=wait_for_schema,
+        base_url=base_url,
+        rate_limit=rate_limit,
+        output=output_config,
+        generation=generation_config,
+    )
+    event_stream = into_event_stream(
+        network_config=network_config,
+        override=override,
         seed=hypothesis_seed,
         max_failures=max_failures,
         unique_data=contrib_unique_data,
@@ -1061,12 +1051,11 @@ def run(
         max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,
-        rate_limit=rate_limit,
         stateful=stateful,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
         checks_config=checks_config,
-        output_config=output_config,
+        loader_config=loader_config,
         service_client=client,
         filter_set=filter_set,
     )
@@ -1078,7 +1067,6 @@ def run(
         rate_limit=rate_limit,
         show_trace=show_trace,
         wait_for_schema=wait_for_schema,
-        validate_schema=validate_schema,
         cassette_config=cassette_config,
         junit_xml=junit_xml,
         debug_output_file=debug_output_file,
@@ -1112,24 +1100,10 @@ def prepare_request_cert(cert: str | None, key: str | None) -> str | tuple[str, 
 
 
 def into_event_stream(
-    schema_or_location: str | dict[str, Any],
     *,
-    base_url: str | None,
-    validate_schema: bool,
-    data_generation_methods: tuple[DataGenerationMethod, ...],
-    force_schema_version: str | None,
-    request_tls_verify: bool | str,
-    request_proxy: str | None,
-    request_cert: str | tuple[str, str] | None,
-    # Network request parameters
-    auth: tuple[str, str] | None,
-    auth_type: str | None,
+    network_config: NetworkConfig,
     override: CaseOverride,
-    headers: dict[str, str] | None,
-    request_timeout: int | None,
-    wait_for_schema: float | None,
     filter_set: FilterSet,
-    # Runtime behavior
     checks: Iterable[CheckFunction],
     checks_config: CheckConfig,
     max_response_time: int | None,
@@ -1137,41 +1111,22 @@ def into_event_stream(
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,
-    output_config: OutputConfig,
-    sanitize_output: bool,
     seed: int | None,
     max_failures: int | None,
-    rate_limit: str | None,
     unique_data: bool,
     dry_run: bool,
     stateful: Stateful | None,
     service_client: ServiceClient | None,
+    loader_config: loaders.AutodetectConfig,
 ) -> events.EventGenerator:
     try:
-        network = NetworkConfig(
-            auth=auth,
-            auth_type=auth_type,
-            headers=headers,
-            timeout=request_timeout,
-            tls_verify=request_tls_verify,
-            proxy=request_proxy,
-            cert=request_cert,
-        )
-        config = loaders.LoaderConfig(
-            schema_or_location=schema_or_location,
-            base_url=base_url,
-            validate_schema=validate_schema,
-            data_generation_methods=data_generation_methods,
-            force_schema_version=force_schema_version,
-            network=network,
-            wait_for_schema=wait_for_schema,
-            rate_limit=rate_limit,
-            sanitize_output=sanitize_output,
-            output_config=output_config,
-            generation_config=generation_config,
-        )
-        schema = loaders.load_schema(config)
+        schema = loaders.load_schema(loader_config)
         schema.filter_set = filter_set
+    except LoaderError as error:
+        yield events.InternalError.from_schema_error(error)
+        return
+
+    try:
         yield from runner.from_schema(
             schema,
             override=override,
@@ -1187,11 +1142,9 @@ def into_event_stream(
             stateful=stateful,
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
-            network=network,
+            network=network_config,
             service_client=service_client,
         ).execute()
-    except LoaderError as error:
-        yield events.InternalError.from_schema_error(error)
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
 
@@ -1259,7 +1212,6 @@ def execute(
     rate_limit: str | None,
     show_trace: bool,
     wait_for_schema: float | None,
-    validate_schema: bool,
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
     debug_output_file: click.utils.LazyFile | None,
@@ -1306,7 +1258,6 @@ def execute(
         rate_limit=rate_limit,
         show_trace=show_trace,
         wait_for_schema=wait_for_schema,
-        validate_schema=validate_schema,
         cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
         report=report_context,

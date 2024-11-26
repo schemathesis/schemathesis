@@ -317,7 +317,7 @@ def test_optional_query_param_negation(ctx):
         }
     )
 
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
@@ -388,7 +388,7 @@ def test_non_default_styles(ctx, location, schema, style, explode):
         }
     )
 
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/bug"]["get"].as_strategy(data_generation_method=DataGenerationMethod.negative))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)

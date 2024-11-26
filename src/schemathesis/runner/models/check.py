@@ -38,7 +38,7 @@ class Check:
         headers = None
         if self.case.headers is not None:
             headers = dict(self.case.headers)
-            if self.case.operation.schema.sanitize_output:
+            if self.case.operation.schema.output_config.sanitize:
                 sanitize_value(headers)
 
         return code_samples.generate(

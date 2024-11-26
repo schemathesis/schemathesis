@@ -175,7 +175,7 @@ def validate_vanilla_requests_kwargs(data: dict[str, Any]) -> None:
                 break
         raise RuntimeError(
             "The `base_url` argument is required when specifying a schema via a file, so Schemathesis knows where to send the data. \n"
-            f"Pass `base_url` either to the `schemathesis.from_*` loader or to the `Case.{method_name}`.\n"
+            f"Pass `base_url` either to the `schemathesis.openapi.from_*` loader or to the `Case.{method_name}`.\n"
             f"If you use the ASGI integration, please supply your test client "
             f"as the `session` argument to `call`.\nURL: {url}"
         )

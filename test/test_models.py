@@ -17,7 +17,7 @@ from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case, CaseSource, TransitionId
 from schemathesis.runner.models import Request, Response
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
-from schemathesis.transports import WSGITransport, _merge_dict_to
+from schemathesis.transports import _merge_dict_to
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ def schema_with_payload(ctx):
             }
         },
     )
-    return schemathesis.from_dict(schema, validate_schema=True)
+    return schemathesis.openapi.from_dict(schema)
 
 
 def test_make_case_explicit_media_type(schema_with_payload):
@@ -91,7 +91,7 @@ def test_make_case_missing_media_type(ctx):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     # And the `media_type` argument is not passed to `make_case`
     # Then there should be a usage error
     with pytest.raises(IncorrectUsage):
@@ -150,7 +150,7 @@ def test_mutate_body(openapi3_schema):
     case.body = {"foo": "bar"}
     response = case.call()
     assert response.request.body == json.dumps(case.body).encode()
-    openapi3_schema.transport = WSGITransport(42)
+    openapi3_schema.app = 42
     assert case.as_transport_kwargs()["json"] == case.body
 
 
@@ -206,7 +206,7 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     case = schema["/data"]["post"].make_case(body="<html></html>", media_type="text/plain")
     # When the `Content-Type` header is explicitly passed
     data = case.as_transport_kwargs(headers={header: "text/html"})
@@ -248,7 +248,7 @@ def custom_check(ctx, response, case):
 )
 @pytest.mark.operations("success")
 def test_call_and_validate(openapi3_schema_url, kwargs):
-    api_schema = schemathesis.from_uri(openapi3_schema_url)
+    api_schema = schemathesis.openapi.from_url(openapi3_schema_url)
 
     @given(case=api_schema["/success"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None)
@@ -260,7 +260,7 @@ def test_call_and_validate(openapi3_schema_url, kwargs):
 
 @pytest.mark.operations("success")
 def test_call_and_validate_for_asgi(fastapi_app):
-    api_schema = schemathesis.from_dict(fastapi_app.openapi(), force_schema_version="30")
+    api_schema = schemathesis.openapi.from_dict(fastapi_app.openapi())
 
     @given(case=api_schema["/users"]["GET"].as_strategy())
     @settings(max_examples=1)
@@ -417,7 +417,7 @@ def test_validate_response_schema_path(
         },
         components={"schemas": {"Foo": {"type": "object"}}},
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
     with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
@@ -490,7 +490,7 @@ def test_data_generation_method_is_available(ctx, method):
         }
     )
 
-    api_schema = schemathesis.from_dict(schema)
+    api_schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=api_schema["/data"]["POST"].as_strategy(data_generation_method=method))
     @settings(max_examples=1)
@@ -521,7 +521,7 @@ def test_case_insensitive_headers(ctx):
         }
     )
     # When headers are generated
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/data"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -559,7 +559,7 @@ def test_iter_parameters(ctx):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     params = list(schema["/data"]["POST"].iter_parameters())
     assert len(params) == 2
     assert params[0].name == "X-id"
@@ -579,7 +579,7 @@ def test_checks_errors_deduplication(ctx):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     case = schema["/data"]["GET"].make_case()
     response = requests.Response()
     response.status_code = 200
@@ -631,7 +631,7 @@ def test_merge_dict_to():
 def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
-    openapi_30.transport = WSGITransport(42)
+    openapi_30.app = 42
     case = Case(
         openapi_30["/users"]["GET"],
         generation_time=0.0,
@@ -696,7 +696,7 @@ def test_get_parameter(ctx, name, location, exists):
         },
         security=[{"ApiKeyAuth": []}],
     )
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     parameter = schema["/data/"]["GET"].get_parameter(name, location)
     assert (parameter is not None) is exists

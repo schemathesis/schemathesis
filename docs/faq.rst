@@ -77,8 +77,7 @@ If you wrote your application in a language other than Python, you should use th
 Should I always have my application running before starting the test suite?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Only in some workflows! In CLI, you can test your AioHTTP / ASGI / WSGI apps with the ``--app`` CLI option.
-For the ``pytest`` integration, there is ``schemathesis.from_pytest_fixture`` loader where you can postpone API schema loading
+For the ``pytest`` integration, there is ``schemathesis.pytest.from_fixture`` loader where you can postpone API schema loading
 and start the test application as a part of your test setup. See more information in the :doc:`../python` section.
 
 How long does it usually take for Schemathesis to test an app?
@@ -292,7 +291,7 @@ Python:
     import schemathesis
     from schemathesis import GenerationConfig
 
-    schema = schemathesis.from_uri(
+    schema = schemathesis.openapi.from_url(
         "https://example.schemathesis.io/openapi.json",
         generation_config=GenerationConfig(allow_x00=False),
     )

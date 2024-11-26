@@ -13,8 +13,8 @@ HERE = Path(__file__).absolute().parent
 @pytest.fixture(autouse=True)
 def cleanup():
     yield
-    schemathesis.openapi.media_types.unregister_all()
-    assert MEDIA_TYPE not in schemathesis.openapi.media_types.MEDIA_TYPES
+    schemathesis.specs.openapi.media_types.unregister_all()
+    assert MEDIA_TYPE not in schemathesis.specs.openapi.media_types.MEDIA_TYPES
     assert MEDIA_TYPE not in schemathesis.serializers.SERIALIZERS
 
 
@@ -42,7 +42,7 @@ def test_pdf_generation(ctx):
         }
     )
     schemathesis.openapi.media_type(MEDIA_TYPE, PDFS, aliases=[ALIAS])
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     strategy = schema["/pdf"]["post"].as_strategy()
 

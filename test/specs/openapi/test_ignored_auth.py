@@ -25,8 +25,8 @@ from schemathesis.specs.openapi.checks import (
 )
 
 
-def run(schema_url, headers=None, **loader_kwargs):
-    schema = schemathesis.from_uri(schema_url, **loader_kwargs)
+def run(schema_url, headers=None, **configuration):
+    schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     _, _, _, _, _, _, event, *_ = from_schema(
         schema,
         checks=[ignored_auth],
@@ -41,7 +41,7 @@ def run(schema_url, headers=None, **loader_kwargs):
 def test_auth_is_not_checked(with_generated, schema_url):
     kwargs = {}
     if not with_generated:
-        kwargs["generation_config"] = GenerationConfig(with_security_parameters=False)
+        kwargs["generation"] = GenerationConfig(with_security_parameters=False)
     # When auth is present
     # And endpoint declares auth as a requirement but doesn't actually require it
     event = run(schema_url, **kwargs)
@@ -154,7 +154,7 @@ def test_contains_auth(ctx, request_kwargs, parameters, expected):
 )
 @pytest.mark.operations("success")
 def test_remove_auth_from_case(schema_url, key, parameters):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     case = schema["/success"]["GET"].make_case(**{key: {"A": "V"}})
     _remove_auth_from_case(case, parameters)
     assert not getattr(case, key)
@@ -171,7 +171,7 @@ def test_proper_session(ignores_auth):
 
         return {"message": "Hello world"}
 
-    schema = schemathesis.from_asgi("/openapi.json", app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
     @given(case=schema["/"]["GET"].as_strategy())
     @settings(max_examples=3, phases=[Phase.generate])
@@ -204,7 +204,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
             )
         return {"message": "Hello world"}
 
-    schema = schemathesis.from_asgi("/openapi.json", app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
     @given(case=schema["/"]["GET"].as_strategy())
     @settings(max_examples=3, phases=[Phase.generate])
@@ -311,7 +311,7 @@ def test_custom_auth():
             )
         return {"message": "Hello world"}
 
-    schema = schemathesis.from_asgi("/openapi.json", app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
     @schema.auth()
     class Auth:
@@ -380,7 +380,7 @@ def test_auth_via_setitem(testdir, location):
 from hypothesis import settings
 import schemathesis
 
-schema = schemathesis.from_asgi("/openapi.json", app)
+schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 @schema.parametrize()
 @settings(max_examples=3)

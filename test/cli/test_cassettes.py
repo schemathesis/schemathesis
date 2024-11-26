@@ -207,10 +207,6 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
     assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
 
 
-def test_get_command_representation_unknown():
-    assert get_command_representation() == "<unknown entrypoint>"
-
-
 def test_get_command_representation(mocker):
     mocker.patch("schemathesis.cli.cassettes.sys.argv", ["schemathesis", "run", "http://example.com/schema.yaml"])
     assert get_command_representation() == "st run http://example.com/schema.yaml"
@@ -237,24 +233,6 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     assert cassette["command"] == command
 
 
-@pytest.mark.operations("invalid")
-def test_main_process_error(cli, schema_url, hypothesis_max_examples, cassette_path):
-    # When there is an error in the main process before the background writer is finished
-    # Here it is happening because the schema is not valid
-    result = cli.run(
-        schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
-        "--validate-schema=true",
-    )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then there should be no hanging threads
-    # And no cassette
-    cassette = load_cassette(cassette_path)
-    assert cassette is None
-
-
 @pytest.mark.operations("__all__")
 @pytest.mark.parametrize("verbose", [True, False])
 @pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
@@ -267,7 +245,6 @@ async def test_replay(
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         "--checks=all",
         *args,
     )
@@ -339,7 +316,6 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
         "--cassette-format=har",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         "--checks=all",
         f"-H Authorization: {auth}",
         f"--sanitize-output={value}",
@@ -371,7 +347,6 @@ def test_har_format_dry_run(cli, schema_url, cassette_path, hypothesis_max_examp
         "--cassette-format=har",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         "--checks=all",
         "--dry-run",
     )
@@ -448,7 +423,6 @@ def test_replay_requests_options(cli, schema_url, cassette_path, request_args, m
         f"--cassette-path={cassette_path}",
         "--hypothesis-max-examples=1",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         "--checks=all",
     )
     send = mocker.spy(requests.adapters.HTTPAdapter, "send")
@@ -470,7 +444,6 @@ def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
     )
     # Then tests should pass
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -489,7 +462,6 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         f"-H Authorization: {auth}",
         f"--sanitize-output={value}",
     )

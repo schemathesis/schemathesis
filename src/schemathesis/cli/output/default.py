@@ -209,9 +209,6 @@ def bold(option: str) -> str:
 
 
 DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
-DISABLE_SCHEMA_VALIDATION_SUGGESTION = (
-    f"Bypass validation using {bold('`--validate-schema=false`')}. Caution: May cause unexpected errors."
-)
 
 
 def _display_error(context: ExecutionContext, error: EngineErrorInfo) -> bool:
@@ -621,9 +618,7 @@ LOADER_ERROR_SUGGESTIONS = {
     LoaderErrorKind.HTTP_FORBIDDEN: "Verify your API keys or authentication headers.",
     LoaderErrorKind.HTTP_NOT_FOUND: VERIFY_URL_SUGGESTION,
     # OpenAPI specification issues
-    LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION: f"Include the version in the schema or manually set it with {bold('`--force-schema-version`')}.",
-    LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION: f"Proceed with {bold('`--force-schema-version`')}. Caution: May not be fully supported.",
-    LoaderErrorKind.OPEN_API_INVALID_SCHEMA: DISABLE_SCHEMA_VALIDATION_SUGGESTION,
+    LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION: "Include the version in the schema.",
     # YAML specific issues
     LoaderErrorKind.YAML_NUMERIC_STATUS_CODES: "Convert numeric status codes to strings.",
     LoaderErrorKind.YAML_NON_STRING_KEYS: "Convert non-string keys to strings.",

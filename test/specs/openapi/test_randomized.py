@@ -17,9 +17,7 @@ from hypothesis_openapi import openapis
 @given(openapis(version="2.0") | openapis(version="3.0"))
 @settings(max_examples=25, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
 def test_random_schemas(schema):
-    schema = schemathesis.from_dict(schema, validate_schema=True)
-    # Disable schema validation to allow more flexible behavior at runtime
-    schema.validate_schema = False
+    schema = schemathesis.openapi.from_dict(schema)
     for event in schemathesis.runner.from_schema(schema, dry_run=True).execute():
         assert not isinstance(event, events.InternalError), repr(event)
         if isinstance(event, events.AfterExecution):

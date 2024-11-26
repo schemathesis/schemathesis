@@ -13,7 +13,7 @@ def test_contains(swagger_20):
 
 
 def test_getitem(simple_schema):
-    swagger = schemathesis.from_dict(simple_schema)
+    swagger = schemathesis.openapi.from_dict(simple_schema)
     assert isinstance(swagger["/users"]["GET"], APIOperation)
 
 
@@ -64,6 +64,6 @@ def test_reference_in_path():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     strategy = schema["/{key}"]["GET"].as_strategy()
     assert isinstance(strategy.example().path_parameters["key"], str)
