@@ -87,7 +87,7 @@ schemathesis = "schemathesis.cli:schemathesis"
 st = "schemathesis.cli:schemathesis"
 
 [project.entry-points.pytest11]
-schemathesis = "schemathesis.extra.pytest_plugin"
+schemathesis = "schemathesis.pytest.plugin"
 
 [tool.pytest.ini_options]
 addopts = ["-ra", "--strict-markers", "--strict-config"]

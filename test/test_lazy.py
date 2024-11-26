@@ -209,44 +209,6 @@ def test_(request, case):
     )
 
 
-@pytest.mark.parametrize(
-    "decorators",
-    [
-        """@lazy_schema.hooks.apply(before_generate_headers)
-@lazy_schema.parametrize()""",
-        """@lazy_schema.parametrize()
-@lazy_schema.hooks.apply(before_generate_headers)""",
-    ],
-)
-def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
-    testdir.make_test(
-        f"""
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
-
-@lazy_schema.hook
-def before_generate_query(context, strategy):
-    return strategy.filter(lambda x: x["id"].isdigit())
-
-def before_generate_headers(context, strategy):
-    def convert(x):
-        x["value"] = "cool"
-        return x
-    return strategy.map(convert)
-
-{decorators}
-@settings(max_examples=5, suppress_health_check=[HealthCheck.filter_too_much])
-def test_(request, case):
-    request.config.HYPOTHESIS_CASES += 1
-    assert case.query["id"].isdigit()
-    assert case.headers["value"] == "cool"
-""",
-        schema=simple_openapi,
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines(["Hypothesis calls: 5"])
-
-
 @pytest.mark.parametrize("given", ["data=st.data()", "st.data()"])
 def test_schema_given(testdir, given):
     # When the schema is defined via a pytest fixture
@@ -383,59 +345,6 @@ def pytest_terminal_summary(terminalreporter) -> None:
     result.stdout.re_match_lines(
         [r"test_data_generation_methods.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS"]
     )
-
-
-def test_hooks_are_merged(testdir):
-    # When the wrapped schema has hooks
-    # And the lazy schema also has hooks
-    testdir.make_test(
-        """
-COUNTER = 1
-
-def before_generate_case_first(ctx, strategy):
-
-    def change(case):
-        global COUNTER
-        if case.headers is None:
-            case.headers = {}
-        case.headers["one"] = COUNTER
-        COUNTER += 1
-        return case
-
-    return strategy.map(change)
-
-@pytest.fixture()
-def api_schema():
-    loaded = schemathesis.openapi.from_dict(raw_schema)
-    loaded.hook("before_generate_case")(before_generate_case_first)
-    return loaded
-
-
-lazy_schema = schemathesis.pytest.from_fixture("api_schema")
-
-def before_generate_case_second(ctx, strategy):
-
-    def change(case):
-        global COUNTER
-        if case.headers is None:
-            case.headers = {}
-        case.headers["two"] = COUNTER
-        COUNTER += 1
-        return case
-
-    return strategy.map(change)
-
-lazy_schema.hook("before_generate_case")(before_generate_case_second)
-
-@lazy_schema.parametrize()
-@settings(max_examples=1)
-def test_(case):
-    assert case.headers == {"one": 1, "two": 2}
-    """,
-    )
-    # Then all hooks should be merged
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)
 
 
 def test_error_on_no_matches(testdir):

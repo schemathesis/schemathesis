@@ -1,4 +1,4 @@
-from schemathesis.extra.pytest_plugin import SchemaHandleMark
+from schemathesis.pytest.plugin import SchemaHandleMark
 
 
 def test_is_schemathesis_test(swagger_20):

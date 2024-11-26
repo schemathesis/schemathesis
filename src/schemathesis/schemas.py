@@ -276,7 +276,7 @@ class BaseSchema(Mapping):
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
-            from schemathesis.extra.pytest_plugin import SchemaHandleMark
+            from schemathesis.pytest.plugin import SchemaHandleMark
 
             if SchemaHandleMark.is_set(func):
 
