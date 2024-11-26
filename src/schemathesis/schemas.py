@@ -289,7 +289,7 @@ class BaseSchema(Mapping):
 
                 return wrapped_test
             HookDispatcher.add_dispatcher(func)
-            cloned = self.clone(test_function=func, filter_set=self.filter_set)
+            cloned = self.clone(test_function=func)
             SchemaHandleMark.set(func, cloned)
             return func
 
@@ -300,48 +300,30 @@ class BaseSchema(Mapping):
         return given_proxy(*args, **kwargs)
 
     def clone(
-        self,
-        *,
-        base_url: str | None | NotSet = NOT_SET,
-        test_function: Callable | None = None,
-        app: Any = NOT_SET,
-        hooks: HookDispatcher | NotSet = NOT_SET,
-        auth: AuthStorage | NotSet = NOT_SET,
-        generation_config: GenerationConfig | NotSet = NOT_SET,
-        output_config: OutputConfig | NotSet = NOT_SET,
-        rate_limiter: Limiter | NotSet | None = NOT_SET,
-        filter_set: FilterSet | None = None,
+        self, *, test_function: Callable | NotSet = NOT_SET, filter_set: FilterSet | NotSet = NOT_SET
     ) -> BaseSchema:
-        if base_url is NOT_SET:
-            base_url = self.base_url
-        if app is NOT_SET:
-            app = self.app
-        if filter_set is None:
-            filter_set = self.filter_set
-        if hooks is NOT_SET:
-            hooks = self.hooks
-        if auth is NOT_SET:
-            auth = self.auth
-        if generation_config is NOT_SET:
-            generation_config = self.generation_config
-        if output_config is NOT_SET:
-            output_config = self.output_config
-        if rate_limiter is NOT_SET:
-            rate_limiter = self.rate_limiter
+        if isinstance(test_function, NotSet):
+            _test_function = self.test_function
+        else:
+            _test_function = test_function
+        if isinstance(filter_set, NotSet):
+            _filter_set = self.filter_set
+        else:
+            _filter_set = filter_set
 
         return self.__class__(
             self.raw_schema,
             specification=self.specification,
             location=self.location,
-            base_url=base_url,  # type: ignore
-            app=app,
-            hooks=hooks,  # type: ignore
-            auth=auth,  # type: ignore
-            test_function=test_function,
-            generation_config=generation_config,  # type: ignore
-            output_config=output_config,  # type: ignore
-            rate_limiter=rate_limiter,  # type: ignore
-            filter_set=filter_set,  # type: ignore
+            base_url=self.base_url,
+            app=self.app,
+            hooks=self.hooks,
+            auth=self.auth,
+            test_function=_test_function,
+            generation_config=self.generation_config,
+            output_config=self.output_config,
+            rate_limiter=self.rate_limiter,
+            filter_set=_filter_set,
         )
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
