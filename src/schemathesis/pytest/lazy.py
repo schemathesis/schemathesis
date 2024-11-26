@@ -19,36 +19,22 @@ from schemathesis._hypothesis._given import (
     validate_given_args,
 )
 from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
-from schemathesis._pytest.control_flow import fail_on_no_matches
-from schemathesis.auths import AuthStorage
-from schemathesis.core import NOT_SET
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
 from schemathesis.internal.result import Ok
+from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
-    from pyrate_limiter import Limiter
 
-    from schemathesis.core import NotSet
-    from schemathesis.generation import GenerationConfig
-    from schemathesis.internal.output import OutputConfig
     from schemathesis.models import APIOperation
 
 
 @dataclass
 class LazySchema:
     fixture_name: str
-    base_url: str | None | NotSet = NOT_SET
-    app: Any = NOT_SET
     filter_set: FilterSet = field(default_factory=FilterSet)
-    hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
-    auth: AuthStorage = field(default_factory=AuthStorage)
-    generation_config: GenerationConfig | NotSet = NOT_SET
-    output_config: OutputConfig | NotSet = NOT_SET
-    rate_limiter: Limiter | None = None
 
     def include(
         self,
@@ -80,17 +66,7 @@ class LazySchema:
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
         )
-        return self.__class__(
-            fixture_name=self.fixture_name,
-            base_url=self.base_url,
-            app=self.app,
-            hooks=self.hooks,
-            auth=self.auth,
-            generation_config=self.generation_config,
-            output_config=self.output_config,
-            rate_limiter=self.rate_limiter,
-            filter_set=filter_set,
-        )
+        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set)
 
     def exclude(
         self,
@@ -128,31 +104,9 @@ class LazySchema:
             operation_id=operation_id,
             operation_id_regex=operation_id_regex,
         )
-        return self.__class__(
-            fixture_name=self.fixture_name,
-            base_url=self.base_url,
-            app=self.app,
-            hooks=self.hooks,
-            auth=self.auth,
-            generation_config=self.generation_config,
-            output_config=self.output_config,
-            rate_limiter=self.rate_limiter,
-            filter_set=filter_set,
-        )
+        return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set)
 
-    def hook(self, hook: str | Callable) -> Callable:
-        return self.hooks.register(hook)
-
-    def parametrize(
-        self,
-        generation_config: GenerationConfig | NotSet = NOT_SET,
-        output_config: OutputConfig | NotSet = NOT_SET,
-    ) -> Callable:
-        if generation_config is NOT_SET:
-            generation_config = self.generation_config
-        if output_config is NOT_SET:
-            output_config = self.output_config
-
+    def parametrize(self) -> Callable:
         def wrapper(test: Callable) -> Callable:
             if is_given_applied(test):
                 # The user wrapped the test function with `@schema.given`
@@ -172,19 +126,10 @@ class LazySchema:
             def wrapped_test(request: FixtureRequest) -> None:
                 """The actual test, which is executed by pytest."""
                 __tracebackhide__ = True
-                parent_dispatcher = HookDispatcherMark.get(wrapped_test)
-                if parent_dispatcher is not None:
-                    HookDispatcherMark.set(test, parent_dispatcher)
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
-                    base_url=self.base_url,
-                    hooks=self.hooks,
-                    auth=self.auth if self.auth.providers is not None else NOT_SET,
                     test_function=test,
-                    generation_config=generation_config,
-                    output_config=output_config,
-                    app=self.app,
                     filter_set=self.filter_set,
                 )
                 fixtures = get_fixtures(test, request, given_kwargs)
@@ -305,34 +250,13 @@ def _get_partial_node_name(node_id: str, **kwargs: Any) -> str:
     return name
 
 
-def get_schema(
-    *,
-    request: FixtureRequest,
-    name: str,
-    base_url: str | None | NotSet = None,
-    filter_set: FilterSet,
-    app: Any = None,
-    test_function: Callable,
-    hooks: HookDispatcher,
-    auth: AuthStorage | NotSet,
-    generation_config: GenerationConfig | NotSet = NOT_SET,
-    output_config: OutputConfig | NotSet = NOT_SET,
-) -> BaseSchema:
+def get_schema(*, request: FixtureRequest, name: str, filter_set: FilterSet, test_function: Callable) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
     if not isinstance(schema, BaseSchema):
         raise ValueError(f"The given schema must be an instance of BaseSchema, got: {type(schema)}")
 
-    return schema.clone(
-        base_url=base_url,
-        filter_set=filter_set,
-        app=app,
-        test_function=test_function,
-        hooks=schema.hooks.merge(hooks),
-        auth=auth,
-        generation_config=generation_config,
-        output_config=output_config,
-    )
+    return schema.clone(filter_set=filter_set, test_function=test_function)
 
 
 def get_fixtures(func: Callable, request: FixtureRequest, given_kwargs: dict[str, Any]) -> dict[str, Any]:
