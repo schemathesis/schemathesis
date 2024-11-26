@@ -18,7 +18,7 @@ Sometimes, during testing, it is needed to disable TLS verification of the servi
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://127.0.0.1/schema.json")
+    schema = schemathesis.openapi.from_uri("http://127.0.0.1/schema.json")
 
 
     @schema.parametrize()
@@ -63,7 +63,7 @@ Different API operations may need different timeouts during testing. You could a
 
     DEFAULT_TIMEOUT = 10  # in seconds
     SCHEMA_URL = "http://127.0.0.1/schema.json"
-    schema = schemathesis.from_uri(SCHEMA_URL)
+    schema = schemathesis.openapi.from_uri(SCHEMA_URL)
 
 
     @schema.parametrize()

@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
-from schemathesis.core import NOT_SET
 from schemathesis.core.errors import IncorrectUsage
 
 from ..constants import NO_LINKS_ERROR_MESSAGE
@@ -293,21 +292,6 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
         return StepResult(response, case, elapsed)
-
-
-def _print_case(case: Case, kwargs: dict[str, Any]) -> str:
-    from requests.structures import CaseInsensitiveDict
-
-    operation = f"state.schema['{case.operation.path}']['{case.operation.method.upper()}']"
-    headers = case.headers or CaseInsensitiveDict()
-    headers.update(kwargs.get("headers", {}))
-    case.headers = headers
-    data = [
-        f"{name}={getattr(case, name)!r}"
-        for name in ("path_parameters", "headers", "cookies", "query", "body", "media_type")
-        if getattr(case, name) not in (None, NOT_SET)
-    ]
-    return f"{operation}.make_case({', '.join(data)})"
 
 
 class Direction:

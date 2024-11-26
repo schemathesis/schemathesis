@@ -293,11 +293,7 @@ def get_schema_for_location(
 ) -> dict[str, Any]:
     schema = parameters_to_json_schema(operation, parameters)
     if location == "path":
-        if not operation.schema.validate_schema:
-            # If schema validation is disabled, we try to generate data even if the parameter definition
-            # contains errors.
-            # In this case, we know that the `required` keyword should always be `True`.
-            schema["required"] = list(schema["properties"])
+        schema["required"] = list(schema["properties"])
         for prop in schema.get("properties", {}).values():
             if prop.get("type") == "string":
                 prop.setdefault("minLength", 1)

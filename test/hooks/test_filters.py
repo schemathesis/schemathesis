@@ -33,7 +33,7 @@ def test_invalid_hook(request, dispatcher_factory, register):
 @pytest.mark.operations("payload")
 @pytest.mark.parametrize("is_include", [True, False])
 def test_simple_filter(schema_url, is_include):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
 
     if is_include:
 
@@ -93,7 +93,7 @@ def map_body(context, body):
 @pytest.mark.operations("payload")
 @pytest.mark.parametrize("hook", [multiple_skip_for, multiple_apply_to])
 def test_filter_combo(schema_url, hook):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     hook(schema)
 
     @given(case=schema["/payload"]["POST"].as_strategy())

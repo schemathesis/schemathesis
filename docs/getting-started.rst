@@ -43,7 +43,7 @@ For more control and customization, integrate Schemathesis into your Python code
 
    import schemathesis
 
-   schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+   schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
    @schema.parametrize()

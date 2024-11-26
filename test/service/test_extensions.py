@@ -439,7 +439,7 @@ def schema_check(ctx, response, case):
 
 
 def test_schema_patches_remove_all(ctx):
-    schema = schemathesis.from_dict(ctx.openapi.build_schema({}))
+    schema = schemathesis.openapi.from_dict(ctx.openapi.build_schema({}))
     _apply_schema_patches_extension(SchemaPatchesExtension(patches=[{"operation": "remove", "path": []}]), schema)
     assert schema.raw_schema == {}
 
@@ -474,7 +474,7 @@ def test_invalid_schema_patches(ctx, path, expected):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     extension = SchemaPatchesExtension(patches=[{"operation": "remove", "path": path}])
     _apply_schema_patches_extension(extension, schema)
     assert extension.state.errors == [expected]

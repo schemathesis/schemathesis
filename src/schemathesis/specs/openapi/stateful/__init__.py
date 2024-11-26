@@ -94,7 +94,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 case_strategy = combine_strategies(
                     [
                         target.as_strategy(data_generation_method=data_generation_method)
-                        for data_generation_method in schema.data_generation_methods
+                        for data_generation_method in schema.generation_config.methods
                     ]
                 )
                 bundle = bundles[bundle_name]
@@ -115,12 +115,12 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
             name = _normalize_name(f"{target.verbose_name} -> X")
-            if len(schema.data_generation_methods) == 1:
-                case_strategy = target.as_strategy(data_generation_method=schema.data_generation_methods[0])
+            if len(schema.generation_config.methods) == 1:
+                case_strategy = target.as_strategy(data_generation_method=schema.generation_config.methods[0])
             else:
                 strategies = {
                     method: target.as_strategy(data_generation_method=method)
-                    for method in schema.data_generation_methods
+                    for method in schema.generation_config.methods
                 }
 
                 @st.composite  # type: ignore[misc]

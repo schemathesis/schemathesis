@@ -1,4 +1,3 @@
-import platform
 from unittest.mock import ANY, Mock
 
 import pytest
@@ -12,7 +11,7 @@ from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.specs.graphql.loaders import extract_schema_from_response, get_introspection_query
+from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
 from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
 from schemathesis.specs.openapi.checks import (
@@ -60,34 +59,16 @@ def test_as_wsgi_kwargs(graphql_strategy):
     assert WSGITransport(None).serialize_case(case) == expected
 
 
-@pytest.mark.parametrize(
-    ("kwargs", "base_path", "expected"),
-    [
-        ({"base_url": "http://0.0.0.0:1234/something"}, "/something", "http://0.0.0.0:1234/something"),
-        ({"port": 8888}, "/graphql", "http://127.0.0.1:8888/graphql"),
-    ],
-)
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
-def test_custom_base_url(graphql_url, kwargs, base_path, expected):
-    # When a custom Base URL is specified
-    if "port" in kwargs:
-        with pytest.raises(LoaderError) as exc:
-            schemathesis.graphql.from_url(graphql_url, **kwargs)
-        if platform.system() == "Windows":
-            detail = "[WinError 10061] No connection could be made because the target machine actively refused it"
-        elif platform.system() == "Darwin":
-            detail = "[Errno 61] Connection refused"
-        else:
-            detail = "[Errno 111] Connection refused"
-        assert exc.value.extras == [f"Failed to establish a new connection: {detail}"]
-    else:
-        schema = schemathesis.graphql.from_url(graphql_url, **kwargs)
-        # Then the base path is changed, in this case it is the only available path
-        assert schema.base_path == base_path
-        strategy = schema["Query"]["getBooks"].as_strategy()
-        case = strategy.example()
-        # And all requests should go to the specified URL
-        assert case.as_transport_kwargs()["url"] == expected
+def test_custom_base_url(graphql_url):
+    schema = schemathesis.graphql.from_url(graphql_url).configure(base_url="http://0.0.0.0:1234/something")
+
+    # Then the base path is changed, in this case it is the only available path
+    assert schema.base_path == "/something"
+    strategy = schema["Query"]["getBooks"].as_strategy()
+    case = strategy.example()
+    # And all requests should go to the specified URL
+    assert case.as_transport_kwargs()["url"] == "http://0.0.0.0:1234/something"
 
 
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])

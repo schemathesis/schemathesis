@@ -92,7 +92,7 @@ Or a Python library:
 ```python
 import schemathesis
 
-schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
 @schema.parametrize()

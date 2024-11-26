@@ -9,7 +9,7 @@ import pytest
 import schemathesis
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.config import StatefulTestRunnerConfig
@@ -631,7 +631,7 @@ def test_external_link(ctx, app_factory, app_runner):
         },
     )
     root_app = app_factory(independent_500=True)
-    schema = schemathesis.from_dict(schema, app=root_app)
+    schema = schemathesis.openapi.from_dict(schema).configure(app=root_app)
     state_machine = schema.as_state_machine()
     runner = state_machine.runner(
         config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None))
@@ -660,7 +660,7 @@ def test_negative_tests(runner_factory):
         config_kwargs={
             "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
         },
-        loader_kwargs={"data_generation_methods": DataGenerationMethod.all()},
+        configuration={"generation": GenerationConfig(methods=DataGenerationMethod.all())},
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors

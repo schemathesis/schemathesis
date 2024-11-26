@@ -16,9 +16,6 @@ from ._hypothesis import (
 from ._methods import (
     DataGenerationMethod as DataGenerationMethod,
 )
-from ._methods import (
-    DataGenerationMethodInput as DataGenerationMethodInput,
-)
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
@@ -53,6 +50,7 @@ class HeaderConfig:
 class GenerationConfig:
     """Holds various configuration options relevant for data generation."""
 
+    methods: list[DataGenerationMethod] = field(default_factory=lambda: [DataGenerationMethod.default()])
     # Allow generating `\x00` bytes in strings
     allow_x00: bool = True
     # Allowing using `null` for optional arguments in GraphQL queries

@@ -1,0 +1,8 @@
+Exit code: 1
+---
+Stdout:
+Schema Loading Error
+
+API schema does not appear syntactically valid
+
+    Expecting value: line 1 column 1 (char 0)

@@ -216,7 +216,7 @@ def test_content_type_wildcards(content_type, is_error, response_factory):
 
 
 def assert_content_type_conformance(response_factory, raw_schema, content_type, is_error, match=None):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["get"]
     case = models.Case(operation, generation_time=0.0)
     response = response_factory.requests(content_type=content_type)
@@ -268,13 +268,12 @@ def test_content_type_conformance_invalid(spec, response, case):
 
 def test_invalid_schema_on_content_type_check(response_factory):
     # When schema validation is disabled, and it doesn't contain "responses" key
-    schema = schemathesis.from_dict(
+    schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
             "paths": {"/users": {"get": {}}},
-        },
-        validate_schema=False,
+        }
     )
     operation = schema["/users"]["get"]
     case = models.Case(operation, generation_time=0.0)
@@ -578,7 +577,7 @@ def test_no_schema(openapi_30, response_factory):
 
 @pytest.mark.hypothesis_nested
 def test_response_schema_conformance_references_invalid(complex_schema, response_factory):
-    schema = schemathesis.from_path(complex_schema)
+    schema = schemathesis.openapi.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
@@ -594,7 +593,7 @@ def test_response_schema_conformance_references_invalid(complex_schema, response
 @pytest.mark.hypothesis_nested
 @pytest.mark.parametrize("value", ["foo", None])
 def test_response_schema_conformance_references_valid(complex_schema, value, response_factory):
-    schema = schemathesis.from_path(complex_schema)
+    schema = schemathesis.openapi.from_path(complex_schema)
 
     @given(case=schema["/teapot"]["POST"].as_strategy())
     @settings(max_examples=3, deadline=None)
@@ -618,7 +617,7 @@ def test_deduplication(ctx, response_factory):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/data"]["GET"]
     case = operation.make_case()
     response = response_factory.requests()
@@ -691,7 +690,7 @@ def test_optional_headers_missing(schema_with_optional_headers, response_factory
     # When a response header is declared as optional
     # NOTE: Open API 2.0 headers are much simpler and do not contain any notion of declaring them as optional
     # For this reason we support `x-required` instead
-    schema = schemathesis.from_dict(schema_with_optional_headers, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema_with_optional_headers)
     case = make_case(schema, schema_with_optional_headers["paths"]["/data"]["get"])
     response = response_factory.requests()
     # Then it should not be reported as missing
@@ -733,7 +732,7 @@ def test_header_conformance(ctx, response_factory, version, header, schema, valu
         },
         version=version,
     )
-    schema = schemathesis.from_dict(base_schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(base_schema)
     case = make_case(schema, base_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={header: value})
     if expected is True:
@@ -769,7 +768,7 @@ def test_header_conformance_definition_behind_ref(ctx, response_factory):
             },
         },
     )
-    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"Link": "Test"})
     with pytest.raises(AssertionError, match="Response header does not conform to the schema"):
@@ -795,7 +794,7 @@ MULTIPLE_HEADERS = {
 
 def test_header_conformance_multiple_invalid_headers(ctx, response_factory):
     raw_schema = ctx.openapi.build_schema(MULTIPLE_HEADERS)
-    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150", "X-RateLimit-Reset": "Invalid"})
     with pytest.raises(FailureGroup) as exc:
@@ -838,7 +837,7 @@ Value:
 
 def test_header_conformance_missing_and_invalid(ctx, response_factory):
     raw_schema = ctx.openapi.build_schema(MULTIPLE_HEADERS)
-    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     case = make_case(schema, raw_schema["paths"]["/data"]["get"])
     response = response_factory.requests(headers={"X-RateLimit-Limit": "150"})
     with pytest.raises(FailureGroup) as exc:

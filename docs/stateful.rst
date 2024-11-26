@@ -87,7 +87,7 @@ Stateful tests could be added to your test suite by defining a test class:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://0.0.0.0/schema.yaml")
+    schema = schemathesis.openapi.from_url("http://0.0.0.0/schema.yaml")
 
     APIWorkflow = schema.as_state_machine()
     TestAPI = APIWorkflow.TestCase
@@ -123,7 +123,7 @@ To do so, you need to create the state machine inside a ``pytest`` fixture and r
     def state_machine():
         # You may use any schema loader here
         # or use any pytest fixtures
-        schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+        schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
         return schema.as_state_machine()
 
 
@@ -184,7 +184,7 @@ If you load your schema lazily, you can extend the state machine inside the ``py
 
     @pytest.fixture
     def state_machine():
-        schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+        schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
         class APIWorkflow(schema.as_state_machine()):
             def setup(self):
@@ -603,7 +603,7 @@ To collect the events you may use a "sink" that consumes the events and collects
     import schemathesis
     from schemathesis.stateful import events
 
-    schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
+    schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/swagger.json")
     state_machine = schema.as_state_machine()
     sink = state_machine.sink()
 

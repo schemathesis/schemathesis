@@ -16,7 +16,7 @@ def test_cookies(fastapi_app):
     def cookies(token: str = Cookie(None)):
         return {"token": token}
 
-    schema = schemathesis.from_dict(
+    schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -36,8 +36,7 @@ def test_cookies(fastapi_app):
                 }
             },
         },
-        app=fastapi_app,
-    )
+    ).configure(app=fastapi_app)
 
     strategy = schema["/cookies"]["GET"].as_strategy()
 
@@ -62,8 +61,8 @@ def test_null_byte(fastapi_app):
         assert "\x00" not in payload["name"]
         return {"success": True}
 
-    schema = schemathesis.from_asgi(
-        "/openapi.json", app=fastapi_app, generation_config=GenerationConfig(allow_x00=False)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app).configure(
+        generation=GenerationConfig(allow_x00=False)
     )
 
     strategy = schema["/data"]["POST"].as_strategy()
@@ -88,8 +87,8 @@ def test_null_byte_in_headers(fastapi_app):
         assert "\x00" not in x_cookie
         return {"success": True}
 
-    schema = schemathesis.from_asgi(
-        "/openapi.json", app=fastapi_app, generation_config=GenerationConfig(allow_x00=False)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app).configure(
+        generation=GenerationConfig(allow_x00=False)
     )
 
     strategy = schema["/data"]["POST"].as_strategy()
@@ -123,7 +122,7 @@ def test_base_url():
     def read_root():
         return {"Hello": "World"}
 
-    schema = schemathesis.from_dict(raw_schema, app=app)
+    schema = schemathesis.openapi.from_dict(raw_schema).configure(app=app)
     strategy = schema["/foo"]["GET"].as_strategy()
 
     @given(case=strategy)
@@ -174,7 +173,7 @@ def test_events(setup):
     async def find_secret():
         return {"status": "OK"}
 
-    schema = schemathesis.from_asgi("/openapi.json", app, force_schema_version="30")
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
     @given(case=schema["/health"]["GET"].as_strategy())
     @settings(max_examples=3, deadline=None)

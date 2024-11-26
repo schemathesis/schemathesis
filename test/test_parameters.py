@@ -227,7 +227,7 @@ def test_(case):
 
 def _assert_parameter(schema, schema_spec, location, expected=None):
     # When security definition is defined as "apiKey"
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     if schema_spec == "swagger":
         operation = schema["/users"]["get"]
         expected = (
@@ -361,7 +361,6 @@ def test_(case):
     pass
         """,
         **as_param({"name": "status", "in": "unknown", "required": True, "type": "string"}),
-        validate_schema=False,
     )
     # Then the generated test ignores this parameter
     testdir.run_and_assert(passed=1)
@@ -397,7 +396,7 @@ def test_date_deserializing(ctx):
     )
     # Then yaml loader should ignore it
     # And data generation should work without errors
-    schema = schemathesis.from_path(str(schema_path))
+    schema = schemathesis.openapi.from_path(str(schema_path))
 
     @given(case=schema["/teapot"]["GET"].as_strategy())
     @settings(suppress_health_check=[HealthCheck.filter_too_much])
@@ -473,7 +472,7 @@ def test_nullable_body_behind_a_reference(ctx):
         },
     )
     # Then it should be properly collected
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/payload"]["POST"]
     # And its definition is not transformed to JSON Schema
     assert operation.body[0].definition == {
@@ -522,9 +521,9 @@ def api_schema(ctx, request, openapi_version):
         )
     if request.param == "aiohttp":
         base_url = request.getfixturevalue("base_url")
-        return schemathesis.from_dict(schema, base_url=base_url)
+        return schemathesis.openapi.from_dict(schema).configure(base_url=base_url)
     app = request.getfixturevalue("flask_app")
-    return schemathesis.from_dict(schema, app=app, base_url="/api")
+    return schemathesis.openapi.from_dict(schema).configure(base_url="/api", app=app)
 
 
 @pytest.mark.hypothesis_nested
@@ -551,7 +550,7 @@ def test_null_body(api_schema):
 @pytest.mark.operations("read_only")
 def test_read_only(schema_url):
     # When API operation has `readOnly` properties
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
 
     @given(case=schema["/read_only"]["GET"].as_strategy())
     @settings(max_examples=1, deadline=None)
@@ -566,7 +565,7 @@ def test_read_only(schema_url):
 @pytest.mark.operations("write_only")
 def test_write_only(schema_url):
     # When API operation has `writeOnly` properties
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
 
     @given(case=schema["/write_only"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -587,7 +586,7 @@ def test_missing_content_and_schema(ctx, location):
     schema = ctx.openapi.build_schema(
         {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
     )
-    schema = schemathesis.from_dict(schema, validate_schema=False)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(schema["/foo"]["GET"].as_strategy())
     @settings(max_examples=1)

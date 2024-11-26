@@ -123,7 +123,7 @@ def test_common_parameters_with_references_stateful(ctx):
         basePath="/v1",
         version="2.0",
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     # Then state machine should be successfully generated
     state_machine = schema.as_state_machine()
     assert len(state_machine.bundles) == 1

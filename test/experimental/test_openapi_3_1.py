@@ -3,8 +3,7 @@ from hypothesis import Phase, given, settings
 from pydantic import BaseModel
 from starlette.responses import JSONResponse
 
-from schemathesis import from_asgi, from_dict
-from schemathesis.core.errors import LoaderError
+import schemathesis
 from schemathesis.core.failures import FailureGroup
 
 
@@ -48,7 +47,7 @@ def test_works_with_fastapi(fastapi_app):
             }
         )
 
-    schema = from_asgi("/openapi.json", fastapi_app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
 
     @given(case=schema["/address/"]["GET"].as_strategy())
     @settings(phases=[Phase.generate], deadline=None)
@@ -58,38 +57,3 @@ def test_works_with_fastapi(fastapi_app):
         assert "Unevaluated properties are not allowed ('department' was unexpected)" in str(exc.value.exceptions[0])
 
     test()
-
-
-def test_openapi_3_1_schema_validation():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": 42, "version": "0.1.0"},
-        "paths": {
-            "/users": {
-                "get": {
-                    "summary": "Root",
-                    "operationId": "root_users_get",
-                    "responses": {
-                        "200": {"description": "Successful Response", "content": {"application/json": {"schema": {}}}}
-                    },
-                }
-            }
-        },
-    }
-    with pytest.raises(LoaderError):
-        from_dict(raw_schema, validate_schema=True, force_schema_version="30")
-
-
-def test_openapi_3_1_regression_path_ref():
-    raw_schema = {
-        "openapi": "3.1.0",
-        "info": {"title": "Test correct validation of spec using $ref in pathItem", "version": "0.0.1"},
-        "paths": {
-            "/foo": {
-                "get": {"summary": "dummy", "operationId": "dummy", "responses": {"200": {"description": "Success"}}}
-            },
-            "/bar": {"$ref": "#/paths/~1bar"},
-        },
-    }
-
-    from_dict(raw_schema, validate_schema=True)

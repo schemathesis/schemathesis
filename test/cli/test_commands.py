@@ -138,25 +138,6 @@ def test_certificate_only_key(cli, tmp_path, snapshot_cli):
     assert cli.run("http://127.0.0.1", f"--request-cert-key={tmp_path}") == snapshot_cli
 
 
-@pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion(cli, schema_url, snapshot_cli):
-    # When the app's schema contains errors
-    # Then the whole Schemathesis run should fail
-    # And there should be a suggestion to disable schema validation
-    assert cli.run(schema_url, "--validate-schema=true") == snapshot_cli
-
-
-@pytest.mark.operations("invalid")
-def test_invalid_operation_suggestion_disabled(cli, schema_url):
-    # When the app's schema contains errors
-    # And schema validation is disabled
-    result = cli.run(schema_url, "--validate-schema=false")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And there should be no suggestion
-    assert "You can disable input schema validation" not in result.stdout
-
-
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize("header", ["Authorization", "authorization"])
 def test_auth_and_authorization_header_are_disallowed(cli, schema_url, header, snapshot_cli):
@@ -173,14 +154,13 @@ def test_schema_not_available(cli, workers, snapshot_cli):
     assert cli.run("http://127.0.0.1:1/schema.yaml", f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.parametrize("args", [(), ("--force-schema-version=30",)])
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_empty_schema_file(testdir, cli, snapshot_cli, args):
+def test_empty_schema_file(testdir, cli, snapshot_cli):
     # When the schema file is empty
     filename = testdir.makefile(".json", schema="")
     # Then a proper error should be reported
-    assert cli.run(str(filename), "--base-url=http://127.0.0.1:1", *args) == snapshot_cli
+    assert cli.run(str(filename), "--base-url=http://127.0.0.1:1") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -520,7 +500,7 @@ def test_invalid_operation(cli, schema_url, workers):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    result = cli.run(schema_url, f"--workers={workers}", "--validate-schema=false")
+    result = cli.run(schema_url, f"--workers={workers}")
     # Then the whole Schemathesis run should fail
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # And standard Hypothesis error should not appear in the output
@@ -972,13 +952,7 @@ def test_no_schema_in_media_type(ctx, cli, base_url, snapshot_cli):
         }
     )
     assert (
-        cli.run(
-            str(schema_path),
-            f"--base-url={base_url}",
-            "--hypothesis-max-examples=1",
-            "--show-trace",
-            "--validate-schema=true",
-        )
+        cli.run(str(schema_path), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-trace")
         == snapshot_cli
     )
 
@@ -1271,7 +1245,6 @@ def test_debug_output(tmp_path, cli, schema_url, hypothesis_max_examples):
     result = cli.run(
         schema_url,
         f"--debug-output-file={debug_file}",
-        "--validate-schema=false",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         f"--cassette-path={cassette_path}",
     )
@@ -1359,7 +1332,6 @@ def assert_exit_code(event_stream, code):
             rate_limit=None,
             show_trace=False,
             wait_for_schema=None,
-            validate_schema=False,
             cassette_config=None,
             junit_xml=None,
             debug_output_file=None,
@@ -1399,7 +1371,6 @@ def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snap
         str(schema_path),
         f"--debug-output-file={debug_file}",
         "--dry-run",
-        "--validate-schema=false",
         "--hypothesis-max-examples=1",
     ]
     if base_url is not None:
@@ -1651,7 +1622,6 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         openapi2_schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
         "--hypothesis-seed=1",
-        "--validate-schema=false",
         f"-H Authorization: {auth}",
         f"--sanitize-output={value}",
     )

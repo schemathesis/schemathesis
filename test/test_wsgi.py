@@ -7,7 +7,7 @@ import schemathesis
 
 @pytest.fixture
 def schema(flask_app):
-    return schemathesis.from_wsgi("/schema.yaml", flask_app)
+    return schemathesis.openapi.from_wsgi("/schema.yaml", flask_app)
 
 
 @pytest.mark.hypothesis_nested
@@ -16,7 +16,7 @@ def test_cookies(flask_app):
     def cookies():
         return jsonify(request.cookies)
 
-    schema = schemathesis.from_dict(
+    schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -36,6 +36,7 @@ def test_cookies(flask_app):
                 }
             },
         },
+    ).configure(
         app=flask_app,
     )
 
@@ -70,7 +71,7 @@ def test_form_data(schema):
 @pytest.mark.hypothesis_nested
 def test_binary_body(mocker, flask_app):
     # When an API operation accepts a binary input
-    schema = schemathesis.from_dict(
+    schema = schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
@@ -85,6 +86,7 @@ def test_binary_body(mocker, flask_app):
                 }
             },
         },
+    ).configure(
         app=flask_app,
     )
     strategy = schema["/api/upload_file"]["POST"].as_strategy()
@@ -108,7 +110,7 @@ def test_app_with_parametrize(testdir):
     from test.apps.openapi._flask.app import app
     from hypothesis import settings
 
-    schema = schemathesis.from_wsgi("/schema.yaml", app)
+    schema = schemathesis.openapi.from_wsgi("/schema.yaml", app)
 
     called = False
 

@@ -476,13 +476,12 @@ def test_invalid_schema(testdir):
         """
 import schemathesis
 
-schema = schemathesis.from_dict({"swagger": "2.0", "paths": 1}, validate_schema=False)
+schema = schemathesis.openapi.from_dict({"swagger": "2.0", "paths": 1})
 
 @schema.parametrize()
 def test_(request, case):
     pass
 """,
-        validate_schema=False,
     )
     result = testdir.runpytest()
     # Then collection phase should fail with error
@@ -490,17 +489,14 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*Error during collection$"])
 
 
-@pytest.mark.parametrize("as_kwarg", [True, False])
-def test_invalid_schema_with_parametrize(testdir, as_kwarg):
-    # When the given schema is not valid but validation is disabled via validate_schema=False argument
+def test_invalid_schema_with_parametrize(testdir):
     testdir.make_test(
         """
-@schema.parametrize({})
+@schema.parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-""".format("" if not as_kwarg else "validate_schema=False"),
-        validate_schema=False,
+""",
         schema_name="simple_openapi.yaml",
         paths={
             "/users": {
@@ -555,7 +551,6 @@ def test_(request, case):
 
 def test_invalid_operation(testdir):
     # When the given schema is invalid
-    # And schema validation is disabled
     testdir.make_test(
         """
 @schema.parametrize()
@@ -566,7 +561,6 @@ def test_(request, case):
             "/valid": {"get": {"parameters": [{"type": "integer", "name": "id", "in": "query", "required": True}]}},
             "/invalid": {"get": {"parameters": [{"type": "int", "name": "id", "in": "query", "required": True}]}},
         },
-        validate_schema=False,
     )
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
@@ -591,11 +585,11 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
-def test_base_url_from_uri(testdir, openapi_3_app, openapi3_base_url, openapi3_schema_url):
+def test_base_url_from_url(testdir, openapi_3_app, openapi3_base_url, openapi3_schema_url):
     # When the schema is created out of URI
     testdir.make_test(
         f"""
-schema = schemathesis.from_uri("{openapi3_schema_url}")
+schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
 
 @schema.parametrize()
 def test_(request, case):
@@ -618,7 +612,7 @@ def test_empty_content():
         "info": {"title": "Test", "description": "Test", "version": "0.1.0"},
         "paths": {"/body": {"post": {"requestBody": {"content": {}}, "responses": {"200": {"description": "OK"}}}}},
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     # Then the body processing should be no-op
     operation = schema["/body"]["POST"]
     assert operation.body == PayloadAlternatives([])
@@ -642,7 +636,7 @@ def test_loose_multipart_definition():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     # Then non-object data should be excluded during generation
 
     @given(case=schema["/body"]["POST"].as_strategy())
@@ -679,7 +673,7 @@ def test_multipart_behind_a_reference():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     # Then it should be correctly resolved
 
     @given(case=schema["/body"]["POST"].as_strategy())
@@ -699,7 +693,7 @@ def test_multipart_behind_a_reference():
 @pytest.mark.operations("multipart")
 def test_optional_form_parameters(schema_url):
     # When form parameters are optional
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     strategy = schema["/multipart"]["POST"].as_strategy()
 
     @given(case=strategy)
@@ -739,7 +733,7 @@ def test_ref_field():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     @given(case=schema["/body"]["POST"].as_strategy())
     @settings(max_examples=5)

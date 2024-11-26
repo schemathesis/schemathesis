@@ -22,7 +22,7 @@ EXPECTED_LINK_PARAMETERS = {"parameters": {"userId": "$response.body#/id"}}
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_default(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When we add a link to the target API operation
     # And it is an `APIOperation` instance
     # And it has the `operationId` key
@@ -38,7 +38,7 @@ def test_add_link_default(schema_url):
 @pytest.mark.parametrize("status_code", ["201", 201])
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_no_operations_cache(schema_url, status_code):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When we add a link to the target API operation
     source = schema["/users/"]["POST"]
     target = schema["/users/{user_id}"]["GET"]
@@ -61,7 +61,7 @@ def test_add_link_no_operations_cache(schema_url, status_code):
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_no_operation_id(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     target = schema["/users/{user_id}"]["GET"]
     del target.definition.raw["operationId"]
     links = add_link(schema, target, parameters={"userId": "$response.body#/id"})
@@ -73,7 +73,7 @@ def test_add_link_no_operation_id(schema_url):
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_by_reference(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     links = add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
     assert links["#/paths/~1users~1{user_id}/get"] == {
         "operationRef": "#/paths/~1users~1{user_id}/get",
@@ -83,7 +83,7 @@ def test_add_link_by_reference(schema_url):
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_by_reference_twice(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={"userId": "$response.body#/id"})
     links = add_link(schema, "#/paths/~1users~1{user_id}/get", request_body="#/foo")
     assert links["#/paths/~1users~1{user_id}/get"] == {
@@ -99,7 +99,7 @@ def test_add_link_by_reference_twice(schema_url):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_behind_a_reference(schema_url):
     # See GH-824
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When all methods for an API operation are behind a reference
     schema.raw_schema["components"]["methods"] = {
         "users": schema.raw_schema["paths"]["/users/"],
@@ -121,7 +121,7 @@ def test_add_link_behind_a_reference(schema_url):
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_nothing_is_provided(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When the user doesn't provide parameters or request_body
     with pytest.raises(ValueError, match="You need to provide `parameters` or `request_body`."):
         # Then there should be an error
@@ -149,7 +149,7 @@ def test_add_link_nothing_is_provided(schema_url):
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_add_link_unknown_operation(schema_url, change, message):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When the source API operation is modified and can't be found
     source = schema["/users/"]["POST"]
     change(source)
@@ -160,7 +160,7 @@ def test_add_link_unknown_operation(schema_url, change, message):
 
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_links_access(schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     links = schema["/users/"]["POST"].links["201"]
     assert len(links) == 2
     assert links["GetUserByUserId"].name == "GetUserByUserId"
@@ -175,7 +175,7 @@ def test_links_access(schema_url):
 )
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_misspelled_parameter(schema_url, parameter, message):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     # When the user supplies a parameter definition, that points to location which has no parameters defined in the
     # schema
     add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={f"header.{parameter}": "$response.body#/id"})
@@ -210,7 +210,7 @@ def test_link_override(ctx, schema_code, link_code):
             },
         }
     )
-    schema = schemathesis.from_dict(schema, validate_schema=False)
+    schema = schemathesis.openapi.from_dict(schema)
     schema.add_link(
         source=schema["/foo"]["GET"], target=schema["/foo"]["GET"], status_code=link_code, parameters={"key": "42"}
     )
@@ -248,7 +248,7 @@ def test_missing_operation(ctx, operation_id, expected):
         }
     )
 
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     with pytest.raises(LoaderError) as exc:
         schema.as_state_machine()

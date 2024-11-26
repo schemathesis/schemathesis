@@ -7,7 +7,7 @@ from schemathesis.specs.openapi.examples import get_strategies_from_examples
 
 @pytest.fixture(scope="module")
 def schema():
-    return schemathesis.from_dict(
+    return schemathesis.openapi.from_dict(
         {
             "openapi": "3.0.2",
             "info": {"title": "Test", "description": "Test", "version": "0.1.0"},

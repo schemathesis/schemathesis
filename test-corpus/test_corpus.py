@@ -12,6 +12,7 @@ from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
 from jsonschema import RefResolutionError
 
+import schemathesis
 from schemathesis._hypothesis._builder import _iter_coverage_cases
 from schemathesis.checks import ALL_CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
@@ -26,7 +27,6 @@ from schemathesis.runner.models import Status
 from schemathesis.service.client import ServiceClient
 from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
 from schemathesis.service.models import AnalysisError, SuccessState
-from schemathesis.specs.openapi import loaders
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -182,9 +182,7 @@ def _load_schema(corpus, filename, app_port=None):
     raw_content = CORPUS_FILES[corpus].extractfile(filename)
     raw_schema = json_loads(raw_content.read())
     try:
-        return loaders.from_dict(
-            raw_schema,
-            validate_schema=False,
+        return schemathesis.openapi.from_dict(raw_schema).configure(
             base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None,
         )
     except LoaderError as exc:

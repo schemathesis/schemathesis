@@ -13,7 +13,7 @@ The following test will load the API schema from ``http://0.0.0.0:8080/swagger.j
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
@@ -42,8 +42,6 @@ We recommend running your tests with the latest `pytest <https://docs.pytest.org
     ======================= 3 passed in 1.55s =======================
 
 Running these tests requires your app running at ``http://0.0.0.0:8080/`` and a valid Open API schema available at ``https://example.schemathesis.io/openapi.json``.
-
-By default, Schemathesis refuses to work with schemas that do not conform to the Open API spec, but you can disable this behavior by passing the ``validate_schema=False`` argument to the ``from_uri`` function.
 
 Narrowing the testing scope
 ---------------------------
@@ -200,20 +198,11 @@ Remote URL
 
 The most common way to load the API schema is from the running application via a network request.
 If your application is running at ``http://app.com`` and the schema is available at the ``/api/openapi.json`` path, then
-you can load it by using the ``schemathesis.from_uri`` loader:
+you can load it by using the ``schemathesis.openapi.from_url`` loader:
 
 .. code:: python
 
-    schema = schemathesis.from_uri("http://app.com/api/openapi.json")
-
-If you want to load the schema from one URL, but run tests against a URL which differs in port value,
-then you can use the ``port`` argument:
-
-.. code:: python
-
-    schema = schemathesis.from_uri("http://app.com/api/openapi.json", port=8081)
-
-This code will run tests against ``http://app.com:8081/api/openapi.json``.
+    schema = schemathesis.openapi.from_url("http://app.com/api/openapi.json")
 
 Local path
 ~~~~~~~~~~
@@ -222,7 +211,7 @@ Sometimes you store the schema in a separate file, then it might be easier to lo
 
 .. code:: python
 
-    schema = schemathesis.from_path("/tmp/openapi.json")
+    schema = schemathesis.openapi.from_path("/tmp/openapi.json")
 
 Schemathesis will load the API schema from the ``/tmp/openapi.json`` file and will use ``host`` or ``servers`` keyword values to send requests to.
 If you don't need this behavior, you can specify the ``base_url`` argument to send testing requests elsewhere.
@@ -239,7 +228,7 @@ But want to send requests to a local test server which is running at ``http://12
 
 .. code:: python
 
-    schema = schemathesis.from_path(
+    schema = schemathesis.openapi.from_path(
         "/tmp/openapi.json", base_url="http://127.0.0.1:8000/v2"
     )
 
@@ -264,7 +253,7 @@ This loader serves as a basic block for the previous two. It loads a schema from
 .. code:: python
 
     # The first argument is a valid Open API schema as a JSON string
-    schema = schemathesis.from_file('{"paths": {}, ...}')
+    schema = schemathesis.openapi.from_file('{"paths": {}, ...}')
 
 Python dictionary
 ~~~~~~~~~~~~~~~~~
@@ -279,7 +268,7 @@ If you maintain your API schema in Python code or your web framework (for exampl
             # Open API operations here
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
 Web applications
 ~~~~~~~~~~~~~~~~
@@ -292,9 +281,9 @@ which is significantly faster since it doesn't involve the network.
     from project import app
 
     # WSGI
-    schema = schemathesis.from_wsgi("/api/openapi.json", app)
+    schema = schemathesis.openapi.from_wsgi("/api/openapi.json", app)
     # Or ASGI
-    schema = schemathesis.from_asgi("/api/openapi.json", app)
+    schema = schemathesis.openapi.from_asgi("/api/openapi.json", app)
 
 Both loaders expect the relative schema path and an application instance.
 
@@ -324,10 +313,10 @@ This approach requires an initialized application instance to generate the API s
             yield
             await db.disconnect()
 
-        return schemathesis.from_dict(app.openapi(), app)
+        return schemathesis.openapi.from_dict(app.openapi(), app)
 
 
-    schema = schemathesis.from_pytest_fixture("web_app")
+    schema = schemathesis.pytest.from_fixture("web_app")
 
 
     @schema.parametrize()
@@ -338,8 +327,8 @@ This approach is useful, when in your tests you need to initialize some pytest f
 
 In this case, the test body will be used as a sub-test via the ``pytest-subtests`` library.
 
-**NOTE**: the used fixture should return a valid schema that could be created via ``schemathesis.from_dict`` or other
-``schemathesis.from_`` variations.
+**NOTE**: the used fixture should return a valid schema that could be created via ``schemathesis.openapi.from_dict`` or other
+``schemathesis.openapi.from_`` variations.
 
 How are responses checked?
 --------------------------
@@ -410,7 +399,7 @@ If you don't use Schemathesis for data generation, you can still utilize respons
 
     import requests
 
-    schema = schemathesis.from_uri("http://0.0.0.0/openapi.json")
+    schema = schemathesis.openapi.from_url("http://0.0.0.0/openapi.json")
 
 
     def test_api():
@@ -528,7 +517,7 @@ Using Schemathesis with a Flask application (WSGI):
 
 
     # Load the schema from the WSGI app
-    schema = schemathesis.from_wsgi("/schema.json", app)
+    schema = schemathesis.openapi.from_wsgi("/schema.json", app)
 
 
     @schema.parametrize()
@@ -555,7 +544,7 @@ Using Schemathesis with a FastAPI application (ASGI):
 
 
     # Load the schema from the ASGI app
-    schema = schemathesis.from_asgi("/openapi.json", app)
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app)
 
 
     @schema.parametrize()
@@ -643,7 +632,7 @@ The ``as_strategy`` method also accepts the ``data_generation_method`` argument 
     from hypothesis import given
     import schemathesis
 
-    schema = schemathesis.from_uri("http://0.0.0.0:8080/schema.json")
+    schema = schemathesis.openapi.from_url("http://0.0.0.0:8080/schema.json")
     create_pet = schema["/pet/"]["POST"]
     create_pet_strategy = create_pet.as_strategy()
 
@@ -670,7 +659,7 @@ Schema loaders accept the ``rate_limit`` argument that can be used to set the ma
     # 10000 requests per day - `10000/d`
     RATE_LIMIT = "3/s"
 
-    schema = schemathesis.from_uri(
+    schema = schemathesis.openapi.from_url(
         "https://example.schemathesis.io/openapi.json",
         rate_limit=RATE_LIMIT,
     )
@@ -687,7 +676,7 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
 
     import schemathesis
 
-    schema = schemathesis.from_uri("https://example.schemathesis.io/openapi.json")
+    schema = schemathesis.openapi.from_url("https://example.schemathesis.io/openapi.json")
 
 
     @schema.parametrize()
@@ -696,7 +685,7 @@ seamlessly combines your API schema with ``pytest``-style parametrization and pr
 
 Such test consists of four main parts:
 
-1. Schema preparation; In this case, the schema is loaded via the ``from_uri`` function.
+1. Schema preparation; In this case, the schema is loaded via the ``openapi.from_url`` function.
 2. Test parametrization; ``@schema.parametrize()`` generates separate tests for all path/method combinations available in the schema.
 3. A network call to the running application; ``case.call_and_validate()`` does it.
 4. Verifying a property you'd like to test; In this example, we run all built-in checks.
@@ -725,7 +714,7 @@ For convenience, you can explore the schemas and strategies manually:
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://api.com/schema.json")
+    schema = schemathesis.openapi.from_url("http://api.com/schema.json")
 
     operation = schema["/pet"]["POST"]
     strategy = operation.as_strategy()

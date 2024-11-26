@@ -10,7 +10,7 @@ from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30P
 
 @pytest.mark.operations("get_user", "update_user")
 def test_get_operation_via_remote_reference(openapi_version, schema_url):
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     first = schema.get_operation_by_reference(f"{schema_url}#/paths/~1users~1{{user_id}}/patch")
     resolved = schema.get_operation_by_reference(f"{schema_url}#/paths/~1users~1{{user_id}}/patch")
     # Check caching
@@ -45,14 +45,14 @@ def test_operation_cache_sharing(mocker, schema_url):
     reference = f"{schema_url}#/paths/~1users~1{{user_id}}/patch"
     operation_id = "updateUser"
 
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     first = schema.get_operation_by_reference(reference)
     # After accessing by reference, there should not be an attempt to insert it again
     setup_mock(schema, "insert_operation")
     second = schema.get_operation_by_id(operation_id)
     assert first is second
     # And the other way around
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
     first = schema.get_operation_by_id(operation_id)
     second = schema.get_operation_by_reference(reference)
     assert first is second
@@ -84,7 +84,7 @@ def matches_operation(case, operation):
 
 def test_path_as_strategy(ctx):
     schema = ctx.openapi.build_schema(TWO_METHOD_PATHS)
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operations = schema["/test"]
     strategy = operations.as_strategy()
     for operation in operations.values():
@@ -94,7 +94,7 @@ def test_path_as_strategy(ctx):
 
 def test_schema_as_strategy(ctx):
     schema = ctx.openapi.build_schema({**SINGLE_METHOD_PATHS, **TWO_METHOD_PATHS})
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategy = schema.as_strategy()
     for operations in schema.values():
         for operation in operations.values():

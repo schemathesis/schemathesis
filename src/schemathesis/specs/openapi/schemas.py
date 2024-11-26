@@ -28,7 +28,7 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
@@ -81,6 +81,7 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefReso
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
+    specification: Specification = Specification.OPENAPI
     nullable_name: ClassVar[str] = ""
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
@@ -530,7 +531,6 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             responses = operation.definition.raw["responses"]
         except KeyError as exc:
-            # Possible to get if `validate_schema=False` is passed during schema creation
             path = operation.path
             full_path = self.get_full_path(path) if isinstance(path, str) else None
             self._raise_invalid_schema(exc, full_path, path, operation.method)
@@ -583,7 +583,7 @@ class BaseOpenAPISchema(BaseSchema):
 
         .. code-block:: python
 
-            schema = schemathesis.from_uri("http://0.0.0.0/schema.yaml")
+            schema = schemathesis.openapi.from_url("http://0.0.0.0/schema.yaml")
 
             schema.add_link(
                 source=schema["/users/"]["POST"],

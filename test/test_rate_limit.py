@@ -11,7 +11,7 @@ from schemathesis.throttling import _get_max_delay
     ("loader", "fixture"),
     [
         (schemathesis.graphql.from_url, "graphql_url"),
-        (schemathesis.openapi.from_uri, "openapi3_schema_url"),
+        (schemathesis.openapi.from_url, "openapi3_schema_url"),
     ],
 )
 @pytest.mark.operations("success")
@@ -21,7 +21,7 @@ def test_maximum_requests(request, loader, fixture, mocker):
     side_effect = BucketFullException(rate_item, Rate(5, 3600))
     mocker.patch("pyrate_limiter.limiter.Limiter.delay_or_raise", side_effect=side_effect)
     url = request.getfixturevalue(fixture)
-    schema = loader(url, rate_limit="5/h")
+    schema = loader(url).configure(rate_limit="5/h")
     counter = 0
 
     def run():

@@ -200,12 +200,12 @@ def dict_with_property_examples() -> dict[str, Any]:
 
 @pytest.fixture(scope="module")
 def schema_with_examples(dict_with_examples) -> BaseOpenAPISchema:
-    return schemathesis.from_dict(dict_with_examples)
+    return schemathesis.openapi.from_dict(dict_with_examples)
 
 
 @pytest.fixture(scope="module")
 def schema_with_property_examples(dict_with_property_examples) -> BaseOpenAPISchema:
-    return schemathesis.from_dict(dict_with_property_examples)
+    return schemathesis.openapi.from_dict(dict_with_property_examples)
 
 
 @pytest.fixture
@@ -473,7 +473,7 @@ def test_multipart_examples():
             },
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     # Then examples should be correctly generated
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
@@ -496,7 +496,7 @@ def test_invalid_x_examples(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     # Then such examples should be skipped as invalid (there should be an object)
     assert schema["/test"]["POST"].get_strategies_from_examples() == []
 
@@ -523,7 +523,7 @@ def test_shared_examples_openapi_2(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
@@ -552,7 +552,7 @@ def test_examples_ref_openapi_2(ctx):
         },
         version="2.0",
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
@@ -583,7 +583,7 @@ def test_examples_ref_openapi_3(ctx, body):
             }
         },
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategies = schema["/test"]["POST"].get_strategies_from_examples()
     assert len(strategies) == 1
     assert find(strategies[0], lambda case: case.body == "value")
@@ -610,7 +610,7 @@ def test_boolean_subschema(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = get_single_example(strategy)
     assert example.body == {"bar": ANY, "foo": "foo-value"}
@@ -651,7 +651,7 @@ def test_examples_ref_missing_components(ctx):
             }
         },
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
     example = get_single_example(strategy)
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
@@ -710,7 +710,7 @@ def test_examples_in_any_of_top_level(ctx, key):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
@@ -776,7 +776,7 @@ def test_examples_in_all_of_top_level(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
@@ -868,7 +868,7 @@ def test_examples_in_any_of_in_schemas(ctx, key):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1"}},
@@ -903,7 +903,7 @@ def test_partial_examples(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/test/{foo}/{bar}/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
@@ -954,7 +954,7 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema, generation_config=GenerationConfig(allow_x00=False))
+    schema = schemathesis.openapi.from_dict(schema).configure(generation=GenerationConfig(allow_x00=False))
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
 
@@ -989,7 +989,7 @@ def test_external_value(ctx, server):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then this example should be used
@@ -1024,7 +1024,7 @@ def test_external_value_network_error(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/test/"]["POST"]
     # Then this example should not be used
     assert not operation.get_strategies_from_examples()
@@ -1071,7 +1071,7 @@ def test_example_override():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/success"]["GET"]
     extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
     assert extracted == [{"container": "query", "name": "key", "value": "query1"}]
@@ -1116,7 +1116,7 @@ def test_no_wrapped_examples():
             },
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/register"]["POST"]
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
     assert extracted == [
@@ -1197,7 +1197,7 @@ def test_openapi_2_example():
             },
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/items"]["POST"]
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
     assert extracted == [
@@ -1316,7 +1316,7 @@ def test_property_examples_behind_ref():
             },
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/trees"]["POST"]
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
     assert extracted == [
@@ -1393,7 +1393,7 @@ def test_property_examples_with_all_of():
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/peers"]["POST"]
     extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
     assert extracted == [
@@ -1521,7 +1521,7 @@ def test_find_in_responses(ctx, response, expected):
             },
         },
     )
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/items/{itemId}/"]["get"]
     assert find_in_responses(operation) == expected
 
@@ -1562,7 +1562,7 @@ def test_find_in_responses_only_in_2xx(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/items/{id}/"]["get"]
     assert find_in_responses(operation) == {}
 

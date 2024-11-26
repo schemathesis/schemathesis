@@ -29,7 +29,6 @@ from schemathesis.constants import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR
-from schemathesis.specs.openapi import loaders as oas_loaders
 from schemathesis.specs.openapi import media_types
 
 from .apps import _graphql as graphql
@@ -239,7 +238,7 @@ def openapi3_schema_url(server_address, openapi_3_app):
 
 @pytest.fixture
 def openapi3_schema(openapi3_schema_url):
-    return oas_loaders.from_uri(openapi3_schema_url)
+    return schemathesis.openapi.from_url(openapi3_schema_url)
 
 
 @pytest.fixture
@@ -876,13 +875,13 @@ def _get_schema_path():
 
 @pytest.fixture
 def swagger_20(simple_schema):
-    return schemathesis.from_dict(simple_schema)
+    return schemathesis.openapi.from_dict(simple_schema)
 
 
 @pytest.fixture
 def openapi_30():
     raw = make_schema("simple_openapi.yaml")
-    return schemathesis.from_dict(raw)
+    return schemathesis.openapi.from_dict(raw)
 
 
 @pytest.fixture
@@ -895,7 +894,6 @@ def testdir(testdir):
     def maker(
         content,
         pytest_plugins=("aiohttp.pytest_plugin",),
-        validate_schema=True,
         sanitize_output=True,
         schema=None,
         schema_name="simple_swagger.yaml",
@@ -906,9 +904,10 @@ def testdir(testdir):
             f"""
         import pytest
         import schemathesis
+        from schemathesis.internal.output import OutputConfig
         from schemathesis.stateful import Stateful
         from schemathesis.core import NOT_SET
-        from schemathesis.generation import DataGenerationMethod
+        from schemathesis.generation import DataGenerationMethod, GenerationConfig
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}
@@ -919,10 +918,12 @@ def testdir(testdir):
         def simple_schema():
             return schema
 
-        schema = schemathesis.from_dict(
-            raw_schema,
-            validate_schema={validate_schema!r},
-            sanitize_output={sanitize_output!r}
+        schema = schemathesis.openapi.from_dict(
+            raw_schema
+        ).configure(
+            output=OutputConfig(
+                sanitize={sanitize_output!r}
+            )
         )
         """
         )
@@ -984,12 +985,12 @@ def fastapi_graphql_app(graphql_path):
 
 @pytest.fixture
 def real_app_schema(schema_url):
-    return oas_loaders.from_uri(schema_url)
+    return schemathesis.openapi.from_url(schema_url)
 
 
 @pytest.fixture
 def wsgi_app_schema(flask_app):
-    return oas_loaders.from_wsgi("/schema.yaml", flask_app)
+    return schemathesis.openapi.from_wsgi("/schema.yaml", flask_app)
 
 
 @pytest.fixture

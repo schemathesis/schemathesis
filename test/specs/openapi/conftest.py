@@ -119,7 +119,6 @@ def open_api_3_user_with_file():
 @pytest.fixture
 def make_openapi_3_schema(ctx):
     def maker(body=None, parameters=None):
-        schema = ctx.openapi.build_schema({})
         definition = {
             "summary": "Test operation",
             "description": "Test",
@@ -129,7 +128,7 @@ def make_openapi_3_schema(ctx):
             definition["requestBody"] = body
         if parameters is not None:
             definition["parameters"] = parameters
-        schema["paths"]["/users"] = {"post": definition}
+        schema = ctx.openapi.build_schema({"/users": {"post": definition}})
         OPENAPI_30_VALIDATOR.validate(schema)
         return schema
 
@@ -151,7 +150,7 @@ def assert_parameters():
                 assert left_attr == right_attr
 
     def check(schema, expected, json_schemas, location="body"):
-        schema = schemathesis.from_dict(schema)
+        schema = schemathesis.openapi.from_dict(schema)
         operation = schema["/users"]["POST"]
         container = getattr(operation, location)
         _compare(container, expected)

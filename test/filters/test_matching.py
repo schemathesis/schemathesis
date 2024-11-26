@@ -31,7 +31,7 @@ RAW_SCHEMA = {
         },
     },
 }
-SCHEMA = schemathesis.from_dict(RAW_SCHEMA)
+SCHEMA = schemathesis.openapi.from_dict(RAW_SCHEMA)
 USERS_GET = SCHEMA["/users/"]["GET"]
 USERS_POST = SCHEMA["/users/"]["POST"]
 USER_ID_PATCH = SCHEMA["/users/{user_id}/"]["PATCH"]
@@ -196,7 +196,7 @@ def test_matcher_repr():
     ],
 )
 def test_exclude_custom(args, kwargs, expected):
-    lazy_schema = schemathesis.from_pytest_fixture("name")
+    lazy_schema = schemathesis.pytest.from_fixture("name")
     schemas = [SCHEMA, lazy_schema]
     for schema in schemas:
         assert (

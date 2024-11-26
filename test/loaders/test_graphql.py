@@ -8,7 +8,7 @@ import pytest
 from hypothesis import given, settings
 
 from schemathesis.core.errors import LoaderError
-from schemathesis.specs.graphql import loaders
+from schemathesis.graphql import loaders
 
 RAW_SCHEMA = """
 type Book {

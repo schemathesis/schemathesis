@@ -75,7 +75,7 @@ def test_resolve(petstore, ref, expected):
 def test_recursive_reference(mocker, schema_with_recursive_references):
     mocker.patch("schemathesis.specs.openapi.references.RECURSION_DEPTH_LIMIT", 1)
     reference = {"$ref": "#/components/schemas/Node"}
-    schema = schemathesis.from_dict(schema_with_recursive_references)
+    schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
     assert schema.resolver.resolve_all(reference) == {
         "properties": {"child": {"properties": {"child": reference}, "required": ["child"], "type": "object"}},
         "required": ["child"],
@@ -160,7 +160,7 @@ def build_schema_with_recursion(schema, definition):
 def test_drop_recursive_references_from_the_last_resolution_level(ctx, definition):
     raw_schema = ctx.openapi.build_schema({})
     build_schema_with_recursion(raw_schema, definition)
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     validator = Draft4Validator({**USER_REFERENCE, "components": raw_schema["components"]})
 
@@ -208,7 +208,7 @@ def test_drop_recursive_references_from_the_last_resolution_level(ctx, definitio
 def test_non_removable_recursive_references(ctx, definition):
     schema = ctx.openapi.build_schema({})
     build_schema_with_recursion(schema, definition)
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/users"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -274,7 +274,7 @@ def test_nested_recursive_references(ctx):
             }
         },
     )
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/folders"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -600,7 +600,7 @@ def test_(request, case):
 
 
 def test_complex_dereference(testdir, complex_schema):
-    schema = schemathesis.from_path(complex_schema)
+    schema = schemathesis.openapi.from_path(complex_schema)
     path = Path(str(testdir))
     body_definition = {
         "schema": {
@@ -729,7 +729,7 @@ def test_unique_objects_after_inlining(ctx):
             }
         },
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     # Then inlined objects should be unique
     assert_unique_objects(schema["/test"]["post"].body[0].definition)
 
@@ -766,7 +766,7 @@ def test_unresolvable_reference_during_generation(ctx, testdir):
     )
     main = testdir.mkdir("root") / "main.json"
     main.write_text(json.dumps(schema), "utf8")
-    schema = schemathesis.from_path(str(main))
+    schema = schemathesis.openapi.from_path(str(main))
 
     @given(case=schema["/test"]["GET"].as_strategy())
     def test(case):
@@ -795,7 +795,7 @@ def test_uncommon_type_in_generation(ctx, testdir, key, expected):
     )
     main = testdir.mkdir("root") / "main.json"
     main.write_text(json.dumps(schema), "utf8")
-    schema = schemathesis.from_path(str(main))
+    schema = schemathesis.openapi.from_path(str(main))
 
     @given(case=schema["/test"]["GET"].as_strategy())
     def test(case):

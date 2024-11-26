@@ -119,7 +119,6 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     test=test_func,
                     settings=ctx.config.execution.hypothesis_settings,
                     seed=ctx.config.execution.seed,
-                    data_generation_methods=ctx.config.schema.data_generation_methods,
                     generation_config=ctx.config.execution.generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
                 )

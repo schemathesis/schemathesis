@@ -10,7 +10,6 @@ from typing import (
     Callable,
     ContextManager,
     Generator,
-    Iterable,
     Iterator,
     NoReturn,
     TypeVar,
@@ -20,6 +19,7 @@ from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.hooks import HookDispatcherMark
+from schemathesis.throttling import build_limiter
 
 from ._hypothesis._builder import create_test
 from ._hypothesis._given import GivenInput, given_proxy
@@ -31,13 +31,7 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .generation import (
-    DEFAULT_DATA_GENERATION_METHODS,
-    DataGenerationMethod,
-    DataGenerationMethodInput,
-    GenerationConfig,
-    combine_strategies,
-)
+from .generation import DataGenerationMethod, GenerationConfig, combine_strategies
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .internal.output import OutputConfig
 from .internal.result import Ok, Result
@@ -47,11 +41,12 @@ if TYPE_CHECKING:
     import hypothesis
     from hypothesis.strategies import SearchStrategy
     from pyrate_limiter import Limiter
+    from typing_extensions import Self
 
     from schemathesis.core import Specification
+    from schemathesis.transports import Transport
 
     from .stateful.state_machine import APIStateMachine
-    from .transports import Transport
     from .transports.responses import GenericResponse
 
 
@@ -66,7 +61,6 @@ def get_full_path(base_path: str, path: str) -> str:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
-    transport: Transport
     specification: Specification
     location: str | None = None
     base_url: str | None = None
@@ -75,17 +69,18 @@ class BaseSchema(Mapping):
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     test_function: Callable | None = None
-    validate_schema: bool = True
-    data_generation_methods: list[DataGenerationMethod] = field(
-        default_factory=lambda: list(DEFAULT_DATA_GENERATION_METHODS)
-    )
     generation_config: GenerationConfig = field(default_factory=GenerationConfig)
     output_config: OutputConfig = field(default_factory=OutputConfig)
     rate_limiter: Limiter | None = None
-    sanitize_output: bool = True
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
+
+    @property
+    def transport(self) -> Transport:
+        from schemathesis import transports
+
+        return transports.get(self.app)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -269,7 +264,6 @@ class BaseSchema(Mapping):
                     test=func,
                     settings=settings,
                     seed=seed,
-                    data_generation_methods=self.data_generation_methods,
                     generation_config=generation_config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     _given_kwargs=_given_kwargs,
@@ -278,11 +272,7 @@ class BaseSchema(Mapping):
             else:
                 yield result
 
-    def parametrize(
-        self,
-        validate_schema: bool | NotSet = NOT_SET,
-        data_generation_methods: Iterable[DataGenerationMethod] | NotSet = NOT_SET,
-    ) -> Callable:
+    def parametrize(self) -> Callable:
         """Mark a test function as a parametrized one."""
 
         def wrapper(func: Callable) -> Callable:
@@ -299,12 +289,7 @@ class BaseSchema(Mapping):
 
                 return wrapped_test
             HookDispatcher.add_dispatcher(func)
-            cloned = self.clone(
-                test_function=func,
-                validate_schema=validate_schema,
-                data_generation_methods=data_generation_methods,
-                filter_set=self.filter_set,
-            )
+            cloned = self.clone(test_function=func, filter_set=self.filter_set)
             SchemaHandleMark.set(func, cloned)
             return func
 
@@ -322,36 +307,27 @@ class BaseSchema(Mapping):
         app: Any = NOT_SET,
         hooks: HookDispatcher | NotSet = NOT_SET,
         auth: AuthStorage | NotSet = NOT_SET,
-        validate_schema: bool | NotSet = NOT_SET,
-        data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
         rate_limiter: Limiter | NotSet | None = NOT_SET,
-        sanitize_output: bool | NotSet | None = NOT_SET,
         filter_set: FilterSet | None = None,
     ) -> BaseSchema:
         if base_url is NOT_SET:
             base_url = self.base_url
         if app is NOT_SET:
             app = self.app
-        if validate_schema is NOT_SET:
-            validate_schema = self.validate_schema
         if filter_set is None:
             filter_set = self.filter_set
         if hooks is NOT_SET:
             hooks = self.hooks
         if auth is NOT_SET:
             auth = self.auth
-        if data_generation_methods is NOT_SET:
-            data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
             generation_config = self.generation_config
         if output_config is NOT_SET:
             output_config = self.output_config
         if rate_limiter is NOT_SET:
             rate_limiter = self.rate_limiter
-        if sanitize_output is NOT_SET:
-            sanitize_output = self.sanitize_output
 
         return self.__class__(
             self.raw_schema,
@@ -362,14 +338,10 @@ class BaseSchema(Mapping):
             hooks=hooks,  # type: ignore
             auth=auth,  # type: ignore
             test_function=test_function,
-            validate_schema=validate_schema,  # type: ignore
-            data_generation_methods=data_generation_methods,  # type: ignore
             generation_config=generation_config,  # type: ignore
             output_config=output_config,  # type: ignore
             rate_limiter=rate_limiter,  # type: ignore
-            sanitize_output=sanitize_output,  # type: ignore
             filter_set=filter_set,  # type: ignore
-            transport=self.transport,
         )
 
     def get_local_hook_dispatcher(self) -> HookDispatcher | None:
@@ -472,6 +444,33 @@ class BaseSchema(Mapping):
             if isinstance(operation, Ok)
         ]
         return combine_strategies(strategies)
+
+    def configure(
+        self,
+        *,
+        base_url: str | None | NotSet = NOT_SET,
+        location: str | None | NotSet = NOT_SET,
+        rate_limit: str | None | NotSet = NOT_SET,
+        generation: GenerationConfig | NotSet = NOT_SET,
+        output: OutputConfig | NotSet = NOT_SET,
+        app: Any | NotSet = NOT_SET,
+    ) -> Self:
+        if not isinstance(base_url, NotSet):
+            self.base_url = base_url
+        if not isinstance(location, NotSet):
+            self.location = location
+        if not isinstance(rate_limit, NotSet):
+            if isinstance(rate_limit, str):
+                self.rate_limiter = build_limiter(rate_limit)
+            else:
+                self.rate_limiter = None
+        if not isinstance(generation, NotSet):
+            self.generation_config = generation
+        if not isinstance(output, NotSet):
+            self.output_config = output
+        if not isinstance(app, NotSet):
+            self.app = app
+        return self
 
 
 @dataclass

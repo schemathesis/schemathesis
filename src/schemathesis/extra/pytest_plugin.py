@@ -133,7 +133,6 @@ class SchemathesisCase(PyCollector):
                     operation=operation,
                     test=self.test_function,
                     _given_kwargs=self.given_kwargs,
-                    data_generation_methods=self.schema.data_generation_methods,
                     generation_config=self.schema.generation_config,
                     as_strategy_kwargs=as_strategy_kwargs,
                     keep_async_fn=is_trio_test,
