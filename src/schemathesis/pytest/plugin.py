@@ -22,6 +22,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.marks import Mark
+from schemathesis.pytest.control_flow import fail_on_no_matches
 
 from .._hypothesis._given import (
     GivenArgsMark,
@@ -31,7 +32,6 @@ from .._hypothesis._given import (
     validate_given_args,
 )
 from .._override import OverrideMark
-from .._pytest.control_flow import fail_on_no_matches
 from ..constants import (
     GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE,
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -214,7 +214,7 @@ class SchemathesisCase(PyCollector):
             pytest.fail("Error during collection")
 
 
-@hookimpl(hookwrapper=True)  # type:ignore # pragma: no mutate
+@hookimpl(hookwrapper=True)  # type:ignore
 def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -> Generator[None, Any, None]:
     """Switch to a different collector if the test is parametrized marked by schemathesis."""
     outcome = yield
