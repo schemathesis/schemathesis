@@ -34,7 +34,6 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
-from ...constants import HTTP_METHODS
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
 from ...internal.copy import fast_deepcopy
@@ -75,6 +74,7 @@ if TYPE_CHECKING:
     from ...stateful.state_machine import APIStateMachine
     from ...transports.responses import GenericResponse
 
+HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
 SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
 
