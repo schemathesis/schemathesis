@@ -54,9 +54,9 @@ def csv_serializer():
 def api_schema(request, openapi_version):
     if request.param == "aiohttp":
         schema_url = request.getfixturevalue("schema_url")
-        return schemathesis.from_uri(schema_url)
+        return schemathesis.openapi.from_url(schema_url)
     app = request.getfixturevalue("flask_app")
-    return schemathesis.from_wsgi("/schema.yaml", app=app)
+    return schemathesis.openapi.from_wsgi("/schema.yaml", app=app)
 
 
 @pytest.mark.hypothesis_nested
@@ -117,12 +117,14 @@ def test_in_cli(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url) == snapshot_cli
 
 
-@pytest.mark.parametrize("transport", [RequestsTransport(), WSGITransport(42)])
+@pytest.mark.parametrize("transport", [RequestsTransport, WSGITransport])
 def test_serialize_yaml(open_api_3_schema_with_yaml_payload, transport):
     # See GH-1010
     # When API expects `text/yaml`
-    schema = schemathesis.from_dict(open_api_3_schema_with_yaml_payload)
-    schema.transport = transport
+    schema = schemathesis.openapi.from_dict(open_api_3_schema_with_yaml_payload)
+
+    if transport is WSGITransport:
+        schema.app = 42
 
     @given(case=schema["/yaml"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -151,7 +153,7 @@ def test_serialize_any(ctx):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/any"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -180,7 +182,7 @@ def test_serialization_not_possible_manual(ctx):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -216,7 +218,7 @@ def test_binary_data(ctx, media_type):
             },
         }
     )
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/test"]["POST"]
     # When an explicit bytes value is passed as body (it happens with `externalValue`)
     body = b"\x92\x42"
@@ -332,7 +334,7 @@ def test_get_matching_serializers(media_type, expected):
 )
 def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
     # When the schema contains XML payload
-    schema = schemathesis.from_dict(openapi_3_schema_with_xml)
+    schema = schemathesis.openapi.from_dict(openapi_3_schema_with_xml)
 
     @given(case=schema[path]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -388,7 +390,7 @@ def test_serialize_xml_unbound_prefix(ctx, schema_object):
         components={"schemas": {"Main": schema_object}},
     )
 
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
@@ -448,7 +450,7 @@ def test_serialize_xml_hypothesis(data, schema_object, media_type):
         "components": {"schemas": {"Main": schema_object}},
     }
 
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     case = data.draw(schema["/test"]["POST"].as_strategy())
 
@@ -475,7 +477,7 @@ def test_xml_with_binary(ctx):
         }
     )
 
-    schema = schemathesis.from_dict(schema)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)

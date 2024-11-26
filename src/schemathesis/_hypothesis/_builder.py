@@ -44,7 +44,6 @@ def create_test(
     test: Callable,
     settings: hypothesis.settings | None = None,
     seed: int | None = None,
-    data_generation_methods: list[DataGenerationMethod],
     generation_config: GenerationConfig | None = None,
     as_strategy_kwargs: dict[str, Any] | None = None,
     keep_async_fn: bool = False,
@@ -55,7 +54,11 @@ def create_test(
     hook_dispatcher = HookDispatcherMark.get(test)
     auth_storage = AuthStorageMark.get(test)
     strategies = []
-    skip_on_not_negated = len(data_generation_methods) == 1 and DataGenerationMethod.negative in data_generation_methods
+    generation_config = generation_config or operation.schema.generation_config
+
+    skip_on_not_negated = (
+        len(generation_config.methods) == 1 and DataGenerationMethod.negative in generation_config.methods
+    )
     as_strategy_kwargs = as_strategy_kwargs or {}
     as_strategy_kwargs.update(
         {
@@ -65,7 +68,7 @@ def create_test(
             "skip_on_not_negated": skip_on_not_negated,
         }
     )
-    for data_generation_method in data_generation_methods:
+    for data_generation_method in generation_config.methods:
         strategies.append(operation.as_strategy(data_generation_method=data_generation_method, **as_strategy_kwargs))
     strategy = combine_strategies(strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
@@ -110,7 +113,7 @@ def create_test(
                 wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
             )
             if COVERAGE_PHASE.is_enabled:
-                wrapped_test = add_coverage(wrapped_test, operation, data_generation_methods)
+                wrapped_test = add_coverage(wrapped_test, operation, generation_config.methods)
     return wrapped_test
 
 
@@ -171,14 +174,6 @@ def add_examples(
         SerializationNotPossible,
         SchemaError,
     ) as exc:
-        # Invalid schema:
-        # In this case, the user didn't pass `--validate-schema=false` and see an error in the output anyway,
-        # and no tests will be executed. For this reason, examples can be skipped
-        # Recursive references: This test will be skipped anyway
-        # Unsatisfiable:
-        # The underlying schema is not satisfiable and test will raise an error for the same reason.
-        # Skipping this exception here allows us to continue the testing process for other operations.
-        # Still, we allow running user-defined hooks
         examples = []
         if isinstance(exc, Unsatisfiable):
             UnsatisfiableExampleMark.set(test, exc)

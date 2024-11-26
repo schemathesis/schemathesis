@@ -275,7 +275,7 @@ class Case:
     def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
         base_url = self.get_full_base_url()
         kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
-        if self.operation.schema.sanitize_output:
+        if self.operation.schema.output_config.sanitize:
             kwargs["url"] = sanitize_url(kwargs["url"])
             sanitize_value(kwargs["headers"])
             if kwargs["cookies"]:

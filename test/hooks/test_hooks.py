@@ -451,7 +451,7 @@ def after_load_schema(
         parameters=PARAMETERS,
     )
 
-schema = schemathesis.from_dict(raw_schema)
+schema = schemathesis.openapi.from_dict(raw_schema)
 
 @schema.parametrize()
 def test_a(case):

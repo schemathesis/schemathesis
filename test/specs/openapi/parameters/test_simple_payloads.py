@@ -68,7 +68,7 @@ def test_payload_open_api_3(media_types, assert_parameters, make_openapi_3_schem
 def test_parameter_set_get(make_openapi_3_schema):
     header = {"in": "header", "name": "id", "required": True, "schema": {}}
     raw_schema = make_openapi_3_schema(parameters=[header])
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
     headers = schema["/users"]["POST"].headers
     assert "id" in headers
     assert headers.contains("id")

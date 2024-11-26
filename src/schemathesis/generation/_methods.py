@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Iterable, Union
 
 
 class DataGenerationMethod(str, Enum):
@@ -33,12 +32,3 @@ class DataGenerationMethod(str, Enum):
     @property
     def is_negative(self) -> bool:
         return self == DataGenerationMethod.negative
-
-    @classmethod
-    def ensure_list(cls, value: DataGenerationMethodInput) -> list[DataGenerationMethod]:
-        if isinstance(value, DataGenerationMethod):
-            return [value]
-        return list(value)
-
-
-DataGenerationMethodInput = Union[DataGenerationMethod, Iterable[DataGenerationMethod]]

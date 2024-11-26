@@ -11,7 +11,7 @@ import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
-from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.failures import FailureGroup
 
 from ..internal.checks import CheckContext
 from ..targets import TargetMetricCollector
@@ -183,11 +183,6 @@ def _execute_state_machine_loop(
                 if config.unique_data:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(case, failure)
-                ctx.step_failed()
-                raise
-            except Failure as exc:
-                if config.unique_data:
-                    ctx.store_step_outcome(case, exc)
                 ctx.step_failed()
                 raise
             except Exception as exc:

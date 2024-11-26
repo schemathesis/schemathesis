@@ -156,7 +156,7 @@ Python:
     import schemathesis
     from schemathesis import GenerationConfig
 
-    schema = schemathesis.from_uri(
+    schema = schemathesis.openapi.from_url(
         "https://example.schemathesis.io/openapi.json",
         generation_config=GenerationConfig(allow_x00=False, codec='ascii'),
     )
@@ -181,7 +181,7 @@ Python:
     import schemathesis
     from schemathesis import DataGenerationMethod
 
-    schema = schemathesis.from_uri(
+    schema = schemathesis.openapi.from_url(
         "https://example.schemathesis.io/openapi.json",
         data_generation_methods=[DataGenerationMethod.negative],
     )
