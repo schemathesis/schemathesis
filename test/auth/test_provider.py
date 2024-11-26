@@ -178,7 +178,7 @@ MULTI_SCOPE_SCHEMA = {
 
 def test_auth_cache_with_scopes():
     # See GH-1775
-    schema = schemathesis.from_dict(MULTI_SCOPE_SCHEMA)
+    schema = schemathesis.openapi.from_dict(MULTI_SCOPE_SCHEMA)
 
     counts = {}
 

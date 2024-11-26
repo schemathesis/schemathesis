@@ -26,7 +26,7 @@ class Message(BaseModel):
 
 def create_app(operations=("root",), version=OpenAPIVersion("3.0")):
     if version != OpenAPIVersion("3.0"):
-        raise ValueError("FastAPI supports only Open API 3.0")
+        raise ValueError("FastAPI supports only Open API 3.x")
     app = FastAPI()
     users = {}
 

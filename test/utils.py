@@ -31,7 +31,7 @@ SIMPLE_PATH = get_schema_path("simple_swagger.yaml")
 
 def get_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> BaseSchema:
     schema = make_schema(schema_name, **kwargs)
-    return schemathesis.from_dict(schema)
+    return schemathesis.openapi.from_dict(schema)
 
 
 def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:

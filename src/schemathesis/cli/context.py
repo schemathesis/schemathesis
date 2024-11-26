@@ -40,7 +40,6 @@ class ExecutionContext:
     rate_limit: str | None = None
     show_trace: bool = False
     wait_for_schema: float | None = None
-    validate_schema: bool = True
     operations_processed: int = 0
     # It is set in runtime, from the `Initialized` event
     operations_count: int | None = None

@@ -8,6 +8,7 @@ import schemathesis
 from schemathesis._hypothesis._builder import create_test
 from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
+from schemathesis.generation import GenerationConfig
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.models import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -958,7 +959,7 @@ def test_negative_query_parameter(ctx):
         }
     )
 
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     urls = []
     operation = schema["/foo"]["post"]
@@ -975,7 +976,7 @@ def test_negative_query_parameter(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        data_generation_methods=[DataGenerationMethod.negative],
+        generation_config=GenerationConfig(methods=[DataGenerationMethod.negative]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1005,7 +1006,7 @@ def test_unspecified_http_methods(ctx):
         }
     )
 
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     methods = set()
     operation = schema["/foo"]["post"]
@@ -1020,7 +1021,7 @@ def test_unspecified_http_methods(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        data_generation_methods=[DataGenerationMethod.negative],
+        generation_config=GenerationConfig(methods=[DataGenerationMethod.negative]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1030,7 +1031,7 @@ def test_unspecified_http_methods(ctx):
 
 
 def assert_coverage(schema, methods, expected, path=None):
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     cases = []
     operation = schema[path[0]][path[1]] if path else schema["/foo"]["post"]
@@ -1051,7 +1052,10 @@ def assert_coverage(schema, methods, expected, path=None):
         cases.append(output)
 
     test_func = create_test(
-        operation=operation, test=test, data_generation_methods=methods, settings=settings(phases=[Phase.explicit])
+        operation=operation,
+        test=test,
+        generation_config=GenerationConfig(methods=methods),
+        settings=settings(phases=[Phase.explicit]),
     )
 
     test_func()

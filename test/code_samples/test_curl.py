@@ -6,7 +6,7 @@ from schemathesis.models import Case
 from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
 
-schema = schemathesis.from_dict(app.openapi(), force_schema_version="30")
+schema = schemathesis.openapi.from_dict(app.openapi())
 
 
 @pytest.fixture
@@ -22,14 +22,14 @@ def loose_schema(ctx):
         },
         version="2.0",
     )
-    return schemathesis.from_dict(schema, base_url="http://127.0.0.1:1", validate_schema=False)
+    return schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1:1")
 
 
 @pytest.mark.parametrize("headers", [None, {"X-Key": "42"}])
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
-    case.operation.schema.sanitize_output = False
+    case.operation.schema.output_config.sanitize = False
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
     assert command == f"curl -X GET{expected_headers} http://localhost/users"
@@ -47,7 +47,7 @@ def test_non_utf_8_body(curl):
 
 def test_json_payload(curl):
     new_app = create_app(operations=["create_user"])
-    schema = schemathesis.from_dict(new_app.openapi(), force_schema_version="30")
+    schema = schemathesis.openapi.from_dict(new_app.openapi())
     case = Case(
         operation=schema["/users/"]["POST"], generation_time=0.0, body={"foo": 42}, media_type="application/json"
     )
@@ -94,7 +94,7 @@ def test_pytest_subtests_output(testdir, openapi3_base_url, app_schema):
     testdir.make_test(
         f"""
 schema.base_url = "{openapi3_base_url}"
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(case):

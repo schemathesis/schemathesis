@@ -5,7 +5,7 @@ def test_default(testdir):
     # When LazySchema is used
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -23,7 +23,7 @@ def test_with_settings(testdir):
     # When hypothesis settings are applied to the test function
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @settings(phases=[])
 @lazy_schema.parametrize()
@@ -43,7 +43,7 @@ def test_invalid_operation(testdir, hypothesis_max_examples):
     # And schema validation is disabled
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(request, case):
@@ -63,7 +63,6 @@ def test_(request, case):
                 }
             },
         },
-        validate_schema=False,
     )
     result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
@@ -85,7 +84,7 @@ def test_with_fixtures(testdir):
     # When the test uses custom arguments for pytest fixtures
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @pytest.fixture
 def another():
@@ -110,7 +109,7 @@ def test_with_parametrize_filters(testdir):
     # When the test uses method / endpoint / tag / operation-id filter
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.include(path_regex="/first").parametrize()
 def test_a(request, case):
@@ -166,7 +165,7 @@ def test_with_schema_filters(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema").include(path_regex="/v1/pets", method="POST")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema").include(path_regex="/v1/pets", method="POST")
 
 @lazy_schema.parametrize()
 def test_a(request, case):
@@ -191,7 +190,7 @@ def test_invalid_fixture(testdir):
 def bad_schema():
     return 1
 
-lazy_schema = schemathesis.from_pytest_fixture("bad_schema")
+lazy_schema = schemathesis.pytest.from_fixture("bad_schema")
 
 @lazy_schema.parametrize()
 def test_(request, case):
@@ -222,7 +221,7 @@ def test_(request, case):
 def test_hooks_with_lazy_schema(testdir, simple_openapi, decorators):
     testdir.make_test(
         f"""
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.hook
 def before_generate_query(context, strategy):
@@ -256,7 +255,7 @@ def test_schema_given(testdir, given):
         f"""
 from hypothesis.strategies._internal.core import DataObject
 
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 OPERATIONS = []
 
 @lazy_schema.parametrize()
@@ -286,7 +285,7 @@ def test_invalid_given_usage(testdir):
     # When `schema.given` is used incorrectly (e.g. called without arguments)
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 @lazy_schema.given()
@@ -300,32 +299,6 @@ def test(case):
     result.stdout.re_match_lines([".+given must be called with at least one argument"])
 
 
-def test_override_base_url(testdir):
-    # When `base_url` is passed to `from_pytest_fixture`
-    testdir.make_test(
-        """
-schema.base_url = "http://127.0.0.1/a1"
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema", base_url="http://127.0.0.1/a2")
-
-@lazy_schema.parametrize()
-def test_a(case):
-    assert schema.base_url == "http://127.0.0.1/a1"
-    assert case.operation.schema.base_url == "http://127.0.0.1/a2"
-
-lazy_schema2 = schemathesis.from_pytest_fixture("simple_schema")
-
-@lazy_schema2.parametrize()
-def test_b(case):
-    # No override
-    assert schema.base_url == case.operation.schema.base_url == "http://127.0.0.1/a1"
-        """,
-    )
-    # Then it should be overridden in the resulting schema
-    # And the original one should remain the same
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=2)
-
-
 @pytest.mark.parametrize("settings", ["", "@settings(deadline=None)"])
 def test_parametrized_fixture(testdir, openapi3_base_url, settings):
     # When the used pytest fixture is parametrized via `params`
@@ -337,7 +310,7 @@ schema.base_url = "{openapi3_base_url}"
 def parametrized_lazy_schema(request):
     return schema
 
-lazy_schema = schemathesis.from_pytest_fixture("parametrized_lazy_schema")
+lazy_schema = schemathesis.pytest.from_fixture("parametrized_lazy_schema")
 
 @lazy_schema.parametrize()
 {settings}
@@ -362,9 +335,11 @@ def test_data_generation_methods(testdir):
         """
 @pytest.fixture()
 def api_schema():
-    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
+    return schemathesis.openapi.from_dict(raw_schema).configure(
+        generation=GenerationConfig(methods=schemathesis.DataGenerationMethod.all())
+    )
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 @settings(max_examples=1)
@@ -410,36 +385,6 @@ def pytest_terminal_summary(terminalreporter) -> None:
     )
 
 
-def test_data_generation_methods_override(testdir):
-    # When data generation method config is specified on the schema which is wrapped by a lazy one
-    # And then overridden on the` from_pytest_fixture` level
-    testdir.make_test(
-        """
-@pytest.fixture()
-def api_schema():
-    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.all())
-
-lazy_schema = schemathesis.from_pytest_fixture(
-    "api_schema",
-    data_generation_methods=schemathesis.DataGenerationMethod.positive
-)
-
-@lazy_schema.parametrize()
-@settings(max_examples=1)
-def test_(case):
-    pass
-""",
-    )
-    # Then the overridden one should be used
-    result = testdir.runpytest("-v")
-    result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines(
-        [
-            r"test_data_generation_methods_override.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS *\[ 50%\]"
-        ]
-    )
-
-
 def test_hooks_are_merged(testdir):
     # When the wrapped schema has hooks
     # And the lazy schema also has hooks
@@ -461,12 +406,12 @@ def before_generate_case_first(ctx, strategy):
 
 @pytest.fixture()
 def api_schema():
-    loaded = schemathesis.from_dict(raw_schema)
+    loaded = schemathesis.openapi.from_dict(raw_schema)
     loaded.hook("before_generate_case")(before_generate_case_first)
     return loaded
 
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 def before_generate_case_second(ctx, strategy):
 
@@ -499,9 +444,9 @@ def test_error_on_no_matches(testdir):
         """
 @pytest.fixture()
 def api_schema():
-    return schemathesis.from_dict(raw_schema)
+    return schemathesis.openapi.from_dict(raw_schema)
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.include(operation_id=["does-not-exist"]).parametrize()
 @settings(max_examples=1)
@@ -538,7 +483,7 @@ def test_marks_transfer(testdir, decorators):
 def web_app():
     1 / 0
 
-schema = schemathesis.from_pytest_fixture("web_app")
+schema = schemathesis.pytest.from_fixture("web_app")
 
 {decorators}
 def test_schema(case):
@@ -557,9 +502,11 @@ def test_skip_negative_without_parameters(testdir):
         """
 @pytest.fixture()
 def api_schema():
-    return schemathesis.from_dict(raw_schema, data_generation_methods=schemathesis.DataGenerationMethod.negative)
+    return schemathesis.openapi.from_dict(raw_schema).configure(
+        generation=GenerationConfig(methods=[schemathesis.DataGenerationMethod.negative])
+    )
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -572,11 +519,11 @@ def test_(case):
 
 
 def test_trimmed_output(testdir):
-    # When `from_pytest_fixture` is used
+    # When `from_fixture` is used
     # And tests are failing
     testdir.make_test(
         """
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -596,9 +543,9 @@ def test_multiple_failures(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{openapi3_schema_url}')
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 @settings(derandomize=True)
@@ -622,9 +569,9 @@ def test_flaky(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{openapi3_schema_url}')
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -649,9 +596,9 @@ def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, va
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{openapi3_schema_url}').configure(output=OutputConfig(sanitize={value}))
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema", sanitize_output={value})
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -673,9 +620,9 @@ def test_rate_limit(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{openapi3_schema_url}').configure(rate_limit="1/s")
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema", rate_limit="1/s")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
@@ -694,9 +641,9 @@ def test_override(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.from_uri('{openapi3_schema_url}')
+    return schemathesis.openapi.from_url('{openapi3_schema_url}')
 
-lazy_schema = schemathesis.from_pytest_fixture("api_schema")
+lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.include(path_regex="path_variable|custom_format").parametrize()
 @lazy_schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})

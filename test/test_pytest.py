@@ -52,8 +52,7 @@ def test_(request, param, case):
 def test_missing_base_url_error_message(testdir):
     testdir.make_test(
         """
-
-schema = schemathesis.from_dict(raw_schema)
+schema = schemathesis.openapi.from_dict(raw_schema)
 
 @schema.parametrize()
 def test_a(case):
@@ -424,30 +423,16 @@ from schemathesis.models import *
     assert "cannot collect test class" not in result.stdout.str()
 
 
-def test_single_data_generation_method_passed_to_loader(testdir):
-    # See GH-1260
-    # When `data_generation_methods` receives a single `DataGenerationMethod` value
-    testdir.make_test(
-        """
-schema = schemathesis.from_dict(raw_schema, data_generation_methods=DataGenerationMethod.positive)
-
-@schema.parametrize()
-def test(case):
-    pass
-        """,
-    )
-    result = testdir.runpytest()
-    # Then it should not fail
-    # And should generate proper tests
-    result.assert_outcomes(passed=1)
-
-
 def test_skip_negative_without_parameters(testdir):
     # See GH-1463
     # When an endpoint has no parameters to negate
     testdir.make_test(
         """
-schema = schemathesis.from_dict(raw_schema, data_generation_methods=DataGenerationMethod.negative)
+schema = schemathesis.openapi.from_dict(
+    raw_schema
+).configure(
+    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+)
 
 @schema.parametrize()
 def test_(case):
@@ -465,9 +450,10 @@ def test_skip_impossible_to_negate(testdir):
     # When endpoint's body schema can't be negated
     testdir.make_test(
         """
-schema = schemathesis.from_dict(
-    raw_schema,
-    data_generation_methods=DataGenerationMethod.negative
+schema = schemathesis.openapi.from_dict(
+    raw_schema
+).configure(
+    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
 ).include(method="POST")
 
 @schema.parametrize()
@@ -503,9 +489,10 @@ def test_do_not_skip_partially_negated(testdir):
     # And there is another parameter that can be negated
     testdir.make_test(
         """
-schema = schemathesis.from_dict(
-    raw_schema,
-    data_generation_methods=DataGenerationMethod.negative
+schema = schemathesis.openapi.from_dict(
+    raw_schema
+).configure(
+    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
 ).include(method="POST")
 
 @schema.parametrize()
@@ -542,9 +529,10 @@ def test_path_parameters_allow_partial_negation(testdir, location):
     # If path parameters can not be negated and other parameters can be negated
     testdir.make_test(
         """
-schema = schemathesis.from_dict(
-    raw_schema,
-    data_generation_methods=DataGenerationMethod.negative
+schema = schemathesis.openapi.from_dict(
+    raw_schema
+).configure(
+    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
 ).include(method="GET", path_regex="/pets/{key}/")
 
 @schema.parametrize()
@@ -576,9 +564,10 @@ def test_many_path_parameters_allow_partial_negation(testdir):
     # If just one path parameter can not be negated and other parameters can be negated
     testdir.make_test(
         """
-schema = schemathesis.from_dict(
-    raw_schema,
-    data_generation_methods=DataGenerationMethod.negative
+schema = schemathesis.openapi.from_dict(
+    raw_schema
+).configure(
+    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
 ).include(
     method="GET",
     path_regex="/pets/{key}/{value}/",
@@ -864,7 +853,7 @@ def test(case):
 def test_override(testdir, openapi3_schema_url):
     testdir.make_test(
         f"""
-schema = schemathesis.from_uri('{openapi3_schema_url}')
+schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
 
 @schema.include(path_regex="path_variable|custom_format").parametrize()
 @schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})

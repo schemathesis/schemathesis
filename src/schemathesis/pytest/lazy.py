@@ -9,11 +9,7 @@ import pytest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
-from schemathesis.core import NOT_SET
-from schemathesis.core.errors import InvalidSchema
-from schemathesis.hooks import HookDispatcherMark
-
-from ._hypothesis._given import (
+from schemathesis._hypothesis._given import (
     GivenArgsMark,
     GivenInput,
     GivenKwargsMark,
@@ -22,23 +18,24 @@ from ._hypothesis._given import (
     merge_given_args,
     validate_given_args,
 )
-from ._override import CaseOverride, OverrideMark, check_no_override_mark
-from ._pytest.control_flow import fail_on_no_matches
-from .auths import AuthStorage
-from .filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from .hooks import HookDispatcher, HookScope
-from .internal.result import Ok
-from .schemas import BaseSchema
+from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
+from schemathesis._pytest.control_flow import fail_on_no_matches
+from schemathesis.auths import AuthStorage
+from schemathesis.core import NOT_SET
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
+from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
+from schemathesis.internal.result import Ok
+from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
     from pyrate_limiter import Limiter
 
     from schemathesis.core import NotSet
-
-    from .generation import DataGenerationMethodInput, GenerationConfig
-    from .internal.output import OutputConfig
-    from .models import APIOperation
+    from schemathesis.generation import GenerationConfig
+    from schemathesis.internal.output import OutputConfig
+    from schemathesis.models import APIOperation
 
 
 @dataclass
@@ -49,12 +46,9 @@ class LazySchema:
     filter_set: FilterSet = field(default_factory=FilterSet)
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
-    validate_schema: bool = True
-    data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET
     generation_config: GenerationConfig | NotSet = NOT_SET
     output_config: OutputConfig | NotSet = NOT_SET
     rate_limiter: Limiter | None = None
-    sanitize_output: bool = True
 
     def include(
         self,
@@ -92,12 +86,9 @@ class LazySchema:
             app=self.app,
             hooks=self.hooks,
             auth=self.auth,
-            validate_schema=self.validate_schema,
-            data_generation_methods=self.data_generation_methods,
             generation_config=self.generation_config,
             output_config=self.output_config,
             rate_limiter=self.rate_limiter,
-            sanitize_output=self.sanitize_output,
             filter_set=filter_set,
         )
 
@@ -143,12 +134,9 @@ class LazySchema:
             app=self.app,
             hooks=self.hooks,
             auth=self.auth,
-            validate_schema=self.validate_schema,
-            data_generation_methods=self.data_generation_methods,
             generation_config=self.generation_config,
             output_config=self.output_config,
             rate_limiter=self.rate_limiter,
-            sanitize_output=self.sanitize_output,
             filter_set=filter_set,
         )
 
@@ -157,13 +145,9 @@ class LazySchema:
 
     def parametrize(
         self,
-        validate_schema: bool | NotSet = NOT_SET,
-        data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
         generation_config: GenerationConfig | NotSet = NOT_SET,
         output_config: OutputConfig | NotSet = NOT_SET,
     ) -> Callable:
-        if data_generation_methods is NOT_SET:
-            data_generation_methods = self.data_generation_methods
         if generation_config is NOT_SET:
             generation_config = self.generation_config
         if output_config is NOT_SET:
@@ -198,13 +182,9 @@ class LazySchema:
                     hooks=self.hooks,
                     auth=self.auth if self.auth.providers is not None else NOT_SET,
                     test_function=test,
-                    validate_schema=validate_schema,
-                    data_generation_methods=data_generation_methods,
                     generation_config=generation_config,
                     output_config=output_config,
                     app=self.app,
-                    rate_limiter=self.rate_limiter,
-                    sanitize_output=self.sanitize_output,
                     filter_set=self.filter_set,
                 )
                 fixtures = get_fixtures(test, request, given_kwargs)
@@ -335,12 +315,8 @@ def get_schema(
     test_function: Callable,
     hooks: HookDispatcher,
     auth: AuthStorage | NotSet,
-    validate_schema: bool | NotSet = NOT_SET,
-    data_generation_methods: DataGenerationMethodInput | NotSet = NOT_SET,
     generation_config: GenerationConfig | NotSet = NOT_SET,
     output_config: OutputConfig | NotSet = NOT_SET,
-    rate_limiter: Limiter | None,
-    sanitize_output: bool,
 ) -> BaseSchema:
     """Loads a schema from the fixture."""
     schema = request.getfixturevalue(name)
@@ -354,12 +330,8 @@ def get_schema(
         test_function=test_function,
         hooks=schema.hooks.merge(hooks),
         auth=auth,
-        validate_schema=validate_schema,
-        data_generation_methods=data_generation_methods,
         generation_config=generation_config,
         output_config=output_config,
-        rate_limiter=rate_limiter,
-        sanitize_output=sanitize_output,
     )
 
 

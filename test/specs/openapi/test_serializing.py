@@ -115,7 +115,7 @@ def make_openapi_schema(*parameters):
 
 
 def assert_generates(testdir, raw_schema, expected, parameter):
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     attribute = "path_parameters" if parameter == "path" else parameter
 
@@ -312,7 +312,7 @@ def test_path_serialization_styles_openapi3(schema, style, explode, expected):
             }
         },
     }
-    schema = schemathesis.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema)
 
     @given(case=schema["/teapot/{color}"]["GET"].as_strategy())
     def test(case):
@@ -553,7 +553,7 @@ def test_unusual_form_schema(ctx, type_name):
             }
         }
     )
-    schema = schemathesis.from_dict(schema, validate_schema=False)
+    schema = schemathesis.openapi.from_dict(schema)
 
     @given(case=schema["/multipart"]["POST"].as_strategy())
     @settings(max_examples=5, deadline=None)

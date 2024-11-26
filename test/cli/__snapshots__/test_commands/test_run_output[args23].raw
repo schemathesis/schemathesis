@@ -59,8 +59,6 @@ Loader options:
   --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the
                                  API schema to become available. Disabled by
                                  default  [x>=1.0]
-  --validate-schema BOOLEAN      Validate input API schema. Set to 'true' to
-                                 enable or 'false' to disable  [default: False]
 
 Network requests options:
   -b, --base-url TEXT            Base URL of the API, required when schema is
@@ -171,16 +169,14 @@ Data generation options:
                                             all]
 
 Open API options:
-  --force-schema-version   Force the schema to be interpreted as a particular
-                           OpenAPI version [possible values: 20, 30]
-  --set-query TEXT         OpenAPI: Override a specific query parameter by
-                           specifying 'parameter=value'
-  --set-header TEXT        OpenAPI: Override a specific header parameter by
-                           specifying 'parameter=value'
-  --set-cookie TEXT        OpenAPI: Override a specific cookie parameter by
-                           specifying 'parameter=value'
-  --set-path TEXT          OpenAPI: Override a specific path parameter by
-                           specifying 'parameter=value'
+  --set-query TEXT   OpenAPI: Override a specific query parameter by specifying
+                     'parameter=value'
+  --set-header TEXT  OpenAPI: Override a specific header parameter by specifying
+                     'parameter=value'
+  --set-cookie TEXT  OpenAPI: Override a specific cookie parameter by specifying
+                     'parameter=value'
+  --set-path TEXT    OpenAPI: Override a specific path parameter by specifying
+                     'parameter=value'
 
 Hypothesis engine options:
   --hypothesis-database TEXT                Storage for examples discovered by

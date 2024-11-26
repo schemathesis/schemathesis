@@ -24,7 +24,7 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 
 from ... import auths
@@ -106,6 +106,7 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
+    specification: Specification = Specification.GRAPHQL
     _operation_cache: OperationCache = field(default_factory=OperationCache)
 
     def __repr__(self) -> str:

@@ -19,7 +19,11 @@ Or in Python tests:
 
 .. code-block:: python
 
-    schema = schemathesis.from_dict({...}, sanitize_output=False)
+    from schemathesis import OutputConfig
+
+    schema = schemathesis.openapi.from_dict({...}).configure(
+        output=OutputConfig(sanitize=False)
+    )
 
 Disabling this option will turn off the automatic sanitization of sensitive data in the output.
 
@@ -39,7 +43,5 @@ Here's how you could do it:
 
     # Configure Schemathesis to use your custom sanitization configuration
     schemathesis.sanitization.configure(custom_config)
-
-This will sanitize the ``X-Customer-ID`` headers (case-insensitive), and any fields containing the substring "address" (case-insensitive) in their names, with the string "[Custom]" in the generated test case and the received response.
 
 This will sanitize the ``X-Customer-ID`` headers, and any fields containing the substring "address" in their names, with the string "[Custom]" in the generated test case and the received response.

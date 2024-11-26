@@ -134,7 +134,7 @@ def token():
         return {{"access_token": "{APP_TEST_TOKEN}"}}
     return {{"detail": "Unauthorized"}}, 401
 
-schema = schemathesis.from_wsgi("/schema.json", app=app)"""
+schema = schemathesis.openapi.from_wsgi("/schema.json", app=app)"""
     if python_app_type == "asgi":
         return f"""
 from fastapi import FastAPI, HTTPException
@@ -153,7 +153,7 @@ def token(data: AuthInput):
         return {{"access_token": "{APP_TEST_TOKEN}"}}
     raise HTTPException(status_code=401, detail="Unauthorized")
 
-schema = schemathesis.from_asgi("/openapi.json", app=app, force_schema_version="30")
+schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
 """
 
 
@@ -177,11 +177,11 @@ def test(case):
     result.assert_outcomes(passed=1)
 
 
-def test_from_pytest_fixture(testdir):
+def test_from_fixture(testdir):
     # When auth is registered on a schema created via a pytest fixture
     testdir.make_test(
         f"""
-lazy_schema = schemathesis.from_pytest_fixture("simple_schema")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 TOKEN = "Foo"
 

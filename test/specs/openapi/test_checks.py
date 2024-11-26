@@ -153,7 +153,7 @@ def sample_schema(ctx):
     ],
 )
 def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
-    schema = schemathesis.from_dict(sample_schema)
+    schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     case = Case(operation=operation, generation_time=0.0, **kwargs)
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
@@ -162,7 +162,7 @@ def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kw
 def test_negative_data_rejection_on_additional_properties(response_factory, sample_schema):
     # See GH-2312
     response = response_factory.requests()
-    schema = schemathesis.from_dict(sample_schema)
+    schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     case = Case(
         operation=operation,
@@ -205,7 +205,7 @@ def test_positive_data_acceptance(
     is_positive,
     should_raise,
 ):
-    schema = schemathesis.from_dict(sample_schema)
+    schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     response = response_factory.requests(status_code=status_code)
     case = Case(

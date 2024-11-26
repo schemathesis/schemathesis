@@ -75,7 +75,7 @@ They execute in the order they are defined, with globally defined hooks executin
         return query["key"] != "42"
 
 
-    schema = schemathesis.from_uri("http://0.0.0.0:8080/swagger.json")
+    schema = schemathesis.openapi.from_url("http://0.0.0.0:8080/swagger.json")
 
 
     @schema.hook("filter_query")
@@ -640,7 +640,7 @@ Here's an example of how you can adjust header generation:
     from schemathesis import GenerationConfig, HeaderConfig
     from hypothesis import strategies as st
 
-    schema = schemathesis.from_uri(
+    schema = schemathesis.openapi.from_url(
         "https://example.schemathesis.io/openapi.json",
         generation_config=GenerationConfig(
             headers=HeaderConfig(
@@ -708,7 +708,7 @@ It can run tests against the given schema URI and will do some simple checks for
 
     import schemathesis
 
-    schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
+    schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/swagger.json")
 
     runner = schemathesis.runner.from_schema(schema)
     for event in runner.execute():
@@ -731,7 +731,7 @@ You can provide your custom checks to the execute function; the check is a calla
         assert response.elapsed < timedelta(milliseconds=300)
 
 
-    schema = schemathesis.from_uri("http://127.0.0.1:8080/swagger.json")
+    schema = schemathesis.openapi.from_url("http://127.0.0.1:8080/swagger.json")
     runner = schemathesis.runner.from_schema(schema, checks=[not_too_long])
     for event in runner.execute():
         ...  # do something with event
