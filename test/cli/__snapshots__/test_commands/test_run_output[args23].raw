@@ -131,8 +131,6 @@ Output options:
                                         [default: True]
   --output-truncate TEXT                Truncate schemas and responses in error
                                         messages  [default: true]
-  --show-trace                          Display complete traceback information
-                                        for internal errors
   --debug-output-file FILENAME          Save debugging information in a JSONL
                                         format at the specified file path
 
