@@ -178,13 +178,21 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_UNSUPPORTED,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
+            RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED,
+            RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR,
+            RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
+            RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
+            RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_TOO_SLOW,
+            RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE,
+            RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_FILTER_TOO_MUCH,
+            RuntimeErrorKind.NETWORK_OTHER,
         )
 
     @cached_property
     def traceback(self) -> str:
         return format_exception(self._error, with_traceback=True)
 
-    def format(self, *, show_trace: bool = False, bold: Callable[[str], str] = str, indent: str = "    ") -> str:
+    def format(self, *, bold: Callable[[str], str] = str, indent: str = "    ") -> str:
         """Format error message with optional styling and traceback."""
         message = []
 
@@ -203,7 +211,7 @@ class EngineErrorInfo:
         # Extras
         if self.extras:
             extras = self.extras
-        elif show_trace and self.has_useful_traceback:
+        elif self.has_useful_traceback:
             extras = split_traceback(self.traceback)
         else:
             extras = []

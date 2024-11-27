@@ -1,6 +1,8 @@
 from functools import lru_cache
 from typing import Generator, Tuple
 
+from schemathesis.core.errors import MalformedMediaType
+
 
 def _parseparam(s: str) -> Generator[str, None, None]:
     while s[:1] == ";":
@@ -38,7 +40,7 @@ def parse_content_type(content_type: str) -> Tuple[str, str]:
         content_type, _ = parse_header(content_type)
         main_type, sub_type = content_type.split("/", 1)
     except ValueError as exc:
-        raise ValueError(f"Malformed media type: `{content_type}`") from exc
+        raise MalformedMediaType(f"Malformed media type: `{content_type}`") from exc
     return main_type.lower(), sub_type.lower()
 
 

@@ -27,6 +27,7 @@ from schemathesis.core.errors import (
     InvalidRegexPattern,
     InvalidRegexType,
     InvalidSchema,
+    MalformedMediaType,
     SerializationNotPossible,
 )
 from schemathesis.core.failures import Failure, FailureGroup, ResponseTimeExceeded
@@ -106,7 +107,10 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = Status.error
         result.mark_errored()
         for error in deduplicate_errors(errors):
-            result.add_error(error)
+            if isinstance(error, MalformedMediaType):
+                result.add_error(InvalidSchema(str(error)))
+            else:
+                result.add_error(error)
     except hypothesis.errors.Flaky as exc:
         status = _on_flaky(exc)
     except BaseExceptionGroup:
