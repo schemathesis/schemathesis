@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-deadline': wrong is not a valid integer or None.
+Error: Invalid value for '--hypothesis-deadline': 0 is not in the range 1<=x<=300000.

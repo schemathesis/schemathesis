@@ -4,7 +4,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
-    from requests.auth import HTTPDigestAuth
     from requests.structures import CaseInsensitiveDict
 
     from .._override import CaseOverride
@@ -40,6 +39,6 @@ class CheckContext:
     """
 
     override: CaseOverride | None
-    auth: HTTPDigestAuth | tuple[str, str] | None
+    auth: tuple[str, str] | None
     headers: CaseInsensitiveDict | None
     config: CheckConfig = field(default_factory=CheckConfig)

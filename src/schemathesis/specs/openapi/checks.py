@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import enum
+import http.client
 from dataclasses import dataclass
 from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
@@ -277,7 +278,6 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
 
 def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
-    from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
@@ -295,7 +295,7 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
             ):
                 free = f"{case.operation.method.upper()} {case.formatted_path}"
                 usage = f"{original.operation.method} {original.formatted_path}"
-                reason = get_reason(response.status_code)
+                reason = http.client.responses.get(response.status_code, "Unknown")
                 raise UseAfterFree(
                     operation=case.operation.verbose_name,
                     message=(
@@ -313,7 +313,6 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
 
 
 def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
-    from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
@@ -330,7 +329,7 @@ def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, o
     ):
         created_with = original.source.case.operation.verbose_name
         not_available_with = original.operation.verbose_name
-        reason = get_reason(response.status_code)
+        reason = http.client.responses.get(response.status_code, "Unknown")
         raise EnsureResourceAvailability(
             operation=created_with,
             message=(
@@ -395,9 +394,7 @@ def _update_response(old: GenericResponse, new: GenericResponse) -> None:
 
 
 def _raise_no_auth_error(response: GenericResponse, operation: str, suffix: str) -> NoReturn:
-    from ...transports.responses import get_reason
-
-    reason = get_reason(response.status_code)
+    reason = http.client.responses.get(response.status_code, "Unknown")
     raise IgnoredAuth(
         operation=operation,
         message=f"The API returned `{response.status_code} {reason}` for `{operation}` {suffix}.",
