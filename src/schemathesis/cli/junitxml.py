@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import platform
 import textwrap
 from dataclasses import dataclass, field
@@ -49,8 +50,6 @@ def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionCon
 
 
 def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:
-    from ..transports.responses import get_reason
-
     message = ""
     for check_idx, check in enumerate(checks):
         if check_idx == 0:
@@ -62,7 +61,7 @@ def build_failure_message(context: ExecutionContext, idx: int, code_sample: str,
             message += f"\n{formatted_message}\n"
         if check_idx + 1 == len(checks):
             status_code = check.response.status_code
-            reason = get_reason(status_code)
+            reason = http.client.responses.get(status_code, "Unknown")
             message += f"\n[{check.response.status_code}] {reason}:\n"
             if check.response.body is not None:
                 if not check.response.body:

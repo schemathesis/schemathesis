@@ -402,7 +402,7 @@ def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session:
     if not ctx.config.execution.dry_run:
         _network_test(case, ctx, result, session, headers)
     else:
-        result.store_requests_response(case, None, Status.skip, [], headers=headers, session=session)
+        result.store_requests_response(case, None, Status.skip, [], session=session)
 
 
 def _network_test(
@@ -423,7 +423,7 @@ def _network_test(
     try:
         response = case.call(**kwargs)
     except (requests.Timeout, requests.ConnectionError):
-        result.store_requests_response(case, None, Status.failure, [], headers=headers, session=session)
+        result.store_requests_response(case, None, Status.failure, [], session=session)
         raise
     targets.run(ctx.config.execution.targets, case=case, response=response)
     status = Status.success
@@ -448,5 +448,5 @@ def _network_test(
         status = Status.failure
         raise
     finally:
-        result.store_requests_response(case, response, status, check_results, headers=headers, session=session)
+        result.store_requests_response(case, response, status, check_results, session=session)
     return response

@@ -15,18 +15,16 @@ def execute(ctx: EngineContext) -> EventGenerator:
 
     from ....stateful import events as stateful_events
     from ....stateful import runner as stateful_runner
-    from ....transports.auth import get_requests_auth
 
     result = TestResult(verbose_name="Stateful tests")
     headers = ctx.config.network.headers or {}
-    auth = get_requests_auth(ctx.config.network.auth, ctx.config.network.auth_type)
     config = stateful_runner.StatefulTestRunnerConfig(
         checks=tuple(ctx.config.execution.checks),
         headers=headers,
         hypothesis_settings=ctx.config.execution.hypothesis_settings,
         max_failures=ctx.control.remaining_failures,
         network=ctx.config.network,
-        auth=auth,
+        auth=ctx.config.network.auth,
         seed=ctx.config.execution.seed,
         override=ctx.config.override,
     )
@@ -50,8 +48,8 @@ def execute(ctx: EngineContext) -> EventGenerator:
                 case=event.case,
                 response=response,
                 checks=event.checks,
-                headers=headers,
-                session=None,
+                # TODO: reuse engine-wide transport
+                session=config.session,
             )
 
     test_start_time: float | None = None

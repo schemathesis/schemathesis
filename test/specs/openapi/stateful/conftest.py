@@ -354,10 +354,13 @@ def app_factory(ctx):
 
 
 @pytest.fixture
-def runner_factory(app_factory):
+def runner_factory(app_factory, app_runner):
     def _runner_factory(*, app_kwargs=None, config_kwargs=None, configuration=None):
         app = app_factory(**(app_kwargs or {}))
-        schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app).configure(**(configuration or {}))
+        port = app_runner.run_flask_app(app)
+        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
+            **(configuration or {})
+        )
         state_machine = schema.as_state_machine()
         config_kwargs = config_kwargs or {}
         config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))

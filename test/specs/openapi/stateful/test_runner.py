@@ -631,7 +631,8 @@ def test_external_link(ctx, app_factory, app_runner):
         },
     )
     root_app = app_factory(independent_500=True)
-    schema = schemathesis.openapi.from_dict(schema).configure(app=root_app)
+    root_app_port = app_runner.run_flask_app(root_app)
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=f"http://127.0.0.1:{root_app_port}/")
     state_machine = schema.as_state_machine()
     runner = state_machine.runner(
         config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None))

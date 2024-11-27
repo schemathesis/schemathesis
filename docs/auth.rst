@@ -48,12 +48,11 @@ For Python tests you can set a header, cookie or a query parameter inside your t
 Built-In Authentication mechanisms
 ----------------------------------
 
-`HTTP Basic <https://datatracker.ietf.org/doc/html/rfc7617>`_ and `HTTP Digest <https://datatracker.ietf.org/doc/html/rfc7616>`_ are two common authentication schemes supported by Schemathesis out of the box.
+`HTTP Basic <https://datatracker.ietf.org/doc/html/rfc7617>`_ is supported by Schemathesis out of the box.
 
 .. code:: text
 
-    st run --auth user:pass --auth-type=basic ...
-    st run --auth user:pass --auth-type=digest ...
+    st run --auth user:pass
 
 In Python tests, you can use the `requests <https://github.com/psf/requests>`_ library to send requests with HTTP Basic or HTTP Digest authentication.
 You can pass the authentication credentials using the ``auth`` arguments of the ``call`` or ``call_and_validate`` methods:

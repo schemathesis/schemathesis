@@ -17,7 +17,6 @@ from schemathesis.core.transport import USER_AGENT
 
 from ...internal.exceptions import format_exception
 from ...sanitization import sanitize_url, sanitize_value
-from ...transports.auth import get_requests_auth
 from .. import events
 from ..models import Request, Response
 
@@ -58,7 +57,7 @@ def run(schema: BaseSchema, config: NetworkConfig) -> list[ProbeRun]:
     if config.cert is not None:
         session.cert = config.cert
     if config.auth is not None:
-        session.auth = get_requests_auth(config.auth, config.auth_type)
+        session.auth = config.auth
 
     return [send(probe(), session, schema, config) for probe in PROBES]
 
