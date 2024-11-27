@@ -39,7 +39,7 @@ from ..internal.output import OutputConfig
 from ..runner import events
 from ..runner.config import NetworkConfig
 from ..stateful import Stateful
-from . import callbacks, cassettes, loaders, output
+from . import cassettes, loaders, output, validation
 from ._hypothesis import prepare_settings
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
@@ -172,7 +172,7 @@ with_request_tls_verify = grouped_option(
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
+    callback=validation.convert_boolean_string,
 )
 with_request_cert = grouped_option(
     "--request-cert",
@@ -189,7 +189,7 @@ with_request_cert_key = grouped_option(
     type=click.Path(exists=True),
     default=None,
     show_default=False,
-    callback=callbacks.validate_request_cert_key,
+    callback=validation.validate_request_cert_key,
 )
 with_hosts_file = grouped_option(
     "--hosts-file",
@@ -197,7 +197,7 @@ with_hosts_file = grouped_option(
     type=click.Path(dir_okay=False, writable=True),
     default=service.DEFAULT_HOSTS_PATH,
     envvar=service.HOSTS_PATH_ENV_VAR,
-    callback=callbacks.convert_hosts_file,
+    callback=validation.convert_hosts_file,
 )
 
 
@@ -258,7 +258,7 @@ REPORT_TO_SERVICE = ReportToService()
     ),
     default=str(DEFAULT_WORKERS),
     show_default=True,
-    callback=callbacks.convert_workers,
+    callback=validation.convert_workers,
     metavar="",
 )
 @grouped_option(
@@ -281,7 +281,7 @@ REPORT_TO_SERVICE = ReportToService()
             experimental.POSITIVE_DATA_ACCEPTANCE.name,
         ]
     ),
-    callback=callbacks.convert_experimental,
+    callback=validation.convert_experimental,
     multiple=True,
     metavar="",
 )
@@ -290,7 +290,7 @@ REPORT_TO_SERVICE = ReportToService()
     "positive_data_acceptance_allowed_statuses",
     help="Comma-separated list of status codes considered as successful responses",
     type=CsvListChoice(),
-    callback=callbacks.convert_status_codes,
+    callback=validation.convert_status_codes,
     metavar="",
     envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
 )
@@ -299,7 +299,7 @@ REPORT_TO_SERVICE = ReportToService()
     "negative_data_rejection_allowed_statuses",
     help="Comma-separated list of status codes expected for rejected negative data",
     type=CsvListChoice(),
-    callback=callbacks.convert_status_codes,
+    callback=validation.convert_status_codes,
     metavar="",
     envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
 )
@@ -311,7 +311,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Comma-separated list of checks to run against API responses",
     type=CHECKS_TYPE,
     default=DEFAULT_CHECKS_NAMES,
-    callback=callbacks.convert_checks,
+    callback=validation.convert_checks,
     show_default=True,
     metavar="",
 )
@@ -321,7 +321,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Comma-separated list of checks to skip during testing",
     type=EXCLUDE_CHECKS_TYPE,
     default=[],
-    callback=callbacks.convert_checks,
+    callback=validation.convert_checks,
     show_default=True,
     metavar="",
 )
@@ -361,7 +361,7 @@ REPORT_TO_SERVICE = ReportToService()
     "-b",
     help="Base URL of the API, required when schema is provided as a file",
     type=str,
-    callback=callbacks.validate_base_url,
+    callback=validation.validate_base_url,
     envvar=BASE_URL_ENV_VAR,
 )
 @grouped_option(
@@ -379,7 +379,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Specify a rate limit for test requests in '<limit>/<duration>' format. "
     "Example - `100/m` for 100 requests per minute",
     type=str,
-    callback=callbacks.validate_rate_limit,
+    callback=validation.validate_rate_limit,
 )
 @grouped_option(
     "--header",
@@ -388,14 +388,14 @@ REPORT_TO_SERVICE = ReportToService()
     help=r"Add a custom HTTP header to all API requests. Format: 'Header-Name: Value'",
     multiple=True,
     type=str,
-    callback=callbacks.validate_headers,
+    callback=validation.validate_headers,
 )
 @grouped_option(
     "--auth",
     "-a",
     help="Provide the server authentication details in the 'USER:PASSWORD' format",
     type=str,
-    callback=callbacks.validate_auth,
+    callback=validation.validate_auth,
 )
 @grouped_option(
     "--auth-type",
@@ -445,14 +445,14 @@ REPORT_TO_SERVICE = ReportToService()
     help="Format of the saved cassettes",
     type=click.Choice([item.name.lower() for item in cassettes.CassetteFormat]),
     default=cassettes.CassetteFormat.VCR.name.lower(),
-    callback=callbacks.convert_cassette_format,
+    callback=validation.convert_cassette_format,
     metavar="",
 )
 @grouped_option(
     "--cassette-preserve-exact-body-bytes",
     help="Retain exact byte sequence of payloads in cassettes, encoded as base64",
     is_flag=True,
-    callback=callbacks.validate_preserve_exact_body_bytes,
+    callback=validation.validate_preserve_exact_body_bytes,
 )
 @grouped_option(
     "--sanitize-output",
@@ -467,15 +467,7 @@ REPORT_TO_SERVICE = ReportToService()
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
-)
-@grouped_option(
-    "--show-trace",
-    help="Display complete traceback information for internal errors",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
+    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--debug-output-file",
@@ -491,7 +483,7 @@ REPORT_TO_SERVICE = ReportToService()
     "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both",
     type=DATA_GENERATION_METHOD_TYPE,
     default=DataGenerationMethod.default().name,
-    callback=callbacks.convert_data_generation_method,
+    callback=validation.convert_data_generation_method,
     show_default=True,
     metavar="",
 )
@@ -500,7 +492,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Enable or disable stateful testing",
     type=click.Choice([item.name for item in Stateful]),
     default=Stateful.links.name,
-    callback=callbacks.convert_stateful,
+    callback=validation.convert_stateful,
     metavar="",
 )
 @grouped_option(
@@ -509,14 +501,14 @@ REPORT_TO_SERVICE = ReportToService()
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
+    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--generation-codec",
     help="The codec used for generating strings",
     type=str,
     default="utf-8",
-    callback=callbacks.validate_generation_codec,
+    callback=validation.validate_generation_codec,
 )
 @grouped_option(
     "--generation-with-security-parameters",
@@ -524,7 +516,7 @@ REPORT_TO_SERVICE = ReportToService()
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
+    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--generation-graphql-allow-null",
@@ -532,7 +524,7 @@ REPORT_TO_SERVICE = ReportToService()
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
+    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--contrib-unique-data",
@@ -568,7 +560,7 @@ REPORT_TO_SERVICE = ReportToService()
     help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
     multiple=True,
     type=str,
-    callback=callbacks.validate_set_query,
+    callback=validation.validate_set_query,
 )
 @grouped_option(
     "--set-header",
@@ -576,7 +568,7 @@ REPORT_TO_SERVICE = ReportToService()
     help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
     multiple=True,
     type=str,
-    callback=callbacks.validate_set_header,
+    callback=validation.validate_set_header,
 )
 @grouped_option(
     "--set-cookie",
@@ -584,7 +576,7 @@ REPORT_TO_SERVICE = ReportToService()
     help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
     multiple=True,
     type=str,
-    callback=callbacks.validate_set_cookie,
+    callback=validation.validate_set_cookie,
 )
 @grouped_option(
     "--set-path",
@@ -592,7 +584,7 @@ REPORT_TO_SERVICE = ReportToService()
     help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
     multiple=True,
     type=str,
-    callback=callbacks.validate_set_path,
+    callback=validation.validate_set_path,
 )
 @group("Hypothesis engine options")
 @grouped_option(
@@ -601,7 +593,7 @@ REPORT_TO_SERVICE = ReportToService()
     f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
     f"or specify a file path for persistent storage",
     type=str,
-    callback=callbacks.validate_hypothesis_database,
+    callback=validation.validate_hypothesis_database,
 )
 @grouped_option(
     "--hypothesis-deadline",
@@ -654,7 +646,7 @@ REPORT_TO_SERVICE = ReportToService()
     "--hypothesis-verbosity",
     help="Verbosity level of Hypothesis output",
     type=click.Choice([item.name for item in Verbosity]),
-    callback=callbacks.convert_verbosity,
+    callback=validation.convert_verbosity,
     metavar="",
 )
 @group("Schemathesis.io options")
@@ -668,7 +660,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     is_flag=False,
     flag_value="",
     envvar=service.REPORT_ENV_VAR,
-    callback=callbacks.convert_report,  # type: ignore
+    callback=validation.convert_report,  # type: ignore
 )
 @grouped_option(
     "--schemathesis-io-token",
@@ -689,7 +681,7 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
     type=str,
     default="true",
     show_default=True,
-    callback=callbacks.convert_boolean_string,
+    callback=validation.convert_boolean_string,
     envvar=service.TELEMETRY_ENV_VAR,
 )
 @with_hosts_file
@@ -751,7 +743,6 @@ def run(
     request_proxy: str | None = None,
     junit_xml: click.utils.LazyFile | None = None,
     debug_output_file: click.utils.LazyFile | None = None,
-    show_trace: bool = False,
     cassette_path: click.utils.LazyFile | None = None,
     cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
@@ -839,7 +830,7 @@ def run(
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
     decide_color_output(ctx, no_color, force_color)
 
-    check_auth(auth, headers, override)
+    validation.validate_auth_overlap(auth, headers, override)
     selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
 
     for values, arg_name in (
@@ -854,7 +845,7 @@ def run(
         (exclude_tag, "--exclude-tag"),
         (exclude_operation_id, "--exclude-operation-id"),
     ):
-        _ensure_unique_filter(values, arg_name)
+        validation.validate_unique_filter(values, arg_name)
     include_by_function = _filter_by_expression_to_func(include_by, "--include-by")
     exclude_by_function = _filter_by_expression_to_func(exclude_by, "--exclude-by")
 
@@ -916,22 +907,22 @@ def run(
 
     schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
     token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
-    schema_kind = callbacks.parse_schema_kind(schema)
-    callbacks.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, api_name=api_name)
+    schema_kind = validation.parse_schema_kind(schema)
+    validation.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, api_name=api_name)
     client = None
     schema_or_location: str | dict[str, Any] = schema
-    if schema_kind == callbacks.SchemaInputKind.NAME:
+    if schema_kind == validation.SchemaInputKind.NAME:
         api_name = schema
     if (
         not isinstance(report, click.utils.LazyFile)
         and api_name is not None
-        and schema_kind == callbacks.SchemaInputKind.NAME
+        and schema_kind == validation.SchemaInputKind.NAME
     ):
         from ..service.client import ServiceClient
 
         client = ServiceClient(base_url=schemathesis_io_url, token=token)
         # It is assigned above
-        if token is not None or schema_kind == callbacks.SchemaInputKind.NAME:
+        if token is not None or schema_kind == validation.SchemaInputKind.NAME:
             if token is None:
                 hostname = (
                     "Schemathesis.io"
@@ -1050,7 +1041,6 @@ def run(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
-        show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         cassette_config=cassette_config,
         junit_xml=junit_xml,
@@ -1061,12 +1051,6 @@ def run(
         report_config=report_config,
         output_config=output_config,
     )
-
-
-def _ensure_unique_filter(values: Sequence[str], arg_name: str) -> None:
-    if len(values) != len(set(values)):
-        duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
-        raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
 
 
 def _filter_by_expression_to_func(value: str | None, arg_name: str) -> Callable | None:
@@ -1134,24 +1118,6 @@ def into_event_stream(
         yield events.InternalError.from_exc(exc)
 
 
-def check_auth(auth: tuple[str, str] | None, headers: dict[str, str], override: CaseOverride) -> None:
-    auth_is_set = auth is not None
-    header_is_set = "authorization" in {header.lower() for header in headers}
-    override_is_set = "authorization" in {header.lower() for header in override.headers}
-    if len([is_set for is_set in (auth_is_set, header_is_set, override_is_set) if is_set]) > 1:
-        message = "The "
-        used = []
-        if auth_is_set:
-            used.append("`--auth`")
-        if header_is_set:
-            used.append("`--header`")
-        if override_is_set:
-            used.append("`--set-header`")
-        message += " and ".join(used)
-        message += " options were both used to set the 'Authorization' header, which is not permitted."
-        raise click.BadParameter(message)
-
-
 def get_output_handler(workers_num: int) -> EventHandler:
     if workers_num > 1:
         output_style = OutputStyle.short
@@ -1195,7 +1161,6 @@ def execute(
     hypothesis_settings: hypothesis.settings,
     workers_num: int,
     rate_limit: str | None,
-    show_trace: bool,
     wait_for_schema: float | None,
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
@@ -1211,7 +1176,6 @@ def execute(
     report_context: ServiceReportContext | FileReportContext | None = None
     report_queue: Queue
     if client:
-        # If API name is specified, validate it
         report_queue = Queue()
         report_context = ServiceReportContext(queue=report_queue, service_base_url=client.base_url)
         handlers.append(
@@ -1241,7 +1205,6 @@ def execute(
         hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
-        show_trace=show_trace,
         wait_for_schema=wait_for_schema,
         cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,

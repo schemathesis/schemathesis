@@ -33,7 +33,7 @@ class JunitXMLHandler(EventHandler):
             if event_.status == Status.failure:
                 _add_failure(test_case, event_.result.checks, context)
             elif event_.status == Status.error:
-                test_case.add_error_info(message=event_.result.errors[-1].format(show_trace=context.show_trace))
+                test_case.add_error_info(message=event_.result.errors[-1].format())
             elif event_.status == Status.skip:
                 test_case.add_skipped_info(message=event_.result.skip_reason)
             self.test_cases.append(test_case)
