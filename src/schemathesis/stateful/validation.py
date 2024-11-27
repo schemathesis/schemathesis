@@ -7,15 +7,16 @@ from schemathesis.core.failures import Failure, FailureGroup
 from ..internal.checks import CheckContext
 
 if TYPE_CHECKING:
+    from requests import Response
+
     from ..internal.checks import CheckFunction
     from ..models import Case
-    from ..transports.responses import GenericResponse
     from .context import RunnerContext
 
 
 def validate_response(
     *,
-    response: GenericResponse,
+    response: Response,
     case: Case,
     runner_ctx: RunnerContext,
     check_ctx: CheckContext,
@@ -39,7 +40,7 @@ def validate_response(
             name=_name,
             status=Status.failure,
             request=Request.from_prepared_request(response.request),
-            response=Response.from_generic(response=response),
+            response=Response.from_requests(response=response),
             case=case,
             failure=failure,
         )
@@ -52,7 +53,7 @@ def validate_response(
             name=_name,
             status=Status.success,
             request=Request.from_prepared_request(response.request),
-            response=Response.from_generic(response=response),
+            response=Response.from_requests(response=response),
             case=_case,
         )
         check_results.append(passed_check)

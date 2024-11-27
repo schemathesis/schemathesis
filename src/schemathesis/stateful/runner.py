@@ -7,7 +7,6 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 import hypothesis
-import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
@@ -117,21 +116,17 @@ def _execute_state_machine_loop(
     from hypothesis import reporting
     from requests.structures import CaseInsensitiveDict
 
-    from ..transports import RequestsTransport
-
     ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.targets))
 
-    call_kwargs: dict[str, Any] = {"headers": config.headers}
-    if isinstance(state_machine.schema.transport, RequestsTransport):
-        call_kwargs["timeout"] = config.network.timeout
-        call_kwargs["verify"] = config.network.tls_verify
-        call_kwargs["cert"] = config.network.cert
-        if config.network.proxy is not None:
-            call_kwargs["proxies"] = {"all": config.network.proxy}
-        session = requests.Session()
-        if config.auth is not None:
-            session.auth = config.auth
-        call_kwargs["session"] = session
+    call_kwargs: dict[str, Any] = {
+        "headers": config.headers,
+        "timeout": config.network.timeout,
+        "verify": config.network.tls_verify,
+        "cert": config.network.cert,
+    }
+    if config.network.proxy is not None:
+        call_kwargs["proxies"] = {"all": config.network.proxy}
+    call_kwargs["session"] = config.session
     check_ctx = CheckContext(
         override=config.override,
         auth=config.auth,

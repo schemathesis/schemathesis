@@ -13,7 +13,6 @@ from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
 from hypothesis import Phase, settings
 from hypothesis import strategies as st
-from requests.auth import HTTPDigestAuth
 
 import schemathesis
 from schemathesis import experimental
@@ -28,7 +27,6 @@ from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.stateful import Stateful
-from schemathesis.transports.auth import get_requests_auth
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -648,10 +646,6 @@ def test_missing_path_parameter(real_app_schema):
     # Then it leads to an error
     assert finished.results.has_errors
     assert "InvalidSchema: Path parameter 'id' is not defined" in str(others[1].result.errors[0])
-
-
-def test_get_requests_auth():
-    assert isinstance(get_requests_auth(("test", "test"), "digest"), HTTPDigestAuth)
 
 
 @pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")

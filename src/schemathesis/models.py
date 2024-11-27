@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import textwrap
 from dataclasses import dataclass, field
 from enum import Enum
@@ -370,7 +371,7 @@ class Case:
         from requests.structures import CaseInsensitiveDict
 
         from .checks import ALL_CHECKS
-        from .transports.responses import get_payload, get_reason
+        from .transports.responses import get_payload
 
         checks = checks or ALL_CHECKS
         checks = tuple(check for check in checks if check not in excluded_checks)
@@ -397,7 +398,7 @@ class Case:
             message = f"Schemathesis found {len(failures)} distinct failure"
             if len(failures) > 1:
                 message += "s"
-            reason = get_reason(response.status_code)
+            reason = http.client.responses.get(response.status_code, "Unknown")
             message += f".\n\n[{response.status_code}] {reason}:"
             payload = get_payload(response)
             if not payload:

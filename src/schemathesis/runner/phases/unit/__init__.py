@@ -25,7 +25,6 @@ from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:
     from requests import Session
-    from requests.auth import HTTPDigestAuth
 
     from ....schemas import APIOperation
     from ...context import EngineContext
@@ -161,7 +160,7 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
 
 
 @contextmanager
-def get_session(auth: HTTPDigestAuth | tuple[str, str] | None = None) -> Generator[Session, None, None]:
+def get_session(auth: tuple[str, str] | None = None) -> Generator[Session, None, None]:
     from requests import Session
 
     with Session() as session:
@@ -172,11 +171,9 @@ def get_session(auth: HTTPDigestAuth | tuple[str, str] | None = None) -> Generat
 
 @contextmanager
 def network_test_function(ctx: EngineContext) -> Generator[Callable, None, None]:
-    from ....transports.auth import get_requests_auth
     from ._executor import network_test
 
-    prepared_auth = get_requests_auth(ctx.config.network.auth, ctx.config.network.auth_type)
-    with get_session(prepared_auth) as session:
+    with get_session(ctx.config.network.auth) as session:
         yield partial(network_test, session=session)
 
 

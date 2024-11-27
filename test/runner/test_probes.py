@@ -18,7 +18,6 @@ def config_factory():
             tls_verify=request_tls_verify,
             cert=request_cert,
             auth=auth,
-            auth_type=None,
             headers=headers,
         )
 
