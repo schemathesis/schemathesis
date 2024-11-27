@@ -134,7 +134,6 @@ def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
             graphql_url,
             "-cunique_test_cases",
             "--hypothesis-max-examples=5",
-            "--show-trace",
             "--contrib-unique-data",
             hooks=unique_hook,
         )

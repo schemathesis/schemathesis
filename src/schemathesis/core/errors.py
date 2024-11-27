@@ -96,6 +96,10 @@ class InvalidRegexType(InvalidSchema):
     """Raised when an invalid type is used where a regex pattern is expected."""
 
 
+class MalformedMediaType(ValueError):
+    """Raised on parsing of incorrect media type."""
+
+
 class InvalidRegexPattern(InvalidSchema):
     """Raised when a string pattern is not a valid regular expression."""
 

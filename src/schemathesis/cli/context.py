@@ -38,7 +38,6 @@ class ExecutionContext:
     hypothesis_settings: hypothesis.settings
     workers_num: int = 1
     rate_limit: str | None = None
-    show_trace: bool = False
     wait_for_schema: float | None = None
     operations_processed: int = 0
     # It is set in runtime, from the `Initialized` event
