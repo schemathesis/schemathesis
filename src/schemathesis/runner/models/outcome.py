@@ -190,7 +190,6 @@ class TestResult:
         response: requests.Response | None,
         status: Status,
         checks: list[Check],
-        headers: dict[str, Any] | None,
-        session: requests.Session | None,
+        session: requests.Session,
     ) -> None:
-        self.interactions.append(Interaction.from_requests(case, response, status, checks, headers, session))
+        self.interactions.append(Interaction.from_requests(case, response, status, checks, session))

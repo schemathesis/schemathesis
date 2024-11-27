@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
-Error: Invalid value for '--auth-type' / '-A': 'random' is not one of 'basic', 'digest'.
+Error: Invalid value for '--header' / '-H': Expected KEY:VALUE format, received 123.

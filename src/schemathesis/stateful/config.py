@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
+from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from ..constants import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
     import hypothesis
-    from requests.auth import HTTPDigestAuth
+    import requests
 
     from .._override import CaseOverride
     from ..models import CheckFunction
@@ -61,7 +62,7 @@ class StatefulTestRunnerConfig:
     max_failures: int | None = None
     # Custom headers sent with each request
     headers: dict[str, str] = field(default_factory=dict)
-    auth: HTTPDigestAuth | tuple[str, str] | None = None
+    auth: tuple[str, str] | None = None
     seed: int | None = None
     override: CaseOverride | None = None
     max_response_time: int | None = None
@@ -75,6 +76,17 @@ class StatefulTestRunnerConfig:
         kwargs = _get_hypothesis_settings_kwargs_override(self.hypothesis_settings)
         if kwargs:
             self.hypothesis_settings = hypothesis.settings(self.hypothesis_settings, **kwargs)
+
+    @cached_property
+    def session(self) -> requests.Session:
+        import requests
+
+        session = requests.Session()
+        if self.auth is not None:
+            session.auth = self.auth
+        if self.headers:
+            session.headers.update(self.headers)
+        return session
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:

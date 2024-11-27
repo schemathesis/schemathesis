@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import http.client
 import os
 import shutil
 import textwrap
@@ -219,8 +220,6 @@ else:
 
 def display_failures_for_single_test(context: ExecutionContext, result: TestResult) -> None:
     """Display a failure for a single method / path."""
-    from ...transports.responses import get_reason
-
     display_subsection(result)
     if result.is_flaky:
         click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
@@ -239,7 +238,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
                 _secho(f"\n{message}", fg="red")
             if check_idx + 1 == len(checks):
                 status_code = check.response.status_code
-                reason = get_reason(status_code)
+                reason = http.client.responses.get(status_code, "Unknown")
                 response = bold(f"[{check.response.status_code}] {reason}")
                 click.echo(f"\n{response}:")
                 if check.response.body is not None:

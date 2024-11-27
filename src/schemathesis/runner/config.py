@@ -38,7 +38,6 @@ class NetworkConfig:
     """Network-related configuration."""
 
     auth: tuple[str, str] | None = None
-    auth_type: str | None = None
     headers: dict[str, Any] | None = None
     timeout: int | None = None
     tls_verify: bool | str = True

@@ -13,7 +13,6 @@ if TYPE_CHECKING:
     import requests
 
     from ...models import Case, TestPhase
-    from ...transports.responses import GenericResponse, WSGIResponse
     from .check import Check
 
 
@@ -90,14 +89,6 @@ class Response:
     verify: bool
 
     @classmethod
-    def from_generic(cls, *, response: GenericResponse) -> Response:
-        import requests
-
-        if isinstance(response, requests.Response):
-            return cls.from_requests(response)
-        return cls.from_wsgi(response, response.elapsed.total_seconds())
-
-    @classmethod
     def from_requests(cls, response: requests.Response) -> Response:
         """Create a response from requests.Response."""
         raw = response.raw
@@ -124,34 +115,6 @@ class Response:
             http_version=http_version,
             elapsed=response.elapsed.total_seconds(),
             verify=getattr(response, "verify", True),
-        )
-
-    @classmethod
-    def from_wsgi(cls, response: WSGIResponse, elapsed: float) -> Response:
-        """Create a response from WSGI response."""
-        from ...transports.responses import get_reason
-
-        message = get_reason(response.status_code)
-        headers = {name: response.headers.getlist(name) for name in response.headers.keys()}
-        # Note, this call ensures that `response.response` is a sequence, which is needed for comparison
-        data = response.get_data()
-        body = None if response.response == [] else data
-        encoding: str | None
-        if body is not None:
-            # Werkzeug <3.0 had `charset` attr, newer versions always have UTF-8
-            encoding = response.mimetype_params.get("charset", getattr(response, "charset", "utf-8"))
-        else:
-            encoding = None
-        return cls(
-            status_code=response.status_code,
-            message=message,
-            body=body,
-            body_size=len(data) if body is not None else None,
-            encoding=encoding,
-            headers=headers,
-            http_version="1.1",
-            elapsed=elapsed,
-            verify=True,
         )
 
     @cached_property
@@ -202,18 +165,11 @@ class Interaction:
         response: requests.Response | None,
         status: Status,
         checks: list[Check],
-        headers: dict[str, Any] | None,
-        session: requests.Session | None,
+        session: requests.Session,
     ) -> Interaction:
         if response is not None:
-            prepared = response.request
-            request = Request.from_prepared_request(prepared)
+            request = Request.from_prepared_request(response.request)
         else:
-            import requests
-
-            if session is None:
-                session = requests.Session()
-                session.headers.update(headers or {})
             request = Request.from_case(case, session)
         return cls(
             request=request,

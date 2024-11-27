@@ -68,7 +68,6 @@ def test_run_as_module(testdir):
         ("http://127.0.0.1", "--auth=:pass"),
         ("http://127.0.0.1", "--auth=тест:pass"),
         ("http://127.0.0.1", "--auth=user:тест"),
-        ("http://127.0.0.1", "--auth-type=random"),
         ("http://127.0.0.1", "--header=123"),
         ("http://127.0.0.1", "--header=:"),
         ("http://127.0.0.1", "--header= :"),
@@ -254,7 +253,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "unique_data": False,
         "max_response_time": None,
         "generation_config": GenerationConfig(),
-        "network": NetworkConfig(auth_type="basic", headers={}, timeout=10),
+        "network": NetworkConfig(headers={}, timeout=10),
         "service_client": None,
         **expected,
     }
@@ -1455,14 +1454,6 @@ def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url):
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "/api/success S" in result.stdout
     assert "1 skipped in" in result.stdout
-
-
-@pytest.mark.operations("success")
-def test_digest_auth(cli, openapi3_schema_url):
-    # When a digest auth is used
-    result = cli.run(openapi3_schema_url, "--auth='test:test'", "--auth-type=digest")
-    # Then it should not cause any exceptions
-    assert result.exit_code == ExitCode.OK, result.stdout
 
 
 @pytest.mark.operations("basic")

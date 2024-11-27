@@ -406,15 +406,6 @@ REPORT_TO_SERVICE = ReportToService()
     type=str,
     callback=validation.validate_auth,
 )
-@grouped_option(
-    "--auth-type",
-    "-A",
-    type=click.Choice(["basic", "digest"], case_sensitive=False),
-    default="basic",
-    help="Specify the authentication method. For custom authentication methods, see our Authentication documentation: https://schemathesis.readthedocs.io/en/stable/auth.html#custom-auth",
-    show_default=True,
-    metavar="",
-)
 @group("Filtering options")
 @with_filters
 @grouped_option(
@@ -703,7 +694,6 @@ def run(
     schema: str,
     api_name: str | None,
     auth: tuple[str, str] | None,
-    auth_type: str,
     headers: dict[str, str],
     set_query: dict[str, str],
     set_header: dict[str, str],
@@ -1014,7 +1004,6 @@ def run(
         max_failures = 1
     network_config = NetworkConfig(
         auth=auth,
-        auth_type=auth_type,
         headers=headers,
         timeout=request_timeout,
         tls_verify=request_tls_verify,

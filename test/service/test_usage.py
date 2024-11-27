@@ -40,14 +40,6 @@ SCHEMA = "http://127.0.0.1:/schema.json"
                 "used_headers": [],
             },
         ),
-        (
-            [SCHEMA, "--auth-type=digest", "--auth=user:pass"],
-            {
-                "schema_kind": "URL",
-                "parameters": {"auth_type": {"value": "digest"}, "auth": {"count": 1}},
-                "used_headers": [],
-            },
-        ),
     ],
 )
 def test_collect(args, expected):

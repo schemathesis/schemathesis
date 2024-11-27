@@ -37,10 +37,4 @@ def get_json(response: GenericResponse) -> Any:
     return response.json
 
 
-def get_reason(status_code: int) -> str:
-    import http.client
-
-    return http.client.responses.get(status_code, "Unknown")
-
-
 GenericResponse = Union["httpxResponse", "requestsResponse", WSGIResponse]

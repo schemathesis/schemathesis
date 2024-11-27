@@ -5,6 +5,7 @@ Usage: run [OPTIONS] SCHEMA [API_NAME]
 Try 'run -h' for help.
 
 <<<<<<< HEAD
+<<<<<<< HEAD
   Run tests against an API using a specified SCHEMA.
 
   [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file,
@@ -523,3 +524,8 @@ Global options:
 =======
 Error: Codec `foobar` is unknown
 >>>>>>> 0b2f80da (chore: Remove deprecation)
+||||||| parent of c52b62cc (refactor: Simplify networking in state machine runner)
+Error: Codec `foobar` is unknown
+=======
+Error: Invalid value for '--set-query': Query parameter value should not contain surrogates.
+>>>>>>> c52b62cc (refactor: Simplify networking in state machine runner)
