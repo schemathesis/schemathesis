@@ -74,20 +74,13 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     )
 
 
-@pytest.mark.parametrize(
-    ("args", "expected"),
-    [
-        ((), "Runtime Error  division by zero"),
-        (("--show-trace",), "Runtime Error  division by zero      Traceback (most recent call last): "),
-    ],
-)
 @pytest.mark.skipif(
     sys.version_info < (3, 11) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_error_with_traceback(ctx, cli, schema_url, tmp_path, args, expected):
+def test_error_with_traceback(ctx, cli, schema_url, tmp_path):
     module = ctx.write_pymodule(
         """
 @schemathesis.check
@@ -96,11 +89,16 @@ def with_error(ctx, response, case):
 """
     )
     xml_path = tmp_path / "junit.xml"
-    cli.main("run", schema_url, "-c", "with_error", f"--junit-xml={xml_path}", *args, hooks=module)
+    cli.main("run", schema_url, "-c", "with_error", f"--junit-xml={xml_path}", hooks=module)
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     testcases = list(root[0])
-    assert testcases[0][0].attrib["message"].replace("\n", " ").startswith(expected)
+    assert (
+        testcases[0][0]
+        .attrib["message"]
+        .replace("\n", " ")
+        .startswith("Runtime Error  division by zero      Traceback (most recent call last): ")
+    )
 
 
 def extract_message(testcase, server_host):

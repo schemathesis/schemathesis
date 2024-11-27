@@ -725,8 +725,7 @@ Schemathesis CLI's ``--rate-limit`` option can be used to set the maximum number
 Debugging
 ---------
 
-If Schemathesis produces an internal error, its traceback is hidden. To show error tracebacks in the CLI output, use
-the ``--show-trace`` option.
+If Schemathesis produces an internal error, its traceback is displayed in the CLI output.
 
 Additionally you can dump all internal events to a JSON Lines file with the ``--debug-output-file`` CLI option.
 

@@ -834,14 +834,14 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli):
             }
         }
     )
-    assert cli.run(str(schema_path), "--show-trace", "--dry-run") == snapshot_cli
+    assert cli.run(str(schema_path), "--dry-run") == snapshot_cli
 
 
 def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
     schema = yaml.dump(simple_openapi)
     schema += "\x00"
     schema_file = testdir.makefile(".yaml", schema=schema)
-    assert cli.run(str(schema_file), "--show-trace", "--dry-run") == snapshot_cli
+    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -858,7 +858,7 @@ def with_error(ctx, response, case):
     1 / 0
 """
     )
-    assert cli.main("run", schema_url, "-c", "with_error", "--show-trace", hooks=module) == snapshot_cli
+    assert cli.main("run", schema_url, "-c", "with_error", hooks=module) == snapshot_cli
 
 
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
@@ -910,7 +910,6 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
         str(schema_path),
         f"--base-url={openapi3_base_url}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--show-trace",
         "--hypothesis-derandomize",
         f"--cassette-path={cassette_path}",
     )
@@ -951,10 +950,7 @@ def test_no_schema_in_media_type(ctx, cli, base_url, snapshot_cli):
             },
         }
     )
-    assert (
-        cli.run(str(schema_path), f"--base-url={base_url}", "--hypothesis-max-examples=1", "--show-trace")
-        == snapshot_cli
-    )
+    assert cli.run(str(schema_path), f"--base-url={base_url}", "--hypothesis-max-examples=1") == snapshot_cli
 
 
 def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
@@ -996,7 +992,7 @@ def test_urlencoded_form(cli, schema_url):
 @pytest.mark.operations("success")
 def test_targeted(mocker, cli, schema_url, workers):
     target = mocker.spy(hypothesis, "target")
-    result = cli.run(schema_url, f"--workers={workers}", "--target=response_time", "--show-trace")
+    result = cli.run(schema_url, f"--workers={workers}", "--target=response_time")
     assert result.exit_code == ExitCode.OK, result.stdout
     target.assert_called_with(mocker.ANY, label="response_time")
 
@@ -1109,7 +1105,7 @@ def test_max_response_time_valid(cli, schema_url):
 def test_exit_first(cli, schema_url, workers_num):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num), "--show-trace")
+    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num))
     # Then tests are failed
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if workers_num == 1:
@@ -1319,7 +1315,7 @@ def test_force_color(cli, schema_url):
 @pytest.mark.parametrize("graphql_path", ["/graphql", "/foo"])
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
-    assert cli.run(graphql_url, "--hypothesis-max-examples=5", "--show-trace", *args) == snapshot_cli
+    assert cli.run(graphql_url, "--hypothesis-max-examples=5", *args) == snapshot_cli
 
 
 def assert_exit_code(event_stream, code):
@@ -1330,7 +1326,6 @@ def assert_exit_code(event_stream, code):
             hypothesis_settings=hypothesis.settings(),
             workers_num=1,
             rate_limit=None,
-            show_trace=False,
             wait_for_schema=None,
             cassette_config=None,
             junit_xml=None,
@@ -1915,17 +1910,31 @@ def no_null_bytes(ctx, response, case):
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_references, openapi3_base_url, snapshot_cli):
     schema_path = ctx.makefile(schema_with_recursive_references)
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--show-trace") == snapshot_cli
+    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("payload")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_unknown_schema_error(mocker, schema_url, cli, snapshot_cli):
-    # Some AssertionError may be caused by internal error in dependencies and can not be associated with a specific
-    # schema issue
-    mocker.patch("hypothesis_jsonschema._from_schema.canonicalish", side_effect=AssertionError("Something bad happen"))
-    assert cli.run(schema_url) == snapshot_cli
+def test_unknown_schema_error(ctx, schema_url, cli, snapshot_cli):
+    module = ctx.write_pymodule(
+        r"""
+import schemathesis
+
+@schemathesis.target
+def buggy(ctx):
+    raise AssertionError("Something bad happen")
+"""
+    )
+    assert (
+        cli.main(
+            "run",
+            schema_url,
+            "--target=buggy",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")

@@ -840,7 +840,7 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     (security_schemes / "bearerAuth.json").write_text(json.dumps(bearer), "utf8")
     (tests / "test.json").write_text(json.dumps(operation), "utf8")
 
-    assert cli.run(str(raw_schema_path), "--dry-run", "--show-trace") == snapshot_cli
+    assert cli.run(str(raw_schema_path), "--dry-run") == snapshot_cli
 
 
 def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli):
@@ -849,4 +849,4 @@ def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli):
     raw_schema_path = root / "openapi.json"
     raw_schema_path.write_text(json.dumps(schema), "utf8")
 
-    assert cli.run(str(raw_schema_path), "--dry-run", "--show-trace") == snapshot_cli
+    assert cli.run(str(raw_schema_path), "--dry-run") == snapshot_cli

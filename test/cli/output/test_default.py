@@ -273,16 +273,14 @@ def test_after_execution_attributes(execution_context, after_execution):
     assert execution_context.current_line_length == 2
 
 
-@pytest.mark.parametrize("show_trace", [True, False])
-def test_display_internal_error(capsys, execution_context, show_trace):
-    execution_context.show_trace = show_trace
+def test_display_internal_error(capsys, execution_context):
     try:
         raise ZeroDivisionError("division by zero")
     except ZeroDivisionError as exc:
         event = InternalError.from_exc(exc)
         display_internal_error(execution_context, event)
         out = capsys.readouterr().out.strip()
-        assert ("Traceback (most recent call last):" in out) is show_trace
+        assert "Traceback (most recent call last):" in out
         assert "ZeroDivisionError: division by zero" in out
 
 

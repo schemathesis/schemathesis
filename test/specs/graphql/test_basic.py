@@ -264,7 +264,6 @@ def filter_body(context, body):
             str(schema_file),
             "--dry-run",
             "--generation-graphql-allow-null=false",
-            "--show-trace",
             hooks=module,
         )
         == snapshot_cli

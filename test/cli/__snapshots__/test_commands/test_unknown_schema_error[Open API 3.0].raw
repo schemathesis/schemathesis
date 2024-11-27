@@ -18,16 +18,26 @@ POST /api/payload E                                                       [100%]
 ______________________________ POST /api/payload _______________________________
 Runtime Error
 
-Unexpected error during testing of this API operation: Something bad happen
+Something bad happen
 
-Add this option to your command line parameters to see full tracebacks: --show-trace
+    Traceback (most recent call last):
+      File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
+        f(ctx=ctx, case=case, result=result, **kwargs)
+      File "/package-root/runner/phases/unit/_executor.py", line XXX, in network_test
+        _network_test(case, ctx, result, session, headers)
+      File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
+        targets.run(ctx.config.execution.targets, case=case, response=response)
+      File "/package-root/targets.py", line XXX, in run
+        value = target(context)
+      File "/tmp/module.py", line XXX, in buggy
+        raise AssertionError("Something bad happen")
+    AssertionError: Something bad happen
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    N / N passed          PASSED 
+No checks were performed.
 
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.

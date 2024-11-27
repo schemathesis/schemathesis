@@ -495,7 +495,7 @@ def test_too_large_payload(cli, schema_url, service):
 @pytest.fixture
 def report_file(tmp_path, cli, schema_url):
     report_file = tmp_path / "report.tar.gz"
-    result = cli.run(schema_url, f"--report={report_file}", "--show-trace")
+    result = cli.run(schema_url, f"--report={report_file}")
     assert result.exit_code == ExitCode.OK, result.stdout
     return report_file
 

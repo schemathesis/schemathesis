@@ -141,7 +141,6 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
         *flags,
         *csv_params,
         f"--report={report}",
-        "--show-trace",
         f"--debug-output-file={debug}",
     )
     check_result(result)

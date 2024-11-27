@@ -7,7 +7,7 @@ import os
 import re
 from contextlib import contextmanager
 from functools import partial, reduce
-from typing import TYPE_CHECKING, Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator, Sequence
 from urllib.parse import urlparse
 
 import click
@@ -28,6 +28,8 @@ from .constants import DEFAULT_WORKERS
 if TYPE_CHECKING:
     import hypothesis
     from click.types import LazyFile  # type: ignore[attr-defined]
+
+    from schemathesis._override import CaseOverride
 
 
 INVALID_DERANDOMIZE_MESSAGE = (
@@ -158,6 +160,24 @@ def validate_auth(
     return None
 
 
+def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str], override: CaseOverride) -> None:
+    auth_is_set = auth is not None
+    header_is_set = "authorization" in {header.lower() for header in headers}
+    override_is_set = "authorization" in {header.lower() for header in override.headers}
+    if len([is_set for is_set in (auth_is_set, header_is_set, override_is_set) if is_set]) > 1:
+        message = "The "
+        used = []
+        if auth_is_set:
+            used.append("`--auth`")
+        if header_is_set:
+            used.append("`--header`")
+        if override_is_set:
+            used.append("`--set-header`")
+        message += " and ".join(used)
+        message += " options were both used to set the 'Authorization' header, which is not permitted."
+        raise click.BadParameter(message)
+
+
 def _validate_and_build_multiple_options(
     values: tuple[str, ...], name: str, callback: Callable[[str, str], None]
 ) -> dict[str, str]:
@@ -176,6 +196,12 @@ def _validate_and_build_multiple_options(
         callback(key, value)
         output[key] = value
     return output
+
+
+def validate_unique_filter(values: Sequence[str], arg_name: str) -> None:
+    if len(values) != len(set(values)):
+        duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
+        raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
 
 
 def _validate_set_query(_: str, value: str) -> None:

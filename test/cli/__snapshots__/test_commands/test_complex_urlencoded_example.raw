@@ -16,11 +16,9 @@ POST /api/test E                                                          [100%]
 
 ==================================== ERRORS ====================================
 ________________________________ POST /api/test ________________________________
-Runtime Error
+Schema Error
 
 Malformed media type: `invalid`
-
-Add this option to your command line parameters to see full tracebacks: --show-trace
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

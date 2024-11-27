@@ -20,8 +20,6 @@ Schema Error
 
 Invalid `pattern` value: expected a string. If your schema is in YAML, ensure `pattern` values are quoted
 
-Add this option to your command line parameters to see full tracebacks: --show-trace
-
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================

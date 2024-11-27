@@ -58,7 +58,6 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         f"--hypothesis-max-examples={hypothesis_max_examples}",
         f"--data-generation-method={data_generation_method}",
         "--experimental=coverage-phase",
-        "--show-trace",
         "--hypothesis-seed=1",
         *args,
     )
@@ -105,7 +104,6 @@ def test_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
         "--experimental=coverage-phase",
-        "--show-trace",
         "--hypothesis-seed=1",
         "--dry-run",
     )
@@ -133,7 +131,6 @@ def test_store_timeout(cli, schema_url, cassette_path):
         f"--cassette-path={cassette_path}",
         "--hypothesis-max-examples=1",
         "--request-timeout=0.001",
-        "--show-trace",
         "--hypothesis-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout

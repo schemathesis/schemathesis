@@ -431,7 +431,6 @@ def schema_check(ctx, response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
-            "--show-trace",
             hooks=module,
         )
         == snapshot_cli

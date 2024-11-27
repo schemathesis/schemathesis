@@ -21,7 +21,7 @@ def collect(args: list[str] | None = None) -> dict[str, Any] | None:
         if not schema:
             schema_kind = None
         else:
-            schema_kind = cli.callbacks.parse_schema_kind(schema).name
+            schema_kind = cli.validation.parse_schema_kind(schema).name
         usage = {
             "schema_kind": schema_kind,
             "parameters": parameters_data,
