@@ -896,6 +896,76 @@ def test_required_header(ctx):
     )
 
 
+def test_required_and_optional_headers(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
+            },
+            {
+                "headers": {},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+            },
+            {
+                "headers": {"X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "{}"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null,null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0", "X-API-Key-2": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null", "X-API-Key-2": "0"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false", "X-API-Key-2": "0"},
+            },
+        ],
+    )
+
+
 def test_path_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {

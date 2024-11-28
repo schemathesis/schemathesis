@@ -432,9 +432,15 @@ def _iter_coverage_cases(
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            yield make_case(
-                only_required, "Only required properties", location, container_name, None, DataGenerationMethod.positive
-            )
+            if DataGenerationMethod.positive in data_generation_methods:
+                yield make_case(
+                    only_required,
+                    "Only required properties",
+                    location,
+                    container_name,
+                    None,
+                    DataGenerationMethod.positive,
+                )
             if DataGenerationMethod.negative in data_generation_methods:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 yield from _yield_negative(subschema, location, container_name)

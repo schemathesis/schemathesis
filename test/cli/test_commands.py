@@ -1959,7 +1959,6 @@ def test_long_operation_output(ctx, cli):
     result = cli.run(str(schema_path), "--dry-run")
     # Then this operation name should be truncated
     assert result.exit_code == ExitCode.OK
-    print(result.stdout)
     assert "GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [ 50%]" in result.stdout
     assert "GET /aaaaaaaaaa .                                                         [100%]" in result.stdout
 

@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - ``UnicodeEncodeError`` when sending a request during the coverage phase.
+- Generating positive test cases when they are explicitly excluded via configuration during the coverage phase.
 
 .. _v3.38.7:
 
