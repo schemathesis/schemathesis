@@ -324,6 +324,15 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
+    "--experimental-missing-required-header-allowed-statuses",
+    "missing_required_header_allowed_statuses",
+    help="Comma-separated list of status codes expected for test cases with a missing required header",
+    type=CsvListChoice(),
+    callback=callbacks.convert_status_codes,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
+)
+@grouped_option(
     "--experimental-positive-data-acceptance-allowed-statuses",
     "positive_data_acceptance_allowed_statuses",
     help="Comma-separated list of status codes considered as successful responses",
@@ -855,6 +864,7 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
+    missing_required_header_allowed_statuses: list[str],
     positive_data_acceptance_allowed_statuses: list[str],
     negative_data_rejection_allowed_statuses: list[str],
     checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
@@ -1172,6 +1182,11 @@ def run(
         selected_checks += (positive_data_acceptance,)
         if positive_data_acceptance_allowed_statuses:
             checks_config.positive_data_acceptance.allowed_statuses = positive_data_acceptance_allowed_statuses
+    if missing_required_header_allowed_statuses:
+        from ..specs.openapi.checks import missing_required_header
+
+        selected_checks += (missing_required_header,)
+        checks_config.missing_required_header.allowed_statuses = missing_required_header_allowed_statuses
     if negative_data_rejection_allowed_statuses:
         checks_config.negative_data_rejection.allowed_statuses = negative_data_rejection_allowed_statuses
 
