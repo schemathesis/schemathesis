@@ -237,17 +237,17 @@ def _iter_coverage_cases(
     template: dict[str, Any] = {}
     responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
+        location = parameter.location
+        name = parameter.name
         schema = parameter.as_json_schema(operation, update_quantifiers=False)
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
-            coverage.CoverageContext(data_generation_methods=data_generation_methods), schema
+            coverage.CoverageContext(location=location, data_generation_methods=data_generation_methods), schema
         )
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
             continue
-        location = parameter.location
-        name = parameter.name
         container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
         if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
             container[name] = _stringify_value(value.value, location)
@@ -263,7 +263,7 @@ def _iter_coverage_cases(
             if examples:
                 schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(
-                coverage.CoverageContext(data_generation_methods=data_generation_methods), schema
+                coverage.CoverageContext(location="body", data_generation_methods=data_generation_methods), schema
             )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet):
@@ -417,7 +417,7 @@ def _iter_coverage_cases(
             subschema: dict[str, Any], _location: str, _container_name: str
         ) -> Generator[Case, None, None]:
             for more in coverage.cover_schema_iter(
-                coverage.CoverageContext(data_generation_methods=[DataGenerationMethod.negative]),
+                coverage.CoverageContext(location=_location, data_generation_methods=[DataGenerationMethod.negative]),
                 subschema,
             ):
                 yield make_case(
