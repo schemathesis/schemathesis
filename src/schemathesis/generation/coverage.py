@@ -21,6 +21,7 @@ from ..internal.copy import fast_deepcopy
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
+from ..transports.headers import has_invalid_characters, is_latin_1_encodable
 from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
 
@@ -103,41 +104,54 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 @dataclass
 class CoverageContext:
     data_generation_methods: list[DataGenerationMethod]
-    location_stack: list[str | int]
+    location: str
+    path: list[str | int]
 
-    __slots__ = ("data_generation_methods", "location_stack")
+    __slots__ = ("location", "data_generation_methods", "path")
 
     def __init__(
         self,
+        *,
+        location: str,
         data_generation_methods: list[DataGenerationMethod] | None = None,
-        location_stack: list[str | int] | None = None,
+        path: list[str | int] | None = None,
     ) -> None:
+        self.location = location
         self.data_generation_methods = (
             data_generation_methods if data_generation_methods is not None else DataGenerationMethod.all()
         )
-        self.location_stack = location_stack or []
+        self.path = path or []
 
     @contextmanager
-    def location(self, key: str | int) -> Generator[None, None, None]:
-        self.location_stack.append(key)
+    def at(self, key: str | int) -> Generator[None, None, None]:
+        self.path.append(key)
         try:
             yield
         finally:
-            self.location_stack.pop()
+            self.path.pop()
 
     @property
-    def current_location(self) -> str:
-        return "/" + "/".join(str(key) for key in self.location_stack)
+    def current_path(self) -> str:
+        return "/" + "/".join(str(key) for key in self.path)
 
     def with_positive(self) -> CoverageContext:
         return CoverageContext(
-            data_generation_methods=[DataGenerationMethod.positive], location_stack=self.location_stack
+            location=self.location,
+            data_generation_methods=[DataGenerationMethod.positive],
+            path=self.path,
         )
 
     def with_negative(self) -> CoverageContext:
         return CoverageContext(
-            data_generation_methods=[DataGenerationMethod.negative], location_stack=self.location_stack
+            location=self.location,
+            data_generation_methods=[DataGenerationMethod.negative],
+            path=self.path,
         )
+
+    def is_valid_for_location(self, value: Any) -> bool:
+        if self.location in ("header", "cookie") and isinstance(value, str):
+            return is_latin_1_encodable(value) and not has_invalid_characters("", value)
+        return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
         return cached_draw(strategy)
@@ -322,7 +336,7 @@ def cover_schema_iter(
     if DataGenerationMethod.negative in ctx.data_generation_methods:
         template = None
         for key, value in schema.items():
-            with _ignore_unfixable(), ctx.location(key):
+            with _ignore_unfixable(), ctx.at(key):
                 if key == "enum":
                     yield from _negative_enum(ctx, value, seen)
                 elif key == "const":
@@ -350,21 +364,17 @@ def cover_schema_iter(
                 elif key == "maximum":
                     next = value + 1
                     if next not in seen:
-                        yield NegativeValue(
-                            next, description="Value greater than maximum", location=ctx.current_location
-                        )
+                        yield NegativeValue(next, description="Value greater than maximum", location=ctx.current_path)
                         seen.add(next)
                 elif key == "minimum":
                     next = value - 1
                     if next not in seen:
-                        yield NegativeValue(
-                            next, description="Value smaller than minimum", location=ctx.current_location
-                        )
+                        yield NegativeValue(next, description="Value smaller than minimum", location=ctx.current_path)
                         seen.add(next)
                 elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and value not in seen:
                     verb = "greater" if key == "exclusiveMaximum" else "smaller"
                     limit = "maximum" if key == "exclusiveMaximum" else "minimum"
-                    yield NegativeValue(value, description=f"Value {verb} than {limit}", location=ctx.current_location)
+                    yield NegativeValue(value, description=f"Value {verb} than {limit}", location=ctx.current_path)
                     seen.add(value)
                 elif key == "multipleOf":
                     for value_ in _negative_multiple_of(ctx, schema, value):
@@ -391,7 +401,7 @@ def cover_schema_iter(
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(
-                                value, description="String smaller than minLength", location=ctx.current_location
+                                value, description="String smaller than minLength", location=ctx.current_path
                             )
                             seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
@@ -413,7 +423,7 @@ def cover_schema_iter(
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(
-                                value, description="String larger than maxLength", location=ctx.current_location
+                                value, description="String larger than maxLength", location=ctx.current_path
                             )
                             seen.add(k)
                     except (InvalidArgument, Unsatisfiable):
@@ -428,12 +438,12 @@ def cover_schema_iter(
                     yield NegativeValue(
                         {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},
                         description="Object with unexpected properties",
-                        location=ctx.current_location,
+                        location=ctx.current_path,
                     )
                 elif key == "allOf":
                     nctx = ctx.with_negative()
                     if len(value) == 1:
-                        with nctx.location(0):
+                        with nctx.at(0):
                             yield from cover_schema_iter(nctx, value[0], seen)
                     else:
                         with _ignore_unfixable():
@@ -443,7 +453,7 @@ def cover_schema_iter(
                     nctx = ctx.with_negative()
                     # NOTE: Other sub-schemas are not filtered out
                     for idx, sub_schema in enumerate(value):
-                        with nctx.location(idx):
+                        with nctx.at(idx):
                             yield from cover_schema_iter(nctx, sub_schema, seen)
 
 
@@ -487,15 +497,17 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     examples = schema.get("examples")
     default = schema.get("default")
     if example or examples or default:
-        if example:
+        if example and ctx.is_valid_for_location(example):
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                yield PositiveValue(example, description="Example value")
+                if ctx.is_valid_for_location(example):
+                    yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and ctx.is_valid_for_location(default)
         ):
             yield PositiveValue(default, description="Default value")
     elif not min_length and not max_length:
@@ -755,7 +767,7 @@ def _negative_enum(
 
     strategy = (st.none() | st.booleans() | NUMERIC_STRATEGY | st.text()).filter(is_not_in_value)
     value = ctx.generate_from(strategy)
-    yield NegativeValue(value, description="Invalid enum value", location=ctx.current_location)
+    yield NegativeValue(value, description="Invalid enum value", location=ctx.current_path)
     hashed = _to_hashable_key(value)
     seen.add(hashed)
 
@@ -765,12 +777,12 @@ def _negative_properties(
 ) -> Generator[GeneratedValue, None, None]:
     nctx = ctx.with_negative()
     for key, sub_schema in properties.items():
-        with nctx.location(key):
+        with nctx.at(key):
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(
                     {**template, key: value.value},
                     description=f"Object with invalid '{key}' value: {value.description}",
-                    location=nctx.current_location,
+                    location=nctx.current_path,
                     parameter=key,
                 )
 
@@ -784,12 +796,12 @@ def _negative_pattern_properties(
             key = ctx.generate_from(st.from_regex(pattern))
         except re.error:
             continue
-        with nctx.location(pattern):
+        with nctx.at(pattern):
             for value in cover_schema_iter(nctx, sub_schema):
                 yield NegativeValue(
                     {**template, key: value.value},
                     description=f"Object with invalid pattern key '{key}' ('{pattern}') value: {value.description}",
-                    location=nctx.current_location,
+                    location=nctx.current_path,
                 )
 
 
@@ -800,7 +812,7 @@ def _negative_items(ctx: CoverageContext, schema: dict[str, Any] | bool) -> Gene
         yield NegativeValue(
             [value.value],
             description=f"Array with invalid items: {value.description}",
-            location=nctx.current_location,
+            location=nctx.current_path,
         )
 
 
@@ -822,7 +834,7 @@ def _negative_pattern(
             )
         ),
         description=f"Value not matching the '{pattern}' pattern",
-        location=ctx.current_location,
+        location=ctx.current_path,
     )
 
 
@@ -836,13 +848,13 @@ def _negative_multiple_of(
     yield NegativeValue(
         ctx.generate_from_schema(_with_negated_key(schema, "multipleOf", multiple_of)),
         description=f"Non-multiple of {multiple_of}",
-        location=ctx.current_location,
+        location=ctx.current_path,
     )
 
 
 def _negative_unique_items(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     unique = ctx.generate_from_schema({**schema, "type": "array", "minItems": 1, "maxItems": 1})
-    yield NegativeValue(unique + unique, description="Non-unique items", location=ctx.current_location)
+    yield NegativeValue(unique + unique, description="Non-unique items", location=ctx.current_path)
 
 
 def _negative_required(
@@ -852,7 +864,7 @@ def _negative_required(
         yield NegativeValue(
             {k: v for k, v in template.items() if k != key},
             description=f"Missing required property: {key}",
-            location=ctx.current_location,
+            location=ctx.current_path,
             parameter=key,
         )
 
@@ -878,7 +890,7 @@ def _negative_format(ctx: CoverageContext, schema: dict, format: str) -> Generat
     yield NegativeValue(
         ctx.generate_from(strategy),
         description=f"Value not matching the '{format}' format",
-        location=ctx.current_location,
+        location=ctx.current_path,
     )
 
 
@@ -901,7 +913,7 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         hashed = _to_hashable_key(value)
         if hashed in seen:
             continue
-        yield NegativeValue(value, description="Incorrect type", location=ctx.current_location)
+        yield NegativeValue(value, description="Incorrect type", location=ctx.current_path)
         seen.add(hashed)
 
 
