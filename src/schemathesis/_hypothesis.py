@@ -443,12 +443,15 @@ def _iter_coverage_cases(
                 )
             if DataGenerationMethod.negative in data_generation_methods:
                 subschema = _combination_schema(only_required, required, parameter_set)
-                yield from _yield_negative(subschema, location, container_name)
+                for case in _yield_negative(subschema, location, container_name):
+                    # Already generated in one of the blocks above
+                    if location != "path" and not case.meta.description.startswith("Missing required property"):
+                        yield case
 
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
-            if combo != base_container:
+            if combo != base_container and DataGenerationMethod.positive in data_generation_methods:
                 yield make_case(
                     combo,
                     f"All required properties and optional '{opt_param}'",
@@ -462,7 +465,7 @@ def _iter_coverage_cases(
                     yield from _yield_negative(subschema, location, container_name)
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
-        if len(optional) > 1:
+        if len(optional) > 1 and DataGenerationMethod.positive in data_generation_methods:
             for size in range(2, len(optional)):
                 for combination in combinations(optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
