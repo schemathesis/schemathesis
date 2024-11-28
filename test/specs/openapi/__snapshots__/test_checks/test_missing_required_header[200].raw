@@ -1,0 +1,32 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: file:///tmp/schema.json
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+GET /api/success .                                                        [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                         N / N passed          PASSED 
+    missing_required_header                    N / N passed          PASSED 
+
+Experimental Features:
+  - Coverage phase: Generate covering test cases
+    Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
+Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
+We run additional conformance checks on reports from public repos.
+
+============================== in 1.00s ========================================

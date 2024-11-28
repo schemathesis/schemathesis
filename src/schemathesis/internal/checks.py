@@ -30,7 +30,13 @@ class PositiveDataAcceptanceConfig:
 
 
 @dataclass
+class MissingRequiredHeaderConfig:
+    allowed_statuses: list[str] = field(default_factory=lambda: ["406"])
+
+
+@dataclass
 class CheckConfig:
+    missing_required_header: MissingRequiredHeaderConfig = field(default_factory=MissingRequiredHeaderConfig)
     negative_data_rejection: NegativeDataRejectionConfig = field(default_factory=NegativeDataRejectionConfig)
     positive_data_acceptance: PositiveDataAcceptanceConfig = field(default_factory=PositiveDataAcceptanceConfig)
 

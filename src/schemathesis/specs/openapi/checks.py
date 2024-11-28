@@ -269,6 +269,20 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
     return None
 
 
+def missing_required_header(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+    if (
+        case.meta
+        and case.meta.parameter_location == "header"
+        and case.meta.description
+        and case.meta.description.startswith("Missing ")
+    ):
+        config = ctx.config.missing_required_header
+        allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+        if response.status_code not in allowed_statuses:
+            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}")
+    return None
+
+
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # Check if the case contains only additional properties in query, headers, or cookies.
     # This function is used to determine if negation is solely in the form of extra properties,
