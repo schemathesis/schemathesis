@@ -1,2 +1,2 @@
 [default]
-extend-ignore-re = ["DELET", "RESTFul"]
+extend-ignore-re = ["DELET", "RESTFul", "parametrized"]
