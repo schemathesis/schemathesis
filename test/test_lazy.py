@@ -435,7 +435,7 @@ def before_generate_headers(context, strategy):
     return strategy.map(convert)
 
 {decorators}
-@settings(max_examples=5)
+@settings(max_examples=5, suppress_health_check=[HealthCheck.filter_too_much])
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.query["id"].isdigit()
