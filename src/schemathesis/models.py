@@ -622,6 +622,7 @@ class Case:
             cookies=fast_deepcopy(self.cookies),
             query=fast_deepcopy(self.query),
             body=fast_deepcopy(self.body),
+            meta=self.meta,
             generation_time=self.generation_time,
             id=self.id,
             _auth=self._auth,

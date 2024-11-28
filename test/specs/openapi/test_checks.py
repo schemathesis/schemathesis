@@ -227,3 +227,33 @@ def test_positive_data_acceptance(
         assert "Rejected positive data" in str(exc_info.value)
     else:
         assert positive_data_acceptance(ctx, response, case) is None
+
+
+@pytest.mark.parametrize("expected_status", ["406", "200"])
+@pytest.mark.operations("success")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, expected_status):
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-phases=explicit",
+            "--data-generation-method=negative",
+            "--experimental=coverage-phase",
+            f"--experimental-missing-required-header-allowed-statuses={expected_status}",
+        )
+        == snapshot_cli
+    )
