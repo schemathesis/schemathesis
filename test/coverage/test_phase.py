@@ -918,9 +918,6 @@ def test_required_and_optional_headers(ctx):
                 "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
             },
             {
-                "headers": {},
-            },
-            {
                 "headers": {"X-API-Key-1": "{}"},
             },
             {
