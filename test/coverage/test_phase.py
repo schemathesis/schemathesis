@@ -938,6 +938,32 @@ def test_path_parameter(ctx):
     )
 
 
+def test_incorrect_headers(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key-1",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string"},
+                            "example": "тест",
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.positive],
+        [{}],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {

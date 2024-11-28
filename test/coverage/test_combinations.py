@@ -65,17 +65,17 @@ def assert_not_conform(values: list, schema: dict):
 
 @pytest.fixture
 def ctx():
-    return CoverageContext()
+    return CoverageContext(location="query")
 
 
 @pytest.fixture
 def pctx():
-    return CoverageContext(data_generation_methods=[DataGenerationMethod.positive])
+    return CoverageContext(location="query", data_generation_methods=[DataGenerationMethod.positive])
 
 
 @pytest.fixture
 def nctx():
-    return CoverageContext(data_generation_methods=[DataGenerationMethod.negative])
+    return CoverageContext(location="query", data_generation_methods=[DataGenerationMethod.negative])
 
 
 @pytest.mark.parametrize(
