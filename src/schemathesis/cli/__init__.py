@@ -290,7 +290,7 @@ REPORT_TO_SERVICE = ReportToService()
     "missing_required_header_allowed_statuses",
     help="Comma-separated list of status codes expected for test cases with a missing required header",
     type=CsvListChoice(),
-    callback=callbacks.convert_status_codes,
+    callback=validation.convert_status_codes,
     metavar="",
     envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
 )

@@ -21,6 +21,10 @@ Experimental options:
                                             [possible values: schema-analysis,
                                             stateful-only, coverage-phase,
                                             positive_data_acceptance]
+  --experimental-missing-required-header-allowed-statuses 
+                                            Comma-separated list of status codes
+                                            expected for test cases with a
+                                            missing required header
   --experimental-positive-data-acceptance-allowed-statuses 
                                             Comma-separated list of status codes
                                             considered as successful responses
