@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable, Sequence
 
 if TYPE_CHECKING:
     import hypothesis
+
+    from schemathesis.generation.targets import TargetFunction
 
     from .._override import CaseOverride
     from ..checks import CheckFunction
@@ -13,7 +15,6 @@ if TYPE_CHECKING:
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..stateful import Stateful
-    from ..targets import Target
 
 
 @dataclass
@@ -21,7 +22,7 @@ class ExecutionConfig:
     """Configuration for test execution."""
 
     checks: Iterable[CheckFunction]
-    targets: Iterable[Target]
+    targets: Sequence[TargetFunction]
     hypothesis_settings: hypothesis.settings
     max_response_time: int | None = None
     generation_config: GenerationConfig | None = None

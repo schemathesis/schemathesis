@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from random import Random
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING, Iterable, Sequence
 
 from ..constants import DEFAULT_DEADLINE
 from ..generation import GenerationConfig
 from ..internal.checks import CheckConfig
-from ..targets import DEFAULT_TARGETS, Target
 from .config import EngineConfig, ExecutionConfig, NetworkConfig
 
 if TYPE_CHECKING:
     import hypothesis
+
+    from schemathesis.generation.targets import TargetFunction
 
     from .._override import CaseOverride
     from ..models import CheckFunction
@@ -26,7 +27,7 @@ def from_schema(
     override: CaseOverride | None = None,
     checks: Iterable[CheckFunction] | None = None,
     max_response_time: int | None = None,
-    targets: Iterable[Target] = DEFAULT_TARGETS,
+    targets: Sequence[TargetFunction] | None = None,
     workers_num: int = 1,
     hypothesis_settings: hypothesis.settings | None = None,
     generation_config: GenerationConfig | None = None,
@@ -56,7 +57,7 @@ def from_schema(
         schema=schema,
         execution=ExecutionConfig(
             checks=checks,
-            targets=targets,
+            targets=targets or [],
             hypothesis_settings=hypothesis_settings,
             max_response_time=max_response_time,
             generation_config=generation_config,

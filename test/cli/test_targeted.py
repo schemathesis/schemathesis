@@ -2,7 +2,7 @@ import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
-from schemathesis.cli import reset_targets
+from schemathesis.generation.targets import TARGETS
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def new_target(context) -> float:
 """
     )
     yield module
-    reset_targets()
+    TARGETS.clear()
     # To verify that "new_target" is unregistered
     assert "new_target" not in cli.run("--help").stdout
 
@@ -64,7 +64,7 @@ def target_function():
 
     yield target_function
 
-    reset_targets()
+    TARGETS.clear()
 
 
 def test_register_returns_a_value(target_function):

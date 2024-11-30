@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.failures import Failure
+from schemathesis.generation.targets import TargetMetricCollector
 
-from ..targets import TargetMetricCollector
 from . import events
 
 if TYPE_CHECKING:
@@ -36,7 +36,7 @@ class RunnerContext:
     # The total number of completed test scenario
     completed_scenarios: int = 0
     # Metrics collector for targeted testing
-    metric_collector: TargetMetricCollector = field(default_factory=lambda: TargetMetricCollector(targets=[]))
+    metric_collector: TargetMetricCollector = field(default_factory=TargetMetricCollector)
     step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
 
     @property
