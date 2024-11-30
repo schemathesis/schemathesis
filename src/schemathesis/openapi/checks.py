@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import textwrap
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.failures import Failure
@@ -9,6 +10,22 @@ if TYPE_CHECKING:
     from jsonschema import ValidationError
 
     from schemathesis.internal.output import OutputConfig
+
+
+@dataclass
+class NegativeDataRejectionConfig:
+    # 5xx will pass through
+    allowed_statuses: list[str] = field(default_factory=lambda: ["400", "401", "403", "404", "422", "5xx"])
+
+
+@dataclass
+class PositiveDataAcceptanceConfig:
+    allowed_statuses: list[str] = field(default_factory=lambda: ["2xx", "401", "403", "404"])
+
+
+@dataclass
+class MissingRequiredHeaderConfig:
+    allowed_statuses: list[str] = field(default_factory=lambda: ["406"])
 
 
 class UndefinedStatusCode(Failure):

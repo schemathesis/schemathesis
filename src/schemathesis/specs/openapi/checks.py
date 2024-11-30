@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
 import schemathesis
+from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
@@ -17,6 +18,9 @@ from schemathesis.openapi.checks import (
     MalformedMediaType,
     MissingContentType,
     MissingHeaders,
+    MissingRequiredHeaderConfig,
+    NegativeDataRejectionConfig,
+    PositiveDataAcceptanceConfig,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
@@ -30,7 +34,6 @@ from .utils import expand_status_code, expand_status_codes
 if TYPE_CHECKING:
     from requests import PreparedRequest
 
-    from ...internal.checks import CheckContext
     from ...models import APIOperation, Case
     from ...transports.responses import GenericResponse
 
@@ -214,7 +217,7 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
 
-    config = ctx.config.negative_data_rejection
+    config = ctx.config.get(negative_data_rejection, NegativeDataRejectionConfig())
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
     if (
@@ -239,7 +242,7 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
 
-    config = ctx.config.positive_data_acceptance
+    config = ctx.config.get(positive_data_acceptance, PositiveDataAcceptanceConfig())
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
     if (
@@ -264,7 +267,7 @@ def missing_required_header(ctx: CheckContext, response: GenericResponse, case: 
         and case.meta.description
         and case.meta.description.startswith("Missing ")
     ):
-        config = ctx.config.missing_required_header
+        config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
         allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
             raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}")

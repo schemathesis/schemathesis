@@ -8,10 +8,9 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import models
-from schemathesis.checks import not_a_server_error
+from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.internal.checks import CheckContext
 from schemathesis.models import OperationDefinition
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.runner.models import TestResult
@@ -27,7 +26,7 @@ from schemathesis.specs.openapi.checks import (
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(override=None, auth=None, headers=None)
+CTX = CheckContext(override=None, auth=None, headers=None, config={})
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:

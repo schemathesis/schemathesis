@@ -5,7 +5,7 @@ from datetime import timedelta
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.checks import CHECKS
+from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.generation.targets import TargetFunction
 
 from ..constants import DEFAULT_DEADLINE
@@ -49,6 +49,7 @@ class StatefulTestRunnerConfig:
 
     # Checks to run against each response
     checks: list[CheckFunction] = field(default_factory=CHECKS.get_all)
+    checks_config: ChecksConfig = field(default_factory=dict)
     # Hypothesis settings for state machine execution
     hypothesis_settings: hypothesis.settings = field(default_factory=_default_hypothesis_settings_factory)
     # Network-level configuration

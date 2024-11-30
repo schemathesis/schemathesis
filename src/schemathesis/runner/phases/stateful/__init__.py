@@ -20,6 +20,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
     headers = ctx.config.network.headers or {}
     config = stateful_runner.StatefulTestRunnerConfig(
         checks=ctx.config.execution.checks,
+        checks_config=ctx.config.checks_config,
         headers=headers,
         hypothesis_settings=ctx.config.execution.hypothesis_settings,
         max_failures=ctx.control.remaining_failures,

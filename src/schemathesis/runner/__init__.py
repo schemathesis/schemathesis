@@ -3,11 +3,10 @@ from __future__ import annotations
 from random import Random
 from typing import TYPE_CHECKING
 
-from schemathesis.checks import CHECKS
+from schemathesis.checks import CHECKS, ChecksConfig
 
 from ..constants import DEFAULT_DEADLINE
 from ..generation import GenerationConfig
-from ..internal.checks import CheckConfig
 from .config import EngineConfig, ExecutionConfig, NetworkConfig
 
 if TYPE_CHECKING:
@@ -39,7 +38,7 @@ def from_schema(
     dry_run: bool = False,
     stateful: Stateful | None = None,
     network: NetworkConfig | None = None,
-    checks_config: CheckConfig | None = None,
+    checks_config: ChecksConfig | None = None,
     service_client: ServiceClient | None = None,
 ) -> Engine:
     import hypothesis
@@ -47,7 +46,7 @@ def from_schema(
     from .core import Engine
 
     checks = checks or CHECKS.get_all()
-    checks_config = checks_config or CheckConfig()
+    checks_config = checks_config or {}
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)
 

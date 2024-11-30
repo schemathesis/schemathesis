@@ -1,10 +1,11 @@
 import pytest
 
 import schemathesis
+from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.internal.checks import CheckConfig, CheckContext, PositiveDataAcceptanceConfig
 from schemathesis.models import Case, GenerationMetadata, TestPhase
+from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
@@ -171,7 +172,9 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         data_generation_method=DataGenerationMethod.negative,
         query={"key": 5, "unknown": 3},
     )
-    assert negative_data_rejection(CheckContext(override=None, auth=None, headers=None), response, case) is None
+    assert (
+        negative_data_rejection(CheckContext(override=None, auth=None, headers=None, config={}), response, case) is None
+    )
 
 
 @pytest.mark.parametrize(
@@ -218,7 +221,7 @@ def test_positive_data_acceptance(
         override=None,
         auth=None,
         headers=None,
-        config=CheckConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)),
+        config={positive_data_acceptance: PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)},
     )
 
     if should_raise:

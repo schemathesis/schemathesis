@@ -23,7 +23,6 @@ from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.constants import DEFAULT_DEADLINE, REPORT_SUGGESTION_ENV_VAR
 from schemathesis.generation import GenerationConfig
-from schemathesis.internal.checks import CheckConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
@@ -241,7 +240,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
 
     expected = {
         "checks": [not_a_server_error],
-        "checks_config": CheckConfig(),
+        "checks_config": {},
         "targets": [],
         "workers_num": 1,
         "max_failures": None,

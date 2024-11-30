@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING, Any, ClassVar
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
+from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
 
 from ..constants import NO_LINKS_ERROR_MESSAGE
-from ..internal.checks import CheckFunction
 from ..models import APIOperation, Case
 from .config import _default_hypothesis_settings_factory
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
