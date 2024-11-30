@@ -10,10 +10,10 @@ import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
+from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation.targets import TargetMetricCollector
 
-from ..internal.checks import CheckContext
 from . import events
 from .config import StatefulTestRunnerConfig
 from .context import RunnerContext
@@ -22,7 +22,7 @@ from .validation import validate_response
 if TYPE_CHECKING:
     from hypothesis.stateful import Rule
 
-    from ..models import Case, CheckFunction
+    from ..models import Case
     from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine, Direction, StepResult
 
@@ -131,6 +131,7 @@ def _execute_state_machine_loop(
         override=config.override,
         auth=config.auth,
         headers=CaseInsensitiveDict(config.headers) if config.headers else None,
+        config=config.checks_config,
     )
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]

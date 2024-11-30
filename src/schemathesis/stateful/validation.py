@@ -2,14 +2,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import Failure, FailureGroup
-
-from ..internal.checks import CheckContext
 
 if TYPE_CHECKING:
     from requests import Response
 
-    from ..internal.checks import CheckFunction
     from ..models import Case
     from .context import RunnerContext
 

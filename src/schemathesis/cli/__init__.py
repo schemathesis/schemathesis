@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 import click
 
 import schemathesis.specs.openapi.checks as checks
-from schemathesis.checks import CHECKS
+from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError
 from schemathesis.generation.targets import TARGETS
@@ -33,7 +33,6 @@ from ..constants import (
 )
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
-from ..internal.checks import CheckConfig
 from ..internal.exceptions import format_exception
 from ..internal.fs import ensure_parent
 from ..internal.output import OutputConfig
@@ -948,20 +947,31 @@ def run(
     else:
         selected_checks = CHECKS.get_by_names(included_check_names or [])
 
-    checks_config = CheckConfig()
+    checks_config: ChecksConfig = {}
     if experimental.POSITIVE_DATA_ACCEPTANCE.is_enabled:
-        from ..specs.openapi.checks import positive_data_acceptance
+        from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
+        from schemathesis.specs.openapi.checks import positive_data_acceptance
 
         selected_checks.append(positive_data_acceptance)
         if positive_data_acceptance_allowed_statuses:
-            checks_config.positive_data_acceptance.allowed_statuses = positive_data_acceptance_allowed_statuses
+            checks_config[positive_data_acceptance] = PositiveDataAcceptanceConfig(
+                allowed_statuses=positive_data_acceptance_allowed_statuses
+            )
     if missing_required_header_allowed_statuses:
-        from ..specs.openapi.checks import missing_required_header
+        from schemathesis.openapi.checks import MissingRequiredHeaderConfig
+        from schemathesis.specs.openapi.checks import missing_required_header
 
         selected_checks.append(missing_required_header)
-        checks_config.missing_required_header.allowed_statuses = missing_required_header_allowed_statuses
+        checks_config[missing_required_header] = MissingRequiredHeaderConfig(
+            allowed_statuses=missing_required_header_allowed_statuses
+        )
     if negative_data_rejection_allowed_statuses:
-        checks_config.negative_data_rejection.allowed_statuses = negative_data_rejection_allowed_statuses
+        from schemathesis.openapi.checks import NegativeDataRejectionConfig
+        from schemathesis.specs.openapi.checks import negative_data_rejection
+
+        checks_config[negative_data_rejection] = NegativeDataRejectionConfig(
+            allowed_statuses=negative_data_rejection_allowed_statuses
+        )
 
     selected_checks = [check for check in selected_checks if check.__name__ not in excluded_check_names]
 
@@ -1056,7 +1066,7 @@ def into_event_stream(
     override: CaseOverride,
     filter_set: FilterSet,
     checks: list[CheckFunction],
-    checks_config: CheckConfig,
+    checks_config: ChecksConfig,
     max_response_time: int | None,
     targets: list[TargetFunction],
     workers_num: int,

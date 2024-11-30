@@ -20,6 +20,7 @@ from schemathesis._hypothesis._builder import (
     NonSerializableMark,
     UnsatisfiableExampleMark,
 )
+from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
     InternalError,
@@ -36,7 +37,6 @@ from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, Unsupp
 
 from ...._compat import BaseExceptionGroup
 from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
-from ....internal.checks import CheckContext
 from ....internal.exceptions import deduplicate_errors
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
@@ -49,7 +49,6 @@ from ...models.transport import Request, Response
 if TYPE_CHECKING:
     import requests
 
-    from ....checks import CheckFunction
     from ....models import APIOperation, Case
     from ....transports.responses import GenericResponse
 
