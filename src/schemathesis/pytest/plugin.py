@@ -22,6 +22,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.marks import Mark
+from schemathesis.core.result import Ok, Result
 from schemathesis.pytest.control_flow import fail_on_no_matches
 
 from .._hypothesis._given import (
@@ -33,7 +34,6 @@ from .._hypothesis._given import (
 )
 from .._override import OverrideMark
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
-from ..internal.result import Ok, Result
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo

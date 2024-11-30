@@ -13,13 +13,14 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis import errors
+from schemathesis.core import rate_limit
+from schemathesis.internal.fs import file_exists, is_filename
 
-from .. import experimental, throttling
+from .. import experimental
 from ..constants import TRUE_VALUES
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from ..generation import DataGenerationMethod
 from ..internal.transformation import convert_boolean_string as _convert_boolean_string
-from ..internal.validation import file_exists, is_filename
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from .cassettes import CassetteFormat
@@ -128,7 +129,7 @@ def validate_rate_limit(ctx: click.core.Context, param: click.core.Parameter, ra
     if raw_value is None:
         return raw_value
     try:
-        throttling.parse_units(raw_value)
+        rate_limit.parse_units(raw_value)
         return raw_value
     except errors.IncorrectUsage as exc:
         raise click.UsageError(exc.args[0]) from exc

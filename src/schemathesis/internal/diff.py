@@ -9,7 +9,4 @@ def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
     for key, value in right.items():
         if key not in left or left[key] != value:
             diff[key] = value
-    for key in left:
-        if key not in right:
-            diff[key] = None  # Mark deleted items as None
     return diff

@@ -5,8 +5,9 @@ import re
 from ipaddress import IPv4Network, IPv6Network
 from typing import TYPE_CHECKING, Any, Callable
 
+from schemathesis.core.result import Err, Ok, Result
+
 from ..graphql import nodes
-from ..internal.result import Err, Ok, Result
 from .models import (
     Extension,
     GraphQLScalarsExtension,

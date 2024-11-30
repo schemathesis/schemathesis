@@ -6,7 +6,8 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    from ....internal.result import Result
+    from schemathesis.core.result import Result
+
     from ...context import EngineContext
 
 

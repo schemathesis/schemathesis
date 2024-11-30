@@ -31,6 +31,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
+from schemathesis.core.result import Err, Ok, Result
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
@@ -38,7 +39,6 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
 from ...internal.copy import fast_deepcopy
 from ...internal.jsonschema import traverse_schema
-from ...internal.result import Err, Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
 from ...transports.content_types import is_json_media_type, parse_content_type

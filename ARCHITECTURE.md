@@ -63,7 +63,7 @@ Loading API schemas.
 
 Utilities for sending & receiving data.
 
-- `core/transports/throttling`
+- `core/rate_limit`
 
 ### `core/output`
 

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 from schemathesis.core.failures import Failure
 
-from ...transports import get_excluded_headers
 from .status import Status
 from .transport import Request, Response
 
@@ -31,9 +30,7 @@ class Check:
         from schemathesis import code_samples
         from schemathesis.sanitization import sanitize_value
 
-        data = self.case.prepare_code_sample_data(
-            {key: value[0] for key, value in self.request.headers.items() if key not in get_excluded_headers()},
-        )
+        data = self.case.prepare_code_sample_data({key: value[0] for key, value in self.request.headers.items()})
 
         headers = None
         if self.case.headers is not None:
