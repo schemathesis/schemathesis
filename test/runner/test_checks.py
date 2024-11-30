@@ -8,13 +8,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis import models
-from schemathesis.checks import (
-    content_type_conformance,
-    not_a_server_error,
-    response_headers_conformance,
-    response_schema_conformance,
-    status_code_conformance,
-)
+from schemathesis.checks import not_a_server_error
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.internal.checks import CheckContext
@@ -22,7 +16,13 @@ from schemathesis.models import OperationDefinition
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.runner.models import TestResult
 from schemathesis.runner.phases.unit._executor import run_checks
-from schemathesis.specs.openapi.checks import _coerce_header_value
+from schemathesis.specs.openapi.checks import (
+    _coerce_header_value,
+    content_type_conformance,
+    response_headers_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema

@@ -20,7 +20,7 @@ class TokenAuth:
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
-def test_custom_auth(ctx, cli, schema_url, app, snapshot_cli):
+def test_custom_auth(ctx, cli, schema_url, snapshot_cli):
     # When a custom auth is used
     module = ctx.write_pymodule(
         f"""
@@ -171,12 +171,27 @@ def after_call(context, case, response):
     assert cli.main("run", schema_url, hooks=module) == snapshot_cli
 
 
+@pytest.fixture
+def verify_auth(ctx):
+    with ctx.check("""
+@schemathesis.check
+def verify_auth(ctx, response, case):
+    request_authorization = response.request.headers.get("Authorization")
+    if case.operation.path == "/text":
+        expected = f"Bearer {TOKEN_1}"
+    if case.operation.path == "/success":
+        expected = f"Bearer {TOKEN_2}"
+    assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
+    """) as module:
+        yield module
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success", "text")
+@pytest.mark.usefixtures("verify_auth")
 def test_conditional(ctx, cli, schema_url, snapshot_cli):
     # When the user sets up multiple auths applied to different API operations
-    module = ctx.write_pymodule(
-        """
+    with ctx.check("""
 TOKEN_1 = "ABC"
 
 @schemathesis.auth().apply_to(method="GET", path="/text")
@@ -207,7 +222,6 @@ def verify_auth(ctx, response, case):
     if case.operation.path == "/success":
         expected = f"Bearer {TOKEN_2}"
     assert request_authorization == expected, f"Expected `{expected}`, got `{request_authorization}`"
-"""
-    )
-    # Then all auths should be properly applied
-    assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli
+    """) as module:
+        # Then all auths should be properly applied
+        assert cli.main("run", schema_url, "-c", "verify_auth", hooks=module) == snapshot_cli

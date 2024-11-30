@@ -15,6 +15,7 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
         schema_url,
         f"--junit-xml={xml_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        "--checks=not_a_server_error",
         "--hypothesis-seed=1",
     )
     # Command executed successfully
@@ -35,6 +36,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
         "--hypothesis-seed=1",
         "--checks=all",
+        "--exclude-checks=positive_data_acceptance",
     )
     tree = ElementTree.parse(xml_path)
     # Inspect root element `testsuites`
@@ -74,22 +76,32 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     )
 
 
+@pytest.fixture
+def with_error(ctx):
+    with ctx.check("""
+@schemathesis.check
+def with_error(ctx, response, case):
+    1 / 0
+""") as module:
+        yield module
+
+
 @pytest.mark.skipif(
     sys.version_info < (3, 11) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
 @pytest.mark.operations("success")
 @pytest.mark.openapi_version("3.0")
-def test_error_with_traceback(ctx, cli, schema_url, tmp_path):
-    module = ctx.write_pymodule(
-        """
-@schemathesis.check
-def with_error(ctx, response, case):
-    1 / 0
-"""
-    )
+def test_error_with_traceback(with_error, cli, schema_url, tmp_path):
     xml_path = tmp_path / "junit.xml"
-    cli.main("run", schema_url, "-c", "with_error", f"--junit-xml={xml_path}", hooks=module)
+    cli.main(
+        "run",
+        schema_url,
+        "-c",
+        "with_error",
+        f"--junit-xml={xml_path}",
+        hooks=with_error,
+    )
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     testcases = list(root[0])
@@ -125,7 +137,13 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
             },
         }
     )
-    cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--checks=all", f"--junit-xml={xml_path}")
+    cli.run(
+        str(schema_path),
+        f"--base-url={openapi3_base_url}",
+        "--checks=all",
+        f"--junit-xml={xml_path}",
+        "--exclude-checks=positive_data_acceptance",
+    )
     tree = ElementTree.parse(xml_path)
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)

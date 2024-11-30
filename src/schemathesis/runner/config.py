@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterable, Sequence
+from typing import TYPE_CHECKING, Any, Sequence
 
 if TYPE_CHECKING:
     import hypothesis
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 class ExecutionConfig:
     """Configuration for test execution."""
 
-    checks: Iterable[CheckFunction]
+    checks: list[CheckFunction]
     targets: Sequence[TargetFunction]
     hypothesis_settings: hypothesis.settings
     max_response_time: int | None = None

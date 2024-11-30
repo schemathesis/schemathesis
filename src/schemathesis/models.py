@@ -20,6 +20,7 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
+from schemathesis.checks import CHECKS
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
@@ -352,9 +353,9 @@ class Case:
     def validate_response(
         self,
         response: GenericResponse,
-        checks: tuple[CheckFunction, ...] = (),
-        additional_checks: tuple[CheckFunction, ...] = (),
-        excluded_checks: tuple[CheckFunction, ...] = (),
+        checks: list[CheckFunction] | None = None,
+        additional_checks: list[CheckFunction] | None = None,
+        excluded_checks: list[CheckFunction] | None = None,
         headers: dict[str, Any] | None = None,
     ) -> None:
         """Validate application response.
@@ -370,17 +371,18 @@ class Case:
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
 
-        from .checks import ALL_CHECKS
         from .transports.responses import get_payload
 
-        checks = checks or ALL_CHECKS
-        checks = tuple(check for check in checks if check not in excluded_checks)
-        additional_checks = tuple(check for check in additional_checks if check not in excluded_checks)
+        checks = checks or CHECKS.get_all()
+        checks = [check for check in checks if check not in (excluded_checks or [])]
+        for check in additional_checks or []:
+            if check not in checks and check not in (excluded_checks or []):
+                checks.append(check)
         failures: set[Failure] = set()
         ctx = CheckContext(
             override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
         )
-        for check in chain(checks, additional_checks):
+        for check in checks:
             try:
                 check(ctx, response, self)
             except Failure as f:
@@ -417,9 +419,9 @@ class Case:
         base_url: str | None = None,
         session: requests.Session | None = None,
         headers: dict[str, Any] | None = None,
-        checks: tuple[CheckFunction, ...] = (),
-        additional_checks: tuple[CheckFunction, ...] = (),
-        excluded_checks: tuple[CheckFunction, ...] = (),
+        checks: list[CheckFunction] | None = None,
+        additional_checks: list[CheckFunction] | None = None,
+        excluded_checks: list[CheckFunction] | None = None,
         **kwargs: Any,
     ) -> GenericResponse:
         __tracebackhide__ = True

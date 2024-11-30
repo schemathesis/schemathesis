@@ -363,14 +363,15 @@ def test_excluded_checks(testdir, openapi3_base_url):
     # When the user would like to exclude a check
     testdir.make_test(
         f"""
-from schemathesis.checks import status_code_conformance, not_a_server_error
+from schemathesis.checks import not_a_server_error
+from schemathesis.specs.openapi.checks import status_code_conformance, positive_data_acceptance
 
 schema.base_url = "{openapi3_base_url}"
 
 @schema.include(path_regex="failure").parametrize()
 def test(case):
     response = case.call()
-    case.validate_response(response, excluded_checks=(status_code_conformance, not_a_server_error))
+    case.validate_response(response, excluded_checks=(status_code_conformance, not_a_server_error, positive_data_acceptance))
 """,
         paths={"/failure": {"get": {"responses": {"200": {"description": "OK"}}}}},
     )

@@ -2,7 +2,7 @@ import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
-from schemathesis.cli import reset_checks
+from schemathesis.checks import CHECKS
 
 
 @pytest.fixture
@@ -13,7 +13,7 @@ def new_check():
 
     yield check_function
 
-    reset_checks()
+    CHECKS.unregister(check_function.__name__)
 
 
 def test_register_returns_a_value(new_check):

@@ -20,7 +20,7 @@ def validate_response(
     case: Case,
     runner_ctx: RunnerContext,
     check_ctx: CheckContext,
-    checks: tuple[CheckFunction, ...],
+    checks: list[CheckFunction],
     additional_checks: tuple[CheckFunction, ...] = (),
     max_response_time: int | None = None,
 ) -> None:

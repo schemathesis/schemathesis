@@ -59,6 +59,9 @@ Performed checks:
     response_headers_conformance                    1 / 1 passed          PASSED 
     response_schema_conformance                     0 / 1 passed          FAILED 
     negative_data_rejection                         1 / 1 passed          PASSED 
+    positive_data_acceptance                        1 / 1 passed          PASSED 
+    use_after_free                                  1 / 1 passed          PASSED 
+    ensure_resource_availability                    1 / 1 passed          PASSED 
     ignored_auth                                    1 / 1 passed          PASSED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.

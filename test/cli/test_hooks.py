@@ -8,8 +8,6 @@ def test_before_call(ctx, cli, schema_url):
     # When the `before_call` hook is registered
     module = ctx.write_pymodule(
         """
-note = print  # To avoid linting error
-
 @schemathesis.hook
 def before_call(context, case, **kwargs):
     note("\\nBefore!")

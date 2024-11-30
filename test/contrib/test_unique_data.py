@@ -70,7 +70,7 @@ def raw_schema(ctx, request):
 
 @pytest.fixture
 def unique_hook(ctx):
-    return ctx.write_pymodule(
+    with ctx.check(
         """
 @schemathesis.check
 def unique_test_cases(ctx, response, case):
@@ -80,7 +80,8 @@ def unique_test_cases(ctx, response, case):
     assert command not in case.operation.schema.seen, f"Test case already seen! {command}"
     case.operation.schema.seen.add(command)
 """
-    )
+    ) as module:
+        yield module
 
 
 def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_examples, *args):

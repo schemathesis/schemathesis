@@ -162,7 +162,7 @@ class APIStateMachine(RuleBasedStateMachine):
         response = self.call(case, **kwargs)
         elapsed = time.monotonic() - start
         self.after_call(response, case)
-        self.validate_response(response, case, additional_checks=(use_after_free,))
+        self.validate_response(response, case, additional_checks=[use_after_free])
         return self.store_result(response, case, elapsed)
 
     def before_call(self, case: Case) -> None:
@@ -256,7 +256,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return {}
 
     def validate_response(
-        self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
+        self, response: GenericResponse, case: Case, additional_checks: list[CheckFunction] | None = None
     ) -> None:
         """Validate an API response.
 

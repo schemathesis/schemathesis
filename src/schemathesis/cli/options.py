@@ -50,14 +50,6 @@ class CsvEnumChoice(BaseCsvChoice):
         self.fail_on_invalid_options(invalid_options, selected)
 
 
-class CsvChoice(BaseCsvChoice):
-    def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[str]:
-        selected, invalid_options = self.parse_value(value)
-        if not invalid_options and selected:
-            return selected
-        self.fail_on_invalid_options(invalid_options, selected)
-
-
 class CsvListChoice(click.ParamType):
     def convert(  # type: ignore[return]
         self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
@@ -66,13 +58,22 @@ class CsvListChoice(click.ParamType):
 
 
 class RegistryChoice(BaseCsvChoice):
-    def __init__(self, registry: Registry) -> None:
+    def __init__(self, registry: Registry, with_all: bool = False) -> None:
         self.registry = registry
         self.case_sensitive = True
+        self.with_all = with_all
 
     @property
     def choices(self) -> list[str]:
-        return self.registry.get_all_names()
+        choices = self.registry.get_all_names()
+        if self.with_all:
+            choices.append("all")
+        return choices
+
+    def convert(  # type: ignore[return]
+        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
+    ) -> list[str]:
+        return [item for item in value.split(",") if item]
 
 
 class OptionalInt(click.types.IntRange):
