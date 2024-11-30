@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.result import Err, Ok, Result
 
 from ..internal.exceptions import format_exception
-from ..internal.result import Err, Ok, Result
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification

@@ -12,7 +12,8 @@ if TYPE_CHECKING:
 
     import hypothesis
 
-    from ..internal.result import Result
+    from schemathesis.core.result import Result
+
     from ..runner.models import TestResult
     from ..runner.phases.probes import ProbeRun
     from ..service.models import AnalysisResult

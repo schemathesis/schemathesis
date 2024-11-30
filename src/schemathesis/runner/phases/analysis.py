@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from ...internal.result import Err, Ok, Result
+from schemathesis.core.result import Err, Ok, Result
+
 from ...service import extensions
 from ...service.models import AnalysisResult, AnalysisSuccess
 from .. import events

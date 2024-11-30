@@ -26,13 +26,13 @@ from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
+from schemathesis.core.result import Ok, Result
 
 from ... import auths
 from ...checks import not_a_server_error
 from ...constants import SCHEMATHESIS_TEST_CASE_HEADER
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...internal.result import Ok, Result
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
 from ..openapi.constants import LOCATION_TO_CONTAINER
