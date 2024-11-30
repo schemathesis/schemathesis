@@ -24,6 +24,7 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis.checks import CheckFunction
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
@@ -43,7 +44,6 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from ...auths import AuthStorage
-    from ...internal.checks import CheckFunction
     from ...transports.responses import GenericResponse
 
 

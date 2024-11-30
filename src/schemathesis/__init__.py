@@ -3,10 +3,9 @@ from __future__ import annotations
 from typing import Any
 
 from schemathesis import graphql, openapi, pytest, python
-from schemathesis.checks import check
+from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
-from schemathesis.internal.checks import CheckContext, CheckFunction
 from schemathesis.internal.output import OutputConfig
 
 from . import auths, contrib, experimental, hooks, runner, serializers

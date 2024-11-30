@@ -5,6 +5,7 @@ from functools import cached_property
 from itertools import groupby
 from typing import TYPE_CHECKING, Any, Generator, Iterator
 
+from schemathesis.core import curl
 from schemathesis.core.failures import Failure
 
 from .status import Status
@@ -27,7 +28,6 @@ class Check:
 
     @cached_property
     def code_sample(self) -> str:
-        from schemathesis import code_samples
         from schemathesis.sanitization import sanitize_value
 
         data = self.case.prepare_code_sample_data({key: value[0] for key, value in self.request.headers.items()})
@@ -38,7 +38,7 @@ class Check:
             if self.case.operation.schema.output_config.sanitize:
                 sanitize_value(headers)
 
-        return code_samples.generate(
+        return curl.generate(
             method=self.case.method,
             url=data.url,
             body=data.body,

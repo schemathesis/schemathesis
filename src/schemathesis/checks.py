@@ -1,16 +1,47 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from schemathesis._override import CaseOverride
 from schemathesis.core.failures import MalformedJson, ServerError
 from schemathesis.core.registries import Registry
-from schemathesis.internal.checks import CheckFunction
 
 if TYPE_CHECKING:
-    from .internal.checks import CheckContext
+    from requests.models import CaseInsensitiveDict
+
     from .models import Case
     from .transports.responses import GenericResponse
+
+CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[bool]]
+ChecksConfig = dict[CheckFunction, Any]
+
+
+class CheckContext:
+    """Context for Schemathesis checks.
+
+    Provides access to broader test execution data beyond individual test cases.
+    """
+
+    override: CaseOverride | None
+    auth: tuple[str, str] | None
+    headers: CaseInsensitiveDict | None
+    config: ChecksConfig
+
+    __slots__ = ("override", "auth", "headers", "config")
+
+    def __init__(
+        self,
+        override: CaseOverride | None,
+        auth: tuple[str, str] | None,
+        headers: CaseInsensitiveDict | None,
+        config: ChecksConfig,
+    ) -> None:
+        self.override = override
+        self.auth = auth
+        self.headers = headers
+        self.config = config
+
 
 CHECKS = Registry[CheckFunction]()
 check = CHECKS.register

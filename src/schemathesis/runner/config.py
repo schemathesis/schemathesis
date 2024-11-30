@@ -6,12 +6,12 @@ from typing import TYPE_CHECKING, Any, Sequence
 if TYPE_CHECKING:
     import hypothesis
 
+    from schemathesis.checks import ChecksConfig
     from schemathesis.generation.targets import TargetFunction
 
     from .._override import CaseOverride
     from ..checks import CheckFunction
     from ..generation import GenerationConfig
-    from ..internal.checks import CheckConfig
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from ..stateful import Stateful
@@ -53,6 +53,6 @@ class EngineConfig:
     schema: BaseSchema
     execution: ExecutionConfig
     network: NetworkConfig
-    checks_config: CheckConfig
+    checks_config: ChecksConfig
     override: CaseOverride | None = None
     service_client: ServiceClient | None = None

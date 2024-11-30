@@ -11,9 +11,9 @@ from hypothesis import Phase, given, settings
 from starlette_testclient import TestClient
 
 import schemathesis
+from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation import GenerationConfig
-from schemathesis.internal.checks import CheckContext
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Status
@@ -78,61 +78,61 @@ def test_no_failure(schema_url):
     ("ctx", "request_kwargs", "parameters", "expected"),
     [
         (
-            CheckContext(override=None, auth=None, headers=None),
+            CheckContext(override=None, auth=None, headers=None, config={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}),
+            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}, config={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"A": "V"}),
+            CheckContext(override=None, auth=None, headers={"A": "V"}, config={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}),
+            CheckContext(override=None, auth=None, headers={}, config={}),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}),
+            CheckContext(override=None, auth=None, headers={}, config={}),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}),
+            CheckContext(override=None, auth=None, headers={}, config={}),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}),
+            CheckContext(override=None, auth=None, headers={}, config={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}, config={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}, config={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}),
+            CheckContext(override=None, auth=None, headers={}, config={}),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,

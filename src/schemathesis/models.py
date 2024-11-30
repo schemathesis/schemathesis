@@ -20,13 +20,13 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
-from schemathesis.checks import CHECKS
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.checks import CHECKS, CheckContext, CheckFunction
+from schemathesis.core import NOT_SET, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
 
-from . import code_samples, serializers
+from . import serializers
 from ._override import CaseOverride
 from .constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
@@ -34,7 +34,6 @@ from .constants import (
 )
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
-from .internal.checks import CheckContext
 from .internal.diff import diff
 from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
@@ -47,7 +46,6 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from .auths import AuthStorage
-    from .internal.checks import CheckFunction
     from .schemas import BaseSchema
     from .serializers import Serializer
     from .transports.responses import GenericResponse
@@ -282,7 +280,7 @@ class Case:
         case_headers = None
         if self.headers is not None:
             case_headers = dict(self.headers)
-        return code_samples.generate(
+        return curl.generate(
             method=request_data.method,
             url=request_data.url,
             body=request_data.body,
@@ -380,7 +378,7 @@ class Case:
                 checks.append(check)
         failures: set[Failure] = set()
         ctx = CheckContext(
-            override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
+            override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None, config={}
         )
         for check in checks:
             try:
