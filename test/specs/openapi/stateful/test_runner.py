@@ -93,6 +93,7 @@ def assert_linked_calls_followed(result: RunnerResult):
 )
 def test_find_independent_5xx(runner_factory, kwargs):
     # When the app contains multiple endpoints with 5xx responses
+    kwargs["checks"] = [not_a_server_error]
     runner = runner_factory(app_kwargs={"independent_500": True}, config_kwargs=kwargs)
     result = collect_result(runner)
     all_affected_operations = {

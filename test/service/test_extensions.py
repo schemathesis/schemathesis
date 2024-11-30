@@ -213,6 +213,20 @@ def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
     assert cli.run(*cli_args, f"--debug-output-file={debug}") == snapshot_cli
 
 
+@pytest.fixture
+def port_check(ctx):
+    with ctx.check(
+        """
+@schemathesis.check
+def port_check(ctx, response, case):
+    assert isinstance(case.body, dict), "Not a dict"
+    assert "port" in case.body, "Missing key"
+    assert 1 <= int(case.body["port"]) <= 65535, "Invalid port"
+"""
+    ) as module:
+        yield module
+
+
 @pytest.mark.analyze_schema(
     extensions=[
         {
@@ -229,7 +243,7 @@ def test_invalid_payload(cli_args, cli, snapshot_cli, tmp_path):
         }
     ]
 )
-def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url):
+def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url, port_check):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -252,17 +266,6 @@ def test_custom_format(ctx, cli, snapshot_cli, service, openapi3_base_url):
             },
         }
     )
-    module = ctx.write_pymodule(
-        """
-import schemathesis
-
-@schemathesis.check
-def port_check(ctx, response, case):
-    assert isinstance(case.body, dict), "Not a dict"
-    assert "port" in case.body, "Missing key"
-    assert 1 <= int(case.body["port"]) <= 65535, "Invalid port"
-"""
-    )
     assert (
         cli.main(
             "run",
@@ -274,7 +277,7 @@ def port_check(ctx, response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
-            hooks=module,
+            hooks=port_check,
         )
         == snapshot_cli
     )
@@ -405,10 +408,8 @@ def test_schema_patches(
         }
     )
     analyze_schema(extensions=[{"type": "schema_patches", "patches": [patch]}])
-    module = ctx.write_pymodule(
+    with ctx.check(
         f"""
-import schemathesis
-
 PATH = {patch["path"]}
 EXPECTED = {expected}
 
@@ -419,22 +420,22 @@ def schema_check(ctx, response, case):
         schema = schema[segment]
     assert schema == EXPECTED, f"Invalid schema: {{schema}}"
 """
-    )
-    assert (
-        cli.main(
-            "run",
-            str(schema_path),
-            "-c",
-            "schema_check",
-            f"--base-url={openapi3_base_url}",
-            f"--schemathesis-io-token={service.token}",
-            f"--schemathesis-io-url={service.base_url}",
-            "--hypothesis-max-examples=10",
-            "--experimental=schema-analysis",
-            hooks=module,
+    ) as module:
+        assert (
+            cli.main(
+                "run",
+                str(schema_path),
+                "-c",
+                "schema_check",
+                f"--base-url={openapi3_base_url}",
+                f"--schemathesis-io-token={service.token}",
+                f"--schemathesis-io-url={service.base_url}",
+                "--hypothesis-max-examples=10",
+                "--experimental=schema-analysis",
+                hooks=module,
+            )
+            == snapshot_cli
         )
-        == snapshot_cli
-    )
 
 
 def test_schema_patches_remove_all(ctx):
@@ -479,6 +480,21 @@ def test_invalid_schema_patches(ctx, path, expected):
     assert extension.state.errors == [expected]
 
 
+@pytest.fixture
+def graphql_port_check(ctx):
+    with ctx.check(
+        r"""
+import re
+
+@schemathesis.check
+def port_check(ctx, response, case):
+    value = re.findall(r"getByDate\(value: (\d+)\)", case.body)[0]
+    assert 1 <= int(value) <= 65535, "Invalid port"
+"""
+    ) as module:
+        yield module
+
+
 @pytest.mark.analyze_schema(
     extensions=[
         {
@@ -495,7 +511,7 @@ def test_invalid_schema_patches(ctx, path, expected):
         }
     ]
 )
-def test_graphql_scalars(ctx, testdir, cli, snapshot_cli, service, openapi3_base_url):
+def test_graphql_scalars(ctx, testdir, cli, snapshot_cli, service, openapi3_base_url, graphql_port_check):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar FooBar
@@ -504,17 +520,6 @@ type Query {
   getByDate(value: FooBar!): Int!
 }
     """,
-    )
-    module = ctx.write_pymodule(
-        r"""
-import re
-import schemathesis
-
-@schemathesis.check
-def port_check(ctx, response, case):
-    value = re.findall(r"getByDate\(value: (\d+)\)", case.body)[0]
-    assert 1 <= int(value) <= 65535, "Invalid port"
-"""
     )
     assert (
         cli.main(
@@ -527,7 +532,7 @@ def port_check(ctx, response, case):
             f"--schemathesis-io-url={service.base_url}",
             "--hypothesis-max-examples=10",
             "--experimental=schema-analysis",
-            hooks=module,
+            hooks=graphql_port_check,
         )
         == snapshot_cli
     )

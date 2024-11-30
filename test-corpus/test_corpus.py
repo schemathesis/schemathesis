@@ -14,7 +14,7 @@ from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis._hypothesis._builder import _iter_coverage_cases
-from schemathesis.checks import ALL_CHECKS
+from schemathesis.checks import CHECKS
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.errors import IncorrectUsage, LoaderError
 from schemathesis.core.failures import Failure
@@ -129,7 +129,7 @@ def app_port():
 
 def combined_check(ctx, response, case):
     case.as_curl_command()
-    for check in ALL_CHECKS:
+    for check in CHECKS:
         try:
             check(ctx, response, case)
         except Failure:

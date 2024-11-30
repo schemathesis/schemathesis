@@ -10,7 +10,6 @@ from schemathesis.specs.openapi.stateful import make_response_filter, match_stat
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
 from schemathesis.stateful.state_machine import StepResult
-from test.utils import flaky
 
 
 @pytest.mark.parametrize(
@@ -159,8 +158,12 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
             )
         )
     failures = [str(e) for e in exc.value.exceptions]
-    assert "Undocumented HTTP status code" in failures[0] or "Undocumented HTTP status code" in failures[1]
-    assert "Server error" in failures[0] or "Server error" in failures[1]
+    assert (
+        "Undocumented HTTP status code" in failures[0]
+        or "Undocumented HTTP status code" in failures[1]
+        or "Undocumented HTTP status code" in failures[2]
+    )
+    assert "Server error" in failures[0] or "Server error" in failures[1] or "Server error" in failures[2]
 
 
 @pytest.mark.openapi_version("3.0")
@@ -232,33 +235,6 @@ def test_settings_error(app_schema):
 
     with pytest.raises(InvalidDefinition):
         Workflow()
-
-
-@flaky(max_runs=10, min_passes=1)
-def test_use_after_free(app_factory):
-    app = app_factory(use_after_free=True)
-    schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
-    state_machine = schema.as_state_machine()
-
-    with pytest.raises(FailureGroup) as exc:
-        state_machine.run(
-            settings=settings(
-                max_examples=2000,
-                deadline=None,
-                suppress_health_check=list(HealthCheck),
-                phases=[Phase.generate],
-                stateful_step_count=3,
-            )
-        )
-    assert (
-        str(exc.value.exceptions[0])
-        .strip()
-        .startswith(
-            """Use after free
-
-The API did not return a `HTTP 404 Not Found` response (got `HTTP 204 No Content`) for a resource that was previously deleted."""
-        )
-    )
 
 
 @pytest.mark.parametrize("merge_body", [True, False])

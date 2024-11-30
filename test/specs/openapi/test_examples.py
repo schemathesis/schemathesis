@@ -374,18 +374,18 @@ def before_generate_case(context, strategy):
     )
 
 
-def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli):
-    module = ctx.write_pymodule(
-        """
-import schemathesis
-
-
+@pytest.fixture
+def explicit_header(ctx):
+    with ctx.check("""
 @schemathesis.check
 def explicit_header(ctx, response, case):
     assert case.headers["anyKey"] == "OVERRIDE"
     assert case.query["id"] == "OVERRIDE"
-"""
-    )
+""") as module:
+        yield module
+
+
+def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_header):
     schema_file = ctx.openapi.write_schema(
         {
             "/success": {
@@ -421,7 +421,7 @@ def explicit_header(ctx, response, case):
             "--checks=explicit_header",
             "--set-header=anyKey=OVERRIDE",
             "--set-query=id=OVERRIDE",
-            hooks=module,
+            hooks=explicit_header,
         )
         == snapshot_cli
     )

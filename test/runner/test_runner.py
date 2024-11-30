@@ -18,7 +18,7 @@ import schemathesis
 from schemathesis import experimental
 from schemathesis._hypothesis._builder import add_examples
 from schemathesis._override import CaseOverride
-from schemathesis.checks import content_type_conformance, response_schema_conformance, status_code_conformance
+from schemathesis.checks import not_a_server_error
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
@@ -26,6 +26,11 @@ from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
+from schemathesis.specs.openapi.checks import (
+    content_type_conformance,
+    response_schema_conformance,
+    status_code_conformance,
+)
 from schemathesis.stateful import Stateful
 
 if TYPE_CHECKING:
@@ -33,6 +38,7 @@ if TYPE_CHECKING:
 
 
 def execute(schema, **options) -> events.Finished:
+    options.setdefault("checks", [not_a_server_error])
     *_, last = from_schema(schema, **options).execute()
     return last
 
@@ -582,6 +588,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
     *_, after, _ = from_schema(
         schema,
+        checks=[not_a_server_error],
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
     ).execute()
     assert [check.case.path_parameters for check in after.result.checks] == [
@@ -972,7 +979,9 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     max_examples = 10
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
     *_, after, finished = from_schema(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None)
+        schema,
+        hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None),
+        checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
     assert after.status == Status.success
@@ -1006,7 +1015,10 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
         }
     )
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
-    *_, after, finished = from_schema(schema).execute()
+    *_, after, finished = from_schema(
+        schema,
+        checks=[not_a_server_error],
+    ).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
     assert after.status == Status.success
