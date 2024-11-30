@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+from functools import lru_cache
 from shlex import quote
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from .transports import get_excluded_headers
+from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+
+if TYPE_CHECKING:
+    from requests.models import CaseInsensitiveDict
 
 
 def generate(
@@ -37,3 +41,21 @@ def _filter_headers(headers: dict[str, Any] | None, extra: dict[str, Any] | None
             if key not in get_excluded_headers():
                 headers[key] = value
     return headers
+
+
+@lru_cache
+def get_excluded_headers() -> CaseInsensitiveDict:
+    from requests.structures import CaseInsensitiveDict
+    from requests.utils import default_headers
+
+    # These headers are added automatically by Schemathesis or `requests`.
+    # Do not show them in code samples to make them more readable
+
+    return CaseInsensitiveDict(
+        {
+            "Content-Length": None,
+            "Transfer-Encoding": None,
+            SCHEMATHESIS_TEST_CASE_HEADER: None,
+            **default_headers(),
+        }
+    )

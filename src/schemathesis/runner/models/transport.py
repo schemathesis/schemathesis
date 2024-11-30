@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import base64
 import datetime
 from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from ...generation import DataGenerationMethod
-from ...transports import RequestsTransport, serialize_payload
+from ...transports import RequestsTransport
 from .status import Status
 
 if TYPE_CHECKING:
@@ -14,6 +15,10 @@ if TYPE_CHECKING:
 
     from ...models import Case, TestPhase
     from .check import Check
+
+
+def serialize_payload(payload: bytes) -> str:
+    return base64.b64encode(payload).decode()
 
 
 @dataclass(repr=False)

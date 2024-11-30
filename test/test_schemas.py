@@ -2,7 +2,7 @@ import pytest
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema, LoaderError, OperationNotFound
-from schemathesis.internal.result import Err, Ok
+from schemathesis.core.result import Err, Ok
 from schemathesis.specs.openapi.parameters import OpenAPI20Body
 from schemathesis.specs.openapi.schemas import InliningResolver
 

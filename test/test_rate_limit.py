@@ -4,7 +4,7 @@ import pytest
 from pyrate_limiter import BucketFullException, Duration, Rate, RateItem
 
 import schemathesis.graphql
-from schemathesis.throttling import _get_max_delay
+from schemathesis.core.rate_limit import _get_max_delay
 
 
 @pytest.mark.parametrize(

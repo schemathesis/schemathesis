@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import inspect
 import time
 from contextlib import contextmanager
@@ -13,22 +12,17 @@ from urllib.parse import urlparse
 
 from schemathesis.core import NOT_SET, NotSet
 
-from ..constants import DEFAULT_RESPONSE_TIMEOUT, SCHEMATHESIS_TEST_CASE_HEADER
+from ..constants import DEFAULT_RESPONSE_TIMEOUT
 from ..serializers import SerializerContext
 
 if TYPE_CHECKING:
     import requests
     import werkzeug
     from _typeshed.wsgi import WSGIApplication
-    from requests.structures import CaseInsensitiveDict
     from starlette_testclient._testclient import ASGI2App, ASGI3App
 
     from ..models import Case
     from .responses import WSGIResponse
-
-
-def serialize_payload(payload: bytes) -> str:
-    return base64.b64encode(payload).decode()
 
 
 def get(app: Any) -> Transport:
@@ -320,22 +314,4 @@ def prepare_request_data(kwargs: dict[str, Any]) -> PreparedRequestData:
     request = requests.Request(**kwargs).prepare()
     return PreparedRequestData(
         method=str(request.method), url=str(request.url), body=request.body, headers=dict(request.headers)
-    )
-
-
-@lru_cache
-def get_excluded_headers() -> CaseInsensitiveDict:
-    from requests.structures import CaseInsensitiveDict
-    from requests.utils import default_headers
-
-    # These headers are added automatically by Schemathesis or `requests`.
-    # Do not show them in code samples to make them more readable
-
-    return CaseInsensitiveDict(
-        {
-            "Content-Length": None,
-            "Transfer-Encoding": None,
-            SCHEMATHESIS_TEST_CASE_HEADER: None,
-            **default_headers(),
-        }
     )

@@ -8,9 +8,9 @@ from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.result import Ok
 
 from ....generation import DataGenerationMethod, combine_strategies
-from ....internal.result import Ok
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links

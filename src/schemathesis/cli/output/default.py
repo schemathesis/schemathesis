@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
+from schemathesis.core.result import Ok
 from schemathesis.runner.models import group_failures_by_code_sample
 
 from ... import experimental, service
@@ -30,7 +31,6 @@ from ...internal.exceptions import (
     split_traceback,
 )
 from ...internal.output import prepare_response_payload
-from ...internal.result import Ok
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
 from ...runner.events import InternalErrorType, LoaderErrorKind

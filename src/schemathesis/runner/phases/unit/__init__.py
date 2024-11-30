@@ -14,8 +14,8 @@ from queue import Queue
 from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.result import Ok
 
-from ....internal.result import Ok
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
 from ...events import EventGenerator

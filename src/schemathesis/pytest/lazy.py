@@ -20,8 +20,8 @@ from schemathesis._hypothesis._given import (
 )
 from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.result import Ok
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.internal.result import Ok
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
