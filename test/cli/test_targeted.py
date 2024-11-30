@@ -19,7 +19,7 @@ def new_target(context) -> float:
 """
     )
     yield module
-    TARGETS.clear()
+    TARGETS.unregister("new_target")
     # To verify that "new_target" is unregistered
     assert "new_target" not in cli.run("--help").stdout
 
@@ -64,7 +64,7 @@ def target_function():
 
     yield target_function
 
-    TARGETS.clear()
+    TARGETS.unregister("new_target")
 
 
 def test_register_returns_a_value(target_function):

@@ -36,7 +36,7 @@ SCHEMA = "http://127.0.0.1:/schema.json"
             [SCHEMA, "--checks=not_a_server_error", "--checks=response_conformance"],
             {
                 "schema_kind": "URL",
-                "parameters": {"checks": {"value": ["not_a_server_error", "response_conformance"]}},
+                "parameters": {"included_check_names": {"value": ["not_a_server_error", "response_conformance"]}},
                 "used_headers": [],
             },
         ),

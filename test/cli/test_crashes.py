@@ -7,7 +7,7 @@ from hypothesis.provisional import urls
 from requests import Response
 
 from schemathesis import DataGenerationMethod
-from schemathesis.cli import ALL_CHECKS_NAMES
+from schemathesis.checks import CHECKS
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
 from schemathesis.runner.events import DEFAULT_INTERNAL_ERROR_MESSAGE
@@ -109,7 +109,7 @@ def csv_strategy(enum, exclude=()):
     multiple_params=st.fixed_dictionaries(
         {},
         optional={
-            "checks": st.lists(st.sampled_from((*ALL_CHECKS_NAMES, "all")), min_size=1),
+            "checks": st.lists(st.sampled_from(CHECKS.get_all_names() + ["all"]), min_size=1),
             "header": st.lists(delimited(), min_size=1),
             "endpoint": st.lists(st.text(min_size=1)),
             "method": st.lists(st.text(min_size=1)),

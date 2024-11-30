@@ -25,6 +25,10 @@ ________________________________ GET /api/flaky ________________________________
     Received: 500
     Documented: 200
 
+- Rejected positive data
+
+    Allowed statuses: 2xx, 401, 403, 404
+
 [500] Internal Server Error:
 
     `500: Internal Server Error`
@@ -42,6 +46,9 @@ Performed checks:
     response_headers_conformance                    N / N passed          PASSED 
     response_schema_conformance                     N / N passed          PASSED 
     negative_data_rejection                         N / N passed          PASSED 
+    positive_data_acceptance                        N / N passed          FAILED 
+    use_after_free                                  N / N passed          PASSED 
+    ensure_resource_availability                    N / N passed          PASSED 
     ignored_auth                                    N / N passed          PASSED 
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.

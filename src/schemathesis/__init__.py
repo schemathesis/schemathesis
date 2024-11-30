@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Any
 
 from schemathesis import graphql, openapi, pytest, python
+from schemathesis.checks import check
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
+from schemathesis.internal.checks import CheckContext, CheckFunction
 from schemathesis.internal.output import OutputConfig
 
-from . import auths, checks, contrib, experimental, hooks, runner, serializers
+from . import auths, contrib, experimental, hooks, runner, serializers
 from ._lazy_import import lazy_import
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from .models import Case
@@ -16,13 +18,14 @@ __version__ = SCHEMATHESIS_VERSION
 
 # Public API
 auth = auths.GLOBAL_AUTH_STORAGE
-check = checks.register
 hook = hooks.register
 serializer = serializers.register
 
 __all__ = [
     "auths",
-    "checks",
+    "check",
+    "CheckContext",
+    "CheckFunction",
     "experimental",
     "contrib",
     "graphql",

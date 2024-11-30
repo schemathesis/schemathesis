@@ -8,16 +8,17 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, NoReturn, Sequence, cast
+from typing import TYPE_CHECKING, Any, Callable, Literal, NoReturn, Sequence, cast
 from urllib.parse import urlparse
 
 import click
 
+import schemathesis.specs.openapi.checks as checks
+from schemathesis.checks import CHECKS
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError
 from schemathesis.generation.targets import TARGETS
 
-from .. import checks as checks_module
 from .. import contrib, experimental, generation, runner, service
 from .._override import CaseOverride
 from ..constants import (
@@ -46,7 +47,7 @@ from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CsvChoice, CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt, RegistryChoice
+from .options import CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt, RegistryChoice
 
 if TYPE_CHECKING:
     import io
@@ -65,30 +66,15 @@ __all__ = [
     "EventHandler",
 ]
 
-
-def _get_callable_names(items: tuple[Callable, ...]) -> tuple[str, ...]:
-    return tuple(item.__name__ for item in items)
-
+del checks
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
-
-DEFAULT_CHECKS_NAMES = _get_callable_names(checks_module.DEFAULT_CHECKS)
-ALL_CHECKS_NAMES = _get_callable_names(checks_module.ALL_CHECKS)
-CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES, "all"))
-EXCLUDE_CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES,))
 
 DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod] + ["all"])
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
-
-
-def reset_checks() -> None:
-    """Get checks list to their default state."""
-    # Useful in tests
-    checks_module.ALL_CHECKS = checks_module.DEFAULT_CHECKS + checks_module.OPTIONAL_CHECKS
-    CHECKS_TYPE.choices = (*_get_callable_names(checks_module.ALL_CHECKS), "all")
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -305,20 +291,22 @@ REPORT_TO_SERVICE = ReportToService()
 @grouped_option(
     "--checks",
     "-c",
+    "included_check_names",
     multiple=True,
     help="Comma-separated list of checks to run against API responses",
-    type=CHECKS_TYPE,
-    default=DEFAULT_CHECKS_NAMES,
+    type=RegistryChoice(CHECKS, with_all=True),
+    default=("not_a_server_error",),
     callback=validation.convert_checks,
     show_default=True,
     metavar="",
 )
 @grouped_option(
     "--exclude-checks",
+    "excluded_check_names",
     multiple=True,
     help="Comma-separated list of checks to skip during testing",
-    type=EXCLUDE_CHECKS_TYPE,
-    default=[],
+    type=RegistryChoice(CHECKS, with_all=True),
+    default=(),
     callback=validation.convert_checks,
     show_default=True,
     metavar="",
@@ -534,11 +522,12 @@ REPORT_TO_SERVICE = ReportToService()
 @grouped_option(
     "--target",
     "-t",
-    "selected_target_names",
+    "included_target_names",
     multiple=True,
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
     default=None,
+    callback=validation.convert_checks,
     show_default=True,
     metavar="",
 )
@@ -692,11 +681,11 @@ def run(
     missing_required_header_allowed_statuses: list[str],
     positive_data_acceptance_allowed_statuses: list[str],
     negative_data_rejection_allowed_statuses: list[str],
-    checks: Iterable[str] = DEFAULT_CHECKS_NAMES,
-    exclude_checks: Iterable[str] = (),
+    included_check_names: Sequence[str],
+    excluded_check_names: Sequence[str],
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: int | None = None,
-    selected_target_names: Sequence[str] | None = None,
+    included_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
     max_failures: int | None = None,
     dry_run: bool = False,
@@ -820,7 +809,7 @@ def run(
     decide_color_output(ctx, no_color, force_color)
 
     validation.validate_auth_overlap(auth, headers, override)
-    selected_targets = TARGETS.get_by_names(selected_target_names or [])
+    selected_targets = TARGETS.get_by_names(included_target_names or [])
 
     for values, arg_name in (
         (include_path, "--include-path"),
@@ -954,27 +943,27 @@ def run(
         telemetry=schemathesis_io_telemetry,
     )
 
-    if "all" in checks:
-        selected_checks = checks_module.ALL_CHECKS
+    if "all" in included_check_names:
+        selected_checks = CHECKS.get_all()
     else:
-        selected_checks = tuple(check for check in checks_module.ALL_CHECKS if check.__name__ in checks)
+        selected_checks = CHECKS.get_by_names(included_check_names or [])
 
     checks_config = CheckConfig()
     if experimental.POSITIVE_DATA_ACCEPTANCE.is_enabled:
         from ..specs.openapi.checks import positive_data_acceptance
 
-        selected_checks += (positive_data_acceptance,)
+        selected_checks.append(positive_data_acceptance)
         if positive_data_acceptance_allowed_statuses:
             checks_config.positive_data_acceptance.allowed_statuses = positive_data_acceptance_allowed_statuses
     if missing_required_header_allowed_statuses:
         from ..specs.openapi.checks import missing_required_header
 
-        selected_checks += (missing_required_header,)
+        selected_checks.append(missing_required_header)
         checks_config.missing_required_header.allowed_statuses = missing_required_header_allowed_statuses
     if negative_data_rejection_allowed_statuses:
         checks_config.negative_data_rejection.allowed_statuses = negative_data_rejection_allowed_statuses
 
-    selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
+    selected_checks = [check for check in selected_checks if check.__name__ not in excluded_check_names]
 
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
@@ -1066,10 +1055,10 @@ def into_event_stream(
     network_config: NetworkConfig,
     override: CaseOverride,
     filter_set: FilterSet,
-    checks: Iterable[CheckFunction],
+    checks: list[CheckFunction],
     checks_config: CheckConfig,
     max_response_time: int | None,
-    targets: Sequence[TargetFunction],
+    targets: list[TargetFunction],
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,

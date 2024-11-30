@@ -7,6 +7,7 @@ from http.cookies import SimpleCookie
 from typing import TYPE_CHECKING, Any, Dict, Generator, NoReturn, cast
 from urllib.parse import parse_qs, urlparse
 
+import schemathesis
 from schemathesis.core.failures import Failure
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
@@ -34,6 +35,7 @@ if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
 
 
+@schemathesis.check
 def status_code_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -62,6 +64,7 @@ def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, N
         yield from expand_status_code(code)
 
 
+@schemathesis.check
 def content_type_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -111,6 +114,7 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
     )
 
 
+@schemathesis.check
 def response_headers_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     import jsonschema
 
@@ -194,6 +198,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
     return value
 
 
+@schemathesis.check
 def response_schema_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -202,6 +207,7 @@ def response_schema_conformance(ctx: CheckContext, response: GenericResponse, ca
     return case.operation.validate_response(response)
 
 
+@schemathesis.check
 def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -226,6 +232,7 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
     return None
 
 
+@schemathesis.check
 def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -250,6 +257,7 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
 
 
 def missing_required_header(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+    # NOTE: This check is intentionally not registered with `@schemathesis.check` because it is experimental
     if (
         case.meta
         and case.meta.parameter_location == "header"
@@ -291,6 +299,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     return True
 
 
+@schemathesis.check
 def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -326,6 +335,7 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
     return None
 
 
+@schemathesis.check
 def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
@@ -362,6 +372,7 @@ class AuthKind(enum.Enum):
     GENERATED = "generated"
 
 
+@schemathesis.check
 def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema

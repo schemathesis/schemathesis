@@ -18,8 +18,8 @@ from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis._override import CaseOverride
-from schemathesis.checks import ALL_CHECKS, DEFAULT_CHECKS, not_a_server_error
-from schemathesis.cli import execute, get_exit_code, reset_checks
+from schemathesis.checks import CHECKS, not_a_server_error
+from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.constants import DEFAULT_DEADLINE, REPORT_SUGGESTION_ENV_VAR
 from schemathesis.generation import GenerationConfig
@@ -240,7 +240,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
     cli.run(SCHEMA_URI, *args)
 
     expected = {
-        "checks": DEFAULT_CHECKS,
+        "checks": [not_a_server_error],
         "checks_config": CheckConfig(),
         "targets": [],
         "workers_num": 1,
@@ -291,14 +291,14 @@ def test_all_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=all")
-    assert execute.call_args[1]["checks"] == ALL_CHECKS
+    assert execute.call_args[1]["checks"] == CHECKS.get_all()
 
 
 def test_comma_separated_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=not_a_server_error,status_code_conformance")
-    assert execute.call_args[1]["checks"] == (not_a_server_error, status_code_conformance)
+    assert execute.call_args[1]["checks"] == [not_a_server_error, status_code_conformance]
 
 
 def test_comma_separated_exclude_checks(cli, mocker, swagger_20):
@@ -306,9 +306,9 @@ def test_comma_separated_exclude_checks(cli, mocker, swagger_20):
     mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
     execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
     cli.run(SCHEMA_URI, "--checks=all", f"--exclude-checks={excluded_checks}")
-    assert execute.call_args[1]["checks"] == tuple(
-        check for check in tuple(ALL_CHECKS) if check.__name__ not in excluded_checks.split(",")
-    )
+    assert execute.call_args[1]["checks"] == [
+        check for check in CHECKS.get_all() if check.__name__ not in excluded_checks.split(",")
+    ]
 
 
 @pytest.mark.operations
@@ -635,23 +635,25 @@ def test_hooks_valid(cli, schema_url, app, digits_format):
     assert all(request.query["id"].isdigit() for request in app["incoming_requests"])
 
 
-def test_conditional_checks(ctx, cli, hypothesis_max_examples, schema_url):
-    module = ctx.write_pymodule(
-        """
+@pytest.fixture
+def conditional_check(ctx):
+    with ctx.check("""
 @schemathesis.check
 def conditional_check(ctx, response, case):
     # skip this check
     return True
-"""
-    )
+""") as module:
+        yield module
 
+
+def test_conditional_checks(cli, hypothesis_max_examples, schema_url, conditional_check):
     result = cli.main(
         "run",
         "-c",
         "conditional_check",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        hooks=module,
+        hooks=conditional_check,
     )
 
     assert result.exit_code == ExitCode.OK
@@ -667,15 +669,14 @@ def conditional_check(ctx, response, case):
 )
 def new_check(ctx, request, cli):
     exception = request.param
-    module = ctx.write_pymodule(
+    with ctx.check(
         f"""
 @schemathesis.check
 def new_check(ctx, response, result):
     raise {exception}
 """
-    )
-    yield module
-    reset_checks()
+    ) as module:
+        yield module
     # To verify that "new_check" is unregistered
     assert "new_check" not in cli.run("--help").stdout
 
@@ -842,21 +843,26 @@ def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
     assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
 
 
+@pytest.fixture
+def with_error(ctx):
+    with ctx.check(
+        """
+@schemathesis.check
+def with_error(ctx, response, case):
+    1 / 0
+"""
+    ) as module:
+        yield module
+
+
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 @pytest.mark.skipif(
     sys.version_info < (3, 11) or sys.version_info >= (3, 13) or platform.system() == "Windows",
     reason="Cover only tracebacks that highlight error positions in every line",
 )
-def test_useful_traceback(ctx, cli, schema_url, snapshot_cli):
-    module = ctx.write_pymodule(
-        """
-@schemathesis.check
-def with_error(ctx, response, case):
-    1 / 0
-"""
-    )
-    assert cli.main("run", schema_url, "-c", "with_error", hooks=module) == snapshot_cli
+def test_useful_traceback(ctx, cli, schema_url, snapshot_cli, with_error):
+    assert cli.main("run", schema_url, "-c", "with_error", hooks=with_error) == snapshot_cli
 
 
 @pytest.mark.parametrize("media_type", ["multipart/form-data", "multipart/mixed", "multipart/*"])
@@ -1467,20 +1473,23 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
     )
 
 
-@flaky(max_runs=5, min_passes=1)
-@pytest.mark.operations("payload")
-def test_multiple_data_generation_methods(ctx, cli, openapi3_schema_url):
-    # When multiple data generation methods are supplied in CLI
-    module = ctx.write_pymodule(
+@pytest.fixture
+def data_generation_check(ctx):
+    with ctx.check(
         """
-note = print
-
 @schemathesis.check
 def data_generation_check(ctx, response, case):
     if case.data_generation_method:
         note("METHOD: {}".format(case.data_generation_method.name))
 """
-    )
+    ) as module:
+        yield module
+
+
+@flaky(max_runs=5, min_passes=1)
+@pytest.mark.operations("payload")
+def test_multiple_data_generation_methods(cli, openapi3_schema_url, data_generation_check):
+    # When multiple data generation methods are supplied in CLI
     result = cli.main(
         "run",
         "-c",
@@ -1492,7 +1501,7 @@ def data_generation_check(ctx, response, case):
         "--hypothesis-suppress-health-check=all",
         "-D",
         "all",
-        hooks=module,
+        hooks=data_generation_check,
     )
     # Then there should be cases generated from different methods
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1656,7 +1665,15 @@ def test_binary_payload(ctx, cli, snapshot_cli, openapi3_base_url):
             },
         }
     )
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--base-url={openapi3_base_url}",
+            "--checks=all",
+            "--exclude-checks=positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
 
 
 @flaky(max_runs=5, min_passes=1)
@@ -1675,7 +1692,15 @@ def test_long_payload(ctx, cli, snapshot_cli, openapi3_base_url):
             },
         }
     )
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--checks=all") == snapshot_cli
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--base-url={openapi3_base_url}",
+            "--checks=all",
+            "--exclude-checks=positive_data_acceptance",
+        )
+        == snapshot_cli
+    )
 
 
 @flaky(max_runs=5, min_passes=1)
@@ -1807,10 +1832,9 @@ def test_complex_urlencoded_example(ctx, cli, snapshot_cli, openapi3_base_url):
     assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--hypothesis-phases=explicit") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("plain_text_body")
-def test_custom_strings(ctx, cli, hypothesis_max_examples, schema_url):
-    module = ctx.write_pymodule(
+@pytest.fixture
+def custom_strings(ctx):
+    with ctx.check(
         """
 @schemathesis.check
 def custom_strings(ctx, response, case):
@@ -1820,8 +1844,13 @@ def custom_strings(ctx, response, case):
         raise AssertionError(str(exc))
     assert "\\x00" not in case.body
 """
-    )
+    ) as module:
+        yield module
 
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("plain_text_body")
+def test_custom_strings(cli, hypothesis_max_examples, schema_url, custom_strings):
     result = cli.main(
         "run",
         "-c",
@@ -1830,15 +1859,14 @@ def custom_strings(ctx, response, case):
         "--generation-codec=ascii",
         schema_url,
         f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
-        hooks=module,
+        hooks=custom_strings,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("path_variable", "custom_format")
-def test_parameter_overrides(ctx, cli, schema_url):
-    module = ctx.write_pymodule(
+@pytest.fixture
+def verify_overrides(ctx):
+    with ctx.check(
         """
 @schemathesis.check
 def verify_overrides(ctx, response, case):
@@ -1849,8 +1877,13 @@ def verify_overrides(ctx, response, case):
         assert case.query["id"] == "bar"
         assert "key" not in (case.path_parameters or {}), "`key` is present"
 """
-    )
+    ) as module:
+        yield module
 
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("path_variable", "custom_format")
+def test_parameter_overrides(cli, schema_url, verify_overrides):
     result = cli.main(
         "run",
         "-c",
@@ -1860,12 +1893,24 @@ def verify_overrides(ctx, response, case):
         "--set-query",
         "id=bar",
         schema_url,
-        hooks=module,
+        hooks=verify_overrides,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
-def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url):
+@pytest.fixture
+def no_null_bytes(ctx):
+    with ctx.check(
+        r"""
+@schemathesis.check
+def no_null_bytes(ctx, response, case):
+    assert "\x00" not in case.headers["X-KEY"]
+"""
+    ) as module:
+        yield module
+
+
+def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url, no_null_bytes):
     schema_path = ctx.openapi.write_schema(
         {
             "/success": {
@@ -1876,13 +1921,6 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url):
             }
         }
     )
-    module = ctx.write_pymodule(
-        r"""
-@schemathesis.check
-def no_null_bytes(ctx, response, case):
-    assert "\x00" not in case.headers["X-KEY"]
-"""
-    )
     assert (
         cli.main(
             "run",
@@ -1891,7 +1929,7 @@ def no_null_bytes(ctx, response, case):
             "no_null_bytes",
             f"--base-url={openapi3_base_url}",
             "--hypothesis-max-examples=1",
-            hooks=module,
+            hooks=no_null_bytes,
         )
         == snapshot_cli
     )

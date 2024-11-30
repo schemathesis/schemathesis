@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from random import Random
-from typing import TYPE_CHECKING, Iterable, Sequence
+from typing import TYPE_CHECKING
+
+from schemathesis.checks import CHECKS
 
 from ..constants import DEFAULT_DEADLINE
 from ..generation import GenerationConfig
@@ -25,9 +27,9 @@ def from_schema(
     schema: BaseSchema,
     *,
     override: CaseOverride | None = None,
-    checks: Iterable[CheckFunction] | None = None,
+    checks: list[CheckFunction] | None = None,
     max_response_time: int | None = None,
-    targets: Sequence[TargetFunction] | None = None,
+    targets: list[TargetFunction] | None = None,
     workers_num: int = 1,
     hypothesis_settings: hypothesis.settings | None = None,
     generation_config: GenerationConfig | None = None,
@@ -42,10 +44,9 @@ def from_schema(
 ) -> Engine:
     import hypothesis
 
-    from ..checks import DEFAULT_CHECKS
     from .core import Engine
 
-    checks = checks or DEFAULT_CHECKS
+    checks = checks or CHECKS.get_all()
     checks_config = checks_config or CheckConfig()
 
     hypothesis_settings = hypothesis_settings or hypothesis.settings(deadline=DEFAULT_DEADLINE)

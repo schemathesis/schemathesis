@@ -73,14 +73,14 @@ class GraphQLCase(Case):
     def validate_response(
         self,
         response: GenericResponse,
-        checks: tuple[CheckFunction, ...] = (),
-        additional_checks: tuple[CheckFunction, ...] = (),
-        excluded_checks: tuple[CheckFunction, ...] = (),
+        checks: list[CheckFunction] | None = None,
+        additional_checks: list[CheckFunction] | None = None,
+        excluded_checks: list[CheckFunction] | None = None,
         headers: dict[str, Any] | None = None,
     ) -> None:
-        checks = checks or (not_a_server_error,)
-        checks += additional_checks
-        checks = tuple(check for check in checks if check not in excluded_checks)
+        checks = checks or [not_a_server_error]
+        checks += additional_checks or []
+        checks = [check for check in checks if check not in (excluded_checks or [])]
         return super().validate_response(response, checks, headers=headers)
 
 
