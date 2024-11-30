@@ -36,6 +36,14 @@ This can be done by using the ``--report`` flag with your CLI commands.
 
 To store a report for later upload, you can first save it using the ``--report=report.tar.gz`` CLI option. Afterward, you can upload it with the ``st upload report.tar.gz`` command.
 
+.. note::
+
+    If the ``--report`` flag is not passed, or if its argument points to a local file, no data is sent to external services. Reports generated locally are fully self-contained and remain on your machine unless you explicitly upload them to Schemathesis.io using the upload command.
+
+    The content of the report includes all HTTP calls made during the test execution, providing transparency into the exact interactions Schemathesis performed.
+
+    This data helps improve the product's quality and usability by identifying edge cases, such as incompatible server behavior, but is only accessible to Schemathesis.io when the report is uploaded.
+
 What Data is Sent?
 ------------------
 
