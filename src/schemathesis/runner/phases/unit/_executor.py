@@ -31,9 +31,9 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.failures import Failure, FailureGroup, ResponseTimeExceeded
+from schemathesis.generation import targets
 from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, UnsupportedRecursiveReference
 
-from .... import targets
 from ...._compat import BaseExceptionGroup
 from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
 from ....internal.checks import CheckContext

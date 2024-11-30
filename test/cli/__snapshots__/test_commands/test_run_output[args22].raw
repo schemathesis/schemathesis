@@ -162,8 +162,7 @@ Data generation options:
   -t, --target                              Guide input generation to values
                                             more likely to expose bugs via
                                             targeted property-based testing
-                                            [possible values: response_time,
-                                            all]
+                                            [possible values: response_time]
 
 Open API options:
   --set-query TEXT   OpenAPI: Override a specific query parameter by specifying

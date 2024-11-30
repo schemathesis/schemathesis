@@ -4,9 +4,10 @@ from typing import Any
 
 from schemathesis import graphql, openapi, pytest, python
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from schemathesis.generation.targets import TargetContext, TargetFunction, target
 from schemathesis.internal.output import OutputConfig
 
-from . import auths, checks, contrib, experimental, hooks, runner, serializers, targets
+from . import auths, checks, contrib, experimental, hooks, runner, serializers
 from ._lazy_import import lazy_import
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from .models import Case
@@ -18,7 +19,6 @@ auth = auths.GLOBAL_AUTH_STORAGE
 check = checks.register
 hook = hooks.register
 serializer = serializers.register
-target = targets.register
 
 __all__ = [
     "auths",
@@ -32,7 +32,9 @@ __all__ = [
     "hooks",
     "runner",
     "serializers",
-    "targets",
+    "target",
+    "TargetContext",
+    "TargetFunction",
     "DataGenerationMethod",
     "Case",
     "openapi",

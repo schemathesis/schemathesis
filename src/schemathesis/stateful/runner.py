@@ -11,9 +11,9 @@ from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.targets import TargetMetricCollector
 
 from ..internal.checks import CheckContext
-from ..targets import TargetMetricCollector
 from . import events
 from .config import StatefulTestRunnerConfig
 from .context import RunnerContext

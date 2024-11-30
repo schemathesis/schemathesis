@@ -27,7 +27,7 @@ Something bad happen
         _network_test(case, ctx, result, session, headers)
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
         targets.run(ctx.config.execution.targets, case=case, response=response)
-      File "/package-root/targets.py", line XXX, in run
+      File "/package-root/generation/targets.py", line XXX, in run
         value = target(context)
       File "/tmp/module.py", line XXX, in buggy
         raise AssertionError("Something bad happen")
