@@ -15,10 +15,10 @@ import click
 
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError
+from schemathesis.generation.targets import TARGETS
 
 from .. import checks as checks_module
 from .. import contrib, experimental, generation, runner, service
-from .. import targets as targets_module
 from .._override import CaseOverride
 from ..constants import (
     API_NAME_ENV_VAR,
@@ -46,7 +46,7 @@ from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
-from .options import CsvChoice, CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt
+from .options import CsvChoice, CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt, RegistryChoice
 
 if TYPE_CHECKING:
     import io
@@ -55,10 +55,10 @@ if TYPE_CHECKING:
     import requests
 
     from schemathesis.core import NotSet
+    from schemathesis.generation.targets import TargetFunction
 
     from ..models import CheckFunction
     from ..service.client import ServiceClient
-    from ..targets import Target
 
 
 __all__ = [
@@ -78,10 +78,6 @@ ALL_CHECKS_NAMES = _get_callable_names(checks_module.ALL_CHECKS)
 CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES, "all"))
 EXCLUDE_CHECKS_TYPE = CsvChoice((*ALL_CHECKS_NAMES,))
 
-DEFAULT_TARGETS_NAMES = _get_callable_names(targets_module.DEFAULT_TARGETS)
-ALL_TARGETS_NAMES = _get_callable_names(targets_module.ALL_TARGETS)
-TARGETS_TYPE = click.Choice((*ALL_TARGETS_NAMES, "all"))
-
 DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod] + ["all"])
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
@@ -93,13 +89,6 @@ def reset_checks() -> None:
     # Useful in tests
     checks_module.ALL_CHECKS = checks_module.DEFAULT_CHECKS + checks_module.OPTIONAL_CHECKS
     CHECKS_TYPE.choices = (*_get_callable_names(checks_module.ALL_CHECKS), "all")
-
-
-def reset_targets() -> None:
-    """Get targets list to their default state."""
-    # Useful in tests
-    targets_module.ALL_TARGETS = targets_module.DEFAULT_TARGETS + targets_module.OPTIONAL_TARGETS
-    TARGETS_TYPE.choices = (*_get_callable_names(targets_module.ALL_TARGETS), "all")
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
@@ -545,11 +534,11 @@ REPORT_TO_SERVICE = ReportToService()
 @grouped_option(
     "--target",
     "-t",
-    "targets",
+    "selected_target_names",
     multiple=True,
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
-    type=TARGETS_TYPE,
-    default=DEFAULT_TARGETS_NAMES,
+    type=RegistryChoice(TARGETS),
+    default=None,
     show_default=True,
     metavar="",
 )
@@ -707,7 +696,7 @@ def run(
     exclude_checks: Iterable[str] = (),
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
     max_response_time: int | None = None,
-    targets: Iterable[str] = DEFAULT_TARGETS_NAMES,
+    selected_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
     max_failures: int | None = None,
     dry_run: bool = False,
@@ -831,7 +820,7 @@ def run(
     decide_color_output(ctx, no_color, force_color)
 
     validation.validate_auth_overlap(auth, headers, override)
-    selected_targets = tuple(target for target in targets_module.ALL_TARGETS if target.__name__ in targets)
+    selected_targets = TARGETS.get_by_names(selected_target_names or [])
 
     for values, arg_name in (
         (include_path, "--include-path"),
@@ -1080,7 +1069,7 @@ def into_event_stream(
     checks: Iterable[CheckFunction],
     checks_config: CheckConfig,
     max_response_time: int | None,
-    targets: Iterable[Target],
+    targets: Sequence[TargetFunction],
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,

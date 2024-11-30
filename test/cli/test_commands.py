@@ -30,7 +30,6 @@ from schemathesis.runner.config import NetworkConfig
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful
-from schemathesis.targets import DEFAULT_TARGETS
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
@@ -243,7 +242,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
     expected = {
         "checks": DEFAULT_CHECKS,
         "checks_config": CheckConfig(),
-        "targets": DEFAULT_TARGETS,
+        "targets": [],
         "workers_num": 1,
         "max_failures": None,
         "dry_run": False,

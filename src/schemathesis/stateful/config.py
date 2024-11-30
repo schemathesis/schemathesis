@@ -5,6 +5,8 @@ from datetime import timedelta
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.generation.targets import TargetFunction
+
 from ..constants import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
@@ -14,7 +16,6 @@ if TYPE_CHECKING:
     from .._override import CaseOverride
     from ..models import CheckFunction
     from ..runner.config import NetworkConfig
-    from ..targets import Target
 
 
 def _default_checks_factory() -> tuple[CheckFunction, ...]:
@@ -67,7 +68,7 @@ class StatefulTestRunnerConfig:
     override: CaseOverride | None = None
     max_response_time: int | None = None
     dry_run: bool = False
-    targets: list[Target] = field(default_factory=list)
+    targets: list[TargetFunction] = field(default_factory=list)
     unique_data: bool = False
 
     def __post_init__(self) -> None:

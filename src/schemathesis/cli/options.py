@@ -9,6 +9,8 @@ from schemathesis.core import NOT_SET, NotSet
 if TYPE_CHECKING:
     from enum import Enum
 
+    from schemathesis.core.registries import Registry
+
 
 class CustomHelpMessageChoice(click.Choice):
     """Allows you to customize how choices are displayed in the help message."""
@@ -61,6 +63,16 @@ class CsvListChoice(click.ParamType):
         self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
     ) -> list[str]:
         return [item for item in value.split(",") if item]
+
+
+class RegistryChoice(BaseCsvChoice):
+    def __init__(self, registry: Registry) -> None:
+        self.registry = registry
+        self.case_sensitive = True
+
+    @property
+    def choices(self) -> list[str]:
+        return self.registry.get_all_names()
 
 
 class OptionalInt(click.types.IntRange):
