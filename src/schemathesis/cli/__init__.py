@@ -312,9 +312,8 @@ REPORT_TO_SERVICE = ReportToService()
 )
 @grouped_option(
     "--max-response-time",
-    help="Time limit in milliseconds for API response times. "
-    "The test will fail if a response time exceeds this limit. ",
-    type=click.IntRange(min=1),
+    help="Time limit in seconds for API response times. The test will fail if a response time exceeds this limit",
+    type=click.FloatRange(min=0.0, min_open=True),
 )
 @grouped_option(
     "-x",
@@ -683,7 +682,7 @@ def run(
     included_check_names: Sequence[str],
     excluded_check_names: Sequence[str],
     data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
-    max_response_time: int | None = None,
+    max_response_time: float | None = None,
     included_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
     max_failures: int | None = None,
@@ -972,6 +971,12 @@ def run(
         checks_config[negative_data_rejection] = NegativeDataRejectionConfig(
             allowed_statuses=negative_data_rejection_allowed_statuses
         )
+    if max_response_time is not None:
+        from schemathesis.checks import max_response_time as _max_response_time
+        from schemathesis.core.failures import MaxResponseTimeConfig
+
+        checks_config[_max_response_time] = MaxResponseTimeConfig(max_response_time)
+        selected_checks.append(_max_response_time)
 
     selected_checks = [check for check in selected_checks if check.__name__ not in excluded_check_names]
 
@@ -1016,7 +1021,6 @@ def run(
         unique_data=contrib_unique_data,
         dry_run=dry_run,
         checks=selected_checks,
-        max_response_time=max_response_time,
         targets=selected_targets,
         workers_num=workers_num,
         stateful=stateful,
@@ -1067,7 +1071,6 @@ def into_event_stream(
     filter_set: FilterSet,
     checks: list[CheckFunction],
     checks_config: ChecksConfig,
-    max_response_time: int | None,
     targets: list[TargetFunction],
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
@@ -1097,7 +1100,6 @@ def into_event_stream(
             dry_run=dry_run,
             checks=checks,
             checks_config=checks_config,
-            max_response_time=max_response_time,
             targets=targets,
             workers_num=workers_num,
             stateful=stateful,
