@@ -7,8 +7,9 @@ import hypothesis.errors
 import pytest
 
 import schemathesis
-from schemathesis.checks import not_a_server_error
+from schemathesis.checks import max_response_time, not_a_server_error
 from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
@@ -466,12 +467,13 @@ def test_max_response_time_valid(runner_factory):
     runner = runner_factory(
         config_kwargs={
             "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-            "max_response_time": 10000,
+            "checks": [max_response_time],
+            "checks_config": {max_response_time: MaxResponseTimeConfig(10.0)},
         },
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
-    assert result.events[-4].checks[-1].name == "max_response_time"
+    assert result.events[-4].checks[0].name == "max_response_time"
 
 
 def test_max_response_time_invalid(runner_factory):
@@ -479,7 +481,8 @@ def test_max_response_time_invalid(runner_factory):
         app_kwargs={"slowdown": 0.010},
         config_kwargs={
             "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
-            "max_response_time": 5,
+            "checks": [max_response_time],
+            "checks_config": {max_response_time: MaxResponseTimeConfig(0.005)},
         },
     )
     failures = []

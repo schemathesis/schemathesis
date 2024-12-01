@@ -61,7 +61,6 @@ class StatefulTestRunnerConfig:
     auth: tuple[str, str] | None = None
     seed: int | None = None
     override: CaseOverride | None = None
-    max_response_time: int | None = None
     dry_run: bool = False
     targets: list[TargetFunction] = field(default_factory=list)
     unique_data: bool = False

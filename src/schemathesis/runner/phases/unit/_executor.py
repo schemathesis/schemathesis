@@ -31,7 +31,7 @@ from schemathesis.core.errors import (
     MalformedMediaType,
     SerializationNotPossible,
 )
-from schemathesis.core.failures import Failure, FailureGroup, ResponseTimeExceeded
+from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.generation import targets
 from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, UnsupportedRecursiveReference
 
@@ -262,7 +262,6 @@ def run_checks(
     check_results: list[Check],
     result: TestResult,
     response: GenericResponse,
-    max_response_time: int | None = None,
 ) -> None:
     failures = set()
 
@@ -303,29 +302,6 @@ def run_checks(
         except FailureGroup as group:
             for e in group.exceptions:
                 add_single_failure(e)
-
-    if max_response_time:
-        elapsed = response.elapsed.total_seconds() * 1000
-        if elapsed > max_response_time:
-            message = f"Actual: {elapsed:.2f}ms\nLimit: {max_response_time}.00ms"
-            fail = ResponseTimeExceeded(
-                operation=case.operation.verbose_name, message=message, elapsed=elapsed, deadline=max_response_time
-            )
-            failures.add(fail)
-            result.add_failure(
-                name="max_response_time",
-                case=case,
-                request=Request.from_prepared_request(response.request),
-                response=Response.from_requests(response=response),
-                failure=fail,
-            )
-        else:
-            result.add_success(
-                name="max_response_time",
-                case=case,
-                request=Request.from_prepared_request(response.request),
-                response=Response.from_requests(response=response),
-            )
 
     if failures:
         raise FailureGroup(list(failures)) from None
@@ -441,7 +417,6 @@ def _network_test(
             check_results=check_results,
             result=result,
             response=response,
-            max_response_time=ctx.config.execution.max_response_time,
         )
     except FailureGroup:
         status = Status.failure

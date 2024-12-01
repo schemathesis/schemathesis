@@ -232,7 +232,6 @@ def _execute_state_machine_loop(
                 check_ctx=check_ctx,
                 checks=config.checks,
                 additional_checks=additional_checks,
-                max_response_time=config.max_response_time,
             )
 
         def teardown(self) -> None:

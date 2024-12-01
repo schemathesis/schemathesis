@@ -47,6 +47,11 @@ class Failure(AssertionError):
         return self.message
 
 
+@dataclass
+class MaxResponseTimeConfig:
+    limit: float = 10.0
+
+
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
 

@@ -20,11 +20,8 @@ def validate_response(
     check_ctx: CheckContext,
     checks: list[CheckFunction],
     additional_checks: tuple[CheckFunction, ...] = (),
-    max_response_time: int | None = None,
 ) -> None:
     """Validate the response against the provided checks."""
-    from schemathesis.core.failures import ResponseTimeExceeded
-
     from ..runner.models import Check, Request, Response, Status
 
     failures: list[Failure] = []
@@ -77,18 +74,5 @@ def validate_response(
                     continue
                 _on_failure(subexc, name)
 
-    if max_response_time:
-        elapsed_time = response.elapsed.total_seconds() * 1000
-        if elapsed_time > max_response_time:
-            message = f"Actual: {elapsed_time:.2f}ms\nLimit: {max_response_time}.00ms"
-            failure = ResponseTimeExceeded(
-                operation=case.operation.verbose_name, message=message, elapsed=elapsed_time, deadline=max_response_time
-            )
-            if not runner_ctx.is_seen_in_run(failure):
-                _on_failure(failure, "max_response_time")
-        else:
-            _on_passed("max_response_time", case)
-
-    # Raise a grouped exception so Hypothesis can properly deduplicate it against the other failures
     if failures:
         raise FailureGroup(failures) from None

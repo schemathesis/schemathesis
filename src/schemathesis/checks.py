@@ -4,7 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from schemathesis._override import CaseOverride
-from schemathesis.core.failures import MalformedJson, ServerError
+from schemathesis.core.failures import MalformedJson, MaxResponseTimeConfig, ResponseTimeExceeded, ServerError
 from schemathesis.core.registries import Registry
 
 if TYPE_CHECKING:
@@ -63,4 +63,17 @@ def not_a_server_error(ctx: CheckContext, response: GenericResponse, case: Case)
             validate_graphql_response(case, data)
         except json.JSONDecodeError as exc:
             raise MalformedJson.from_exception(operation=case.operation.verbose_name, exc=exc) from None
+    return None
+
+
+def max_response_time(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+    config = ctx.config.get(max_response_time, MaxResponseTimeConfig())
+    elapsed = response.elapsed.total_seconds()
+    if elapsed > config.limit:
+        raise ResponseTimeExceeded(
+            operation=case.operation.verbose_name,
+            message=f"Actual: {elapsed:.2f}ms\nLimit: {config.limit * 1000:.2f}ms",
+            elapsed=elapsed,
+            deadline=config.limit,
+        )
     return None
