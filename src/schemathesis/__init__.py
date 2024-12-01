@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from schemathesis import graphql, openapi, pytest, python
+from schemathesis import errors, graphql, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
@@ -25,6 +25,7 @@ __all__ = [
     "check",
     "CheckContext",
     "CheckFunction",
+    "errors",
     "experimental",
     "contrib",
     "graphql",
@@ -39,13 +40,10 @@ __all__ = [
     "TargetFunction",
     "DataGenerationMethod",
     "Case",
-    "openapi",
     "__version__",
     "auth",
-    "check",
     "hook",
     "serializer",
-    "target",
     "OutputConfig",
     "GenerationConfig",
     "HeaderConfig",

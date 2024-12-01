@@ -33,37 +33,35 @@ Experimental options:
                                             expected for rejected negative data
 
 API validation options:
-  -c, --checks                       Comma-separated list of checks to run
-                                     against API responses  [default:
-                                     not_a_server_error] [possible values:
-                                     not_a_server_error,
-                                     status_code_conformance,
-                                     content_type_conformance,
-                                     response_headers_conformance,
-                                     response_schema_conformance,
-                                     negative_data_rejection,
-                                     positive_data_acceptance, use_after_free,
-                                     ensure_resource_availability, ignored_auth,
-                                     all]
-  --exclude-checks                   Comma-separated list of checks to skip
-                                     during testing [possible values:
-                                     not_a_server_error,
-                                     status_code_conformance,
-                                     content_type_conformance,
-                                     response_headers_conformance,
-                                     response_schema_conformance,
-                                     negative_data_rejection,
-                                     positive_data_acceptance, use_after_free,
-                                     ensure_resource_availability, ignored_auth,
-                                     all]
-  --max-response-time INTEGER RANGE  Time limit in milliseconds for API response
-                                     times. The test will fail if a response
-                                     time exceeds this limit.   [x>=1]
-  -x, --exitfirst                    Terminate the test suite immediately upon
-                                     the first failure or error encountered
-  --max-failures INTEGER RANGE       Terminate the test suite after reaching a
-                                     specified number of failures or errors
-                                     [x>=1]
+  -c, --checks                     Comma-separated list of checks to run against
+                                   API responses  [default: not_a_server_error]
+                                   [possible values: not_a_server_error,
+                                   status_code_conformance,
+                                   content_type_conformance,
+                                   response_headers_conformance,
+                                   response_schema_conformance,
+                                   negative_data_rejection,
+                                   positive_data_acceptance, use_after_free,
+                                   ensure_resource_availability, ignored_auth,
+                                   all]
+  --exclude-checks                 Comma-separated list of checks to skip during
+                                   testing [possible values: not_a_server_error,
+                                   status_code_conformance,
+                                   content_type_conformance,
+                                   response_headers_conformance,
+                                   response_schema_conformance,
+                                   negative_data_rejection,
+                                   positive_data_acceptance, use_after_free,
+                                   ensure_resource_availability, ignored_auth,
+                                   all]
+  --max-response-time FLOAT RANGE  Time limit in seconds for API response times.
+                                   The test will fail if a response time exceeds
+                                   this limit  [x>0.0]
+  -x, --exitfirst                  Terminate the test suite immediately upon the
+                                   first failure or error encountered
+  --max-failures INTEGER RANGE     Terminate the test suite after reaching a
+                                   specified number of failures or errors
+                                   [x>=1]
 
 Loader options:
   --wait-for-schema FLOAT RANGE  Maximum duration, in seconds, to wait for the

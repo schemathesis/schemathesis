@@ -18,10 +18,11 @@ from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis._override import CaseOverride
-from schemathesis.checks import CHECKS, not_a_server_error
+from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.constants import DEFAULT_DEADLINE, REPORT_SUGGESTION_ENV_VAR
+from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner import from_schema
@@ -229,7 +230,13 @@ SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
                 )
             },
         ),
-        (["--max-response-time=10"], {"max_response_time": 10}),
+        (
+            ["--max-response-time=10"],
+            {
+                "checks_config": {max_response_time: MaxResponseTimeConfig(limit=10.0)},
+                "checks": [not_a_server_error, max_response_time],
+            },
+        ),
     ],
 )
 def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
@@ -249,7 +256,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "override": CaseOverride({}, {}, {}, {}),
         "seed": None,
         "unique_data": False,
-        "max_response_time": None,
         "generation_config": GenerationConfig(),
         "network": NetworkConfig(headers={}, timeout=10),
         "service_client": None,
@@ -1091,7 +1097,7 @@ def test_max_response_time_invalid(cli, schema_url, workers, snapshot_cli):
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
     # And the proper error message should be displayed
-    assert cli.run(schema_url, "--max-response-time=50", f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "--max-response-time=0.05", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("slow")
