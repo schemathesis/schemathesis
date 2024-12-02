@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - ``UnicodeEncodeError`` when sending a request during the coverage phase.
+- Duplicated test cases for missing required headers during the coverage phase.
 
 .. _v3.38.8:
 
