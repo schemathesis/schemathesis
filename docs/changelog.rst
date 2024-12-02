@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.8...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- ``UnicodeEncodeError`` when sending a request during the coverage phase.
+
 .. _v3.38.8:
 
 :version:`3.38.8 <v3.38.7...v3.38.8>` - 2024-11-28
