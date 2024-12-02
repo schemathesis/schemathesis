@@ -760,7 +760,7 @@ def _negative_enum(
     ctx: CoverageContext, value: list, seen: set[Any | tuple[type, str]]
 ) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
-        if x in value:
+        if x in value or not ctx.is_valid_for_location(x):
             return False
         _hashed = _to_hashable_key(x)
         return _hashed not in seen
@@ -829,9 +829,9 @@ def _negative_pattern(
         return
     yield NegativeValue(
         ctx.generate_from(
-            st.text(min_size=min_length or 0, max_size=max_length).filter(
-                partial(_not_matching_pattern, pattern=compiled)
-            )
+            st.text(min_size=min_length or 0, max_size=max_length)
+            .filter(partial(_not_matching_pattern, pattern=compiled))
+            .filter(ctx.is_valid_for_location)
         ),
         description=f"Value not matching the '{pattern}' pattern",
         location=ctx.current_path,

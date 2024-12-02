@@ -1031,6 +1031,47 @@ def test_incorrect_headers(ctx):
     )
 
 
+def test_incorrect_headers_with_enum(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key-1",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"enum": ["foo"]},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "headers": {},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+            },
+        ],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
