@@ -462,7 +462,10 @@ def _iter_coverage_cases(
                 )
                 if DataGenerationMethod.negative in data_generation_methods:
                     subschema = _combination_schema(combo, required, parameter_set)
-                    yield from _yield_negative(subschema, location, container_name)
+                    for case in _yield_negative(subschema, location, container_name):
+                        # Already generated in one of the blocks above
+                        if location != "path" and not case.meta.description.startswith("Missing required property"):
+                            yield case
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
         if len(optional) > 1 and DataGenerationMethod.positive in data_generation_methods:
