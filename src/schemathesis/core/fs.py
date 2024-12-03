@@ -17,8 +17,3 @@ def file_exists(path: str) -> bool:
     except OSError:
         # For example, path could be too long
         return False
-
-
-def is_filename(value: str) -> bool:
-    """Detect if the input string is a filename by checking its extension."""
-    return bool(pathlib.Path(value).suffix)

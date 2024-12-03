@@ -6,7 +6,6 @@ from hypothesis.errors import NoSuchExample
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.internal.copy import fast_deepcopy
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 
 from .utils import as_param
@@ -157,9 +156,9 @@ def schema_spec(request):
 @pytest.fixture
 def base_schema(request, schema_spec):
     if schema_spec == "swagger":
-        return fast_deepcopy(request.getfixturevalue("simple_schema"))
+        return request.getfixturevalue("simple_schema")
     if schema_spec == "openapi":
-        return fast_deepcopy(request.getfixturevalue("simple_openapi"))
+        return request.getfixturevalue("simple_openapi")
 
 
 @pytest.fixture(params=["header", "query"])
@@ -201,11 +200,10 @@ def test_(case):
 
 @pytest.fixture
 def cookie_schema(simple_openapi):
-    schema = fast_deepcopy(simple_openapi)
-    components = schema.setdefault("components", {})
+    components = simple_openapi.setdefault("components", {})
     components["securitySchemes"] = {"api_key": {"type": "apiKey", "name": "api_key", "in": "cookie"}}
-    schema["security"] = [{"api_key": []}]
-    return schema
+    simple_openapi["security"] = [{"api_key": []}]
+    return simple_openapi
 
 
 def test_security_definitions_api_key_cookie(testdir, cookie_schema):
@@ -321,10 +319,9 @@ def test_(case):
 
 def test_security_definitions_bearer_auth(testdir, simple_openapi):
     # When schema is using HTTP Bearer Auth scheme
-    schema = fast_deepcopy(simple_openapi)
-    components = schema.setdefault("components", {})
+    components = simple_openapi.setdefault("components", {})
     components["securitySchemes"] = {"bearer_auth": {"type": "http", "scheme": "bearer"}}
-    schema["security"] = [{"bearer_auth": []}]
+    simple_openapi["security"] = [{"bearer_auth": []}]
     testdir.make_test(
         """
 @schema.parametrize()
@@ -335,7 +332,7 @@ def test_(case):
     assert auth.startswith("Bearer ")
     assert_requests_call(case)
         """,
-        schema=schema,
+        schema=simple_openapi,
     )
     # Then the generated test case should contain a valid "Authorization" header
     testdir.run_and_assert("-s", passed=1)

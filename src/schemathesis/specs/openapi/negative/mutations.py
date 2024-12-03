@@ -11,7 +11,8 @@ from hypothesis import reject
 from hypothesis import strategies as st
 from hypothesis.strategies._internal.featureflags import FeatureStrategy
 
-from ....internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
+
 from ..utils import get_type, is_header_location
 from .types import Draw, Schema
 from .utils import can_negate
@@ -111,7 +112,7 @@ class MutationContext:
             # Body can be of any type and does not have any specific type semantic.
             mutations = draw(ordered(get_mutations(draw, self.keywords)))
         # Deep copy all keywords to avoid modifying the original schema
-        new_schema = fast_deepcopy(self.keywords)
+        new_schema = deepclone(self.keywords)
         enabled_mutations = draw(st.shared(FeatureStrategy(), key="mutations"))  # type: ignore
         # Always apply at least one mutation, otherwise everything is rejected, and we'd like to avoid it
         # for performance reasons

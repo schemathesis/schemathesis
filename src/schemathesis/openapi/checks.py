@@ -5,11 +5,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.failures import Failure
+from schemathesis.core.output import OutputConfig, truncate_json
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
-
-    from schemathesis.internal.output import OutputConfig
 
 
 @dataclass
@@ -113,8 +112,6 @@ class JsonSchemaError(Failure):
         exc: ValidationError,
         output_config: OutputConfig | None = None,
     ) -> JsonSchemaError:
-        from schemathesis.internal.output import OutputConfig, truncate_json
-
         output_config = OutputConfig.from_parent(output_config, max_lines=20)
         schema = textwrap.indent(truncate_json(exc.schema, config=output_config), prefix="    ")
         value = textwrap.indent(truncate_json(exc.instance, config=output_config), prefix="    ")

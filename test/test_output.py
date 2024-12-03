@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.internal.output import OutputConfig, prepare_response_payload, truncate_json
+from schemathesis.core.output import OutputConfig, prepare_response_payload, truncate_json
 
 SIMPLE_DICT = {
     "name": "John",

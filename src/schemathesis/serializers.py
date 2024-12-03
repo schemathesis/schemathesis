@@ -16,15 +16,10 @@ from typing import (
     runtime_checkable,
 )
 
+from schemathesis.core import media_types
+from schemathesis.core.transforms import deepclone, transform
+
 from ._xml import _to_xml
-from .internal.copy import fast_deepcopy
-from .internal.jsonschema import traverse_schema
-from .transports.content_types import (
-    is_json_media_type,
-    is_plain_text_media_type,
-    is_xml_media_type,
-    parse_content_type,
-)
 
 if TYPE_CHECKING:
     from .models import Case
@@ -174,7 +169,7 @@ def _to_yaml(value: Any) -> dict[str, Any]:
     if isinstance(value, Binary):
         return {"data": value.data}
     if isinstance(value, (list, dict)):
-        value = traverse_schema(value, _replace_binary)
+        value = transform(value, _replace_binary)
     return {"data": yaml.dump(value, Dumper=SafeDumper)}
 
 
@@ -252,7 +247,7 @@ class MultipartSerializer:
         if isinstance(value, bytes):
             return {"data": value}
         if isinstance(value, dict):
-            value = fast_deepcopy(value)
+            value = deepclone(value)
             multipart = _prepare_form_data(value)
             files, data = context.case.operation.prepare_multipart(multipart)
             return {"files": files, "data": data}
@@ -303,12 +298,12 @@ def get_matching_media_types(media_type: str) -> Generator[str, None, None]:
         # Shortcut to avoid comparing all values
         yield from iter(SERIALIZERS)
     else:
-        main, sub = parse_content_type(media_type)
+        main, sub = media_types.parse(media_type)
         if main == "application" and (sub == "json" or sub.endswith("+json")):
             yield media_type
         else:
             for registered_media_type in SERIALIZERS:
-                target_main, target_sub = parse_content_type(registered_media_type)
+                target_main, target_sub = media_types.parse(registered_media_type)
                 if main in ("*", target_main) and sub in ("*", target_sub):
                     yield registered_media_type
 
@@ -319,10 +314,10 @@ def get_first_matching_media_type(media_type: str) -> str | None:
 
 def get(media_type: str) -> type[Serializer] | None:
     """Get an appropriate serializer for the given media type."""
-    if is_json_media_type(media_type):
+    if media_types.is_json(media_type):
         media_type = "application/json"
-    if is_plain_text_media_type(media_type):
+    if media_types.is_plain_text(media_type):
         media_type = "text/plain"
-    if is_xml_media_type(media_type):
+    if media_types.is_xml(media_type):
         media_type = "application/xml"
     return SERIALIZERS.get(media_type)

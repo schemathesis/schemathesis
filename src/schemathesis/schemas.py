@@ -18,6 +18,7 @@ from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
+from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
 from schemathesis.hooks import HookDispatcherMark
@@ -34,7 +35,6 @@ from .filters import (
 )
 from .generation import DataGenerationMethod, GenerationConfig, combine_strategies
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
-from .internal.output import OutputConfig
 from .models import APIOperation, Case
 
 if TYPE_CHECKING:

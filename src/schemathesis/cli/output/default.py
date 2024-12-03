@@ -10,13 +10,20 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
+from schemathesis.core import string_to_boolean
+from schemathesis.core.errors import (
+    format_exception,
+    get_request_error_extras,
+    get_request_error_message,
+    split_traceback,
+)
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.result import Ok
 from schemathesis.runner.models import group_failures_by_code_sample
 
 from ... import experimental, service
 from ...constants import (
     DISCORD_LINK,
-    FALSE_VALUES,
     FLAKY_FAILURE_MESSAGE,
     GITHUB_APP_LINK,
     ISSUE_TRACKER_URL,
@@ -24,13 +31,6 @@ from ...constants import (
     SCHEMATHESIS_TEST_CASE_HEADER,
 )
 from ...experimental import GLOBAL_EXPERIMENTS
-from ...internal.exceptions import (
-    format_exception,
-    get_request_error_extras,
-    get_request_error_message,
-    split_traceback,
-)
-from ...internal.output import prepare_response_payload
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
 from ...runner.events import InternalErrorType, LoaderErrorKind
@@ -399,7 +399,7 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
             handle_service_integration(context.report)
     else:
         env_var = os.getenv(REPORT_SUGGESTION_ENV_VAR)
-        if env_var is not None and env_var.lower() in FALSE_VALUES:
+        if env_var is not None and string_to_boolean(env_var) is False:
             return
         click.echo(
             f"\n{bold('Tip')}: Use the {bold('`--report`')} CLI option to visualize test results via Schemathesis.io.\n"

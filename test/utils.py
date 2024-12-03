@@ -13,7 +13,7 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis.core.deserialization import deserialize_yaml
-from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
 
 if TYPE_CHECKING:
     from schemathesis.models import Case
@@ -48,7 +48,7 @@ def merge_recursively(a: dict[str, Any], b: dict[str, Any]) -> dict[str, Any]:
 
 
 def make_schema(schema_name: str = "simple_swagger.yaml", **kwargs: Any) -> dict[str, Any]:
-    schema = fast_deepcopy(load_schema(schema_name))
+    schema = deepclone(load_schema(schema_name))
     return merge_recursively(kwargs, schema)
 
 
