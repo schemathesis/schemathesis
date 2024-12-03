@@ -17,9 +17,9 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 
-from ..internal.copy import fast_deepcopy
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
@@ -468,7 +468,7 @@ def _get_properties(schema: dict | bool) -> dict | bool:
             return {"enum": schema["examples"]}
         if schema.get("type") == "object":
             return _get_template_schema(schema, "object")
-        _schema = fast_deepcopy(schema)
+        _schema = deepclone(schema)
         update_pattern_in_schema(_schema)
         return _schema
     return schema

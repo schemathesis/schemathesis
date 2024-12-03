@@ -33,11 +33,15 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.generation import targets
-from schemathesis.runner.errors import DeadlineExceeded, UnexpectedError, UnsupportedRecursiveReference
+from schemathesis.runner.errors import (
+    DeadlineExceeded,
+    UnexpectedError,
+    UnsupportedRecursiveReference,
+    deduplicate_errors,
+)
 
 from ...._compat import BaseExceptionGroup
 from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
-from ....internal.exceptions import deduplicate_errors
 from ... import events
 from ..._hypothesis import ignore_hypothesis_output
 from ...context import EngineContext

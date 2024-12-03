@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Any, Callable, Union
 from schemathesis import graphql, openapi
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.fs import file_exists
+from schemathesis.core.output import OutputConfig
 from schemathesis.generation import GenerationConfig
-from schemathesis.internal.fs import file_exists
-from schemathesis.internal.output import OutputConfig
 
 if TYPE_CHECKING:
     from ..runner.config import NetworkConfig

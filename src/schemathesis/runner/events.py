@@ -4,10 +4,8 @@ import enum
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception
 from schemathesis.core.result import Err, Ok, Result
-
-from ..internal.exceptions import format_exception
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification

@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterator, Union
 
-from ....internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
+
 from ....stateful.statistic import TransitionStats
 
 if TYPE_CHECKING:
@@ -85,7 +86,7 @@ class OpenAPILinkStats(TransitionStats):
                 target[key] = counter + 1
 
     def copy(self) -> OpenAPILinkStats:
-        return self.__class__(transitions=fast_deepcopy(self.transitions))
+        return self.__class__(transitions=deepclone(self.transitions))
 
     def iter(self) -> Iterator[StatisticEntry]:
         for source_idx, (source, responses) in enumerate(self.transitions.items()):

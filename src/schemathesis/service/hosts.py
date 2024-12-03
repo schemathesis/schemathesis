@@ -12,7 +12,8 @@ from typing import TYPE_CHECKING, Any
 import tomli
 import tomli_w
 
-from ..internal.fs import ensure_parent
+from schemathesis.core.fs import ensure_parent
+
 from .constants import DEFAULT_HOSTNAME, DEFAULT_HOSTS_PATH, HOSTS_FORMAT_VERSION
 
 if TYPE_CHECKING:

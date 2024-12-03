@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.transports.content_types import is_json_media_type, is_plain_text_media_type, parse_content_type
+from schemathesis.core import media_types
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,7 @@ from schemathesis.transports.content_types import is_json_media_type, is_plain_t
     ],
 )
 def test_parse_content_type(value, expected):
-    assert parse_content_type(value) == expected
+    assert media_types.parse(value) == expected
 
 
 @pytest.mark.parametrize(
@@ -26,7 +26,7 @@ def test_parse_content_type(value, expected):
     ],
 )
 def test_is_json_media_type(value, expected):
-    assert is_json_media_type(value) is expected
+    assert media_types.is_json(value) is expected
 
 
 @pytest.mark.parametrize(
@@ -39,4 +39,4 @@ def test_is_json_media_type(value, expected):
     ],
 )
 def test_is_plain_text_media_type(value, expected):
-    assert is_plain_text_media_type(value) is expected
+    assert media_types.is_plain_text(value) is expected

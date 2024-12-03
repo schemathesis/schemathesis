@@ -4,6 +4,7 @@ import codecs
 import enum
 import operator
 import os
+import pathlib
 import re
 from contextlib import contextmanager
 from functools import partial, reduce
@@ -13,14 +14,12 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis import errors
-from schemathesis.core import rate_limit
-from schemathesis.internal.fs import file_exists, is_filename
+from schemathesis.core import rate_limit, string_to_boolean
+from schemathesis.core.fs import file_exists
 
 from .. import experimental
-from ..constants import TRUE_VALUES
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from ..generation import DataGenerationMethod
-from ..internal.transformation import convert_boolean_string as _convert_boolean_string
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from .cassettes import CassetteFormat
@@ -71,7 +70,7 @@ def parse_schema_kind(schema: str) -> SchemaInputKind:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE)
     if netloc:
         return SchemaInputKind.URL
-    if file_exists(schema) or is_filename(schema):
+    if file_exists(schema) or bool(pathlib.Path(schema).suffix):
         return SchemaInputKind.PATH
     # Assume NAME if it is not a URL or PATH or APP_PATH
     return SchemaInputKind.NAME
@@ -392,11 +391,11 @@ def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, val
 
 
 def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str | bool:
-    return _convert_boolean_string(value)
+    return string_to_boolean(value)
 
 
 def convert_report(ctx: click.core.Context, param: click.core.Option, value: LazyFile) -> LazyFile:
-    if param.resolve_envvar_value(ctx) is not None and value.lower() in TRUE_VALUES:
+    if param.resolve_envvar_value(ctx) is not None and string_to_boolean(value) is True:
         value = param.flag_value
     return value
 

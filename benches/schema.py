@@ -6,7 +6,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
-from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
 from schemathesis.runner import from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -239,5 +239,5 @@ def test_links_count(raw_schema):
     ],
     ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
-def test_deepcopy(schema):
-    fast_deepcopy(schema)
+def test_deepclone(schema):
+    deepclone(schema)

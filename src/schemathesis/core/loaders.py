@@ -4,9 +4,8 @@ import http.client
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
 from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.core.errors import LoaderError, LoaderErrorKind
+from schemathesis.core.errors import LoaderError, LoaderErrorKind, get_request_error_extras, get_request_error_message
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.internal.exceptions import get_request_error_extras, get_request_error_message
 
 if TYPE_CHECKING:
     import requests

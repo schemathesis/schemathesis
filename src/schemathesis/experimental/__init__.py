@@ -1,7 +1,7 @@
 import os
 from dataclasses import dataclass, field
 
-from ..constants import TRUE_VALUES
+from schemathesis.core import string_to_boolean
 
 
 @dataclass(eq=False)
@@ -25,7 +25,7 @@ class Experiment:
 
     @property
     def is_env_var_set(self) -> bool:
-        return os.getenv(self.env_var, "").lower() in TRUE_VALUES
+        return string_to_boolean(os.getenv(self.env_var, "")) is True
 
 
 @dataclass

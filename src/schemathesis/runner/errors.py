@@ -9,12 +9,17 @@ from __future__ import annotations
 import enum
 import re
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, cast
 
 from schemathesis import errors
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-
-from ..internal.exceptions import format_exception, get_request_error_extras, get_request_error_message, split_traceback
+from schemathesis.core.errors import (
+    SerializationNotPossible,
+    format_exception,
+    get_request_error_extras,
+    get_request_error_message,
+    split_traceback,
+)
 
 if TYPE_CHECKING:
     import hypothesis.errors
@@ -377,3 +382,36 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
             return RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX
         return RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE
     return RuntimeErrorKind.UNCLASSIFIED
+
+
+def deduplicate_errors(errors: Sequence[Exception]) -> Iterator[Exception]:
+    """Deduplicate a list of errors."""
+    seen = set()
+    serialization_media_types = []
+
+    for error in errors:
+        # Collect media types
+        if isinstance(error, SerializationNotPossible):
+            serialization_media_types.extend(error.media_types)
+            continue
+
+        message = canonicalize_error_message(error)
+        if message not in seen:
+            seen.add(message)
+            yield error
+
+    if serialization_media_types:
+        yield SerializationNotPossible.from_media_types(*serialization_media_types)
+
+
+MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")
+URL_IN_ERROR_MESSAGE_RE = re.compile(r"Max retries exceeded with url: .*? \(Caused by")
+
+
+def canonicalize_error_message(error: Exception, with_traceback: bool = True) -> str:
+    """Canonicalize error messages by removing dynamic components."""
+    message = format_exception(error, with_traceback=with_traceback)
+    # Replace memory addresses
+    message = MEMORY_ADDRESS_RE.sub("0xbaaaaaaaaaad", message)
+    # Remove URL information
+    return URL_IN_ERROR_MESSAGE_RE.sub("", message)
