@@ -1,15 +1,11 @@
 from __future__ import annotations
 
-import threading
 from collections.abc import MutableMapping, MutableSequence
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlsplit, urlunsplit
 
-from schemathesis.core import NOT_SET
-
-if TYPE_CHECKING:
-    from .models import Case
+from schemathesis.core import NOT_SET, NotSet
 
 # Exact keys to sanitize
 DEFAULT_KEYS_TO_SANITIZE = frozenset(
@@ -77,60 +73,88 @@ DEFAULT_REPLACEMENT = "[Filtered]"
 
 
 @dataclass
-class Config:
-    """Configuration class for sanitizing sensitive data.
-
-    :param FrozenSet[str] keys_to_sanitize: The exact keys to sanitize (case-insensitive).
-    :param FrozenSet[str] sensitive_markers: Markers indicating potentially sensitive keys (case-insensitive).
-    :param str replacement: The replacement string for sanitized values.
-    """
+class SanitizationConfig:
+    """Configuration class for sanitizing sensitive data."""
 
     keys_to_sanitize: frozenset[str] = DEFAULT_KEYS_TO_SANITIZE
     sensitive_markers: frozenset[str] = DEFAULT_SENSITIVE_MARKERS
     replacement: str = DEFAULT_REPLACEMENT
 
-    def with_keys_to_sanitize(self, *keys: str) -> Config:
-        """Create a new configuration with additional keys to sanitize."""
-        new_keys_to_sanitize = self.keys_to_sanitize.union([key.lower() for key in keys])
-        return replace(self, keys_to_sanitize=frozenset(new_keys_to_sanitize))
+    @classmethod
+    def from_config(
+        cls,
+        base_config: SanitizationConfig,
+        *,
+        replacement: str | NotSet = NOT_SET,
+        keys_to_sanitize: list[str] | NotSet = NOT_SET,
+        sensitive_markers: list[str] | NotSet = NOT_SET,
+    ) -> SanitizationConfig:
+        """Create a new config by replacing specified values."""
+        kwargs: dict[str, Any] = {}
+        if not isinstance(replacement, NotSet):
+            kwargs["replacement"] = replacement
+        if not isinstance(keys_to_sanitize, NotSet):
+            kwargs["keys_to_sanitize"] = frozenset(key.lower() for key in keys_to_sanitize)
+        if not isinstance(sensitive_markers, NotSet):
+            kwargs["sensitive_markers"] = frozenset(marker.lower() for marker in sensitive_markers)
+        return replace(base_config, **kwargs)
 
-    def without_keys_to_sanitize(self, *keys: str) -> Config:
-        """Create a new configuration without certain keys to sanitize."""
-        new_keys_to_sanitize = self.keys_to_sanitize.difference([key.lower() for key in keys])
-        return replace(self, keys_to_sanitize=frozenset(new_keys_to_sanitize))
+    def extend(
+        self,
+        *,
+        keys_to_sanitize: list[str] | NotSet = NOT_SET,
+        sensitive_markers: list[str] | NotSet = NOT_SET,
+    ) -> SanitizationConfig:
+        """Create a new config by extending current sets."""
+        config = self
+        if not isinstance(keys_to_sanitize, NotSet):
+            new_keys = config.keys_to_sanitize.union(key.lower() for key in keys_to_sanitize)
+            config = replace(config, keys_to_sanitize=new_keys)
 
-    def with_sensitive_markers(self, *markers: str) -> Config:
-        """Create a new configuration with additional sensitive markers."""
-        new_sensitive_markers = self.sensitive_markers.union([key.lower() for key in markers])
-        return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
+        if not isinstance(sensitive_markers, NotSet):
+            new_markers = config.sensitive_markers.union(marker.lower() for marker in sensitive_markers)
+            config = replace(config, sensitive_markers=new_markers)
 
-    def without_sensitive_markers(self, *markers: str) -> Config:
-        """Create a new configuration without certain sensitive markers."""
-        new_sensitive_markers = self.sensitive_markers.difference([key.lower() for key in markers])
-        return replace(self, sensitive_markers=frozenset(new_sensitive_markers))
-
-
-_thread_local = threading.local()
-
-
-def _get_default_sanitization_config() -> Config:
-    # Initialize the thread-local default sanitization config if not already set
-    if not hasattr(_thread_local, "default_sanitization_config"):
-        _thread_local.default_sanitization_config = Config()
-    return _thread_local.default_sanitization_config
+        return config
 
 
-def configure(config: Config) -> None:
-    _thread_local.default_sanitization_config = config
+_DEFAULT_SANITIZATION_CONFIG = SanitizationConfig()
 
 
-def sanitize_value(item: Any, *, config: Config | None = None) -> None:
+def configure(
+    replacement: str | NotSet = NOT_SET,
+    keys_to_sanitize: list[str] | NotSet = NOT_SET,
+    sensitive_markers: list[str] | NotSet = NOT_SET,
+) -> None:
+    """Replace current sanitization configuration."""
+    global _DEFAULT_SANITIZATION_CONFIG
+    _DEFAULT_SANITIZATION_CONFIG = SanitizationConfig.from_config(
+        _DEFAULT_SANITIZATION_CONFIG,
+        replacement=replacement,
+        keys_to_sanitize=keys_to_sanitize,
+        sensitive_markers=sensitive_markers,
+    )
+
+
+def extend(
+    keys_to_sanitize: list[str] | NotSet = NOT_SET,
+    sensitive_markers: list[str] | NotSet = NOT_SET,
+) -> None:
+    """Extend current sanitization configuration."""
+    global _DEFAULT_SANITIZATION_CONFIG
+    _DEFAULT_SANITIZATION_CONFIG = _DEFAULT_SANITIZATION_CONFIG.extend(
+        keys_to_sanitize=keys_to_sanitize,
+        sensitive_markers=sensitive_markers,
+    )
+
+
+def sanitize_value(item: Any, *, config: SanitizationConfig | None = None) -> None:
     """Sanitize sensitive values within a given item.
 
     This function is recursive and will sanitize sensitive data within nested
     dictionaries and lists as well.
     """
-    config = config or _get_default_sanitization_config()
+    config = config or _DEFAULT_SANITIZATION_CONFIG
     if isinstance(item, MutableMapping):
         for key in list(item.keys()):
             lower_key = key.lower()
@@ -148,26 +172,12 @@ def sanitize_value(item: Any, *, config: Config | None = None) -> None:
                 sanitize_value(value, config=config)
 
 
-def sanitize_case(case: Case, *, config: Config | None = None) -> None:
-    """Sanitize sensitive values within a given case."""
-    if case.path_parameters is not None:
-        sanitize_value(case.path_parameters, config=config)
-    if case.headers is not None:
-        sanitize_value(case.headers, config=config)
-    if case.cookies is not None:
-        sanitize_value(case.cookies, config=config)
-    if case.query is not None:
-        sanitize_value(case.query, config=config)
-    if case.body not in (None, NOT_SET):
-        sanitize_value(case.body, config=config)
-
-
-def sanitize_url(url: str, *, config: Config | None = None) -> str:
+def sanitize_url(url: str, *, config: SanitizationConfig | None = None) -> str:
     """Sanitize sensitive parts of a given URL.
 
     This function will sanitize the authority and query parameters in the URL.
     """
-    config = config or _get_default_sanitization_config()
+    config = config or _DEFAULT_SANITIZATION_CONFIG
     parsed = urlsplit(url)
 
     # Sanitize authority
