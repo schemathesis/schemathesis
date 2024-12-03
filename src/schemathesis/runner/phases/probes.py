@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import format_exception
+from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transport import USER_AGENT
 
-from ...sanitization import sanitize_url, sanitize_value
 from .. import events
 from ..models import Request, Response
 

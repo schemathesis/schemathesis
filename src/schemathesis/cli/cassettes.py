@@ -14,11 +14,11 @@ from urllib.parse import parse_qsl, urlparse
 
 import harfile
 
+from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 from ..runner import events
-from ..sanitization import sanitize_url, sanitize_value
 from .handlers import EventHandler
 
 if TYPE_CHECKING:
