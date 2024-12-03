@@ -34,14 +34,17 @@ Here's how you could do it:
 
     import schemathesis
 
-    # Create a custom config
-    custom_config = (
-        schemathesis.sanitization.Config(replacement="[Custom]")
-        .with_keys_to_sanitize("X-Customer-ID")
-        .with_sensitive_markers("address")
+    # Replace configuration
+    schemathesis.sanitization.configure(
+        replacement="[Custom]",
+        keys_to_sanitize=["X-Customer-ID"],
+        sensitive_markers=["address"]
     )
 
-    # Configure Schemathesis to use your custom sanitization configuration
-    schemathesis.sanitization.configure(custom_config)
+    # Extend existing configuration
+    schemathesis.sanitization.extend(
+        keys_to_sanitize=["Additional-Key"],
+        sensitive_markers=["password"]
+    )
 
 This will sanitize the ``X-Customer-ID`` headers, and any fields containing the substring "address" in their names, with the string "[Custom]" in the generated test case and the received response.

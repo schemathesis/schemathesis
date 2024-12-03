@@ -24,6 +24,7 @@ from schemathesis.core import NOT_SET, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
 from schemathesis.core.transport import USER_AGENT
 
@@ -33,7 +34,6 @@ from .constants import SCHEMATHESIS_TEST_CASE_HEADER
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
-from .sanitization import sanitize_url, sanitize_value
 from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
 
 if TYPE_CHECKING:

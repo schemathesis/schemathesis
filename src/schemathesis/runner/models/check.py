@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 from schemathesis.core import curl
 from schemathesis.core.failures import Failure
+from schemathesis.core.output.sanitization import sanitize_value
 
 from .status import Status
 from .transport import Request, Response
@@ -28,8 +29,6 @@ class Check:
 
     @cached_property
     def code_sample(self) -> str:
-        from schemathesis.sanitization import sanitize_value
-
         data = self.case.prepare_code_sample_data({key: value[0] for key, value in self.request.headers.items()})
 
         headers = None
