@@ -7,11 +7,11 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any
 
+from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.hooks import HookContext, dispatch
-from schemathesis.transports.content_types import is_json_media_type, is_yaml_media_type
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
@@ -126,9 +126,9 @@ def _detect_from_headers(headers: CaseInsensitiveDict[str] | Headers) -> Content
     """Detect content type from HTTP headers."""
     content_type = headers.get("Content-Type", "").lower()
     try:
-        if content_type and is_json_media_type(content_type):
+        if content_type and media_types.is_json(content_type):
             return ContentType.JSON
-        if content_type and is_yaml_media_type(content_type):
+        if content_type and media_types.is_yaml(content_type):
             return ContentType.YAML
     except ValueError:
         pass

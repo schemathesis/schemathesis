@@ -13,7 +13,6 @@ from typing import (
     Generic,
     Iterator,
     Literal,
-    NoReturn,
     Type,
     TypeVar,
     cast,
@@ -24,18 +23,15 @@ from schemathesis.checks import CHECKS, CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.transforms import diff
 from schemathesis.core.transport import USER_AGENT
 
 from . import serializers
 from ._override import CaseOverride
-from .constants import (
-    SCHEMATHESIS_TEST_CASE_HEADER,
-    SERIALIZERS_SUGGESTION_MESSAGE,
-)
+from .constants import SCHEMATHESIS_TEST_CASE_HEADER
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
-from .internal.diff import diff
-from .internal.output import prepare_response_payload
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 from .sanitization import sanitize_url, sanitize_value
 from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
@@ -68,16 +64,6 @@ class CaseSource:
     elapsed: float
     overrides_all_parameters: bool
     transition_id: TransitionId
-
-
-def cant_serialize(media_type: str) -> NoReturn:  # type: ignore
-    """Reject the current example if we don't know how to send this data to the application."""
-    from hypothesis import event, note, reject
-
-    event_text = f"Can't serialize data to `{media_type}`."
-    note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
-    event(event_text)
-    reject()  # type: ignore
 
 
 class TestPhase(str, Enum):

@@ -14,7 +14,7 @@ from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
 from schemathesis.auths import AuthStorageMark
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.hooks import HookDispatcherMark
@@ -27,7 +27,6 @@ from ..generation import DataGenerationMethod, GenerationConfig, combine_strateg
 from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
 from ..models import APIOperation, Case, GenerationMetadata, TestPhase
 from ..parameters import ParameterSet
-from ..transports.content_types import parse_content_type
 from ._given import GivenInput
 
 # Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
@@ -195,7 +194,7 @@ def add_examples(
                 continue
         if example.media_type is not None:
             try:
-                media_type = parse_content_type(example.media_type)
+                media_type = media_types.parse(example.media_type)
                 if media_type == ("application", "x-www-form-urlencoded"):
                     example.body = prepare_urlencoded(example.body)
             except ValueError:

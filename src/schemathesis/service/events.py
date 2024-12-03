@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from ..internal.exceptions import format_exception
+from schemathesis.core.errors import format_exception
 
 if TYPE_CHECKING:
     from . import ci

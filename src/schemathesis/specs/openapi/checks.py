@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlparse
 
 import schemathesis
 from schemathesis.checks import CheckContext
+from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
@@ -27,8 +28,6 @@ from schemathesis.openapi.checks import (
     UseAfterFree,
 )
 
-from ...internal.transformation import convert_boolean_string
-from ...transports.content_types import parse_content_type
 from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
@@ -78,19 +77,19 @@ def content_type_conformance(ctx: CheckContext, response: GenericResponse, case:
         return None
     content_type = response.headers.get("Content-Type")
     if not content_type:
-        media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
+        all_media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
         raise MissingContentType(
             operation=case.operation.verbose_name,
-            message=f"The following media types are documented in the schema:{''.join(media_types)}",
+            message=f"The following media types are documented in the schema:{''.join(all_media_types)}",
             media_types=documented_content_types,
         )
     for option in documented_content_types:
         try:
-            expected_main, expected_sub = parse_content_type(option)
+            expected_main, expected_sub = media_types.parse(option)
         except ValueError:
             _reraise_malformed_media_type(case, "Schema", option, option)
         try:
-            received_main, received_sub = parse_content_type(content_type)
+            received_main, received_sub = media_types.parse(content_type)
         except ValueError:
             _reraise_malformed_media_type(case, "Response", content_type, option)
         if (
@@ -197,7 +196,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
     if schema_type == "null" and value.lower() == "null":
         return None
     if schema_type == "boolean":
-        return convert_boolean_string(value)
+        return string_to_boolean(value)
     return value
 
 

@@ -11,9 +11,9 @@ import requests
 from jsonschema.exceptions import RefResolutionError
 
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.transforms import deepclone
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...internal.copy import fast_deepcopy
 from .constants import ALL_KEYWORDS
 from .converter import to_json_schema_recursive
 from .utils import get_type
@@ -96,7 +96,7 @@ class InliningResolver(jsonschema.RefResolver):
                     # In other cases, this method create new objects for mutable types (dict & list)
                     next_recursion_level = recursion_level + 1
                     if next_recursion_level > RECURSION_DEPTH_LIMIT:
-                        copied = fast_deepcopy(resolved)
+                        copied = deepclone(resolved)
                         remove_optional_references(copied)
                         return copied
                     return resolve(resolved, next_recursion_level)

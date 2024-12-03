@@ -28,20 +28,18 @@ import jsonschema
 from packaging import version
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import NOT_SET, NotSet, Specification
+from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
+from schemathesis.core.transforms import deepclone, transform
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
-from ...internal.copy import fast_deepcopy
-from ...internal.jsonschema import traverse_schema
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...transports.content_types import is_json_media_type, parse_content_type
 from ...transports.responses import get_json
 from . import links, serialization
 from ._cache import OperationCache
@@ -637,13 +635,13 @@ class BaseOpenAPISchema(BaseSchema):
         content_type = response.headers.get("Content-Type")
         failures: list[Failure] = []
         if content_type is None:
-            media_types = self.get_content_types(operation, response)
-            formatted_content_types = [f"\n- `{content_type}`" for content_type in media_types]
+            all_media_types = self.get_content_types(operation, response)
+            formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             failures.append(
-                MissingContentType(operation=operation.verbose_name, message=message, media_types=media_types)
+                MissingContentType(operation=operation.verbose_name, message=message, media_types=all_media_types)
             )
-        if content_type and not is_json_media_type(content_type):
+        if content_type and not media_types.is_json(content_type):
             _maybe_raise_one_or_more(failures)
             return None
         try:
@@ -700,7 +698,7 @@ class BaseOpenAPISchema(BaseSchema):
                     else:
                         break
                 else:
-                    target.update(traverse_schema(fast_deepcopy(schema), callback, self.nullable_name))
+                    target.update(transform(deepclone(schema), callback, self.nullable_name))
             if self._inline_reference_cache:
                 components[INLINED_REFERENCES_KEY] = self._inline_reference_cache
             self._rewritten_components = components
@@ -711,8 +709,8 @@ class BaseOpenAPISchema(BaseSchema):
 
         Inlining components helps `hypothesis-jsonschema` generate data that involves non-resolved references.
         """
-        schema = fast_deepcopy(schema)
-        schema = traverse_schema(schema, self._rewrite_references, self.resolver)
+        schema = deepclone(schema)
+        schema = transform(schema, self._rewrite_references, self.resolver)
         # Only add definitions that are reachable from the schema via references
         stack = [schema]
         seen = set()
@@ -762,7 +760,7 @@ class BaseOpenAPISchema(BaseSchema):
                 if key not in self._inline_reference_cache:
                     with resolver.resolving(reference) as resolved:
                         # Resolved object also may have references
-                        self._inline_reference_cache[key] = traverse_schema(
+                        self._inline_reference_cache[key] = transform(
                             resolved, lambda s: self._rewrite_references(s, resolver)
                         )
             # Rewrite the reference with the new location
@@ -1148,7 +1146,7 @@ class OpenApi30(SwaggerV20):
         # Open API 3.0 requires media types to be present. We can get here only if the schema defines
         # the "multipart/form-data" media type, or any other more general media type that matches it (like `*/*`)
         for media_type, entry in content.items():
-            main, sub = parse_content_type(media_type)
+            main, sub = media_types.parse(media_type)
             if main in ("*", "multipart") and sub in ("*", "form-data", "mixed"):
                 schema = entry.get("schema")
                 break
@@ -1172,8 +1170,8 @@ class OpenApi30(SwaggerV20):
             else:
                 body = definition["requestBody"]
             if "content" in body:
-                main, sub = parse_content_type(media_type)
+                main, sub = media_types.parse(media_type)
                 for defined_media_type, item in body["content"].items():
-                    if parse_content_type(defined_media_type) == (main, sub):
+                    if media_types.parse(defined_media_type) == (main, sub):
                         return item["schema"]
         return None

@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING, cast
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.runner.models import group_failures_by_code_sample
 
-from ..internal.output import prepare_response_payload
 from ..runner import events
 from ..runner.models import Check, Status
 from .handlers import EventHandler

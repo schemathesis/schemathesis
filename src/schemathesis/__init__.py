@@ -4,9 +4,9 @@ from typing import Any
 
 from schemathesis import errors, graphql, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
+from schemathesis.core.output import OutputConfig
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
-from schemathesis.internal.output import OutputConfig
 
 from . import auths, contrib, experimental, hooks, runner, serializers
 from ._lazy_import import lazy_import

@@ -732,7 +732,7 @@ def openapi_3_schema_with_xml(ctx):
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture
 def simple_openapi():
     return {
         "openapi": "3.0.2",
@@ -902,9 +902,9 @@ def testdir(testdir):
             f"""
         import pytest
         import schemathesis
-        from schemathesis.internal.output import OutputConfig
-        from schemathesis.stateful import Stateful
         from schemathesis.core import NOT_SET
+        from schemathesis.core.output import OutputConfig
+        from schemathesis.stateful import Stateful
         from schemathesis.generation import DataGenerationMethod, GenerationConfig
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed

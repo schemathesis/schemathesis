@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, Any
 
-from ..internal.exceptions import format_exception
+from schemathesis.core.errors import format_exception
 
 if TYPE_CHECKING:
     from ..models import Case

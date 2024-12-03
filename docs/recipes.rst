@@ -95,19 +95,19 @@ You can do it with the following hook:
     def before_init_operation(context, operation):
         for parameter in operation.iter_parameters():
             schema = parameter.definition.get("schema", {})
-            traverse_schema(schema, drop_optional_properties)
+            transform(schema, drop_optional_properties)
         for alternative in operation.body:
             schema = alternative.definition.get("schema", {})
-            traverse_schema(schema, drop_optional_properties)
+            transform(schema, drop_optional_properties)
 
 
-    def traverse_schema(schema, callback):
+    def transform(schema, callback):
         if isinstance(schema, dict):
             schema = callback(schema)
             for key, sub_item in schema.items():
-                schema[key] = traverse_schema(sub_item, callback)
+                schema[key] = transform(sub_item, callback)
         elif isinstance(schema, list):
-            schema = [traverse_schema(sub_item, callback) for sub_item in schema]
+            schema = [transform(sub_item, callback) for sub_item in schema]
         return schema
 
 

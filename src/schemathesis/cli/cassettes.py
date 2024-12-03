@@ -14,9 +14,9 @@ from urllib.parse import parse_qsl, urlparse
 
 import harfile
 
+from schemathesis.core.transforms import deepclone
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
-from ..internal.copy import fast_deepcopy
 from ..runner import events
 from ..sanitization import sanitize_url, sanitize_value
 from .handlers import EventHandler
@@ -153,7 +153,7 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
     if config.sanitize_output:
 
         def format_headers(headers: dict[str, list[str]]) -> str:
-            headers = fast_deepcopy(headers)
+            headers = deepclone(headers)
             sanitize_value(headers)
             return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
@@ -384,7 +384,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"
                         if config.sanitize_output:
-                            headers = fast_deepcopy(interaction.response.headers)
+                            headers = deepclone(interaction.response.headers)
                             sanitize_value(headers)
                         else:
                             headers = interaction.response.headers
@@ -406,7 +406,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                         http_version = ""
 
                     if config.sanitize_output:
-                        headers = fast_deepcopy(interaction.request.headers)
+                        headers = deepclone(interaction.request.headers)
                         sanitize_value(headers)
                     else:
                         headers = interaction.request.headers

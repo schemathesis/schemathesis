@@ -7,8 +7,7 @@ from typing import Any, Dict, List, Union
 
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.generator.filters import is_valid_xml
-
-from .internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]
@@ -133,7 +132,7 @@ def _write_array(buffer: StringIO, obj: list[JSON], tag: str, schema: dict[str, 
             _write_namespace(buffer, options)
         buffer.write(">")
     # In Open API `items` value should be an object and not an array
-    items = fast_deepcopy((schema or {}).get("items", {}))
+    items = deepclone((schema or {}).get("items", {}))
     child_options = items.get("xml", {})
     child_tag = child_options.get("name", tag)
     if not is_namespace_specified and "namespace" in options:

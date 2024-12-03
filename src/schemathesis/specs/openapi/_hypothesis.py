@@ -7,23 +7,23 @@ from typing import Any, Callable, Dict, Iterable, Optional
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
-from hypothesis import reject
+from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.constants import SERIALIZERS_SUGGESTION_MESSAGE
+from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SerializationNotPossible
 from schemathesis.core.generator.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
+from schemathesis.core.transforms import deepclone
 
 from ... import auths, serializers
 from ..._hypothesis._builder import prepare_urlencoded
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...internal.copy import fast_deepcopy
-from ...models import APIOperation, Case, GenerationMetadata, TestPhase, cant_serialize
-from ...transports.content_types import parse_content_type
+from ...models import APIOperation, Case, GenerationMetadata, TestPhase
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES
@@ -103,9 +103,15 @@ def get_case_strategy(
                     # None of media types defined for this operation are not supported
                     raise SerializationNotPossible.from_media_types(*all_media_types)
                 # Other media types are possible - avoid choosing this media type in the future
-                cant_serialize(parameter.media_type)
+                event_text = f"Can't serialize data to `{parameter.media_type}`."
+                note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
+                event(event_text)
+                reject()  # type: ignore
             media_type = draw(st.sampled_from(possible_media_types))
-            if media_type is not None and parse_content_type(media_type) == ("application", "x-www-form-urlencoded"):
+            if media_type is not None and media_types.parse(media_type) == (
+                "application",
+                "x-www-form-urlencoded",
+            ):
                 strategy = strategy.map(prepare_urlencoded).filter(is_valid_urlencoded)
             body_ = ValueContainer(value=draw(strategy), location="body", generator=body_generator)
         else:
@@ -202,7 +208,7 @@ def get_parameters_value(
     strategy = apply_hooks(operation, context, hooks, strategy, location)
     new = draw(strategy)
     if new is not None:
-        copied = fast_deepcopy(value)
+        copied = deepclone(value)
         copied.update(new)
         return copied
     return value

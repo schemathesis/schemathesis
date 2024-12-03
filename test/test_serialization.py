@@ -15,7 +15,7 @@ from schemathesis.core.errors import (
     SerializationError,
     SerializationNotPossible,
 )
-from schemathesis.internal.copy import fast_deepcopy
+from schemathesis.core.transforms import deepclone
 from schemathesis.transports import RequestsTransport, WSGITransport
 from test.utils import assert_requests_call
 
@@ -347,7 +347,7 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
             # it can be parsed.
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data.decode('utf8')}</root>")
 
-    original = fast_deepcopy(schema[path]["POST"].body[0].definition)
+    original = deepclone(schema[path]["POST"].body[0].definition)
 
     test()
     # And serialization does not modify the original schema

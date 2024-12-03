@@ -5,8 +5,8 @@ from unittest.mock import ANY
 import pytest
 
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.internal.exceptions import canonicalize_error_message
 from schemathesis.runner.config import NetworkConfig
+from schemathesis.runner.errors import canonicalize_error_message
 from schemathesis.runner.phases import probes
 
 

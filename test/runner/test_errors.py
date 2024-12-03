@@ -1,6 +1,6 @@
 import requests
 
-from schemathesis.internal.exceptions import deduplicate_errors
+from schemathesis.runner.errors import deduplicate_errors
 
 
 def test_deduplicate_errors():

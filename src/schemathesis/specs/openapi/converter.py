@@ -3,8 +3,8 @@ from __future__ import annotations
 from itertools import chain
 from typing import Any, Callable
 
-from ...internal.copy import fast_deepcopy
-from ...internal.jsonschema import traverse_schema
+from schemathesis.core.transforms import deepclone, transform
+
 from .patterns import update_quantifier
 
 
@@ -22,7 +22,7 @@ def to_json_schema(
     See a recursive version below.
     """
     if copy:
-        schema = fast_deepcopy(schema)
+        schema = deepclone(schema)
     if schema.get(nullable_name) is True:
         del schema[nullable_name]
         schema = {"anyOf": [schema, {"type": "null"}]}
@@ -94,7 +94,7 @@ def is_read_only(schema: dict[str, Any] | bool) -> bool:
 def to_json_schema_recursive(
     schema: dict[str, Any], nullable_name: str, is_response_schema: bool = False, update_quantifiers: bool = True
 ) -> dict[str, Any]:
-    return traverse_schema(
+    return transform(
         schema,
         to_json_schema,
         nullable_name=nullable_name,

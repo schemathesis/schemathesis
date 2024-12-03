@@ -9,9 +9,10 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator, Union, cast
 import requests
 from hypothesis_jsonschema import from_schema
 
+from schemathesis.core.transforms import deepclone
+
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...generation import get_single_example
-from ...internal.copy import fast_deepcopy
 from ...models import APIOperation, Case, TestPhase
 from ._hypothesis import get_case_strategy, get_default_format_strategies
 from .constants import LOCATION_TO_CONTAINER
@@ -144,7 +145,7 @@ def _expand_subschemas(schema: dict[str, Any] | bool) -> Generator[dict[str, Any
                 for subschema in schema[key]:
                     yield subschema
         if "allOf" in schema:
-            subschema = fast_deepcopy(schema["allOf"][0])
+            subschema = deepclone(schema["allOf"][0])
             for sub in schema["allOf"][1:]:
                 if isinstance(sub, dict):
                     for key, value in sub.items():

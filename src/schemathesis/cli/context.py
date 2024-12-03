@@ -4,7 +4,7 @@ import shutil
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
-from ..internal.output import OutputConfig
+from schemathesis.core.output import OutputConfig
 
 if TYPE_CHECKING:
     import os

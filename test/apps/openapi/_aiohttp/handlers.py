@@ -8,8 +8,8 @@ from uuid import uuid4
 import jsonschema
 from aiohttp import web
 
-from schemathesis.internal.output import MAX_PAYLOAD_SIZE
-from schemathesis.transports.content_types import parse_content_type
+from schemathesis.core import media_types
+from schemathesis.core.output import MAX_PAYLOAD_SIZE
 
 try:
     from ..schema import PAYLOAD_VALIDATOR
@@ -19,7 +19,7 @@ except (ImportError, ValueError):
 
 async def expect_content_type(request: web.Request, value: str):
     content_type = request.headers.get("Content-Type", "")
-    main, sub = parse_content_type(content_type)
+    main, sub = media_types.parse(content_type)
     if f"{main}/{sub}" != value:
         raise web.HTTPInternalServerError(text=f"Expected {value} payload")
     return await request.read()
