@@ -16,12 +16,12 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import experimental
-from schemathesis._hypothesis._builder import add_examples
 from schemathesis._override import CaseOverride
 from schemathesis.checks import not_a_server_error
 from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
+from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
@@ -601,7 +601,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
 async def test_explicit_example_disable(app, real_app_schema, mocker):
     # When API operation has an example specified
     # And the `explicit` phase is excluded
-    spy = mocker.patch("schemathesis._hypothesis._builder.add_examples", wraps=add_examples)
+    spy = mocker.patch("schemathesis.generation.hypothesis.builder.add_examples", wraps=add_examples)
     result = execute(
         real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=1, phases=[Phase.generate], deadline=None)
     )

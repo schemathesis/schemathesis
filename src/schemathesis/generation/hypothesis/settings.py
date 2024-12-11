@@ -1,16 +1,16 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
+from schemathesis.constants import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core import NotSet
-
-from ..constants import DEFAULT_DEADLINE, HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
     import hypothesis
 
 
-def prepare_settings(
+def prepare(
     database: str | None = None,
     deadline: int | NotSet | None = None,
     derandomize: bool | None = None,
@@ -23,7 +23,7 @@ def prepare_settings(
     import hypothesis
     from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-    kwargs = {
+    kwargs: dict[str, Any] = {
         key: value
         for key, value in (
             ("derandomize", derandomize),

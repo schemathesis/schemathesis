@@ -5,12 +5,12 @@ from hypothesis import Phase, settings
 from requests import Request
 
 import schemathesis
-from schemathesis._hypothesis._builder import create_test
 from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation._methods import DataGenerationMethod
-from schemathesis.models import TestPhase
+from schemathesis.generation.hypothesis.builder import create_test
+from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from test.utils import assert_requests_call
 

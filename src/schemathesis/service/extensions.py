@@ -129,16 +129,16 @@ def _apply_schema_patches_extension(extension: SchemaPatchesExtension, schema: B
 
 
 def strategy_from_definitions(definitions: list[StrategyDefinition]) -> Result[st.SearchStrategy, Exception]:
-    from ..generation import combine_strategies
+    from schemathesis.generation.hypothesis import strategies
 
-    strategies = []
+    _strategies = []
     for definition in definitions:
         strategy = _strategy_from_definition(definition)
         if isinstance(strategy, Ok):
-            strategies.append(strategy.ok())
+            _strategies.append(strategy.ok())
         else:
             return strategy
-    return Ok(combine_strategies(strategies))
+    return Ok(strategies.combine(_strategies))
 
 
 KNOWN_ARGUMENTS = {

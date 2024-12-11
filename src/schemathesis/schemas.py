@@ -21,10 +21,10 @@ from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
+from schemathesis.generation.hypothesis import strategies
+from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.hooks import HookDispatcherMark
 
-from ._hypothesis._builder import create_test
-from ._hypothesis._given import GivenInput, given_proxy
 from .auths import AuthStorage
 from .filters import (
     FilterSet,
@@ -33,12 +33,11 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .generation import DataGenerationMethod, GenerationConfig, combine_strategies
+from .generation import DataGenerationMethod, GenerationConfig
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .models import APIOperation, Case
 
 if TYPE_CHECKING:
-    import hypothesis
     from hypothesis.strategies import SearchStrategy
     from pyrate_limiter import Limiter
     from typing_extensions import Self
@@ -241,37 +240,6 @@ class BaseSchema(Mapping):
         """Get a function that serializes parameters for the given location."""
         raise NotImplementedError
 
-    def get_all_tests(
-        self,
-        func: Callable,
-        settings: hypothesis.settings | None = None,
-        generation_config: GenerationConfig | None = None,
-        seed: int | None = None,
-        as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
-        _given_kwargs: dict[str, GivenInput] | None = None,
-    ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
-        """Generate all operations and Hypothesis tests for them."""
-        for result in self.get_all_operations(generation_config=generation_config):
-            if isinstance(result, Ok):
-                operation = result.ok()
-                _as_strategy_kwargs: dict[str, Any] | None
-                if callable(as_strategy_kwargs):
-                    _as_strategy_kwargs = as_strategy_kwargs(operation)
-                else:
-                    _as_strategy_kwargs = as_strategy_kwargs
-                test = create_test(
-                    operation=operation,
-                    test=func,
-                    settings=settings,
-                    seed=seed,
-                    generation_config=generation_config,
-                    as_strategy_kwargs=_as_strategy_kwargs,
-                    _given_kwargs=_given_kwargs,
-                )
-                yield Ok((operation, test))
-            else:
-                yield result
-
     def parametrize(self) -> Callable:
         """Mark a test function as a parametrized one."""
 
@@ -414,7 +382,7 @@ class BaseSchema(Mapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all defined API operations."""
-        strategies = [
+        _strategies = [
             operation.ok().as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
@@ -425,7 +393,7 @@ class BaseSchema(Mapping):
             for operation in self.get_all_operations()
             if isinstance(operation, Ok)
         ]
-        return combine_strategies(strategies)
+        return strategies.combine(_strategies)
 
     def configure(
         self,
@@ -478,7 +446,7 @@ class APIOperationMap(Mapping):
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all API operations defined in this subset."""
-        strategies = [
+        _strategies = [
             operation.as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
@@ -488,4 +456,4 @@ class APIOperationMap(Mapping):
             )
             for operation in self._data.values()
         ]
-        return combine_strategies(strategies)
+        return strategies.combine(_strategies)

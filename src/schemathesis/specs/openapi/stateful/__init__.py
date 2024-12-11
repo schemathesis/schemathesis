@@ -9,8 +9,9 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
+from schemathesis.generation.hypothesis import strategies
 
-from ....generation import DataGenerationMethod, combine_strategies
+from ....generation import DataGenerationMethod
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links
@@ -91,7 +92,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 source = link.operation
                 bundle_name = f"{source.verbose_name} -> {link.status_code}"
                 name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
-                case_strategy = combine_strategies(
+                case_strategy = strategies.combine(
                     [
                         target.as_strategy(data_generation_method=data_generation_method)
                         for data_generation_method in schema.generation_config.methods
@@ -118,14 +119,14 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             if len(schema.generation_config.methods) == 1:
                 case_strategy = target.as_strategy(data_generation_method=schema.generation_config.methods[0])
             else:
-                strategies = {
+                _strategies = {
                     method: target.as_strategy(data_generation_method=method)
                     for method in schema.generation_config.methods
                 }
 
                 @st.composite  # type: ignore[misc]
                 def case_strategy_factory(
-                    draw: st.DrawFn, strategies: dict[DataGenerationMethod, st.SearchStrategy] = strategies
+                    draw: st.DrawFn, strategies: dict[DataGenerationMethod, st.SearchStrategy] = _strategies
                 ) -> Case:
                     if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
                         return draw(strategies[DataGenerationMethod.negative])

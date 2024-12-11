@@ -19,11 +19,11 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 from schemathesis.core import NOT_SET
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
+from schemathesis.generation.hypothesis import examples
 
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
-from ._hypothesis import get_single_example
 from ._methods import DataGenerationMethod
 
 
@@ -99,7 +99,7 @@ NegativeValue = GeneratedValue.with_negative
 
 @lru_cache(maxsize=128)
 def cached_draw(strategy: st.SearchStrategy) -> Any:
-    return get_single_example(strategy)
+    return examples.generate_one(strategy)
 
 
 @dataclass

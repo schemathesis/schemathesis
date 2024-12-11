@@ -10,31 +10,59 @@ from typing import Any, Callable, Generator, Mapping
 import hypothesis
 from hypothesis import Phase
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
-from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
 from schemathesis.auths import AuthStorageMark
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
-from schemathesis.hooks import HookDispatcherMark
+from schemathesis.core.result import Ok, Result
+from schemathesis.core.transport import prepare_urlencoded
+from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
+from schemathesis.experimental import COVERAGE_PHASE
+from schemathesis.generation import GenerationConfig, coverage
+from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
+from schemathesis.generation.hypothesis.given import GivenInput
+from schemathesis.generation.meta import GenerationMetadata, TestPhase
+from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
+from schemathesis.models import APIOperation, Case
+from schemathesis.parameters import ParameterSet
+from schemathesis.schemas import BaseSchema
 
-from .. import _patches
-from ..constants import DEFAULT_DEADLINE
-from ..core.validation import has_invalid_characters, is_latin_1_encodable
-from ..experimental import COVERAGE_PHASE
-from ..generation import DataGenerationMethod, GenerationConfig, combine_strategies, coverage, get_single_example
-from ..hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher
-from ..models import APIOperation, Case, GenerationMetadata, TestPhase
-from ..parameters import ParameterSet
-from ._given import GivenInput
+setup()
 
-# Forcefully initializes Hypothesis' global PRNG to avoid races that initialize it
-# if e.g. Schemathesis CLI is used with multiple workers
-with deterministic_PRNG():
-    pass
 
-_patches.install()
+def get_all_tests(
+    schema: BaseSchema,
+    func: Callable,
+    settings: hypothesis.settings | None = None,
+    generation_config: GenerationConfig | None = None,
+    seed: int | None = None,
+    as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
+    _given_kwargs: dict[str, GivenInput] | None = None,
+) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
+    """Generate all operations and Hypothesis tests for them."""
+    for result in schema.get_all_operations(generation_config=generation_config):
+        if isinstance(result, Ok):
+            operation = result.ok()
+            _as_strategy_kwargs: dict[str, Any] | None
+            if callable(as_strategy_kwargs):
+                _as_strategy_kwargs = as_strategy_kwargs(operation)
+            else:
+                _as_strategy_kwargs = as_strategy_kwargs
+            test = create_test(
+                operation=operation,
+                test=func,
+                settings=settings,
+                seed=seed,
+                generation_config=generation_config,
+                as_strategy_kwargs=_as_strategy_kwargs,
+                _given_kwargs=_given_kwargs,
+            )
+            yield Ok((operation, test))
+        else:
+            yield result
 
 
 def create_test(
@@ -52,7 +80,7 @@ def create_test(
     """Create a Hypothesis test."""
     hook_dispatcher = HookDispatcherMark.get(test)
     auth_storage = AuthStorageMark.get(test)
-    strategies = []
+    _strategies = []
     generation_config = generation_config or operation.schema.generation_config
 
     skip_on_not_negated = (
@@ -68,8 +96,8 @@ def create_test(
         }
     )
     for data_generation_method in generation_config.methods:
-        strategies.append(operation.as_strategy(data_generation_method=data_generation_method, **as_strategy_kwargs))
-    strategy = combine_strategies(strategies)
+        _strategies.append(operation.as_strategy(data_generation_method=data_generation_method, **as_strategy_kwargs))
+    strategy = strategies.combine(_strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
 
@@ -162,8 +190,8 @@ def add_examples(
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
     try:
-        examples: list[Case] = [
-            get_single_example(strategy)
+        result: list[Case] = [
+            examples.generate_one(strategy)
             for strategy in operation.get_strategies_from_examples(as_strategy_kwargs=as_strategy_kwargs)
         ]
     except (
@@ -173,7 +201,7 @@ def add_examples(
         SerializationNotPossible,
         SchemaError,
     ) as exc:
-        examples = []
+        result = []
         if isinstance(exc, Unsatisfiable):
             UnsatisfiableExampleMark.set(test, exc)
         if isinstance(exc, SerializationNotPossible):
@@ -181,12 +209,12 @@ def add_examples(
         if isinstance(exc, SchemaError):
             InvalidRegexMark.set(test, exc)
     context = HookContext(operation)  # context should be passed here instead
-    GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, examples)
-    operation.schema.hooks.dispatch("before_add_examples", context, examples)
+    GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, result)
+    operation.schema.hooks.dispatch("before_add_examples", context, result)
     if hook_dispatcher:
-        hook_dispatcher.dispatch("before_add_examples", context, examples)
+        hook_dispatcher.dispatch("before_add_examples", context, result)
     original_test = test
-    for example in examples:
+    for example in result:
         if example.headers is not None:
             invalid_headers = dict(find_invalid_headers(example.headers))
             if invalid_headers:
@@ -214,8 +242,8 @@ def add_coverage(
 def _iter_coverage_cases(
     operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
 ) -> Generator[Case, None, None]:
-    from ..specs.openapi.constants import LOCATION_TO_CONTAINER
-    from ..specs.openapi.examples import find_in_responses, find_matching_in_responses
+    from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+    from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
 
     def _stringify_value(val: Any, location: str) -> str | list[str]:
         if isinstance(val, list):
@@ -501,19 +529,6 @@ def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, N
     for name, value in headers.items():
         if not is_latin_1_encodable(value) or has_invalid_characters(name, value):
             yield name, value
-
-
-def prepare_urlencoded(data: Any) -> Any:
-    if isinstance(data, list):
-        output = []
-        for item in data:
-            if isinstance(item, dict):
-                for key, value in item.items():
-                    output.append((key, value))
-            else:
-                output.append(item)
-        return output
-    return data
 
 
 UnsatisfiableExampleMark = Mark[Unsatisfiable](attr_name="unsatisfiable_example")

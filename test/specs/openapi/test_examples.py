@@ -10,14 +10,16 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig, get_single_example
-from schemathesis.generation._hypothesis import combine_strategies
-from schemathesis.specs.openapi import examples
+from schemathesis.generation import GenerationConfig
+from schemathesis.generation.hypothesis import examples, strategies
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
+    extract_from_schemas,
     extract_inner_examples,
+    extract_top_level,
     find_in_responses,
     find_matching_in_responses,
+    produce_combinations,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
 from schemathesis.transports import WSGITransport
@@ -227,7 +229,7 @@ def example_to_dict(example):
 
 
 def test_extract_top_level(operation):
-    top_level_examples = list(examples.extract_top_level(operation))
+    top_level_examples = list(extract_top_level(operation))
     extracted = [example_to_dict(example) for example in top_level_examples]
     assert extracted == [
         {"container": "headers", "name": "anyKey", "value": "header0"},
@@ -254,7 +256,7 @@ def test_extract_top_level(operation):
         {"media_type": "multipart/form-data", "value": {"bar": "string1"}},
         {"media_type": "multipart/form-data", "value": {"bar": "referenced-body2"}},
     ]
-    assert list(examples.produce_combinations(top_level_examples)) == [
+    assert list(produce_combinations(top_level_examples)) == [
         {
             "body": {"foo": "string0"},
             "cookies": {"SESSION": "cookie0"},
@@ -428,9 +430,7 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
 
 
 def test_extract_from_schemas(operation_with_property_examples):
-    extracted = [
-        example_to_dict(example) for example in examples.extract_from_schemas(operation_with_property_examples)
-    ]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation_with_property_examples)]
     assert extracted == [
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-11"}},
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-11", "foo-1": "foo-12"}},
@@ -612,7 +612,7 @@ def test_boolean_subschema(ctx):
     )
     schema = schemathesis.openapi.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
-    example = get_single_example(strategy)
+    example = examples.generate_one(strategy)
     assert example.body == {"bar": ANY, "foo": "foo-value"}
 
 
@@ -653,7 +653,7 @@ def test_examples_ref_missing_components(ctx):
     )
     schema = schemathesis.openapi.from_dict(schema)
     strategy = schema["/test"]["POST"].get_strategies_from_examples()[0]
-    example = get_single_example(strategy)
+    example = examples.generate_one(strategy)
     assert example.query == {"q": {"foo-1": "foo-11", "spam-1": {"inner": "example"}}}
 
 
@@ -711,7 +711,7 @@ def test_examples_in_any_of_top_level(ctx, key):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
+    extracted = [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
         {"container": "query", "name": "q", "value": "foo-2-1"},
@@ -777,7 +777,7 @@ def test_examples_in_all_of_top_level(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    extracted = [example_to_dict(example) for example in examples.extract_top_level(schema["/test"]["POST"])]
+    extracted = [example_to_dict(example) for example in extract_top_level(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q", "value": "foo-1-1"},
         {"container": "query", "name": "q", "value": "foo-1-2"},
@@ -869,7 +869,7 @@ def test_examples_in_any_of_in_schemas(ctx, key):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(schema["/test"]["POST"])]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(schema["/test"]["POST"])]
     assert extracted == [
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-1-1", "foo-1": "foo-1-1-1"}},
         {"container": "query", "name": "q-1", "value": {"bar-1": "bar-1-2-1", "foo-1": "foo-1-1-2"}},
@@ -907,7 +907,7 @@ def test_partial_examples(ctx):
     operation = schema["/test/{foo}/{bar}/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then all generated examples should have those missing parts generated according to the API schema
-    example = get_single_example(strategy)
+    example = examples.generate_one(strategy)
     parameters_schema = parameters_to_json_schema(operation, operation.path_parameters)
     jsonschema.validate(example.path_parameters, parameters_schema)
 
@@ -993,7 +993,7 @@ def test_external_value(ctx, server):
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
     # Then this example should be used
-    example = get_single_example(strategy)
+    example = examples.generate_one(strategy)
     assert example.body == b"42"
     # And this data should be OK to send
     assert_requests_call(example)
@@ -1073,7 +1073,7 @@ def test_example_override():
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/success"]["GET"]
-    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
     assert extracted == [{"container": "query", "name": "key", "value": "query1"}]
 
 
@@ -1118,14 +1118,14 @@ def test_no_wrapped_examples():
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/register"]["POST"]
-    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
     assert extracted == [
         {
             "media_type": "application/json",
             "value": {"username": "username", "email": "john.doe@email.com", "password": "password"},
         }
     ]
-    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
     assert extracted == [
         {
             "media_type": "application/json",
@@ -1199,7 +1199,7 @@ def test_openapi_2_example():
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/items"]["POST"]
-    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
     assert extracted == [
         {
             "value": {
@@ -1211,7 +1211,7 @@ def test_openapi_2_example():
             "media_type": "application/json",
         }
     ]
-    extracted = [example_to_dict(example) for example in examples.extract_top_level(operation)]
+    extracted = [example_to_dict(example) for example in extract_top_level(operation)]
     assert extracted == [
         {
             "value": {"title": "Reading", "description": "Read a comic"},
@@ -1318,7 +1318,7 @@ def test_property_examples_behind_ref():
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/trees"]["POST"]
-    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
     assert extracted == [
         {
             "value": {
@@ -1395,7 +1395,7 @@ def test_property_examples_with_all_of():
     }
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/peers"]["POST"]
-    extracted = [example_to_dict(example) for example in examples.extract_from_schemas(operation)]
+    extracted = [example_to_dict(example) for example in extract_from_schemas(operation)]
     assert extracted == [
         {
             "value": {"outbound_proxy": {"host": "10.22.22.191", "port": 8080}},
@@ -1526,7 +1526,7 @@ def test_find_in_responses(ctx, response, expected):
     assert find_in_responses(operation) == expected
 
     if expected:
-        strategy = combine_strategies(operation.get_strategies_from_examples())
+        strategy = strategies.combine(operation.get_strategies_from_examples())
         collected = []
 
         @given(strategy)

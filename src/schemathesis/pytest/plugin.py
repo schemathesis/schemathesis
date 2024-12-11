@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import unittest
-from contextlib import contextmanager
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
 
@@ -9,7 +8,6 @@ import pytest
 from _pytest import nodes
 from _pytest.config import hookimpl
 from _pytest.python import Class, Function, FunctionDefinition, Metafunc, Module, PyCollector
-from hypothesis import reporting
 from hypothesis.errors import InvalidArgument, Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
@@ -23,15 +21,16 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
-from schemathesis.pytest.control_flow import fail_on_no_matches
-
-from .._hypothesis._given import (
+from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
     GivenKwargsMark,
     is_given_applied,
     merge_given_args,
     validate_given_args,
 )
+from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.pytest.control_flow import fail_on_no_matches
+
 from .._override import OverrideMark
 from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
 
@@ -108,7 +107,7 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        from .._hypothesis._builder import create_test
+        from schemathesis.generation.hypothesis.builder import create_test
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -227,26 +226,6 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.get_result()
 
 
-IGNORED_HYPOTHESIS_OUTPUT = ("Falsifying example",)
-
-
-def _should_ignore_entry(value: str) -> bool:
-    return value.startswith(IGNORED_HYPOTHESIS_OUTPUT)
-
-
-def hypothesis_reporter(value: str) -> None:
-    if _should_ignore_entry(value):
-        return
-    reporting.default(value)
-
-
-@contextmanager
-def skip_unnecessary_hypothesis_output() -> Generator:
-    """Avoid printing Hypothesis output that is not necessary in Schemathesis' pytest plugin."""
-    with reporting.with_reporter(hypothesis_reporter):  # type: ignore
-        yield
-
-
 @hookimpl(wrapper=True)
 def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """It is possible to have a Hypothesis exception in runtime.
@@ -255,7 +234,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     """
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
-    from schemathesis._hypothesis._builder import (
+    from schemathesis.generation.hypothesis.builder import (
         InvalidHeadersExampleMark,
         InvalidRegexMark,
         NonSerializableMark,
@@ -265,7 +244,7 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
     __tracebackhide__ = True
     if isinstance(pyfuncitem, SchemathesisFunction):
         try:
-            with skip_unnecessary_hypothesis_output():
+            with ignore_hypothesis_output():
                 yield
         except InvalidArgument as exc:
             if "Inconsistent args" in str(exc) and "@example()" in str(exc):
@@ -293,10 +272,6 @@ def pytest_pyfunc_call(pyfuncitem):  # type:ignore
             pytest.skip(exc.args[0])
         except SchemaError as exc:
             raise InvalidRegexPattern.from_schema_error(exc, from_examples=False) from exc
-        except Exception as exc:
-            if hasattr(exc, "__notes__"):
-                exc.__notes__ = [note for note in exc.__notes__ if not _should_ignore_entry(note)]  # type: ignore
-            raise
         invalid_headers = InvalidHeadersExampleMark.get(pyfuncitem.obj)
         if invalid_headers is not None:
             raise InvalidHeadersExample.from_headers(invalid_headers) from None

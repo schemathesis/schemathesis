@@ -4,8 +4,8 @@ from random import Random
 from typing import TYPE_CHECKING
 
 from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 
-from ..constants import DEFAULT_DEADLINE
 from ..generation import GenerationConfig
 from .config import EngineConfig, ExecutionConfig, NetworkConfig
 

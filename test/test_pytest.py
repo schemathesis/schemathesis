@@ -2,7 +2,8 @@ import platform
 
 import pytest
 
-from schemathesis.constants import DEFAULT_DEADLINE, RECURSIVE_REFERENCE_ERROR_MESSAGE
+from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 
 
 def test_pytest_parametrize_fixture(testdir):

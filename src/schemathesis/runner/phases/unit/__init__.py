@@ -15,9 +15,9 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
+from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 from ... import events
-from ..._hypothesis import ignore_hypothesis_output
 from ...events import EventGenerator
 from ...models.outcome import TestResult
 from ...models.status import Status
@@ -41,10 +41,13 @@ def execute(ctx: EngineContext) -> EventGenerator:
 
 
 def single_threaded(ctx: EngineContext) -> EventGenerator:
+    from schemathesis.generation.hypothesis.builder import get_all_tests
+
     from ._executor import run_test
 
     with network_test_function(ctx) as test_func:
-        for result in ctx.config.schema.get_all_tests(
+        for result in get_all_tests(
+            ctx.config.schema,
             test_func,
             settings=ctx.config.execution.hypothesis_settings,
             generation_config=ctx.config.execution.generation_config,
@@ -100,7 +103,8 @@ def multi_threaded(ctx: EngineContext) -> EventGenerator:
 def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
     from hypothesis.errors import HypothesisWarning
 
-    from ...._hypothesis._builder import create_test
+    from schemathesis.generation.hypothesis.builder import create_test
+
     from ._executor import run_test
 
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)

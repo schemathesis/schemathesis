@@ -12,6 +12,7 @@ from hypothesis.errors import Flaky, Unsatisfiable
 
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.targets import TargetMetricCollector
 
 from . import events
@@ -113,7 +114,6 @@ def _execute_state_machine_loop(
     stop_event: threading.Event,
 ) -> None:
     """Execute the state machine testing loop."""
-    from hypothesis import reporting
     from requests.structures import CaseInsensitiveDict
 
     ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.targets))
@@ -263,7 +263,7 @@ def _execute_state_machine_loop(
             break
         suite_status = events.SuiteStatus.SUCCESS
         try:
-            with reporting.with_reporter(lambda _: None):  # type: ignore
+            with ignore_hypothesis_output():  # type: ignore
                 InstrumentedStateMachine.run(settings=config.hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code

@@ -3,7 +3,6 @@ from __future__ import annotations
 import http.client
 import textwrap
 from dataclasses import dataclass, field
-from enum import Enum
 from functools import partial
 from itertools import chain
 from typing import (
@@ -27,6 +26,7 @@ from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
 from schemathesis.core.transport import USER_AGENT
+from schemathesis.generation.meta import GenerationMetadata
 
 from . import serializers
 from ._override import CaseOverride
@@ -64,44 +64,6 @@ class CaseSource:
     elapsed: float
     overrides_all_parameters: bool
     transition_id: TransitionId
-
-
-class TestPhase(str, Enum):
-    __test__ = False
-
-    EXPLICIT = "explicit"
-    COVERAGE = "coverage"
-    GENERATE = "generate"
-
-
-@dataclass
-class GenerationMetadata:
-    """Stores various information about how data is generated."""
-
-    query: DataGenerationMethod | None
-    path_parameters: DataGenerationMethod | None
-    headers: DataGenerationMethod | None
-    cookies: DataGenerationMethod | None
-    body: DataGenerationMethod | None
-    phase: TestPhase
-    # Temporary attributes to carry info specific to the coverage phase
-    description: str | None
-    location: str | None
-    parameter: str | None
-    parameter_location: str | None
-
-    __slots__ = (
-        "query",
-        "path_parameters",
-        "headers",
-        "cookies",
-        "body",
-        "phase",
-        "description",
-        "location",
-        "parameter",
-        "parameter_location",
-    )
 
 
 @dataclass(repr=False)
