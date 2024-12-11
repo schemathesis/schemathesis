@@ -1030,6 +1030,47 @@ def test_incorrect_headers(ctx):
     )
 
 
+def test_incorrect_headers_with_enum(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "X-API-Key-1",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"enum": ["foo"]},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.negative],
+        [
+            {
+                "headers": {},
+            },
+            {
+                "headers": {"X-API-Key-1": "{}"},
+            },
+            {
+                "headers": {"X-API-Key-1": "null,null"},
+            },
+            {
+                "headers": {"X-API-Key-1": "false"},
+            },
+            {
+                "headers": {"X-API-Key-1": "0"},
+            },
+        ],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
@@ -1121,6 +1162,44 @@ def test_unspecified_http_methods(ctx):
     test_func()
 
     assert methods == {"HEAD", "PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+
+
+def test_no_missing_header_duplication(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {"name": "X-Key-1", "in": "header", "required": False, "schema": {"type": "string"}},
+                        {"name": "X-Key-2", "in": "header", "required": False, "schema": {"type": "string"}},
+                        {"name": "X-Key-3", "in": "header", "required": True, "schema": {"type": "string"}},
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=True)
+
+    descriptions = []
+    operation = schema["/foo"]["post"]
+
+    def test(case):
+        if case.meta.phase != TestPhase.COVERAGE:
+            return
+        descriptions.append(case.meta.description)
+
+    test_func = create_test(
+        operation=operation,
+        test=test,
+        data_generation_methods=DataGenerationMethod.all(),
+        settings=settings(phases=[Phase.explicit]),
+    )
+
+    test_func()
+
+    assert "Missing required property: X-Key-3" not in descriptions
+    assert "Missing `X-Key-3` at header" in descriptions
 
 
 def assert_coverage(schema, methods, expected, path=None):
