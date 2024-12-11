@@ -9,7 +9,12 @@ import pytest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
-from schemathesis._hypothesis._given import (
+from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
+from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.result import Ok
+from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
+from schemathesis.generation.hypothesis.builder import get_all_tests
+from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
     GivenInput,
     GivenKwargsMark,
@@ -18,10 +23,6 @@ from schemathesis._hypothesis._given import (
     merge_given_args,
     validate_given_args,
 )
-from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
-from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.result import Ok
-from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
@@ -150,8 +151,8 @@ class LazySchema:
                         }
 
                 tests = list(
-                    schema.get_all_tests(
-                        test, settings, as_strategy_kwargs=as_strategy_kwargs, _given_kwargs=given_kwargs
+                    get_all_tests(
+                        schema, test, settings, as_strategy_kwargs=as_strategy_kwargs, _given_kwargs=given_kwargs
                     )
                 )
                 if not tests:

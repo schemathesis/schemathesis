@@ -6,8 +6,8 @@ from io import StringIO
 from typing import Any, Dict, List, Union
 
 from schemathesis.core.errors import UnboundPrefix
-from schemathesis.core.generator.filters import is_valid_xml
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.validation import is_valid_xml
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]

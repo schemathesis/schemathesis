@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ..._lazy_import import lazy_import
+from schemathesis.core.lazy_import import lazy_import
 
 if TYPE_CHECKING:
     from jsonschema import Validator

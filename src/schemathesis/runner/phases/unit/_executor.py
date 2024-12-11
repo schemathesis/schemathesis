@@ -14,12 +14,6 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis._hypothesis._builder import (
-    InvalidHeadersExampleMark,
-    InvalidRegexMark,
-    NonSerializableMark,
-    UnsatisfiableExampleMark,
-)
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -33,6 +27,13 @@ from schemathesis.core.errors import (
 )
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.generation import targets
+from schemathesis.generation.hypothesis.builder import (
+    InvalidHeadersExampleMark,
+    InvalidRegexMark,
+    NonSerializableMark,
+    UnsatisfiableExampleMark,
+)
+from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.runner.errors import (
     DeadlineExceeded,
     UnexpectedError,
@@ -43,7 +44,6 @@ from schemathesis.runner.errors import (
 from ...._compat import BaseExceptionGroup
 from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
 from ... import events
-from ..._hypothesis import ignore_hypothesis_output
 from ...context import EngineContext
 from ...models.check import Check
 from ...models.outcome import TestResult
@@ -73,10 +73,8 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.error
             result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
-        elif (
-            hasattr(hypothesis.errors, "FlakyFailure")
-            and isinstance(exc, hypothesis.errors.FlakyFailure)
-            and any(isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions)
+        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
+            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
         ):
             for sub_exc in exc.exceptions:
                 if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):

@@ -1,4 +1,5 @@
 import re
+from xml.etree import ElementTree
 
 # Adapted from http.client._is_illegal_header_value
 INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
@@ -36,3 +37,11 @@ def contains_unicode_surrogate_pair(item: object) -> bool:
     if isinstance(item, list):
         return any(isinstance(item_, str) and bool(_contains_surrogate_pair(item_)) for item_ in item)
     return isinstance(item, str) and bool(_contains_surrogate_pair(item))
+
+
+def is_valid_xml(data: str) -> bool:
+    try:
+        ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{data}</root>")
+        return True
+    except ElementTree.ParseError:
+        return False

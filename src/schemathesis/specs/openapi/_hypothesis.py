@@ -16,14 +16,15 @@ from schemathesis.constants import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SerializationNotPossible
-from schemathesis.core.generator.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import prepare_urlencoded
+from schemathesis.generation.meta import GenerationMetadata, TestPhase
+from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths, serializers
-from ..._hypothesis._builder import prepare_urlencoded
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...models import APIOperation, Case, GenerationMetadata, TestPhase
+from ...models import APIOperation, Case
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES

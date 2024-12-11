@@ -6,9 +6,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.targets import TargetFunction
-
-from ..constants import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
     import hypothesis

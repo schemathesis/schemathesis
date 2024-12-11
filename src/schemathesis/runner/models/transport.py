@@ -13,7 +13,9 @@ from .status import Status
 if TYPE_CHECKING:
     import requests
 
-    from ...models import Case, TestPhase
+    from schemathesis.generation.meta import TestPhase
+
+    from ...models import Case
     from .check import Check
 
 
