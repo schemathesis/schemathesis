@@ -4,7 +4,8 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
 from schemathesis.generation import DataGenerationMethod
-from schemathesis.models import Case, GenerationMetadata, TestPhase
+from schemathesis.generation.meta import GenerationMetadata, TestPhase
+from schemathesis.models import Case
 from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
 from schemathesis.specs.openapi.checks import (
     ResourcePath,

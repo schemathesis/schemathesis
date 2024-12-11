@@ -9,7 +9,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
-from schemathesis.generation._hypothesis import get_single_example
+from schemathesis.generation.hypothesis import examples
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.serializers import Binary
@@ -134,7 +134,7 @@ def test_default_strategies_binary(swagger_20):
     )
     operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
     swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
-    case = get_single_example(get_case_strategy(operation))
+    case = examples.generate_one(get_case_strategy(operation))
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
     assert kwargs["files"] == [("upfile", case.body["upfile"].data)]

@@ -10,10 +10,11 @@ import requests
 from hypothesis_jsonschema import from_schema
 
 from schemathesis.core.transforms import deepclone
+from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.meta import TestPhase
 
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
-from ...generation import get_single_example
-from ...models import APIOperation, Case, TestPhase
+from ...models import APIOperation, Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies
 from .constants import LOCATION_TO_CONTAINER
 from .formats import STRING_FORMATS
@@ -307,7 +308,7 @@ def _generate_single_example(
         allow_x00=generation_config.allow_x00,
         codec=generation_config.codec,
     )
-    return get_single_example(strategy)
+    return examples.generate_one(strategy)
 
 
 def produce_combinations(examples: list[Example]) -> Generator[dict[str, Any], None, None]:

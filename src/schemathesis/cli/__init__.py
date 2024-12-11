@@ -19,6 +19,7 @@ from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, format_exception
 from schemathesis.core.fs import ensure_parent
 from schemathesis.core.output import OutputConfig
+from schemathesis.generation.hypothesis import settings
 from schemathesis.generation.targets import TARGETS
 
 from .. import contrib, experimental, generation, runner, service
@@ -39,7 +40,6 @@ from ..runner import events
 from ..runner.config import NetworkConfig
 from ..stateful import Stateful
 from . import cassettes, loaders, output, validation
-from ._hypothesis import prepare_settings
 from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
@@ -982,7 +982,7 @@ def run(
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
 
-    hypothesis_settings = prepare_settings(
+    hypothesis_settings = settings.prepare(
         database=hypothesis_database,
         deadline=hypothesis_deadline,
         derandomize=hypothesis_derandomize,
