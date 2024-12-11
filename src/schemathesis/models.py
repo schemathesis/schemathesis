@@ -474,6 +474,7 @@ class Case:
         excluded_checks: tuple[CheckFunction, ...] = (),
         code_sample_style: str | None = None,
         headers: dict[str, Any] | None = None,
+        transport_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Validate application response.
 
@@ -507,7 +508,10 @@ class Case:
         additional_checks = tuple(check for check in _additional_checks if check not in excluded_checks)
         failed_checks = []
         ctx = CheckContext(
-            override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None
+            override=self._override,
+            auth=None,
+            headers=CaseInsensitiveDict(headers) if headers else None,
+            transport_kwargs=transport_kwargs,
         )
         for check in chain(checks, additional_checks):
             copied_case = self.partial_deepcopy()
@@ -591,6 +595,7 @@ class Case:
             headers=headers,
             additional_checks=additional_checks,
             excluded_checks=excluded_checks,
+            transport_kwargs=kwargs,
         )
         return response
 

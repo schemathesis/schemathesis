@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.38.9...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Ignored request-related configuration inside the ``ignored_auth`` check. :issue:`2613`
+
 .. _v3.38.9:
 
 :version:`3.38.9 <v3.38.8...v3.38.9>` - 2024-12-02

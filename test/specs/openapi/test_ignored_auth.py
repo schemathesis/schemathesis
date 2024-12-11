@@ -17,15 +17,17 @@ from schemathesis.internal.checks import CheckContext
 from schemathesis.models import Status
 from schemathesis.runner import from_schema
 from schemathesis.specs.openapi.checks import AuthKind, _contains_auth, _remove_auth_from_case, ignored_auth
+from schemathesis.transports import RequestsTransport
 
 
-def run(schema_url, headers=None, **loader_kwargs):
+def run(schema_url, headers=None, runner_config=None, **loader_kwargs):
     schema = schemathesis.from_uri(schema_url, **loader_kwargs)
     _, _, _, _, _, _, event, *_ = from_schema(
         schema,
         checks=[ignored_auth],
         headers=headers,
         hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
+        **(runner_config or {}),
     ).execute()
     return event
 
@@ -66,6 +68,43 @@ def test_no_failure(schema_url):
     event = run(schema_url)
     # Then there is no failure
     assert event.status == Status.success
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("ignored_auth")
+def test_keep_tls_verification(schema_url, mocker):
+    # See GH-2613
+    # `verify` and other options should not be ignored in `ignored_auth`
+    send = mocker.spy(RequestsTransport, "send")
+    run(
+        schema_url,
+        runner_config={
+            "request_timeout": 5,
+            "request_tls_verify": False,
+        },
+        headers={"Authorization": "Basic dGVzdDp0ZXN0"},
+    )
+    for call in send.mock_calls:
+        assert call.kwargs["timeout"] == 0.005
+        assert not call.kwargs["verify"]
+    send.reset_mock()
+
+    schema = schemathesis.from_uri(schema_url)
+
+    operation = schema["/ignored_auth"]["get"]
+
+    @given(operation.as_strategy())
+    def test(case):
+        try:
+            case.call_and_validate(verify=False, timeout=0.005)
+        except Exception:
+            pass
+
+    test()
+
+    for call in send.mock_calls:
+        assert call.kwargs["timeout"] == 0.005
+        assert not call.kwargs["verify"]
 
 
 @pytest.mark.parametrize(
