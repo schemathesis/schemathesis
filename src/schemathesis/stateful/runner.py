@@ -132,6 +132,7 @@ def _execute_state_machine_loop(
         auth=config.auth,
         headers=CaseInsensitiveDict(config.headers) if config.headers else None,
         config=config.checks_config,
+        transport_kwargs=call_kwargs,
     )
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]

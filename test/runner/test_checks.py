@@ -26,7 +26,7 @@ from schemathesis.specs.openapi.checks import (
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(override=None, auth=None, headers=None, config={})
+CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None)
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
