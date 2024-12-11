@@ -389,14 +389,21 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
             _remove_auth_from_case(case, security_parameters)
-            new_response = case.operation.schema.transport.send(case)
+            kwargs = ctx.transport_kwargs or {}
+            kwargs.copy()
+            if "headers" in kwargs:
+                headers = kwargs["headers"].copy()
+                _remove_auth_from_explicit_headers(headers, security_parameters)
+                kwargs["headers"] = headers
+            kwargs.pop("session", None)
+            new_response = case.operation.schema.transport.send(case, **kwargs)
             if new_response.status_code != 401:
                 _update_response(response, new_response)
                 _raise_no_auth_error(new_response, case.operation.verbose_name, "that requires authentication")
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 _set_auth_for_case(case, parameter)
-                new_response = case.operation.schema.transport.send(case)
+                new_response = case.operation.schema.transport.send(case, **kwargs)
                 if new_response.status_code != 401:
                     _update_response(response, new_response)
                     _raise_no_auth_error(new_response, case.operation.verbose_name, "with any auth")
@@ -505,6 +512,13 @@ def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParamet
             case.query.pop(name, None)
         if parameter["in"] == "cookie" and case.cookies:
             case.cookies.pop(name, None)
+
+
+def _remove_auth_from_explicit_headers(headers: dict, security_parameters: list[SecurityParameter]) -> None:
+    for parameter in security_parameters:
+        name = parameter["name"]
+        if parameter["in"] == "header":
+            headers.pop(name, None)
 
 
 def _set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:

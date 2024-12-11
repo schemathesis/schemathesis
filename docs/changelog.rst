@@ -1,8 +1,27 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.38.8...HEAD>` - TBD
---------------------------------------------
+:version:`Unreleased <v3.38.10...HEAD>` - TBD
+---------------------------------------------
+
+.. _v3.38.10:
+
+:version:`3.38.10 <v3.38.9...v3.38.10>` - 2024-12-11
+----------------------------------------------------
+
+**Fixed**
+
+- Ignored request-related configuration inside the ``ignored_auth`` check. :issue:`2613`
+
+.. _v3.38.9:
+
+:version:`3.38.9 <v3.38.8...v3.38.9>` - 2024-12-02
+--------------------------------------------------
+
+**Fixed**
+
+- ``UnicodeEncodeError`` when sending a request during the coverage phase.
+- Duplicated test cases for missing required headers during the coverage phase.
 
 .. _v3.38.8:
 

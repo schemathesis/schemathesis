@@ -341,6 +341,7 @@ class Case:
         additional_checks: list[CheckFunction] | None = None,
         excluded_checks: list[CheckFunction] | None = None,
         headers: dict[str, Any] | None = None,
+        transport_kwargs: dict[str, Any] | None = None,
     ) -> None:
         """Validate application response.
 
@@ -364,7 +365,11 @@ class Case:
                 checks.append(check)
         failures: set[Failure] = set()
         ctx = CheckContext(
-            override=self._override, auth=None, headers=CaseInsensitiveDict(headers) if headers else None, config={}
+            override=self._override,
+            auth=None,
+            headers=CaseInsensitiveDict(headers) if headers else None,
+            config={},
+            transport_kwargs=transport_kwargs,
         )
         for check in checks:
             try:
@@ -416,6 +421,7 @@ class Case:
             headers=headers,
             additional_checks=additional_checks,
             excluded_checks=excluded_checks,
+            transport_kwargs=kwargs,
         )
         return response
 
