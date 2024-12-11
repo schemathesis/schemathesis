@@ -52,6 +52,7 @@ class CheckContext:
     auth: HTTPDigestAuth | RawAuth | None
     headers: CaseInsensitiveDict | None
     config: CheckConfig = field(default_factory=CheckConfig)
+    transport_kwargs: dict | None = None
 
 
 def wrap_check(check: Callable) -> CheckFunction:
