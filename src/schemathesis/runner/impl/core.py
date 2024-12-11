@@ -994,18 +994,18 @@ def _network_test(
     max_response_time: int | None,
 ) -> requests.Response:
     check_results: list[Check] = []
+    hook_context = HookContext(operation=case.operation)
+    kwargs: dict[str, Any] = {
+        "session": session,
+        "headers": headers,
+        "timeout": request_config.prepared_timeout,
+        "verify": request_config.tls_verify,
+        "cert": request_config.cert,
+    }
+    if request_config.proxy is not None:
+        kwargs["proxies"] = {"all": request_config.proxy}
+    hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
     try:
-        hook_context = HookContext(operation=case.operation)
-        kwargs: dict[str, Any] = {
-            "session": session,
-            "headers": headers,
-            "timeout": request_config.prepared_timeout,
-            "verify": request_config.tls_verify,
-            "cert": request_config.cert,
-        }
-        if request_config.proxy is not None:
-            kwargs["proxies"] = {"all": request_config.proxy}
-        hooks.dispatch("process_call_kwargs", hook_context, case, kwargs)
         response = case.call(**kwargs)
     except CheckFailed as exc:
         check_name = "request_timeout"
@@ -1030,6 +1030,7 @@ def _network_test(
         auth=ctx.auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.checks_config,
+        transport_kwargs=kwargs,
     )
     try:
         run_checks(
@@ -1127,6 +1128,7 @@ def _wsgi_test(
         auth=ctx.auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.checks_config,
+        transport_kwargs=kwargs,
     )
     try:
         run_checks(
@@ -1212,6 +1214,7 @@ def _asgi_test(
         auth=ctx.auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.checks_config,
+        transport_kwargs=kwargs,
     )
     try:
         run_checks(
