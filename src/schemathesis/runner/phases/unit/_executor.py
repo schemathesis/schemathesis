@@ -412,6 +412,7 @@ def _network_test(
         auth=ctx.config.network.auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.config.checks_config,
+        transport_kwargs=kwargs,
     )
     try:
         run_checks(

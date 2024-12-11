@@ -27,8 +27,9 @@ class CheckContext:
     auth: tuple[str, str] | None
     headers: CaseInsensitiveDict | None
     config: ChecksConfig
+    transport_kwargs: dict[str, Any] | None
 
-    __slots__ = ("override", "auth", "headers", "config")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs")
 
     def __init__(
         self,
@@ -36,11 +37,13 @@ class CheckContext:
         auth: tuple[str, str] | None,
         headers: CaseInsensitiveDict | None,
         config: ChecksConfig,
+        transport_kwargs: dict[str, Any] | None,
     ) -> None:
         self.override = override
         self.auth = auth
         self.headers = headers
         self.config = config
+        self.transport_kwargs = transport_kwargs
 
 
 CHECKS = Registry[CheckFunction]()

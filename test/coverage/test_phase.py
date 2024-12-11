@@ -1179,7 +1179,7 @@ def test_no_missing_header_duplication(ctx):
             }
         }
     )
-    schema = schemathesis.from_dict(schema, validate_schema=True)
+    schema = schemathesis.openapi.from_dict(schema)
 
     descriptions = []
     operation = schema["/foo"]["post"]
@@ -1192,7 +1192,7 @@ def test_no_missing_header_duplication(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        data_generation_methods=DataGenerationMethod.all(),
+        generation_config=GenerationConfig(methods=DataGenerationMethod.all()),
         settings=settings(phases=[Phase.explicit]),
     )
 

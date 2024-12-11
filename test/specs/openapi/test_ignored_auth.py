@@ -26,14 +26,13 @@ from schemathesis.specs.openapi.checks import (
 from schemathesis.transports import RequestsTransport
 
 
-def run(schema_url, headers=None, runner_config=None, **configuration):
+def run(schema_url, headers=None, network_config=None, **configuration):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     _, _, _, _, _, _, event, *_ = from_schema(
         schema,
         checks=[ignored_auth],
-        network=NetworkConfig(headers=headers),
+        network=NetworkConfig(headers=headers, **(network_config or {})),
         hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
-        **(runner_config or {}),
     ).execute()
     return event
 
@@ -84,32 +83,32 @@ def test_keep_tls_verification(schema_url, mocker):
     send = mocker.spy(RequestsTransport, "send")
     run(
         schema_url,
-        runner_config={
-            "request_timeout": 5,
-            "request_tls_verify": False,
+        network_config={
+            "timeout": 5,
+            "tls_verify": False,
         },
         headers={"Authorization": "Basic dGVzdDp0ZXN0"},
     )
     for call in send.mock_calls:
-        assert call.kwargs["timeout"] == 0.005
+        assert call.kwargs["timeout"] == 5
         assert not call.kwargs["verify"]
     send.reset_mock()
 
-    schema = schemathesis.from_uri(schema_url)
+    schema = schemathesis.openapi.from_url(schema_url)
 
     operation = schema["/ignored_auth"]["get"]
 
     @given(operation.as_strategy())
     def test(case):
         try:
-            case.call_and_validate(verify=False, timeout=0.005)
-        except Exception:
+            case.call_and_validate(verify=False, timeout=5)
+        except FailureGroup:
             pass
 
     test()
 
     for call in send.mock_calls:
-        assert call.kwargs["timeout"] == 0.005
+        assert call.kwargs["timeout"] == 5
         assert not call.kwargs["verify"]
 
 
@@ -117,61 +116,61 @@ def test_keep_tls_verification(schema_url, mocker):
     ("ctx", "request_kwargs", "parameters", "expected"),
     [
         (
-            CheckContext(override=None, auth=None, headers=None, config={}),
+            CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}, config={}),
+            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"A": "V"}, config={}),
+            CheckContext(override=None, auth=None, headers={"A": "V"}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}, config={}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}, config={}),
+            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,

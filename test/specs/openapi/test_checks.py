@@ -173,7 +173,10 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         query={"key": 5, "unknown": 3},
     )
     assert (
-        negative_data_rejection(CheckContext(override=None, auth=None, headers=None, config={}), response, case) is None
+        negative_data_rejection(
+            CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None), response, case
+        )
+        is None
     )
 
 
@@ -222,6 +225,7 @@ def test_positive_data_acceptance(
         auth=None,
         headers=None,
         config={positive_data_acceptance: PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)},
+        transport_kwargs=None,
     )
 
     if should_raise:
