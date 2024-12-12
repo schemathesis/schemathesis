@@ -3,13 +3,12 @@ from hypothesis import HealthCheck, Phase, settings
 from hypothesis.errors import InvalidDefinition
 
 import schemathesis
-from schemathesis.constants import NO_LINKS_ERROR_MESSAGE
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.config import _get_default_hypothesis_settings_kwargs
-from schemathesis.stateful.state_machine import StepResult
+from schemathesis.stateful.state_machine import NO_LINKS_ERROR_MESSAGE, StepResult
 
 
 @pytest.mark.parametrize(

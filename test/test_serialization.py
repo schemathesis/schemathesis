@@ -72,11 +72,7 @@ def test_text_csv(api_schema):
         # Then this serializer should be used
         response = case.call_and_validate()
         # And data should be successfully sent to the API as CSV
-        if case.app is not None:
-            data = response.json
-        else:
-            data = response.json()
-        assert data == case.body
+        assert response.json() == case.body
 
     test()
 

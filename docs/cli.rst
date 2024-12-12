@@ -673,8 +673,8 @@ To use your custom checks with Schemathesis CLI, you need to register them via t
         # some awesome assertions!
         pass
 
-The registered check should accept ``ctx``, a ``response`` with ``requests.Response`` / ``schemathesis.utils.WSGIResponse`` type and
-``case`` with ``schemathesis.models.Case`` type. This code should be placed in the module you pass to the ``SCHEMATHESIS_HOOKS`` environment variable.
+The registered check should accept ``ctx``, a ``response`` with ``schemathesis.Response`` type and
+``case`` with ``schemathesis.Case`` type. This code should be placed in the module you pass to the ``SCHEMATHESIS_HOOKS`` environment variable.
 
 Then your checks will be available in Schemathesis CLI, and you can use them via the ``-c`` command-line option.
 

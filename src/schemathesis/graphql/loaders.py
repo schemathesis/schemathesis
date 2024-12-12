@@ -4,7 +4,7 @@ import json
 from functools import lru_cache
 from os import PathLike
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any, Dict, NoReturn, cast
+from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, cast
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from graphql import DocumentNode
 
     from schemathesis.specs.graphql.schemas import GraphQLSchema
-    from schemathesis.transports.responses import GenericResponse
 
 
 def from_asgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
@@ -24,7 +23,7 @@ def from_asgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
     kwargs.setdefault("json", {"query": get_introspection_query()})
     client = get_client(app)
     response = load_from_url(client.post, url=path, **kwargs)
-    schema = extract_schema_from_response(response)
+    schema = extract_schema_from_response(response, lambda r: r.json())
     return from_dict(schema=schema).configure(app=app, location=path)
 
 
@@ -37,7 +36,7 @@ def from_wsgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
     client = get_client(app)
     response = client.post(path=path, **kwargs)
     raise_for_status(response)
-    schema = extract_schema_from_response(response)
+    schema = extract_schema_from_response(response, lambda r: r.json)
     return from_dict(schema=schema).configure(app=app, location=path)
 
 
@@ -47,7 +46,7 @@ def from_url(url: str, *, wait_for_schema: float | None = None, **kwargs: Any) -
 
     kwargs.setdefault("json", {"query": get_introspection_query()})
     response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
-    schema = extract_schema_from_response(response)
+    schema = extract_schema_from_response(response, lambda r: r.json())
     return from_dict(schema).configure(location=url)
 
 
@@ -113,14 +112,12 @@ def get_introspection_query_ast() -> DocumentNode:
     return graphql.parse(query)
 
 
-def extract_schema_from_response(response: GenericResponse) -> dict[str, Any]:
-    from requests import Response
+R = TypeVar("R")
 
+
+def extract_schema_from_response(response: R, callback: Callable[[R], Any]) -> dict[str, Any]:
     try:
-        if isinstance(response, Response):
-            decoded = response.json()
-        else:
-            decoded = response.json
+        decoded = callback(response)
     except json.JSONDecodeError as exc:
         raise LoaderError(
             LoaderErrorKind.UNEXPECTED_CONTENT_TYPE,

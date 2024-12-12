@@ -8,14 +8,13 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.core import NOT_SET
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case
-from schemathesis.runner.models import Request, Response
+from schemathesis.runner.models import Request
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 from schemathesis.transports import _merge_dict_to
 
@@ -297,17 +296,32 @@ def test_(case):
 def test_validate_response_no_errors(testdir):
     testdir.make_test(
         r"""
-from requests import Response
+import requests
+from schemathesis.core.transport import Response
+from unittest.mock import Mock
+
+class Headers(dict):
+
+    def getlist(self, key):
+        v = self.get(key)
+        if v is not None:
+            return [v]
 
 @schema.parametrize()
 def test_(case):
-    response = Response()
+    response = requests.Response()
+    response._content = b"{}"
     response.headers["Content-Type"] = "application/json"
+
+    response.raw = Mock(headers=Headers({"Content-Type": "application/json"}))
     response.status_code = 200
-    assert case.validate_response(response) is None
+    request = requests.PreparedRequest()
+    request.prepare("GET", "http://127.0.0.1")
+    response.request = request
+    assert case.validate_response(Response.from_requests(response, True)) is None
 """
     )
-    result = testdir.runpytest()
+    result = testdir.runpytest("--tb=long", "-sv")
     result.assert_outcomes(passed=1)
 
 
@@ -353,6 +367,17 @@ def test_validate_response_schema_path(
     )
     schema = schemathesis.openapi.from_dict(schema)
     response = getattr(response_factory, factory_type)(content=json.dumps(payload).encode("utf-8"))
+    if factory_type == "requests":
+        response = Response.from_requests(response, True)
+    else:
+        response = Response(
+            status_code=response.status_code,
+            headers={key: [value] for key, value in response.headers.items()},
+            content=response.content,
+            request=response.request,
+            elapsed=1.0,
+            verify=False,
+        )
     with pytest.raises(Failure) as exc:
         schema["/test"]["POST"].validate_response(response)
     failure = exc.value
@@ -365,12 +390,12 @@ def test_validate_response_schema_path(
 @pytest.mark.operations
 def test_response_from_requests(base_url):
     response = requests.get(f"{base_url}/cookies", timeout=1)
-    serialized = Response.from_requests(response)
-    assert serialized.body == b""
+    serialized = Response.from_requests(response, True)
+    assert serialized.content == b""
     assert serialized.status_code == 200
     assert serialized.http_version == "1.1"
     assert serialized.message == "OK"
-    assert serialized.headers["Set-Cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
+    assert serialized.headers["set-cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
 
 
 @pytest.mark.parametrize(("body", "expected"), [(NOT_SET, None), (b"example", b"example")])

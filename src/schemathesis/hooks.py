@@ -9,6 +9,7 @@ from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from schemathesis.core.marks import Mark
+from schemathesis.core.transport import Response
 
 from .filters import FilterSet, attach_filter_chain
 
@@ -17,7 +18,6 @@ if TYPE_CHECKING:
 
     from .models import APIOperation, Case
     from .schemas import BaseSchema
-    from .transports.responses import GenericResponse
 
 HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 
@@ -400,7 +400,7 @@ def before_call(context: HookContext, case: Case, **kwargs: Any) -> None:
 
 
 @HookDispatcher.register_spec([HookScope.GLOBAL])
-def after_call(context: HookContext, case: Case, response: GenericResponse) -> None:
+def after_call(context: HookContext, case: Case, response: Response) -> None:
     """Called after every network call in CLI tests.
 
     Note that you need to modify the response in-place.

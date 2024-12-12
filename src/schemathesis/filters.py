@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any, Callable, List, Protocol, Union
 
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.transforms import resolve_pointer
 
 if TYPE_CHECKING:
     from .models import APIOperation
@@ -365,8 +366,6 @@ def parse_expression(expression: str) -> tuple[str, str, Any]:
 
 
 def expression_to_filter_function(expression: str) -> Callable[[HasAPIOperation], bool]:
-    from .specs.openapi.references import resolve_pointer
-
     pointer, op, value = parse_expression(expression)
 
     if op == "==":

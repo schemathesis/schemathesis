@@ -63,14 +63,14 @@ def build_failure_message(context: ExecutionContext, idx: int, code_sample: str,
             status_code = check.response.status_code
             reason = http.client.responses.get(status_code, "Unknown")
             message += f"\n[{check.response.status_code}] {reason}:\n"
-            if check.response.body is not None:
-                if not check.response.body:
+            if check.response.content is not None:
+                if not check.response.content:
                     message += "\n    <EMPTY>\n"
                 else:
                     encoding = check.response.encoding or "utf8"
                     try:
                         # Checked that is not None
-                        body = cast(bytes, check.response.body)
+                        body = cast(bytes, check.response.content)
                         payload = body.decode(encoding)
                         payload = prepare_response_payload(payload, config=context.output_config)
                         payload = textwrap.indent(f"\n`{payload}`\n", prefix="    ")

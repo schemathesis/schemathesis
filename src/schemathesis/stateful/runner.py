@@ -12,6 +12,7 @@ from hypothesis.errors import Flaky, Unsatisfiable
 
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import FailureGroup
+from schemathesis.core.transport import Response
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.targets import TargetMetricCollector
 
@@ -24,7 +25,6 @@ if TYPE_CHECKING:
     from hypothesis.stateful import Rule
 
     from ..models import Case
-    from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine, Direction, StepResult
 
 EVENT_QUEUE_TIMEOUT = 0.01
@@ -222,7 +222,7 @@ def _execute_state_machine_loop(
             return result
 
         def validate_response(
-            self, response: GenericResponse, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
+            self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
             ctx.collect_metric(case, response)
             ctx.current_response = response

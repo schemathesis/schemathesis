@@ -72,3 +72,40 @@ def transform(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args:
     elif isinstance(schema, list):
         schema = [transform(sub_item, callback, *args, **kwargs) for sub_item in schema]
     return schema
+
+
+class Unresolvable:
+    pass
+
+
+UNRESOLVABLE = Unresolvable()
+
+
+def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | float | None | Unresolvable:
+    """Implementation is adapted from Rust's `serde-json` crate.
+
+    Ref: https://github.com/serde-rs/json/blob/master/src/value/mod.rs#L751
+    """
+    if not pointer:
+        return document
+    if not pointer.startswith("/"):
+        return UNRESOLVABLE
+
+    def replace(value: str) -> str:
+        return value.replace("~1", "/").replace("~0", "~")
+
+    tokens = map(replace, pointer.split("/")[1:])
+    target = document
+    for token in tokens:
+        if isinstance(target, dict):
+            target = target.get(token, UNRESOLVABLE)
+            if target is UNRESOLVABLE:
+                return UNRESOLVABLE
+        elif isinstance(target, list):
+            try:
+                target = target[int(token)]
+            except IndexError:
+                return UNRESOLVABLE
+        else:
+            return UNRESOLVABLE
+    return target

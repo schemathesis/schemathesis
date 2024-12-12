@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
-
 from schemathesis import errors, graphql, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
-from schemathesis.core.lazy_import import lazy_import
 from schemathesis.core.output import OutputConfig, sanitization
+from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
 
@@ -28,6 +26,7 @@ __all__ = [
     "GenerationConfig",
     "HeaderConfig",
     "OutputConfig",
+    "Response",
     "TargetContext",
     "TargetFunction",
     "__version__",
@@ -47,17 +46,3 @@ __all__ = [
     "serializer",
     "target",
 ]
-
-
-def _load_generic_response() -> Any:
-    from .transports.responses import GenericResponse
-
-    return GenericResponse
-
-
-_imports = {"GenericResponse": _load_generic_response}
-
-
-def __getattr__(name: str) -> Any:
-    # Some modules are relatively heavy, hence load them lazily to improve startup time for CLI
-    return lazy_import(__name__, name, _imports, globals())
