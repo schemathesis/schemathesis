@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, cast
 
 import click
 
-from schemathesis.core import string_to_boolean
+from schemathesis.cli.constants import ISSUE_TRACKER_URL
+from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, string_to_boolean
 from schemathesis.core.errors import (
     format_exception,
     get_request_error_extras,
@@ -22,14 +24,6 @@ from schemathesis.core.result import Ok
 from schemathesis.runner.models import group_failures_by_code_sample
 
 from ... import experimental, service
-from ...constants import (
-    DISCORD_LINK,
-    FLAKY_FAILURE_MESSAGE,
-    GITHUB_APP_LINK,
-    ISSUE_TRACKER_URL,
-    REPORT_SUGGESTION_ENV_VAR,
-    SCHEMATHESIS_TEST_CASE_HEADER,
-)
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
@@ -48,6 +42,8 @@ if TYPE_CHECKING:
 
 SPINNER_REPETITION_NUMBER = 10
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
+DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
+GITHUB_APP_LINK = "https://github.com/apps/schemathesis"
 
 
 def get_terminal_width() -> int:
@@ -222,7 +218,7 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
     """Display a failure for a single method / path."""
     display_subsection(result)
     if result.is_flaky:
-        click.secho(FLAKY_FAILURE_MESSAGE, fg="red")
+        click.secho("[FLAKY] Schemathesis was not able to reliably reproduce this failure", fg="red")
         click.echo()
     for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(result.checks), 1):
         # Make server errors appear first in the list of checks
@@ -241,14 +237,14 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
                 reason = http.client.responses.get(status_code, "Unknown")
                 response = bold(f"[{check.response.status_code}] {reason}")
                 click.echo(f"\n{response}:")
-                if check.response.body is not None:
-                    if not check.response.body:
+                if check.response.content is not None:
+                    if not check.response.content:
                         click.echo("\n    <EMPTY>")
                     else:
                         encoding = check.response.encoding or "utf8"
                         try:
                             # Checked that is not None
-                            body = cast(bytes, check.response.body)
+                            body = cast(bytes, check.response.content)
                             payload = body.decode(encoding)
                             payload = prepare_response_payload(payload, config=context.output_config)
                             payload = textwrap.indent(f"\n`{payload}`", prefix="    ")

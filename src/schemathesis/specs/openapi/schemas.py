@@ -32,7 +32,8 @@ from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
-from schemathesis.core.transforms import deepclone, transform
+from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
+from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
@@ -40,7 +41,6 @@ from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
-from ...transports.responses import get_json
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
@@ -55,13 +55,7 @@ from .parameters import (
     OpenAPI30Parameter,
     OpenAPIParameter,
 )
-from .references import (
-    RECURSION_DEPTH_LIMIT,
-    UNRESOLVABLE,
-    ConvertingResolver,
-    InliningResolver,
-    resolve_pointer,
-)
+from .references import RECURSION_DEPTH_LIMIT, ConvertingResolver, InliningResolver
 from .security import BaseSecurityProcessor, OpenAPISecurityProcessor, SwaggerSecurityProcessor
 from .stateful import create_state_machine
 
@@ -70,7 +64,6 @@ if TYPE_CHECKING:
 
     from ...auths import AuthStorage
     from ...stateful.state_machine import APIStateMachine
-    from ...transports.responses import GenericResponse
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
@@ -396,7 +389,7 @@ class BaseOpenAPISchema(BaseSchema):
             self._resolver = InliningResolver(self.location or "", self.raw_schema)
         return self._resolver
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         """Content types available for this API operation."""
         raise NotImplementedError
 
@@ -524,7 +517,7 @@ class BaseOpenAPISchema(BaseSchema):
         raise NotImplementedError
 
     def _get_response_definitions(
-        self, operation: APIOperation, response: GenericResponse
+        self, operation: APIOperation, response: Response
     ) -> tuple[list[str], dict[str, Any]] | None:
         try:
             responses = operation.definition.raw["responses"]
@@ -540,7 +533,7 @@ class BaseOpenAPISchema(BaseSchema):
         return None
 
     def get_headers(
-        self, operation: APIOperation, response: GenericResponse
+        self, operation: APIOperation, response: Response
     ) -> tuple[list[str], dict[str, dict[str, Any]] | None] | None:
         resolved = self._get_response_definitions(operation, response)
         if not resolved:
@@ -618,7 +611,7 @@ class BaseOpenAPISchema(BaseSchema):
             return jsonschema.Draft202012Validator
         return jsonschema.Draft4Validator
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
+    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:
@@ -632,20 +625,23 @@ class BaseOpenAPISchema(BaseSchema):
         if not schema:
             # No schema to check against
             return None
-        content_type = response.headers.get("Content-Type")
+        content_types = response.headers.get("content-type")
         failures: list[Failure] = []
-        if content_type is None:
+        if content_types is None:
             all_media_types = self.get_content_types(operation, response)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
             failures.append(
                 MissingContentType(operation=operation.verbose_name, message=message, media_types=all_media_types)
             )
+            content_type = None
+        else:
+            content_type = content_types[0]
         if content_type and not media_types.is_json(content_type):
             _maybe_raise_one_or_more(failures)
             return None
         try:
-            data = get_json(response)
+            data = response.json()
         except JSONDecodeError as exc:
             failures.append(MalformedJson.from_exception(operation=operation.verbose_name, exc=exc))
             _maybe_raise_one_or_more(failures)
@@ -953,7 +949,7 @@ class SwaggerV20(BaseOpenAPISchema):
             schema, self.nullable_name, is_response_schema=True, update_quantifiers=False
         )
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         produces = operation.definition.raw.get("produces", None)
         if produces:
             return produces
@@ -1113,7 +1109,7 @@ class OpenApi30(SwaggerV20):
         """Get examples from the API operation."""
         return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
 
-    def get_content_types(self, operation: APIOperation, response: GenericResponse) -> list[str]:
+    def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         resolved = self._get_response_definitions(operation, response)
         if not resolved:
             return []

@@ -15,32 +15,24 @@ import click
 
 import schemathesis.specs.openapi.checks as checks
 from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.cli import env
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, format_exception
 from schemathesis.core.fs import ensure_parent
 from schemathesis.core.output import OutputConfig
-from schemathesis.generation.hypothesis import settings
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
+from schemathesis.generation.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, settings
 from schemathesis.generation.targets import TARGETS
 
 from .. import contrib, experimental, generation, runner, service
 from .._override import CaseOverride
-from ..constants import (
-    API_NAME_ENV_VAR,
-    BASE_URL_ENV_VAR,
-    DEFAULT_RESPONSE_TIMEOUT,
-    EXTENSIONS_DOCUMENTATION_URL,
-    HOOKS_MODULE_ENV_VAR,
-    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    ISSUE_TRACKER_URL,
-    WAIT_FOR_SCHEMA_ENV_VAR,
-)
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
 from ..runner import events
 from ..runner.config import NetworkConfig
 from ..stateful import Stateful
 from . import cassettes, loaders, output, validation
-from .constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
+from .constants import DEFAULT_WORKERS, ISSUE_TRACKER_URL, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
@@ -73,13 +65,14 @@ DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGeneration
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
+EXTENSIONS_DOCUMENTATION_URL = "https://schemathesis.readthedocs.io/en/stable/extending.html"
 
 
 @click.group(context_settings=CONTEXT_SETTINGS)
 @click.version_option()
 def schemathesis() -> None:
     """Property-based API testing for OpenAPI and GraphQL."""
-    hooks = os.getenv(HOOKS_MODULE_ENV_VAR)
+    hooks = os.getenv(env.HOOKS_MODULE_ENV_VAR)
     if hooks:
         load_hook(hooks)
 
@@ -218,7 +211,7 @@ REPORT_TO_SERVICE = ReportToService()
     context_settings={"terminal_width": output.default.get_terminal_width(), **CONTEXT_SETTINGS},
 )
 @click.argument("schema", type=str)
-@click.argument("api_name", type=str, required=False, envvar=API_NAME_ENV_VAR)
+@click.argument("api_name", type=str, required=False, envvar=env.API_NAME_ENV_VAR)
 @group("Options")
 @grouped_option(
     "--workers",
@@ -336,7 +329,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default",
     type=click.FloatRange(1.0),
     default=None,
-    envvar=WAIT_FOR_SCHEMA_ENV_VAR,
+    envvar=env.WAIT_FOR_SCHEMA_ENV_VAR,
 )
 @group("Network requests options")
 @grouped_option(
@@ -345,7 +338,7 @@ REPORT_TO_SERVICE = ReportToService()
     help="Base URL of the API, required when schema is provided as a file",
     type=str,
     callback=validation.validate_base_url,
-    envvar=BASE_URL_ENV_VAR,
+    envvar=env.BASE_URL_ENV_VAR,
 )
 @grouped_option(
     "--request-timeout",

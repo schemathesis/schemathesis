@@ -2,7 +2,7 @@ import platform
 
 import pytest
 
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
+from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 
 

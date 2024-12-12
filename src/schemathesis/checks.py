@@ -6,14 +6,14 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 from schemathesis._override import CaseOverride
 from schemathesis.core.failures import MalformedJson, MaxResponseTimeConfig, ResponseTimeExceeded, ServerError
 from schemathesis.core.registries import Registry
+from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
     from .models import Case
-    from .transports.responses import GenericResponse
 
-CheckFunction = Callable[["CheckContext", "GenericResponse", "Case"], Optional[bool]]
+CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 ChecksConfig = dict[CheckFunction, Any]
 
 
@@ -51,27 +51,26 @@ check = CHECKS.register
 
 
 @check
-def not_a_server_error(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
     from .specs.graphql.schemas import GraphQLCase
     from .specs.graphql.validation import validate_graphql_response
-    from .transports.responses import get_json
 
     status_code = response.status_code
     if status_code >= 500:
         raise ServerError(operation=case.operation.verbose_name, status_code=status_code)
     if isinstance(case, GraphQLCase):
         try:
-            data = get_json(response)
+            data = response.json()
             validate_graphql_response(case, data)
         except json.JSONDecodeError as exc:
             raise MalformedJson.from_exception(operation=case.operation.verbose_name, exc=exc) from None
     return None
 
 
-def max_response_time(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     config = ctx.config.get(max_response_time, MaxResponseTimeConfig())
-    elapsed = response.elapsed.total_seconds()
+    elapsed = response.elapsed
     if elapsed > config.limit:
         raise ResponseTimeExceeded(
             operation=case.operation.verbose_name,

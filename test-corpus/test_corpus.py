@@ -14,8 +14,7 @@ from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import CHECKS
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
-from schemathesis.core.errors import IncorrectUsage, LoaderError, format_exception
+from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.generation._methods import DataGenerationMethod

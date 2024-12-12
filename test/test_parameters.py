@@ -534,12 +534,8 @@ def test_null_body(api_schema):
         assume(case.body is None)
         # Then it should be possible to send `null`
         response = case.call_and_validate()
-        if case.app is None:
-            data = response.content
-        else:
-            data = response.data.strip()
         # And the application should return what was sent (`/payload` behaves this way)
-        assert data == b"null"
+        assert response.content.strip() == b"null"
 
     test()
 

@@ -524,9 +524,6 @@ Called right after any successful test request during CLI runs. With this hook, 
 
 .. important:: Won't be called if request times-out.
 
-Depending on whether you use your Python app in-process, you might get different types for the ``response`` argument.
-For the WSGI case, it will be ``schemathesis.utils.WSGIResponse``.
-
 ``process_call_kwargs``
 ~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -566,7 +563,7 @@ Define a check as a function taking three parameters: ``ctx``, ``response`` and 
         ...
 
 - ``ctx`` holds a context relevant to the current check. Currently unused and is placed here for future-compatibility.
-- ``response`` is the API response, an instance of ``requests.Response`` or ``schemathesis.utils.WSGIResponse``, based on your integration method.
+- ``response`` is the API response, an instance of ``schemathesis.Response``.
 - ``case`` is the ``schemathesis.Case`` instance used to send data to the application.
 
 Here’s an example of a check that ensures that when an ``item_id`` of 42 is used, the response contains the text "Answer to the Ultimate Question":

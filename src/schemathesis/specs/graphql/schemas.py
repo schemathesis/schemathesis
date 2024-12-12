@@ -25,13 +25,13 @@ from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckFunction
-from schemathesis.core import NOT_SET, NotSet, Specification
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.transport import Response
 
 from ... import auths
 from ...checks import not_a_server_error
-from ...constants import SCHEMATHESIS_TEST_CASE_HEADER
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, OperationDefinition
@@ -44,7 +44,6 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from ...auths import AuthStorage
-    from ...transports.responses import GenericResponse
 
 
 @unique
@@ -72,7 +71,7 @@ class GraphQLCase(Case):
 
     def validate_response(
         self,
-        response: GenericResponse,
+        response: Response,
         checks: list[CheckFunction] | None = None,
         additional_checks: list[CheckFunction] | None = None,
         excluded_checks: list[CheckFunction] | None = None,

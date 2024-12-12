@@ -6,11 +6,11 @@ from enum import Enum
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import format_exception
+from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
     from ..models import Case
     from ..runner.models import Check
-    from ..transports.responses import GenericResponse
     from .state_machine import APIStateMachine
 
 
@@ -208,7 +208,7 @@ class StepFinished(StatefulEvent):
     transition_id: TransitionId | None
     target: str
     case: Case
-    response: GenericResponse | None
+    response: Response | None
     checks: list[Check]
 
     __slots__ = ("timestamp", "status", "transition_id", "target", "case", "response", "checks")
@@ -220,7 +220,7 @@ class StepFinished(StatefulEvent):
         transition_id: TransitionId | None,
         target: str,
         case: Case,
-        response: GenericResponse | None,
+        response: Response | None,
         checks: list[Check],
     ) -> None:
         self.status = status
@@ -245,7 +245,7 @@ class StepFinished(StatefulEvent):
             "target": self.target,
             "response": {
                 "status_code": self.response.status_code,
-                "elapsed": self.response.elapsed.total_seconds(),
+                "elapsed": self.response.elapsed,
             }
             if self.response is not None
             else None,

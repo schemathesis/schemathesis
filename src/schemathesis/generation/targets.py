@@ -6,16 +6,16 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Callable, Sequence
 
 from schemathesis.core.registries import Registry
+from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
     from schemathesis.models import Case
-    from schemathesis.transports.responses import GenericResponse
 
 
 @dataclass
 class TargetContext:
     case: Case
-    response: GenericResponse
+    response: Response
 
     __slots__ = ("case", "response")
 
@@ -29,7 +29,7 @@ target = TARGETS.register
 @target
 def response_time(ctx: TargetContext) -> float:
     """Response time as a metric to maximize."""
-    return ctx.response.elapsed.total_seconds()
+    return ctx.response.elapsed
 
 
 class TargetMetricCollector:
@@ -46,7 +46,7 @@ class TargetMetricCollector:
         for target in self.targets:
             self.observations[target.__name__].clear()
 
-    def store(self, case: Case, response: GenericResponse) -> None:
+    def store(self, case: Case, response: Response) -> None:
         """Calculate target metrics & store them."""
         context = TargetContext(case=case, response=response)
         for target in self.targets:
@@ -62,7 +62,7 @@ class TargetMetricCollector:
             hypothesis.target(metric, label=target.__name__)
 
 
-def run(targets: Sequence[TargetFunction], case: Case, response: GenericResponse) -> None:
+def run(targets: Sequence[TargetFunction], case: Case, response: Response) -> None:
     import hypothesis
 
     context = TargetContext(case=case, response=response)

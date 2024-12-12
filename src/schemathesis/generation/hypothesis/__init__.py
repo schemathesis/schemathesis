@@ -2,6 +2,7 @@ from typing import Any
 
 # Maximum test running time
 DEFAULT_DEADLINE = 15000
+HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 
 
 def setup() -> None:

@@ -6,7 +6,7 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.specs.openapi.serialization import (
     comma_delimited_object,
     conversion,

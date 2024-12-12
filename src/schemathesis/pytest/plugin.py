@@ -13,6 +13,8 @@ from jsonschema.exceptions import SchemaError
 
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    SERIALIZERS_SUGGESTION_MESSAGE,
     IncorrectUsage,
     InvalidHeadersExample,
     InvalidRegexPattern,
@@ -32,7 +34,6 @@ from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_outpu
 from schemathesis.pytest.control_flow import fail_on_no_matches
 
 from .._override import OverrideMark
-from ..constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SERIALIZERS_SUGGESTION_MESSAGE
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo

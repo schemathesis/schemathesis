@@ -21,6 +21,7 @@ from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
+from schemathesis.core.transport import Response
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.hooks import HookDispatcherMark
@@ -46,7 +47,6 @@ if TYPE_CHECKING:
     from schemathesis.transports import Transport
 
     from .stateful.state_machine import APIStateMachine
-    from .transports.responses import GenericResponse
 
 
 C = TypeVar("C", bound=Case)
@@ -357,7 +357,7 @@ class BaseSchema(Mapping):
     def get_tags(self, operation: APIOperation) -> list[str] | None:
         raise NotImplementedError
 
-    def validate_response(self, operation: APIOperation, response: GenericResponse) -> bool | None:
+    def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
         raise NotImplementedError
 
     def prepare_schema(self, schema: Any) -> Any:

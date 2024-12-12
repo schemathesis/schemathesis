@@ -1,15 +1,17 @@
 import json
+from unittest.mock import Mock
 
 import pytest
 import requests
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.core.transport import Response
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
-from schemathesis.specs.openapi.references import UNRESOLVABLE, resolve_pointer
 
 DOCUMENT = {
     "foo": ["bar", "baz"],
@@ -54,6 +56,13 @@ def case(operation):
     )
 
 
+class Headers(dict):
+    def getlist(self, key):
+        v = self.get(key)
+        if v is not None:
+            return [v]
+
+
 @pytest.fixture(scope="module")
 def response():
     response = requests.Response()
@@ -61,7 +70,8 @@ def response():
     response.status_code = 200
     response.headers["Content-Type"] = "application/json"
     response.headers["X-Response"] = "Y"
-    return response
+    response.raw = Mock(headers=Headers({"Content-Type": "application/json", "X-Response": "Y"}))
+    return Response.from_requests(response, True)
 
 
 @pytest.fixture

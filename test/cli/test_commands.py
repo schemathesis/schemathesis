@@ -21,7 +21,7 @@ from schemathesis._override import CaseOverride
 from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
-from schemathesis.constants import REPORT_SUGGESTION_ENV_VAR
+from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE

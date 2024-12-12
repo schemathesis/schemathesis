@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from requests.structures import CaseInsensitiveDict
 
-from .. import references
+from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 
 if TYPE_CHECKING:
     from .context import ExpressionContext
@@ -106,8 +106,8 @@ class BodyRequest(Node):
         document = context.case.body
         if self.pointer is None:
             return document
-        resolved = references.resolve_pointer(document, self.pointer[1:])
-        if resolved is references.UNRESOLVABLE:
+        resolved = resolve_pointer(document, self.pointer[1:])
+        if resolved is UNRESOLVABLE:
             return None
         return resolved
 
@@ -120,12 +120,12 @@ class HeaderResponse(Node):
     extractor: Extractor | None = None
 
     def evaluate(self, context: ExpressionContext) -> str:
-        value = context.response.headers.get(self.parameter)
+        value = context.response.headers.get(self.parameter.lower())
         if value is None:
             return ""
         if self.extractor is not None:
-            return self.extractor.extract(value) or ""
-        return value
+            return self.extractor.extract(value[0]) or ""
+        return value[0]
 
 
 @dataclass
@@ -135,16 +135,11 @@ class BodyResponse(Node):
     pointer: str | None = None
 
     def evaluate(self, context: ExpressionContext) -> Any:
-        from ....transports.responses import WSGIResponse
-
-        if isinstance(context.response, WSGIResponse):
-            document = context.response.json
-        else:
-            document = context.response.json()
+        document = context.response.json()
         if self.pointer is None:
             # We need the parsed document - data will be serialized before sending to the application
             return document
-        resolved = references.resolve_pointer(document, self.pointer[1:])
-        if resolved is references.UNRESOLVABLE:
+        resolved = resolve_pointer(document, self.pointer[1:])
+        if resolved is UNRESOLVABLE:
             return None
         return resolved

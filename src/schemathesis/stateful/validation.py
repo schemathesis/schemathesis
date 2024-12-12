@@ -4,10 +4,9 @@ from typing import TYPE_CHECKING
 
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
-    from requests import Response
-
     from ..models import Case
     from .context import RunnerContext
 
@@ -22,7 +21,7 @@ def validate_response(
     additional_checks: tuple[CheckFunction, ...] = (),
 ) -> None:
     """Validate the response against the provided checks."""
-    from ..runner.models import Check, Request, Response, Status
+    from ..runner.models import Check, Request, Status
 
     failures: list[Failure] = []
     check_results = runner_ctx.checks_for_step
@@ -35,7 +34,7 @@ def validate_response(
             name=_name,
             status=Status.failure,
             request=Request.from_prepared_request(response.request),
-            response=Response.from_requests(response=response),
+            response=response,
             case=case,
             failure=failure,
         )
@@ -48,7 +47,7 @@ def validate_response(
             name=_name,
             status=Status.success,
             request=Request.from_prepared_request(response.request),
-            response=Response.from_requests(response=response),
+            response=response,
             case=_case,
         )
         check_results.append(passed_check)

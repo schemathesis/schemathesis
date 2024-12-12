@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.failures import Failure
+from schemathesis.core.transport import Response
 from schemathesis.generation.targets import TargetMetricCollector
 
 from . import events
@@ -12,7 +13,6 @@ from . import events
 if TYPE_CHECKING:
     from ..models import Case
     from ..runner.models import Check
-    from ..transports.responses import GenericResponse
 
 
 @dataclass
@@ -30,7 +30,7 @@ class RunnerContext:
     # Status of the current step
     current_step_status: events.StepStatus | None = None
     # The currently processed response
-    current_response: GenericResponse | None = None
+    current_response: Response | None = None
     # Total number of failures
     failures_count: int = 0
     # The total number of completed test scenario
@@ -91,7 +91,7 @@ class RunnerContext:
         self.failures_for_suite.append(check)
         self.failures_count += 1
 
-    def collect_metric(self, case: Case, response: GenericResponse) -> None:
+    def collect_metric(self, case: Case, response: Response) -> None:
         self.metric_collector.store(case, response)
 
     def maximize_metrics(self) -> None:

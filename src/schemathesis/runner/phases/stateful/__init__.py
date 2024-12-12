@@ -11,8 +11,6 @@ if TYPE_CHECKING:
 
 
 def execute(ctx: EngineContext) -> EventGenerator:
-    import requests
-
     from ....stateful import events as stateful_events
     from ....stateful import runner as stateful_runner
 
@@ -43,11 +41,10 @@ def execute(ctx: EngineContext) -> EventGenerator:
 
     def on_step_finished(event: stateful_events.StepFinished) -> None:
         if event.response is not None and event.status is not None:
-            response = cast(requests.Response, event.response)
             result.store_requests_response(
                 status=from_step_status(event.status),
                 case=event.case,
-                response=response,
+                response=event.response,
                 checks=event.checks,
                 # TODO: reuse engine-wide transport
                 session=config.session,

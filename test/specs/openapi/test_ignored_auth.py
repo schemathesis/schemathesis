@@ -1,4 +1,3 @@
-import json
 import sys
 from typing import Annotated
 from unittest.mock import Mock
@@ -52,10 +51,10 @@ def test_auth_is_not_checked(with_generated, schema_url):
     assert check.name == "ignored_auth"
     if with_generated:
         assert "Authorization" in check.request.headers
-        assert json.loads(check.response.body) == {"has_auth": True}
+        assert check.response.json() == {"has_auth": True}
     else:
         assert "Authorization" not in check.request.headers
-        assert json.loads(check.response.body) == {"has_auth": False}
+        assert check.response.json() == {"has_auth": False}
 
 
 @pytest.mark.operations("basic")

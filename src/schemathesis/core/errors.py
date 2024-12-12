@@ -8,7 +8,6 @@ import traceback
 from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
-from schemathesis.constants import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
@@ -16,10 +15,13 @@ if TYPE_CHECKING:
     from jsonschema import SchemaError as JsonSchemaError
     from requests import RequestException
 
-    from schemathesis.transports.responses import GenericResponse
-
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"
+SERIALIZERS_SUGGESTION_MESSAGE = (
+    "You can register your own serializer with `schemathesis.serializer` "
+    "and Schemathesis will be able to make API calls with this media type. \n"
+    "See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information."
+)
 
 
 class SchemathesisError(Exception):
@@ -186,6 +188,11 @@ SERIALIZATION_NOT_POSSIBLE_MESSAGE = (
 SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE = (
     f"Schemathesis can't serialize data to {{}} \n{SERIALIZERS_SUGGESTION_MESSAGE}"
 )
+RECURSIVE_REFERENCE_ERROR_MESSAGE = (
+    "Currently, Schemathesis can't generate data for this operation due to "
+    "recursive references in the operation definition. See more information in "
+    "this issue - https://github.com/schemathesis/schemathesis/issues/947"
+)
 
 
 class SerializationNotPossible(SerializationError):
@@ -268,13 +275,11 @@ class LoaderError(SchemathesisError):
         kind: LoaderErrorKind,
         message: str,
         url: str | None = None,
-        response: GenericResponse | None = None,
         extras: list[str] | None = None,
     ) -> None:
         self.kind = kind
         self.message = message
         self.url = url
-        self.response = response
         self.extras = extras or []
 
     def __str__(self) -> str:

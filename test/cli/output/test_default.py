@@ -1,6 +1,7 @@
 import click
 import hypothesis
 import pytest
+from requests import PreparedRequest
 
 import schemathesis
 import schemathesis.cli.context
@@ -8,9 +9,10 @@ from schemathesis import models, runner
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.core import NOT_SET
+from schemathesis.core.transport import Response
 from schemathesis.models import Case, OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
-from schemathesis.runner.models import Check, Request, Response, Status, TestResult, TestResultSet
+from schemathesis.runner.models import Check, Request, Status, TestResult, TestResultSet
 
 from ...utils import strip_style_win32
 
@@ -40,14 +42,16 @@ def operation(swagger_20):
 
 @pytest.fixture
 def response():
-    body = b'{"id": 5}'
+    content = b'{"id": 5}'
+    request = PreparedRequest()
+    request.prepare("GET", "http://127.0.0.1")
     return Response(
         status_code=201,
-        body=body,
-        body_size=len(body),
+        content=content,
         message="Created",
         encoding="utf-8",
         http_version="1.1",
+        request=request,
         elapsed=1.0,
         headers={"Content-Type": ["application/json"]},
         verify=True,

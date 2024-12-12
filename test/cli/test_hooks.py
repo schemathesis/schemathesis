@@ -32,10 +32,7 @@ import requests
 @schemathesis.hook
 def after_call(context, case, response):
     data = b'{"wrong": 42}'
-    if isinstance(response, requests.Response):
-        response._content = data
-    else:
-        response.set_data(data)
+    response.content = data
         """
     )
     # Then the tests should fail

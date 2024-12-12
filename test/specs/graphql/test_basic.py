@@ -7,7 +7,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
@@ -169,7 +169,7 @@ def test_malformed_response(graphql_url):
     response = requests.post(graphql_url, json={"query": get_introspection_query()}, timeout=1)
     response._content += b"42"
     with pytest.raises(LoaderError, match="Received unsupported content while expecting a JSON payload for GraphQL"):
-        extract_schema_from_response(response)
+        extract_schema_from_response(response, lambda r: r.json())
 
 
 def test_operations_count(graphql_url):

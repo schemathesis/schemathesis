@@ -47,7 +47,7 @@ def test_cookies(flask_app):
     def test(case):
         response = case.call()
         assert response.status_code == 200
-        assert response.json == {"token": "test"}
+        assert response.json() == {"token": "test"}
 
     test()
 
@@ -63,7 +63,7 @@ def test_form_data(schema):
         response = case.call()
         assert response.status_code == 200
         # converted to string in the app
-        assert response.json == {key: str(value) for key, value in case.body.items()}
+        assert response.json() == {key: str(value) for key, value in case.body.items()}
 
     test()
 
@@ -96,7 +96,7 @@ def test_binary_body(mocker, flask_app):
     def test(case):
         response = case.call()
         assert response.status_code == 200
-        assert response.json == {"size": mocker.ANY}
+        assert response.json() == {"size": mocker.ANY}
 
     # Then it should be sent correctly
     test()

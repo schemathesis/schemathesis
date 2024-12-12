@@ -48,7 +48,12 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(
-            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.FAILURE, request=ANY, response=ANY, error=None
+            probe=probes.NullByteInHeader(),
+            outcome=probes.ProbeOutcome.FAILURE,
+            config=config,
+            request=ANY,
+            response=ANY,
+            error=None,
         )
     ]
     assert results[0].serialize() == {
@@ -96,17 +101,17 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
             "elapsed": 0.0,
             "encoding": None,
             "headers": {
-                "Content-Length": [
+                "content-length": [
                     "17",
                 ],
-                "Content-Type": [
+                "content-type": [
                     "application/json",
                 ],
             },
             "http_version": "1.1",
             "message": None,
             "status_code": 200,
-            "verify": True,
+            "verify": False,
         },
         "outcome": "failure",
     }
@@ -118,7 +123,12 @@ def test_detect_null_byte_error(openapi_30, config_factory):
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(
-            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.ERROR, request=ANY, response=None, error=ANY
+            probe=probes.NullByteInHeader(),
+            outcome=probes.ProbeOutcome.ERROR,
+            config=config,
+            request=ANY,
+            response=None,
+            error=ANY,
         )
     ]
     serialized = results[0].serialize()
@@ -158,7 +168,12 @@ def test_detect_null_byte_skipped(openapi_30, config_factory):
     results = probes.run(openapi_30, config)
     assert results == [
         probes.ProbeRun(
-            probe=probes.NullByteInHeader(), outcome=probes.ProbeOutcome.SKIP, request=None, response=None, error=None
+            probe=probes.NullByteInHeader(),
+            outcome=probes.ProbeOutcome.SKIP,
+            config=config,
+            request=None,
+            response=None,
+            error=None,
         )
     ]
     assert results[0].serialize() == {

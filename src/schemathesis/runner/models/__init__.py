@@ -1,7 +1,7 @@
 from .check import Check, group_failures_by_code_sample
 from .outcome import TestResult, TestResultSet
 from .status import Status
-from .transport import Interaction, Request, Response
+from .transport import Interaction, Request
 
 __all__ = [
     "Check",
@@ -9,7 +9,6 @@ __all__ = [
     "TestResultSet",
     "TestResult",
     "Request",
-    "Response",
     "Interaction",
     "group_failures_by_code_sample",
 ]

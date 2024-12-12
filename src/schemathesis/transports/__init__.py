@@ -4,15 +4,14 @@ import inspect
 import time
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import timedelta
 from functools import lru_cache
 from inspect import iscoroutinefunction
 from typing import TYPE_CHECKING, Any, Generator, Protocol, TypeVar
 from urllib.parse import urlparse
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 
-from ..constants import DEFAULT_RESPONSE_TIMEOUT
 from ..serializers import SerializerContext
 
 if TYPE_CHECKING:
@@ -22,7 +21,6 @@ if TYPE_CHECKING:
     from starlette_testclient._testclient import ASGI2App, ASGI3App
 
     from ..models import Case
-    from .responses import WSGIResponse
 
 
 def get(app: Any) -> Transport:
@@ -37,10 +35,9 @@ def get(app: Any) -> Transport:
 
 
 S = TypeVar("S", contravariant=True)
-R = TypeVar("R", covariant=True)
 
 
-class Transport(Protocol[S, R]):
+class Transport(Protocol[S]):
     def serialize_case(
         self,
         case: Case,
@@ -62,7 +59,7 @@ class Transport(Protocol[S, R]):
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> R:
+    ) -> Response:
         raise NotImplementedError
 
 
@@ -124,7 +121,7 @@ class RequestsTransport:
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> requests.Response:
+    ) -> Response:
         import requests
 
         data = self.serialize_case(case, base_url=base_url, headers=headers, params=params, cookies=cookies)
@@ -139,11 +136,9 @@ class RequestsTransport:
         verify = data.get("verify", True)
         with case.operation.schema.ratelimit():
             response = session.request(**data)  # type: ignore
-        response.verify = verify  # type: ignore[attr-defined]
-        response._session = session  # type: ignore[attr-defined]
         if close_session:
             session.close()
-        return response
+        return Response.from_requests(response, verify=verify)
 
 
 def _merge_dict_to(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
@@ -189,7 +184,7 @@ class ASGITransport(RequestsTransport):
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> requests.Response:
+    ) -> Response:
         from starlette_testclient import TestClient as ASGIClient
 
         if base_url is None:
@@ -251,16 +246,14 @@ class WSGITransport:
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> WSGIResponse:
+    ) -> Response:
         import requests
         import werkzeug
-
-        from .responses import WSGIResponse
 
         application = kwargs.pop("app", self.app) or self.app
         data = self.serialize_case(case, headers=headers, params=params)
         data.update(kwargs)
-        client = werkzeug.Client(application, WSGIResponse)
+        client = werkzeug.Client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}
         with cookie_handler(client, cookies), case.operation.schema.ratelimit():
             start = time.monotonic()
@@ -273,9 +266,15 @@ class WSGITransport:
             params=params,
             cookies=cookies,
         )
-        response.request = requests.Request(**requests_kwargs).prepare()
-        response.elapsed = timedelta(seconds=elapsed)
-        return response
+        headers = {key: response.headers.getlist(key) for key in response.headers.keys()}
+        return Response(
+            status_code=response.status_code,
+            headers=headers,
+            content=response.get_data(),
+            request=requests.Request(**requests_kwargs).prepare(),
+            elapsed=elapsed,
+            verify=False,
+        )
 
 
 @contextmanager

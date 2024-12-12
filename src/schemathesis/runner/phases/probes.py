@@ -15,10 +15,10 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import format_exception
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.transport import USER_AGENT, Response
 
 from .. import events
-from ..models import Request, Response
+from ..models import Request
 
 if TYPE_CHECKING:
     import requests
@@ -95,6 +95,7 @@ class ProbeOutcome(str, enum.Enum):
 class ProbeRun:
     probe: Probe
     outcome: ProbeOutcome
+    config: NetworkConfig
     request: requests.PreparedRequest | None = None
     response: requests.Response | None = None
     error: requests.RequestException | None = None
@@ -114,7 +115,7 @@ class ProbeRun:
             request = None
         if self.response:
             sanitize_value(self.response.headers)
-            response = Response.from_requests(self.response).asdict()
+            response = Response.from_requests(self.response, verify=bool(self.config.tls_verify)).asdict()
         else:
             response = None
         if self.error:
@@ -163,7 +164,7 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
-        kwargs: dict[str, Any] = {"timeout": config.timeout or 2}
+        kwargs: dict[str, Any] = {"timeout": config.timeout or 2, "verify": config.tls_verify}
         if config.proxy is not None:
             kwargs["proxies"] = {"all": config.proxy}
         with warnings.catch_warnings():
@@ -172,9 +173,9 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
-        return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
+        return ProbeRun(probe, ProbeOutcome.SKIP, config, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
+        return ProbeRun(probe, ProbeOutcome.ERROR, config, req, None, exc)
     result_type = probe.analyze_response(response)
-    return ProbeRun(probe, result_type, request, response)
+    return ProbeRun(probe, result_type, config, request, response)

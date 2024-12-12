@@ -11,8 +11,8 @@ from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.transport import Response
 
-from ..constants import NO_LINKS_ERROR_MESSAGE
 from ..models import APIOperation, Case
 from .config import _default_hypothesis_settings_factory
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
@@ -23,15 +23,20 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from ..schemas import BaseSchema
-    from ..transports.responses import GenericResponse
     from .statistic import TransitionStats
+
+NO_LINKS_ERROR_MESSAGE = (
+    "Stateful testing requires at least one OpenAPI link in the schema, but no links detected. "
+    "Please add OpenAPI links to enable stateful testing or use stateless tests instead. \n"
+    "See https://schemathesis.readthedocs.io/en/stable/stateful.html#how-to-specify-connections for more information."
+)
 
 
 @dataclass
 class StepResult:
     """Output from a single transition of a state machine."""
 
-    response: GenericResponse
+    response: Response
     case: Case
     elapsed: float
 
@@ -190,7 +195,7 @@ class APIStateMachine(RuleBasedStateMachine):
                         case.body["is_fake"] = True
         """
 
-    def after_call(self, response: GenericResponse, case: Case) -> None:
+    def after_call(self, response: Response, case: Case) -> None:
         """Hook method for additional actions with case or response instances.
 
         :param response: Response from the application under test.
@@ -223,7 +228,7 @@ class APIStateMachine(RuleBasedStateMachine):
             # PATCH /users/{user_id} -> 500
         """
 
-    def call(self, case: Case, **kwargs: Any) -> GenericResponse:
+    def call(self, case: Case, **kwargs: Any) -> Response:
         """Make a request to the API.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
@@ -256,7 +261,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return {}
 
     def validate_response(
-        self, response: GenericResponse, case: Case, additional_checks: list[CheckFunction] | None = None
+        self, response: Response, case: Case, additional_checks: list[CheckFunction] | None = None
     ) -> None:
         """Validate an API response.
 
@@ -290,7 +295,7 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks)
 
-    def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
+    def store_result(self, response: Response, case: Case, elapsed: float) -> StepResult:
         return StepResult(response, case, elapsed)
 
 

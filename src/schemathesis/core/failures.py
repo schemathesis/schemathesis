@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from json import JSONDecodeError
 
-from schemathesis._compat import BaseExceptionGroup
+from schemathesis.core.compat import BaseExceptionGroup
 
 
 @dataclass

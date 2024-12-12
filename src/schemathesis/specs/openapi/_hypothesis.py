@@ -12,10 +12,9 @@ from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.constants import SERIALIZERS_SUGGESTION_MESSAGE
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
-from schemathesis.core.errors import SerializationNotPossible
+from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import GenerationMetadata, TestPhase

@@ -4,7 +4,7 @@ from functools import lru_cache
 from shlex import quote
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict

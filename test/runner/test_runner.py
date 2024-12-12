@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import platform
 from dataclasses import asdict
 from typing import TYPE_CHECKING
@@ -18,7 +17,8 @@ import schemathesis
 from schemathesis import experimental
 from schemathesis._override import CaseOverride
 from schemathesis.checks import not_a_server_error
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE, SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
@@ -124,8 +124,8 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     }
     assert failure.response.status_code == 500
     assert failure.response.message == "Internal Server Error"
-    assert failure.response.headers["Content-Type"] == ["text/plain; charset=utf-8"]
-    assert failure.response.headers["Content-Length"] == ["26"]
+    assert failure.response.headers["content-type"] == ["text/plain; charset=utf-8"]
+    assert failure.response.headers["content-length"] == ["26"]
     # success
     interactions = next(
         event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.success
@@ -147,9 +147,9 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     }
     assert success.response.status_code == 200
     assert success.response.message == "OK"
-    assert json.loads(success.response.body) == {"success": True}
+    assert success.response.json() == {"success": True}
     assert success.response.encoding == "utf-8"
-    assert success.response.headers["Content-Type"] == ["application/json; charset=utf-8"]
+    assert success.response.headers["content-type"] == ["application/json; charset=utf-8"]
 
 
 @pytest.mark.operations("root")
@@ -169,8 +169,6 @@ def test_empty_response_interaction(real_app_schema):
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
         assert interaction.request.body is None
-        # And its response as well
-        assert interaction.response.body is None
         # And response encoding is missing
         assert interaction.response.encoding is None
 
@@ -183,7 +181,7 @@ def test_empty_string_response_interaction(real_app_schema):
     interactions = next(event for event in others if isinstance(event, events.AfterExecution)).result.interactions
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
-        assert interaction.response.body == b""
+        assert interaction.response.content == b""
         assert interaction.response.encoding == "utf-8"
 
 

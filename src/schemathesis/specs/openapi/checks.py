@@ -11,6 +11,7 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
+from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -34,11 +35,10 @@ if TYPE_CHECKING:
     from requests import PreparedRequest
 
     from ...models import APIOperation, Case
-    from ...transports.responses import GenericResponse
 
 
 @schemathesis.check
-def status_code_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def status_code_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -67,7 +67,7 @@ def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, N
 
 
 @schemathesis.check
-def content_type_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def content_type_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -75,14 +75,15 @@ def content_type_conformance(ctx: CheckContext, response: GenericResponse, case:
     documented_content_types = case.operation.schema.get_content_types(case.operation, response)
     if not documented_content_types:
         return None
-    content_type = response.headers.get("Content-Type")
-    if not content_type:
+    content_types = response.headers.get("content-type")
+    if not content_types:
         all_media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
         raise MissingContentType(
             operation=case.operation.verbose_name,
             message=f"The following media types are documented in the schema:{''.join(all_media_types)}",
             media_types=documented_content_types,
         )
+    content_type = content_types[0]
     for option in documented_content_types:
         try:
             expected_main, expected_sub = media_types.parse(option)
@@ -117,7 +118,7 @@ def _reraise_malformed_media_type(case: Case, location: str, actual: str, define
 
 
 @schemathesis.check
-def response_headers_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def response_headers_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     import jsonschema
 
     from .parameters import OpenAPI20Parameter, OpenAPI30Parameter
@@ -135,7 +136,7 @@ def response_headers_conformance(ctx: CheckContext, response: GenericResponse, c
     missing_headers = [
         header
         for header, definition in defined_headers.items()
-        if header not in response.headers and definition.get(case.operation.schema.header_required_field, False)
+        if header.lower() not in response.headers and definition.get(case.operation.schema.header_required_field, False)
     ]
     errors: list[Failure] = []
     if missing_headers:
@@ -145,8 +146,9 @@ def response_headers_conformance(ctx: CheckContext, response: GenericResponse, c
             MissingHeaders(operation=case.operation.verbose_name, message=message, missing_headers=missing_headers)
         )
     for name, definition in defined_headers.items():
-        value = response.headers.get(name)
-        if value is not None:
+        values = response.headers.get(name.lower())
+        if values is not None:
+            value = values[0]
             with case.operation.schema._validating_response(scopes) as resolver:
                 if "$ref" in definition:
                     _, definition = resolver.resolve(definition["$ref"])
@@ -201,7 +203,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
 
 
 @schemathesis.check
-def response_schema_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def response_schema_conformance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -210,7 +212,7 @@ def response_schema_conformance(ctx: CheckContext, response: GenericResponse, ca
 
 
 @schemathesis.check
-def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -235,7 +237,7 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
 
 
 @schemathesis.check
-def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
@@ -258,7 +260,7 @@ def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case:
     return None
 
 
-def missing_required_header(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def missing_required_header(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     # NOTE: This check is intentionally not registered with `@schemathesis.check` because it is experimental
     if (
         case.meta
@@ -302,7 +304,7 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
 
 @schemathesis.check
-def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
+def use_after_free(ctx: CheckContext, response: Response, original: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
@@ -338,7 +340,7 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
 
 
 @schemathesis.check
-def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, original: Case) -> bool | None:
+def ensure_resource_availability(ctx: CheckContext, response: Response, original: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
@@ -375,7 +377,7 @@ class AuthKind(enum.Enum):
 
 
 @schemathesis.check
-def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema
 
@@ -418,16 +420,12 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
     return None
 
 
-def _update_response(old: GenericResponse, new: GenericResponse) -> None:
-    # Mutate the response object in place on the best effort basis
-    if hasattr(old, "__attrs__"):
-        for attribute in new.__attrs__:
-            setattr(old, attribute, getattr(new, attribute))
-    else:
-        old.__dict__.update(new.__dict__)
+def _update_response(old: Response, new: Response) -> None:
+    for key in Response.__slots__:
+        setattr(old, key, getattr(new, key))
 
 
-def _raise_no_auth_error(response: GenericResponse, operation: str, suffix: str) -> NoReturn:
+def _raise_no_auth_error(response: Response, operation: str, suffix: str) -> NoReturn:
     reason = http.client.responses.get(response.status_code, "Unknown")
     raise IgnoredAuth(
         operation=operation,
