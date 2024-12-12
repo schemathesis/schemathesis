@@ -9,6 +9,4 @@ if TYPE_CHECKING:
 def get_client(app: Any) -> Client:
     from werkzeug import Client
 
-    from schemathesis.transports.responses import WSGIResponse
-
-    return Client(app, WSGIResponse)
+    return Client(app)

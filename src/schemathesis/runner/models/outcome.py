@@ -5,11 +5,12 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence
 
 from schemathesis.core.failures import Failure
+from schemathesis.core.transport import Response
 
 from ..errors import EngineErrorInfo, deduplicate_errors
 from .check import Check
 from .status import Status
-from .transport import Interaction, Request, Response
+from .transport import Interaction, Request
 
 if TYPE_CHECKING:
     import unittest
@@ -186,7 +187,7 @@ class TestResult:
     def store_requests_response(
         self,
         case: Case,
-        response: requests.Response | None,
+        response: Response | None,
         status: Status,
         checks: list[Check],
         session: requests.Session,

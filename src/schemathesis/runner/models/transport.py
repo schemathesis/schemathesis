@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
+from schemathesis.core.transport import Response
+
 from ...generation import DataGenerationMethod
 from ...transports import RequestsTransport
 from .status import Status
@@ -81,69 +83,6 @@ class Request:
         }
 
 
-@dataclass(repr=False)
-class Response:
-    """Unified response data."""
-
-    status_code: int
-    message: str
-    headers: dict[str, list[str]]
-    body: bytes | None
-    body_size: int | None
-    encoding: str | None
-    http_version: str
-    elapsed: float
-    verify: bool
-
-    @classmethod
-    def from_requests(cls, response: requests.Response) -> Response:
-        """Create a response from requests.Response."""
-        raw = response.raw
-        raw_headers = raw.headers if raw is not None else {}
-        headers = {name: response.raw.headers.getlist(name) for name in raw_headers.keys()}
-        # Similar to http.client:319 (HTTP version detection in stdlib's `http` package)
-        version = raw.version if raw is not None else 10
-        http_version = "1.0" if version == 10 else "1.1"
-
-        def is_empty(_response: requests.Response) -> bool:
-            # Assume the response is empty if:
-            #   - no `Content-Length` header
-            #   - no chunks when iterating over its content
-            return "Content-Length" not in headers and list(_response.iter_content()) == []
-
-        body = None if is_empty(response) else response.content
-        return cls(
-            status_code=response.status_code,
-            message=response.reason,
-            body=body,
-            body_size=len(response.content) if body is not None else None,
-            encoding=response.encoding,
-            headers=headers,
-            http_version=http_version,
-            elapsed=response.elapsed.total_seconds(),
-            verify=getattr(response, "verify", True),
-        )
-
-    @cached_property
-    def encoded_body(self) -> str | None:
-        if self.body is not None:
-            return serialize_payload(self.body)
-        return None
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "status_code": self.status_code,
-            "message": self.message,
-            "headers": self.headers,
-            "body": self.encoded_body,
-            "body_size": self.body_size,
-            "encoding": self.encoding,
-            "http_version": self.http_version,
-            "elapsed": self.elapsed,
-            "verify": self.verify,
-        }
-
-
 TIMEZONE = datetime.datetime.now(datetime.timezone.utc).astimezone().tzinfo
 
 
@@ -169,7 +108,7 @@ class Interaction:
     def from_requests(
         cls,
         case: Case,
-        response: requests.Response | None,
+        response: Response | None,
         status: Status,
         checks: list[Check],
         session: requests.Session,
@@ -180,7 +119,7 @@ class Interaction:
             request = Request.from_case(case, session)
         return cls(
             request=request,
-            response=Response.from_requests(response) if response is not None else None,
+            response=response,
             status=status,
             checks=checks,
             data_generation_method=cast(DataGenerationMethod, case.data_generation_method),

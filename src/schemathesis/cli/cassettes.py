@@ -16,6 +16,7 @@ import harfile
 
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 
 from ..runner import events
@@ -25,7 +26,7 @@ if TYPE_CHECKING:
     import click
     import requests
 
-    from ..runner.models import Check, Interaction, Request, Response
+    from ..runner.models import Check, Interaction, Request
     from .context import ExecutionContext
 
 # Wait until the worker terminates
@@ -209,9 +210,9 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
                 write_double_quoted(output, string)
 
         def format_response_body(output: IO, response: Response) -> None:
-            if response.body is not None:
+            if response.content is not None:
                 encoding = response.encoding or "utf8"
-                string = response.body.decode(encoding, "replace")
+                string = response.content.decode(encoding, "replace")
                 output.write(
                     f"""    body:
       encoding: '{encoding}'
@@ -375,11 +376,11 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                             mimeType=content_type,
                             text=interaction.response.encoded_body
                             if config.preserve_exact_body_bytes
-                            else interaction.response.body.decode("utf-8", "replace")
-                            if interaction.response.body is not None
+                            else interaction.response.content.decode("utf-8", "replace")
+                            if interaction.response.content is not None
                             else None,
                             encoding="base64"
-                            if interaction.response.body is not None and config.preserve_exact_body_bytes
+                            if interaction.response.content is not None and config.preserve_exact_body_bytes
                             else None,
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"

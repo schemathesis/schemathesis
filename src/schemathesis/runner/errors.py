@@ -12,8 +12,8 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, cast
 
 from schemathesis import errors
-from schemathesis.constants import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.errors import (
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
     SerializationNotPossible,
     format_exception,
     get_request_error_extras,

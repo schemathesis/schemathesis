@@ -3,9 +3,8 @@ from __future__ import annotations
 import http.client
 from typing import TYPE_CHECKING, Any, Callable, NoReturn
 
-from schemathesis.constants import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, get_request_error_extras, get_request_error_message
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, USER_AGENT
 
 if TYPE_CHECKING:
     import requests
@@ -33,7 +32,6 @@ def handle_request_error(exc: requests.RequestException) -> NoReturn:
         message=get_request_error_message(exc),
         kind=kind,
         url=url,
-        response=exc.response,
         extras=get_request_error_extras(exc),
     ) from exc
 
@@ -57,7 +55,7 @@ def raise_for_status(response: requests.Response) -> requests.Response:
             if status_code == 404
             else LoaderErrorKind.HTTP_CLIENT_ERROR
         )
-    raise LoaderError(message=message, kind=kind, url=response.request.url, response=response, extras=[])
+    raise LoaderError(message=message, kind=kind, url=response.request.url, extras=[])
 
 
 def make_request(func: Callable[..., requests.Response], url: str, **kwargs: Any) -> requests.Response:

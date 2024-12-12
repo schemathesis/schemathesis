@@ -15,8 +15,10 @@ from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction
+from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
+    SERIALIZERS_SUGGESTION_MESSAGE,
     InternalError,
     InvalidHeadersExample,
     InvalidRegexPattern,
@@ -26,6 +28,7 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transport import Response
 from schemathesis.generation import targets
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
@@ -41,20 +44,17 @@ from schemathesis.runner.errors import (
     deduplicate_errors,
 )
 
-from ...._compat import BaseExceptionGroup
-from ....constants import SERIALIZERS_SUGGESTION_MESSAGE
 from ... import events
 from ...context import EngineContext
 from ...models.check import Check
 from ...models.outcome import TestResult
 from ...models.status import Status
-from ...models.transport import Request, Response
+from ...models.transport import Request
 
 if TYPE_CHECKING:
     import requests
 
     from ....models import APIOperation, Case
-    from ....transports.responses import GenericResponse
 
 
 def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineContext) -> events.EventGenerator:
@@ -263,7 +263,7 @@ def run_checks(
     checks: Iterable[CheckFunction],
     check_results: list[Check],
     result: TestResult,
-    response: GenericResponse,
+    response: Response,
 ) -> None:
     failures = set()
 
@@ -274,7 +274,7 @@ def run_checks(
                 name=check_name,
                 case=case,
                 request=Request.from_prepared_request(response.request),
-                response=Response.from_requests(response=response),
+                response=response,
                 failure=failure,
             )
         )
@@ -288,7 +288,7 @@ def run_checks(
                     name=check_name,
                     case=case,
                     request=Request.from_prepared_request(response.request),
-                    response=Response.from_requests(response=response),
+                    response=response,
                 )
                 check_results.append(check_result)
         except Failure as failure:
@@ -384,7 +384,7 @@ def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session:
 
 def _network_test(
     case: Case, ctx: EngineContext, result: TestResult, session: requests.Session, headers: dict[str, Any] | None
-) -> requests.Response:
+) -> Response:
     import requests
 
     check_results: list[Check] = []

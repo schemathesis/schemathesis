@@ -8,9 +8,10 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator
 from schemathesis.core import curl
 from schemathesis.core.failures import Failure
 from schemathesis.core.output.sanitization import sanitize_value
+from schemathesis.core.transport import Response
 
 from .status import Status
-from .transport import Request, Response
+from .transport import Request
 
 if TYPE_CHECKING:
     from ...models import Case
@@ -73,5 +74,5 @@ def _by_unique_key(check: Check) -> tuple[str, int, bytes]:
     return (
         check.code_sample,
         check.response.status_code,
-        check.response.body or b"SCHEMATHESIS-INTERNAL-EMPTY-BODY",
+        check.response.content or b"SCHEMATHESIS-INTERNAL-EMPTY-BODY",
     )

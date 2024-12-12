@@ -8,7 +8,7 @@ import pytest
 
 import schemathesis
 from schemathesis.checks import max_response_time, not_a_server_error
-from schemathesis.constants import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.service.serialization import _serialize_stateful_event

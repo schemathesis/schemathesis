@@ -25,7 +25,7 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis.cli import CUSTOM_HANDLERS
-from schemathesis.constants import HOOKS_MODULE_ENV_VAR
+from schemathesis.cli.env import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR

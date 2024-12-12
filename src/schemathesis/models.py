@@ -19,18 +19,17 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction
-from schemathesis.core import NOT_SET, NotSet, curl
+from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation.meta import GenerationMetadata
 
 from . import serializers
 from ._override import CaseOverride
-from .constants import SCHEMATHESIS_TEST_CASE_HEADER
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
@@ -44,7 +43,6 @@ if TYPE_CHECKING:
     from .auths import AuthStorage
     from .schemas import BaseSchema
     from .serializers import Serializer
-    from .transports.responses import GenericResponse
 
 
 @dataclass
@@ -60,7 +58,7 @@ class CaseSource:
     """Data sources, used to generate a test case."""
 
     case: Case
-    response: GenericResponse
+    response: Response
     elapsed: float
     overrides_all_parameters: bool
     transition_id: TransitionId
@@ -175,7 +173,7 @@ class Case:
 
     def set_source(
         self,
-        response: GenericResponse,
+        response: Response,
         case: Case,
         elapsed: float,
         overrides_all_parameters: bool,
@@ -287,7 +285,7 @@ class Case:
         params: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         **kwargs: Any,
-    ) -> GenericResponse:
+    ) -> Response:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self, **kwargs)
         response = self.operation.schema.transport.send(
@@ -298,7 +296,7 @@ class Case:
 
     def validate_response(
         self,
-        response: GenericResponse,
+        response: Response,
         checks: list[CheckFunction] | None = None,
         additional_checks: list[CheckFunction] | None = None,
         excluded_checks: list[CheckFunction] | None = None,
@@ -317,8 +315,6 @@ class Case:
         """
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
-
-        from .transports.responses import get_payload
 
         checks = checks or CHECKS.get_all()
         checks = [check for check in checks if check not in (excluded_checks or [])]
@@ -353,7 +349,7 @@ class Case:
                 message += "s"
             reason = http.client.responses.get(response.status_code, "Unknown")
             message += f".\n\n[{response.status_code}] {reason}:"
-            payload = get_payload(response)
+            payload = response.text
             if not payload:
                 message += "\n\n    <EMPTY>"
             else:
@@ -374,7 +370,7 @@ class Case:
         additional_checks: list[CheckFunction] | None = None,
         excluded_checks: list[CheckFunction] | None = None,
         **kwargs: Any,
-    ) -> GenericResponse:
+    ) -> Response:
         __tracebackhide__ = True
         response = self.call(base_url, session, headers, **kwargs)
         self.validate_response(
@@ -609,14 +605,14 @@ class APIOperation(Generic[P, C]):
         path = self.path.replace("~", "~0").replace("/", "~1")
         return f"#/paths/{path}/{self.method}"
 
-    def validate_response(self, response: GenericResponse) -> bool | None:
+    def validate_response(self, response: Response) -> bool | None:
         """Validate API response for conformance.
 
         :raises FailureGroup: If the response does not conform to the API schema.
         """
         return self.schema.validate_response(self, response)
 
-    def is_response_valid(self, response: GenericResponse) -> bool:
+    def is_response_valid(self, response: Response) -> bool:
         """Validate API response for conformance."""
         try:
             self.validate_response(response)

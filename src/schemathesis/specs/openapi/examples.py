@@ -10,10 +10,10 @@ import requests
 from hypothesis_jsonschema import from_schema
 
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 
-from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...models import APIOperation, Case
 from ._hypothesis import get_case_strategy, get_default_format_strategies
 from .constants import LOCATION_TO_CONTAINER
