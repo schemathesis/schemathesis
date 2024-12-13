@@ -28,12 +28,12 @@ def from_asgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
 
 
 def from_wsgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
-    from schemathesis.python.wsgi import get_client
+    from schemathesis.python import wsgi
 
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     kwargs.setdefault("json", {"query": get_introspection_query()})
-    client = get_client(app)
+    client = wsgi.get_client(app)
     response = client.post(path=path, **kwargs)
     raise_for_status(response)
     schema = extract_schema_from_response(response, lambda r: r.json)

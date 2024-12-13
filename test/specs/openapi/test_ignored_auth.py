@@ -22,7 +22,7 @@ from schemathesis.specs.openapi.checks import (
     _remove_auth_from_case,
     ignored_auth,
 )
-from schemathesis.transports import RequestsTransport
+from schemathesis.transport.requests import RequestsTransport
 
 
 def run(schema_url, headers=None, network_config=None, **configuration):

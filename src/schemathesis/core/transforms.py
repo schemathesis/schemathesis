@@ -40,6 +40,13 @@ def diff(left: Mapping[str, Any], right: Mapping[str, Any]) -> dict[str, Any]:
     return diff
 
 
+def merge_at(data: dict[str, Any], data_key: str, new: dict[str, Any]) -> None:
+    original = data[data_key] or {}
+    for key, value in new.items():
+        original[key] = value
+    data[data_key] = original
+
+
 JsonValue = Union[Dict[str, Any], List, str, float, int]
 
 
