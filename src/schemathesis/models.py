@@ -27,17 +27,18 @@ from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation.meta import GenerationMetadata
+from schemathesis.transport.requests import RequestsTransport
 
 from . import serializers
 from ._override import CaseOverride
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
-from .transports import PreparedRequestData, RequestsTransport, prepare_request_data
 
 if TYPE_CHECKING:
     import requests.auth
     from hypothesis import strategies as st
+    from requests.sessions import PreparedRequest
     from requests.structures import CaseInsensitiveDict
 
     from .auths import AuthStorage
@@ -208,7 +209,9 @@ class Case:
             return urlunsplit(("http", "localhost", path or "", "", ""))
         return self.base_url
 
-    def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequestData:
+    def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequest:
+        import requests
+
         base_url = self.get_full_base_url()
         kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
         if self.operation.schema.output_config.sanitize:
@@ -218,21 +221,19 @@ class Case:
                 sanitize_value(kwargs["cookies"])
             if kwargs["params"]:
                 sanitize_value(kwargs["params"])
-        return prepare_request_data(kwargs)
+
+        return requests.Request(**kwargs).prepare()
 
     def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         request_data = self.prepare_code_sample_data(headers)
-        case_headers = None
-        if self.headers is not None:
-            case_headers = dict(self.headers)
         return curl.generate(
-            method=request_data.method,
-            url=request_data.url,
+            method=str(request_data.method),
+            url=str(request_data.url),
             body=request_data.body,
-            headers=case_headers,
             verify=verify,
-            extra_headers=request_data.headers,
+            headers=dict(request_data.headers),
+            known_generated_headers=dict(self.headers or {}),
         )
 
     def _get_base_url(self, base_url: str | None = None) -> str:

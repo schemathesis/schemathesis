@@ -21,7 +21,7 @@ from schemathesis.specs.openapi.checks import (
     positive_data_acceptance,
     use_after_free,
 )
-from schemathesis.transports import WSGITransport
+from schemathesis.transport import WSGITransport
 from test.apps import _graphql as graphql
 from test.apps._graphql.schema import Author
 from test.utils import assert_requests_call

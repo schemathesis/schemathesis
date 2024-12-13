@@ -5,7 +5,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.transports import RequestsTransport, WSGITransport
+from schemathesis.transport.requests import RequestsTransport
+from schemathesis.transport.wsgi import WSGITransport
 
 HERE = Path(__file__).absolute().parent
 

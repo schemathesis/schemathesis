@@ -11,12 +11,12 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
+from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import DataGenerationMethod
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner.models import Request
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
-from schemathesis.transports import _merge_dict_to
 
 
 @pytest.fixture
@@ -580,9 +580,9 @@ def test_call_overrides(mocker, arg, openapi_30):
     _assert_override(spy, arg, original, overridden)
 
 
-def test_merge_dict_to():
+def test_merge_at():
     data = {"params": {"A": 1}}
-    _merge_dict_to(data, "params", {"B": 2})
+    merge_at(data, "params", {"B": 2})
     assert data == {"params": {"A": 1, "B": 2}}
 
 
