@@ -7,9 +7,9 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.transport import Response
+from schemathesis.transport.requests import RequestsTransport
 
 from ...generation import DataGenerationMethod
-from ...transports import RequestsTransport
 from .status import Status
 
 if TYPE_CHECKING:
@@ -49,7 +49,6 @@ class Request:
     @classmethod
     def from_prepared_request(cls, prepared: requests.PreparedRequest) -> Request:
         """A prepared request version is already stored in `requests.Response`."""
-        # TODO: Support httpx.Request
         body = prepared.body
 
         if isinstance(body, str):

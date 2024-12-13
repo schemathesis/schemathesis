@@ -5,7 +5,7 @@ import json
 import re
 from os import PathLike
 from pathlib import Path
-from typing import IO, TYPE_CHECKING, Any
+from typing import IO, TYPE_CHECKING, Any, Mapping
 
 from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
@@ -14,9 +14,6 @@ from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, rai
 from schemathesis.hooks import HookContext, dispatch
 
 if TYPE_CHECKING:
-    from requests.models import CaseInsensitiveDict
-    from werkzeug.datastructures import Headers
-
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
@@ -32,11 +29,11 @@ def from_asgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
 
 
 def from_wsgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
-    from schemathesis.python.wsgi import get_client
+    from schemathesis.python import wsgi
 
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
-    client = get_client(app)
+    client = wsgi.get_client(app)
     response = client.get(path=path, **kwargs)
     raise_for_status(response)
     content_type = detect_content_type(headers=response.headers, path=path)
@@ -111,9 +108,7 @@ class ContentType(enum.Enum):
     UNKNOWN = enum.auto()
 
 
-def detect_content_type(
-    *, headers: CaseInsensitiveDict[str] | Headers | None = None, path: str | None = None
-) -> ContentType:
+def detect_content_type(*, headers: Mapping[str, str] | None = None, path: str | None = None) -> ContentType:
     """Detect content type from various sources."""
     if headers is not None and (content_type := _detect_from_headers(headers)) != ContentType.UNKNOWN:
         return content_type
@@ -122,7 +117,7 @@ def detect_content_type(
     return ContentType.UNKNOWN
 
 
-def _detect_from_headers(headers: CaseInsensitiveDict[str] | Headers) -> ContentType:
+def _detect_from_headers(headers: Mapping[str, str]) -> ContentType:
     """Detect content type from HTTP headers."""
     content_type = headers.get("Content-Type", "").lower()
     try:

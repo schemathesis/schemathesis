@@ -16,7 +16,8 @@ from schemathesis.core.errors import (
     SerializationNotPossible,
 )
 from schemathesis.core.transforms import deepclone
-from schemathesis.transports import RequestsTransport, WSGITransport
+from schemathesis.transport.requests import RequestsTransport
+from schemathesis.transport.wsgi import WSGITransport
 from test.utils import assert_requests_call
 
 

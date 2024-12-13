@@ -22,7 +22,7 @@ from schemathesis.specs.openapi.examples import (
     produce_combinations,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
-from schemathesis.transports import WSGITransport
+from schemathesis.transport import WSGITransport
 from test.utils import assert_requests_call
 
 if TYPE_CHECKING:

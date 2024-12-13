@@ -16,6 +16,7 @@ from typing import (
 )
 from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
+from schemathesis import transport
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.output import OutputConfig
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from schemathesis.core import Specification
-    from schemathesis.transports import Transport
+    from schemathesis.transport import Transport
 
     from .stateful.state_machine import APIStateMachine
 
@@ -77,9 +78,7 @@ class BaseSchema(Mapping):
 
     @property
     def transport(self) -> Transport:
-        from schemathesis import transports
-
-        return transports.get(self.app)
+        return transport.get(self.app)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
