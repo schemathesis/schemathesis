@@ -4,6 +4,14 @@ Changelog
 :version:`Unreleased <v3.38.10...HEAD>` - TBD
 ---------------------------------------------
 
+**Fixed**:
+
+- Avoid writing unbounded prefixes in XML serialization.
+
+**Changed**:
+
+- Escape XML entities instead of rejecting invalid ones.
+
 .. _v3.38.10:
 
 :version:`3.38.10 <v3.38.9...v3.38.10>` - 2024-12-11

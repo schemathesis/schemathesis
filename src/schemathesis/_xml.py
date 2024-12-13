@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import re
 from io import StringIO
 from typing import Any, Dict, List, Union
+from unicodedata import normalize
 
 from schemathesis.core.errors import UnboundPrefix
 from schemathesis.core.transforms import deepclone
-from schemathesis.core.validation import is_valid_xml
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]
@@ -32,10 +33,6 @@ def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict
     namespace_stack: list[str] = []
     _write_xml(buffer, value, tag, resolved_schema, namespace_stack)
     data = buffer.getvalue()
-    if not is_valid_xml(data):
-        from hypothesis import reject
-
-        reject()
     return {"data": data.encode("utf8")}
 
 
@@ -87,11 +84,14 @@ def _write_object(
 ) -> None:
     options = (schema or {}).get("xml", {})
     push_namespace_if_any(stack, options)
+    tag = _sanitize_xml_name(tag)
     if "prefix" in options:
         tag = f"{options['prefix']}:{tag}"
     buffer.write(f"<{tag}")
     if "namespace" in options:
         _write_namespace(buffer, options)
+
+    attribute_namespaces = {}
     attributes = []
     children_buffer = StringIO()
     properties = (schema or {}).get("properties", {})
@@ -100,15 +100,30 @@ def _write_object(
         child_options = property_schema.get("xml", {})
         push_namespace_if_any(stack, child_options)
         child_tag = child_options.get("name", child_name)
+
+        if child_options.get("attribute", False):
+            if child_options.get("prefix") and child_options.get("namespace"):
+                _validate_prefix(child_options, stack)
+                prefix = child_options["prefix"]
+                attr_name = f"{prefix}:{_sanitize_xml_name(child_tag)}"
+                # Store namespace declaration
+                attribute_namespaces[prefix] = child_options["namespace"]
+            else:
+                attr_name = _sanitize_xml_name(child_tag)
+            attributes.append(f'{attr_name}="{_escape_xml(value)}"')
+            continue
+
+        child_tag = _sanitize_xml_name(child_tag)
         if child_options.get("prefix"):
             _validate_prefix(child_options, stack)
             prefix = child_options["prefix"]
             child_tag = f"{prefix}:{child_tag}"
-        if child_options.get("attribute", False):
-            attributes.append(f'{child_tag}="{value}"')
-            continue
         _write_xml(children_buffer, value, child_tag, property_schema, stack)
         pop_namespace_if_any(stack, child_options)
+
+    # Write namespace declarations for attributes
+    for prefix, namespace in attribute_namespaces.items():
+        buffer.write(f' xmlns:{prefix}="{namespace}"')
 
     if attributes:
         buffer.write(f" {' '.join(attributes)}")
@@ -158,7 +173,7 @@ def _write_primitive(
     buffer.write(f"<{tag}")
     if "namespace" in xml_options:
         _write_namespace(buffer, xml_options)
-    buffer.write(f">{obj}</{tag}>")
+    buffer.write(f">{_escape_xml(obj)}</{tag}>")
 
 
 def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
@@ -171,3 +186,48 @@ def _write_namespace(buffer: StringIO, options: dict[str, Any]) -> None:
 def _get_tag_name_from_reference(reference: str) -> str:
     """Extract object name from a reference."""
     return reference.rsplit("/", maxsplit=1)[1]
+
+
+def _escape_xml(value: JSON) -> str:
+    """Escape special characters in XML content."""
+    if isinstance(value, (int, float, bool)):
+        return str(value)
+    if value is None:
+        return ""
+
+    # Filter out invalid XML characters
+    cleaned = "".join(
+        char
+        for char in str(value)
+        if (
+            char in "\t\n\r"
+            or 0x20 <= ord(char) <= 0xD7FF
+            or 0xE000 <= ord(char) <= 0xFFFD
+            or 0x10000 <= ord(char) <= 0x10FFFF
+        )
+    )
+
+    replacements = {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&apos;",
+    }
+    return "".join(replacements.get(c, c) for c in cleaned)
+
+
+def _sanitize_xml_name(name: str) -> str:
+    """Sanitize a string to be a valid XML element name."""
+    if not name:
+        return "element"
+
+    name = normalize("NFKC", str(name))
+
+    name = name.replace(":", "_")
+    sanitized = re.sub(r"[^a-zA-Z0-9_\-.]", "_", name)
+
+    if not sanitized[0].isalpha() and sanitized[0] != "_":
+        sanitized = "x_" + sanitized
+
+    return sanitized

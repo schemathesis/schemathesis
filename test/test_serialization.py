@@ -290,7 +290,7 @@ def test_get_matching_serializers(media_type, expected):
         ),
         (
             "/prefixed-attribute",
-            b'<PrefixedAttribute smp:id="42"></PrefixedAttribute>',
+            b'<PrefixedAttribute xmlns:smp="http://example.com/schema" smp:id="42"></PrefixedAttribute>',
         ),
         (
             "/namespaced-object",
