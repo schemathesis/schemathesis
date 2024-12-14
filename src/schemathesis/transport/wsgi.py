@@ -5,11 +5,12 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generator
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import prepare_headers
+from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
@@ -42,7 +43,7 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
         if not isinstance(case.body, NotSet) and media_type is not None:
             serializer = self._get_serializer(media_type)
             context = SerializationContext(case=case)
-            extra = serializer(context, case._get_body())
+            extra = serializer(context, prepare_body(case))
         else:
             extra = {}
 
@@ -80,14 +81,17 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
         client = session or wsgi.get_client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}
 
-        with cookie_handler(client, cookies), case.operation.schema.ratelimit():
+        with (
+            cookie_handler(client, cookies),
+            ratelimit(case.operation.schema.rate_limiter, case.operation.schema.base_url),
+        ):
             start = time.monotonic()
             response = client.open(**data)
             elapsed = time.monotonic() - start
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
-            base_url=case.get_full_base_url(),
+            base_url=normalize_base_url(case.base_url),
             headers=headers,
             params=params,
             cookies=cookies,

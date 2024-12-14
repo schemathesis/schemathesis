@@ -14,7 +14,7 @@ import click
 @schemathesis.target
 def new_target(context) -> float:
     click.echo("NEW TARGET IS CALLED")
-    assert context.case.data_generation_method is not None, "Empty data_generation_method"
+    assert context.case.generator_mode is not None, "Empty generator mode"
     return float(len(context.response.content))
 """
     )

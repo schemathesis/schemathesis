@@ -1424,7 +1424,7 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
 def test_skip_not_negated_tests(cli, schema_url):
     # See GH-1463
     # When an endpoint has no parameters to negate
-    result = cli.run(schema_url, "-D", "negative")
+    result = cli.run(schema_url, "--generator-mode", "negative")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should be skipped
     lines = result.stdout.splitlines()
@@ -1434,7 +1434,7 @@ def test_skip_not_negated_tests(cli, schema_url):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_dont_skip_when_generation_is_possible(cli, schema_url):
-    result = cli.run(schema_url, "-D", "all")
+    result = cli.run(schema_url, "--generator-mode", "all")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.splitlines()
     assert "1 passed in" in lines[-1]
@@ -1485,8 +1485,8 @@ def data_generation_check(ctx):
         """
 @schemathesis.check
 def data_generation_check(ctx, response, case):
-    if case.data_generation_method:
-        note("METHOD: {}".format(case.data_generation_method.name))
+    if case.generator_mode:
+        note("MODE: {}".format(case.generator_mode.name))
 """
     ) as module:
         yield module
@@ -1494,7 +1494,7 @@ def data_generation_check(ctx, response, case):
 
 @flaky(max_runs=5, min_passes=1)
 @pytest.mark.operations("payload")
-def test_multiple_data_generation_methods(cli, openapi3_schema_url, data_generation_check):
+def test_multiple_generator_modes(cli, openapi3_schema_url, data_generation_check):
     # When multiple data generation methods are supplied in CLI
     result = cli.main(
         "run",
@@ -1505,14 +1505,14 @@ def test_multiple_data_generation_methods(cli, openapi3_schema_url, data_generat
         openapi3_schema_url,
         "--hypothesis-max-examples=25",
         "--hypothesis-suppress-health-check=all",
-        "-D",
+        "--generator-mode",
         "all",
         hooks=data_generation_check,
     )
     # Then there should be cases generated from different methods
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert "METHOD: positive" in result.stdout
-    assert "METHOD: negative" in result.stdout
+    assert "MODE: positive" in result.stdout
+    assert "MODE: negative" in result.stdout
 
 
 @pytest.mark.operations("success", "failure")

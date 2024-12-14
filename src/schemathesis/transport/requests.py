@@ -8,10 +8,11 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import deepclone, merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import prepare_headers
+from schemathesis.transport.prepare import prepare_body, prepare_headers, prepare_url
 from schemathesis.transport.serialization import Binary, serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
@@ -41,13 +42,13 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
             if "content-type" not in final_headers:
                 final_headers["Content-Type"] = media_type
 
-        url = case._get_url(base_url)
+        url = prepare_url(case, base_url)
 
         # Handle serialization
         if not isinstance(case.body, NotSet) and media_type is not None:
             serializer = self._get_serializer(media_type)
             context = SerializationContext(case=case)
-            extra = serializer(context, case._get_body())
+            extra = serializer(context, prepare_body(case))
         else:
             extra = {}
 
@@ -94,7 +95,7 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
         verify = data.get("verify", True)
 
         try:
-            with case.operation.schema.ratelimit():
+            with ratelimit(case.operation.schema.rate_limiter, case.operation.schema.base_url):
                 response = session.request(**data)  # type: ignore
             return Response.from_requests(response, verify=verify)
         finally:

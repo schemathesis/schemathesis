@@ -222,8 +222,8 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
     if (
-        case.data_generation_method
-        and case.data_generation_method.is_negative
+        case.generator_mode
+        and case.generator_mode.is_negative
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
@@ -246,11 +246,7 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     config = ctx.config.get(positive_data_acceptance, PositiveDataAcceptanceConfig())
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
-    if (
-        case.data_generation_method
-        and case.data_generation_method.is_positive
-        and response.status_code not in allowed_statuses
-    ):
+    if case.generator_mode and case.generator_mode.is_positive and response.status_code not in allowed_statuses:
         raise RejectedPositiveData(
             operation=case.operation.verbose_name,
             message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",

@@ -20,8 +20,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.experimental import COVERAGE_PHASE
-from schemathesis.generation import GenerationConfig, coverage
-from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.generation import GenerationConfig, GeneratorMode, coverage
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import GenerationMetadata, TestPhase
@@ -83,9 +82,7 @@ def create_test(
     _strategies = []
     generation_config = generation_config or operation.schema.generation_config
 
-    skip_on_not_negated = (
-        len(generation_config.methods) == 1 and DataGenerationMethod.negative in generation_config.methods
-    )
+    skip_on_not_negated = len(generation_config.modes) == 1 and GeneratorMode.negative in generation_config.modes
     as_strategy_kwargs = as_strategy_kwargs or {}
     as_strategy_kwargs.update(
         {
@@ -95,8 +92,8 @@ def create_test(
             "skip_on_not_negated": skip_on_not_negated,
         }
     )
-    for data_generation_method in generation_config.methods:
-        _strategies.append(operation.as_strategy(data_generation_method=data_generation_method, **as_strategy_kwargs))
+    for mode in generation_config.modes:
+        _strategies.append(operation.as_strategy(generator_mode=mode, **as_strategy_kwargs))
     strategy = strategies.combine(_strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)
@@ -140,7 +137,7 @@ def create_test(
                 wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
             )
             if COVERAGE_PHASE.is_enabled:
-                wrapped_test = add_coverage(wrapped_test, operation, generation_config.methods)
+                wrapped_test = add_coverage(wrapped_test, operation, generation_config.modes)
     return wrapped_test
 
 
@@ -231,17 +228,13 @@ def add_examples(
     return test
 
 
-def add_coverage(
-    test: Callable, operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
-) -> Callable:
-    for example in _iter_coverage_cases(operation, data_generation_methods):
+def add_coverage(test: Callable, operation: APIOperation, generator_modes: list[GeneratorMode]) -> Callable:
+    for example in _iter_coverage_cases(operation, generator_modes):
         test = hypothesis.example(case=example)(test)
     return test
 
 
-def _iter_coverage_cases(
-    operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
-) -> Generator[Case, None, None]:
+def _iter_coverage_cases(operation: APIOperation, generator_modes: list[GeneratorMode]) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
     from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
 
@@ -264,7 +257,7 @@ def _iter_coverage_cases(
         for value in find_matching_in_responses(responses, parameter.name):
             schema.setdefault("examples", []).append(value)
         gen = coverage.cover_schema_iter(
-            coverage.CoverageContext(location=location, data_generation_methods=data_generation_methods), schema
+            coverage.CoverageContext(location=location, generator_modes=generator_modes), schema
         )
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
@@ -284,7 +277,7 @@ def _iter_coverage_cases(
             if examples:
                 schema.setdefault("examples", []).extend(examples)
             gen = coverage.cover_schema_iter(
-                coverage.CoverageContext(location="body", data_generation_methods=data_generation_methods), schema
+                coverage.CoverageContext(location="body", generator_modes=generator_modes), schema
             )
             value = next(gen, NOT_SET)
             if isinstance(value, NotSet):
@@ -293,7 +286,7 @@ def _iter_coverage_cases(
                 template["body"] = value.value
                 template["media_type"] = body.media_type
             case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
-            case.data_generation_method = value.data_generation_method
+            case.generator_mode = value.generator_mode
             case.meta = _make_meta(
                 description=value.description,
                 location=value.location,
@@ -303,7 +296,7 @@ def _iter_coverage_cases(
             yield case
             for next_value in gen:
                 case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
-                case.data_generation_method = next_value.data_generation_method
+                case.generator_mode = next_value.generator_mode
                 case.meta = _make_meta(
                     description=next_value.description,
                     location=next_value.location,
@@ -311,9 +304,9 @@ def _iter_coverage_cases(
                     parameter_location="body",
                 )
                 yield case
-    elif DataGenerationMethod.positive in data_generation_methods:
+    elif GeneratorMode.positive in generator_modes:
         case = operation.make_case(**template)
-        case.data_generation_method = DataGenerationMethod.positive
+        case.generator_mode = GeneratorMode.positive
         case.meta = _make_meta(description="Default positive test case")
         yield case
 
@@ -326,7 +319,7 @@ def _iter_coverage_cases(
             else:
                 generated = value.value
             case = operation.make_case(**{**template, container_name: {**container, name: generated}})
-            case.data_generation_method = value.data_generation_method
+            case.generator_mode = value.generator_mode
             case.meta = _make_meta(
                 description=value.description,
                 location=value.location,
@@ -334,7 +327,7 @@ def _iter_coverage_cases(
                 parameter_location=location,
             )
             yield case
-    if DataGenerationMethod.negative in data_generation_methods:
+    if GeneratorMode.negative in generator_modes:
         # Generate HTTP methods that are not specified in the spec
         methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"} - set(
             operation.schema[operation.path]
@@ -342,7 +335,7 @@ def _iter_coverage_cases(
         for method in methods:
             case = operation.make_case(**template)
             case._explicit_method = method
-            case.data_generation_method = DataGenerationMethod.negative
+            case.generator_mode = GeneratorMode.negative
             case.meta = _make_meta(description=f"Unspecified HTTP method: {method}")
             yield case
         # Generate duplicate query parameters
@@ -351,7 +344,7 @@ def _iter_coverage_cases(
             for parameter in operation.query:
                 value = container[parameter.name]
                 case = operation.make_case(**{**template, "query": {**container, parameter.name: [value, value]}})
-                case.data_generation_method = DataGenerationMethod.negative
+                case.generator_mode = GeneratorMode.negative
                 case.meta = _make_meta(
                     description=f"Duplicate `{parameter.name}` query parameter",
                     location=None,
@@ -369,7 +362,7 @@ def _iter_coverage_cases(
                 case = operation.make_case(
                     **{**template, container_name: {k: v for k, v in container.items() if k != name}}
                 )
-                case.data_generation_method = DataGenerationMethod.negative
+                case.generator_mode = GeneratorMode.negative
                 case.meta = _make_meta(
                     description=f"Missing `{name}` at {location}",
                     location=None,
@@ -401,7 +394,7 @@ def _iter_coverage_cases(
             _location: str,
             _container_name: str,
             _parameter: str | None,
-            _data_generation_method: DataGenerationMethod,
+            _generator_mode: GeneratorMode,
         ) -> Case:
             if _location in ("header", "cookie", "path", "query"):
                 container = {
@@ -412,7 +405,7 @@ def _iter_coverage_cases(
                 container = container_values
 
             case = operation.make_case(**{**template, _container_name: container})
-            case.data_generation_method = _data_generation_method
+            case.generator_mode = _generator_mode
             case.meta = _make_meta(
                 description=description,
                 location=None,
@@ -438,7 +431,7 @@ def _iter_coverage_cases(
             subschema: dict[str, Any], _location: str, _container_name: str
         ) -> Generator[Case, None, None]:
             for more in coverage.cover_schema_iter(
-                coverage.CoverageContext(location=_location, data_generation_methods=[DataGenerationMethod.negative]),
+                coverage.CoverageContext(location=_location, generator_modes=[GeneratorMode.negative]),
                 subschema,
             ):
                 yield make_case(
@@ -447,22 +440,22 @@ def _iter_coverage_cases(
                     _location,
                     _container_name,
                     more.parameter,
-                    DataGenerationMethod.negative,
+                    GeneratorMode.negative,
                 )
 
         # 1. Generate only required properties
         if required and all_params != required:
             only_required = {k: v for k, v in base_container.items() if k in required}
-            if DataGenerationMethod.positive in data_generation_methods:
+            if GeneratorMode.positive in generator_modes:
                 yield make_case(
                     only_required,
                     "Only required properties",
                     location,
                     container_name,
                     None,
-                    DataGenerationMethod.positive,
+                    GeneratorMode.positive,
                 )
-            if DataGenerationMethod.negative in data_generation_methods:
+            if GeneratorMode.negative in generator_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 for case in _yield_negative(subschema, location, container_name):
                     # Already generated in one of the blocks above
@@ -472,16 +465,16 @@ def _iter_coverage_cases(
         # 2. Generate combinations with required properties and one optional property
         for opt_param in optional:
             combo = {k: v for k, v in base_container.items() if k in required or k == opt_param}
-            if combo != base_container and DataGenerationMethod.positive in data_generation_methods:
+            if combo != base_container and GeneratorMode.positive in generator_modes:
                 yield make_case(
                     combo,
                     f"All required properties and optional '{opt_param}'",
                     location,
                     container_name,
                     None,
-                    DataGenerationMethod.positive,
+                    GeneratorMode.positive,
                 )
-                if DataGenerationMethod.negative in data_generation_methods:
+                if GeneratorMode.negative in generator_modes:
                     subschema = _combination_schema(combo, required, parameter_set)
                     for case in _yield_negative(subschema, location, container_name):
                         # Already generated in one of the blocks above
@@ -489,7 +482,7 @@ def _iter_coverage_cases(
                             yield case
 
         # 3. Generate one combination for each size from 2 to N-1 of optional parameters
-        if len(optional) > 1 and DataGenerationMethod.positive in data_generation_methods:
+        if len(optional) > 1 and GeneratorMode.positive in generator_modes:
             for size in range(2, len(optional)):
                 for combination in combinations(optional, size):
                     combo = {k: v for k, v in base_container.items() if k in required or k in combination}
@@ -500,7 +493,7 @@ def _iter_coverage_cases(
                             location,
                             container_name,
                             None,
-                            DataGenerationMethod.positive,
+                            GeneratorMode.positive,
                         )
 
 

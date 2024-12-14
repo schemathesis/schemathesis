@@ -13,30 +13,26 @@ from typing import (
     Iterator,
     Literal,
     TypeVar,
-    cast,
 )
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.output import prepare_response_payload
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
 from schemathesis.core.transport import Response
 from schemathesis.generation.meta import GenerationMetadata
-from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.prepare import prepare_request
 
 from ._override import CaseOverride
-from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
+from .generation import GenerationConfig, GeneratorMode, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 
 if TYPE_CHECKING:
     import requests.auth
     from hypothesis import strategies as st
-    from requests.sessions import PreparedRequest
     from requests.structures import CaseInsensitiveDict
 
     from .auths import AuthStorage
@@ -85,7 +81,7 @@ class Case:
     meta: GenerationMetadata | None = None
 
     # The way the case was generated (None for manually crafted ones)
-    data_generation_method: DataGenerationMethod | None = None
+    generator_mode: GeneratorMode | None = None
     _auth: requests.auth.AuthBase | None = None
     _has_explicit_auth: bool = False
     _explicit_method: str | None = None
@@ -198,32 +194,9 @@ class Case:
             # A single unmatched `}` inside the path template may cause this
             raise InvalidSchema(f"Malformed path template: `{self.path}`\n\n  {exc}") from exc
 
-    def get_full_base_url(self) -> str | None:
-        """Create a full base url, adding "localhost" for WSGI apps."""
-        parts = urlsplit(self.base_url)
-        if not parts.hostname:
-            path = cast(str, parts.path or "")
-            return urlunsplit(("http", "localhost", path or "", "", ""))
-        return self.base_url
-
-    def prepare_code_sample_data(self, headers: dict[str, Any] | None) -> PreparedRequest:
-        import requests
-
-        base_url = self.get_full_base_url()
-        kwargs = REQUESTS_TRANSPORT.serialize_case(self, base_url=base_url, headers=headers)
-        if self.operation.schema.output_config.sanitize:
-            kwargs["url"] = sanitize_url(kwargs["url"])
-            sanitize_value(kwargs["headers"])
-            if kwargs["cookies"]:
-                sanitize_value(kwargs["cookies"])
-            if kwargs["params"]:
-                sanitize_value(kwargs["params"])
-
-        return requests.Request(**kwargs).prepare()
-
     def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
-        request_data = self.prepare_code_sample_data(headers)
+        request_data = prepare_request(self, headers, self.operation.schema.output_config.sanitize)
         return curl.generate(
             method=str(request_data.method),
             url=str(request_data.url),
@@ -232,20 +205,6 @@ class Case:
             headers=dict(request_data.headers),
             known_generated_headers=dict(self.headers or {}),
         )
-
-    def _get_base_url(self, base_url: str | None = None) -> str:
-        if base_url is None:
-            if self.base_url is not None:
-                base_url = self.base_url
-            else:
-                raise ValueError(
-                    "Base URL is required as `base_url` argument in `call` or should be specified "
-                    "in the schema constructor as a part of Schema URL."
-                )
-        return base_url
-
-    def _get_body(self) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
-        return self.body
 
     def as_transport_kwargs(self, base_url: str | None = None, headers: dict[str, str] | None = None) -> dict[str, Any]:
         """Convert the test case into a dictionary acceptable by the underlying transport call."""
@@ -365,13 +324,6 @@ class Case:
         )
         return response
 
-    def _get_url(self, base_url: str | None) -> str:
-        base_url = self._get_base_url(base_url)
-        formatted_path = self.formatted_path.lstrip("/")
-        if not base_url.endswith("/"):
-            base_url += "/"
-        return unquote(urljoin(base_url, quote(formatted_path)))
-
 
 P = TypeVar("P", bound=Parameter)
 D = TypeVar("D", bound=dict)
@@ -481,13 +433,13 @@ class APIOperation(Generic[P, C]):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
         strategy = self.schema.get_case_strategy(
-            self, hooks, auth_storage, data_generation_method, generation_config=generation_config, **kwargs
+            self, hooks, auth_storage, generator_mode, generation_config=generation_config, **kwargs
         )
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:

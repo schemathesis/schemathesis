@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.transport import Response
 from schemathesis.python import asgi
+from schemathesis.transport.prepare import normalize_base_url
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
 
 if TYPE_CHECKING:
@@ -15,7 +16,7 @@ if TYPE_CHECKING:
 class ASGITransport(RequestsTransport):
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         if kwargs.get("base_url") is None:
-            kwargs["base_url"] = case.get_full_base_url()
+            kwargs["base_url"] = normalize_base_url(case.base_url)
         application = kwargs.pop("app", case.app)
 
         with asgi.get_client(application) as client:

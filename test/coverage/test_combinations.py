@@ -4,7 +4,7 @@ from unittest.mock import ANY
 import jsonschema
 import pytest
 
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import GeneratorMode
 from schemathesis.generation.coverage import (
     CoverageContext,
     GeneratedValue,
@@ -70,12 +70,12 @@ def ctx():
 
 @pytest.fixture
 def pctx():
-    return CoverageContext(location="query", data_generation_methods=[DataGenerationMethod.positive])
+    return CoverageContext(location="query", generator_modes=[GeneratorMode.positive])
 
 
 @pytest.fixture
 def nctx():
-    return CoverageContext(location="query", data_generation_methods=[DataGenerationMethod.negative])
+    return CoverageContext(location="query", generator_modes=[GeneratorMode.negative])
 
 
 @pytest.mark.parametrize(

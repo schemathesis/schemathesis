@@ -3,7 +3,7 @@ import pytest
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import GeneratorMode
 from schemathesis.generation.meta import GenerationMetadata, TestPhase
 from schemathesis.models import Case
 from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
@@ -119,13 +119,13 @@ def sample_schema(ctx):
     [
         ({}, False),
         (
-            {"meta": build_metadata(body=DataGenerationMethod.negative)},
+            {"meta": build_metadata(body=GeneratorMode.negative)},
             False,
         ),
         (
             {
                 "query": {"key": 1},
-                "meta": build_metadata(query=DataGenerationMethod.negative),
+                "meta": build_metadata(query=GeneratorMode.negative),
             },
             False,
         ),
@@ -133,14 +133,14 @@ def sample_schema(ctx):
             {
                 "query": {"key": 1},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=DataGenerationMethod.negative),
+                "meta": build_metadata(query=GeneratorMode.negative),
             },
             False,
         ),
         (
             {
                 "query": {"key": 5, "unknown": 3},
-                "meta": build_metadata(query=DataGenerationMethod.negative),
+                "meta": build_metadata(query=GeneratorMode.negative),
             },
             True,
         ),
@@ -148,7 +148,7 @@ def sample_schema(ctx):
             {
                 "query": {"key": 5, "unknown": 3},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=DataGenerationMethod.negative),
+                "meta": build_metadata(query=GeneratorMode.negative),
             },
             True,
         ),
@@ -169,8 +169,8 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     case = Case(
         operation=operation,
         generation_time=0.0,
-        meta=build_metadata(query=DataGenerationMethod.negative),
-        data_generation_method=DataGenerationMethod.negative,
+        meta=build_metadata(query=GeneratorMode.negative),
+        generator_mode=GeneratorMode.negative,
         query={"key": 5, "unknown": 3},
     )
     assert (
@@ -218,8 +218,8 @@ def test_positive_data_acceptance(
     case = Case(
         operation=operation,
         generation_time=0.0,
-        meta=build_metadata(query=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative),
-        data_generation_method=DataGenerationMethod.positive if is_positive else DataGenerationMethod.negative,
+        meta=build_metadata(query=GeneratorMode.positive if is_positive else GeneratorMode.negative),
+        generator_mode=GeneratorMode.positive if is_positive else GeneratorMode.negative,
     )
     ctx = CheckContext(
         override=None,
@@ -259,7 +259,7 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, expe
             str(schema_path),
             f"--base-url={openapi3_base_url}",
             "--hypothesis-phases=explicit",
-            "--data-generation-method=negative",
+            "--generator-mode=negative",
             "--experimental=coverage-phase",
             f"--experimental-missing-required-header-allowed-statuses={expected_status}",
         )

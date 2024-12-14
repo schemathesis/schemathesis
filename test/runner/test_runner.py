@@ -20,7 +20,7 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.generation import DataGenerationMethod, GenerationConfig, HeaderConfig
+from schemathesis.generation import GenerationConfig, GeneratorMode, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
@@ -1161,7 +1161,7 @@ def test_explicit_header_negative(ctx, parameters, expected):
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
     schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+        generation=GenerationConfig(modes=[GeneratorMode.negative])
     )
     *_, event, finished = list(
         from_schema(
@@ -1188,7 +1188,7 @@ def test_skip_non_negated_headers(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+        generation=GenerationConfig(modes=[GeneratorMode.negative])
     )
     *_, event, finished = list(
         from_schema(
@@ -1223,16 +1223,16 @@ def test_stateful_auth(real_app_schema):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
-def test_stateful_all_generation_methods(real_app_schema):
+def test_stateful_all_generator_modes(real_app_schema):
     experimental.STATEFUL_ONLY.enable()
-    method = DataGenerationMethod.negative
-    real_app_schema.generation_config.methods = [method]
+    method = GeneratorMode.negative
+    real_app_schema.generation_config.modes = [method]
     _, *_, after_execution, _ = from_schema(real_app_schema, **STATEFUL_KWARGS).execute()
     interactions = after_execution.result.interactions
     assert len(interactions) > 0
     for interaction in interactions:
         for check in interaction.checks:
-            assert check.case.data_generation_method == method
+            assert check.case.generator_mode == method
 
 
 @pytest.mark.openapi_version("3.0")

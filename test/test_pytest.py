@@ -433,7 +433,7 @@ def test_skip_negative_without_parameters(testdir):
 schema = schemathesis.openapi.from_dict(
     raw_schema
 ).configure(
-    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    generation=GenerationConfig(modes=[GeneratorMode.negative])
 )
 
 @schema.parametrize()
@@ -455,7 +455,7 @@ def test_skip_impossible_to_negate(testdir):
 schema = schemathesis.openapi.from_dict(
     raw_schema
 ).configure(
-    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    generation=GenerationConfig(modes=[GeneratorMode.negative])
 ).include(method="POST")
 
 @schema.parametrize()
@@ -494,7 +494,7 @@ def test_do_not_skip_partially_negated(testdir):
 schema = schemathesis.openapi.from_dict(
     raw_schema
 ).configure(
-    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    generation=GenerationConfig(modes=[GeneratorMode.negative])
 ).include(method="POST")
 
 @schema.parametrize()
@@ -534,7 +534,7 @@ def test_path_parameters_allow_partial_negation(testdir, location):
 schema = schemathesis.openapi.from_dict(
     raw_schema
 ).configure(
-    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    generation=GenerationConfig(modes=[GeneratorMode.negative])
 ).include(method="GET", path_regex="/pets/{key}/")
 
 @schema.parametrize()
@@ -569,7 +569,7 @@ def test_many_path_parameters_allow_partial_negation(testdir):
 schema = schemathesis.openapi.from_dict(
     raw_schema
 ).configure(
-    generation=GenerationConfig(methods=[DataGenerationMethod.negative])
+    generation=GenerationConfig(modes=[GeneratorMode.negative])
 ).include(
     method="GET",
     path_regex="/pets/{key}/{value}/",

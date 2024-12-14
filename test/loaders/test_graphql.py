@@ -9,6 +9,7 @@ from hypothesis import given, settings
 
 from schemathesis.core.errors import LoaderError
 from schemathesis.graphql import loaders
+from schemathesis.transport.prepare import normalize_base_url
 
 RAW_SCHEMA = """
 type Book {
@@ -52,7 +53,9 @@ def test_graphql_url(graphql_path, fastapi_graphql_app):
     @given(case=strategy)
     @settings(max_examples=1, deadline=None)
     def test(case):
-        assert case.as_transport_kwargs(base_url=case.get_full_base_url())["url"] == "http://localhost/graphql/"
+        assert (
+            case.as_transport_kwargs(base_url=normalize_base_url(case.base_url))["url"] == "http://localhost/graphql/"
+        )
 
     test()
 

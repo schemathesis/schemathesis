@@ -1,11 +1,21 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from contextlib import nullcontext
+from typing import TYPE_CHECKING, ContextManager
+from urllib.parse import urlparse
 
 from schemathesis.core.errors import InvalidRateLimit
 
 if TYPE_CHECKING:
     from pyrate_limiter import Duration, Limiter
+
+
+def ratelimit(rate_limiter: Limiter | None, base_url: str | None) -> ContextManager:
+    """Limit the rate of sending generated requests."""
+    label = urlparse(base_url).netloc
+    if rate_limiter is not None:
+        rate_limiter.try_acquire(label)
+    return nullcontext()
 
 
 def parse_units(rate: str) -> tuple[int, int]:

@@ -4,7 +4,7 @@ import pytest
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import DataGenerationMethod
+from schemathesis import GeneratorMode
 from schemathesis.models import APIOperation, Case
 
 
@@ -39,9 +39,7 @@ def test_as_strategy(swagger_20):
     operation = swagger_20["/users"]["GET"]
     strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == Case(
-        operation, generation_time=ANY, data_generation_method=DataGenerationMethod.positive, meta=ANY
-    )
+    assert strategy.example() == Case(operation, generation_time=ANY, generator_mode=GeneratorMode.positive, meta=ANY)
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

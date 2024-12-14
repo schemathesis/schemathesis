@@ -37,7 +37,7 @@ from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
-from ...generation import DataGenerationMethod, GenerationConfig
+from ...generation import GenerationConfig, GeneratorMode
 from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -487,7 +487,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -495,7 +495,7 @@ class BaseOpenAPISchema(BaseSchema):
             operation=operation,
             auth_storage=auth_storage,
             hooks=hooks,
-            generator=data_generation_method,
+            generator_mode=generator_mode,
             generation_config=generation_config or self.generation_config,
             **kwargs,
         )

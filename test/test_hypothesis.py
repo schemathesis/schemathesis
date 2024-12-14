@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.generation import DataGenerationMethod, GenerationConfig
+from schemathesis.generation import GenerationConfig, GeneratorMode
 from schemathesis.generation.hypothesis import examples
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
@@ -71,7 +71,7 @@ def test_get_examples(location, swagger_20):
     assert strategies[0].example() == Case(
         operation,
         generation_time=ANY,
-        data_generation_method=DataGenerationMethod.positive,
+        generator_mode=GeneratorMode.positive,
         media_type=media_type,
         meta=ANY,
         **{container: expected},

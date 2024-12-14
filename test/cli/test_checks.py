@@ -39,7 +39,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
         f"--base-url={openapi3_base_url}",
         "--checks",
         "negative_data_rejection",
-        "-D",
+        "--generator-mode",
         "negative",
         "--hypothesis-max-examples=5",
     )

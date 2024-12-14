@@ -19,7 +19,7 @@ from schemathesis.core.fs import file_exists
 
 from .. import experimental
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
-from ..generation import DataGenerationMethod
+from ..generation import GeneratorMode
 from ..service.hosts import get_temporary_hosts_file
 from ..stateful import Stateful
 from .cassettes import CassetteFormat
@@ -362,12 +362,10 @@ def convert_cassette_format(ctx: click.core.Context, param: click.core.Parameter
     return CassetteFormat.from_str(value)
 
 
-def convert_data_generation_method(
-    ctx: click.core.Context, param: click.core.Parameter, value: str
-) -> list[DataGenerationMethod]:
+def convert_generator_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GeneratorMode]:
     if value == "all":
-        return DataGenerationMethod.all()
-    return [DataGenerationMethod[value]]
+        return GeneratorMode.all()
+    return [GeneratorMode[value]]
 
 
 def _is_usable_dir(path: os.PathLike) -> bool:

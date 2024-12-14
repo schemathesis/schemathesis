@@ -11,7 +11,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis import strategies
 
-from ....generation import DataGenerationMethod
+from ....generation import GeneratorMode
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links
@@ -93,10 +93,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 bundle_name = f"{source.verbose_name} -> {link.status_code}"
                 name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
                 case_strategy = strategies.combine(
-                    [
-                        target.as_strategy(data_generation_method=data_generation_method)
-                        for data_generation_method in schema.generation_config.methods
-                    ]
+                    [target.as_strategy(generator_mode=mode) for mode in schema.generation_config.modes]
                 )
                 bundle = bundles[bundle_name]
                 rules[name] = transition(
@@ -116,21 +113,20 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
             name = _normalize_name(f"{target.verbose_name} -> X")
-            if len(schema.generation_config.methods) == 1:
-                case_strategy = target.as_strategy(data_generation_method=schema.generation_config.methods[0])
+            if len(schema.generation_config.modes) == 1:
+                case_strategy = target.as_strategy(generator_mode=schema.generation_config.modes[0])
             else:
                 _strategies = {
-                    method: target.as_strategy(data_generation_method=method)
-                    for method in schema.generation_config.methods
+                    method: target.as_strategy(generator_mode=method) for method in schema.generation_config.modes
                 }
 
                 @st.composite  # type: ignore[misc]
                 def case_strategy_factory(
-                    draw: st.DrawFn, strategies: dict[DataGenerationMethod, st.SearchStrategy] = _strategies
+                    draw: st.DrawFn, strategies: dict[GeneratorMode, st.SearchStrategy] = _strategies
                 ) -> Case:
                     if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
-                        return draw(strategies[DataGenerationMethod.negative])
-                    return draw(strategies[DataGenerationMethod.positive])
+                        return draw(strategies[GeneratorMode.negative])
+                    return draw(strategies[GeneratorMode.positive])
 
                 case_strategy = case_strategy_factory()
 
