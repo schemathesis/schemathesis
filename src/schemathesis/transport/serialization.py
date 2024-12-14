@@ -1,14 +1,74 @@
-"""XML serialization."""
-
 from __future__ import annotations
 
 import re
+from dataclasses import dataclass
 from io import StringIO
 from typing import Any, Dict, List, Union
 from unicodedata import normalize
 
 from schemathesis.core.errors import UnboundPrefix
-from schemathesis.core.transforms import deepclone
+from schemathesis.core.transforms import deepclone, transform
+
+
+@dataclass
+class Binary(str):
+    """A wrapper around `bytes` to resolve OpenAPI and JSON Schema `format` discrepancies.
+
+    Treat `bytes` as a valid type, allowing generation of bytes for OpenAPI `format` values like `binary` or `file`
+    that JSON Schema expects to be strings.
+    """
+
+    data: bytes
+
+    __slots__ = ("data",)
+
+    def __hash__(self) -> int:
+        return hash(self.data)
+
+
+def serialize_json(value: Any) -> dict[str, Any]:
+    if isinstance(value, bytes):
+        # Possible to get via explicit examples, e.g. `externalValue`
+        return {"data": value}
+    if isinstance(value, Binary):
+        return {"data": value.data}
+    if value is None:
+        # If the body is `None`, then the app expects `null`, but `None` is also the default value for the `json`
+        # argument in `requests.request` and `werkzeug.Client.open` which makes these cases indistinguishable.
+        # Therefore we explicitly create such payload
+        return {"data": b"null"}
+    return {"json": value}
+
+
+def _replace_binary(value: dict) -> dict:
+    return {key: value.data if isinstance(value, Binary) else value for key, value in value.items()}
+
+
+def serialize_binary(value: Any) -> bytes:
+    """Convert the input value to bytes and ignore any conversion errors."""
+    if isinstance(value, bytes):
+        return value
+    if isinstance(value, Binary):
+        return value.data
+    return str(value).encode(errors="ignore")
+
+
+def serialize_yaml(value: Any) -> dict[str, Any]:
+    import yaml
+
+    try:
+        from yaml import CSafeDumper as SafeDumper
+    except ImportError:
+        from yaml import SafeDumper  # type: ignore
+
+    if isinstance(value, bytes):
+        return {"data": value}
+    if isinstance(value, Binary):
+        return {"data": value.data}
+    if isinstance(value, (list, dict)):
+        value = transform(value, _replace_binary)
+    return {"data": yaml.dump(value, Dumper=SafeDumper)}
+
 
 Primitive = Union[str, int, float, bool, None]
 JSON = Union[Primitive, List, Dict[str, Any]]
@@ -16,7 +76,9 @@ DEFAULT_TAG_NAME = "data"
 NAMESPACE_URL = "http://example.com/schema"
 
 
-def _to_xml(value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None) -> dict[str, Any]:
+def serialize_xml(
+    value: Any, raw_schema: dict[str, Any] | None, resolved_schema: dict[str, Any] | None
+) -> dict[str, Any]:
     """Serialize a generated Python object as an XML string.
 
     Schemas may contain additional information for fine-tuned XML serialization.

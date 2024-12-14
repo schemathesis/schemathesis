@@ -2,95 +2,99 @@ from __future__ import annotations
 
 import time
 from contextlib import contextmanager
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
 from schemathesis.python import wsgi
-from schemathesis.transport.requests import RequestsTransport
-
-from ..serializers import SerializerContext
+from schemathesis.transport import BaseTransport, SerializationContext
+from schemathesis.transport.prepare import prepare_headers
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
 if TYPE_CHECKING:
     import werkzeug
-    from _typeshed.wsgi import WSGIApplication
 
     from ..models import Case
 
 
-@dataclass
-class WSGITransport:
-    app: WSGIApplication
+class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
+    def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
+        headers = kwargs.get("headers")
+        params = kwargs.get("params")
 
-    def serialize_case(
-        self,
-        case: Case,
-        *,
-        base_url: str | None = None,
-        headers: dict[str, Any] | None = None,
-        params: dict[str, Any] | None = None,
-        cookies: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        final_headers = case._get_headers(headers)
+        final_headers = prepare_headers(case, headers)
+
+        # Determine media type
         media_type: str | None
         if case.body is not NOT_SET and case.media_type is None:
             media_type = case.operation._get_default_media_type()
         else:
             media_type = case.media_type
+
+        # Set content type for payload
         if media_type and not isinstance(case.body, NotSet):
-            # If we need to send a payload, then the Content-Type header should be set
             final_headers["Content-Type"] = media_type
+
         extra: dict[str, Any]
-        serializer = case._get_serializer(media_type)
-        if serializer is not None and not isinstance(case.body, NotSet):
-            context = SerializerContext(case=case)
-            extra = serializer.as_werkzeug(context, case._get_body())
+        # Handle serialization
+        if not isinstance(case.body, NotSet) and media_type is not None:
+            serializer = self._get_serializer(media_type)
+            context = SerializationContext(case=case)
+            extra = serializer(context, case._get_body())
         else:
             extra = {}
+
         data = {
             "method": case.method,
             "path": case.operation.schema.get_full_path(case.formatted_path),
-            # Convert to a regular dictionary, as we use `CaseInsensitiveDict` which is not supported by Werkzeug
+            # Convert to regular dict for Werkzeug compatibility
             "headers": dict(final_headers),
             "query_string": case.query,
             **extra,
         }
+
         if params is not None:
             merge_at(data, "query_string", params)
+
         return data
 
     def send(
         self,
         case: Case,
         *,
-        session: Any = None,
-        base_url: str | None = None,
-        headers: dict[str, Any] | None = None,
-        params: dict[str, Any] | None = None,
-        cookies: dict[str, Any] | None = None,
+        session: werkzeug.Client | None = None,
         **kwargs: Any,
     ) -> Response:
         import requests
 
-        application = kwargs.pop("app", self.app) or self.app
+        headers = kwargs.pop("headers", None)
+        params = kwargs.pop("params", None)
+        cookies = kwargs.pop("cookies", None)
+        application = kwargs.pop("app")
+
         data = self.serialize_case(case, headers=headers, params=params)
-        data.update(kwargs)
-        client = wsgi.get_client(application)
+        data.update({key: value for key, value in kwargs.items() if key not in data})
+
+        client = session or wsgi.get_client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}
+
         with cookie_handler(client, cookies), case.operation.schema.ratelimit():
             start = time.monotonic()
             response = client.open(**data)
             elapsed = time.monotonic() - start
-        requests_kwargs = RequestsTransport().serialize_case(
+
+        requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
             base_url=case.get_full_base_url(),
             headers=headers,
             params=params,
             cookies=cookies,
         )
+
         headers = {key: response.headers.getlist(key) for key in response.headers.keys()}
+
         return Response(
             status_code=response.status_code,
             headers=headers,
@@ -112,3 +116,52 @@ def cookie_handler(client: werkzeug.Client, cookies: dict[str, Any] | None) -> G
         yield
         for key in cookies:
             client.delete_cookie(key=key, domain="localhost")
+
+
+WSGI_TRANSPORT = WSGITransport()
+
+
+@WSGI_TRANSPORT.serializer("application/json", "text/json")
+def json_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    return serialize_json(value)
+
+
+@WSGI_TRANSPORT.serializer(
+    "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
+)
+def yaml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    return serialize_yaml(value)
+
+
+@WSGI_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
+def multipart_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    return {"data": value}
+
+
+@WSGI_TRANSPORT.serializer("application/xml", "text/xml")
+def xml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    media_type = ctx.case.media_type
+
+    assert media_type is not None
+
+    raw_schema = ctx.case.operation.get_raw_payload_schema(media_type)
+    resolved_schema = ctx.case.operation.get_resolved_payload_schema(media_type)
+
+    return serialize_xml(value, raw_schema, resolved_schema)
+
+
+@WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")
+def urlencoded_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    return {"data": value}
+
+
+@WSGI_TRANSPORT.serializer("text/plain")
+def text_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    if isinstance(value, bytes):
+        return {"data": value}
+    return {"data": str(value)}
+
+
+@WSGI_TRANSPORT.serializer("application/octet-stream")
+def binary_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+    return {"data": serialize_binary(value)}

@@ -22,7 +22,7 @@ from schemathesis.specs.openapi.examples import (
     produce_combinations,
 )
 from schemathesis.specs.openapi.parameters import parameters_to_json_schema
-from schemathesis.transport import WSGITransport
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import assert_requests_call
 
 if TYPE_CHECKING:
@@ -997,7 +997,7 @@ def test_external_value(ctx, server):
     assert example.body == b"42"
     # And this data should be OK to send
     assert_requests_call(example)
-    assert WSGITransport(None).serialize_case(example)["data"] == b"42"
+    assert WSGI_TRANSPORT.serialize_case(example)["data"] == b"42"
 
 
 def test_external_value_network_error(ctx):

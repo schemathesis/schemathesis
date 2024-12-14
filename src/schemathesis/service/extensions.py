@@ -6,6 +6,7 @@ from ipaddress import IPv4Network, IPv6Network
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis.core.result import Err, Ok, Result
+from schemathesis.transport.serialization import Binary
 
 from ..graphql import nodes
 from .models import (
@@ -205,8 +206,6 @@ def make_strftime(format: str) -> Callable:
 
 
 def _get_map_function(definition: TransformFunctionDefinition) -> Result[Callable | None, Exception]:
-    from ..serializers import Binary
-
     TRANSFORM_FACTORIES: dict[str, Callable] = {
         "str": lambda: str,
         "base64_encode": lambda: lambda x: Binary(base64.b64encode(x)),
