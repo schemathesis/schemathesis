@@ -5,8 +5,8 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.transport.requests import RequestsTransport
-from schemathesis.transport.wsgi import WSGITransport
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
 
 HERE = Path(__file__).absolute().parent
 
@@ -16,7 +16,6 @@ def cleanup():
     yield
     schemathesis.specs.openapi.media_types.unregister_all()
     assert MEDIA_TYPE not in schemathesis.specs.openapi.media_types.MEDIA_TYPES
-    assert MEDIA_TYPE not in schemathesis.serializers.SERIALIZERS
 
 
 SAMPLE_PDF = (HERE / "blank.pdf").read_bytes()
@@ -51,7 +50,7 @@ def test_pdf_generation(ctx):
     def test(case):
         assert case.body == SAMPLE_PDF
         assert case.media_type in (MEDIA_TYPE, ALIAS)
-        for transport in (RequestsTransport(), WSGITransport(app=None)):
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             assert transport.serialize_case(case)["data"] == SAMPLE_PDF
 
     test()

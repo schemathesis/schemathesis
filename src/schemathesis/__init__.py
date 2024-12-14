@@ -7,7 +7,7 @@ from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
 
-from . import auths, contrib, experimental, hooks, runner, serializers
+from . import auths, contrib, experimental, hooks, runner
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
 from .models import Case
 
@@ -16,7 +16,6 @@ __version__ = SCHEMATHESIS_VERSION
 # Public API
 auth = auths.GLOBAL_AUTH_STORAGE
 hook = hooks.register
-serializer = serializers.register
 
 __all__ = [
     "Case",
@@ -43,6 +42,5 @@ __all__ = [
     "python",
     "runner",
     "sanitization",
-    "serializer",
     "target",
 ]

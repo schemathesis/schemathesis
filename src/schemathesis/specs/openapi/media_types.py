@@ -2,6 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Collection
 
+from schemathesis.transport import SerializationContext
+from schemathesis.transport.asgi import ASGI_TRANSPORT
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
+
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
@@ -11,15 +16,12 @@ MEDIA_TYPES: dict[str, st.SearchStrategy[bytes]] = {}
 
 def register_media_type(name: str, strategy: st.SearchStrategy[bytes], *, aliases: Collection[str] = ()) -> None:
     """Register a strategy for the given media type."""
-    from ...serializers import SerializerContext, register
 
-    @register(name, aliases=aliases)
-    class MediaTypeSerializer:
-        def as_requests(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-            return {"data": value}
-
-        def as_werkzeug(self, context: SerializerContext, value: Any) -> dict[str, Any]:
-            return {"data": value}
+    @REQUESTS_TRANSPORT.serializer(name, *aliases)
+    @ASGI_TRANSPORT.serializer(name, *aliases)
+    @WSGI_TRANSPORT.serializer(name, *aliases)
+    def serialize(ctx: SerializationContext, value: Any) -> dict[str, Any]:
+        return {"data": value}
 
     MEDIA_TYPES[name] = strategy
     for alias in aliases:
@@ -27,8 +29,4 @@ def register_media_type(name: str, strategy: st.SearchStrategy[bytes], *, aliase
 
 
 def unregister_all() -> None:
-    from ...serializers import unregister
-
-    for media_type in MEDIA_TYPES:
-        unregister(media_type)
     MEDIA_TYPES.clear()

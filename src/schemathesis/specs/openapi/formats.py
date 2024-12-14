@@ -5,6 +5,8 @@ from base64 import b64encode
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
+from schemathesis.transport.serialization import Binary
+
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
@@ -53,8 +55,6 @@ def get_default_format_strategies() -> dict[str, st.SearchStrategy]:
     """Get all default "format" strategies."""
     from hypothesis import strategies as st
     from requests.auth import _basic_auth_str
-
-    from ...serializers import Binary
 
     def make_basic_auth_str(item: tuple[str, str]) -> str:
         return _basic_auth_str(*item)

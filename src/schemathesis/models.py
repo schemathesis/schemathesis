@@ -12,7 +12,6 @@ from typing import (
     Generic,
     Iterator,
     Literal,
-    Type,
     TypeVar,
     cast,
 )
@@ -20,16 +19,15 @@ from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
-from schemathesis.core.errors import IncorrectUsage, InvalidSchema, SerializationNotPossible
+from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import diff
-from schemathesis.core.transport import USER_AGENT, Response
+from schemathesis.core.transport import Response
 from schemathesis.generation.meta import GenerationMetadata
-from schemathesis.transport.requests import RequestsTransport
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
-from . import serializers
 from ._override import CaseOverride
 from .generation import DataGenerationMethod, GenerationConfig, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
@@ -43,7 +41,6 @@ if TYPE_CHECKING:
 
     from .auths import AuthStorage
     from .schemas import BaseSchema
-    from .serializers import Serializer
 
 
 @dataclass
@@ -213,7 +210,7 @@ class Case:
         import requests
 
         base_url = self.get_full_base_url()
-        kwargs = RequestsTransport().serialize_case(self, base_url=base_url, headers=headers)
+        kwargs = REQUESTS_TRANSPORT.serialize_case(self, base_url=base_url, headers=headers)
         if self.operation.schema.output_config.sanitize:
             kwargs["url"] = sanitize_url(kwargs["url"])
             sanitize_value(kwargs["headers"])
@@ -247,30 +244,6 @@ class Case:
                 )
         return base_url
 
-    def _get_headers(self, headers: dict[str, str] | None = None) -> CaseInsensitiveDict:
-        from requests.structures import CaseInsensitiveDict
-
-        final_headers = self.headers.copy() if self.headers is not None else CaseInsensitiveDict()
-        if headers:
-            final_headers.update(headers)
-        final_headers.setdefault("User-Agent", USER_AGENT)
-        final_headers.setdefault(SCHEMATHESIS_TEST_CASE_HEADER, self.id)
-        return final_headers
-
-    def _get_serializer(self, media_type: str | None = None) -> Serializer | None:
-        """Get a serializer for the payload, if there is any."""
-        input_media_type = media_type or self.media_type
-        if input_media_type is not None:
-            media_type = serializers.get_first_matching_media_type(input_media_type)
-            if media_type is None:
-                # This media type is set manually. Otherwise, it should have been rejected during the data generation
-                raise SerializationNotPossible.for_media_type(input_media_type)
-            # SAFETY: It is safe to assume that serializer will be found, because `media_type` returned above
-            # is registered. This intentionally ignores cases with concurrent serializers registry modification.
-            cls = cast(Type[serializers.Serializer], serializers.get(media_type))
-            return cls()
-        return None
-
     def _get_body(self) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
         return self.body
 
@@ -289,8 +262,16 @@ class Case:
     ) -> Response:
         hook_context = HookContext(operation=self.operation)
         dispatch("before_call", hook_context, self, **kwargs)
+        if self.app is not None:
+            kwargs["app"] = self.app
         response = self.operation.schema.transport.send(
-            self, session=session, base_url=base_url, headers=headers, params=params, cookies=cookies, **kwargs
+            self,
+            session=session,
+            base_url=base_url,
+            headers=headers,
+            params=params,
+            cookies=cookies,
+            **kwargs,
         )
         dispatch("after_call", hook_context, self, response)
         return response
@@ -390,16 +371,6 @@ class Case:
         if not base_url.endswith("/"):
             base_url += "/"
         return unquote(urljoin(base_url, quote(formatted_path)))
-
-    def get_full_url(self) -> str:
-        """Make a full URL to the current API operation, including query parameters."""
-        import requests
-
-        base_url = self.base_url or "http://127.0.0.1"
-        kwargs = RequestsTransport().serialize_case(self, base_url=base_url)
-        request = requests.Request(**kwargs)
-        prepared = requests.Session().prepare_request(request)  # type: ignore
-        return cast(str, prepared.url)
 
 
 P = TypeVar("P", bound=Parameter)

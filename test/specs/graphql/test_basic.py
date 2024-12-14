@@ -21,7 +21,7 @@ from schemathesis.specs.openapi.checks import (
     positive_data_acceptance,
     use_after_free,
 )
-from schemathesis.transport import WSGITransport
+from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.apps import _graphql as graphql
 from test.apps._graphql.schema import Author
 from test.utils import assert_requests_call
@@ -56,7 +56,7 @@ def test_as_wsgi_kwargs(graphql_strategy):
         "json": {"query": case.body},
         "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY, "Content-Type": "application/json"},
     }
-    assert WSGITransport(None).serialize_case(case) == expected
+    assert WSGI_TRANSPORT.serialize_case(case) == expected
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

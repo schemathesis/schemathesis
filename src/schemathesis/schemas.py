@@ -45,7 +45,6 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from schemathesis.core import Specification
-    from schemathesis.transport import Transport
 
     from .stateful.state_machine import APIStateMachine
 
@@ -77,7 +76,7 @@ class BaseSchema(Mapping):
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
 
     @property
-    def transport(self) -> Transport:
+    def transport(self) -> transport.BaseTransport:
         return transport.get(self.app)
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
