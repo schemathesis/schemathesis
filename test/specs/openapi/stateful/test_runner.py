@@ -10,7 +10,7 @@ import schemathesis
 from schemathesis.checks import max_response_time, not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.failures import MaxResponseTimeConfig
-from schemathesis.generation import GenerationConfig, GeneratorMode
+from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.config import StatefulTestRunnerConfig
@@ -665,7 +665,7 @@ def test_negative_tests(runner_factory):
         config_kwargs={
             "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
         },
-        configuration={"generation": GenerationConfig(modes=GeneratorMode.all())},
+        configuration={"generation": GenerationConfig(modes=GenerationMode.all())},
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors

@@ -81,12 +81,20 @@ class BaseTransport(Generic[C, R, S]):
             yield from iter(self._serializers.items())
         else:
             main, sub = media_types.parse(media_type)
+            checks = [
+                media_types.is_json,
+                media_types.is_xml,
+                media_types.is_plain_text,
+                media_types.is_yaml,
+            ]
             for registered_media_type, serializer in self._serializers.items():
-                target_main, target_sub = media_types.parse(registered_media_type)
-                if main == "application" and (sub == "json" or sub.endswith("+json")):
+                # Try known variations for popular media types and fallback to comparison
+                if any(check(media_type) and check(registered_media_type) for check in checks):
                     yield media_type, serializer
-                elif main in ("*", target_main) and sub in ("*", target_sub):
-                    yield registered_media_type, serializer
+                else:
+                    target_main, target_sub = media_types.parse(registered_media_type)
+                    if main in ("*", target_main) and sub in ("*", target_sub):
+                        yield registered_media_type, serializer
 
     def _get_serializer(self, input_media_type: str) -> Serializer[C]:
         pair = self.get_first_matching_media_type(input_media_type)

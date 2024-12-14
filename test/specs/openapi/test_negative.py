@@ -10,7 +10,7 @@ from jsonschema import Draft4Validator
 
 import schemathesis
 from schemathesis.core.transforms import deepclone
-from schemathesis.generation import GenerationConfig, GeneratorMode
+from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema
@@ -319,7 +319,7 @@ def test_optional_query_param_negation(ctx):
 
     schema = schemathesis.openapi.from_dict(schema)
 
-    @given(case=schema["/bug"]["get"].as_strategy(generator_mode=GeneratorMode.negative))
+    @given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         request = requests.PreparedRequest()
@@ -390,7 +390,7 @@ def test_non_default_styles(ctx, location, schema, style, explode):
 
     schema = schemathesis.openapi.from_dict(schema)
 
-    @given(case=schema["/bug"]["get"].as_strategy(generator_mode=GeneratorMode.negative))
+    @given(case=schema["/bug"]["get"].as_strategy(generation_mode=GenerationMode.NEGATIVE))
     @settings(deadline=None, max_examples=10, suppress_health_check=SUPPRESSED_HEALTH_CHECKS)
     def test(case):
         assert_requests_call(case)

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import inspect
 from collections import defaultdict
-from copy import deepcopy
 from dataclasses import dataclass, field
 from enum import Enum, unique
 from functools import partial
@@ -138,18 +137,6 @@ class HookDispatcher:
         """
         raise NotImplementedError
 
-    def merge(self, other: HookDispatcher) -> HookDispatcher:
-        """Merge two dispatches together.
-
-        The resulting dispatcher will call the `self` hooks first.
-        """
-        all_hooks = deepcopy(self._hooks)
-        for name, hooks in other._hooks.items():
-            all_hooks[name].extend(hooks)
-        instance = self.__class__(scope=self.scope)
-        instance._hooks = all_hooks
-        return instance
-
     def apply(self, hook: Callable, *, name: str | None = None) -> Callable[[Callable], Callable]:
         """Register hook to run only on one test function.
 
@@ -232,12 +219,6 @@ class HookDispatcher:
     def get_all_by_name(self, name: str) -> list[Callable]:
         """Get a list of hooks registered for a name."""
         return self._hooks.get(name, [])
-
-    def is_installed(self, name: str, needle: Callable) -> bool:
-        for hook in self.get_all_by_name(name):
-            if hook is needle:
-                return True
-        return False
 
     def apply_to_container(
         self, strategy: st.SearchStrategy, container: str, context: HookContext
@@ -414,7 +395,6 @@ def after_call(context: HookContext, case: Case, response: Response) -> None:
 GLOBAL_HOOK_DISPATCHER = HookDispatcher(scope=HookScope.GLOBAL)
 dispatch = GLOBAL_HOOK_DISPATCHER.dispatch
 get_all_by_name = GLOBAL_HOOK_DISPATCHER.get_all_by_name
-is_installed = GLOBAL_HOOK_DISPATCHER.is_installed
 collect_statistic = GLOBAL_HOOK_DISPATCHER.collect_statistic
 register = GLOBAL_HOOK_DISPATCHER.register
 unregister = GLOBAL_HOOK_DISPATCHER.unregister

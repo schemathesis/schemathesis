@@ -30,9 +30,9 @@ def test_maximum_requests(request, loader, fixture, mocker):
             for operation in schema.get_all_operations():
                 operation = operation.ok()
                 if fixture == "graphql_url":
-                    case = operation.make_case(body={})
+                    case = operation.Case(body={})
                 else:
-                    case = operation.make_case()
+                    case = operation.Case()
                 try:
                     case.call()
                 except BucketFullException:

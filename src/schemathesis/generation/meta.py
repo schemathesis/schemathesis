@@ -2,8 +2,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any
 
-from schemathesis.generation import GeneratorMode
+from schemathesis.generation import GenerationMode
 
 
 class TestPhase(str, Enum):
@@ -14,31 +15,121 @@ class TestPhase(str, Enum):
     GENERATE = "generate"
 
 
-@dataclass
-class GenerationMetadata:
-    """Stores various information about how data is generated."""
+class ComponentKind(str, Enum):
+    """Components that can be generated."""
 
-    query: GeneratorMode | None
-    path_parameters: GeneratorMode | None
-    headers: GeneratorMode | None
-    cookies: GeneratorMode | None
-    body: GeneratorMode | None
-    phase: TestPhase
-    # Temporary attributes to carry info specific to the coverage phase
-    description: str | None
+    QUERY = "query"
+    PATH_PARAMETERS = "path_parameters"
+    HEADERS = "headers"
+    COOKIES = "cookies"
+    BODY = "body"
+
+
+@dataclass
+class ComponentInfo:
+    """Information about how a specific component was generated."""
+
+    mode: GenerationMode
+
+    __slots__ = ("mode",)
+
+
+@dataclass
+class GeneratePhaseData:
+    """Metadata specific to generate phase."""
+
+
+@dataclass
+class ExplicitPhaseData:
+    """Metadata specific to explicit phase."""
+
+
+@dataclass
+class CoveragePhaseData:
+    """Metadata specific to coverage phase."""
+
+    description: str
     location: str | None
     parameter: str | None
     parameter_location: str | None
 
-    __slots__ = (
-        "query",
-        "path_parameters",
-        "headers",
-        "cookies",
-        "body",
-        "phase",
-        "description",
-        "location",
-        "parameter",
-        "parameter_location",
-    )
+    __slots__ = ("description", "location", "parameter", "parameter_location")
+
+
+@dataclass
+class PhaseInfo:
+    """Phase-specific information."""
+
+    name: TestPhase
+    data: CoveragePhaseData | ExplicitPhaseData | GeneratePhaseData
+
+    __slots__ = ("name", "data")
+
+    @classmethod
+    def coverage(
+        cls,
+        description: str,
+        location: str | None = None,
+        parameter: str | None = None,
+        parameter_location: str | None = None,
+    ) -> PhaseInfo:
+        return cls(
+            name=TestPhase.COVERAGE,
+            data=CoveragePhaseData(
+                description=description, location=location, parameter=parameter, parameter_location=parameter_location
+            ),
+        )
+
+    @classmethod
+    def generate(cls) -> PhaseInfo:
+        return cls(name=TestPhase.GENERATE, data=GeneratePhaseData())
+
+
+@dataclass
+class GenerationInfo:
+    """Information about test case generation."""
+
+    time: float
+    mode: GenerationMode
+
+    __slots__ = ("time", "mode")
+
+
+@dataclass
+class CaseMetadata:
+    """Complete metadata for generated cases."""
+
+    generation: GenerationInfo
+    components: dict[ComponentKind, ComponentInfo]
+    phase: PhaseInfo
+
+    __slots__ = ("generation", "components", "phase")
+
+    def __init__(
+        self,
+        generation: GenerationInfo,
+        components: dict[ComponentKind, ComponentInfo],
+        phase: PhaseInfo,
+    ) -> None:
+        self.generation = generation
+        self.components = components
+        self.phase = phase
+
+    def asdict(self) -> dict[str, Any]:
+        data: dict[str, Any] = {
+            "generation": {"time": self.generation.time, "mode": self.generation.mode.value},
+            "phase": {"name": self.phase.name.value},
+            "components": {kind.value: {"mode": info.mode} for kind, info in self.components.items()},
+        }
+
+        if isinstance(self.phase.data, CoveragePhaseData):
+            data["phase"]["data"] = {
+                "description": self.phase.data.description,
+                "location": self.phase.data.location,
+                "parameter": self.phase.data.parameter,
+                "parameter_location": self.phase.data.parameter_location,
+            }
+        elif isinstance(self.phase.data, (GeneratePhaseData, ExplicitPhaseData)):
+            data["phase"]["data"] = {}
+
+        return data

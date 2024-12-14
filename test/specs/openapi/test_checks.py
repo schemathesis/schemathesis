@@ -3,9 +3,14 @@ import pytest
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
-from schemathesis.generation import GeneratorMode
-from schemathesis.generation.meta import GenerationMetadata, TestPhase
-from schemathesis.models import Case
+from schemathesis.generation import GenerationMode
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    ComponentKind,
+    GenerationInfo,
+    PhaseInfo,
+)
 from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
@@ -75,18 +80,26 @@ def test_is_prefix_operation(lhs, lhs_vars, rhs, rhs_vars, expected):
     assert _is_prefix_operation(ResourcePath(lhs, lhs_vars), ResourcePath(rhs, rhs_vars)) == expected
 
 
-def build_metadata(path_parameters=None, query=None, headers=None, cookies=None, body=None):
-    return GenerationMetadata(
-        path_parameters=path_parameters,
-        query=query,
-        headers=headers,
-        cookies=cookies,
-        body=body,
-        phase=TestPhase.GENERATE,
-        description=None,
-        location=None,
-        parameter=None,
-        parameter_location=None,
+def build_metadata(
+    path_parameters=None, query=None, headers=None, cookies=None, body=None, generation_mode=GenerationMode.POSITIVE
+):
+    return CaseMetadata(
+        generation=GenerationInfo(
+            time=0.1,
+            mode=generation_mode,
+        ),
+        components={
+            kind: ComponentInfo(mode=value)
+            for kind, value in [
+                (ComponentKind.QUERY, query),
+                (ComponentKind.PATH_PARAMETERS, path_parameters),
+                (ComponentKind.HEADERS, headers),
+                (ComponentKind.COOKIES, cookies),
+                (ComponentKind.BODY, body),
+            ]
+            if value is not None
+        },
+        phase=PhaseInfo.generate(),
     )
 
 
@@ -119,13 +132,13 @@ def sample_schema(ctx):
     [
         ({}, False),
         (
-            {"meta": build_metadata(body=GeneratorMode.negative)},
+            {"meta": build_metadata(body=GenerationMode.NEGATIVE)},
             False,
         ),
         (
             {
                 "query": {"key": 1},
-                "meta": build_metadata(query=GeneratorMode.negative),
+                "meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             False,
         ),
@@ -133,14 +146,14 @@ def sample_schema(ctx):
             {
                 "query": {"key": 1},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=GeneratorMode.negative),
+                "meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             False,
         ),
         (
             {
                 "query": {"key": 5, "unknown": 3},
-                "meta": build_metadata(query=GeneratorMode.negative),
+                "meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             True,
         ),
@@ -148,7 +161,7 @@ def sample_schema(ctx):
             {
                 "query": {"key": 5, "unknown": 3},
                 "headers": {"X-Key": 42},
-                "meta": build_metadata(query=GeneratorMode.negative),
+                "meta": build_metadata(query=GenerationMode.NEGATIVE),
             },
             True,
         ),
@@ -157,7 +170,7 @@ def sample_schema(ctx):
 def test_has_only_additional_properties_in_non_body_parameters(sample_schema, kwargs, expected):
     schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
-    case = Case(operation=operation, generation_time=0.0, **kwargs)
+    case = operation.Case(**kwargs)
     assert has_only_additional_properties_in_non_body_parameters(case) is expected
 
 
@@ -166,11 +179,11 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
     response = response_factory.requests()
     schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
-    case = Case(
-        operation=operation,
-        generation_time=0.0,
-        meta=build_metadata(query=GeneratorMode.negative),
-        generator_mode=GeneratorMode.negative,
+    case = operation.Case(
+        meta=build_metadata(
+            query=GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.NEGATIVE,
+        ),
         query={"key": 5, "unknown": 3},
     )
     assert (
@@ -215,11 +228,11 @@ def test_positive_data_acceptance(
     schema = schemathesis.openapi.from_dict(sample_schema)
     operation = schema["/test"]["POST"]
     response = response_factory.requests(status_code=status_code)
-    case = Case(
-        operation=operation,
-        generation_time=0.0,
-        meta=build_metadata(query=GeneratorMode.positive if is_positive else GeneratorMode.negative),
-        generator_mode=GeneratorMode.positive if is_positive else GeneratorMode.negative,
+    case = operation.Case(
+        meta=build_metadata(
+            query=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
+            generation_mode=GenerationMode.POSITIVE if is_positive else GenerationMode.NEGATIVE,
+        ),
     )
     ctx = CheckContext(
         override=None,
@@ -259,7 +272,7 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, expe
             str(schema_path),
             f"--base-url={openapi3_base_url}",
             "--hypothesis-phases=explicit",
-            "--generator-mode=negative",
+            "--generation-mode=negative",
             "--experimental=coverage-phase",
             f"--experimental-missing-required-header-allowed-statuses={expected_status}",
         )
