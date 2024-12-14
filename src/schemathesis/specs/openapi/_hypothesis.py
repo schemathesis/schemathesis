@@ -21,7 +21,7 @@ from schemathesis.generation.meta import GenerationMetadata, TestPhase
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths
-from ...generation import DataGenerationMethod, GenerationConfig
+from ...generation import GenerationConfig, GeneratorMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case
 from .constants import LOCATION_TO_CONTAINER
@@ -42,7 +42,7 @@ def get_case_strategy(
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
-    generator: DataGenerationMethod = DataGenerationMethod.default(),
+    generator_mode: GeneratorMode = GeneratorMode.default(),
     generation_config: GenerationConfig | None = None,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
@@ -66,30 +66,30 @@ def get_case_strategy(
     as it works with `body`.
     """
     start = time.monotonic()
-    strategy_factory = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
+    strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator_mode]
 
     context = HookContext(operation)
 
     generation_config = generation_config or operation.schema.generation_config
 
     path_parameters_ = generate_parameter(
-        "path", path_parameters, operation, draw, context, hooks, generator, generation_config
+        "path", path_parameters, operation, draw, context, hooks, generator_mode, generation_config
     )
-    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator, generation_config)
-    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator, generation_config)
-    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator, generation_config)
+    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator_mode, generation_config)
+    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator_mode, generation_config)
+    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator_mode, generation_config)
 
     if body is NOT_SET:
         if operation.body:
-            body_generator = generator
-            if generator.is_negative:
+            body_generator = generator_mode
+            if generator_mode.is_negative:
                 # Consider only schemas that are possible to negate
                 candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
                     strategy_factory = make_positive_strategy
-                    body_generator = DataGenerationMethod.positive
+                    body_generator = GeneratorMode.positive
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
@@ -130,7 +130,7 @@ def get_case_strategy(
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
-    if generator.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
+    if generator_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if skip_on_not_negated:
             raise SkipTest(f"It is not possible to generate negative test cases for `{operation.verbose_name}`")
         else:
@@ -144,7 +144,7 @@ def get_case_strategy(
         cookies=cookies_.value,
         query=query_.value,
         body=body_.value,
-        data_generation_method=generator,
+        generator_mode=generator_mode,
         meta=GenerationMetadata(
             query=query_.generator,
             path_parameters=path_parameters_.generator,
@@ -228,7 +228,7 @@ class ValueContainer:
 
     value: Any
     location: str
-    generator: DataGenerationMethod | None
+    generator: GeneratorMode | None
 
     __slots__ = ("value", "location", "generator")
 
@@ -240,7 +240,7 @@ class ValueContainer:
 
 def any_negated_values(values: list[ValueContainer]) -> bool:
     """Check if any generated values are negated."""
-    return any(value.generator == DataGenerationMethod.negative for value in values if value.is_generated)
+    return any(value.generator == GeneratorMode.negative for value in values if value.is_generated)
 
 
 def generate_parameter(
@@ -250,7 +250,7 @@ def generate_parameter(
     draw: Callable,
     context: HookContext,
     hooks: HookDispatcher | None,
-    generator: DataGenerationMethod,
+    generator: GeneratorMode,
     generation_config: GenerationConfig,
 ) -> ValueContainer:
     """Generate a value for a parameter.
@@ -264,13 +264,13 @@ def generate_parameter(
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
         strategy_factory = make_positive_strategy
-        generator = DataGenerationMethod.positive
+        generator = GeneratorMode.positive
     else:
-        strategy_factory = DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY[generator]
+        strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator]
     value = get_parameters_value(
         explicit, location, draw, operation, context, hooks, strategy_factory, generation_config
     )
-    used_generator: DataGenerationMethod | None = generator
+    used_generator: GeneratorMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
@@ -443,9 +443,9 @@ def make_negative_strategy(
     )
 
 
-DATA_GENERATION_METHOD_TO_STRATEGY_FACTORY = {
-    DataGenerationMethod.positive: make_positive_strategy,
-    DataGenerationMethod.negative: make_negative_strategy,
+GENERATOR_MODE_TO_STRATEGY_FACTORY = {
+    GeneratorMode.positive: make_positive_strategy,
+    GeneratorMode.negative: make_negative_strategy,
 }
 
 

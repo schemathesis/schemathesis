@@ -27,7 +27,7 @@ from schemathesis.generation.targets import TARGETS
 from .. import contrib, experimental, generation, runner, service
 from .._override import CaseOverride
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
-from ..generation import DEFAULT_DATA_GENERATION_METHODS, DataGenerationMethod
+from ..generation import DEFAULT_GENERATOR_MODES, GeneratorMode
 from ..runner import events
 from ..runner.config import NetworkConfig
 from ..stateful import Stateful
@@ -61,7 +61,7 @@ del checks
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 CONTEXT_SETTINGS = {"help_option_names": ["-h", "--help"]}
 
-DATA_GENERATION_METHOD_TYPE = click.Choice([item.name for item in DataGenerationMethod] + ["all"])
+GENERATOR_MODE_TYPE = click.Choice([item.name for item in GeneratorMode] + ["all"])
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
@@ -443,14 +443,13 @@ REPORT_TO_SERVICE = ReportToService()
 )
 @group("Data generation options")
 @grouped_option(
-    "--data-generation-method",
-    "-D",
-    "data_generation_methods",
+    "--generator-mode",
+    "generator_modes",
     help="Specify the approach Schemathesis uses to generate test data. "
     "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both",
-    type=DATA_GENERATION_METHOD_TYPE,
-    default=DataGenerationMethod.default().name,
-    callback=validation.convert_data_generation_method,
+    type=GENERATOR_MODE_TYPE,
+    default=GeneratorMode.default().name,
+    callback=validation.convert_generator_mode,
     show_default=True,
     metavar="",
 )
@@ -673,7 +672,7 @@ def run(
     negative_data_rejection_allowed_statuses: list[str],
     included_check_names: Sequence[str],
     excluded_check_names: Sequence[str],
-    data_generation_methods: tuple[DataGenerationMethod, ...] = DEFAULT_DATA_GENERATION_METHODS,
+    generator_modes: tuple[GeneratorMode, ...] = DEFAULT_GENERATOR_MODES,
     max_response_time: float | None = None,
     included_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
@@ -778,7 +777,7 @@ def run(
     override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
 
     generation_config = generation.GenerationConfig(
-        methods=list(data_generation_methods),
+        modes=list(generator_modes),
         allow_x00=generation_allow_x00,
         graphql_allow_null=generation_graphql_allow_null,
         codec=generation_codec,

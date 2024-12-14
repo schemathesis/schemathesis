@@ -13,7 +13,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import GeneratorMode
 from schemathesis.models import APIOperation, Case
 from schemathesis.runner.models import Request
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
@@ -431,9 +431,9 @@ def test_method_suggestion(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
-@pytest.mark.parametrize("method", DataGenerationMethod.all())
+@pytest.mark.parametrize("method", GeneratorMode.all())
 @pytest.mark.hypothesis_nested
-def test_data_generation_method_is_available(ctx, method):
+def test_generator_mode_is_available(ctx, method):
     # When a new case is generated
     schema = ctx.openapi.build_schema(
         {
@@ -451,11 +451,11 @@ def test_data_generation_method_is_available(ctx, method):
 
     api_schema = schemathesis.openapi.from_dict(schema)
 
-    @given(case=api_schema["/data"]["POST"].as_strategy(data_generation_method=method))
+    @given(case=api_schema["/data"]["POST"].as_strategy(generator_mode=method))
     @settings(max_examples=1)
     def test(case):
-        # Then its data generation method should be available
-        assert case.data_generation_method == method
+        # Then its generator mode should be available
+        assert case.generator_mode == method
 
     test()
 

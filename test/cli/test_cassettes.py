@@ -26,7 +26,7 @@ from schemathesis.cli.cassettes import (
 )
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.generation import DataGenerationMethod
+from schemathesis.generation import GeneratorMode
 from schemathesis.runner.models import Request
 
 
@@ -47,16 +47,16 @@ def load_response_body(cassette, idx):
     return body["string"]
 
 
-@pytest.mark.parametrize("data_generation_method", [m.value for m in DataGenerationMethod.all()] + ["all"])
+@pytest.mark.parametrize("mode", [m.value for m in GeneratorMode.all()] + ["all"])
 @pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
-def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, data_generation_method):
+def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
-        f"--data-generation-method={data_generation_method}",
+        f"--generator-mode={mode}",
         "--experimental=coverage-phase",
         "--hypothesis-seed=1",
         *args,
@@ -68,15 +68,15 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     assert interactions[1]["id"] == "2"
     assert interactions[0]["status"] == "SUCCESS"
     assert interactions[0]["seed"] == "1"
-    if data_generation_method == "all":
-        assert interactions[0]["data_generation_method"] in ["positive", "negative"]
+    if mode == "all":
+        assert interactions[0]["generator_mode"] in ["positive", "negative"]
     else:
-        assert interactions[0]["data_generation_method"] == data_generation_method
+        assert interactions[0]["generator_mode"] == mode
     assert interactions[0]["phase"] in ("explicit", "coverage", "generate")
     correlation_id = interactions[0]["correlation_id"]
     UUID(correlation_id)
     assert float(interactions[0]["elapsed"]) >= 0
-    if data_generation_method == "positive":
+    if mode == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in interactions)
     assert len(interactions[0]["checks"]) == 1
@@ -88,9 +88,9 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     assert len(interactions[1]["checks"]) == 1
     for interaction in interactions:
         if interaction["phase"] == "coverage":
-            if interaction["data_generation_method"] == "negative" and not interaction["meta"][
-                "description"
-            ].startswith("Unspecified"):
+            if interaction["generator_mode"] == "negative" and not interaction["meta"]["description"].startswith(
+                "Unspecified"
+            ):
                 assert interaction["meta"]["location"] is not None
                 assert interaction["meta"]["parameter"] is not None
                 assert interaction["meta"]["parameter_location"] is not None

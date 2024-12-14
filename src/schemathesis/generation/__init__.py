@@ -4,15 +4,13 @@ import random
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from ._methods import (
-    DataGenerationMethod as DataGenerationMethod,
-)
+from schemathesis.generation.modes import GeneratorMode as GeneratorMode
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 
-DEFAULT_DATA_GENERATION_METHODS = (DataGenerationMethod.default(),)
+DEFAULT_GENERATOR_MODES = (GeneratorMode.default(),)
 
 
 CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
@@ -41,7 +39,7 @@ class HeaderConfig:
 class GenerationConfig:
     """Holds various configuration options relevant for data generation."""
 
-    methods: list[DataGenerationMethod] = field(default_factory=lambda: [DataGenerationMethod.default()])
+    modes: list[GeneratorMode] = field(default_factory=lambda: [GeneratorMode.default()])
     # Allow generating `\x00` bytes in strings
     allow_x00: bool = True
     # Allowing using `null` for optional arguments in GraphQL queries

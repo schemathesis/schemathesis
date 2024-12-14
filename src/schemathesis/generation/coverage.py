@@ -19,12 +19,12 @@ from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING
 from schemathesis.core import NOT_SET
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
+from schemathesis.generation import GeneratorMode
 from schemathesis.generation.hypothesis import examples
 
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
 from ..specs.openapi.patterns import update_quantifier
-from ._methods import DataGenerationMethod
 
 
 def _replace_zero_with_nonzero(x: float) -> float:
@@ -63,18 +63,18 @@ UNKNOWN_PROPERTY_VALUE = 42
 @dataclass
 class GeneratedValue:
     value: Any
-    data_generation_method: DataGenerationMethod
+    generator_mode: GeneratorMode
     description: str
     parameter: str | None
     location: str | None
 
-    __slots__ = ("value", "data_generation_method", "description", "parameter", "location")
+    __slots__ = ("value", "generator_mode", "description", "parameter", "location")
 
     @classmethod
     def with_positive(cls, value: Any, *, description: str) -> GeneratedValue:
         return cls(
             value=value,
-            data_generation_method=DataGenerationMethod.positive,
+            generator_mode=GeneratorMode.positive,
             description=description,
             location=None,
             parameter=None,
@@ -86,7 +86,7 @@ class GeneratedValue:
     ) -> GeneratedValue:
         return cls(
             value=value,
-            data_generation_method=DataGenerationMethod.negative,
+            generator_mode=GeneratorMode.negative,
             description=description,
             location=location,
             parameter=parameter,
@@ -104,23 +104,21 @@ def cached_draw(strategy: st.SearchStrategy) -> Any:
 
 @dataclass
 class CoverageContext:
-    data_generation_methods: list[DataGenerationMethod]
+    generator_modes: list[GeneratorMode]
     location: str
     path: list[str | int]
 
-    __slots__ = ("location", "data_generation_methods", "path")
+    __slots__ = ("location", "generator_modes", "path")
 
     def __init__(
         self,
         *,
         location: str,
-        data_generation_methods: list[DataGenerationMethod] | None = None,
+        generator_modes: list[GeneratorMode] | None = None,
         path: list[str | int] | None = None,
     ) -> None:
         self.location = location
-        self.data_generation_methods = (
-            data_generation_methods if data_generation_methods is not None else DataGenerationMethod.all()
-        )
+        self.generator_modes = generator_modes if generator_modes is not None else GeneratorMode.all()
         self.path = path or []
 
     @contextmanager
@@ -138,14 +136,14 @@ class CoverageContext:
     def with_positive(self) -> CoverageContext:
         return CoverageContext(
             location=self.location,
-            data_generation_methods=[DataGenerationMethod.positive],
+            generator_modes=[GeneratorMode.positive],
             path=self.path,
         )
 
     def with_negative(self) -> CoverageContext:
         return CoverageContext(
             location=self.location,
-            data_generation_methods=[DataGenerationMethod.negative],
+            generator_modes=[GeneratorMode.negative],
             path=self.path,
         )
 
@@ -256,7 +254,7 @@ def _cover_positive_for_type(
         template = ctx.generate_from_schema(template_schema)
     else:
         template = None
-    if DataGenerationMethod.positive in ctx.data_generation_methods:
+    if GeneratorMode.positive in ctx.generator_modes:
         ctx = ctx.with_positive()
         enum = schema.get("enum", NOT_SET)
         const = schema.get("const", NOT_SET)
@@ -334,7 +332,7 @@ def cover_schema_iter(
     for ty in types:
         with _ignore_unfixable():
             yield from _cover_positive_for_type(ctx, schema, ty)
-    if DataGenerationMethod.negative in ctx.data_generation_methods:
+    if GeneratorMode.negative in ctx.generator_modes:
         template = None
         for key, value in schema.items():
             with _ignore_unfixable(), ctx.at(key):

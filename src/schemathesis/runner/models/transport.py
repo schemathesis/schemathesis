@@ -7,9 +7,10 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.transport import Response
+from schemathesis.transport.prepare import normalize_base_url
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
-from ...generation import DataGenerationMethod
+from ...generation import GeneratorMode
 from .status import Status
 
 if TYPE_CHECKING:
@@ -40,7 +41,7 @@ class Request:
         """Create a new `Request` instance from `Case`."""
         import requests
 
-        base_url = case.get_full_base_url()
+        base_url = normalize_base_url(case.base_url)
         kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url)
         request = requests.Request(**kwargs)
         prepared = session.prepare_request(request)  # type: ignore
@@ -93,7 +94,7 @@ class Interaction:
     response: Response | None
     checks: list[Check]
     status: Status
-    data_generation_method: DataGenerationMethod
+    generator_mode: GeneratorMode
     phase: TestPhase | None
     # `description` & `location` are related to metadata about this interaction
     # NOTE: It will be better to keep it in a separate attribute
@@ -121,7 +122,7 @@ class Interaction:
             response=response,
             status=status,
             checks=checks,
-            data_generation_method=cast(DataGenerationMethod, case.data_generation_method),
+            generator_mode=cast(GeneratorMode, case.generator_mode),
             phase=case.meta.phase if case.meta is not None else None,
             description=case.meta.description if case.meta is not None else None,
             location=case.meta.location if case.meta is not None else None,
@@ -135,7 +136,7 @@ class Interaction:
             "response": self.response.asdict() if self.response is not None else None,
             "checks": [check.asdict() for check in self.checks],
             "status": self.status.value,
-            "data_generation_method": self.data_generation_method.as_short_name(),
+            "generator_mode": self.generator_mode.as_short_name(),
             "phase": self.phase.value if self.phase is not None else None,
             "description": self.description,
             "location": self.location,
