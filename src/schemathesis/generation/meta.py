@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.generation import GeneratorMode
 
 
 class TestPhase(str, Enum):
@@ -18,11 +18,11 @@ class TestPhase(str, Enum):
 class GenerationMetadata:
     """Stores various information about how data is generated."""
 
-    query: DataGenerationMethod | None
-    path_parameters: DataGenerationMethod | None
-    headers: DataGenerationMethod | None
-    cookies: DataGenerationMethod | None
-    body: DataGenerationMethod | None
+    query: GeneratorMode | None
+    path_parameters: GeneratorMode | None
+    headers: GeneratorMode | None
+    cookies: GeneratorMode | None
+    body: GeneratorMode | None
     phase: TestPhase
     # Temporary attributes to carry info specific to the coverage phase
     description: str | None

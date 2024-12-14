@@ -17,7 +17,7 @@ from typing import (
     TypeVar,
     cast,
 )
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlsplit
 
 import graphql
 from hypothesis import strategies as st
@@ -32,7 +32,7 @@ from schemathesis.core.transport import Response
 
 from ... import auths
 from ...checks import not_a_server_error
-from ...generation import DataGenerationMethod, GenerationConfig
+from ...generation import GenerationConfig, GeneratorMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -58,16 +58,6 @@ class GraphQLCase(Case):
         return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    def _get_url(self, base_url: str | None) -> str:
-        base_url = self._get_base_url(base_url)
-        # Replace the path, in case if the user provided any path parameters via hooks
-        parts = list(urlsplit(base_url))
-        parts[2] = self.formatted_path
-        return urlunsplit(parts)
-
-    def _get_body(self) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
-        return self.body if isinstance(self.body, (NotSet, bytes)) else {"query": self.body}
 
     def validate_response(
         self,
@@ -242,7 +232,7 @@ class GraphQLSchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -251,7 +241,7 @@ class GraphQLSchema(BaseSchema):
             client_schema=self.client_schema,
             hooks=hooks,
             auth_storage=auth_storage,
-            data_generation_method=data_generation_method,
+            generator_mode=generator_mode,
             generation_config=generation_config or self.generation_config,
             **kwargs,
         )
@@ -341,7 +331,7 @@ def get_case_strategy(
     client_schema: graphql.GraphQLSchema,
     hooks: HookDispatcher | None = None,
     auth_storage: AuthStorage | None = None,
-    data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+    generator_mode: GeneratorMode = GeneratorMode.default(),
     generation_config: GenerationConfig | None = None,
     **kwargs: Any,
 ) -> Any:
@@ -378,7 +368,7 @@ def get_case_strategy(
         query=query_,
         body=body,
         operation=operation,
-        data_generation_method=data_generation_method,
+        generator_mode=generator_mode,
         generation_time=time.monotonic() - start,
         media_type="application/json",
     )  # type: ignore

@@ -7,8 +7,7 @@ from requests import Request
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
-from schemathesis.generation import GenerationConfig
-from schemathesis.generation._methods import DataGenerationMethod
+from schemathesis.generation import GenerationConfig, GeneratorMode
 from schemathesis.generation.hypothesis.builder import create_test
 from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -150,15 +149,15 @@ MIXED_CASES = [
     ("methods", "expected"),
     [
         (
-            [DataGenerationMethod.positive],
+            [GeneratorMode.positive],
             POSITIVE_CASES,
         ),
         (
-            [DataGenerationMethod.negative],
+            [GeneratorMode.negative],
             NEGATIVE_CASES,
         ),
         (
-            [DataGenerationMethod.positive, DataGenerationMethod.negative],
+            [GeneratorMode.positive, GeneratorMode.negative],
             MIXED_CASES,
         ),
     ],
@@ -239,7 +238,7 @@ def test_phase_no_body(ctx):
             },
         }
     )
-    assert_coverage(schema, [DataGenerationMethod.positive], [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
+    assert_coverage(schema, [GeneratorMode.positive], [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
 
 
 def test_with_example(ctx):
@@ -262,7 +261,7 @@ def test_with_example(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [{"query": {"q1": "secret"}}],
     )
 
@@ -308,7 +307,7 @@ def test_with_examples_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         EXPECTED_EXAMPLES,
     )
 
@@ -331,7 +330,7 @@ def test_with_optional_parameters(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [
             {
                 "query": {
@@ -405,7 +404,7 @@ def test_with_example_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [
             {
                 "query": {
@@ -444,7 +443,7 @@ def test_with_response_example_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [
             {
                 "path_parameters": {
@@ -489,7 +488,7 @@ def test_with_examples_openapi_3_1():
     }
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         EXPECTED_EXAMPLES,
     )
 
@@ -544,7 +543,7 @@ def test_with_examples_openapi_3_request_body(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [
             {"body": {"address": {}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
             {
@@ -646,7 +645,7 @@ def test_with_examples_openapi_2(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         EXPECTED_EXAMPLES,
     )
 
@@ -682,7 +681,7 @@ def test_negative_patterns(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "body": {},
@@ -761,7 +760,7 @@ def test_array_in_header_path_query(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -859,7 +858,7 @@ def test_required_header(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -911,7 +910,7 @@ def test_required_and_optional_headers(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
@@ -977,7 +976,7 @@ def test_path_parameter(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "path_parameters": {
@@ -1025,7 +1024,7 @@ def test_incorrect_headers(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.positive],
+        [GeneratorMode.positive],
         [{}],
     )
 
@@ -1050,7 +1049,7 @@ def test_incorrect_headers_with_enum(ctx):
     )
     assert_coverage(
         schema,
-        [DataGenerationMethod.negative],
+        [GeneratorMode.negative],
         [
             {
                 "headers": {},
@@ -1110,7 +1109,7 @@ def test_negative_query_parameter(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(methods=[DataGenerationMethod.negative]),
+        generation_config=GenerationConfig(modes=[GeneratorMode.negative]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1155,7 +1154,7 @@ def test_unspecified_http_methods(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(methods=[DataGenerationMethod.negative]),
+        generation_config=GenerationConfig(modes=[GeneratorMode.negative]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1192,7 +1191,7 @@ def test_no_missing_header_duplication(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(methods=DataGenerationMethod.all()),
+        generation_config=GenerationConfig(modes=GeneratorMode.all()),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1202,7 +1201,7 @@ def test_no_missing_header_duplication(ctx):
     assert "Missing `X-Key-3` at header" in descriptions
 
 
-def assert_coverage(schema, methods, expected, path=None):
+def assert_coverage(schema, modes, expected, path=None):
     schema = schemathesis.openapi.from_dict(schema)
 
     cases = []
@@ -1214,8 +1213,8 @@ def assert_coverage(schema, methods, expected, path=None):
         if case.meta.description.startswith("Unspecified"):
             return
         assert_requests_call(case)
-        if len(methods) == 1:
-            assert case.data_generation_method == methods[0]
+        if len(modes) == 1:
+            assert case.generator_mode == modes[0]
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
             value = getattr(case, container)
@@ -1226,7 +1225,7 @@ def assert_coverage(schema, methods, expected, path=None):
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(methods=methods),
+        generation_config=GenerationConfig(modes=modes),
         settings=settings(phases=[Phase.explicit]),
     )
 

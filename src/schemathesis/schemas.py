@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from contextlib import nullcontext
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    ContextManager,
     Generator,
     Iterator,
     NoReturn,
     TypeVar,
 )
-from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.core import NOT_SET, NotSet
@@ -35,7 +33,7 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .generation import DataGenerationMethod, GenerationConfig
+from .generation import GenerationConfig, GeneratorMode
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .models import APIOperation, Case
 
@@ -339,7 +337,7 @@ class BaseSchema(Mapping):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -361,13 +359,6 @@ class BaseSchema(Mapping):
     def prepare_schema(self, schema: Any) -> Any:
         raise NotImplementedError
 
-    def ratelimit(self) -> ContextManager:
-        """Limit the rate of sending generated requests."""
-        label = urlparse(self.base_url).netloc
-        if self.rate_limiter is not None:
-            self.rate_limiter.try_acquire(label)
-        return nullcontext()
-
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         raise NotImplementedError
 
@@ -375,7 +366,7 @@ class BaseSchema(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -384,7 +375,7 @@ class BaseSchema(Mapping):
             operation.ok().as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
-                data_generation_method=data_generation_method,
+                generator_mode=generator_mode,
                 generation_config=generation_config,
                 **kwargs,
             )
@@ -439,7 +430,7 @@ class APIOperationMap(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        data_generation_method: DataGenerationMethod = DataGenerationMethod.default(),
+        generator_mode: GeneratorMode = GeneratorMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -448,7 +439,7 @@ class APIOperationMap(Mapping):
             operation.as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
-                data_generation_method=data_generation_method,
+                generator_mode=generator_mode,
                 generation_config=generation_config,
                 **kwargs,
             )

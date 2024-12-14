@@ -585,26 +585,6 @@ def test_(request, case):
     result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
-def test_base_url_from_url(testdir, openapi_3_app, openapi3_base_url, openapi3_schema_url):
-    # When the schema is created out of URI
-    testdir.make_test(
-        f"""
-schema = schemathesis.openapi.from_url("{openapi3_schema_url}")
-
-@schema.parametrize()
-def test_(request, case):
-    assert case._get_base_url(None) == "{openapi3_base_url}"
-    case.call()
-"""
-    )
-    result = testdir.runpytest("-v")
-    # Then base URL can be discovered automatically
-    # And can be omitted in `call`
-    result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines([r".*\[GET /api/failure\]", r".*\[GET /api/success\]"])
-    assert len(openapi_3_app["incoming_requests"]) == 2
-
-
 def test_empty_content():
     # When the "content" value is empty in "requestBody"
     raw_schema = {

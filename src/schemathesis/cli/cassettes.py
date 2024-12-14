@@ -240,7 +240,7 @@ http_interactions:"""
   status: '{status}'
   seed: {seed}
   correlation_id: '{item.correlation_id}'
-  data_generation_method: '{interaction.data_generation_method.value}'
+  generator_mode: '{interaction.generator_mode.value}'
   meta:
     description: """
                 )
