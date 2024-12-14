@@ -905,7 +905,7 @@ def testdir(testdir):
         from schemathesis.core import NOT_SET
         from schemathesis.core.output import OutputConfig
         from schemathesis.stateful import Stateful
-        from schemathesis.generation import GeneratorMode, GenerationConfig
+        from schemathesis.generation import GenerationMode, GenerationConfig
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}
@@ -1037,7 +1037,8 @@ def response_factory():
 def case_factory(swagger_20):
     def factory(**kwargs):
         kwargs.setdefault("operation", swagger_20["/users"]["get"])
-        return Case(generation_time=0.0, **kwargs)
+        kwargs.setdefault("method", "GET")
+        return Case(**kwargs)
 
     return factory
 

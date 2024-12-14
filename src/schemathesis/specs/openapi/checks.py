@@ -12,6 +12,7 @@ from schemathesis.checks import CheckContext
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
+from schemathesis.generation.meta import ComponentKind, CoveragePhaseData
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
     EnsureResourceAvailability,
@@ -215,15 +216,14 @@ def response_schema_conformance(ctx: CheckContext, response: Response, case: Cas
 def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or case.meta is None:
         return True
 
     config = ctx.config.get(negative_data_rejection, NegativeDataRejectionConfig())
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
     if (
-        case.generator_mode
-        and case.generator_mode.is_negative
+        case.meta.generation.mode.is_negative
         and response.status_code not in allowed_statuses
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
@@ -240,13 +240,13 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
 def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or case.meta is None:
         return True
 
     config = ctx.config.get(positive_data_acceptance, PositiveDataAcceptanceConfig())
     allowed_statuses = expand_status_codes(config.allowed_statuses or [])
 
-    if case.generator_mode and case.generator_mode.is_positive and response.status_code not in allowed_statuses:
+    if case.meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
         raise RejectedPositiveData(
             operation=case.operation.verbose_name,
             message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
@@ -258,12 +258,11 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
 
 def missing_required_header(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     # NOTE: This check is intentionally not registered with `@schemathesis.check` because it is experimental
-    if (
-        case.meta
-        and case.meta.parameter_location == "header"
-        and case.meta.description
-        and case.meta.description.startswith("Missing ")
-    ):
+    meta = case.meta
+    if meta is None or not isinstance(meta.phase.data, CoveragePhaseData):
+        return None
+    data = meta.phase.data
+    if data.parameter_location == "header" and data.description and data.description.startswith("Missing "):
         config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
         allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
@@ -281,14 +280,17 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     if meta is None:
         # Ignore manually created cases
         return False
-    if (meta.body and meta.body.is_negative) or (meta.path_parameters and meta.path_parameters.is_negative):
+    if (ComponentKind.BODY in meta.components and meta.components[ComponentKind.BODY].mode.is_negative) or (
+        ComponentKind.PATH_PARAMETERS in meta.components
+        and meta.components[ComponentKind.PATH_PARAMETERS].mode.is_negative
+    ):
         # Body or path negations always imply other negations
         return False
     validator_cls = case.operation.schema.validator_cls  # type: ignore[attr-defined]
-    for container in ("query", "headers", "cookies"):
-        meta_for_location = getattr(meta, container)
-        value = getattr(case, container)
-        if value is not None and meta_for_location is not None and meta_for_location.is_negative:
+    for container in (ComponentKind.QUERY, ComponentKind.HEADERS, ComponentKind.COOKIES):
+        meta_for_location = meta.components.get(container)
+        value = getattr(case, container.value)
+        if value is not None and meta_for_location is not None and meta_for_location.mode.is_negative:
             parameters = getattr(case.operation, container)
             value_without_additional_properties = {k: v for k, v in value.items() if k in parameters}
             schema = get_schema_for_location(case.operation, container, parameters)

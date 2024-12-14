@@ -11,7 +11,6 @@ from typing import (
     Callable,
     Generic,
     Iterator,
-    Literal,
     TypeVar,
 )
 
@@ -22,11 +21,11 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transforms import diff
 from schemathesis.core.transport import Response
-from schemathesis.generation.meta import GenerationMetadata
+from schemathesis.generation.meta import CaseMetadata, ComponentKind
 from schemathesis.transport.prepare import prepare_request
 
 from ._override import CaseOverride
-from .generation import GenerationConfig, GeneratorMode, generate_random_case_id
+from .generation import GenerationConfig, GenerationMode, generate_random_case_id
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, dispatch
 from .parameters import Parameter, ParameterSet, PayloadAlternatives
 
@@ -63,8 +62,7 @@ class Case:
     """A single test case parameters."""
 
     operation: APIOperation
-    # Time spent on generation of this test case
-    generation_time: float
+    method: str
     # Unique test case identifier
     id: str = field(default_factory=generate_random_case_id, compare=False)
     path_parameters: dict[str, Any] | None = None
@@ -78,13 +76,10 @@ class Case:
     media_type: str | None = None
     source: CaseSource | None = None
 
-    meta: GenerationMetadata | None = None
+    meta: CaseMetadata | None = None
 
-    # The way the case was generated (None for manually crafted ones)
-    generator_mode: GeneratorMode | None = None
     _auth: requests.auth.AuthBase | None = None
     _has_explicit_auth: bool = False
-    _explicit_method: str | None = None
 
     def __post_init__(self) -> None:
         self._original_path_parameters = self.path_parameters.copy() if self.path_parameters else None
@@ -95,7 +90,7 @@ class Case:
     def asdict(self) -> dict[str, Any]:
         return {
             "id": self.id,
-            "generation_time": self.generation_time,
+            "meta": self.meta.asdict() if self.meta is not None else None,
             "verbose_name": self.operation.verbose_name,
             "path_template": self.path,
             "path_parameters": self.path_parameters,
@@ -104,15 +99,14 @@ class Case:
             "media_type": self.media_type,
         }
 
-    def _has_generated_component(self, name: str) -> bool:
-        assert name in ["path_parameters", "headers", "cookies", "query"]
+    def _has_generated_component(self, component: ComponentKind) -> bool:
         if self.meta is None:
             return False
-        return getattr(self.meta, name) is not None
+        return self.meta.components.get(component) is not None
 
-    def _get_diff(self, component: Literal["path_parameters", "headers", "query", "cookies"]) -> dict[str, Any]:
-        original = getattr(self, f"_original_{component}")
-        current = getattr(self, component)
+    def _get_diff(self, component: ComponentKind) -> dict[str, Any]:
+        original = getattr(self, f"_original_{component.value}")
+        current = getattr(self, component.value)
         if not (current and original):
             return {}
         original_value = original if self._has_generated_component(component) else {}
@@ -137,10 +131,10 @@ class Case:
     @property
     def _override(self) -> CaseOverride:
         return CaseOverride(
-            path_parameters=self._get_diff("path_parameters"),
-            headers=self._get_diff("headers"),
-            query=self._get_diff("query"),
-            cookies=self._get_diff("cookies"),
+            path_parameters=self._get_diff(ComponentKind.PATH_PARAMETERS),
+            headers=self._get_diff(ComponentKind.HEADERS),
+            query=self._get_diff(ComponentKind.QUERY),
+            cookies=self._get_diff(ComponentKind.COOKIES),
         )
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -152,10 +146,6 @@ class Case:
     @property
     def full_path(self) -> str:
         return self.operation.full_path
-
-    @property
-    def method(self) -> str:
-        return self._explicit_method.upper() if self._explicit_method else self.operation.method.upper()
 
     @property
     def base_url(self) -> str | None:
@@ -433,13 +423,13 @@ class APIOperation(Generic[P, C]):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> st.SearchStrategy:
         """Turn this API operation into a Hypothesis strategy."""
         strategy = self.schema.get_case_strategy(
-            self, hooks, auth_storage, generator_mode, generation_config=generation_config, **kwargs
+            self, hooks, auth_storage, generation_mode, generation_config=generation_config, **kwargs
         )
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: st.SearchStrategy[Case]) -> st.SearchStrategy[Case]:
@@ -499,15 +489,17 @@ class APIOperation(Generic[P, C]):
             f"or pass any other media type available for serialization. Defined media types: {media_types_repr}"
         )
 
-    def make_case(
+    def Case(
         self,
         *,
+        method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        meta: CaseMetadata | None = None,
     ) -> C:
         """Create a new example for this API operation.
 
@@ -516,12 +508,14 @@ class APIOperation(Generic[P, C]):
         return self.schema.make_case(
             case_cls=self.case_cls,
             operation=self,
+            method=method,
             path_parameters=path_parameters,
             headers=headers,
             cookies=cookies,
             query=query,
             body=body,
             media_type=media_type,
+            meta=meta,
         )
 
     @property

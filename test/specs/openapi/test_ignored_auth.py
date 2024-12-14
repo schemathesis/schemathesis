@@ -192,7 +192,7 @@ def test_contains_auth(ctx, request_kwargs, parameters, expected):
 @pytest.mark.operations("success")
 def test_remove_auth_from_case(schema_url, key, parameters):
     schema = schemathesis.openapi.from_url(schema_url)
-    case = schema["/success"]["GET"].make_case(**{key: {"A": "V"}})
+    case = schema["/success"]["GET"].Case(**{key: {"A": "V"}})
     _remove_auth_from_case(case, parameters)
     assert not getattr(case, key)
 

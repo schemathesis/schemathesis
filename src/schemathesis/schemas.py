@@ -23,6 +23,7 @@ from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
+from schemathesis.generation.meta import CaseMetadata
 from schemathesis.hooks import HookDispatcherMark
 
 from .auths import AuthStorage
@@ -33,7 +34,7 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .generation import GenerationConfig, GeneratorMode
+from .generation import GenerationConfig, GenerationMode
 from .hooks import HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
 from .models import APIOperation, Case
 
@@ -323,12 +324,14 @@ class BaseSchema(Mapping):
         *,
         case_cls: type[C],
         operation: APIOperation,
+        method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        meta: CaseMetadata | None = None,
     ) -> C:
         raise NotImplementedError
 
@@ -337,7 +340,7 @@ class BaseSchema(Mapping):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -366,7 +369,7 @@ class BaseSchema(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -375,7 +378,7 @@ class BaseSchema(Mapping):
             operation.ok().as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
-                generator_mode=generator_mode,
+                generation_mode=generation_mode,
                 generation_config=generation_config,
                 **kwargs,
             )
@@ -430,7 +433,7 @@ class APIOperationMap(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -439,7 +442,7 @@ class APIOperationMap(Mapping):
             operation.as_strategy(
                 hooks=hooks,
                 auth_storage=auth_storage,
-                generator_mode=generator_mode,
+                generation_mode=generation_mode,
                 generation_config=generation_config,
                 **kwargs,
             )

@@ -2,23 +2,23 @@ Exit code: 1
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
-Schema location: http://127.0.0.1/schema.yaml
-Base URL: http://127.0.0.1/api
+Schema location: file:///tmp/schema.json
+Base URL: file:///
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
-API probing: SUCCESS
+API probing: SKIP
 Schema analysis: SKIP
 
-POST /api/csv E                                                           [100%]
+POST /csv E                                                               [100%]
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/csv _________________________________
+__________________________________ POST /csv ___________________________________
 Serialization not possible
 
-Schemathesis can't serialize data to any of the defined media types: text/csv 
+Schemathesis can't serialize data to any of the defined media types: text/tsv 
 You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
 See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
 

@@ -25,7 +25,7 @@ from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
-from schemathesis.models import APIOperation, Case
+from schemathesis.models import APIOperation
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.specs.openapi import unregister_string_format
@@ -715,7 +715,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
-    original = Case(operation, generation_time=0.0).call
+    original = operation.Case().call
     counter = 0
 
     def mocked(*args, **kwargs):
@@ -1424,7 +1424,7 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
 def test_skip_not_negated_tests(cli, schema_url):
     # See GH-1463
     # When an endpoint has no parameters to negate
-    result = cli.run(schema_url, "--generator-mode", "negative")
+    result = cli.run(schema_url, "--generation-mode", "negative")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then it should be skipped
     lines = result.stdout.splitlines()
@@ -1434,7 +1434,7 @@ def test_skip_not_negated_tests(cli, schema_url):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_dont_skip_when_generation_is_possible(cli, schema_url):
-    result = cli.run(schema_url, "--generator-mode", "all")
+    result = cli.run(schema_url, "--generation-mode", "all")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.splitlines()
     assert "1 passed in" in lines[-1]
@@ -1485,8 +1485,8 @@ def data_generation_check(ctx):
         """
 @schemathesis.check
 def data_generation_check(ctx, response, case):
-    if case.generator_mode:
-        note("MODE: {}".format(case.generator_mode.name))
+    if case.meta.generation.mode:
+        note("MODE: {}".format(case.meta.generation.mode.value))
 """
     ) as module:
         yield module
@@ -1494,7 +1494,7 @@ def data_generation_check(ctx, response, case):
 
 @flaky(max_runs=5, min_passes=1)
 @pytest.mark.operations("payload")
-def test_multiple_generator_modes(cli, openapi3_schema_url, data_generation_check):
+def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_check):
     # When multiple data generation methods are supplied in CLI
     result = cli.main(
         "run",
@@ -1505,7 +1505,7 @@ def test_multiple_generator_modes(cli, openapi3_schema_url, data_generation_chec
         openapi3_schema_url,
         "--hypothesis-max-examples=25",
         "--hypothesis-suppress-health-check=all",
-        "--generator-mode",
+        "--generation-mode",
         "all",
         hooks=data_generation_check,
     )

@@ -7,7 +7,7 @@ from requests import Request
 import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
-from schemathesis.generation import GenerationConfig, GeneratorMode
+from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.generation.hypothesis.builder import create_test
 from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -149,15 +149,15 @@ MIXED_CASES = [
     ("methods", "expected"),
     [
         (
-            [GeneratorMode.positive],
+            [GenerationMode.POSITIVE],
             POSITIVE_CASES,
         ),
         (
-            [GeneratorMode.negative],
+            [GenerationMode.NEGATIVE],
             NEGATIVE_CASES,
         ),
         (
-            [GeneratorMode.positive, GeneratorMode.negative],
+            [GenerationMode.POSITIVE, GenerationMode.NEGATIVE],
             MIXED_CASES,
         ),
     ],
@@ -238,7 +238,7 @@ def test_phase_no_body(ctx):
             },
         }
     )
-    assert_coverage(schema, [GeneratorMode.positive], [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
+    assert_coverage(schema, [GenerationMode.POSITIVE], [{"query": {"q1": "6"}}, {"query": {"q1": "5"}}])
 
 
 def test_with_example(ctx):
@@ -261,7 +261,7 @@ def test_with_example(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [{"query": {"q1": "secret"}}],
     )
 
@@ -307,7 +307,7 @@ def test_with_examples_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         EXPECTED_EXAMPLES,
     )
 
@@ -330,7 +330,7 @@ def test_with_optional_parameters(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -404,7 +404,7 @@ def test_with_example_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [
             {
                 "query": {
@@ -443,7 +443,7 @@ def test_with_response_example_openapi_3(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [
             {
                 "path_parameters": {
@@ -488,7 +488,7 @@ def test_with_examples_openapi_3_1():
     }
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         EXPECTED_EXAMPLES,
     )
 
@@ -543,7 +543,7 @@ def test_with_examples_openapi_3_request_body(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [
             {"body": {"address": {}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
             {
@@ -645,7 +645,7 @@ def test_with_examples_openapi_2(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         EXPECTED_EXAMPLES,
     )
 
@@ -681,7 +681,7 @@ def test_negative_patterns(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "body": {},
@@ -760,7 +760,7 @@ def test_array_in_header_path_query(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -858,7 +858,7 @@ def test_required_header(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -910,7 +910,7 @@ def test_required_and_optional_headers(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {"X-API-Key-1": "", "x-schemathesis-unknown-property": "42"},
@@ -976,7 +976,7 @@ def test_path_parameter(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "path_parameters": {
@@ -1024,7 +1024,7 @@ def test_incorrect_headers(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.positive],
+        [GenerationMode.POSITIVE],
         [{}],
     )
 
@@ -1049,7 +1049,7 @@ def test_incorrect_headers_with_enum(ctx):
     )
     assert_coverage(
         schema,
-        [GeneratorMode.negative],
+        [GenerationMode.NEGATIVE],
         [
             {
                 "headers": {},
@@ -1098,9 +1098,9 @@ def test_negative_query_parameter(ctx):
     operation = schema["/foo"]["post"]
 
     def test(case):
-        if case.meta.phase != TestPhase.COVERAGE:
+        if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if case.meta.description.startswith("Unspecified"):
+        if case.meta.phase.data.description.startswith("Unspecified"):
             return
         kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
         request = Request(**kwargs).prepare()
@@ -1109,7 +1109,7 @@ def test_negative_query_parameter(ctx):
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(modes=[GeneratorMode.negative]),
+        generation_config=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1145,16 +1145,16 @@ def test_unspecified_http_methods(ctx):
     operation = schema["/foo"]["post"]
 
     def test(case):
-        if case.meta.phase != TestPhase.COVERAGE:
+        if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if not case.meta.description.startswith("Unspecified"):
+        if not case.meta.phase.data.description.startswith("Unspecified"):
             return
         methods.add(case.method)
 
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(modes=[GeneratorMode.negative]),
+        generation_config=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1184,14 +1184,14 @@ def test_no_missing_header_duplication(ctx):
     operation = schema["/foo"]["post"]
 
     def test(case):
-        if case.meta.phase != TestPhase.COVERAGE:
+        if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        descriptions.append(case.meta.description)
+        descriptions.append(case.meta.phase.data.description)
 
     test_func = create_test(
         operation=operation,
         test=test,
-        generation_config=GenerationConfig(modes=GeneratorMode.all()),
+        generation_config=GenerationConfig(modes=GenerationMode.all()),
         settings=settings(phases=[Phase.explicit]),
     )
 
@@ -1208,13 +1208,13 @@ def assert_coverage(schema, modes, expected, path=None):
     operation = schema[path[0]][path[1]] if path else schema["/foo"]["post"]
 
     def test(case):
-        if case.meta.phase != TestPhase.COVERAGE:
+        if case.meta.phase.name != TestPhase.COVERAGE:
             return
-        if case.meta.description.startswith("Unspecified"):
+        if case.meta.phase.data.description.startswith("Unspecified"):
             return
         assert_requests_call(case)
         if len(modes) == 1:
-            assert case.generator_mode == modes[0]
+            assert case.meta.generation.mode == modes[0]
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
             value = getattr(case, container)

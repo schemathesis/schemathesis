@@ -179,7 +179,7 @@ def test_misspelled_parameter(schema_url, parameter, message):
     # When the user supplies a parameter definition, that points to location which has no parameters defined in the
     # schema
     add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={f"header.{parameter}": "$response.body#/id"})
-    case = schema["/users/{user_id}"]["GET"].make_case()
+    case = schema["/users/{user_id}"]["GET"].Case()
     link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
     with pytest.raises(ValueError, match=re.escape(message)):
         link.set_data(case, elapsed=1.0, context=expressions.ExpressionContext(case=case, response=None))

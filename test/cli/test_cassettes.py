@@ -5,7 +5,6 @@ import platform
 import re
 from unittest.mock import ANY
 from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
-from uuid import UUID
 
 import harfile
 import pytest
@@ -26,7 +25,7 @@ from schemathesis.cli.cassettes import (
 )
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.generation import GeneratorMode
+from schemathesis.generation import GenerationMode
 from schemathesis.runner.models import Request
 
 
@@ -47,7 +46,7 @@ def load_response_body(cassette, idx):
     return body["string"]
 
 
-@pytest.mark.parametrize("mode", [m.value for m in GeneratorMode.all()] + ["all"])
+@pytest.mark.parametrize("mode", [m.value for m in GenerationMode.all()] + ["all"])
 @pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
@@ -56,7 +55,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         schema_url,
         f"--cassette-path={cassette_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples}",
-        f"--generator-mode={mode}",
+        f"--generation-mode={mode}",
         "--experimental=coverage-phase",
         "--hypothesis-seed=1",
         *args,
@@ -64,18 +63,14 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
     interactions = cassette["http_interactions"]
-    assert interactions[0]["id"] == "1"
-    assert interactions[1]["id"] == "2"
     assert interactions[0]["status"] == "SUCCESS"
-    assert interactions[0]["seed"] == "1"
+    assert cassette["seed"] == 1
     if mode == "all":
-        assert interactions[0]["generator_mode"] in ["positive", "negative"]
+        assert interactions[0]["generation"]["mode"] in ["positive", "negative"]
     else:
-        assert interactions[0]["generator_mode"] == mode
-    assert interactions[0]["phase"] in ("explicit", "coverage", "generate")
-    correlation_id = interactions[0]["correlation_id"]
-    UUID(correlation_id)
-    assert float(interactions[0]["elapsed"]) >= 0
+        assert interactions[0]["generation"]["mode"] == mode
+    assert interactions[0]["phase"]["name"] in ("explicit", "coverage", "generate")
+    assert float(interactions[0]["response"]["elapsed"]) >= 0
     if mode == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in interactions)
@@ -87,13 +82,13 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     }
     assert len(interactions[1]["checks"]) == 1
     for interaction in interactions:
-        if interaction["phase"] == "coverage":
-            if interaction["generator_mode"] == "negative" and not interaction["meta"]["description"].startswith(
-                "Unspecified"
-            ):
-                assert interaction["meta"]["location"] is not None
-                assert interaction["meta"]["parameter"] is not None
-                assert interaction["meta"]["parameter_location"] is not None
+        if interaction["phase"]["name"] == "coverage":
+            if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][
+                "description"
+            ].startswith("Unspecified"):
+                assert interaction["phase"]["data"]["location"] is not None
+                assert interaction["phase"]["data"]["parameter"] is not None
+                assert interaction["phase"]["data"]["parameter_location"] is not None
 
 
 @pytest.mark.operations("success", "upload_file")
@@ -109,14 +104,9 @@ def test_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["id"] == "1"
-    assert cassette["http_interactions"][1]["id"] == "2"
     assert cassette["http_interactions"][0]["status"] == "SKIP"
-    assert cassette["http_interactions"][0]["seed"] == "1"
-    assert cassette["http_interactions"][0]["phase"] in ("explicit", "coverage", "generate")
-    correlation_id = cassette["http_interactions"][0]["correlation_id"]
-    UUID(correlation_id)
-    assert float(cassette["http_interactions"][0]["elapsed"]) >= 0
+    assert cassette["seed"] == 1
+    assert cassette["http_interactions"][0]["phase"]["name"] in ("explicit", "coverage", "generate")
     assert all("checks" in interaction for interaction in cassette["http_interactions"])
     assert cassette["http_interactions"][0]["response"] is None
     assert len(cassette["http_interactions"][0]["checks"]) == 0
@@ -135,9 +125,8 @@ def test_store_timeout(cli, schema_url, cassette_path):
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["id"] == "1"
     assert cassette["http_interactions"][0]["status"] == "FAILURE"
-    assert cassette["http_interactions"][0]["seed"] == "1"
+    assert cassette["seed"] == 1
     assert cassette["http_interactions"][0]["response"] is None
 
 

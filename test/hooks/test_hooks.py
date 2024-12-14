@@ -373,9 +373,7 @@ def test_before_add_examples(testdir, simple_openapi):
         """
 @schema.hook
 def before_add_examples(context, examples):
-    new = schemathesis.models.Case(
-        operation=context.operation,
-        generation_time=0.0,
+    new = context.operation.Case(
         query={"foo": "bar"}
     )
     examples.append(new)
@@ -387,9 +385,7 @@ def test_a(case):
 
 
 def another_hook(context, examples):
-    new = schemathesis.models.Case(
-        operation=context.operation,
-        generation_time=0.0,
+    new = context.operation.Case(
         query={"spam": "baz"}
     )
     examples.append(new)

@@ -24,7 +24,7 @@ def test_get_container_invalid_location(swagger_20):
     ]
     for parameter in parameters:
         operation.add_parameter(parameter)
-    case = operation.make_case()
+    case = operation.Case()
     with pytest.raises(ValueError, match="Parameter `unknown` is not defined in API operation `GET /users/{user_id}`"):
         get_container(case, None, "unknown")
 

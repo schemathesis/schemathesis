@@ -6,7 +6,7 @@ from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from requests import Response
 
-from schemathesis import GeneratorMode
+from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
@@ -74,7 +74,7 @@ def csv_strategy(enum, exclude=()):
         optional={
             "auth": delimited(),
             "auth-type": st.sampled_from(["basic", "digest", "BASIC", "DIGEST"]),
-            "data-generation-method": st.sampled_from([item.name for item in GeneratorMode]),
+            "data-generation-method": st.sampled_from([item.name for item in GenerationMode]),
             "target": st.sampled_from(TARGETS.get_all_names()),
             "stateful": st.sampled_from([item.name for item in Stateful]),
             "force-schema-version": st.sampled_from(["20", "30"]),

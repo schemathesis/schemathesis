@@ -138,7 +138,7 @@ Output options:
                                         format at the specified file path
 
 Data generation options:
-  --generator-mode                          Specify the approach Schemathesis
+  --generation-mode                         Specify the approach Schemathesis
                                             uses to generate test data. Use
                                             'positive' for valid data,
                                             'negative' for invalid data, or

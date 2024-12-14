@@ -73,7 +73,7 @@ def test_custom_base_url(graphql_url):
 
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
 def test_make_case(graphql_schema, kwargs):
-    case = graphql_schema["Query"]["getBooks"].make_case(**kwargs)
+    case = graphql_schema["Query"]["getBooks"].Case(**kwargs)
     assert isinstance(case, GraphQLCase)
     assert_requests_call(case)
 
@@ -87,13 +87,13 @@ def test_make_case(graphql_schema, kwargs):
 )
 def test_response_validation(graphql_schema, response_factory, kwargs, expected):
     response = response_factory.requests(status_code=200, **kwargs)
-    case = graphql_schema["Query"]["getBooks"].make_case(body="Q")
+    case = graphql_schema["Query"]["getBooks"].Case(body="Q")
     with pytest.raises(Failure, match=expected):
         not_a_server_error(None, response, case)
 
 
 def test_client_error(graphql_schema):
-    case = graphql_schema["Query"]["getBooks"].make_case(body="invalid query")
+    case = graphql_schema["Query"]["getBooks"].Case(body="invalid query")
     with pytest.raises(FailureGroup) as exc:
         case.call_and_validate()
     assert "Syntax Error: Unexpected Name 'invalid'." in str(exc.value.exceptions[0])
@@ -319,5 +319,5 @@ def test_schema_as_strategy(graphql_schema):
 )
 def test_ignored_checks(graphql_schema, check):
     # Just in case
-    case = graphql_schema["Query"]["getBooks"].make_case()
+    case = graphql_schema["Query"]["getBooks"].Case()
     assert check(None, None, case)

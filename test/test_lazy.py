@@ -291,14 +291,14 @@ def test_(case):
     )
 
 
-def test_generator_modes(testdir):
+def test_generation_modes(testdir):
     # When data generation method config is specified on the schema which is wrapped by a lazy one
     testdir.make_test(
         """
 @pytest.fixture()
 def api_schema():
     return schemathesis.openapi.from_dict(raw_schema).configure(
-        generation=GenerationConfig(modes=schemathesis.GeneratorMode.all())
+        generation=GenerationConfig(modes=schemathesis.GenerationMode.all())
     )
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
@@ -343,7 +343,7 @@ def pytest_terminal_summary(terminalreporter) -> None:
     # And it should be the same test in the end
     # We do not assert the outcome here, because it is not reported.
     result.stdout.re_match_lines(
-        [r"test_generator_modes.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS"]
+        [r"test_generation_modes.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS"]
     )
 
 
@@ -412,7 +412,7 @@ def test_skip_negative_without_parameters(testdir):
 @pytest.fixture()
 def api_schema():
     return schemathesis.openapi.from_dict(raw_schema).configure(
-        generation=GenerationConfig(modes=[schemathesis.GeneratorMode.negative])
+        generation=GenerationConfig(modes=[schemathesis.GenerationMode.NEGATIVE])
     )
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")

@@ -31,10 +31,9 @@ CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
-    operation = models.APIOperation(
+    return models.APIOperation(
         "/path", "GET", definition=OperationDefinition(definition, definition, ""), schema=schema
-    )
-    return models.Case(operation, generation_time=0.0)
+    ).Case()
 
 
 @pytest.fixture
@@ -218,7 +217,7 @@ def test_content_type_wildcards(content_type, is_error, response_factory):
 def assert_content_type_conformance(response_factory, raw_schema, content_type, is_error, match=None):
     schema = schemathesis.openapi.from_dict(raw_schema)
     operation = schema["/users"]["get"]
-    case = models.Case(operation, generation_time=0.0)
+    case = operation.Case()
     response = Response.from_requests(response_factory.requests(content_type=content_type), True)
     if not is_error:
         assert content_type_conformance(CTX, response, case) is None
@@ -276,7 +275,7 @@ def test_invalid_schema_on_content_type_check(response_factory):
         }
     )
     operation = schema["/users"]["get"]
-    case = models.Case(operation, generation_time=0.0)
+    case = operation.Case()
     response = response_factory.requests(content_type="application/json")
     # Then an error should be risen
     with pytest.raises(InvalidSchema):
@@ -621,7 +620,7 @@ def test_deduplication(ctx, response_factory):
     )
     schema = schemathesis.openapi.from_dict(schema)
     operation = schema["/data"]["GET"]
-    case = operation.make_case()
+    case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
     result = TestResult(verbose_name=operation.verbose_name)
     checks = []

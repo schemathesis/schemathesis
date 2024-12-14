@@ -34,10 +34,11 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
 from schemathesis.core.transport import Response
+from schemathesis.generation.meta import CaseMetadata
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
-from ...generation import GenerationConfig, GeneratorMode
+from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -487,7 +488,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -495,7 +496,7 @@ class BaseOpenAPISchema(BaseSchema):
             operation=operation,
             auth_storage=auth_storage,
             hooks=hooks,
-            generator_mode=generator_mode,
+            generation_mode=generation_mode,
             generation_config=generation_config or self.generation_config,
             **kwargs,
         )
@@ -1002,25 +1003,27 @@ class SwaggerV20(BaseOpenAPISchema):
         *,
         case_cls: type[C],
         operation: APIOperation,
+        method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
-        generation_time: float = 0.0,
+        meta: CaseMetadata | None = None,
     ) -> C:
         if body is not NOT_SET and media_type is None:
             media_type = operation._get_default_media_type()
         return case_cls(
             operation=operation,
+            method=method or operation.method.upper(),
             path_parameters=path_parameters,
             headers=CaseInsensitiveDict(headers) if headers is not None else headers,
             cookies=cookies,
             query=query,
             body=body,
             media_type=media_type,
-            generation_time=generation_time,
+            meta=meta,
         )
 
     def _get_consumes_for_operation(self, definition: dict[str, Any]) -> list[str]:

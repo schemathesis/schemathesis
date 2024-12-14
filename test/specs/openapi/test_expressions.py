@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import Response
-from schemathesis.models import APIOperation, Case, OperationDefinition
+from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token
@@ -46,9 +46,7 @@ def operation(openapi_30):
 
 @pytest.fixture
 def case(operation):
-    return Case(
-        operation,
-        generation_time=0.0,
+    return operation.Case(
         path_parameters={"user_id": 5},
         query={"username": "foo"},
         headers={"X-Token": "secret"},

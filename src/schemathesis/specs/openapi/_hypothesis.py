@@ -3,27 +3,35 @@ from __future__ import annotations
 import time
 from contextlib import suppress
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, Union, cast
 from urllib.parse import quote_plus
 from weakref import WeakKeyDictionary
 
 from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
-from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import prepare_urlencoded
-from schemathesis.generation.meta import GenerationMetadata, TestPhase
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    ComponentKind,
+    ExplicitPhaseData,
+    GeneratePhaseData,
+    GenerationInfo,
+    PhaseInfo,
+    TestPhase,
+)
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
 from ... import auths
-from ...generation import GenerationConfig, GeneratorMode
+from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...models import APIOperation, Case
+from ...models import APIOperation
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES
@@ -42,7 +50,7 @@ def get_case_strategy(
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
-    generator_mode: GeneratorMode = GeneratorMode.default(),
+    generation_mode: GenerationMode = GenerationMode.default(),
     generation_config: GenerationConfig | None = None,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
@@ -66,30 +74,34 @@ def get_case_strategy(
     as it works with `body`.
     """
     start = time.monotonic()
-    strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator_mode]
+    strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
     context = HookContext(operation)
 
     generation_config = generation_config or operation.schema.generation_config
 
     path_parameters_ = generate_parameter(
-        "path", path_parameters, operation, draw, context, hooks, generator_mode, generation_config
+        "path", path_parameters, operation, draw, context, hooks, generation_mode, generation_config
     )
-    headers_ = generate_parameter("header", headers, operation, draw, context, hooks, generator_mode, generation_config)
-    cookies_ = generate_parameter("cookie", cookies, operation, draw, context, hooks, generator_mode, generation_config)
-    query_ = generate_parameter("query", query, operation, draw, context, hooks, generator_mode, generation_config)
+    headers_ = generate_parameter(
+        "header", headers, operation, draw, context, hooks, generation_mode, generation_config
+    )
+    cookies_ = generate_parameter(
+        "cookie", cookies, operation, draw, context, hooks, generation_mode, generation_config
+    )
+    query_ = generate_parameter("query", query, operation, draw, context, hooks, generation_mode, generation_config)
 
     if body is NOT_SET:
         if operation.body:
-            body_generator = generator_mode
-            if generator_mode.is_negative:
+            body_generator = generation_mode
+            if generation_mode.is_negative:
                 # Consider only schemas that are possible to negate
                 candidates = [item for item in operation.body.items if can_negate(item.as_json_schema(operation))]
                 # Not possible to negate body, fallback to positive data generation
                 if not candidates:
                     candidates = operation.body.items
                     strategy_factory = make_positive_strategy
-                    body_generator = GeneratorMode.positive
+                    body_generator = GenerationMode.POSITIVE
             else:
                 candidates = operation.body.items
             parameter = draw(st.sampled_from(candidates))
@@ -130,32 +142,42 @@ def get_case_strategy(
         body_ = ValueContainer(value=body, location="body", generator=None)
 
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
-    if generator_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
+    if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if skip_on_not_negated:
             raise SkipTest(f"It is not possible to generate negative test cases for `{operation.verbose_name}`")
         else:
             reject()
-    instance = Case(
-        operation=operation,
-        generation_time=time.monotonic() - start,
+
+    _phase_data = {
+        TestPhase.EXPLICIT: ExplicitPhaseData(),
+        TestPhase.GENERATE: GeneratePhaseData(),
+    }[phase]
+    phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
+
+    instance = operation.Case(
         media_type=media_type,
         path_parameters=path_parameters_.value,
-        headers=CaseInsensitiveDict(headers_.value) if headers_.value is not None else headers_.value,
+        headers=headers_.value,
         cookies=cookies_.value,
         query=query_.value,
         body=body_.value,
-        generator_mode=generator_mode,
-        meta=GenerationMetadata(
-            query=query_.generator,
-            path_parameters=path_parameters_.generator,
-            headers=headers_.generator,
-            cookies=cookies_.generator,
-            body=body_.generator,
-            phase=phase,
-            description=None,
-            location=None,
-            parameter=None,
-            parameter_location=None,
+        meta=CaseMetadata(
+            generation=GenerationInfo(
+                time=time.monotonic() - start,
+                mode=generation_mode,
+            ),
+            phase=PhaseInfo(name=phase, data=phase_data),
+            components={
+                kind: ComponentInfo(mode=value.generator)
+                for kind, value in [
+                    (ComponentKind.QUERY, query_),
+                    (ComponentKind.PATH_PARAMETERS, path_parameters_),
+                    (ComponentKind.HEADERS, headers_),
+                    (ComponentKind.COOKIES, cookies_),
+                    (ComponentKind.BODY, body_),
+                ]
+                if value.generator is not None
+            },
         ),
     )
     auth_context = auths.AuthContext(
@@ -228,7 +250,7 @@ class ValueContainer:
 
     value: Any
     location: str
-    generator: GeneratorMode | None
+    generator: GenerationMode | None
 
     __slots__ = ("value", "location", "generator")
 
@@ -240,7 +262,7 @@ class ValueContainer:
 
 def any_negated_values(values: list[ValueContainer]) -> bool:
     """Check if any generated values are negated."""
-    return any(value.generator == GeneratorMode.negative for value in values if value.is_generated)
+    return any(value.generator == GenerationMode.NEGATIVE for value in values if value.is_generated)
 
 
 def generate_parameter(
@@ -250,7 +272,7 @@ def generate_parameter(
     draw: Callable,
     context: HookContext,
     hooks: HookDispatcher | None,
-    generator: GeneratorMode,
+    generator: GenerationMode,
     generation_config: GenerationConfig,
 ) -> ValueContainer:
     """Generate a value for a parameter.
@@ -264,13 +286,13 @@ def generate_parameter(
         # If we can't negate any parameter, generate positive ones
         # If nothing else will be negated, then skip the test completely
         strategy_factory = make_positive_strategy
-        generator = GeneratorMode.positive
+        generator = GenerationMode.POSITIVE
     else:
         strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generator]
     value = get_parameters_value(
         explicit, location, draw, operation, context, hooks, strategy_factory, generation_config
     )
-    used_generator: GeneratorMode | None = generator
+    used_generator: GenerationMode | None = generator
     if value == explicit:
         # When we pass `explicit`, then its parts are excluded from generation of the final value
         # If the final value is the same, then other parameters were generated at all
@@ -444,8 +466,8 @@ def make_negative_strategy(
 
 
 GENERATOR_MODE_TO_STRATEGY_FACTORY = {
-    GeneratorMode.positive: make_positive_strategy,
-    GeneratorMode.negative: make_negative_strategy,
+    GenerationMode.POSITIVE: make_positive_strategy,
+    GenerationMode.NEGATIVE: make_negative_strategy,
 }
 
 

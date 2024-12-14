@@ -8,9 +8,9 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core import NOT_SET
-from schemathesis.generation import GenerationConfig, GeneratorMode
+from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import examples
-from schemathesis.models import APIOperation, Case, OperationDefinition
+from schemathesis.models import APIOperation, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
@@ -68,10 +68,7 @@ def test_get_examples(location, swagger_20):
     )
     strategies = operation.get_strategies_from_examples()
     assert len(strategies) == 1
-    assert strategies[0].example() == Case(
-        operation,
-        generation_time=ANY,
-        generator_mode=GeneratorMode.positive,
+    assert strategies[0].example() == operation.Case(
         media_type=media_type,
         meta=ANY,
         **{container: expected},

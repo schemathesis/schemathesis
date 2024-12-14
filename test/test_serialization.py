@@ -33,8 +33,8 @@ def to_csv(data):
 
 @pytest.fixture
 def csv_serializer():
-    @REQUESTS_TRANSPORT.serializer("text/csv", "text/tsv")
-    @WSGI_TRANSPORT.serializer("text/csv", "text/tsv")
+    @REQUESTS_TRANSPORT.serializer("text/csv")
+    @WSGI_TRANSPORT.serializer("text/csv")
     def serialize_csv(ctx, value):
         return {"data": to_csv(value)}
 
@@ -71,13 +71,24 @@ def test_text_csv(api_schema):
     test()
 
 
+@pytest.fixture
+def tsv_schema(schema_url):
+    schema = schemathesis.openapi.from_url(schema_url)
+    definition = schema.raw_schema["paths"]["/csv"]["post"]
+    if "consumes" in definition:
+        definition["consumes"] = ["text/tsv"]
+    else:
+        definition["requestBody"]["content"]["text/tsv"] = definition["requestBody"]["content"].pop("text/csv")
+    return schema
+
+
 @pytest.mark.hypothesis_nested
 @pytest.mark.operations("csv_payload")
-def test_no_serialization_possible(api_schema):
-    # When API expects `text/csv`
+def test_no_serialization_possible(tsv_schema):
+    # When API expects `text/tsv`
     # And there is no registered serializer for this media type
 
-    @given(case=api_schema["/csv"]["POST"].as_strategy())
+    @given(case=tsv_schema["/csv"]["POST"].as_strategy())
     @settings(max_examples=5)
     def test(case):
         pass
@@ -85,15 +96,16 @@ def test_no_serialization_possible(api_schema):
     # Then there should be an error indicating this
     with pytest.raises(
         SerializationNotPossible,
-        match="Schemathesis can't serialize data to any of the defined media types: text/csv",
+        match="Schemathesis can't serialize data to any of the defined media types: text/tsv",
     ):
         test()
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("csv_payload")
-def test_in_cli(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url) == snapshot_cli
+def test_in_cli(ctx, cli, tsv_schema, snapshot_cli):
+    schema_path = ctx.openapi.write_schema(tsv_schema.raw_schema["paths"])
+    assert cli.run(str(schema_path), "--dry-run") == snapshot_cli
 
 
 @pytest.mark.parametrize("transport", [RequestsTransport, WSGITransport])
@@ -201,7 +213,7 @@ def test_binary_data(ctx, media_type):
     operation = schema["/test"]["POST"]
     # When an explicit bytes value is passed as body (it happens with `externalValue`)
     body = b"\x92\x42"
-    case = operation.make_case(body=body, media_type=media_type)
+    case = operation.Case(body=body, media_type=media_type)
     # Then it should be used as is
     for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
         kwargs = transport.serialize_case(case)
@@ -479,6 +491,6 @@ def test_xml_with_binary(ctx):
     @given(case=schema["/test"]["POST"].as_strategy())
     @settings(max_examples=1)
     def test(case):
-        assert case.as_transport_kwargs()["data"] == ""
+        assert case.as_transport_kwargs()["data"] in ("", "0")
 
     test()

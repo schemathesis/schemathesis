@@ -7,16 +7,14 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.transport import Response
+from schemathesis.generation.meta import CaseMetadata
 from schemathesis.transport.prepare import normalize_base_url
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
-from ...generation import GeneratorMode
 from .status import Status
 
 if TYPE_CHECKING:
     import requests
-
-    from schemathesis.generation.meta import TestPhase
 
     from ...models import Case
     from .check import Check
@@ -94,14 +92,8 @@ class Interaction:
     response: Response | None
     checks: list[Check]
     status: Status
-    generator_mode: GeneratorMode
-    phase: TestPhase | None
-    # `description` & `location` are related to metadata about this interaction
-    # NOTE: It will be better to keep it in a separate attribute
-    description: str | None
-    location: str | None
-    parameter: str | None
-    parameter_location: str | None
+    id: str
+    meta: CaseMetadata | None
     recorded_at: str = field(default_factory=lambda: datetime.datetime.now(TIMEZONE).isoformat())
 
     @classmethod
@@ -122,12 +114,8 @@ class Interaction:
             response=response,
             status=status,
             checks=checks,
-            generator_mode=cast(GeneratorMode, case.generator_mode),
-            phase=case.meta.phase if case.meta is not None else None,
-            description=case.meta.description if case.meta is not None else None,
-            location=case.meta.location if case.meta is not None else None,
-            parameter=case.meta.parameter if case.meta is not None else None,
-            parameter_location=case.meta.parameter_location if case.meta is not None else None,
+            id=case.id,
+            meta=case.meta,
         )
 
     def asdict(self) -> dict[str, Any]:
@@ -136,11 +124,6 @@ class Interaction:
             "response": self.response.asdict() if self.response is not None else None,
             "checks": [check.asdict() for check in self.checks],
             "status": self.status.value,
-            "generator_mode": self.generator_mode.as_short_name(),
-            "phase": self.phase.value if self.phase is not None else None,
-            "description": self.description,
-            "location": self.location,
-            "parameter": self.parameter,
-            "parameter_location": self.parameter_location,
+            "meta": self.meta.asdict() if self.meta is not None else None,
             "recorded_at": self.recorded_at,
         }

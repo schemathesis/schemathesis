@@ -11,7 +11,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis import strategies
 
-from ....generation import GeneratorMode
+from ....generation import GenerationMode
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links
@@ -93,7 +93,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 bundle_name = f"{source.verbose_name} -> {link.status_code}"
                 name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
                 case_strategy = strategies.combine(
-                    [target.as_strategy(generator_mode=mode) for mode in schema.generation_config.modes]
+                    [target.as_strategy(generation_mode=mode) for mode in schema.generation_config.modes]
                 )
                 bundle = bundles[bundle_name]
                 rules[name] = transition(
@@ -114,19 +114,19 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # in order to reach other transitions
             name = _normalize_name(f"{target.verbose_name} -> X")
             if len(schema.generation_config.modes) == 1:
-                case_strategy = target.as_strategy(generator_mode=schema.generation_config.modes[0])
+                case_strategy = target.as_strategy(generation_mode=schema.generation_config.modes[0])
             else:
                 _strategies = {
-                    method: target.as_strategy(generator_mode=method) for method in schema.generation_config.modes
+                    method: target.as_strategy(generation_mode=method) for method in schema.generation_config.modes
                 }
 
                 @st.composite  # type: ignore[misc]
                 def case_strategy_factory(
-                    draw: st.DrawFn, strategies: dict[GeneratorMode, st.SearchStrategy] = _strategies
+                    draw: st.DrawFn, strategies: dict[GenerationMode, st.SearchStrategy] = _strategies
                 ) -> Case:
                     if draw(st.integers(min_value=0, max_value=99)) < NEGATIVE_TEST_CASES_THRESHOLD:
-                        return draw(strategies[GeneratorMode.negative])
-                    return draw(strategies[GeneratorMode.positive])
+                        return draw(strategies[GenerationMode.NEGATIVE])
+                    return draw(strategies[GenerationMode.POSITIVE])
 
                 case_strategy = case_strategy_factory()
 
