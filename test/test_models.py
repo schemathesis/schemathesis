@@ -13,8 +13,8 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
-from schemathesis.generation import GeneratorMode
-from schemathesis.models import APIOperation, Case
+from schemathesis.generation import GenerationMode
+from schemathesis.models import APIOperation
 from schemathesis.runner.models import Request
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
@@ -58,7 +58,7 @@ def test_make_case_explicit_media_type(schema_with_payload):
     # When there is only one possible media type
     # And the `media_type` argument is passed to `make_case` explicitly
     for method in ("POST", "PUT", "PATCH"):
-        case = schema_with_payload["/data"][method].make_case(body="<foo></foo>", media_type="text/xml")
+        case = schema_with_payload["/data"][method].Case(body="<foo></foo>", media_type="text/xml")
         # Then this explicit media type should be in `case`
         assert case.media_type == "text/xml"
 
@@ -67,7 +67,7 @@ def test_make_case_automatic_media_type(schema_with_payload):
     # When there is only one possible media type
     # And the `media_type` argument is not passed to `make_case`
     for method in ("POST", "PUT", "PATCH"):
-        case = schema_with_payload["/data"][method].make_case(body="foo")
+        case = schema_with_payload["/data"][method].Case(body="foo")
         # Then it should be chosen automatically
         assert case.media_type == "text/plain"
 
@@ -94,12 +94,12 @@ def test_make_case_missing_media_type(ctx):
     # And the `media_type` argument is not passed to `make_case`
     # Then there should be a usage error
     with pytest.raises(IncorrectUsage):
-        schema["/data"]["POST"].make_case(body="foo")
+        schema["/data"]["POST"].Case(body="foo")
 
 
 def test_path(swagger_20):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
-    case = operation.make_case(path_parameters={"name": "test"})
+    case = operation.Case(path_parameters={"name": "test"})
     assert case.formatted_path == "/users/test"
 
 
@@ -115,7 +115,7 @@ def test_path(swagger_20):
 )
 def test_case_repr(swagger_20, kwargs, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
-    case = operation.make_case(**kwargs)
+    case = operation.Case(**kwargs)
     assert repr(case) == expected
 
 
@@ -124,7 +124,7 @@ def test_case_repr(swagger_20, kwargs, expected):
 def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
     base_url = converter(base_url)
     operation = APIOperation("/success", "GET", {}, swagger_20)
-    case = operation.make_case(cookies={"TOKEN": "secret"})
+    case = operation.Case(cookies={"TOKEN": "secret"})
     if override:
         data = case.as_transport_kwargs(base_url)
     else:
@@ -145,8 +145,7 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
 @pytest.mark.operations("create_user")
 def test_mutate_body(openapi3_schema):
     operation = openapi3_schema["/users/"]["post"]
-    case = operation.make_case()
-    case.body = {"foo": "bar"}
+    case = operation.Case(body={"foo": "bar"})
     response = case.call()
     assert response.request.body == json.dumps(case.body).encode()
     openapi3_schema.app = 42
@@ -157,7 +156,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
     # See GH-992
     # When an API operation name contains `:`
     operation = APIOperation("/foo:bar", "GET", {}, swagger_20)
-    case = operation.make_case()
+    case = operation.Case()
     # Then it should not be truncated during API call
     assert case.as_transport_kwargs("/")["url"] == "/foo:bar"
 
@@ -174,7 +173,7 @@ def test_reserved_characters_in_operation_name(swagger_20):
 def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swagger_20, headers, expected):
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=openapi2_base_url)
     original_headers = headers.copy() if headers is not None else headers
-    case = operation.make_case(headers=headers)
+    case = operation.Case(headers=headers)
     data = case.as_transport_kwargs(headers={"X-Key": "foo"})
     expected[SCHEMATHESIS_TEST_CASE_HEADER] = ANY
     assert data == {
@@ -206,7 +205,7 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    case = schema["/data"]["post"].make_case(body="<html></html>", media_type="text/plain")
+    case = schema["/data"]["post"].Case(body="<html></html>", media_type="text/plain")
     # When the `Content-Type` header is explicitly passed
     data = case.as_transport_kwargs(headers={header: "text/html"})
     # Then it should be used in network requests
@@ -223,7 +222,7 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
 @pytest.mark.parametrize("override", [False, True])
 def test_call(override, base_url, swagger_20):
     operation = APIOperation("/success", "GET", {}, swagger_20)
-    case = operation.make_case()
+    case = operation.Case()
     if override:
         response = case.call(base_url)
     else:
@@ -401,9 +400,7 @@ def test_response_from_requests(base_url):
 @pytest.mark.parametrize(("body", "expected"), [(NOT_SET, None), (b"example", b"example")])
 def test_from_case(swagger_20, body, expected):
     operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = Case(
-        operation,
-        generation_time=0.0,
+    case = operation.Case(
         path_parameters={"name": "test"},
         body=body,
         media_type="application/octet-stream",
@@ -431,9 +428,9 @@ def test_method_suggestion(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
-@pytest.mark.parametrize("method", GeneratorMode.all())
+@pytest.mark.parametrize("mode", GenerationMode.all())
 @pytest.mark.hypothesis_nested
-def test_generator_mode_is_available(ctx, method):
+def test_generation_mode_is_available(ctx, mode):
     # When a new case is generated
     schema = ctx.openapi.build_schema(
         {
@@ -451,11 +448,11 @@ def test_generator_mode_is_available(ctx, method):
 
     api_schema = schemathesis.openapi.from_dict(schema)
 
-    @given(case=api_schema["/data"]["POST"].as_strategy(generator_mode=method))
+    @given(case=api_schema["/data"]["POST"].as_strategy(generation_mode=mode))
     @settings(max_examples=1)
     def test(case):
         # Then its generator mode should be available
-        assert case.generator_mode == method
+        assert case.meta.generation.mode == mode
 
     test()
 
@@ -539,7 +536,7 @@ def test_checks_errors_deduplication(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    case = schema["/data"]["GET"].make_case()
+    case = schema["/data"]["GET"].Case()
     response = requests.Response()
     response.status_code = 200
     response.request = requests.PreparedRequest()
@@ -564,13 +561,7 @@ def _assert_override(spy, arg, original, overridden):
 def test_call_overrides(mocker, arg, openapi_30):
     spy = mocker.patch("requests.Session.request", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
-    case = Case(
-        openapi_30["/users"]["GET"],
-        generation_time=0.0,
-        headers=original,
-        cookies=original,
-        query=original,
-    )
+    case = openapi_30["/users"]["GET"].Case(headers=original, cookies=original, query=original)
     # When user passes header / cookie / query explicitly
     overridden = {"B": "Y"}
     try:
@@ -591,12 +582,7 @@ def test_call_overrides_wsgi(mocker, call_arg, client_arg, openapi_30):
     spy = mocker.patch("werkzeug.Client.open", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
     openapi_30.app = 42
-    case = Case(
-        openapi_30["/users"]["GET"],
-        generation_time=0.0,
-        headers=original,
-        query=original,
-    )
+    case = openapi_30["/users"]["GET"].Case(headers=original, query=original)
     # NOTE: Werkzeug does not accept cookies, so no override
     # When user passes header / query explicitly
     overridden = {"B": "Y"}

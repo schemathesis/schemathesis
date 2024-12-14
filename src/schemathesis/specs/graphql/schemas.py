@@ -29,10 +29,17 @@ from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, Sp
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    ComponentKind,
+    GenerationInfo,
+    PhaseInfo,
+)
 
 from ... import auths
 from ...checks import not_a_server_error
-from ...generation import GenerationConfig, GeneratorMode
+from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case, OperationDefinition
 from ...schemas import APIOperationMap, BaseSchema
@@ -232,7 +239,7 @@ class GraphQLSchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generator_mode: GeneratorMode = GeneratorMode.default(),
+        generation_mode: GenerationMode = GenerationMode.default(),
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
@@ -241,7 +248,7 @@ class GraphQLSchema(BaseSchema):
             client_schema=self.client_schema,
             hooks=hooks,
             auth_storage=auth_storage,
-            generator_mode=generator_mode,
+            generation_mode=generation_mode,
             generation_config=generation_config or self.generation_config,
             **kwargs,
         )
@@ -256,22 +263,25 @@ class GraphQLSchema(BaseSchema):
         *,
         case_cls: type[C],
         operation: APIOperation,
+        method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
         query: dict[str, Any] | None = None,
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
+        meta: CaseMetadata | None = None,
     ) -> C:
         return case_cls(
             operation=operation,
+            method=method or operation.method.upper(),
             path_parameters=path_parameters,
             headers=CaseInsensitiveDict(headers) if headers is not None else headers,
             cookies=cookies,
             query=query,
             body=body,
             media_type=media_type or "application/json",
-            generation_time=0.0,
+            meta=meta,
         )
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:
@@ -331,7 +341,7 @@ def get_case_strategy(
     client_schema: graphql.GraphQLSchema,
     hooks: HookDispatcher | None = None,
     auth_storage: AuthStorage | None = None,
-    generator_mode: GeneratorMode = GeneratorMode.default(),
+    generation_mode: GenerationMode = GenerationMode.default(),
     generation_config: GenerationConfig | None = None,
     **kwargs: Any,
 ) -> Any:
@@ -361,15 +371,30 @@ def get_case_strategy(
     cookies_ = _generate_parameter("cookie", draw, operation, hook_context, hooks)
     query_ = _generate_parameter("query", draw, operation, hook_context, hooks)
 
-    instance = GraphQLCase(
+    instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,
         cookies=cookies_,
         query=query_,
         body=body,
-        operation=operation,
-        generator_mode=generator_mode,
-        generation_time=time.monotonic() - start,
+        meta=CaseMetadata(
+            generation=GenerationInfo(
+                time=time.monotonic() - start,
+                mode=generation_mode,
+            ),
+            phase=PhaseInfo.generate(),
+            components={
+                kind: ComponentInfo(mode=generation_mode)
+                for kind, value in [
+                    (ComponentKind.QUERY, query_),
+                    (ComponentKind.PATH_PARAMETERS, path_parameters_),
+                    (ComponentKind.HEADERS, headers_),
+                    (ComponentKind.COOKIES, cookies_),
+                    (ComponentKind.BODY, body),
+                ]
+                if value is not NOT_SET
+            },
+        ),
         media_type="application/json",
     )  # type: ignore
     context = auths.AuthContext(

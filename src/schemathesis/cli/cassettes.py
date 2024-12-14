@@ -18,6 +18,7 @@ from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from schemathesis.generation.meta import CoveragePhaseData
 
 from ..runner import events
 from .handlers import EventHandler
@@ -81,20 +82,9 @@ class CassetteWriter(EventHandler):
             # In the beginning we write metadata and start `http_interactions` list
             self.queue.put(Initialize(seed=event.seed))
         elif isinstance(event, events.AfterExecution):
-            self.queue.put(
-                Process(
-                    correlation_id=event.correlation_id,
-                    interactions=event.result.interactions,
-                )
-            )
+            self.queue.put(Process(interactions=event.result.interactions))
         elif isinstance(event, events.AfterStatefulExecution):
-            self.queue.put(
-                Process(
-                    # Correlation ID is not used in stateful testing
-                    correlation_id="",
-                    interactions=event.result.interactions,
-                )
-            )
+            self.queue.put(Process(interactions=event.result.interactions))
         elif isinstance(event, events.Finished):
             self.shutdown()
 
@@ -117,7 +107,6 @@ class Initialize:
 class Process:
     """A new chunk of data should be processed."""
 
-    correlation_id: str
     interactions: list[Interaction]
 
 
@@ -220,61 +209,73 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
                 )
                 write_double_quoted(output, string)
 
-    seed = "null"
     while True:
         item = queue.get()
         if isinstance(item, Initialize):
-            seed = f"'{item.seed}'"
             stream.write(
                 f"""command: '{get_command_representation()}'
 recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'
+seed: {item.seed}
 http_interactions:"""
             )
         elif isinstance(item, Process):
             for interaction in item.interactions:
                 status = interaction.status.name.upper()
                 # Body payloads are handled via separate `stream.write` calls to avoid some allocations
-                phase = f"'{interaction.phase.value}'" if interaction.phase is not None else "null"
                 stream.write(
-                    f"""\n- id: '{current_id}'
-  status: '{status}'
-  seed: {seed}
-  correlation_id: '{item.correlation_id}'
-  generator_mode: '{interaction.generator_mode.value}'
-  meta:
-    description: """
+                    f"""\n- id: '{interaction.id}'
+  status: '{status}'"""
                 )
+                if interaction.meta is not None:
+                    # Start metadata block
+                    stream.write(f"""
+  generation:
+    time: {interaction.meta.generation.time}
+    mode: {interaction.meta.generation.mode.value}
+  components:""")
 
-                if interaction.description is not None:
-                    write_double_quoted(stream, interaction.description)
+                    # Write components
+                    for kind, info in interaction.meta.components.items():
+                        stream.write(f"""
+    {kind.value}:
+      mode: '{info.mode.value}'""")
+                    # Write phase info
+                    stream.write("\n  phase:")
+                    stream.write(f"\n    name: '{interaction.meta.phase.name.value}'")
+                    stream.write("\n    data: ")
+
+                    # Write phase-specific data
+                    if isinstance(interaction.meta.phase.data, CoveragePhaseData):
+                        stream.write("""
+      description: """)
+                        write_double_quoted(stream, interaction.meta.phase.data.description)
+                        stream.write("""
+      location: """)
+                        write_double_quoted(stream, interaction.meta.phase.data.location)
+                        stream.write("""
+      parameter: """)
+                        if interaction.meta.phase.data.parameter is not None:
+                            write_double_quoted(stream, interaction.meta.phase.data.parameter)
+                        else:
+                            stream.write("null")
+                        stream.write("""
+      parameter_location: """)
+                        if interaction.meta.phase.data.parameter_location is not None:
+                            write_double_quoted(stream, interaction.meta.phase.data.parameter_location)
+                        else:
+                            stream.write("null")
+                    else:
+                        # Empty objects for these phases
+                        stream.write("{}")
                 else:
                     stream.write("null")
 
-                stream.write("\n    location: ")
-                if interaction.location is not None:
-                    write_double_quoted(stream, interaction.location)
-                else:
-                    stream.write("null")
-
-                stream.write("\n    parameter: ")
-                if interaction.parameter is not None:
-                    write_double_quoted(stream, interaction.parameter)
-                else:
-                    stream.write("null")
-
-                stream.write("\n    parameter_location: ")
-                if interaction.parameter_location is not None:
-                    write_double_quoted(stream, interaction.parameter_location)
-                else:
-                    stream.write("null")
                 if config.sanitize_output:
                     uri = sanitize_url(interaction.request.uri)
                 else:
                     uri = interaction.request.uri
                 stream.write(
                     f"""
-  phase: {phase}
-  elapsed: '{interaction.response.elapsed if interaction.response else 0}'
   recorded_at: '{interaction.recorded_at}'
 {format_checks(interaction.checks)}
   request:
@@ -291,6 +292,7 @@ http_interactions:"""
     status:
       code: '{interaction.response.status_code}'
       message: {json.dumps(interaction.response.message)}
+    elapsed: '{interaction.response.elapsed}'
     headers:
 {format_headers(interaction.response.headers)}
 """
@@ -302,17 +304,20 @@ http_interactions:"""
                     )
                 else:
                     stream.write("""
-  response: null
-""")
+  response: null""")
                 current_id += 1
         else:
             break
     config.path.close()
 
 
-def write_double_quoted(stream: IO, text: str) -> None:
+def write_double_quoted(stream: IO, text: str | None) -> None:
     """Writes a valid YAML string enclosed in double quotes."""
     from yaml.emitter import Emitter
+
+    if text is None:
+        stream.write("null")
+        return
 
     # Adapted from `yaml.Emitter.write_double_quoted`:
     #   - Doesn't split the string, therefore doesn't track the current column

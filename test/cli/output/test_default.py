@@ -10,7 +10,7 @@ from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.core import NOT_SET
 from schemathesis.core.transport import Response
-from schemathesis.models import Case, OperationDefinition
+from schemathesis.models import OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.models import Check, Request, Status, TestResult, TestResultSet
 
@@ -113,8 +113,8 @@ def test_handle_initialized(capsys, mocker, execution_context, swagger_20):
 
 def test_display_statistic(capsys, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = Check("not_a_server_error", Status.success, response, 0, Case(operation, generation_time=0.0))
-    failure = Check("not_a_server_error", Status.failure, response, 0, Case(operation, generation_time=0.0))
+    success = Check("not_a_server_error", Status.success, response, 0, operation.Case())
+    failure = Check("not_a_server_error", Status.failure, response, 0, operation.Case())
     single_test_statistic = TestResult(
         verbose_name=f"{operation.method} {operation.full_path}",
         checks=[
@@ -123,7 +123,7 @@ def test_display_statistic(capsys, execution_context, operation, response):
             success,
             failure,
             failure,
-            Check("different_check", Status.success, response, 0, Case(operation, generation_time=0.0)),
+            Check("different_check", Status.success, response, 0, operation.Case()),
         ],
     )
     results = TestResultSet(seed=42, results=[single_test_statistic])
@@ -205,14 +205,14 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
         Status.success,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        Case(operation, generation_time=0.0, body=body, media_type=media_type),
+        operation.Case(body=body, media_type=media_type),
     )
     failure = Check(
         "not_a_server_error",
         Status.failure,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
-        Case(operation, generation_time=0.0, body=body, media_type=media_type),
+        operation.Case(body=body, media_type=media_type),
     )
     test_statistic = TestResult(
         verbose_name=f"{operation.method} {operation.full_path}",
@@ -227,12 +227,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
                 Status.success,
                 Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
                 response,
-                Case(
-                    operation,
-                    generation_time=0.0,
-                    body=body,
-                    media_type=media_type,
-                ),
+                operation.Case(body=body, media_type=media_type),
             ),
         ],
     )

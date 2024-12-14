@@ -3,32 +3,26 @@ from __future__ import annotations
 from enum import Enum
 
 
-class GeneratorMode(str, Enum):
+class GenerationMode(str, Enum):
     """Defines what data Schemathesis generates for tests."""
 
     # Generate data, that fits the API schema
-    positive = "positive"
+    POSITIVE = "positive"
     # Doesn't fit the API schema
-    negative = "negative"
+    NEGATIVE = "negative"
 
     @classmethod
-    def default(cls) -> GeneratorMode:
-        return cls.positive
+    def default(cls) -> GenerationMode:
+        return cls.POSITIVE
 
     @classmethod
-    def all(cls) -> list[GeneratorMode]:
-        return list(GeneratorMode)
-
-    def as_short_name(self) -> str:
-        return {
-            GeneratorMode.positive: "P",
-            GeneratorMode.negative: "N",
-        }[self]
+    def all(cls) -> list[GenerationMode]:
+        return list(GenerationMode)
 
     @property
     def is_positive(self) -> bool:
-        return self == GeneratorMode.positive
+        return self == GenerationMode.POSITIVE
 
     @property
     def is_negative(self) -> bool:
-        return self == GeneratorMode.negative
+        return self == GenerationMode.NEGATIVE

@@ -17,7 +17,7 @@ from schemathesis.checks import CHECKS
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
-from schemathesis.generation import GeneratorMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.errors import EngineErrorInfo
@@ -167,7 +167,7 @@ def test_default(corpus, filename, app_port):
 
 def test_coverage_phase(corpus, filename):
     schema = _load_schema(corpus, filename)
-    modes = GeneratorMode.all()
+    modes = GenerationMode.all()
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
             for _ in _iter_coverage_cases(operation.ok(), modes):

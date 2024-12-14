@@ -8,7 +8,7 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
 
 from . import auths, contrib, experimental, hooks, runner
-from .generation import GenerationConfig, GeneratorMode, HeaderConfig
+from .generation import GenerationConfig, GenerationMode, HeaderConfig
 from .models import Case
 
 __version__ = SCHEMATHESIS_VERSION
@@ -21,7 +21,7 @@ __all__ = [
     "Case",
     "CheckContext",
     "CheckFunction",
-    "GeneratorMode",
+    "GenerationMode",
     "GenerationConfig",
     "HeaderConfig",
     "OutputConfig",
