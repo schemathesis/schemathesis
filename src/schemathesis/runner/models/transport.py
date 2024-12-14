@@ -7,7 +7,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.transport import Response
-from schemathesis.transport.requests import RequestsTransport
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 from ...generation import DataGenerationMethod
 from .status import Status
@@ -33,7 +33,7 @@ class Request:
     uri: str
     body: bytes | None
     body_size: int | None
-    headers: dict[str, Any]
+    headers: dict[str, list[str]]
 
     @classmethod
     def from_case(cls, case: Case, session: requests.Session) -> Request:
@@ -41,7 +41,7 @@ class Request:
         import requests
 
         base_url = case.get_full_base_url()
-        kwargs = RequestsTransport().serialize_case(case, base_url=base_url)
+        kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url)
         request = requests.Request(**kwargs)
         prepared = session.prepare_request(request)  # type: ignore
         return cls.from_prepared_request(prepared)

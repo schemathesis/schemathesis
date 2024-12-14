@@ -12,7 +12,6 @@ from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.generation.hypothesis import examples
 from schemathesis.models import APIOperation, Case, OperationDefinition
 from schemathesis.parameters import ParameterSet, PayloadAlternatives
-from schemathesis.serializers import Binary
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
     get_case_strategy,
@@ -22,6 +21,7 @@ from schemathesis.specs.openapi._hypothesis import (
 )
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI20CompositeBody, OpenAPI20Parameter
+from schemathesis.transport.serialization import Binary
 from test.utils import assert_requests_call
 
 

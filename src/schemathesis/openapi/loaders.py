@@ -12,16 +12,15 @@ from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.hooks import HookContext, dispatch
+from schemathesis.python import asgi, wsgi
 
 if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
 def from_asgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
-    from schemathesis.python.asgi import get_client
-
     require_relative_url(path)
-    client = get_client(app)
+    client = asgi.get_client(app)
     response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(response.text, content_type)
@@ -29,8 +28,6 @@ def from_asgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
 
 
 def from_wsgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
-    from schemathesis.python import wsgi
-
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     client = wsgi.get_client(app)

@@ -9,6 +9,7 @@ from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, ca
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.hooks import HookContext, dispatch
+from schemathesis.python import asgi, wsgi
 
 if TYPE_CHECKING:
     from graphql import DocumentNode
@@ -17,19 +18,15 @@ if TYPE_CHECKING:
 
 
 def from_asgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
-    from schemathesis.python.asgi import get_client
-
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
-    client = get_client(app)
+    client = asgi.get_client(app)
     response = load_from_url(client.post, url=path, **kwargs)
     schema = extract_schema_from_response(response, lambda r: r.json())
     return from_dict(schema=schema).configure(app=app, location=path)
 
 
 def from_wsgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
-    from schemathesis.python import wsgi
-
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     kwargs.setdefault("json", {"query": get_introspection_query()})

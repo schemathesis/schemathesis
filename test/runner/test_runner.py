@@ -663,28 +663,6 @@ def test_max_failures(real_app_schema):
     assert result.results.failed_count + result.results.errored_count == 2
 
 
-@pytest.mark.parametrize("schema_path", ["petstore_v2.yaml", "petstore_v3.yaml"])
-def test_url_joining(request, server, get_schema_path, schema_path):
-    if schema_path == "petstore_v2.yaml":
-        base_url = request.getfixturevalue("openapi2_base_url")
-    else:
-        base_url = request.getfixturevalue("openapi3_base_url")
-    path = get_schema_path(schema_path)
-    schema = (
-        schemathesis.openapi.from_path(path)
-        .configure(base_url=f"{base_url}/v3")
-        .include(path_regex="/pet/findByStatus")
-    )
-    *_, after_execution, _ = from_schema(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
-    ).execute()
-    assert after_execution.result.verbose_name == "GET /api/v3/pet/findByStatus"
-    assert (
-        after_execution.result.checks[0].case.get_full_url()
-        == f"http://127.0.0.1:{server['port']}/api/v3/pet/findByStatus"
-    )
-
-
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references

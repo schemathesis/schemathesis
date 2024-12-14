@@ -20,7 +20,7 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.generation.meta import GenerationMetadata, TestPhase
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
 
-from ... import auths, serializers
+from ... import auths
 from ...generation import DataGenerationMethod, GenerationConfig
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from ...models import APIOperation, Case
@@ -96,10 +96,15 @@ def get_case_strategy(
             strategy = _get_body_strategy(parameter, strategy_factory, operation, generation_config)
             strategy = apply_hooks(operation, context, hooks, strategy, "body")
             # Parameter may have a wildcard media type. In this case, choose any supported one
-            possible_media_types = sorted(serializers.get_matching_media_types(parameter.media_type))
+            possible_media_types = sorted(
+                operation.schema.transport.get_matching_media_types(parameter.media_type), key=lambda x: x[0]
+            )
             if not possible_media_types:
                 all_media_types = operation.get_request_payload_content_types()
-                if all(serializers.get_first_matching_media_type(media_type) is None for media_type in all_media_types):
+                if all(
+                    operation.schema.transport.get_first_matching_media_type(media_type) is None
+                    for media_type in all_media_types
+                ):
                     # None of media types defined for this operation are not supported
                     raise SerializationNotPossible.from_media_types(*all_media_types)
                 # Other media types are possible - avoid choosing this media type in the future
@@ -107,7 +112,7 @@ def get_case_strategy(
                 note(f"{event_text} {SERIALIZERS_SUGGESTION_MESSAGE}")
                 event(event_text)
                 reject()  # type: ignore
-            media_type = draw(st.sampled_from(possible_media_types))
+            media_type, _ = draw(st.sampled_from(possible_media_types))
             if media_type is not None and media_types.parse(media_type) == (
                 "application",
                 "x-www-form-urlencoded",

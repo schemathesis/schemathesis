@@ -4,11 +4,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum, unique
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
+from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
 if TYPE_CHECKING:
     from .context import ExpressionContext
@@ -53,7 +54,12 @@ class URL(Node):
     """A node for `$url` expression."""
 
     def evaluate(self, context: ExpressionContext) -> str:
-        return context.case.get_full_url()
+        import requests
+
+        base_url = context.case.base_url or "http://127.0.0.1"
+        kwargs = REQUESTS_TRANSPORT.serialize_case(context.case, base_url=base_url)
+        prepared = requests.Request(**kwargs).prepare()
+        return cast(str, prepared.url)
 
 
 @dataclass

@@ -9,15 +9,14 @@ from hypothesis import HealthCheck, Phase, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import serializers
 from schemathesis.core.errors import (
     SERIALIZATION_FOR_TYPE_IS_NOT_POSSIBLE_MESSAGE,
     SerializationError,
     SerializationNotPossible,
 )
 from schemathesis.core.transforms import deepclone
-from schemathesis.transport.requests import RequestsTransport
-from schemathesis.transport.wsgi import WSGITransport
+from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
+from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
 from test.utils import assert_requests_call
 
 
@@ -34,21 +33,15 @@ def to_csv(data):
 
 @pytest.fixture
 def csv_serializer():
-    @schemathesis.serializer("text/csv", aliases=["text/tsv"])
-    class CSVSerializer:
-        def as_requests(self, context, value):
-            return {"data": to_csv(value)}
-
-        def as_werkzeug(self, context, value):
-            return {"data": to_csv(value)}
-
-    assert serializers.SERIALIZERS["text/csv"] is CSVSerializer
-    assert serializers.SERIALIZERS["text/tsv"] is CSVSerializer
+    @REQUESTS_TRANSPORT.serializer("text/csv", "text/tsv")
+    @WSGI_TRANSPORT.serializer("text/csv", "text/tsv")
+    def serialize_csv(ctx, value):
+        return {"data": to_csv(value)}
 
     yield
 
-    serializers.unregister("text/csv")
-    schemathesis.serializers.unregister("text/tsv")
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
+        transport.unregister_serializer("text/csv", "text/tsv")
 
 
 @pytest.fixture(params=["aiohttp", "flask"])
@@ -76,17 +69,6 @@ def test_text_csv(api_schema):
         assert response.json() == case.body
 
     test()
-
-
-def test_register_incomplete_serializer():
-    # When register a new serializer without a required method
-    # Then you'll have a TypeError
-    with pytest.raises(TypeError, match="`CSVSerializer` is not a valid serializer."):
-
-        @schemathesis.serializer("text/csv")
-        class CSVSerializer:
-            def as_requests(self, context, value):
-                pass
 
 
 @pytest.mark.hypothesis_nested
@@ -156,7 +138,7 @@ def test_serialize_any(ctx):
     @settings(max_examples=1)
     def test(case):
         # Then Schemathesis should generate valid data of any supported type
-        assert case.as_transport_kwargs()["headers"]["Content-Type"] in serializers.SERIALIZERS
+        assert case.as_transport_kwargs()["headers"]["Content-Type"] in REQUESTS_TRANSPORT._serializers
 
     test()
 
@@ -221,7 +203,7 @@ def test_binary_data(ctx, media_type):
     body = b"\x92\x42"
     case = operation.make_case(body=body, media_type=media_type)
     # Then it should be used as is
-    for transport in (RequestsTransport(), WSGITransport(app=None)):
+    for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
         kwargs = transport.serialize_case(case)
         assert kwargs["data"] == body
         if media_type != "multipart/form-data":
@@ -229,6 +211,23 @@ def test_binary_data(ctx, media_type):
             assert kwargs["headers"]["Content-Type"] == media_type
     # And it is OK to send it over the network
     assert_requests_call(case)
+
+
+TRANSPORT = RequestsTransport()
+
+
+@TRANSPORT.serializer(
+    "application/json",
+    "multipart/form-data",
+    "application/problem+json",
+    "application/octet-stream",
+    "application/x-www-form-urlencoded",
+    "application/x-yaml",
+    "application/yaml",
+    "application/xml",
+)
+def foo(ctx, value):
+    pass
 
 
 @pytest.mark.parametrize(
@@ -241,6 +240,7 @@ def test_binary_data(ctx, media_type):
             {
                 "application/json",
                 "application/octet-stream",
+                "application/problem+json",
                 "application/x-www-form-urlencoded",
                 "application/x-yaml",
                 "application/yaml",
@@ -248,11 +248,11 @@ def test_binary_data(ctx, media_type):
             },
         ),
         ("*/form-data", {"multipart/form-data"}),
-        ("*/*", set(serializers.SERIALIZERS)),
+        ("*/*", set(TRANSPORT._serializers)),
     ],
 )
 def test_get_matching_serializers(media_type, expected):
-    assert set(serializers.get_matching_media_types(media_type)) == expected
+    assert {media_type for media_type, _ in TRANSPORT.get_matching_media_types(media_type)} == expected
 
 
 @pytest.mark.parametrize(
@@ -337,7 +337,7 @@ def test_serialize_xml(openapi_3_schema_with_xml, path, expected):
     @settings(max_examples=1)
     def test(case):
         # Then it should be correctly serialized
-        for transport in (RequestsTransport(), WSGITransport(app=None)):
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             data = transport.serialize_case(case)["data"]
             assert data == expected
             # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
@@ -454,7 +454,7 @@ def test_serialize_xml_hypothesis(data, schema_object, media_type):
     # Arrays may be serialized into multiple elements without root, therefore wrapping everything and check if
     # it can be parsed.
     with suppress(SerializationError):
-        for transport in (RequestsTransport(), WSGITransport(app=None)):
+        for transport in (REQUESTS_TRANSPORT, WSGI_TRANSPORT):
             serialized_data = transport.serialize_case(case)["data"].decode("utf8")
             ElementTree.fromstring(f"<root xmlns:smp='http://example.com/schema'>{serialized_data}</root>")
 
