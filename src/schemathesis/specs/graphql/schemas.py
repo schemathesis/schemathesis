@@ -14,7 +14,6 @@ from typing import (
     Iterator,
     Mapping,
     NoReturn,
-    TypeVar,
     cast,
 )
 from urllib.parse import urlsplit
@@ -24,11 +23,9 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.checks import CheckFunction
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, Specification
+from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
-from schemathesis.core.transport import Response
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -38,11 +35,10 @@ from schemathesis.generation.meta import (
 )
 
 from ... import auths
-from ...checks import not_a_server_error
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...models import APIOperation, Case, OperationDefinition
-from ...schemas import APIOperationMap, BaseSchema
+from ...models import Case
+from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
@@ -57,31 +53,6 @@ if TYPE_CHECKING:
 class RootType(enum.Enum):
     QUERY = enum.auto()
     MUTATION = enum.auto()
-
-
-@dataclass(repr=False)
-class GraphQLCase(Case):
-    def __hash__(self) -> int:
-        return hash(self.as_curl_command({SCHEMATHESIS_TEST_CASE_HEADER: "0"}))
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    def validate_response(
-        self,
-        response: Response,
-        checks: list[CheckFunction] | None = None,
-        additional_checks: list[CheckFunction] | None = None,
-        excluded_checks: list[CheckFunction] | None = None,
-        headers: dict[str, Any] | None = None,
-        transport_kwargs: dict[str, Any] | None = None,
-    ) -> None:
-        checks = checks or [not_a_server_error]
-        checks += additional_checks or []
-        checks = [check for check in checks if check not in (excluded_checks or [])]
-        return super().validate_response(response, checks, headers=headers, transport_kwargs=transport_kwargs)
-
-
-C = TypeVar("C", bound=Case)
 
 
 @dataclass(repr=False)
@@ -231,7 +202,6 @@ class GraphQLSchema(BaseSchema):
                 field_name=field_name,
                 root_type=root_type,
             ),
-            case_cls=GraphQLCase,
         )
 
     def get_case_strategy(
@@ -261,7 +231,6 @@ class GraphQLSchema(BaseSchema):
     def make_case(
         self,
         *,
-        case_cls: type[C],
         operation: APIOperation,
         method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
@@ -271,8 +240,8 @@ class GraphQLSchema(BaseSchema):
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
-    ) -> C:
-        return case_cls(
+    ) -> Case:
+        return Case(
             operation=operation,
             method=method or operation.method.upper(),
             path_parameters=path_parameters,

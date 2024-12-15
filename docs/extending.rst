@@ -461,7 +461,7 @@ Allows you to modify just initialized API operation:
 .. code:: python
 
     import schemathesis
-    from schemathesis.models import APIOperation
+    from schemathesis.schemas import APIOperation
 
 
     @schemathesis.hook

@@ -7,7 +7,8 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
 
 if TYPE_CHECKING:
-    from .models import APIOperation
+    from schemathesis.schemas import APIOperation
+
     from .parameters import ParameterSet
 
 

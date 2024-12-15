@@ -26,9 +26,8 @@ from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import CaseMetadata, CoveragePhaseData, GenerationInfo, PhaseInfo
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
-from schemathesis.models import APIOperation, Case
-from schemathesis.parameters import ParameterSet
-from schemathesis.schemas import BaseSchema
+from schemathesis.models import Case
+from schemathesis.schemas import APIOperation, BaseSchema, ParameterSet
 
 setup()
 

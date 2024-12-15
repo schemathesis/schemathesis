@@ -13,7 +13,7 @@ from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
 
-from ..models import APIOperation, Case
+from ..models import Case
 from .config import _default_hypothesis_settings_factory
 from .runner import StatefulTestRunner, StatefulTestRunnerConfig
 from .sink import StateMachineSink
@@ -22,7 +22,8 @@ if TYPE_CHECKING:
     import hypothesis
     from requests.structures import CaseInsensitiveDict
 
-    from ..schemas import BaseSchema
+    from schemathesis.schemas import APIOperation, BaseSchema
+
     from .statistic import TransitionStats
 
 NO_LINKS_ERROR_MESSAGE = (

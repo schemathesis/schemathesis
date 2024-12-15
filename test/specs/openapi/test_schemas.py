@@ -4,7 +4,7 @@ import pytest
 from hypothesis import find
 
 import schemathesis
-from schemathesis.models import APIOperation
+from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 

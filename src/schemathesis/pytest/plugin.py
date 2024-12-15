@@ -32,13 +32,13 @@ from schemathesis.generation.hypothesis.given import (
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.pytest.control_flow import fail_on_no_matches
+from schemathesis.schemas import APIOperation
 
 from .._override import OverrideMark
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
-    from ..models import APIOperation
     from ..schemas import BaseSchema
 
 GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (

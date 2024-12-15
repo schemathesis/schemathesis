@@ -2,7 +2,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
 
 import schemathesis
-from schemathesis.parameters import PayloadAlternatives
+from schemathesis.schemas import PayloadAlternatives
 
 from .utils import assert_requests_call, integer
 

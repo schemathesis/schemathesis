@@ -29,7 +29,7 @@ from schemathesis.schemas import BaseSchema
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
 
-    from schemathesis.models import APIOperation
+    from schemathesis.schemas import APIOperation
 
 
 @dataclass

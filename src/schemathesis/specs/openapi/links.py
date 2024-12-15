@@ -10,8 +10,9 @@ from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.schemas import APIOperation
 
-from ...models import APIOperation, Case, TransitionId
+from ...models import Case, CaseSource, TransitionId
 from ...stateful.state_machine import Direction
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
@@ -71,11 +72,11 @@ class OpenAPILink(Direction):
                 if parameter.name not in overrides.get(parameter.location, []):
                     overrides_all_parameters = False
                     break
-        case.set_source(
-            context.response,
-            context.case,
-            elapsed,
-            overrides_all_parameters,
+        case.source = CaseSource(
+            case=context.case,
+            response=context.response,
+            elapsed=elapsed,
+            overrides_all_parameters=overrides_all_parameters,
             transition_id=TransitionId(
                 name=self.name,
                 status_code=self.status_code,

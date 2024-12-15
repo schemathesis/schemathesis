@@ -5,7 +5,7 @@ import pytest
 import schemathesis
 from schemathesis import filters
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.models import APIOperation
+from schemathesis.schemas import APIOperation
 
 RAW_SCHEMA = {
     "openapi": "3.0.2",

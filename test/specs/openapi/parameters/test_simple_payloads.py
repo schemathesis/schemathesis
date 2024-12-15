@@ -3,7 +3,7 @@
 import pytest
 
 import schemathesis
-from schemathesis.parameters import PayloadAlternatives
+from schemathesis.schemas import PayloadAlternatives
 from schemathesis.specs.openapi.parameters import OpenAPI20Body, OpenAPI30Body
 
 

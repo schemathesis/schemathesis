@@ -15,8 +15,8 @@ from .filters import FilterSet, attach_filter_chain
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
-    from .models import APIOperation, Case
-    from .schemas import BaseSchema
+    from .models import Case
+    from .schemas import APIOperation, BaseSchema
 
 HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 

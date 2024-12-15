@@ -7,15 +7,15 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
-from schemathesis import models
 from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
-from schemathesis.models import OperationDefinition
+from schemathesis.models import Case
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.runner.models import TestResult
 from schemathesis.runner.phases.unit._executor import run_checks
+from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
     _coerce_header_value,
     content_type_conformance,
@@ -30,8 +30,8 @@ if TYPE_CHECKING:
 CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None)
 
 
-def make_case(schema: BaseSchema, definition: dict[str, Any]) -> models.Case:
-    return models.APIOperation(
+def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
+    return APIOperation(
         "/path", "GET", definition=OperationDefinition(definition, definition, ""), schema=schema
     ).Case()
 
@@ -52,7 +52,7 @@ def response(request, response_factory):
 
 
 @pytest.fixture
-def case(request, spec) -> models.Case:
+def case(request, spec) -> Case:
     if "swagger" in spec.raw_schema:
         data = {"produces": getattr(request, "param", ["application/json"])}
     else:

@@ -14,8 +14,8 @@ from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
-from schemathesis.models import APIOperation
 from schemathesis.runner.models import Request
+from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
 

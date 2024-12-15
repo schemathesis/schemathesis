@@ -5,14 +5,14 @@ from requests import PreparedRequest
 
 import schemathesis
 import schemathesis.cli.context
-from schemathesis import models, runner
+from schemathesis import runner
 from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.core import NOT_SET
 from schemathesis.core.transport import Response
-from schemathesis.models import OperationDefinition
 from schemathesis.runner.events import Finished, InternalError
 from schemathesis.runner.models import Check, Request, Status, TestResult, TestResultSet
+from schemathesis.schemas import APIOperation, OperationDefinition
 
 from ...utils import strip_style_win32
 
@@ -31,7 +31,7 @@ def execution_context():
 
 @pytest.fixture
 def operation(swagger_20):
-    return models.APIOperation(
+    return APIOperation(
         "/success",
         "GET",
         definition=OperationDefinition({}, {}, ""),
