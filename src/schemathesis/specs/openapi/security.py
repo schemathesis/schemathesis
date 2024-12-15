@@ -10,7 +10,7 @@ from .parameters import OpenAPI20Parameter, OpenAPI30Parameter, OpenAPIParameter
 if TYPE_CHECKING:
     from jsonschema import RefResolver
 
-    from ...models import APIOperation
+    from ...schemas import APIOperation
 
 
 @dataclass

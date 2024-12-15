@@ -25,7 +25,9 @@ from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
 if TYPE_CHECKING:
     import requests.auth
 
-    from .models import APIOperation, Case
+    from schemathesis.schemas import APIOperation
+
+    from .models import Case
 
 DEFAULT_REFRESH_INTERVAL = 300
 AuthStorageMark = Mark["AuthStorage"](attr_name="auth_storage")

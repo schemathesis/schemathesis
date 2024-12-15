@@ -4,7 +4,7 @@ import pytest
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.models import APIOperation
+from schemathesis.schemas import APIOperation
 
 
 def test_contains(swagger_20):

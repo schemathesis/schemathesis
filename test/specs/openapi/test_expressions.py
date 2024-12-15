@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import Response
-from schemathesis.models import APIOperation, OperationDefinition
+from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
 from schemathesis.specs.openapi.expressions.lexer import Token

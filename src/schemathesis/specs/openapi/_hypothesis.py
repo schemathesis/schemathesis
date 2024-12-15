@@ -27,11 +27,11 @@ from schemathesis.generation.meta import (
     TestPhase,
 )
 from schemathesis.openapi.generation.filters import is_valid_header, is_valid_path, is_valid_query, is_valid_urlencoded
+from schemathesis.schemas import APIOperation
 
 from ... import auths
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...models import APIOperation
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
 from .media_types import MEDIA_TYPES

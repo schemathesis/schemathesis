@@ -26,7 +26,7 @@ from schemathesis.transport.wsgi import WSGI_TRANSPORT
 from test.utils import assert_requests_call
 
 if TYPE_CHECKING:
-    from schemathesis.models import APIOperation
+    from schemathesis.schemas import APIOperation
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 

@@ -10,8 +10,7 @@ from schemathesis.core.result import Err, Ok, Result
 if TYPE_CHECKING:
     from schemathesis.core import Specification
 
-    from ..models import APIOperation
-    from ..schemas import BaseSchema
+    from ..schemas import APIOperation, BaseSchema
     from ..service.models import AnalysisResult
     from ..stateful import events
     from .models import Status, TestResult, TestResultSet

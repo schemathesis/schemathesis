@@ -35,7 +35,8 @@ from .utils import expand_status_code, expand_status_codes
 if TYPE_CHECKING:
     from requests import PreparedRequest
 
-    from ...models import APIOperation, Case
+    from ...models import Case
+    from ...schemas import APIOperation
 
 
 @schemathesis.check

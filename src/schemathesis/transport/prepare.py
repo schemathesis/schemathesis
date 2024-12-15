@@ -27,12 +27,12 @@ def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseIn
 
 def prepare_url(case: Case, base_url: str | None) -> str:
     """Prepare URL based on case type."""
-    from schemathesis.specs.graphql.schemas import GraphQLCase
+    from schemathesis.specs.graphql.schemas import GraphQLSchema
 
     base_url = base_url or case.base_url
     assert base_url is not None
 
-    if isinstance(case, GraphQLCase):
+    if isinstance(case.operation.schema, GraphQLSchema):
         parts = list(urlsplit(base_url))
         parts[2] = case.formatted_path
         return urlunsplit(parts)
@@ -45,9 +45,9 @@ def prepare_url(case: Case, base_url: str | None) -> str:
 
 def prepare_body(case: Case) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
     """Prepare body based on case type."""
-    from schemathesis.specs.graphql.schemas import GraphQLCase
+    from schemathesis.specs.graphql.schemas import GraphQLSchema
 
-    if isinstance(case, GraphQLCase):
+    if isinstance(case.operation.schema, GraphQLSchema):
         return case.body if isinstance(case.body, (NotSet, bytes)) else {"query": case.body}
     return case.body
 

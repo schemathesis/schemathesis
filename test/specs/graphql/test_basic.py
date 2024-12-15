@@ -12,7 +12,6 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.graphql.loaders import extract_schema_from_response, get_introspection_query
-from schemathesis.specs.graphql.schemas import GraphQLCase
 from schemathesis.specs.graphql.validation import validate_graphql_response
 from schemathesis.specs.openapi.checks import (
     ensure_resource_availability,
@@ -74,7 +73,6 @@ def test_custom_base_url(graphql_url):
 @pytest.mark.parametrize("kwargs", [{"body": "SomeQuery"}, {"body": b'{"query": "SomeQuery"}'}])
 def test_make_case(graphql_schema, kwargs):
     case = graphql_schema["Query"]["getBooks"].Case(**kwargs)
-    assert isinstance(case, GraphQLCase)
     assert_requests_call(case)
 
 

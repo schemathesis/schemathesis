@@ -5,12 +5,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Iterable
 
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.schemas import Parameter
 
-from ...parameters import Parameter
 from .converter import to_json_schema_recursive
 
 if TYPE_CHECKING:
-    from ...models import APIOperation
+    from ...schemas import APIOperation
 
 
 @dataclass(eq=False)
