@@ -54,7 +54,9 @@ from ...models.transport import Request
 if TYPE_CHECKING:
     import requests
 
-    from ....models import APIOperation, Case
+    from schemathesis.schemas import APIOperation
+
+    from ....models import Case
 
 
 def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineContext) -> events.EventGenerator:

@@ -1,6 +1,6 @@
 """Tests for parsing of non-payload parameters."""
 
-from schemathesis.parameters import ParameterSet
+from schemathesis.schemas import ParameterSet
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
 
 

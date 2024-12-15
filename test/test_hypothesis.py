@@ -10,8 +10,7 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import examples
-from schemathesis.models import APIOperation, OperationDefinition
-from schemathesis.parameters import ParameterSet, PayloadAlternatives
+from schemathesis.schemas import APIOperation, OperationDefinition, ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
     get_case_strategy,

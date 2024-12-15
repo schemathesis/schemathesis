@@ -1,6 +1,6 @@
 import pytest
 
-from schemathesis.models import APIOperation, OperationDefinition
+from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.links import get_container
 from schemathesis.specs.openapi.parameters import OpenAPI30Parameter
 

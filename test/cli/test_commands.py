@@ -25,9 +25,9 @@ from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
-from schemathesis.models import APIOperation
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
+from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from schemathesis.stateful import Stateful

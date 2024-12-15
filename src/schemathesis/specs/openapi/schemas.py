@@ -19,7 +19,6 @@ from typing import (
     Iterator,
     Mapping,
     NoReturn,
-    TypeVar,
     cast,
 )
 from urllib.parse import urlsplit
@@ -40,8 +39,8 @@ from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from ..._override import CaseOverride, OverrideMark, check_no_override_mark
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
-from ...models import APIOperation, Case, OperationDefinition
-from ...schemas import APIOperationMap, BaseSchema
+from ...models import Case
+from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import get_case_strategy
@@ -364,7 +363,7 @@ class BaseOpenAPISchema(BaseSchema):
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
         base_url = self.get_base_url()
-        operation: APIOperation[OpenAPIParameter, Case] = APIOperation(
+        operation: APIOperation[OpenAPIParameter] = APIOperation(
             path=path,
             method=method,
             definition=OperationDefinition(raw, resolved, scope),
@@ -869,7 +868,6 @@ class MethodMap(Mapping):
 
 OPENAPI_20_DEFAULT_BODY_MEDIA_TYPE = "application/json"
 OPENAPI_20_DEFAULT_FORM_MEDIA_TYPE = "multipart/form-data"
-C = TypeVar("C", bound=Case)
 
 
 class SwaggerV20(BaseOpenAPISchema):
@@ -1001,7 +999,6 @@ class SwaggerV20(BaseOpenAPISchema):
     def make_case(
         self,
         *,
-        case_cls: type[C],
         operation: APIOperation,
         method: str | None = None,
         path_parameters: dict[str, Any] | None = None,
@@ -1011,10 +1008,10 @@ class SwaggerV20(BaseOpenAPISchema):
         body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET,
         media_type: str | None = None,
         meta: CaseMetadata | None = None,
-    ) -> C:
+    ) -> Case:
         if body is not NOT_SET and media_type is None:
             media_type = operation._get_default_media_type()
-        return case_cls(
+        return Case(
             operation=operation,
             method=method or operation.method.upper(),
             path_parameters=path_parameters,

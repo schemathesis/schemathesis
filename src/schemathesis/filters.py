@@ -13,7 +13,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transforms import resolve_pointer
 
 if TYPE_CHECKING:
-    from .models import APIOperation
+    from schemathesis.schemas import APIOperation
 
 
 class HasAPIOperation(Protocol):
