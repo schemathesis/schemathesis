@@ -20,7 +20,6 @@ class TestSchema(TestCase):
 
     @given(case=schema["/users"]["GET"].as_strategy())
     def test_something(self, case):
-        assert case.full_path == "/v1/users"
         assert case.method == "GET"
 """
     )

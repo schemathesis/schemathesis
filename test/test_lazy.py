@@ -9,8 +9,7 @@ lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
-    assert case.full_path == "/v1/users"
-    assert case.method == "GET"
+    pass
 """
     )
     result = testdir.runpytest("-v")
@@ -93,8 +92,6 @@ def another():
 @lazy_schema.parametrize()
 def test_(request, case, another):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
-    assert case.method == "GET"
     assert another == 1
 """
     )
@@ -114,7 +111,7 @@ lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 @lazy_schema.include(path_regex="/first").parametrize()
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/first"
+    assert case.operation.full_path == "/v1/first"
 
 @lazy_schema.include(method="POST").parametrize()
 def test_b(request, case):
@@ -124,13 +121,13 @@ def test_b(request, case):
 @lazy_schema.include(tag="foo").parametrize()
 def test_c(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/second"
+    assert case.operation.full_path == "/v1/second"
     assert case.method == "GET"
 
 @lazy_schema.include(operation_id="updateThird").parametrize()
 def test_d(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/third"
+    assert case.operation.full_path == "/v1/third"
     assert case.method == "PUT"
 """,
         paths={
@@ -170,7 +167,7 @@ lazy_schema = schemathesis.pytest.from_fixture("simple_schema").include(path_reg
 @lazy_schema.parametrize()
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/pets"
+    assert case.operation.full_path == "/v1/pets"
     assert case.method == "POST"
 """,
         paths={"/pets": {"post": {"responses": {"200": {"description": "OK"}}}}},

@@ -1,10 +1,16 @@
 from __future__ import annotations
 
+import http.client
+import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import Enum
 from json import JSONDecodeError
+from typing import Callable
 
 from schemathesis.core.compat import BaseExceptionGroup
+from schemathesis.core.output import OutputConfig, prepare_response_payload
+from schemathesis.core.transport import Response
 
 
 @dataclass
@@ -150,7 +156,68 @@ class FailureGroup(BaseExceptionGroup):
 
     def __new__(cls, failures: Sequence[Failure], message: str | None = None) -> FailureGroup:
         if message is None:
-            message = f"Schemathesis found {len(failures)} distinct failure"
-            if len(failures) > 1:
-                message += "s"
+            message = failure_report_title(failures)
         return super().__new__(cls, message, list(failures))
+
+
+class MessageBlock(Enum):
+    CASE_ID = "case_id"
+    FAILURE = "failure"
+    STATUS = "status"
+    CURL = "curl"
+
+
+BlockFormatter = Callable[[MessageBlock, str], str]
+
+
+def failure_report_title(failures: Sequence[Failure]) -> str:
+    message = f"Schemathesis found {len(failures)} distinct failure"
+    if len(failures) > 1:
+        message += "s"
+    return message
+
+
+def format_failures(
+    *,
+    case_id: str | None,
+    response: Response,
+    failures: Sequence[Failure],
+    curl: str,
+    formatter: BlockFormatter | None = None,
+    config: OutputConfig,
+) -> str:
+    """Format failure information with custom styling."""
+    formatter = formatter or (lambda _, x: x)
+
+    if case_id is not None:
+        output = formatter(MessageBlock.CASE_ID, f"{case_id}\n")
+    else:
+        output = ""
+
+    # Failures
+    for idx, failure in enumerate(failures):
+        output += formatter(MessageBlock.FAILURE, f"\n- {failure.title}")
+        if failure.message:
+            output += "\n\n"
+            output += textwrap.indent(failure.message, "    ")
+        if idx != len(failures):
+            output += "\n"
+
+    # Response status
+    reason = http.client.responses.get(response.status_code, "Unknown")
+    output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
+
+    # Response payload
+    if response.content is None or not response.content:
+        output += "\n    <EMPTY>"
+    else:
+        try:
+            payload = prepare_response_payload(response.text, config=config)
+            output += textwrap.indent(f"\n`{payload}`", prefix="    ")
+        except UnicodeDecodeError:
+            output += "\n    <BINARY>"
+
+    # cURL
+    output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n    {curl}")
+
+    return output

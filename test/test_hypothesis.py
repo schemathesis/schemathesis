@@ -1,6 +1,5 @@
 import datetime
 from base64 import b64decode
-from unittest.mock import ANY
 
 import pytest
 from hypothesis import HealthCheck, assume, find, given, settings
@@ -10,6 +9,8 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import examples
+from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
@@ -69,7 +70,9 @@ def test_get_examples(location, swagger_20):
     assert len(strategies) == 1
     assert strategies[0].example() == operation.Case(
         media_type=media_type,
-        meta=ANY,
+        meta=CaseMetadata(
+            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.generate()
+        ),
         **{container: expected},
     )
 

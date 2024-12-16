@@ -27,7 +27,6 @@ import schemathesis.cli
 from schemathesis.cli import CUSTOM_HANDLERS
 from schemathesis.cli.env import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
-from schemathesis.models import Case
 from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import media_types
 
@@ -1035,9 +1034,10 @@ def response_factory():
 @pytest.fixture
 def case_factory(swagger_20):
     def factory(**kwargs):
-        kwargs.setdefault("operation", swagger_20["/users"]["get"])
+        operation = kwargs.pop("operation", swagger_20["/users"]["get"])
         kwargs.setdefault("method", "GET")
-        return Case(**kwargs)
+        kwargs.setdefault("media_type", "application/json")
+        return operation.Case(**kwargs)
 
     return factory
 

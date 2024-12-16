@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transport import USER_AGENT
 
@@ -29,18 +30,19 @@ def prepare_url(case: Case, base_url: str | None) -> str:
     """Prepare URL based on case type."""
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
-    base_url = base_url or case.base_url
+    base_url = base_url or case.operation.base_url
     assert base_url is not None
+    path = prepare_path(case.path, case.path_parameters)
 
     if isinstance(case.operation.schema, GraphQLSchema):
         parts = list(urlsplit(base_url))
-        parts[2] = case.formatted_path
+        parts[2] = path
         return urlunsplit(parts)
     else:
-        formatted_path = case.formatted_path.lstrip("/")
+        path = path.lstrip("/")
         if not base_url.endswith("/"):
             base_url += "/"
-        return unquote(urljoin(base_url, quote(formatted_path)))
+        return unquote(urljoin(base_url, quote(path)))
 
 
 def prepare_body(case: Case) -> list | dict[str, Any] | str | int | float | bool | bytes | NotSet:
@@ -66,12 +68,25 @@ def normalize_base_url(base_url: str | None) -> str | None:
     return base_url
 
 
+def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
+    try:
+        return path.format(**parameters or {})
+    except KeyError as exc:
+        # This may happen when a path template has a placeholder for variable "X", but parameter "X" is not defined
+        # in the parameters list.
+        # When `exc` is formatted, it is the missing key name in quotes. E.g. 'id'
+        raise InvalidSchema(f"Path parameter {exc} is not defined") from exc
+    except (IndexError, ValueError) as exc:
+        # A single unmatched `}` inside the path template may cause this
+        raise InvalidSchema(f"Malformed path template: `{path}`\n\n  {exc}") from exc
+
+
 def prepare_request(case: Case, headers: dict[str, Any] | None, sanitize: bool) -> PreparedRequest:
     import requests
 
     from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
-    base_url = normalize_base_url(case.base_url)
+    base_url = normalize_base_url(case.operation.base_url)
     kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=headers)
     if sanitize:
         kwargs["url"] = sanitize_url(kwargs["url"])

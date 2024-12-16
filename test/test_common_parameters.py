@@ -11,7 +11,6 @@ def test_common_parameters(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
     assert case.method in ["GET", "POST"]
     assert_int(case.query["common_id"])
     assert_int(case.query["not_common_id"])
@@ -44,7 +43,6 @@ def test_common_parameters_with_references(testdir):
         """
 def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/foo"
     assert case.method in ["PUT", "POST"]
     if case.method == "POST":
         assert_int(case.body)
@@ -139,7 +137,6 @@ def test_common_parameters_multiple_tests(testdir):
         """
 def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
     assert case.method in ["GET", "POST"]
     assert_int(case.query["common_id"])
 

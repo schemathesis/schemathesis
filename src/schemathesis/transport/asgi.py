@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 class ASGITransport(RequestsTransport):
     def send(self, case: Case, *, session: requests.Session | None = None, **kwargs: Any) -> Response:
         if kwargs.get("base_url") is None:
-            kwargs["base_url"] = normalize_base_url(case.base_url)
-        application = kwargs.pop("app", case.app)
+            kwargs["base_url"] = normalize_base_url(case.operation.base_url)
+        application = kwargs.pop("app", case.operation.app)
 
         with asgi.get_client(application) as client:
             return super().send(case, session=client, **kwargs)

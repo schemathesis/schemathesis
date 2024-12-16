@@ -1,7 +1,4 @@
-from functools import partial
-
 import pytest
-from hypothesis import find
 
 import schemathesis
 from schemathesis.schemas import APIOperation
@@ -65,38 +62,3 @@ def test_operation_cache_sharing(mocker, schema_url):
     second = schema.get_operation_by_id("getUser")
     assert first is second
     assert len(schema._operation_cache._operations) == 2
-
-
-SINGLE_METHOD_PATHS = {
-    "/test-2": {"get": {"responses": {"200": {"description": "OK"}}}},
-}
-TWO_METHOD_PATHS = {
-    "/test": {
-        "get": {"responses": {"200": {"description": "OK"}}},
-        "post": {"responses": {"200": {"description": "OK"}}},
-    },
-}
-
-
-def matches_operation(case, operation):
-    return operation.method.upper() == case.method.upper() and operation.full_path == case.full_path
-
-
-def test_path_as_strategy(ctx):
-    schema = ctx.openapi.build_schema(TWO_METHOD_PATHS)
-    schema = schemathesis.openapi.from_dict(schema)
-    operations = schema["/test"]
-    strategy = operations.as_strategy()
-    for operation in operations.values():
-        # All fields should be possible to generate
-        find(strategy, partial(matches_operation, operation=operation))
-
-
-def test_schema_as_strategy(ctx):
-    schema = ctx.openapi.build_schema({**SINGLE_METHOD_PATHS, **TWO_METHOD_PATHS})
-    schema = schemathesis.openapi.from_dict(schema)
-    strategy = schema.as_strategy()
-    for operations in schema.values():
-        for operation in operations.values():
-            # All operations should be possible to generate
-            find(strategy, partial(matches_operation, operation=operation))

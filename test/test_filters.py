@@ -10,7 +10,7 @@ def test_method_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path in ("/v1/foo", "/v1/users")
+    assert case.operation.full_path in ("/v1/foo", "/v1/users")
     assert case.method == "GET"
 """,
         paths={"/foo": {"get": parameters}, "/bar": {"post": parameters}},
@@ -35,7 +35,7 @@ def test_tag_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/bar"
+    assert case.operation.full_path == "/v1/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -57,7 +57,7 @@ def test_loader_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/foo"
+    assert case.operation.full_path == "/v1/foo"
     assert case.method == "POST"
 """,
         paths={
@@ -84,7 +84,7 @@ def test_operation_id_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/bar"
+    assert case.operation.full_path == "/v1/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -108,7 +108,7 @@ def test_operation_id_list_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/foo"
+    assert case.operation.full_path == "/v1/foo"
 """,
         paths={
             "/foo": {
