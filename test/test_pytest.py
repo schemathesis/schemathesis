@@ -24,7 +24,7 @@ def param(inner):
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
+    assert case.operation.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -88,7 +88,7 @@ class TestAPI:
     @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_(self, request, param, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.full_path == "/v1/users"
+        assert case.operation.full_path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
         paths={

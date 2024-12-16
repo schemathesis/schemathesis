@@ -56,7 +56,7 @@ class URL(Node):
     def evaluate(self, context: ExpressionContext) -> str:
         import requests
 
-        base_url = context.case.base_url or "http://127.0.0.1"
+        base_url = context.case.operation.base_url or "http://127.0.0.1"
         kwargs = REQUESTS_TRANSPORT.serialize_case(context.case, base_url=base_url)
         prepared = requests.Request(**kwargs).prepare()
         return cast(str, prepared.url)

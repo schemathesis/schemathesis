@@ -1,14 +1,12 @@
 from __future__ import annotations
 
-import http.client
 import platform
-import textwrap
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
-from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.failures import format_failures
 from schemathesis.runner.models import group_failures_by_code_sample
 
 from ..runner import events
@@ -50,33 +48,11 @@ def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionCon
 
 
 def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:
-    message = ""
-    for check_idx, check in enumerate(checks):
-        if check_idx == 0:
-            message += f"{idx}. Test Case ID: {check.case.id}\n"
-        assert check.failure is not None
-        message += f"\n- {check.failure.title}\n"
-        formatted_message = textwrap.indent(check.failure.message, prefix="    ")
-        if formatted_message:
-            message += f"\n{formatted_message}\n"
-        if check_idx + 1 == len(checks):
-            status_code = check.response.status_code
-            reason = http.client.responses.get(status_code, "Unknown")
-            message += f"\n[{check.response.status_code}] {reason}:\n"
-            if check.response.content is not None:
-                if not check.response.content:
-                    message += "\n    <EMPTY>\n"
-                else:
-                    encoding = check.response.encoding or "utf8"
-                    try:
-                        # Checked that is not None
-                        body = cast(bytes, check.response.content)
-                        payload = body.decode(encoding)
-                        payload = prepare_response_payload(payload, config=context.output_config)
-                        payload = textwrap.indent(f"\n`{payload}`\n", prefix="    ")
-                        message += payload
-                    except UnicodeDecodeError:
-                        message += "\n    <BINARY>\n"
-
-    message += f"\nReproduce with: \n\n    {code_sample}"
-    return message
+    check = checks[0]
+    return format_failures(
+        case_id=f"{idx}. Test Case ID: {check.case.id}",
+        response=check.response,
+        failures=[check.failure for check in checks if check.failure is not None],
+        curl=code_sample,
+        config=context.output_config,
+    )

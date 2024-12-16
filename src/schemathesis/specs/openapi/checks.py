@@ -29,6 +29,7 @@ from schemathesis.openapi.checks import (
     UndefinedStatusCode,
     UseAfterFree,
 )
+from schemathesis.transport.prepare import prepare_path
 
 from .utils import expand_status_code, expand_status_codes
 
@@ -319,8 +320,8 @@ def use_after_free(ctx: CheckContext, response: Response, original: Case) -> boo
                 ResourcePath(case.path, case.path_parameters or {}),
                 ResourcePath(original.path, original.path_parameters or {}),
             ):
-                free = f"{case.operation.method.upper()} {case.formatted_path}"
-                usage = f"{original.operation.method} {original.formatted_path}"
+                free = f"{case.operation.method.upper()} {prepare_path(case.path, case.path_parameters)}"
+                usage = f"{original.operation.method} {prepare_path(original.path, original.path_parameters)}"
                 reason = http.client.responses.get(response.status_code, "Unknown")
                 raise UseAfterFree(
                     operation=case.operation.verbose_name,

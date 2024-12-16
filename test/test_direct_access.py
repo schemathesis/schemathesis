@@ -1,9 +1,9 @@
-from unittest.mock import ANY
-
 import pytest
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation
 
 
@@ -38,7 +38,11 @@ def test_as_strategy(swagger_20):
     operation = swagger_20["/users"]["GET"]
     strategy = operation.as_strategy()
     assert isinstance(strategy, st.SearchStrategy)
-    assert strategy.example() == operation.Case(meta=ANY)
+    assert strategy.example() == operation.Case(
+        meta=CaseMetadata(
+            generation=GenerationInfo(time=0.0, mode=GenerationMode.POSITIVE), components={}, phase=PhaseInfo.generate()
+        ),
+    )
 
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")

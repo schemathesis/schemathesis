@@ -10,7 +10,7 @@ from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
-from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers
+from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers, prepare_path
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
 from schemathesis.transport.serialization import serialize_binary, serialize_json, serialize_xml, serialize_yaml
 
@@ -49,7 +49,7 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
 
         data = {
             "method": case.method,
-            "path": case.operation.schema.get_full_path(case.formatted_path),
+            "path": case.operation.schema.get_full_path(prepare_path(case.path, case.path_parameters)),
             # Convert to regular dict for Werkzeug compatibility
             "headers": dict(final_headers),
             "query_string": case.query,
@@ -91,7 +91,7 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
 
         requests_kwargs = REQUESTS_TRANSPORT.serialize_case(
             case,
-            base_url=normalize_base_url(case.base_url),
+            base_url=normalize_base_url(case.operation.base_url),
             headers=headers,
             params=params,
             cookies=cookies,

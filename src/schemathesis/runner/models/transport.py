@@ -39,7 +39,7 @@ class Request:
         """Create a new `Request` instance from `Case`."""
         import requests
 
-        base_url = normalize_base_url(case.base_url)
+        base_url = normalize_base_url(case.operation.base_url)
         kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url)
         request = requests.Request(**kwargs)
         prepared = session.prepare_request(request)  # type: ignore

@@ -14,7 +14,7 @@ def test_parametrization(testdir):
 @schema.parametrize()
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
+    assert case.operation.full_path == "/v1/users"
     assert case.method == "GET"
 """
     )
@@ -35,7 +35,7 @@ def test_pytest_parametrize(testdir):
 @schema.parametrize()
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
+    assert case.operation.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -67,7 +67,7 @@ class TestAPI:
     @schema.parametrize()
     def test_(self, request, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.full_path == "/v1/users"
+        assert case.operation.full_path == "/v1/users"
         assert case.method in ("GET", "POST")
 """,
         paths={
@@ -98,7 +98,7 @@ def test_max_examples(testdir):
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
+    assert case.operation.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         paths={"/users": {"get": parameters, "post": parameters}},
@@ -117,7 +117,7 @@ def test_direct_schema(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
+    assert case.operation.full_path == "/v1/users"
     assert case.method == "POST"
     assert_list(case.body)
     assert_str(case.body[0])
@@ -389,7 +389,7 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.formatted_path in ("/users/1/2", "/users/42/43")
+    assert case.path_parameters in ({"a": 1, "b": 2}, {"a": 42, "b": 43})
 """,
         schema_name="simple_openapi.yaml",
         paths={

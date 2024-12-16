@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
+from schemathesis.core.transforms import diff
+from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
+    from schemathesis.models import Case
     from schemathesis.schemas import APIOperation
 
     from .parameters import ParameterSet
@@ -29,6 +33,15 @@ class CaseOverride:
             "path_parameters": (_for_parameters(self.path_parameters, operation.path_parameters)),
         }
 
+    @classmethod
+    def from_components(cls, components: dict[ComponentKind, StoredValue], case: Case) -> CaseOverride:
+        return CaseOverride(
+            **{
+                kind.value: get_component_diff(stored=stored, current=getattr(case, kind.value))
+                for kind, stored in components.items()
+            }
+        )
+
 
 def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[str, str]:
     output = {}
@@ -36,6 +49,45 @@ def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[s
         if param.name in overridden:
             output[param.name] = overridden[param.name]
     return output
+
+
+@dataclass
+class StoredValue:
+    value: dict[str, Any] | None
+    is_generated: bool
+
+    __slots__ = ("value", "is_generated")
+
+
+def store_original_state(value: dict[str, Any] | None) -> dict[str, Any] | None:
+    if isinstance(value, Mapping):
+        return value.copy()
+    return value
+
+
+def get_component_diff(stored: StoredValue, current: dict[str, Any] | None) -> dict[str, Any]:
+    """Calculate difference between stored and current components."""
+    if not (current and stored.value):
+        return {}
+    if stored.is_generated:
+        return diff(stored.value, current)
+    return current
+
+
+def store_components(case: Case) -> dict[ComponentKind, StoredValue]:
+    """Store original component states for a test case."""
+    return {
+        kind: StoredValue(
+            value=store_original_state(getattr(case, kind.value)),
+            is_generated=bool(case.meta and kind in case.meta.components),
+        )
+        for kind in [
+            ComponentKind.QUERY,
+            ComponentKind.HEADERS,
+            ComponentKind.COOKIES,
+            ComponentKind.PATH_PARAMETERS,
+        ]
+    }
 
 
 OverrideMark = Mark[CaseOverride](attr_name="override")

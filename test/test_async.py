@@ -30,7 +30,6 @@ async def func():
 @schema.parametrize()
 async def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
     assert case.method == "GET"
     assert await func() == 1
     if "{plugin}" == "trio":
@@ -58,7 +57,6 @@ def test_settings_first(testdir, plugin):
 @settings(max_examples=5)
 async def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.full_path == "/v1/users"
     assert case.method in ("GET", "POST")
 """,
         pytest_plugins=[plugin],
@@ -100,7 +98,7 @@ def app():
 async def test_(request, aiohttp_client, app, case):
     request.config.HYPOTHESIS_CASES += 1
     client = await aiohttp_client(app)
-    response = await client.request(case.method, f"/v1{case.formatted_path}", headers=case.headers)
+    response = await client.request(case.method, "/v1/users", headers=case.headers)
     assert response.status < 500
     assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].method == "GET"

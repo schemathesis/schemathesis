@@ -326,6 +326,7 @@ class BaseSchema(Mapping):
         *,
         operation: APIOperation,
         method: str | None = None,
+        path: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
