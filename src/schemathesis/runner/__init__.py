@@ -18,7 +18,6 @@ if TYPE_CHECKING:
     from ..models import CheckFunction
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
-    from ..stateful import Stateful
     from .core import Engine
 
 
@@ -35,7 +34,6 @@ def from_schema(
     max_failures: int | None = None,
     unique_data: bool = False,
     dry_run: bool = False,
-    stateful: Stateful | None = None,
     network: NetworkConfig | None = None,
     checks_config: ChecksConfig | None = None,
     service_client: ServiceClient | None = None,
@@ -63,7 +61,6 @@ def from_schema(
             unique_data=unique_data,
             dry_run=dry_run,
             seed=seed,
-            stateful=stateful,
             workers_num=workers_num,
         ),
         network=network or NetworkConfig(),

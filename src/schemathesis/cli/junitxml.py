@@ -31,11 +31,11 @@ class JunitXMLHandler(EventHandler):
             event_: events.AfterExecution | events.AfterStatefulExecution = event
             name = event_.result.verbose_name
             test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
-            if event_.status == Status.failure:
+            if event_.status == Status.FAILURE:
                 _add_failure(test_case, event_.result.checks, context)
-            elif event_.status == Status.error:
+            elif event_.status == Status.ERROR:
                 test_case.add_error_info(message=event_.result.errors[-1].format())
-            elif event_.status == Status.skip:
+            elif event_.status == Status.SKIP:
                 test_case.add_skipped_info(message=event_.result.skip_reason)
             self.test_cases.append(test_case)
         elif isinstance(event, events.Finished):

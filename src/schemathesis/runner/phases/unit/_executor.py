@@ -73,7 +73,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
 
     def _on_flaky(exc: Exception) -> Status:
         if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
-            status = Status.error
+            status = Status.ERROR
             result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
         elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
             isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
@@ -81,12 +81,12 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             for sub_exc in exc.exceptions:
                 if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
                     result.add_error(DeadlineExceeded.from_exc(sub_exc))
-            status = Status.error
+            status = Status.ERROR
         elif errors:
-            status = Status.error
+            status = Status.ERROR
             result.add_errors(errors)
         else:
-            status = Status.failure
+            status = Status.FAILURE
             result.mark_flaky()
         return status
 
@@ -95,19 +95,19 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             test_function(ctx=ctx, result=result, errors=errors)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         if not result.is_executed:
-            status = Status.skip
+            status = Status.SKIP
             result.mark_skipped(None)
         else:
-            status = Status.success
+            status = Status.SUCCESS
     except unittest.case.SkipTest as exc:
         # Newer Hypothesis versions raise this exception if no tests were executed
-        status = Status.skip
+        status = Status.SKIP
         result.mark_skipped(exc)
     except (FailureGroup, Failure):
-        status = Status.failure
+        status = Status.FAILURE
     except UnexpectedError:
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
-        status = Status.error
+        status = Status.ERROR
         result.mark_errored()
         for error in deduplicate_errors(errors):
             if isinstance(error, MalformedMediaType):
@@ -118,22 +118,22 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = _on_flaky(exc)
     except BaseExceptionGroup:
         if errors:
-            status = Status.error
+            status = Status.ERROR
             result.add_errors(errors)
         else:
-            status = Status.failure
+            status = Status.FAILURE
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
-        status = Status.error
+        status = Status.ERROR
         result.add_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
         yield events.Interrupted()
         return
     except SkipTest as exc:
-        status = Status.skip
+        status = Status.SKIP
         result.mark_skipped(exc)
     except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
-        status = Status.error
+        status = Status.ERROR
         try:
             operation.schema.validate()
             msg = "Unexpected error during testing of this API operation"
@@ -153,10 +153,10 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             )
         result.add_error(error)
     except HypothesisRefResolutionError:
-        status = Status.error
+        status = Status.ERROR
         result.add_error(UnsupportedRecursiveReference())
     except InvalidArgument as error:
-        status = Status.error
+        status = Status.ERROR
         message = get_invalid_regular_expression_message(warnings)
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
@@ -164,13 +164,13 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         else:
             result.add_error(error)
     except hypothesis.errors.DeadlineExceeded as error:
-        status = Status.error
+        status = Status.ERROR
         result.add_error(DeadlineExceeded.from_exc(error))
     except JsonSchemaError as error:
-        status = Status.error
+        status = Status.ERROR
         result.add_error(InvalidRegexPattern.from_schema_error(error, from_examples=False))
     except Exception as error:
-        status = Status.error
+        status = Status.ERROR
         # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
         if str(error) == "first argument must be string or compiled pattern":
             result.add_error(
@@ -182,13 +182,13 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         else:
             result.add_error(error)
     if UnsatisfiableExampleMark.is_set(test_function):
-        status = Status.error
+        status = Status.ERROR
         result.add_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
         )
     non_serializable = NonSerializableMark.get(test_function)
-    if non_serializable is not None and status != Status.error:
-        status = Status.error
+    if non_serializable is not None and status != Status.ERROR:
+        status = Status.ERROR
         media_types = ", ".join(non_serializable.media_types)
         result.add_error(
             SerializationNotPossible(
@@ -198,12 +198,12 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             )
         )
     invalid_regex = InvalidRegexMark.get(test_function)
-    if invalid_regex is not None and status != Status.error:
-        status = Status.error
+    if invalid_regex is not None and status != Status.ERROR:
+        status = Status.ERROR
         result.add_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
     invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:
-        status = Status.error
+        status = Status.ERROR
         result.add_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
     ctx.add_result(result)
@@ -381,7 +381,7 @@ def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session:
     if not ctx.config.execution.dry_run:
         _network_test(case, ctx, result, session, headers)
     else:
-        result.store_requests_response(case, None, Status.skip, [], session=session)
+        result.store_requests_response(case, None, Status.SKIP, [], session=session)
 
 
 def _network_test(
@@ -402,10 +402,10 @@ def _network_test(
     try:
         response = case.call(**kwargs)
     except (requests.Timeout, requests.ConnectionError):
-        result.store_requests_response(case, None, Status.failure, [], session=session)
+        result.store_requests_response(case, None, Status.FAILURE, [], session=session)
         raise
     targets.run(ctx.config.execution.targets, case=case, response=response)
-    status = Status.success
+    status = Status.SUCCESS
 
     check_ctx = CheckContext(
         override=ctx.config.override,
@@ -424,7 +424,7 @@ def _network_test(
             response=response,
         )
     except FailureGroup:
-        status = Status.failure
+        status = Status.FAILURE
         raise
     finally:
         result.store_requests_response(case, response, status, check_results, session=session)

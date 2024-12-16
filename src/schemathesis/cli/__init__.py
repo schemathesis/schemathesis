@@ -30,7 +30,6 @@ from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_GENERATOR_MODES, GenerationMode
 from ..runner import events
 from ..runner.config import NetworkConfig
-from ..stateful import Stateful
 from . import cassettes, loaders, output, validation
 from .constants import DEFAULT_WORKERS, ISSUE_TRACKER_URL, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext, FileReportContext, ServiceReportContext
@@ -454,14 +453,6 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
-    "--stateful",
-    help="Enable or disable stateful testing",
-    type=click.Choice([item.name for item in Stateful]),
-    default=Stateful.links.name,
-    callback=validation.convert_stateful,
-    metavar="",
-)
-@grouped_option(
     "--generation-allow-x00",
     help="Whether to allow the generation of `\x00` bytes within strings",
     type=str,
@@ -715,7 +706,6 @@ def run(
     cassette_preserve_exact_body_bytes: bool = False,
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
-    stateful: Stateful | None = None,
     sanitize_output: bool = True,
     output_truncate: bool = True,
     contrib_unique_data: bool = False,
@@ -1014,7 +1004,6 @@ def run(
         checks=selected_checks,
         targets=selected_targets,
         workers_num=workers_num,
-        stateful=stateful,
         hypothesis_settings=hypothesis_settings,
         generation_config=generation_config,
         checks_config=checks_config,
@@ -1070,7 +1059,6 @@ def into_event_stream(
     max_failures: int | None,
     unique_data: bool,
     dry_run: bool,
-    stateful: Stateful | None,
     service_client: ServiceClient | None,
     loader_config: loaders.AutodetectConfig,
 ) -> events.EventGenerator:
@@ -1093,7 +1081,6 @@ def into_event_stream(
             checks_config=checks_config,
             targets=targets,
             workers_num=workers_num,
-            stateful=stateful,
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
             network=network_config,
@@ -1469,14 +1456,14 @@ def login(token: str, hostname: str, hosts_file: os.PathLike, protocol: str, req
 def logout(hostname: str, hosts_file: os.PathLike) -> None:
     """Remove authentication for a Schemathesis.io host."""
     result = service.hosts.remove(hostname, hosts_file)
-    if result == service.hosts.RemoveAuth.success:
+    if result == service.hosts.RemoveAuth.SUCCESS:
         success_message(f"Logged out of {hostname} account")
     else:
-        if result == service.hosts.RemoveAuth.no_match:
+        if result == service.hosts.RemoveAuth.NO_MATCH:
             warning_message(f"Not logged in to {hostname}")
-        if result == service.hosts.RemoveAuth.no_hosts:
+        if result == service.hosts.RemoveAuth.NO_HOSTS:
             warning_message("Not logged in to any hosts")
-        if result == service.hosts.RemoveAuth.error:
+        if result == service.hosts.RemoveAuth.ERROR:
             error_message(f"Failed to read the hosts file. Try to remove {hosts_file}")
         sys.exit(1)
 

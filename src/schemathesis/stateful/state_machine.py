@@ -15,8 +15,6 @@ from schemathesis.core.transport import Response
 
 from ..models import Case
 from .config import _default_hypothesis_settings_factory
-from .runner import StatefulTestRunner, StatefulTestRunnerConfig
-from .sink import StateMachineSink
 
 if TYPE_CHECKING:
     import hypothesis
@@ -110,18 +108,6 @@ class APIStateMachine(RuleBasedStateMachine):
         from . import run_state_machine_as_test
 
         return run_state_machine_as_test(cls, settings=settings)
-
-    @classmethod
-    def runner(cls, *, config: StatefulTestRunnerConfig | None = None) -> StatefulTestRunner:
-        """Create a runner for this state machine."""
-        from .runner import StatefulTestRunnerConfig
-
-        return StatefulTestRunner(cls, config=config or StatefulTestRunnerConfig())
-
-    @classmethod
-    def sink(cls) -> StateMachineSink:
-        """Create a sink to collect events into."""
-        return StateMachineSink(transitions=cls._transition_stats_template.copy())
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario.

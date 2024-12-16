@@ -67,7 +67,7 @@ def results_set(operation):
 @pytest.fixture
 def after_execution(results_set):
     return runner.events.AfterExecution.from_result(
-        result=results_set.results[0], status=Status.success, elapsed_time=1.0, correlation_id="foo"
+        result=results_set.results[0], status=Status.SUCCESS, elapsed_time=1.0, correlation_id="foo"
     )
 
 
@@ -113,8 +113,8 @@ def test_handle_initialized(capsys, mocker, execution_context, swagger_20):
 
 def test_display_statistic(capsys, execution_context, operation, response):
     # Given multiple successful & failed checks in a single test
-    success = Check("not_a_server_error", Status.success, response, 0, operation.Case())
-    failure = Check("not_a_server_error", Status.failure, response, 0, operation.Case())
+    success = Check("not_a_server_error", Status.SUCCESS, response, 0, operation.Case())
+    failure = Check("not_a_server_error", Status.FAILURE, response, 0, operation.Case())
     single_test_statistic = TestResult(
         verbose_name=f"{operation.method} {operation.full_path}",
         checks=[
@@ -123,7 +123,7 @@ def test_display_statistic(capsys, execution_context, operation, response):
             success,
             failure,
             failure,
-            Check("different_check", Status.success, response, 0, operation.Case()),
+            Check("different_check", Status.SUCCESS, response, 0, operation.Case()),
         ],
     )
     results = TestResultSet(seed=42, results=[single_test_statistic])
@@ -202,14 +202,14 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
     media_type = "application/json" if body is not NOT_SET else None
     success = Check(
         "not_a_server_error",
-        Status.success,
+        Status.SUCCESS,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
         operation.Case(body=body, media_type=media_type),
     )
     failure = Check(
         "not_a_server_error",
-        Status.failure,
+        Status.FAILURE,
         Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
         response,
         operation.Case(body=body, media_type=media_type),
@@ -224,7 +224,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
             failure,
             Check(
                 "different_check",
-                Status.success,
+                Status.SUCCESS,
                 Request(method="POST", uri="http://user:pass@127.0.0.1/path", body=None, body_size=None, headers={}),
                 response,
                 operation.Case(body=body, media_type=media_type),
@@ -241,7 +241,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
 
 @pytest.mark.parametrize(
     ("status", "expected_symbol", "color"),
-    [(Status.success, ".", "green"), (Status.failure, "F", "red"), (Status.error, "E", "red")],
+    [(Status.SUCCESS, ".", "green"), (Status.FAILURE, "F", "red"), (Status.ERROR, "E", "red")],
 )
 def test_handle_after_execution(capsys, execution_context, after_execution, status, expected_symbol, color):
     # Given AfterExecution even with certain status

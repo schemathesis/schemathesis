@@ -8,7 +8,7 @@ import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.stateful.runner import StatefulTestRunnerConfig
+from schemathesis.stateful.runner import StatefulTestRunner, StatefulTestRunnerConfig
 
 
 @dataclass
@@ -364,6 +364,6 @@ def runner_factory(app_factory, app_runner):
         state_machine = schema.as_state_machine()
         config_kwargs = config_kwargs or {}
         config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))
-        return state_machine.runner(config=StatefulTestRunnerConfig(**config_kwargs))
+        return StatefulTestRunner(state_machine, config=StatefulTestRunnerConfig(**config_kwargs))
 
     return _runner_factory

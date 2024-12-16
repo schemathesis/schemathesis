@@ -21,7 +21,6 @@ from .. import experimental
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from ..generation import GenerationMode
 from ..service.hosts import get_temporary_hosts_file
-from ..stateful import Stateful
 from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
 
@@ -294,12 +293,6 @@ def convert_verbosity(
     if value is None:
         return value
     return hypothesis.Verbosity[value]
-
-
-def convert_stateful(ctx: click.core.Context, param: click.core.Parameter, value: str) -> Stateful | None:
-    if value == "none":
-        return None
-    return Stateful[value]
 
 
 def convert_experimental(

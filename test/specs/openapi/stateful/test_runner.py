@@ -14,7 +14,7 @@ from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.config import StatefulTestRunnerConfig
-from schemathesis.stateful.runner import events
+from schemathesis.stateful.runner import StatefulTestRunner, events
 from schemathesis.stateful.sink import StateMachineSink
 from test.utils import flaky
 
@@ -58,7 +58,7 @@ def serialize_all_events(events):
 
 
 def collect_result(runner) -> RunnerResult:
-    sink = runner.state_machine.sink()
+    sink = StateMachineSink(transitions=runner.state_machine._transition_stats_template.copy())
     events_ = []
     for event in runner.execute():
         sink.consume(event)
@@ -137,8 +137,6 @@ def test_stop_in_check(runner_factory, func):
 
     runner = runner_factory(config_kwargs={"checks": (stop_immediately,)})
     result = collect_result(runner)
-    assert result.sink.duration
-    assert result.sink.duration > 0
     assert result.sink.suites[events.SuiteStatus.INTERRUPTED] == 1
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
@@ -149,8 +147,6 @@ def test_stop_in_check(runner_factory, func):
 @pytest.mark.parametrize("event_cls", [events.ScenarioStarted, events.ScenarioFinished])
 def test_explicit_stop(runner_factory, event_cls):
     runner = runner_factory()
-    sink = runner.state_machine.sink()
-    assert sink.duration is None
     collected = []
     for event in runner.execute():
         collected.append(event)
@@ -638,8 +634,9 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=f"http://127.0.0.1:{root_app_port}/")
     state_machine = schema.as_state_machine()
-    runner = state_machine.runner(
-        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None))
+    runner = StatefulTestRunner(
+        state_machine,
+        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None)),
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE

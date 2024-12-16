@@ -1,18 +1,11 @@
 from __future__ import annotations
 
-import enum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import hypothesis
 
     from .state_machine import APIStateMachine
-
-
-@enum.unique
-class Stateful(enum.Enum):
-    none = 1
-    links = 2
 
 
 def run_state_machine_as_test(

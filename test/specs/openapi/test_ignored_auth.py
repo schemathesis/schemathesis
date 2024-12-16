@@ -47,7 +47,7 @@ def test_auth_is_not_checked(with_generated, schema_url):
     event = run(schema_url, **kwargs)
     # Then it is a failure
     check = event.result.checks[-1]
-    assert check.status == Status.failure
+    assert check.status == Status.FAILURE
     assert check.name == "ignored_auth"
     if with_generated:
         assert "Authorization" in check.request.headers
@@ -63,7 +63,7 @@ def test_auth_is_checked(schema_url):
     # And endpoint declares auth as a requirement and checks it
     event = run(schema_url, headers={"Authorization": "Basic dGVzdDp0ZXN0"})
     # Then there is no failure
-    assert event.status == Status.success
+    assert event.status == Status.SUCCESS
 
 
 @pytest.mark.operations("success")
@@ -71,7 +71,7 @@ def test_no_failure(schema_url):
     # When there is no auth
     event = run(schema_url)
     # Then there is no failure
-    assert event.status == Status.success
+    assert event.status == Status.SUCCESS
 
 
 @pytest.mark.openapi_version("3.0")
