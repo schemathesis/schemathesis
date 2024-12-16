@@ -1,9 +1,7 @@
 from __future__ import annotations
 
-import http.client
 import os
 import shutil
-import textwrap
 import time
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Literal, cast
@@ -19,7 +17,7 @@ from schemathesis.core.errors import (
     get_request_error_message,
     split_traceback,
 )
-from schemathesis.core.output import prepare_response_payload
+from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.core.result import Ok
 from schemathesis.runner.models import group_failures_by_code_sample
 
@@ -204,14 +202,25 @@ def display_failures(context: ExecutionContext, event: events.Finished) -> None:
 
 if IO_ENCODING != "utf-8":
 
-    def _secho(text: str, **kwargs: Any) -> None:
+    def _style(text: str, **kwargs: Any) -> str:
         text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
-        click.secho(text, **kwargs)
+        return click.style(text, **kwargs)
 
 else:
 
-    def _secho(text: str, **kwargs: Any) -> None:
-        click.secho(text, **kwargs)
+    def _style(text: str, **kwargs: Any) -> str:
+        return click.style(text, **kwargs)
+
+
+def failure_formatter(block: MessageBlock, content: str) -> str:
+    if block == MessageBlock.CASE_ID:
+        return _style(content, bold=True)
+    if block == MessageBlock.FAILURE:
+        return _style(content, fg="red", bold=True)
+    if block == MessageBlock.STATUS:
+        return _style(content, bold=True)
+    assert block == MessageBlock.CURL
+    return _style(content.replace("Reproduce with", bold("Reproduce with")))
 
 
 def display_failures_for_single_test(context: ExecutionContext, result: TestResult) -> None:
@@ -224,34 +233,19 @@ def display_failures_for_single_test(context: ExecutionContext, result: TestResu
         # Make server errors appear first in the list of checks
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
 
-        for check_idx, check in enumerate(checks):
-            if check_idx == 0:
-                click.secho(f"{idx}. Test Case ID: {check.case.id}", bold=True)
-            assert check.failure is not None
-            click.secho(f"\n- {check.failure.title}", fg="red", bold=True)
-            message = textwrap.indent(check.failure.message, prefix="    ")
-            if message:
-                _secho(f"\n{message}", fg="red")
-            if check_idx + 1 == len(checks):
-                status_code = check.response.status_code
-                reason = http.client.responses.get(status_code, "Unknown")
-                response = bold(f"[{check.response.status_code}] {reason}")
-                click.echo(f"\n{response}:")
-                if check.response.content is not None:
-                    if not check.response.content:
-                        click.echo("\n    <EMPTY>")
-                    else:
-                        encoding = check.response.encoding or "utf8"
-                        try:
-                            # Checked that is not None
-                            body = cast(bytes, check.response.content)
-                            payload = body.decode(encoding)
-                            payload = prepare_response_payload(payload, config=context.output_config)
-                            payload = textwrap.indent(f"\n`{payload}`", prefix="    ")
-                            click.echo(payload)
-                        except UnicodeDecodeError:
-                            click.echo("\n    <BINARY>")
-        _secho(f"\n{bold('Reproduce with')}: \n\n    {code_sample}\n")
+        check = checks[0]
+
+        click.echo(
+            format_failures(
+                case_id=f"{idx}. Test Case ID: {check.case.id}",
+                response=check.response,
+                failures=[check.failure for check in checks if check.failure is not None],
+                curl=code_sample,
+                formatter=failure_formatter,
+                config=context.output_config,
+            )
+        )
+        click.echo()
 
 
 def display_analysis(context: ExecutionContext) -> None:

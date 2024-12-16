@@ -97,12 +97,6 @@ def test_make_case_missing_media_type(ctx):
         schema["/data"]["POST"].Case(body="foo")
 
 
-def test_path(swagger_20):
-    operation = APIOperation("/users/{name}", "GET", {}, swagger_20)
-    case = operation.Case(path_parameters={"name": "test"})
-    assert case.formatted_path == "/users/test"
-
-
 @pytest.mark.parametrize(
     ("kwargs", "expected"),
     [

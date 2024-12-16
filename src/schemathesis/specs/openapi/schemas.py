@@ -1001,6 +1001,7 @@ class SwaggerV20(BaseOpenAPISchema):
         *,
         operation: APIOperation,
         method: str | None = None,
+        path: str | None = None,
         path_parameters: dict[str, Any] | None = None,
         headers: dict[str, Any] | None = None,
         cookies: dict[str, Any] | None = None,
@@ -1014,6 +1015,7 @@ class SwaggerV20(BaseOpenAPISchema):
         return Case(
             operation=operation,
             method=method or operation.method.upper(),
+            path=path or operation.path,
             path_parameters=path_parameters,
             headers=CaseInsensitiveDict(headers) if headers is not None else headers,
             cookies=cookies,

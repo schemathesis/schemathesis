@@ -54,7 +54,8 @@ def test_graphql_url(graphql_path, fastapi_graphql_app):
     @settings(max_examples=1, deadline=None)
     def test(case):
         assert (
-            case.as_transport_kwargs(base_url=normalize_base_url(case.base_url))["url"] == "http://localhost/graphql/"
+            case.as_transport_kwargs(base_url=normalize_base_url(case.operation.base_url))["url"]
+            == "http://localhost/graphql/"
         )
 
     test()
