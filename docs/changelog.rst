@@ -9,15 +9,15 @@ Changelog
 :version:`3.39.0 <v3.38.10...v3.39.0>` - 2024-12-16
 ---------------------------------------------------
 
-**Added**:
+**Added**
 
 - ``--experimental-no-failfast`` CLI option to make Schemathesis continue testing an API operation after a failure is found.
 
-**Fixed**:
+**Fixed**
 
 - Avoid writing unbounded prefixes in XML serialization.
 
-**Changed**:
+**Changed**
 
 - Escape XML entities instead of rejecting invalid ones.
 
