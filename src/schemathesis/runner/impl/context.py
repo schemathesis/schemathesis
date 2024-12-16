@@ -28,8 +28,19 @@ class RunnerContext:
     outcome_cache: dict[int, BaseException | None]
     checks_config: CheckConfig
     override: CaseOverride | None
+    no_failfast: bool
 
-    __slots__ = ("data", "auth", "seed", "stop_event", "unique_data", "outcome_cache", "checks_config", "override")
+    __slots__ = (
+        "data",
+        "auth",
+        "seed",
+        "stop_event",
+        "unique_data",
+        "outcome_cache",
+        "checks_config",
+        "override",
+        "no_failfast",
+    )
 
     def __init__(
         self,
@@ -40,6 +51,7 @@ class RunnerContext:
         unique_data: bool,
         checks_config: CheckConfig,
         override: CaseOverride | None,
+        no_failfast: bool,
     ) -> None:
         self.data = TestResultSet(seed=seed)
         self.auth = auth
@@ -49,6 +61,7 @@ class RunnerContext:
         self.unique_data = unique_data
         self.checks_config = checks_config
         self.override = override
+        self.no_failfast = no_failfast
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
