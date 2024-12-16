@@ -202,11 +202,11 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
 def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if isinstance(event, events.AfterExecution):
         assert not event.result.has_failures, event.result.verbose_name
-        failures = [check for check in event.result.checks if check.status == Status.failure]
+        failures = [check for check in event.result.checks if check.status == Status.FAILURE]
         assert not failures, event.result.verbose_name
         check_no_errors(schema_id, event)
         # Errors are checked above and unknown ones cause a test failure earlier
-        assert event.status in (Status.success, Status.skip, Status.error)
+        assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.InternalError):
         raise AssertionError(f"Internal Error: {event.exception_with_traceback}")
     if VERIFY_SCHEMA_ANALYSIS and isinstance(event, events.AfterAnalysis):

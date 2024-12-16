@@ -35,7 +35,7 @@ class Engine:
             Phase(PhaseKind.UNIT_TESTING, not experimental.STATEFUL_ONLY.is_enabled),
             Phase(
                 PhaseKind.STATEFUL_TESTING,
-                self.config.execution.stateful is not None and self.config.schema.links_count > 0,
+                self.config.schema.links_count > 0,
             ),
         ]
         return ExecutionPlan(phases)

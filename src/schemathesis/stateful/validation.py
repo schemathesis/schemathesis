@@ -32,7 +32,7 @@ def validate_response(
             return
         failed_check = Check(
             name=_name,
-            status=Status.failure,
+            status=Status.FAILURE,
             request=Request.from_prepared_request(response.request),
             response=response,
             case=case,
@@ -45,7 +45,7 @@ def validate_response(
     def _on_passed(_name: str, _case: Case) -> None:
         passed_check = Check(
             name=_name,
-            status=Status.success,
+            status=Status.SUCCESS,
             request=Request.from_prepared_request(response.request),
             response=response,
             case=_case,

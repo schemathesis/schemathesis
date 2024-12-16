@@ -564,13 +564,13 @@ def display_checks_statistics(total: dict[str, dict[str | Status, int]]) -> None
 
 def display_check_result(check_name: str, results: dict[str | Status, int], template: str) -> None:
     """Show results of single check execution."""
-    if Status.failure in results:
+    if Status.FAILURE in results:
         verdict = "FAILED"
         color = "red"
     else:
         verdict = "PASSED"
         color = "green"
-    success = results.get(Status.success, 0)
+    success = results.get(Status.SUCCESS, 0)
     total = results.get("total", 0)
     click.echo(template.format(check_name, f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)))
 
@@ -756,7 +756,9 @@ def handle_internal_error(context: ExecutionContext, event: events.InternalError
 
 def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent) -> None:
     if isinstance(event.data, stateful_events.RunStarted):
-        context.state_machine_sink = event.data.state_machine.sink()
+        context.state_machine_sink = StateMachineSink(
+            transitions=event.data.state_machine._transition_stats_template.copy()
+        )
         if not experimental.STATEFUL_ONLY.is_enabled:
             click.echo()
         click.secho("Stateful tests\n", bold=True)

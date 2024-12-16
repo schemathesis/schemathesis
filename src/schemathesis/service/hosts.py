@@ -73,10 +73,10 @@ def load_for_host(hostname: str = DEFAULT_HOSTNAME, hosts_file: os.PathLike = DE
 
 @enum.unique
 class RemoveAuth(enum.Enum):
-    success = 1
-    no_match = 2
-    no_hosts = 3
-    error = 4
+    SUCCESS = 1
+    NO_MATCH = 2
+    NO_HOSTS = 3
+    ERROR = 4
 
 
 def remove(hostname: str = DEFAULT_HOSTNAME, hosts_file: os.PathLike = DEFAULT_HOSTS_PATH) -> RemoveAuth:
@@ -87,13 +87,13 @@ def remove(hostname: str = DEFAULT_HOSTNAME, hosts_file: os.PathLike = DEFAULT_H
         try:
             hosts.pop(hostname)
             _dump_hosts(hosts_file, hosts)
-            return RemoveAuth.success
+            return RemoveAuth.SUCCESS
         except KeyError:
-            return RemoveAuth.no_match
+            return RemoveAuth.NO_MATCH
     except FileNotFoundError:
-        return RemoveAuth.no_hosts
+        return RemoveAuth.NO_HOSTS
     except tomli.TOMLDecodeError:
-        return RemoveAuth.error
+        return RemoveAuth.ERROR
 
 
 def get_token(hostname: str = DEFAULT_HOSTNAME, hosts_file: os.PathLike = DEFAULT_HOSTS_PATH) -> str | None:

@@ -11,28 +11,10 @@ if TYPE_CHECKING:
 
 
 @dataclass
-class AverageResponseTime:
-    """Average response time for a given status code.
-
-    Stored as a sum of all response times and a count of responses.
-    """
-
-    total: float
-    count: int
-
-    __slots__ = ("total", "count")
-
-    def __init__(self) -> None:
-        self.total = 0.0
-        self.count = 0
-
-
-@dataclass
 class StateMachineSink:
     """Collects events and stores data about the state machine execution."""
 
     transitions: TransitionStats
-    response_times: dict[str, dict[int, AverageResponseTime]] = field(default_factory=dict)
     steps: dict[events.StepStatus, int] = field(default_factory=lambda: {status: 0 for status in events.StepStatus})
     scenarios: dict[events.ScenarioStatus, int] = field(
         default_factory=lambda: {status: 0 for status in events.ScenarioStatus}
@@ -48,11 +30,6 @@ class StateMachineSink:
             self.start_time = event.timestamp
         elif isinstance(event, events.StepFinished) and event.status is not None:
             self.steps[event.status] += 1
-            responses = self.response_times.setdefault(event.target, {})
-            if event.response is not None:
-                average = responses.setdefault(event.response.status_code, AverageResponseTime())
-                average.total += event.response.elapsed
-                average.count += 1
         elif isinstance(event, events.ScenarioFinished):
             self.scenarios[event.status] += 1
         elif isinstance(event, events.SuiteFinished):
@@ -60,9 +37,3 @@ class StateMachineSink:
             self.failures.extend(event.failures)
         elif isinstance(event, events.RunFinished):
             self.end_time = event.timestamp
-
-    @property
-    def duration(self) -> float | None:
-        if self.start_time is not None and self.end_time is not None:
-            return self.end_time - self.start_time
-        return None

@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..generation import GenerationConfig
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
-    from ..stateful import Stateful
 
 
 @dataclass
@@ -29,7 +28,6 @@ class ExecutionConfig:
     unique_data: bool = False
     dry_run: bool = False
     seed: int | None = None
-    stateful: Stateful | None = None
     workers_num: int = 1
 
 

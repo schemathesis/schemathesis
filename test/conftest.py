@@ -904,7 +904,6 @@ def testdir(testdir):
         import schemathesis
         from schemathesis.core import NOT_SET
         from schemathesis.core.output import OutputConfig
-        from schemathesis.stateful import Stateful
         from schemathesis.generation import GenerationMode, GenerationConfig
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed

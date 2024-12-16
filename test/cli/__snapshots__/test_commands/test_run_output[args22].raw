@@ -145,8 +145,6 @@ Data generation options:
                                             'all' for both  [default: positive]
                                             [possible values: positive,
                                             negative, all]
-  --stateful                                Enable or disable stateful testing
-                                            [possible values: none, links]
   --generation-allow-x00 TEXT               Whether to allow the generation of
                                             ` ` bytes within strings  [default:
                                             true]
