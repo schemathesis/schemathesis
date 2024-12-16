@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from schemathesis.stateful.runner import StatefulTestRunner
+
 from ... import events
 from ...models import Status, TestResult
 
@@ -28,15 +30,15 @@ def execute(ctx: EngineContext) -> EventGenerator:
         override=ctx.config.override,
     )
     state_machine = ctx.config.schema.as_state_machine()
-    runner = state_machine.runner(config=config)
-    status = Status.success
+    runner = StatefulTestRunner(state_machine, config=config)
+    status = Status.SUCCESS
 
     def from_step_status(step_status: stateful_events.StepStatus) -> Status:
         return {
-            stateful_events.StepStatus.SUCCESS: Status.success,
-            stateful_events.StepStatus.FAILURE: Status.failure,
-            stateful_events.StepStatus.ERROR: Status.error,
-            stateful_events.StepStatus.INTERRUPTED: Status.error,
+            stateful_events.StepStatus.SUCCESS: Status.SUCCESS,
+            stateful_events.StepStatus.FAILURE: Status.FAILURE,
+            stateful_events.StepStatus.ERROR: Status.ERROR,
+            stateful_events.StepStatus.INTERRUPTED: Status.ERROR,
         }[step_status]
 
     def on_step_finished(event: stateful_events.StepFinished) -> None:
@@ -55,8 +57,8 @@ def execute(ctx: EngineContext) -> EventGenerator:
 
     for stateful_event in runner.execute():
         if isinstance(stateful_event, stateful_events.SuiteFinished):
-            if stateful_event.failures and status != Status.error:
-                status = Status.failure
+            if stateful_event.failures and status != Status.ERROR:
+                status = Status.FAILURE
         elif isinstance(stateful_event, stateful_events.RunStarted):
             test_start_time = stateful_event.timestamp
         elif isinstance(stateful_event, stateful_events.RunFinished):
@@ -65,7 +67,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
             result.checks.extend(stateful_event.checks)
             on_step_finished(stateful_event)
         elif isinstance(stateful_event, stateful_events.Errored):
-            status = Status.error
+            status = Status.ERROR
             result.add_error(stateful_event.exception)
         yield events.StatefulEvent(data=stateful_event)
     ctx.add_result(result)

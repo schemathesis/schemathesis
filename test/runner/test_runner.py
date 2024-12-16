@@ -31,7 +31,6 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from schemathesis.stateful import Stateful
 
 if TYPE_CHECKING:
     from aiohttp import web
@@ -96,7 +95,7 @@ def test_execute(app, real_app_schema):
     assert_request(app, 1, "GET", "/api/success", headers)
 
     # And statistic is showing the breakdown of cases types
-    assert stats.results.total == {"not_a_server_error": {Status.success: 1, Status.failure: 1, "total": 2}}
+    assert stats.results.total == {"not_a_server_error": {Status.SUCCESS: 1, Status.FAILURE: 1, "total": 2}}
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -105,7 +104,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
 
     # failure
     interactions = next(
-        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.failure
+        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.FAILURE
     ).result.interactions
     assert len(interactions) == 1
     failure = interactions[0]
@@ -128,7 +127,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     assert failure.response.headers["content-length"] == ["26"]
     # success
     interactions = next(
-        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.success
+        event for event in others if isinstance(event, events.AfterExecution) and event.status == Status.SUCCESS
     ).result.interactions
     assert len(interactions) == 1
     success = interactions[0]
@@ -157,7 +156,7 @@ def test_asgi_interactions(fastapi_app):
     schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     _, _, _, _, _, *ev, _ = from_schema(schema).execute()
     interaction = ev[1].result.interactions[0]
-    assert interaction.status == Status.success
+    assert interaction.status == Status.SUCCESS
     assert interaction.request.uri == "http://localhost/users"
 
 
@@ -322,7 +321,7 @@ def test_unknown_response_code(real_app_schema):
     assert finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
-    assert check.status == Status.failure
+    assert check.status == Status.FAILURE
     assert check.failure.status_code == 418
     assert check.failure.allowed_status_codes == [200]
     assert check.failure.defined_status_codes == ["200"]
@@ -341,7 +340,7 @@ def test_unknown_response_code_with_default(real_app_schema):
     assert not finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "status_code_conformance"
-    assert check.status == Status.success
+    assert check.status == Status.SUCCESS
 
 
 @pytest.mark.operations("text")
@@ -357,7 +356,7 @@ def test_unknown_content_type(real_app_schema):
     assert finished.results.has_failures
     check = others[1].result.checks[0]
     assert check.name == "content_type_conformance"
-    assert check.status == Status.failure
+    assert check.status == Status.FAILURE
     assert check.failure.content_type == "text/plain"
     assert check.failure.defined_content_types == ["application/json"]
 
@@ -524,7 +523,7 @@ def test_path_parameters_encoding(real_app_schema):
 def test_exceptions(schema_url, configuration, from_schema_options):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     results = from_schema(schema, **from_schema_options).execute()
-    assert any(event.status == Status.error for event in results if isinstance(event, events.AfterExecution))
+    assert any(event.status == Status.ERROR for event in results if isinstance(event, events.AfterExecution))
 
 
 @pytest.mark.operations("multipart")
@@ -669,7 +668,7 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
     *_, after, _ = from_schema(schema).execute()
     # Then it causes an error with a proper error message
-    assert after.status == Status.error
+    assert after.status == Status.ERROR
     assert RECURSIVE_REFERENCE_ERROR_MESSAGE in str(after.result.errors[0])
 
 
@@ -960,7 +959,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
         checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
-    assert after.status == Status.success
+    assert after.status == Status.SUCCESS
     # And there should be requested amount of test examples
     assert len(after.result.checks) == max_examples
     assert not finished.results.has_failures
@@ -997,7 +996,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
     ).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
-    assert after.status == Status.success
+    assert after.status == Status.SUCCESS
     assert not finished.results.has_failures
     assert not finished.results.has_errors
 
@@ -1103,7 +1102,7 @@ def test_malformed_path_template(ctx, path, expected):
     schema = schemathesis.openapi.from_dict(schema)
     # Then it should not cause a fatal error
     *_, event, _ = list(from_schema(schema).execute())
-    assert event.status == Status.error
+    assert event.status == Status.ERROR
     # And should produce the proper error message
     assert (
         str(event.result.errors[0])
@@ -1119,7 +1118,7 @@ def result():
 def make_check(status_code):
     response = requests.Response()
     response.status_code = status_code
-    return Check(name="not_a_server_error", status=Status.success, request=None, response=response, case=None)
+    return Check(name="not_a_server_error", status=Status.SUCCESS, request=None, response=response, case=None)
 
 
 def test_authorization_warning_no_checks(result):
@@ -1143,8 +1142,8 @@ def test_authorization_warning_missing_threshold(result):
 @pytest.mark.parametrize(
     ("parameters", "expected"),
     [
-        ([{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}], Status.success),
-        ([], Status.skip),
+        ([{"in": "query", "name": "key", "required": True, "schema": {"type": "integer"}}], Status.SUCCESS),
+        ([], Status.SKIP),
     ],
 )
 def test_explicit_header_negative(ctx, parameters, expected):
@@ -1199,11 +1198,10 @@ def test_skip_non_negated_headers(ctx):
     )
     # There should not be unsatisfiable
     assert finished.results.errored_count == 0
-    assert event.status == Status.skip
+    assert event.status == Status.SKIP
 
 
 STATEFUL_KWARGS = {
-    "stateful": Stateful.links,
     "hypothesis_settings": hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
 }
 
@@ -1259,7 +1257,6 @@ def test_stateful_override(real_app_schema):
         real_app_schema,
         override=CaseOverride(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
-        stateful=Stateful.links,
     ).execute()
     interactions = after_execution.result.interactions
     assert len(interactions) > 0

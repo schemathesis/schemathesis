@@ -30,7 +30,6 @@ from schemathesis.runner.config import NetworkConfig
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
-from schemathesis.stateful import Stateful
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
@@ -253,7 +252,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "workers_num": 1,
         "max_failures": None,
         "dry_run": False,
-        "stateful": Stateful.links,
         "override": CaseOverride({}, {}, {}, {}),
         "seed": None,
         "unique_data": False,

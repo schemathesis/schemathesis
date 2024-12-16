@@ -153,7 +153,7 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
             yield events.BeforeExecution(verbose_name=verbose_name, correlation_id=correlation_id)
 
         yield events.AfterExecution(
-            status=Status.error,
+            status=Status.ERROR,
             result=result,
             elapsed_time=0.0,
             correlation_id=correlation_id,

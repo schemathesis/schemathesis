@@ -158,17 +158,17 @@ class TestResult:
 
     @property
     def has_failures(self) -> bool:
-        return any(check.status == Status.failure for check in self.checks)
+        return any(check.status == Status.FAILURE for check in self.checks)
 
     def add_success(self, *, name: str, case: Case, request: Request, response: Response) -> Check:
-        check = Check(name=name, status=Status.success, request=request, response=response, case=case)
+        check = Check(name=name, status=Status.SUCCESS, request=request, response=response, case=case)
         self.checks.append(check)
         return check
 
     def add_failure(self, *, name: str, case: Case, request: Request, response: Response, failure: Failure) -> Check:
         check = Check(
             name=name,
-            status=Status.failure,
+            status=Status.FAILURE,
             case=case,
             request=request,
             response=response,
