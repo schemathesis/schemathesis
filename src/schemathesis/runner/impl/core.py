@@ -111,6 +111,7 @@ class BaseRunner:
     store_interactions: bool = False
     seed: int | None = None
     exit_first: bool = False
+    no_failfast: bool = False
     max_failures: int | None = None
     started_at: str = field(default_factory=current_datetime)
     unique_data: bool = False
@@ -139,6 +140,7 @@ class BaseRunner:
             unique_data=self.unique_data,
             checks_config=self.checks_config,
             override=self.override,
+            no_failfast=self.no_failfast,
         )
         start_time = time.monotonic()
         initialized = None
@@ -672,6 +674,8 @@ def run_test(
             )
         else:
             result.add_error(error)
+    if status == Status.success and ctx.no_failfast and any(check.value == Status.failure for check in result.checks):
+        status = Status.failure
     if has_unsatisfied_example_mark(test):
         status = Status.error
         result.add_error(
@@ -811,6 +815,7 @@ def run_checks(
     response: GenericResponse,
     elapsed_time: float,
     max_response_time: int | None = None,
+    no_failfast: bool,
 ) -> None:
     errors = []
 
@@ -852,7 +857,7 @@ def run_checks(
         else:
             result.add_success("max_response_time", case, response, elapsed_time)
 
-    if errors:
+    if errors and not no_failfast:
         raise get_grouped_exception(case.operation.verbose_name, *errors)(causes=tuple(errors))
 
 
@@ -1042,6 +1047,7 @@ def _network_test(
             response=response,
             elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
+            no_failfast=ctx.no_failfast,
         )
     except CheckFailed:
         status = Status.failure
@@ -1140,6 +1146,7 @@ def _wsgi_test(
             response=response,
             elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
+            no_failfast=ctx.no_failfast,
         )
     except CheckFailed:
         status = Status.failure
@@ -1226,6 +1233,7 @@ def _asgi_test(
             response=response,
             elapsed_time=context.response_time * 1000,
             max_response_time=max_response_time,
+            no_failfast=ctx.no_failfast,
         )
     except CheckFailed:
         status = Status.failure
