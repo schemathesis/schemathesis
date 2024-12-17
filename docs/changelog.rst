@@ -9,6 +9,10 @@ Changelog
 :version:`3.39.0 <v3.38.10...v3.39.0>` - 2024-12-16
 ---------------------------------------------------
 
+**Fixed**
+
+- False positive in the ``ensure_resource_availability`` check.
+
 **Added**
 
 - ``--experimental-no-failfast`` CLI option to make Schemathesis continue testing an API operation after a failure is found.

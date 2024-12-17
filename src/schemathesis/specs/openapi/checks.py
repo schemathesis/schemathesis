@@ -366,6 +366,10 @@ def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, o
         and original.source.case.operation.method.upper() == "POST"
         and 200 <= original.source.response.status_code < 400
         and original.source.overrides_all_parameters
+        and _is_prefix_operation(
+            ResourcePath(original.source.case.path, original.source.case.path_parameters or {}),
+            ResourcePath(original.path, original.path_parameters or {}),
+        )
     ):
         created_with = original.source.case.operation.verbose_name
         not_available_with = original.operation.verbose_name
