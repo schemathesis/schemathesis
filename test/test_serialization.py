@@ -527,8 +527,8 @@ def test_duplicate_xml_attributes(ctx):
         }
     )
 
-    schema = schemathesis.from_dict(schema)
-    case = schema["/test"]["POST"].make_case(body={"prop1": 1, "prop2": 2})
+    schema = schemathesis.openapi.from_dict(schema)
+    case = schema["/test"]["POST"].Case(body={"prop1": 1, "prop2": 2})
 
     serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
     ElementTree.fromstring(serialized_data)
