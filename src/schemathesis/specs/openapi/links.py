@@ -11,8 +11,9 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cas
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.schemas import APIOperation
+from schemathesis.stateful.graph import ExecutionMetadata, TransitionId
 
-from ...models import Case, CaseSource, TransitionId
+from ...models import Case
 from ...stateful.state_machine import Direction
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
@@ -59,9 +60,10 @@ class OpenAPILink(Direction):
         if extension is not None:
             self.merge_body = extension.get("merge_body", True)
 
-    def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
+    def set_data(self, case: Case, **kwargs: Any) -> None:
         """Assign all linked definitions to the new case instance."""
         context = kwargs["context"]
+        execution_graph = kwargs["execution_graph"]
         overrides = self.set_parameters(case, context)
         self.set_body(case, context, overrides)
         overrides_all_parameters = True
@@ -72,14 +74,17 @@ class OpenAPILink(Direction):
                 if parameter.name not in overrides.get(parameter.location, []):
                     overrides_all_parameters = False
                     break
-        case.source = CaseSource(
-            case=context.case,
-            response=context.response,
-            elapsed=elapsed,
-            overrides_all_parameters=overrides_all_parameters,
-            transition_id=TransitionId(
-                name=self.name,
-                status_code=self.status_code,
+
+        execution_graph.add_node(
+            case=case,
+            parent_id=context.case.id,
+            metadata=ExecutionMetadata(
+                response=context.response,
+                overrides_all_parameters=overrides_all_parameters,
+                transition_id=TransitionId(
+                    name=self.name,
+                    status_code=self.status_code,
+                ),
             ),
         )
 

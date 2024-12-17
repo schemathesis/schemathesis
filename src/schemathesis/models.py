@@ -8,6 +8,7 @@ from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, cu
 from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response
 from schemathesis.generation.meta import CaseMetadata
+from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.prepare import prepare_request
 
 from ._override import CaseOverride, store_components
@@ -19,25 +20,6 @@ if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
 
     from schemathesis.schemas import APIOperation
-
-
-@dataclass
-class TransitionId:
-    name: str
-    status_code: str
-
-    __slots__ = ("name", "status_code")
-
-
-@dataclass
-class CaseSource:
-    """Data sources, used to generate a test case."""
-
-    case: Case
-    response: Response
-    elapsed: float
-    overrides_all_parameters: bool
-    transition_id: TransitionId
 
 
 @dataclass
@@ -58,7 +40,6 @@ class Case:
     body: list | dict[str, Any] | str | int | float | bool | bytes | NotSet = NOT_SET
     # The media type for cases with a payload. For example, "application/json"
     media_type: str | None = None
-    source: CaseSource | None = None
 
     meta: CaseMetadata | None = field(compare=False, default=None)
 
@@ -178,6 +159,7 @@ class Case:
             headers=CaseInsensitiveDict(headers) if headers else None,
             config={},
             transport_kwargs=transport_kwargs,
+            execution_graph=ExecutionGraph(),
         )
         for check in checks:
             try:

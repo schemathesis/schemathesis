@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.stateful.graph import ExecutionGraph
 
 from .control import ExecutionControl
 from .errors import EngineErrorInfo
@@ -65,7 +66,7 @@ class EngineContext:
     phase_data: PhaseStorage
     start_time: float
 
-    __slots__ = ("data", "control", "outcome_cache", "config", "phase_data", "start_time")
+    __slots__ = ("data", "control", "outcome_cache", "config", "phase_data", "start_time", "execution_graph")
 
     def __init__(self, *, stop_event: threading.Event, config: EngineConfig) -> None:
         self.data = TestResultSet(seed=config.execution.seed)
@@ -74,6 +75,7 @@ class EngineContext:
         self.config = config
         self.phase_data = PhaseStorage()
         self.start_time = time.monotonic()
+        self.execution_graph = ExecutionGraph()
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 

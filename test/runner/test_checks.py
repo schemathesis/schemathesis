@@ -23,11 +23,14 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
+from schemathesis.stateful.graph import ExecutionGraph
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None)
+CTX = CheckContext(
+    override=None, auth=None, headers=None, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+)
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:

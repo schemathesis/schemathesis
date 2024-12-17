@@ -22,6 +22,7 @@ from schemathesis.specs.openapi.checks import (
     _remove_auth_from_case,
     ignored_auth,
 )
+from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.requests import RequestsTransport
 
 
@@ -115,61 +116,106 @@ def test_keep_tls_verification(schema_url, mocker):
     ("ctx", "request_kwargs", "parameters", "expected"),
     [
         (
-            CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config={},
+                transport_kwargs=None,
+                execution_graph=ExecutionGraph(),
+            ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Foo": "Bar"}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers={"Foo": "Bar"},
+                config={},
+                transport_kwargs=None,
+                execution_graph=ExecutionGraph(),
+            ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"A": "V"}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers={"A": "V"},
+                config={},
+                transport_kwargs=None,
+                execution_graph=ExecutionGraph(),
+            ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+            ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+            ),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+            ),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "A=v;"}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers={"Cookie": "A=v;"},
+                config={},
+                transport_kwargs=None,
+                execution_graph=ExecutionGraph(),
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={"Cookie": "B=v;"}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None,
+                auth=None,
+                headers={"Cookie": "B=v;"},
+                config={},
+                transport_kwargs=None,
+                execution_graph=ExecutionGraph(),
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(
+                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
+            ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,
