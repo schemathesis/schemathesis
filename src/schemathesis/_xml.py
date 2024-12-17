@@ -92,7 +92,7 @@ def _write_object(
         _write_namespace(buffer, options)
 
     attribute_namespaces = {}
-    attributes = []
+    attributes = {}
     children_buffer = StringIO()
     properties = (schema or {}).get("properties", {})
     for child_name, value in obj.items():
@@ -110,7 +110,9 @@ def _write_object(
                 attribute_namespaces[prefix] = child_options["namespace"]
             else:
                 attr_name = _sanitize_xml_name(child_tag)
-            attributes.append(f'{attr_name}="{_escape_xml(value)}"')
+
+            if attr_name not in attributes:  # Only keep first occurrence
+                attributes[attr_name] = f'{attr_name}="{_escape_xml(value)}"'
             continue
 
         child_tag = _sanitize_xml_name(child_tag)
@@ -126,7 +128,7 @@ def _write_object(
         buffer.write(f' xmlns:{prefix}="{namespace}"')
 
     if attributes:
-        buffer.write(f" {' '.join(attributes)}")
+        buffer.write(f" {' '.join(attributes.values())}")
     buffer.write(">")
     buffer.write(children_buffer.getvalue())
     buffer.write(f"</{tag}>")
