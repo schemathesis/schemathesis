@@ -633,6 +633,7 @@ def test_deduplication(ctx, response_factory):
             check_results=checks,
             result=result,
             response=response,
+            no_failfast=False,
         )
     # Then the resulting output should be deduplicated
     assert len([check for check in checks if check.failure is not None]) == 1

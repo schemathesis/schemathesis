@@ -251,6 +251,15 @@ REPORT_TO_SERVICE = ReportToService()
     metavar="",
 )
 @grouped_option(
+    "--experimental-no-failfast",
+    "no_failfast",
+    help="Continue testing an API operation after a failure is found",
+    is_flag=True,
+    default=False,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_NO_FAILFAST",
+)
+@grouped_option(
     "--experimental-missing-required-header-allowed-statuses",
     "missing_required_header_allowed_statuses",
     help="Comma-separated list of status codes expected for test cases with a missing required header",
@@ -658,6 +667,7 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
+    no_failfast: bool,
     missing_required_header_allowed_statuses: list[str],
     positive_data_acceptance_allowed_statuses: list[str],
     negative_data_rejection_allowed_statuses: list[str],
@@ -998,6 +1008,7 @@ def run(
         network_config=network_config,
         override=override,
         seed=hypothesis_seed,
+        no_failfast=no_failfast,
         max_failures=max_failures,
         unique_data=contrib_unique_data,
         dry_run=dry_run,
@@ -1056,6 +1067,7 @@ def into_event_stream(
     hypothesis_settings: hypothesis.settings | None,
     generation_config: generation.GenerationConfig,
     seed: int | None,
+    no_failfast: bool,
     max_failures: int | None,
     unique_data: bool,
     dry_run: bool,
@@ -1074,6 +1086,7 @@ def into_event_stream(
             schema,
             override=override,
             seed=seed,
+            no_failfast=no_failfast,
             max_failures=max_failures,
             unique_data=unique_data,
             dry_run=dry_run,

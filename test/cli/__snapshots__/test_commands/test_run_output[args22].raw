@@ -21,6 +21,8 @@ Experimental options:
                                             [possible values: schema-analysis,
                                             stateful-only, coverage-phase,
                                             positive_data_acceptance]
+  --experimental-no-failfast                Continue testing an API operation
+                                            after a failure is found
   --experimental-missing-required-header-allowed-statuses 
                                             Comma-separated list of status codes
                                             expected for test cases with a

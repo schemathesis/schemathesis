@@ -181,6 +181,12 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             )
         else:
             result.add_error(error)
+    if (
+        status == Status.SUCCESS
+        and ctx.config.execution.no_failfast
+        and any(check.status == Status.FAILURE for check in result.checks)
+    ):
+        status = Status.FAILURE
     if UnsatisfiableExampleMark.is_set(test_function):
         status = Status.ERROR
         result.add_error(
@@ -266,6 +272,7 @@ def run_checks(
     check_results: list[Check],
     result: TestResult,
     response: Response,
+    no_failfast: bool,
 ) -> None:
     failures = set()
 
@@ -307,7 +314,7 @@ def run_checks(
             for e in group.exceptions:
                 add_single_failure(e)
 
-    if failures:
+    if failures and not no_failfast:
         raise FailureGroup(list(failures)) from None
 
 
@@ -422,6 +429,7 @@ def _network_test(
             check_results=check_results,
             result=result,
             response=response,
+            no_failfast=ctx.config.execution.no_failfast,
         )
     except FailureGroup:
         status = Status.FAILURE
