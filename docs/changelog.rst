@@ -1,8 +1,18 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.0...HEAD>` - TBD
+:version:`Unreleased <v3.39.1...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.39.1:
+
+:version:`3.39.1 <v3.39.0...v3.39.1>` - 2024-12-17
+--------------------------------------------------
+
+**Fixed**
+
+- False positive in the ``ensure_resource_availability`` check.
+- XML serialization no longer produces duplicate attributes.
 
 .. _v3.39.0:
 

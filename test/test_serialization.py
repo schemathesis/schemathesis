@@ -494,3 +494,41 @@ def test_xml_with_binary(ctx):
         assert case.as_transport_kwargs()["data"] in ("", "0")
 
     test()
+
+
+def test_duplicate_xml_attributes(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "content": {
+                            "application/xml": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "prop1": {
+                                            "type": "integer",
+                                            "xml": {"namespace": "foo", "name": "attr", "attribute": True},
+                                        },
+                                        "prop2": {
+                                            "type": "integer",
+                                            "xml": {"namespace": "foo", "name": "attr", "attribute": True},
+                                        },
+                                    },
+                                }
+                            }
+                        },
+                        "required": True,
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    schema = schemathesis.from_dict(schema)
+    case = schema["/test"]["POST"].make_case(body={"prop1": 1, "prop2": 2})
+
+    serialized_data = case.as_transport_kwargs()["data"].decode("utf8")
+    ElementTree.fromstring(serialized_data)
