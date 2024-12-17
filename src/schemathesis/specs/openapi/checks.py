@@ -304,27 +304,29 @@ def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
 
 
 @schemathesis.check
-def use_after_free(ctx: CheckContext, response: Response, original: Case) -> bool | None:
+def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
-    if response.status_code == 404 or not original.source:
+    if response.status_code == 404:
         return None
-    response = original.source.response
-    case = original.source.case
-    while True:
-        # Find the most recent successful DELETE call that corresponds to the current operation
-        if case.operation.method.lower() == "delete" and 200 <= response.status_code < 300:
+
+    for related_case in ctx.execution_graph.find_ancestors_and_their_children(case):
+        metadata = ctx.get_metadata(related_case)
+        if not metadata:
+            continue
+
+        if related_case.operation.method.lower() == "delete" and 200 <= metadata.response.status_code < 300:
             if _is_prefix_operation(
+                ResourcePath(related_case.path, related_case.path_parameters or {}),
                 ResourcePath(case.path, case.path_parameters or {}),
-                ResourcePath(original.path, original.path_parameters or {}),
             ):
-                free = f"{case.operation.method.upper()} {prepare_path(case.path, case.path_parameters)}"
-                usage = f"{original.operation.method} {prepare_path(original.path, original.path_parameters)}"
+                free = f"{related_case.operation.method.upper()} {prepare_path(related_case.path, related_case.path_parameters)}"
+                usage = f"{case.operation.method.upper()} {prepare_path(case.path, case.path_parameters)}"
                 reason = http.client.responses.get(response.status_code, "Unknown")
                 raise UseAfterFree(
-                    operation=case.operation.verbose_name,
+                    operation=related_case.operation.verbose_name,
                     message=(
                         "The API did not return a `HTTP 404 Not Found` response "
                         f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
@@ -332,31 +334,37 @@ def use_after_free(ctx: CheckContext, response: Response, original: Case) -> boo
                     free=free,
                     usage=usage,
                 )
-        if case.source is None:
-            break
-        response = case.source.response
-        case = case.source.case
+
     return None
 
 
 @schemathesis.check
-def ensure_resource_availability(ctx: CheckContext, response: Response, original: Case) -> bool | None:
+def ensure_resource_availability(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
+
+    parent = ctx.find_parent(case)
+    metadata = ctx.get_metadata(case) if parent else None
+
     if (
         # Response indicates a client error, even though all available parameters were taken from links
         # and comes from a POST request. This case likely means that the POST request actually did not
         # save the resource and it is not available for subsequent operations
         400 <= response.status_code < 500
-        and original.source
-        and original.source.case.operation.method.upper() == "POST"
-        and 200 <= original.source.response.status_code < 400
-        and original.source.overrides_all_parameters
+        and parent is not None
+        and parent.operation.method.upper() == "POST"
+        and metadata is not None
+        and 200 <= metadata.response.status_code < 400
+        and metadata.overrides_all_parameters
+        and _is_prefix_operation(
+            ResourcePath(parent.path, parent.path_parameters or {}),
+            ResourcePath(case.path, case.path_parameters or {}),
+        )
     ):
-        created_with = original.source.case.operation.verbose_name
-        not_available_with = original.operation.verbose_name
+        created_with = parent.operation.verbose_name
+        not_available_with = case.operation.verbose_name
         reason = http.client.responses.get(response.status_code, "Unknown")
         raise EnsureResourceAvailability(
             operation=created_with,

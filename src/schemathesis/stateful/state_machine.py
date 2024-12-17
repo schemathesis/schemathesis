@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import time
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar
@@ -12,6 +11,7 @@ from hypothesis.stateful import RuleBasedStateMachine
 from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
+from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
 
 from ..models import Case
 from .config import _default_hypothesis_settings_factory
@@ -37,7 +37,6 @@ class StepResult:
 
     response: Response
     case: Case
-    elapsed: float
 
 
 def _normalize_name(name: str) -> str:
@@ -110,10 +109,8 @@ class APIStateMachine(RuleBasedStateMachine):
         return run_state_machine_as_test(cls, settings=settings)
 
     def setup(self) -> None:
-        """Hook method that runs unconditionally in the beginning of each test scenario.
-
-        Does nothing by default.
-        """
+        """Hook method that runs unconditionally in the beginning of each test scenario."""
+        self._execution_graph = ExecutionGraph()
 
     def teardown(self) -> None:
         pass
@@ -121,7 +118,7 @@ class APIStateMachine(RuleBasedStateMachine):
     # To provide the return type in the rendered documentation
     teardown.__doc__ = RuleBasedStateMachine.teardown.__doc__
 
-    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
+    def transform(self, execution_graph: ExecutionGraph, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
     def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult | None:
@@ -133,7 +130,7 @@ class APIStateMachine(RuleBasedStateMachine):
             return self.step(case, (previous, link))
         return self.step(case, None)
 
-    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
+    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
         """A single state machine step.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
@@ -147,15 +144,18 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True
         if previous is not None:
             result, direction = previous
-            case = self.transform(result, direction, case)
+            case = self.transform(self._execution_graph, result, direction, case)
         self.before_call(case)
         kwargs = self.get_call_kwargs(case)
-        start = time.monotonic()
         response = self.call(case, **kwargs)
-        elapsed = time.monotonic() - start
+        if previous is None:
+            self._execution_graph.add_node(
+                case=case,
+                metadata=ExecutionMetadata(response=response, overrides_all_parameters=False, transition_id=None),
+            )
         self.after_call(response, case)
         self.validate_response(response, case, additional_checks=[use_after_free])
-        return self.store_result(response, case, elapsed)
+        return self.store_result(response, case)
 
     def before_call(self, case: Case) -> None:
         """Hook method for modifying the case data before making a request.
@@ -282,8 +282,8 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks)
 
-    def store_result(self, response: Response, case: Case, elapsed: float) -> StepResult:
-        return StepResult(response, case, elapsed)
+    def store_result(self, response: Response, case: Case) -> StepResult:
+        return StepResult(response, case)
 
 
 class Direction:
@@ -291,5 +291,5 @@ class Direction:
     status_code: str
     operation: APIOperation
 
-    def set_data(self, case: Case, elapsed: float, **kwargs: Any) -> None:
+    def set_data(self, case: Case, **kwargs: Any) -> None:
         raise NotImplementedError
