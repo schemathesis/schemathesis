@@ -81,6 +81,7 @@ def csv_strategy(enum, exclude=()):
             "max-response-time": st.integers(min_value=1),
             "validate-schema": st.booleans(),
             "generation-with-security-parameters": st.booleans(),
+            "experimental-no-failfast": st.booleans(),
             "hypothesis-database": st.text(),
             "hypothesis-deadline": st.integers(min_value=1, max_value=300000) | st.none(),
             "hypothesis-max-examples": st.integers(min_value=1),

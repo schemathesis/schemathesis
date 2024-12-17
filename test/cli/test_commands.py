@@ -255,6 +255,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "override": CaseOverride({}, {}, {}, {}),
         "seed": None,
         "unique_data": False,
+        "no_failfast": False,
         "generation_config": GenerationConfig(),
         "network": NetworkConfig(headers={}, timeout=10),
         "service_client": None,
@@ -546,6 +547,13 @@ def test_headers_conformance_valid(cli, schema_url):
 @pytest.mark.snapshot(replace_statistic=True)
 def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize") == snapshot_cli
+
+
+@pytest.mark.operations("multiple_failures")
+@pytest.mark.openapi_version("3.0")
+def test_no_failfast(cli, schema_url):
+    result = cli.run(schema_url, "--experimental-no-failfast")
+    assert "/ 100 passed" in result.stdout
 
 
 @pytest.mark.operations("multiple_failures")
