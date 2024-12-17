@@ -10,6 +10,7 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis import strategies
+from schemathesis.stateful.graph import ExecutionGraph
 
 from ....generation import GenerationMode
 from ....stateful.state_machine import APIStateMachine, Direction, StepResult
@@ -34,9 +35,9 @@ class OpenAPIStateMachine(APIStateMachine):
             return None
         return matcher(result)
 
-    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
+    def transform(self, execution_graph: ExecutionGraph, result: StepResult, direction: Direction, case: Case) -> Case:
         context = expressions.ExpressionContext(case=result.case, response=result.response)
-        direction.set_data(case, elapsed=result.elapsed, context=context)
+        direction.set_data(case, context=context, execution_graph=execution_graph)
         return case
 
     @classmethod

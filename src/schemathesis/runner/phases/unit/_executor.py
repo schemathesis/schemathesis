@@ -420,6 +420,7 @@ def _network_test(
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.config.checks_config,
         transport_kwargs=kwargs,
+        execution_graph=ctx.execution_graph,
     )
     try:
         run_checks(

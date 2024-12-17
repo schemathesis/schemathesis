@@ -11,6 +11,8 @@ from schemathesis.core.transport import Response
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
+    from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
+
     from .models import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
@@ -28,8 +30,9 @@ class CheckContext:
     headers: CaseInsensitiveDict | None
     config: ChecksConfig
     transport_kwargs: dict[str, Any] | None
+    execution_graph: ExecutionGraph
 
-    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "execution_graph")
 
     def __init__(
         self,
@@ -38,12 +41,21 @@ class CheckContext:
         headers: CaseInsensitiveDict | None,
         config: ChecksConfig,
         transport_kwargs: dict[str, Any] | None,
+        execution_graph: ExecutionGraph,
     ) -> None:
         self.override = override
         self.auth = auth
         self.headers = headers
         self.config = config
         self.transport_kwargs = transport_kwargs
+        self.execution_graph = execution_graph
+
+    def find_parent(self, case: Case) -> Case | None:
+        return self.execution_graph.find_parent(case)
+
+    def get_metadata(self, case: Case) -> ExecutionMetadata | None:
+        node = self.execution_graph._nodes.get(case.id)
+        return node.metadata if node else None
 
 
 CHECKS = Registry[CheckFunction]()

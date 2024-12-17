@@ -8,7 +8,6 @@ import pytest
 
 import schemathesis
 from schemathesis.checks import max_response_time, not_a_server_error
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.service.serialization import _serialize_stateful_event
@@ -66,25 +65,6 @@ def collect_result(runner) -> RunnerResult:
     return RunnerResult(events=events_, sink=sink)
 
 
-def assert_linked_calls_followed(result: RunnerResult):
-    # Every successful POST should have a linked call followed
-    steps = [event for event in result.events if isinstance(event, events.StepFinished)]
-    ids = {
-        "POST": set(),
-        "GET": set(),
-        "DELETE": set(),
-        "PATCH": set(),
-    }
-    sources = set()
-    for event in steps:
-        ids[event.response.request.method].add(event.response.request.headers[SCHEMATHESIS_TEST_CASE_HEADER])
-        if event.response.request.method != "POST":
-            if event.case.source.response.request.method == "POST":
-                sources.add(event.case.source.response.request.headers[SCHEMATHESIS_TEST_CASE_HEADER])
-    # Most POSTs should be followed by a GET, DELETE, or PATCH
-    assert len(sources) - len(ids["POST"]) < 10
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -113,7 +93,6 @@ def test_find_independent_5xx(runner_factory, kwargs):
         assert len(result.failures) == 2
         assert {check.case.operation.verbose_name for check in result.failures} == all_affected_operations
     serialize_all_events(result.events)
-    assert_linked_calls_followed(result)
 
 
 def test_works_on_single_link(runner_factory):

@@ -15,6 +15,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.targets import TargetMetricCollector
+from schemathesis.stateful.graph import ExecutionGraph
 
 from . import events
 from .config import StatefulTestRunnerConfig
@@ -133,6 +134,8 @@ def _execute_state_machine_loop(
         headers=CaseInsensitiveDict(config.headers) if config.headers else None,
         config=config.checks_config,
         transport_kwargs=call_kwargs,
+        # TODO: Pass it from the main engine
+        execution_graph=ExecutionGraph(),
     )
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
@@ -141,7 +144,7 @@ def _execute_state_machine_loop(
         def setup(self) -> None:
             build_ctx = current_build_context()
             event_queue.put(events.ScenarioStarted(is_final=build_ctx.is_final))
-            super().setup()
+            self._execution_graph = check_ctx.execution_graph
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return call_kwargs

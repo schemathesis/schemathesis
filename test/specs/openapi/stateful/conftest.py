@@ -265,10 +265,15 @@ def app_factory(ctx):
             return jsonify({"message": "User deleted successfully"}), 204
         return jsonify({"error": "User not found"}), 404
 
+    deleted_orders = set()
+
     @app.route("/orders/<order_id>", methods=["DELETE"])
     def delete_order(order_id):
         if config.slowdown:
             time.sleep(config.slowdown)
+        if order_id in deleted_orders:
+            return jsonify({"error": "Order not found"}), 404
+        deleted_orders.add(order_id)
         return jsonify({"message": "Nothing happened"}), 200
 
     @app.before_request
