@@ -317,7 +317,7 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
 
     if not isinstance(original.operation.schema, BaseOpenAPISchema):
         return True
-    if response.status_code == 404 or not original.source:
+    if response.status_code == 404 or not original.source or response.status_code >= 500:
         return None
     response = original.source.response
     case = original.source.case
