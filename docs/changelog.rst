@@ -12,6 +12,10 @@ Changelog
 
 - Update upper bound on ``pytest-subtests`` to ``<0.15.0``.
 
+**Fixed**
+
+- Do not report 5XX responses in ``use_after_free`` as they don't indicate the presence of the previously deleted resource.
+
 .. _v3.39.1:
 
 :version:`3.39.1 <v3.39.0...v3.39.1>` - 2024-12-17
