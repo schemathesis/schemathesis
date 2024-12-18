@@ -8,6 +8,10 @@ Changelog
 
 - Faster iteration over API operations.
 
+**Changed**
+
+- Update upper bound on ``pytest-subtests`` to ``<0.15.0``.
+
 .. _v3.39.1:
 
 :version:`3.39.1 <v3.39.0...v3.39.1>` - 2024-12-17
