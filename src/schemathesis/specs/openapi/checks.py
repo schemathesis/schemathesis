@@ -309,7 +309,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
 
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
-    if response.status_code == 404:
+    if response.status_code == 404 or response.status_code >= 500:
         return None
 
     for related_case in ctx.execution_graph.find_ancestors_and_their_children(case):
