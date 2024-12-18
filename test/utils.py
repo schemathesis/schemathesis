@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import platform
 from functools import lru_cache, wraps
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
 import click
 import pytest
@@ -12,12 +12,10 @@ import urllib3
 from syrupy import SnapshotAssertion
 
 import schemathesis
+from schemathesis import Case
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
-
-if TYPE_CHECKING:
-    from schemathesis.models import Case
-    from schemathesis.schemas import BaseSchema
+from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 

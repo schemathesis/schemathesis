@@ -17,7 +17,6 @@ from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis._override import CaseOverride
 from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
@@ -25,6 +24,7 @@ from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
+from schemathesis.generation.overrides import Override
 from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.schemas import APIOperation
@@ -252,7 +252,7 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "workers_num": 1,
         "max_failures": None,
         "dry_run": False,
-        "override": CaseOverride({}, {}, {}, {}),
+        "override": Override({}, {}, {}, {}),
         "seed": None,
         "unique_data": False,
         "no_failfast": False,

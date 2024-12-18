@@ -22,11 +22,11 @@ from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation import GenerationConfig, GenerationMode, coverage
+from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import CaseMetadata, CoveragePhaseData, GenerationInfo, PhaseInfo
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
-from schemathesis.models import Case
 from schemathesis.schemas import APIOperation, BaseSchema, ParameterSet
 
 setup()

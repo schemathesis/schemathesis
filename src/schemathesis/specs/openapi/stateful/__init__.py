@@ -20,7 +20,8 @@ from ..utils import expand_status_code
 from .statistic import OpenAPILinkStats
 
 if TYPE_CHECKING:
-    from ....models import Case
+    from schemathesis.generation.case import Case
+
     from ..schemas import BaseOpenAPISchema
     from .types import FilterFunction, LinkName, StatusCode, TargetName
 

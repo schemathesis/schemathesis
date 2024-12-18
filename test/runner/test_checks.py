@@ -7,14 +7,14 @@ import pytest
 from hypothesis import given, settings
 
 import schemathesis
+from schemathesis import Case
 from schemathesis.checks import CheckContext, not_a_server_error
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
-from schemathesis.models import Case
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
 from schemathesis.runner.models import TestResult
-from schemathesis.runner.phases.unit._executor import run_checks
+from schemathesis.runner.phases.unit._executor import validate_response
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
     _coerce_header_value,
@@ -629,7 +629,7 @@ def test_deduplication(ctx, response_factory):
     checks = []
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):
-        run_checks(
+        validate_response(
             case=case,
             ctx=CTX,
             checks=(content_type_conformance, response_schema_conformance),

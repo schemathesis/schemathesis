@@ -3,14 +3,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.python import asgi
 from schemathesis.transport.prepare import normalize_base_url
 from schemathesis.transport.requests import REQUESTS_TRANSPORT, RequestsTransport
 
 if TYPE_CHECKING:
     import requests
-
-    from ..models import Case
 
 
 class ASGITransport(RequestsTransport):

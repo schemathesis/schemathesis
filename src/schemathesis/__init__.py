@@ -5,11 +5,11 @@ from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.output import OutputConfig, sanitization
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from schemathesis.generation.case import Case
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
 
 from . import auths, contrib, experimental, hooks, runner
 from .generation import GenerationConfig, GenerationMode, HeaderConfig
-from .models import Case
 
 __version__ = SCHEMATHESIS_VERSION
 

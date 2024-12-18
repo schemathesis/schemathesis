@@ -14,7 +14,7 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.checks import CheckContext, CheckFunction
+from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -54,9 +54,8 @@ from ...models.transport import Request
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
-
-    from ....models import Case
 
 
 def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineContext) -> events.EventGenerator:
@@ -264,7 +263,7 @@ def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> st
     return None
 
 
-def run_checks(
+def validate_response(
     *,
     case: Case,
     ctx: CheckContext,
@@ -276,11 +275,11 @@ def run_checks(
 ) -> None:
     failures = set()
 
-    def add_single_failure(failure: Failure) -> None:
-        failures.add(failure)
+    def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+        collected.add(failure)
         check_results.append(
             result.add_failure(
-                name=check_name,
+                name=name,
                 case=case,
                 request=Request.from_prepared_request(response.request),
                 response=response,
@@ -288,31 +287,24 @@ def run_checks(
             )
         )
 
-    for check in checks:
-        check_name = check.__name__
-        try:
-            skip_check = check(ctx, response, case)
-            if not skip_check:
-                check_result = result.add_success(
-                    name=check_name,
-                    case=case,
-                    request=Request.from_prepared_request(response.request),
-                    response=response,
-                )
-                check_results.append(check_result)
-        except Failure as failure:
-            add_single_failure(failure)
-        except AssertionError as exc:
-            add_single_failure(
-                Failure.from_assertion(
-                    name=check_name,
-                    operation=case.operation.verbose_name,
-                    exc=exc,
-                )
+    def on_success(name: str, _case: Case) -> None:
+        check_results.append(
+            result.add_success(
+                name=name,
+                case=_case,
+                request=Request.from_prepared_request(response.request),
+                response=response,
             )
-        except FailureGroup as group:
-            for e in group.exceptions:
-                add_single_failure(e)
+        )
+
+    failures = run_checks(
+        case=case,
+        response=response,
+        ctx=ctx,
+        checks=checks,
+        on_failure=on_failure,
+        on_success=on_success,
+    )
 
     if failures and not no_failfast:
         raise FailureGroup(list(failures)) from None
@@ -423,7 +415,7 @@ def _network_test(
         execution_graph=ctx.execution_graph,
     )
     try:
-        run_checks(
+        validate_response(
             case=case,
             ctx=check_ctx,
             checks=ctx.config.execution.checks,

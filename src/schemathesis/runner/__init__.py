@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
+from schemathesis.generation.overrides import Override
 
 from ..generation import GenerationConfig
 from .config import EngineConfig, ExecutionConfig, NetworkConfig
@@ -12,10 +13,9 @@ from .config import EngineConfig, ExecutionConfig, NetworkConfig
 if TYPE_CHECKING:
     import hypothesis
 
+    from schemathesis.generation.case import CheckFunction
     from schemathesis.generation.targets import TargetFunction
 
-    from .._override import CaseOverride
-    from ..models import CheckFunction
     from ..schemas import BaseSchema
     from ..service.client import ServiceClient
     from .core import Engine
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 def from_schema(
     schema: BaseSchema,
     *,
-    override: CaseOverride | None = None,
+    override: Override | None = None,
     checks: list[CheckFunction] | None = None,
     targets: list[TargetFunction] | None = None,
     workers_num: int = 1,

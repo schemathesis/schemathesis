@@ -284,7 +284,10 @@ def test_failure_hidden_behind_another_failure(runner_factory):
 
     runner = runner_factory(
         app_kwargs={"failure_behind_failure": True},
-        config_kwargs={"checks": (dynamic_check,)},
+        config_kwargs={
+            "checks": (dynamic_check,),
+            "hypothesis_settings": hypothesis.settings(max_examples=60, database=None),
+        },
     )
     failures = []
     for event in runner.execute():

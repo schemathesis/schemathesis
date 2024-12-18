@@ -15,8 +15,8 @@ if TYPE_CHECKING:
     import threading
 
     from schemathesis.core.errors import InvalidSchema
+    from schemathesis.generation.case import Case
 
-    from ..models import Case
     from . import events
     from .config import EngineConfig
     from .phases import PhaseKind

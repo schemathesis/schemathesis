@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from ...hooks import HookContext, register, unregister
 
 if TYPE_CHECKING:
-    from ...models import Case
+    from schemathesis.generation.case import Case
 
 
 def install() -> None:

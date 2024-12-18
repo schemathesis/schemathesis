@@ -16,10 +16,11 @@ import click
 from schemathesis import errors
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
+from schemathesis.generation import GenerationMode
+from schemathesis.generation.overrides import Override
 
 from .. import experimental
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
-from ..generation import GenerationMode
 from ..service.hosts import get_temporary_hosts_file
 from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
@@ -27,8 +28,6 @@ from .constants import DEFAULT_WORKERS
 if TYPE_CHECKING:
     import hypothesis
     from click.types import LazyFile  # type: ignore[attr-defined]
-
-    from schemathesis._override import CaseOverride
 
 
 INVALID_DERANDOMIZE_MESSAGE = (
@@ -159,7 +158,7 @@ def validate_auth(
     return None
 
 
-def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str], override: CaseOverride) -> None:
+def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str], override: Override) -> None:
     auth_is_set = auth is not None
     header_is_set = "authorization" in {header.lower() for header in headers}
     override_is_set = "authorization" in {header.lower() for header in override.headers}

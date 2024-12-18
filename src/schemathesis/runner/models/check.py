@@ -5,16 +5,14 @@ from functools import cached_property
 from itertools import groupby
 from typing import TYPE_CHECKING, Any, Generator, Iterator
 
-from schemathesis.core import curl
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
-from schemathesis.transport.prepare import prepare_request
 
 from .status import Status
 from .transport import Request
 
 if TYPE_CHECKING:
-    from ...models import Case
+    from schemathesis.generation.case import Case
 
 
 @dataclass(repr=False)
@@ -30,18 +28,8 @@ class Check:
 
     @cached_property
     def code_sample(self) -> str:
-        data = prepare_request(
-            self.case,
-            {key: value[0] for key, value in self.request.headers.items()},
-            self.case.operation.schema.output_config.sanitize,
-        )
-        return curl.generate(
-            method=self.case.method,
-            url=str(data.url),
-            body=data.body,
-            verify=self.response.verify,
-            headers=dict(data.headers),
-            known_generated_headers=None,
+        return self.case.as_curl_command(
+            headers={key: value[0] for key, value in self.request.headers.items()}, verify=self.response.verify
         )
 
     def asdict(self) -> dict[str, Any]:
