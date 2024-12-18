@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.1...HEAD>` - TBD
 --------------------------------------------
 
+**Performance**
+
+- Faster iteration over API operations.
+
 .. _v3.39.1:
 
 :version:`3.39.1 <v3.39.0...v3.39.1>` - 2024-12-17
