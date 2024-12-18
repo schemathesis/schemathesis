@@ -26,8 +26,10 @@ division by zero
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in network_test
         _network_test(case, ctx, result, session, headers)
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
-        run_checks(
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in run_checks
+        validate_response(
+      File "/package-root/runner/phases/unit/_executor.py", line XXX, in validate_response
+        failures = run_checks(
+      File "/package-root/checks.py", line XXX, in run_checks
         skip_check = check(ctx, response, case)
       File "/tmp/module.py", line XXX, in with_error
         1 / 0

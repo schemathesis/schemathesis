@@ -10,10 +10,10 @@ from difflib import get_close_matches
 from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation
 from schemathesis.stateful.graph import ExecutionMetadata, TransitionId
 
-from ...models import Case
 from ...stateful.state_machine import Direction
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER

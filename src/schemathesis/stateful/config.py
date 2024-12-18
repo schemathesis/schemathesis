@@ -5,16 +5,15 @@ from datetime import timedelta
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.checks import CHECKS, CheckFunction, ChecksConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
+from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TargetFunction
 
 if TYPE_CHECKING:
     import hypothesis
     import requests
 
-    from .._override import CaseOverride
-    from ..models import CheckFunction
     from ..runner.config import NetworkConfig
 
 
@@ -59,7 +58,7 @@ class StatefulTestRunnerConfig:
     headers: dict[str, str] = field(default_factory=dict)
     auth: tuple[str, str] | None = None
     seed: int | None = None
-    override: CaseOverride | None = None
+    override: Override | None = None
     dry_run: bool = False
     targets: list[TargetFunction] = field(default_factory=list)
     unique_data: bool = False

@@ -9,7 +9,7 @@ from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
-    from schemathesis.models import Case
+    from schemathesis.generation.case import Case
 
 
 @dataclass

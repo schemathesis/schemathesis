@@ -11,7 +11,8 @@ from schemathesis.generation.targets import TargetMetricCollector
 from . import events
 
 if TYPE_CHECKING:
-    from ..models import Case
+    from schemathesis.generation.case import Case
+
     from ..runner.models import Check
 
 

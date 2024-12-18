@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Sequence
 
+from schemathesis.generation.overrides import Override
+
 if TYPE_CHECKING:
     import hypothesis
 
     from schemathesis.checks import ChecksConfig
     from schemathesis.generation.targets import TargetFunction
 
-    from .._override import CaseOverride
     from ..checks import CheckFunction
     from ..generation import GenerationConfig
     from ..schemas import BaseSchema
@@ -52,5 +53,5 @@ class EngineConfig:
     execution: ExecutionConfig
     network: NetworkConfig
     checks_config: ChecksConfig
-    override: CaseOverride | None = None
+    override: Override | None = None
     service_client: ServiceClient | None = None

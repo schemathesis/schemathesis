@@ -1,19 +1,25 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
 
-from schemathesis._override import CaseOverride
-from schemathesis.core.failures import MalformedJson, MaxResponseTimeConfig, ResponseTimeExceeded, ServerError
+from schemathesis.core.failures import (
+    Failure,
+    FailureGroup,
+    MalformedJson,
+    MaxResponseTimeConfig,
+    ResponseTimeExceeded,
+    ServerError,
+)
 from schemathesis.core.registries import Registry
 from schemathesis.core.transport import Response
+from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
+    from schemathesis.generation.case import Case
     from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
-
-    from .models import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 ChecksConfig = dict[CheckFunction, Any]
@@ -25,7 +31,7 @@ class CheckContext:
     Provides access to broader test execution data beyond individual test cases.
     """
 
-    override: CaseOverride | None
+    override: Override | None
     auth: tuple[str, str] | None
     headers: CaseInsensitiveDict | None
     config: ChecksConfig
@@ -36,7 +42,7 @@ class CheckContext:
 
     def __init__(
         self,
-        override: CaseOverride | None,
+        override: Override | None,
         auth: tuple[str, str] | None,
         headers: CaseInsensitiveDict | None,
         config: ChecksConfig,
@@ -91,3 +97,37 @@ def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool
             deadline=config.limit,
         )
     return None
+
+
+def run_checks(
+    *,
+    case: Case,
+    response: Response,
+    ctx: CheckContext,
+    checks: Iterable[CheckFunction],
+    on_failure: Callable[[str, set[Failure], Failure], None],
+    on_success: Callable[[str, Case], None] | None = None,
+) -> set[Failure]:
+    """Run a set of checks against a response."""
+    collected: set[Failure] = set()
+
+    for check in checks:
+        name = check.__name__
+        try:
+            skip_check = check(ctx, response, case)
+            if not skip_check and on_success:
+                on_success(name, case)
+        except Failure as failure:
+            on_failure(name, collected, failure.with_traceback(None))
+        except AssertionError as exc:
+            custom_failure = Failure.from_assertion(
+                name=name,
+                operation=case.operation.verbose_name,
+                exc=exc,
+            )
+            on_failure(name, collected, custom_failure)
+        except FailureGroup as group:
+            for sub_failure in group.exceptions:
+                on_failure(name, collected, sub_failure)
+
+    return collected

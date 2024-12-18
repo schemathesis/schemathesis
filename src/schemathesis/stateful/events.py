@@ -9,7 +9,8 @@ from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
-    from ..models import Case
+    from schemathesis.generation.case import Case
+
     from ..runner.models import Check
     from .state_machine import APIStateMachine
 

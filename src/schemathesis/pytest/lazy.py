@@ -9,7 +9,6 @@ import pytest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
-from schemathesis._override import CaseOverride, OverrideMark, check_no_override_mark
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
@@ -23,6 +22,7 @@ from schemathesis.generation.hypothesis.given import (
     merge_given_args,
     validate_given_args,
 )
+from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
 from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
@@ -195,7 +195,7 @@ class LazySchema:
 
         def _add_override(test: Callable) -> Callable:
             check_no_override_mark(test)
-            override = CaseOverride(
+            override = Override(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
             )
             OverrideMark.set(test, override)

@@ -25,7 +25,8 @@ from .validation import validate_response
 if TYPE_CHECKING:
     from hypothesis.stateful import Rule
 
-    from ..models import Case
+    from schemathesis.generation.case import Case
+
     from .state_machine import APIStateMachine, Direction, StepResult
 
 EVENT_QUEUE_TIMEOUT = 0.01

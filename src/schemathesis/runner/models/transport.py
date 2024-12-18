@@ -16,7 +16,8 @@ from .status import Status
 if TYPE_CHECKING:
     import requests
 
-    from ...models import Case
+    from schemathesis.generation.case import Case
+
     from .check import Check
 
 

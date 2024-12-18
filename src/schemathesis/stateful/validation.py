@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from schemathesis.checks import CheckContext, CheckFunction
+from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
-    from ..models import Case
+    from schemathesis.generation.case import Case
+
     from .context import RunnerContext
 
 
@@ -23,55 +24,43 @@ def validate_response(
     """Validate the response against the provided checks."""
     from ..runner.models import Check, Request, Status
 
-    failures: list[Failure] = []
-    check_results = runner_ctx.checks_for_step
+    results = runner_ctx.checks_for_step
 
-    def _on_failure(failure: Failure, _name: str) -> None:
-        failures.append(failure)
-        if runner_ctx.is_seen_in_suite(failure):
+    def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+        if runner_ctx.is_seen_in_suite(failure) or runner_ctx.is_seen_in_run(failure):
             return
         failed_check = Check(
-            name=_name,
+            name=name,
             status=Status.FAILURE,
             request=Request.from_prepared_request(response.request),
             response=response,
             case=case,
             failure=failure,
         )
+        results.append(failed_check)
         runner_ctx.add_failed_check(failed_check)
-        check_results.append(failed_check)
         runner_ctx.mark_as_seen_in_suite(failure)
+        collected.add(failure)
 
-    def _on_passed(_name: str, _case: Case) -> None:
-        passed_check = Check(
-            name=_name,
-            status=Status.SUCCESS,
-            request=Request.from_prepared_request(response.request),
-            response=response,
-            case=_case,
+    def on_success(name: str, case: Case) -> None:
+        results.append(
+            Check(
+                name=name,
+                status=Status.SUCCESS,
+                request=Request.from_prepared_request(response.request),
+                response=response,
+                case=case,
+            )
         )
-        check_results.append(passed_check)
 
-    for check in tuple(checks) + tuple(additional_checks):
-        name = check.__name__
-        try:
-            skip_check = check(check_ctx, response, case)
-            if not skip_check:
-                _on_passed(name, case)
-        except Failure as exc:
-            if runner_ctx.is_seen_in_run(exc):
-                continue
-            _on_failure(exc, name)
-        except AssertionError as exc:
-            failure = Failure.from_assertion(name=name, operation=case.operation.verbose_name, exc=exc)
-            if runner_ctx.is_seen_in_run(failure):
-                continue
-            _on_failure(failure, name)
-        except FailureGroup as exc:
-            for subexc in exc.exceptions:
-                if runner_ctx.is_seen_in_run(subexc):
-                    continue
-                _on_failure(subexc, name)
+    failures = run_checks(
+        case=case,
+        response=response,
+        ctx=check_ctx,
+        checks=tuple(checks) + tuple(additional_checks),
+        on_failure=on_failure,
+        on_success=on_success,
+    )
 
     if failures:
-        raise FailureGroup(failures) from None
+        raise FailureGroup(list(failures)) from None
