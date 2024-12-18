@@ -36,7 +36,8 @@ from .utils import expand_status_code, expand_status_codes
 if TYPE_CHECKING:
     from requests import PreparedRequest
 
-    from ...models import Case
+    from schemathesis.generation.case import Case
+
     from ...schemas import APIOperation
 
 

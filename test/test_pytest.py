@@ -418,7 +418,7 @@ def test(case):
 def test_no_collect_warnings(testdir):
     testdir.make_test(
         """
-from schemathesis.models import *
+from schemathesis import *
     """,
     )
     result = testdir.runpytest()

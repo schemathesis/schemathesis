@@ -22,10 +22,10 @@ from schemathesis.core.fs import ensure_parent
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, settings
+from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
 
 from .. import contrib, experimental, generation, runner, service
-from .._override import CaseOverride
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_GENERATOR_MODES, GenerationMode
 from ..runner import events
@@ -44,10 +44,10 @@ if TYPE_CHECKING:
     import hypothesis
     import requests
 
+    from schemathesis.checks import CheckFunction
     from schemathesis.core import NotSet
     from schemathesis.generation.targets import TargetFunction
 
-    from ..models import CheckFunction
     from ..service.client import ServiceClient
 
 
@@ -774,7 +774,7 @@ def run(
             sanitize_output=sanitize_output,
             preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
         )
-    override = CaseOverride(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
+    override = Override(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
 
     generation_config = generation.GenerationConfig(
         modes=list(generation_modes),
@@ -1058,7 +1058,7 @@ def prepare_request_cert(cert: str | None, key: str | None) -> str | tuple[str, 
 def into_event_stream(
     *,
     network_config: NetworkConfig,
-    override: CaseOverride,
+    override: Override,
     filter_set: FilterSet,
     checks: list[CheckFunction],
     checks_config: ChecksConfig,

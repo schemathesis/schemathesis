@@ -2,7 +2,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.models import Case
+from schemathesis import Case
 from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
 

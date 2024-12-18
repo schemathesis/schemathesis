@@ -15,13 +15,13 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis import experimental
-from schemathesis._override import CaseOverride
 from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
+from schemathesis.generation.overrides import Override
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
@@ -1255,7 +1255,7 @@ def test_stateful_override(real_app_schema):
     experimental.STATEFUL_ONLY.enable()
     _, *_, after_execution, _ = from_schema(
         real_app_schema,
-        override=CaseOverride(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
+        override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
     interactions = after_execution.result.interactions

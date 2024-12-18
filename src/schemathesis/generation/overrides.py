@@ -10,14 +10,12 @@ from schemathesis.core.transforms import diff
 from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
-    from schemathesis.models import Case
-    from schemathesis.schemas import APIOperation
-
-    from .parameters import ParameterSet
+    from schemathesis.generation.case import Case
+    from schemathesis.schemas import APIOperation, ParameterSet
 
 
 @dataclass
-class CaseOverride:
+class Override:
     """Overrides for various parts of a test case."""
 
     query: dict[str, str]
@@ -34,8 +32,8 @@ class CaseOverride:
         }
 
     @classmethod
-    def from_components(cls, components: dict[ComponentKind, StoredValue], case: Case) -> CaseOverride:
-        return CaseOverride(
+    def from_components(cls, components: dict[ComponentKind, StoredValue], case: Case) -> Override:
+        return Override(
             **{
                 kind.value: get_component_diff(stored=stored, current=getattr(case, kind.value))
                 for kind, stored in components.items()
@@ -90,7 +88,7 @@ def store_components(case: Case) -> dict[ComponentKind, StoredValue]:
     }
 
 
-OverrideMark = Mark[CaseOverride](attr_name="override")
+OverrideMark = Mark[Override](attr_name="override")
 
 
 def check_no_override_mark(test: Callable) -> None:

@@ -217,7 +217,7 @@ def app_factory(ctx):
             return response, 201
 
         if config.failure_behind_failure:
-            if len(name) % 10 == 7:
+            if len(name) % 10 < 7:
                 return jsonify({"invalid": "user structure"}), 201
             return jsonify({"error": "Error - rare"}), 500
 

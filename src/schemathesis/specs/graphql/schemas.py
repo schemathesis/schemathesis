@@ -26,6 +26,7 @@ from requests.structures import CaseInsensitiveDict
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
+from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -37,7 +38,6 @@ from schemathesis.generation.meta import (
 from ... import auths
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...models import Case
 from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache

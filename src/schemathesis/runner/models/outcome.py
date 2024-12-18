@@ -18,8 +18,7 @@ if TYPE_CHECKING:
     import requests
 
     from schemathesis.core.control import SkipTest
-
-    from ...models import Case
+    from schemathesis.generation.case import Case
 
 
 @dataclass(repr=False)

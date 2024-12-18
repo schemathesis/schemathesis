@@ -8,6 +8,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.python import wsgi
 from schemathesis.transport import BaseTransport, SerializationContext
 from schemathesis.transport.prepare import normalize_base_url, prepare_body, prepare_headers, prepare_path
@@ -16,8 +17,6 @@ from schemathesis.transport.serialization import serialize_binary, serialize_jso
 
 if TYPE_CHECKING:
     import werkzeug
-
-    from ..models import Case
 
 
 class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):

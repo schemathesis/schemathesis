@@ -11,9 +11,9 @@ from hypothesis.stateful import RuleBasedStateMachine
 from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
 
-from ..models import Case
 from .config import _default_hypothesis_settings_factory
 
 if TYPE_CHECKING:

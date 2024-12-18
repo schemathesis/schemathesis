@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Iterator
 from schemathesis.core.transport import Response
 
 if TYPE_CHECKING:
-    from schemathesis.models import Case
+    from schemathesis.generation.case import Case
 
 
 @dataclass

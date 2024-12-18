@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from requests import PreparedRequest
     from requests.structures import CaseInsensitiveDict
 
-    from schemathesis.models import Case
+    from schemathesis.generation.case import Case
 
 
 def prepare_headers(case: Case, headers: dict[str, str] | None = None) -> CaseInsensitiveDict:

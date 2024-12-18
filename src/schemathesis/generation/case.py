@@ -3,17 +3,16 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.checks import CHECKS, CheckContext, CheckFunction
+from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
-from schemathesis.core.failures import Failure, FailureGroup, failure_report_title, format_failures
+from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response
+from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
+from schemathesis.generation.overrides import Override, store_components
+from schemathesis.hooks import HookContext, dispatch
 from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.prepare import prepare_request
-
-from ._override import CaseOverride, store_components
-from .generation import generate_random_case_id
-from .hooks import HookContext, dispatch
 
 if TYPE_CHECKING:
     import requests.auth
@@ -50,8 +49,8 @@ class Case:
         self._components = store_components(self)
 
     @property
-    def _override(self) -> CaseOverride:
-        return CaseOverride.from_components(self._components, self)
+    def _override(self) -> Override:
+        return Override.from_components(self._components, self)
 
     def asdict(self) -> dict[str, Any]:
         return {
@@ -147,12 +146,12 @@ class Case:
         __tracebackhide__ = True
         from requests.structures import CaseInsensitiveDict
 
-        checks = checks or CHECKS.get_all()
-        checks = [check for check in checks if check not in (excluded_checks or [])]
-        for check in additional_checks or []:
-            if check not in checks and check not in (excluded_checks or []):
-                checks.append(check)
-        failures: set[Failure] = set()
+        checks = [
+            check
+            for check in list(checks or CHECKS.get_all()) + list(additional_checks or [])
+            if check not in set(excluded_checks or [])
+        ]
+
         ctx = CheckContext(
             override=self._override,
             auth=None,
@@ -161,20 +160,13 @@ class Case:
             transport_kwargs=transport_kwargs,
             execution_graph=ExecutionGraph(),
         )
-        for check in checks:
-            try:
-                check(ctx, response, self)
-            except Failure as f:
-                # Tracebacks are not relevant here
-                failures.add(f.with_traceback(None))
-            except AssertionError as exc:
-                failures.add(
-                    Failure.from_assertion(
-                        name=check.__name__,
-                        operation=self.operation.verbose_name,
-                        exc=exc,
-                    )
-                )
+        failures = run_checks(
+            case=self,
+            response=response,
+            ctx=ctx,
+            checks=checks,
+            on_failure=lambda _, collected, failure: collected.add(failure),
+        )
         if failures:
             _failures = list(failures)
             message = failure_report_title(_failures) + "\n"

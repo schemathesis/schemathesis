@@ -33,13 +33,13 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
+from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
-from ..._override import CaseOverride, OverrideMark, check_no_override_mark
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
-from ...models import Case
 from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from . import links, serialization
 from ._cache import OperationCache
@@ -202,7 +202,7 @@ class BaseOpenAPISchema(BaseSchema):
 
         def _add_override(test: Callable) -> Callable:
             check_no_override_mark(test)
-            override = CaseOverride(
+            override = Override(
                 query=query or {}, headers=headers or {}, cookies=cookies or {}, path_parameters=path_parameters or {}
             )
             OverrideMark.set(test, override)

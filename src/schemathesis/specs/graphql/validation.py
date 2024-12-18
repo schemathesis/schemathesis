@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, List, cast
 from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError, UnexpectedGraphQLResponse
 
 if TYPE_CHECKING:
-    from schemathesis.models import Case
+    from schemathesis.generation.case import Case
 
 
 def validate_graphql_response(case: Case, payload: Any) -> None:

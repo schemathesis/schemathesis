@@ -23,6 +23,8 @@ from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
+from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
 from schemathesis.generation.meta import CaseMetadata
@@ -36,9 +38,7 @@ from .filters import (
     RegexValue,
     is_deprecated,
 )
-from .generation import GenerationConfig, GenerationMode
 from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScope, dispatch, to_filterable_hook
-from .models import Case
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
