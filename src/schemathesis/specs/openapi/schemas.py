@@ -160,6 +160,9 @@ class BaseOpenAPISchema(BaseSchema):
     ) -> bool:
         if method not in HTTP_METHODS:
             return True
+        if self.filter_set.is_empty():
+            return False
+        path = self.get_full_path(path)
         # Attribute assignment is way faster than creating a new namespace every time
         operation = _ctx_cache.operation
         operation.method = method
@@ -175,17 +178,15 @@ class BaseOpenAPISchema(BaseSchema):
             paths = self.raw_schema["paths"]
         except KeyError:
             return
-        get_full_path = self.get_full_path
         resolve = self.resolver.resolve
         should_skip = self._should_skip
         for path, path_item in paths.items():
-            full_path = get_full_path(path)
             try:
                 if "$ref" in path_item:
                     _, path_item = resolve(path_item["$ref"])
                 # Straightforward iteration is faster than converting to a set & calculating length.
                 for method, definition in path_item.items():
-                    if should_skip(full_path, method, definition):
+                    if should_skip(path, method, definition):
                         continue
                     yield definition
             except SCHEMA_PARSING_ERRORS:
@@ -282,7 +283,6 @@ class BaseOpenAPISchema(BaseSchema):
 
         context = HookContext()
         # Optimization: local variables are faster than attribute access
-        get_full_path = self.get_full_path
         dispatch_hook = self.dispatch_hook
         resolve_path_item = self._resolve_path_item
         resolve_shared_parameters = self._resolve_shared_parameters
@@ -294,7 +294,6 @@ class BaseOpenAPISchema(BaseSchema):
         for path, path_item in paths.items():
             method = None
             try:
-                full_path = get_full_path(path)  # Should be available for later use
                 dispatch_hook("before_process_path", context, path, path_item)
                 scope, path_item = resolve_path_item(path_item)
                 with in_scope(self.resolver, scope):
@@ -304,7 +303,7 @@ class BaseOpenAPISchema(BaseSchema):
                             continue
                         try:
                             resolved = resolve_operation(entry)
-                            if should_skip(full_path, method, resolved):
+                            if should_skip(path, method, resolved):
                                 continue
                             parameters = resolved.get("parameters", ())
                             parameters = collect_parameters(itertools.chain(parameters, shared_parameters), resolved)
