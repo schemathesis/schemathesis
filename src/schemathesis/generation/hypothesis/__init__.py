@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 # Maximum test running time
 DEFAULT_DEADLINE = 15000
@@ -29,3 +29,14 @@ def setup() -> None:
     core.is_first_param_referenced_in_function = _is_first_param_referenced_in_function  # type: ignore
     _resolve.deepcopy = deepclone  # type: ignore
     _from_schema.deepcopy = deepclone  # type: ignore
+
+
+GENERATORS: dict[str, Callable] = {}
+
+
+def generator(specification: str) -> Callable[[Callable], Callable]:
+    def inner(func: Callable) -> Callable:
+        GENERATORS[specification] = func
+        return func
+
+    return inner

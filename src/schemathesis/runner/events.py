@@ -8,8 +8,6 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_except
 from schemathesis.core.result import Err, Ok, Result
 
 if TYPE_CHECKING:
-    from schemathesis.core import Specification
-
     from ..schemas import APIOperation, BaseSchema
     from ..service.models import AnalysisResult
     from ..stateful import events
@@ -42,7 +40,6 @@ class Initialized(ExecutionEvent):
     """Runner is initialized, settings are prepared, requests session is ready."""
 
     schema: dict[str, Any]
-    specification: Specification
     # Total number of operations in the schema
     operations_count: int | None
     # Total number of links in the schema

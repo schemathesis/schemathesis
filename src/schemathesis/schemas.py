@@ -45,8 +45,6 @@ if TYPE_CHECKING:
     from pyrate_limiter import Limiter
     from typing_extensions import Self
 
-    from schemathesis.core import Specification
-
     from .stateful.state_machine import APIStateMachine
 
 
@@ -61,7 +59,6 @@ def get_full_path(base_path: str, path: str) -> str:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
-    specification: Specification
     location: str | None = None
     base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
@@ -280,7 +277,6 @@ class BaseSchema(Mapping):
 
         return self.__class__(
             self.raw_schema,
-            specification=self.specification,
             location=self.location,
             base_url=self.base_url,
             app=self.app,

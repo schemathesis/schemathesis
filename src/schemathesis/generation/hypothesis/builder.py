@@ -23,11 +23,12 @@ from schemathesis.core.validation import has_invalid_characters, is_latin_1_enco
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation import GenerationConfig, GenerationMode, coverage
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, GENERATORS, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import CaseMetadata, CoveragePhaseData, GenerationInfo, PhaseInfo
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
 from schemathesis.schemas import APIOperation, BaseSchema, ParameterSet
+from schemathesis.specification.interface import ApiOperation
 
 setup()
 
@@ -66,7 +67,8 @@ def get_all_tests(
 
 def create_test(
     *,
-    operation: APIOperation,
+    operation: ApiOperation,
+    make_strategy,
     test: Callable,
     settings: hypothesis.settings | None = None,
     seed: int | None = None,
@@ -93,7 +95,7 @@ def create_test(
         }
     )
     for mode in generation_config.modes:
-        _strategies.append(operation.as_strategy(generation_mode=mode, **as_strategy_kwargs))
+        _strategies.append(generator(operation=operation, generation_mode=mode, **as_strategy_kwargs))
     strategy = strategies.combine(_strategies)
     _given_kwargs = (_given_kwargs or {}).copy()
     _given_kwargs.setdefault("case", strategy)

@@ -1,0 +1,2 @@
+from schemathesis.specification.interface import ApiOperation as ApiOperation
+from schemathesis.specification.interface import ApiSpecification as ApiSpecification

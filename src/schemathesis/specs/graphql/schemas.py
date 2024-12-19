@@ -10,7 +10,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     Callable,
-    Generator,
     Iterator,
     Mapping,
     NoReturn,
@@ -23,10 +22,11 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.core import NOT_SET, NotSet, Specification
+from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
-from schemathesis.core.result import Ok, Result
+from schemathesis.core.result import Result
 from schemathesis.generation.case import Case
+from schemathesis.generation.hypothesis import generator
 from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
@@ -34,6 +34,8 @@ from schemathesis.generation.meta import (
     GenerationInfo,
     PhaseInfo,
 )
+from schemathesis.graphql.specification import GraphQlOperationLoader
+from schemathesis.specification.interface import ApiOperation, ApiSpecification
 
 from ... import auths
 from ...generation import GenerationConfig, GenerationMode
@@ -47,6 +49,10 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
     from ...auths import AuthStorage
+
+from schemathesis.graphql.generation import cases
+
+generator("graphql")(cases)
 
 
 @unique
@@ -74,8 +80,12 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
-    specification: Specification = Specification.GRAPHQL
+    specification: ApiSpecification = field(init=False)
     _operation_cache: OperationCache = field(default_factory=OperationCache)
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        self.specification = ApiSpecification("graphql", self.raw_schema, GraphQlOperationLoader)
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}>"
@@ -157,19 +167,8 @@ class GraphQLSchema(BaseSchema):
 
     def get_all_operations(
         self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
-        schema = self.client_schema
-        for root_type, operation_type in (
-            (RootType.QUERY, schema.query_type),
-            (RootType.MUTATION, schema.mutation_type),
-        ):
-            if operation_type is None:
-                continue
-            for field_name, field_ in operation_type.fields.items():
-                operation = self._build_operation(root_type, operation_type, field_name, field_)
-                if self._should_skip(operation):
-                    continue
-                yield Ok(operation)
+    ) -> Iterator[Result[ApiOperation, InvalidSchema]]:
+        yield from self.specification.iter_operations()
 
     def _should_skip(
         self,
