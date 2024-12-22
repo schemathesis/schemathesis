@@ -24,7 +24,7 @@ class ExecutionConfig:
     checks: list[CheckFunction]
     targets: Sequence[TargetFunction]
     hypothesis_settings: hypothesis.settings
-    generation_config: GenerationConfig | None = None
+    generation_config: GenerationConfig
     max_failures: int | None = None
     unique_data: bool = False
     no_failfast: bool = False

@@ -14,7 +14,6 @@ from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import APIOperation, OperationDefinition, ParameterSet, PayloadAlternatives
 from schemathesis.specs.openapi._hypothesis import (
     _get_body_strategy,
-    get_case_strategy,
     jsonify_python_specific_types,
     make_positive_strategy,
     quote_all,
@@ -116,7 +115,7 @@ def test_custom_strategies(swagger_20):
             ]
         ),
     )
-    result = get_case_strategy(operation).example()
+    result = operation.as_strategy().example()
     assert len(result.query["id"]) == 4
     assert int(result.query["id"]) % 2 == 0
 
@@ -133,7 +132,7 @@ def test_default_strategies_binary(swagger_20):
     )
     operation = make_operation(swagger_20, body=PayloadAlternatives([body]))
     swagger_20.raw_schema["consumes"] = ["multipart/form-data"]
-    case = examples.generate_one(get_case_strategy(operation))
+    case = examples.generate_one(operation.as_strategy())
     assert isinstance(case.body["upfile"], Binary)
     kwargs = case.as_transport_kwargs(base_url="http://127.0.0.1")
     assert kwargs["files"] == [("upfile", case.body["upfile"].data)]
@@ -216,7 +215,7 @@ def test_default_strategies_bytes(swagger_20):
             ]
         ),
     )
-    result = get_case_strategy(operation).example()
+    result = operation.as_strategy().example()
     assert isinstance(result.body, str)
     b64decode(result.body)
 
@@ -248,7 +247,7 @@ def test_valid_headers(openapi2_base_url, swagger_20, definition):
         headers=ParameterSet([OpenAPI20Parameter(definition)]),
     )
 
-    @given(case=get_case_strategy(operation))
+    @given(case=operation.as_strategy())
     @settings(suppress_health_check=[HealthCheck.filter_too_much, HealthCheck.too_slow], deadline=None, max_examples=10)
     def inner(case):
         case.call()

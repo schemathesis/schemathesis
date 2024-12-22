@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-import asyncio
 import json
-import warnings
+from dataclasses import dataclass, field
 from functools import wraps
 from itertools import combinations
 from time import perf_counter
@@ -10,7 +9,8 @@ from typing import Any, Callable, Generator, Mapping
 
 import hypothesis
 from hypothesis import Phase
-from hypothesis.errors import HypothesisWarning, Unsatisfiable
+from hypothesis import strategies as st
+from hypothesis.errors import Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
 from schemathesis.auths import AuthStorageMark
@@ -33,163 +33,142 @@ setup()
 
 
 def get_all_tests(
+    *,
     schema: BaseSchema,
-    func: Callable,
+    test_func: Callable,
+    generation_config: GenerationConfig,
     settings: hypothesis.settings | None = None,
-    generation_config: GenerationConfig | None = None,
     seed: int | None = None,
-    as_strategy_kwargs: dict[str, Any] | Callable[[APIOperation], dict[str, Any]] | None = None,
-    _given_kwargs: dict[str, GivenInput] | None = None,
+    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None,
+    given_kwargs: dict[str, GivenInput] | None = None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
     for result in schema.get_all_operations(generation_config=generation_config):
         if isinstance(result, Ok):
             operation = result.ok()
-            _as_strategy_kwargs: dict[str, Any] | None
             if callable(as_strategy_kwargs):
                 _as_strategy_kwargs = as_strategy_kwargs(operation)
             else:
-                _as_strategy_kwargs = as_strategy_kwargs
+                _as_strategy_kwargs = {}
             test = create_test(
                 operation=operation,
-                test=func,
-                settings=settings,
-                seed=seed,
-                generation_config=generation_config,
-                as_strategy_kwargs=_as_strategy_kwargs,
-                _given_kwargs=_given_kwargs,
+                test_func=test_func,
+                config=HypothesisTestConfig(
+                    settings=settings,
+                    seed=seed,
+                    generation=generation_config,
+                    as_strategy_kwargs=_as_strategy_kwargs,
+                    given_kwargs=given_kwargs or {},
+                ),
             )
             yield Ok((operation, test))
         else:
             yield result
 
 
+@dataclass
+class HypothesisTestConfig:
+    generation: GenerationConfig
+    settings: hypothesis.settings | None = None
+    seed: int | None = None
+    as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
+    given_args: tuple[GivenInput, ...] = ()
+    given_kwargs: dict[str, GivenInput] = field(default_factory=dict)
+
+
 def create_test(
     *,
     operation: APIOperation,
-    test: Callable,
-    settings: hypothesis.settings | None = None,
-    seed: int | None = None,
-    generation_config: GenerationConfig | None = None,
-    as_strategy_kwargs: dict[str, Any] | None = None,
-    keep_async_fn: bool = False,
-    _given_args: tuple[GivenInput, ...] = (),
-    _given_kwargs: dict[str, GivenInput] | None = None,
+    test_func: Callable,
+    config: HypothesisTestConfig,
 ) -> Callable:
     """Create a Hypothesis test."""
-    hook_dispatcher = HookDispatcherMark.get(test)
-    auth_storage = AuthStorageMark.get(test)
-    _strategies = []
-    generation_config = generation_config or operation.schema.generation_config
+    hook_dispatcher = HookDispatcherMark.get(test_func)
+    auth_storage = AuthStorageMark.get(test_func)
 
-    skip_on_not_negated = len(generation_config.modes) == 1 and GenerationMode.NEGATIVE in generation_config.modes
-    as_strategy_kwargs = as_strategy_kwargs or {}
-    as_strategy_kwargs.update(
-        {
-            "hooks": hook_dispatcher,
-            "auth_storage": auth_storage,
-            "generation_config": generation_config,
-            "skip_on_not_negated": skip_on_not_negated,
-        }
+    strategy_kwargs = {
+        "hooks": hook_dispatcher,
+        "auth_storage": auth_storage,
+        "generation_config": config.generation,
+        **config.as_strategy_kwargs,
+    }
+    strategy = strategies.combine(
+        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in config.generation.modes]
     )
-    for mode in generation_config.modes:
-        _strategies.append(operation.as_strategy(generation_mode=mode, **as_strategy_kwargs))
-    strategy = strategies.combine(_strategies)
-    _given_kwargs = (_given_kwargs or {}).copy()
-    _given_kwargs.setdefault("case", strategy)
 
-    # Each generated test should be a unique function. It is especially important for the case when Schemathesis runs
-    # tests in multiple threads because Hypothesis stores some internal attributes on function objects and re-writing
-    # them from different threads may lead to unpredictable side-effects.
+    hypothesis_test = create_base_test(
+        test_function=test_func,
+        strategy=strategy,
+        args=config.given_args,
+        kwargs=config.given_kwargs,
+    )
 
-    @wraps(test)
-    def test_function(*args: Any, **kwargs: Any) -> Any:
-        __tracebackhide__ = True
-        return test(*args, **kwargs)
+    if config.seed is not None:
+        hypothesis_test = hypothesis.seed(config.seed)(hypothesis_test)
 
-    wrapped_test = hypothesis.given(*_given_args, **_given_kwargs)(test_function)
-    if seed is not None:
-        wrapped_test = hypothesis.seed(seed)(wrapped_test)
-    if asyncio.iscoroutinefunction(test):
-        # `pytest-trio` expects a coroutine function
-        if keep_async_fn:
-            wrapped_test.hypothesis.inner_test = test  # type: ignore
-        else:
-            wrapped_test.hypothesis.inner_test = make_async_test(test)  # type: ignore
-    setup_default_deadline(wrapped_test)
-    if settings is not None:
-        existing_settings = _get_hypothesis_settings(wrapped_test)
-        if existing_settings is not None:
-            # Merge the user-provided settings with the current ones
-            default = hypothesis.settings.default
-            wrapped_test._hypothesis_internal_use_settings = hypothesis.settings(
-                wrapped_test._hypothesis_internal_use_settings,
-                **{item: value for item, value in settings.__dict__.items() if value != getattr(default, item)},
-            )
-        else:
-            wrapped_test = settings(wrapped_test)
-    existing_settings = _get_hypothesis_settings(wrapped_test)
-    if existing_settings is not None:
-        existing_settings = remove_explain_phase(existing_settings)
-        wrapped_test._hypothesis_internal_use_settings = existing_settings  # type: ignore
-        if Phase.explicit in existing_settings.phases:
-            wrapped_test = add_examples(
-                wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
-            )
-            if COVERAGE_PHASE.is_enabled:
-                wrapped_test = add_coverage(wrapped_test, operation, generation_config.modes)
-    return wrapped_test
+    default = hypothesis.settings.default
+    settings = getattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, None)
+    assert settings is not None
 
+    if settings.deadline == default.deadline:
+        settings = hypothesis.settings(settings, deadline=DEFAULT_DEADLINE)
 
-def setup_default_deadline(wrapped_test: Callable) -> None:
-    # Quite hacky, but it is the simplest way to set up the default deadline value without affecting non-Schemathesis
-    # tests globally
-    existing_settings = _get_hypothesis_settings(wrapped_test)
-    if existing_settings is not None and existing_settings.deadline == hypothesis.settings.default.deadline:
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", HypothesisWarning)
-            new_settings = hypothesis.settings(existing_settings, deadline=DEFAULT_DEADLINE)
-        wrapped_test._hypothesis_internal_use_settings = new_settings  # type: ignore
+    if config.settings is not None:
+        # Merge the user-provided settings with the current ones
+        settings = hypothesis.settings(
+            settings,
+            **{item: value for item, value in config.settings.__dict__.items() if value != getattr(default, item)},
+        )
 
-
-def remove_explain_phase(settings: hypothesis.settings) -> hypothesis.settings:
-    # The "explain" phase is not supported
     if Phase.explain in settings.phases:
         phases = tuple(phase for phase in settings.phases if phase != Phase.explain)
-        return hypothesis.settings(settings, phases=phases)
-    return settings
+        settings = hypothesis.settings(settings, phases=phases)
+
+    # Add examples if explicit phase is enabled
+    if Phase.explicit in settings.phases:
+        hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
+
+    if COVERAGE_PHASE.is_enabled:
+        # Ensure explicit phase is enabled if coverage is enabled
+        if Phase.explicit not in settings.phases:
+            phases = settings.phases + (Phase.explicit,)
+            settings = hypothesis.settings(settings, phases=phases)
+        hypothesis_test = add_coverage(hypothesis_test, operation, config.generation.modes)
+
+    setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
+
+    return hypothesis_test
 
 
-def _get_hypothesis_settings(test: Callable) -> hypothesis.settings | None:
-    return getattr(test, "_hypothesis_internal_use_settings", None)
+SETTINGS_ATTRIBUTE_NAME = "_hypothesis_internal_use_settings"
 
 
-def make_async_test(test: Callable) -> Callable:
-    def async_run(*args: Any, **kwargs: Any) -> None:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-        coro = test(*args, **kwargs)
-        future = asyncio.ensure_future(coro, loop=loop)
-        loop.run_until_complete(future)
+def create_base_test(
+    *,
+    test_function: Callable,
+    strategy: st.SearchStrategy,
+    args: tuple[GivenInput, ...],
+    kwargs: dict[str, GivenInput],
+) -> Callable:
+    """Create the basic Hypothesis test with the given strategy."""
 
-    return async_run
+    @wraps(test_function)
+    def test_wrapper(*args: Any, **kwargs: Any) -> Any:
+        __tracebackhide__ = True
+        return test_function(*args, **kwargs)
+
+    return hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
 
 
 def add_examples(
-    test: Callable,
-    operation: APIOperation,
-    hook_dispatcher: HookDispatcher | None = None,
-    as_strategy_kwargs: dict[str, Any] | None = None,
+    test: Callable, operation: APIOperation, hook_dispatcher: HookDispatcher | None = None, **kwargs: Any
 ) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 
     try:
         result: list[Case] = [
-            examples.generate_one(strategy)
-            for strategy in operation.get_strategies_from_examples(as_strategy_kwargs=as_strategy_kwargs)
+            examples.generate_one(strategy) for strategy in operation.get_strategies_from_examples(**kwargs)
         ]
     except (
         InvalidSchema,

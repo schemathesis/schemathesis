@@ -43,7 +43,7 @@ from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
 from . import links, serialization
 from ._cache import OperationCache
-from ._hypothesis import get_case_strategy
+from ._hypothesis import openapi_cases
 from .converter import to_json_schema, to_json_schema_recursive
 from .definitions import OPENAPI_30_VALIDATOR, OPENAPI_31_VALIDATOR, SWAGGER_20_VALIDATOR
 from .examples import get_strategies_from_examples
@@ -392,9 +392,7 @@ class BaseOpenAPISchema(BaseSchema):
         """Content types available for this API operation."""
         raise NotImplementedError
 
-    def get_strategies_from_examples(
-        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
@@ -490,7 +488,7 @@ class BaseOpenAPISchema(BaseSchema):
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
-        return get_case_strategy(
+        return openapi_cases(
             operation=operation,
             auth_storage=auth_storage,
             hooks=hooks,
@@ -930,11 +928,9 @@ class SwaggerV20(BaseOpenAPISchema):
                 )
         return collected
 
-    def get_strategies_from_examples(
-        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
+        return get_strategies_from_examples(operation, **kwargs)
 
     def get_response_schema(self, definition: dict[str, Any], scope: str) -> tuple[list[str], dict[str, Any] | None]:
         scopes, definition = self.resolver.resolve_in_scope(definition, scope)
@@ -1104,11 +1100,9 @@ class OpenApi30(SwaggerV20):
             )
         return scopes, None
 
-    def get_strategies_from_examples(
-        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return get_strategies_from_examples(operation, as_strategy_kwargs=as_strategy_kwargs)
+        return get_strategies_from_examples(operation, **kwargs)
 
     def get_content_types(self, operation: APIOperation, response: Response) -> list[str]:
         resolved = self._get_response_definitions(operation, response)

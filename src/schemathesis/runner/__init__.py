@@ -57,7 +57,7 @@ def from_schema(
             checks=checks,
             targets=targets or [],
             hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
+            generation_config=generation_config or schema.generation_config,
             max_failures=max_failures,
             no_failfast=no_failfast,
             unique_data=unique_data,

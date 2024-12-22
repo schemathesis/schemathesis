@@ -16,7 +16,7 @@ from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
 
-from ._hypothesis import get_case_strategy, get_default_format_strategies
+from ._hypothesis import get_default_format_strategies, openapi_cases
 from .constants import LOCATION_TO_CONTAINER
 from .formats import STRING_FORMATS
 from .parameters import OpenAPIBody, OpenAPIParameter
@@ -48,7 +48,7 @@ Example = Union[ParameterExample, BodyExample]
 
 
 def get_strategies_from_examples(
-    operation: APIOperation[OpenAPIParameter], as_strategy_kwargs: dict[str, Any] | None = None
+    operation: APIOperation[OpenAPIParameter], **kwargs: Any
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
     maps = {}
@@ -71,10 +71,10 @@ def get_strategies_from_examples(
     examples = list(extract_top_level(operation))
     # Add examples from parameter's schemas
     examples.extend(extract_from_schemas(operation))
-    as_strategy_kwargs = as_strategy_kwargs or {}
-    as_strategy_kwargs["phase"] = TestPhase.EXPLICIT
     return [
-        get_case_strategy(operation=operation, **{**parameters, **(as_strategy_kwargs or {})}).map(serialize_components)
+        openapi_cases(operation=operation, **{**parameters, **kwargs, "phase": TestPhase.EXPLICIT}).map(
+            serialize_components
+        )
         for parameters in produce_combinations(examples)
     ]
 
