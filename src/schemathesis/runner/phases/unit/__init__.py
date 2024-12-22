@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
+from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 from ... import events
@@ -47,8 +48,8 @@ def single_threaded(ctx: EngineContext) -> EventGenerator:
 
     with network_test_function(ctx) as test_func:
         for result in get_all_tests(
-            ctx.config.schema,
-            test_func,
+            schema=ctx.config.schema,
+            test_func=test_func,
             settings=ctx.config.execution.hypothesis_settings,
             generation_config=ctx.config.execution.generation_config,
             seed=ctx.config.execution.seed,
@@ -119,11 +120,13 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                 as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
                 test_function = create_test(
                     operation=operation,
-                    test=test_func,
-                    settings=ctx.config.execution.hypothesis_settings,
-                    seed=ctx.config.execution.seed,
-                    generation_config=ctx.config.execution.generation_config,
-                    as_strategy_kwargs=as_strategy_kwargs,
+                    test_func=test_func,
+                    config=HypothesisTestConfig(
+                        settings=ctx.config.execution.hypothesis_settings,
+                        seed=ctx.config.execution.seed,
+                        generation=ctx.config.execution.generation_config,
+                        as_strategy_kwargs=as_strategy_kwargs,
+                    ),
                 )
 
                 # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue

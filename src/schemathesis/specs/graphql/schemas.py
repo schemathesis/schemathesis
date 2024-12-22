@@ -14,6 +14,7 @@ from typing import (
     Iterator,
     Mapping,
     NoReturn,
+    Union,
     cast,
 )
 from urllib.parse import urlsplit
@@ -31,8 +32,11 @@ from schemathesis.generation.meta import (
     CaseMetadata,
     ComponentInfo,
     ComponentKind,
+    ExplicitPhaseData,
+    GeneratePhaseData,
     GenerationInfo,
     PhaseInfo,
+    TestPhase,
 )
 
 from ... import auths
@@ -213,9 +217,8 @@ class GraphQLSchema(BaseSchema):
         generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
-        return get_case_strategy(
+        return graphql_cases(
             operation=operation,
-            client_schema=self.client_schema,
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
@@ -223,9 +226,7 @@ class GraphQLSchema(BaseSchema):
             **kwargs,
         )
 
-    def get_strategies_from_examples(
-        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         return []
 
     def make_case(
@@ -306,15 +307,21 @@ class FieldMap(Mapping):
 
 
 @st.composite  # type: ignore
-def get_case_strategy(
+def graphql_cases(
     draw: Callable,
+    *,
     operation: APIOperation,
-    client_schema: graphql.GraphQLSchema,
     hooks: HookDispatcher | None = None,
-    auth_storage: AuthStorage | None = None,
+    auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig | None = None,
-    **kwargs: Any,
+    generation_config: GenerationConfig,
+    path_parameters: NotSet | dict[str, Any] = NOT_SET,
+    headers: NotSet | dict[str, Any] = NOT_SET,
+    cookies: NotSet | dict[str, Any] = NOT_SET,
+    query: NotSet | dict[str, Any] = NOT_SET,
+    body: Any = NOT_SET,
+    media_type: str | None = None,
+    phase: TestPhase = TestPhase.GENERATE,
 ) -> Any:
     start = time.monotonic()
     definition = cast(GraphQLOperationDefinition, operation.definition)
@@ -323,10 +330,9 @@ def get_case_strategy(
         RootType.MUTATION: gql_st.mutations,
     }[definition.root_type]
     hook_context = HookContext(operation)
-    generation_config = generation_config or GenerationConfig()
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
     strategy = strategy_factory(
-        client_schema,
+        operation.schema.client_schema,  # type: ignore[attr-defined]
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
@@ -337,11 +343,16 @@ def get_case_strategy(
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)
 
-    path_parameters_ = _generate_parameter("path", draw, operation, hook_context, hooks)
-    headers_ = _generate_parameter("header", draw, operation, hook_context, hooks)
-    cookies_ = _generate_parameter("cookie", draw, operation, hook_context, hooks)
-    query_ = _generate_parameter("query", draw, operation, hook_context, hooks)
+    path_parameters_ = _generate_parameter("path", path_parameters, draw, operation, hook_context, hooks)
+    headers_ = _generate_parameter("header", headers, draw, operation, hook_context, hooks)
+    cookies_ = _generate_parameter("cookie", cookies, draw, operation, hook_context, hooks)
+    query_ = _generate_parameter("query", query, draw, operation, hook_context, hooks)
 
+    _phase_data = {
+        TestPhase.EXPLICIT: ExplicitPhaseData(),
+        TestPhase.GENERATE: GeneratePhaseData(),
+    }[phase]
+    phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
     instance = operation.Case(
         path_parameters=path_parameters_,
         headers=headers_,
@@ -353,7 +364,7 @@ def get_case_strategy(
                 time=time.monotonic() - start,
                 mode=generation_mode,
             ),
-            phase=PhaseInfo.generate(),
+            phase=PhaseInfo(name=phase, data=phase_data),
             components={
                 kind: ComponentInfo(mode=generation_mode)
                 for kind, value in [
@@ -366,7 +377,7 @@ def get_case_strategy(
                 if value is not NOT_SET
             },
         ),
-        media_type="application/json",
+        media_type=media_type or "application/json",
     )  # type: ignore
     context = auths.AuthContext(
         operation=operation,
@@ -377,11 +388,19 @@ def get_case_strategy(
 
 
 def _generate_parameter(
-    location: str, draw: Callable, operation: APIOperation, context: HookContext, hooks: HookDispatcher | None
+    location: str,
+    explicit: NotSet | dict[str, Any],
+    draw: Callable,
+    operation: APIOperation,
+    context: HookContext,
+    hooks: HookDispatcher | None,
 ) -> Any:
     # Schemathesis does not generate anything but `body` for GraphQL, hence use `None`
     container = LOCATION_TO_CONTAINER[location]
-    strategy = apply_to_all_dispatchers(operation, context, hooks, st.none(), container)
+    if isinstance(explicit, NotSet):
+        strategy = apply_to_all_dispatchers(operation, context, hooks, st.none(), container)
+    else:
+        strategy = apply_to_all_dispatchers(operation, context, hooks, st.just(explicit), container)
     return draw(strategy)
 
 

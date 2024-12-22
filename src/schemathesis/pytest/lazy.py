@@ -108,18 +108,18 @@ class LazySchema:
         return self.__class__(fixture_name=self.fixture_name, filter_set=filter_set)
 
     def parametrize(self) -> Callable:
-        def wrapper(test: Callable) -> Callable:
-            if is_given_applied(test):
+        def wrapper(test_func: Callable) -> Callable:
+            if is_given_applied(test_func):
                 # The user wrapped the test function with `@schema.given`
                 # These args & kwargs go as extra to the underlying test generator
-                given_args = GivenArgsMark.get(test)
-                given_kwargs = GivenKwargsMark.get(test)
+                given_args = GivenArgsMark.get(test_func)
+                given_kwargs = GivenKwargsMark.get(test_func)
                 assert given_args is not None
                 assert given_kwargs is not None
-                test_function = validate_given_args(test, given_args, given_kwargs)
+                test_function = validate_given_args(test_func, given_args, given_kwargs)
                 if test_function is not None:
                     return test_function
-                given_kwargs = merge_given_args(test, given_args, given_kwargs)
+                given_kwargs = merge_given_args(test_func, given_args, given_kwargs)
                 del given_args
             else:
                 given_kwargs = {}
@@ -130,17 +130,17 @@ class LazySchema:
                 schema = get_schema(
                     request=request,
                     name=self.fixture_name,
-                    test_function=test,
+                    test_function=test_func,
                     filter_set=self.filter_set,
                 )
-                fixtures = get_fixtures(test, request, given_kwargs)
+                fixtures = get_fixtures(test_func, request, given_kwargs)
                 # Changing the node id is required for better reporting - the method and path will appear there
                 node_id = request.node._nodeid
                 settings = getattr(wrapped_test, "_hypothesis_internal_use_settings", None)
 
                 as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None
 
-                override = OverrideMark.get(test)
+                override = OverrideMark.get(test_func)
                 if override is not None:
 
                     def as_strategy_kwargs(_operation: APIOperation) -> dict[str, Any]:
@@ -152,7 +152,12 @@ class LazySchema:
 
                 tests = list(
                     get_all_tests(
-                        schema, test, settings, as_strategy_kwargs=as_strategy_kwargs, _given_kwargs=given_kwargs
+                        schema=schema,
+                        test_func=test_func,
+                        settings=settings,
+                        generation_config=schema.generation_config,
+                        as_strategy_kwargs=as_strategy_kwargs,
+                        given_kwargs=given_kwargs,
                     )
                 )
                 if not tests:
@@ -170,11 +175,11 @@ class LazySchema:
                 subtests.item._nodeid = node_id
 
             wrapped_test = pytest.mark.usefixtures(self.fixture_name)(wrapped_test)
-            _copy_marks(test, wrapped_test)
+            _copy_marks(test_func, wrapped_test)
 
             # Needed to prevent a failure when settings are applied to the test function
             wrapped_test.is_hypothesis_test = True  # type: ignore
-            wrapped_test.hypothesis = HypothesisHandle(test, wrapped_test, given_kwargs)  # type: ignore
+            wrapped_test.hypothesis = HypothesisHandle(test_func, wrapped_test, given_kwargs)  # type: ignore
 
             return wrapped_test
 

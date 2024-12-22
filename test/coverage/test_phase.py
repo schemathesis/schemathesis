@@ -8,7 +8,7 @@ import schemathesis
 from schemathesis.core import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation import GenerationConfig, GenerationMode
-from schemathesis.generation.hypothesis.builder import create_test
+from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, create_test
 from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from test.utils import assert_requests_call
@@ -1108,9 +1108,11 @@ def test_negative_query_parameter(ctx):
 
     test_func = create_test(
         operation=operation,
-        test=test,
-        generation_config=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
-        settings=settings(phases=[Phase.explicit]),
+        test_func=test,
+        config=HypothesisTestConfig(
+            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
+            settings=settings(phases=[Phase.explicit]),
+        ),
     )
 
     test_func()
@@ -1156,9 +1158,11 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     test_func = create_test(
         operation=operation,
-        test=test,
-        generation_config=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
-        settings=settings(phases=[Phase.explicit]),
+        test_func=test,
+        config=HypothesisTestConfig(
+            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
+            settings=settings(phases=[Phase.explicit]),
+        ),
     )
 
     test_func()
@@ -1171,7 +1175,7 @@ import schemathesis
 
 @schemathesis.check
 def failed(ctx, response, case):
-    if case.meta.phase.data and getattr(case.meta.phase.data, "description", "") == "Unspecified HTTP method: DELETE":
+    if case.meta and getattr(case.meta.phase.data, "description", "") == "Unspecified HTTP method: DELETE":
         raise AssertionError(f"Should be {case.meta.phase.data.description}")
 """
     )
@@ -1229,9 +1233,11 @@ def test_urlencoded_payloads_are_valid(ctx):
 
     test_func = create_test(
         operation=operation,
-        test=test,
-        generation_config=GenerationConfig(modes=GenerationMode.all()),
-        settings=settings(phases=[Phase.explicit]),
+        test_func=test,
+        config=HypothesisTestConfig(
+            generation=GenerationConfig(modes=GenerationMode.all()),
+            settings=settings(phases=[Phase.explicit]),
+        ),
     )
 
     test_func()
@@ -1264,9 +1270,11 @@ def test_no_missing_header_duplication(ctx):
 
     test_func = create_test(
         operation=operation,
-        test=test,
-        generation_config=GenerationConfig(modes=GenerationMode.all()),
-        settings=settings(phases=[Phase.explicit]),
+        test_func=test,
+        config=HypothesisTestConfig(
+            generation=GenerationConfig(modes=GenerationMode.all()),
+            settings=settings(phases=[Phase.explicit]),
+        ),
     )
 
     test_func()
@@ -1298,9 +1306,11 @@ def assert_coverage(schema, modes, expected, path=None):
 
     test_func = create_test(
         operation=operation,
-        test=test,
-        generation_config=GenerationConfig(modes=modes),
-        settings=settings(phases=[Phase.explicit]),
+        test_func=test,
+        config=HypothesisTestConfig(
+            generation=GenerationConfig(modes=modes),
+            settings=settings(phases=[Phase.explicit]),
+        ),
     )
 
     test_func()
