@@ -225,9 +225,7 @@ class BaseSchema(Mapping):
     ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
-    def get_strategies_from_examples(
-        self, operation: APIOperation, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
         raise NotImplementedError
 
@@ -667,11 +665,10 @@ class APIOperation(Generic[P]):
     def get_security_requirements(self) -> list[str]:
         return self.schema.get_security_requirements(self)
 
-    def get_strategies_from_examples(
-        self, as_strategy_kwargs: dict[str, Any] | None = None
-    ) -> list[SearchStrategy[Case]]:
+    def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        return self.schema.get_strategies_from_examples(self, as_strategy_kwargs=as_strategy_kwargs)
+        kwargs.setdefault("generation_config", self.schema.generation_config)
+        return self.schema.get_strategies_from_examples(self, **kwargs)
 
     def get_parameter_serializer(self, location: str) -> Callable | None:
         """Get a function that serializes parameters for the given location.

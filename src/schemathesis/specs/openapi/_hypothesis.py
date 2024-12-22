@@ -45,20 +45,20 @@ StrategyFactory = Callable[[Dict[str, Any], str, str, Optional[str], GenerationC
 
 
 @st.composite  # type: ignore
-def get_case_strategy(
+def openapi_cases(
     draw: Callable,
+    *,
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig | None = None,
+    generation_config: GenerationConfig,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
-    skip_on_not_negated: bool = True,
     phase: TestPhase = TestPhase.GENERATE,
 ) -> Any:
     """A strategy that creates `Case` instances.
@@ -77,8 +77,6 @@ def get_case_strategy(
     strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
     context = HookContext(operation)
-
-    generation_config = generation_config or operation.schema.generation_config
 
     path_parameters_ = generate_parameter(
         "path", path_parameters, operation, draw, context, hooks, generation_mode, generation_config
@@ -143,7 +141,7 @@ def get_case_strategy(
 
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
-        if skip_on_not_negated:
+        if generation_config.modes == [GenerationMode.NEGATIVE]:
             raise SkipTest(f"It is not possible to generate negative test cases for `{operation.verbose_name}`")
         else:
             reject()

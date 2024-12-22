@@ -8,7 +8,7 @@ import schemathesis
 from schemathesis.generation import GenerationConfig, HeaderConfig
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
-from schemathesis.specs.openapi._hypothesis import get_case_strategy, make_positive_strategy
+from schemathesis.specs.openapi._hypothesis import make_positive_strategy
 from schemathesis.specs.openapi.references import load_file
 from test.utils import assert_requests_call
 
@@ -48,7 +48,7 @@ def operation(make_openapi_3_schema):
 )
 def test_explicit_attributes(operation, values, expected):
     # When some Case's attribute is passed explicitly to the case strategy
-    strategy = get_case_strategy(operation=operation, **values)
+    strategy = operation.as_strategy(**values)
 
     @given(strategy)
     @settings(max_examples=1)

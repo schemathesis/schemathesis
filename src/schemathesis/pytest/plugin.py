@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import unittest
 from functools import partial
 from typing import TYPE_CHECKING, Any, Callable, Generator, Type, cast
@@ -70,7 +71,7 @@ class SchemathesisFunction(Function):
 
 class SchemathesisCase(PyCollector):
     def __init__(self, test_function: Callable, schema: BaseSchema, *args: Any, **kwargs: Any) -> None:
-        self.given_kwargs: dict[str, Any] | None
+        self.given_kwargs: dict[str, Any]
         given_args = GivenArgsMark.get(test_function)
         given_kwargs = GivenKwargsMark.get(test_function)
 
@@ -87,7 +88,7 @@ class SchemathesisCase(PyCollector):
             if failing_test is not None:
                 self.test_function = failing_test
                 self.is_invalid_test = True
-                self.given_kwargs = None
+                self.given_kwargs = {}
             else:
                 _init_with_valid_test(test_function, given_args, given_kwargs)
         else:
@@ -107,7 +108,7 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        from schemathesis.generation.hypothesis.builder import create_test
+        from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, create_test
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -121,22 +122,28 @@ class SchemathesisCase(PyCollector):
                 funcobj = self.test_function
             else:
                 override = OverrideMark.get(self.test_function)
-                as_strategy_kwargs: dict | None
                 if override is not None:
                     as_strategy_kwargs = {}
                     for location, entry in override.for_operation(operation).items():
                         if entry:
                             as_strategy_kwargs[location] = entry
                 else:
-                    as_strategy_kwargs = None
+                    as_strategy_kwargs = {}
                 funcobj = create_test(
                     operation=operation,
-                    test=self.test_function,
-                    _given_kwargs=self.given_kwargs,
-                    generation_config=self.schema.generation_config,
-                    as_strategy_kwargs=as_strategy_kwargs,
-                    keep_async_fn=is_trio_test,
+                    test_func=self.test_function,
+                    config=HypothesisTestConfig(
+                        given_kwargs=self.given_kwargs,
+                        generation=self.schema.generation_config,
+                        as_strategy_kwargs=as_strategy_kwargs,
+                    ),
                 )
+                if asyncio.iscoroutinefunction(self.test_function):
+                    # `pytest-trio` expects a coroutine function
+                    if is_trio_test:
+                        funcobj.hypothesis.inner_test = self.test_function  # type: ignore
+                    else:
+                        funcobj.hypothesis.inner_test = make_async_test(self.test_function)  # type: ignore
             name = self._get_test_name(operation)
         else:
             error = result.err()
@@ -212,6 +219,19 @@ class SchemathesisCase(PyCollector):
             return items
         except Exception:
             pytest.fail("Error during collection")
+
+
+def make_async_test(test: Callable) -> Callable:
+    def async_run(*args: Any, **kwargs: Any) -> None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+        coro = test(*args, **kwargs)
+        future = asyncio.ensure_future(coro, loop=loop)
+        loop.run_until_complete(future)
+
+    return async_run
 
 
 @hookimpl(hookwrapper=True)  # type:ignore
