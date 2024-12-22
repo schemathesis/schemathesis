@@ -69,7 +69,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     assert testcases[3][0].tag == "error"
     assert testcases[3][0].attrib["type"] == "error"
     assert (
-        testcases[3][0].attrib["message"].replace("\n", " ")
+        testcases[3][0].text.replace("\n", " ")
         == "Schema Error  Failed to generate test cases for this API operation. Possible reasons:      - Contradictory schema constraints, such as a minimum value exceeding the maximum.     - Invalid schema definitions for headers or cookies, for example allowing for non-ASCII characters.     - Excessive schema complexity, which hinders parameter generation.  Tip: Examine the schema for inconsistencies and consider simplifying it."
     )
 
@@ -100,12 +100,12 @@ def with_error(ctx, response, case):
     tree = ElementTree.parse(xml_path)
     root = tree.getroot()
     testcases = list(root[0])
-    assert testcases[0][0].attrib["message"].replace("\n", " ").startswith(expected)
+    assert testcases[0][0].text.replace("\n", " ").startswith(expected)
 
 
 def extract_message(testcase, server_host):
     return (
-        re.sub(r"Test Case ID: (\w+)", "Test Case ID: <PLACEHOLDER>", testcase.attrib["message"])
+        re.sub(r"Test Case ID: (\w+)", "Test Case ID: <PLACEHOLDER>", testcase.text or testcase.attrib["message"])
         .replace(server_host, "localhost")
         .replace("\n", " ")
     )
