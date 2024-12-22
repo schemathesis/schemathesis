@@ -4,17 +4,19 @@ Changelog
 :version:`Unreleased <v3.39.1...HEAD>` - TBD
 --------------------------------------------
 
-**Performance**
-
-- Faster iteration over API operations.
-
 **Changed**
 
 - Update upper bound on ``pytest-subtests`` to ``<0.15.0``.
+- Adjust JUnit XML output so it is properly displayed by Jenkins.
 
 **Fixed**
 
 - Do not report 5XX responses in ``use_after_free`` as they don't indicate the presence of the previously deleted resource.
+- Deduplicate test cases in JUnit XML report.
+
+**Performance**
+
+- Faster iteration over API operations.
 
 .. _v3.39.1:
 
