@@ -71,7 +71,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     assert testcases[3][0].tag == "error"
     assert testcases[3][0].attrib["type"] == "error"
     assert (
-        testcases[3][0].attrib["message"].replace("\n", " ")
+        testcases[3][0].text.replace("\n", " ")
         == "Schema Error  Failed to generate test cases for this API operation. Possible reasons:      - Contradictory schema constraints, such as a minimum value exceeding the maximum.     - Invalid schema definitions for headers or cookies, for example allowing for non-ASCII characters.     - Excessive schema complexity, which hinders parameter generation.  Tip: Examine the schema for inconsistencies and consider simplifying it."
     )
 
@@ -107,15 +107,14 @@ def test_error_with_traceback(with_error, cli, schema_url, tmp_path):
     testcases = list(root[0])
     assert (
         testcases[0][0]
-        .attrib["message"]
-        .replace("\n", " ")
+        .text.replace("\n", " ")
         .startswith("Runtime Error  division by zero      Traceback (most recent call last): ")
     )
 
 
 def extract_message(testcase, server_host):
     return (
-        re.sub(r"Test Case ID: (\w+)", "Test Case ID: <PLACEHOLDER>", testcase.attrib["message"])
+        re.sub(r"Test Case ID: (\w+)", "Test Case ID: <PLACEHOLDER>", testcase.text or testcase.attrib["message"])
         .replace(server_host, "localhost")
         .replace("\n", " ")
     )
@@ -176,7 +175,7 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     assert testcases[0].attrib["name"] == "GET /api/slow"
     assert testcases[0][0].tag == "error"
     assert testcases[0][0].attrib["type"] == "error"
-    assert "Read timed out after 0.01 seconds" in testcases[0][0].attrib["message"]
+    assert "Read timed out after 0.01 seconds" in testcases[0][0].text
 
 
 @pytest.mark.operations("success")
