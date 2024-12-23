@@ -22,29 +22,37 @@ if TYPE_CHECKING:
 @dataclass
 class JunitXMLHandler(EventHandler):
     file_handle: LazyFile
-    test_cases: list = field(default_factory=list)
+    test_cases: dict = field(default_factory=dict)
 
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
             event_: events.AfterExecution | events.AfterStatefulExecution = event
             name = event_.result.verbose_name
-            test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
+            if name in self.test_cases:
+                test_case = self.test_cases[name]
+                test_case.elapsed_sec += event_.elapsed_time
+            else:
+                test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
             if event_.status == Status.FAILURE:
                 _add_failure(test_case, event_.result.checks, context)
             elif event_.status == Status.ERROR:
-                test_case.add_error_info(message=event_.result.errors[-1].format())
+                test_case.add_error_info(output=event_.result.errors[-1].format())
             elif event_.status == Status.SKIP:
-                test_case.add_skipped_info(message=event_.result.skip_reason)
-            self.test_cases.append(test_case)
+                test_case.add_skipped_info(output=event_.result.skip_reason)
+            self.test_cases[name] = test_case
         elif isinstance(event, events.Finished):
-            test_suites = [TestSuite("schemathesis", test_cases=self.test_cases, hostname=platform.node())]
+            test_suites = [
+                TestSuite("schemathesis", test_cases=list(self.test_cases.values()), hostname=platform.node())
+            ]
             to_xml_report_file(file_descriptor=self.file_handle, test_suites=test_suites, prettyprint=True)
 
 
 def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionContext) -> None:
+    messages = []
     for idx, (code, group) in enumerate(group_failures_by_code_sample(checks), 1):
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-        test_case.add_failure_info(message=build_failure_message(context, idx, code, checks))
+        messages.append(build_failure_message(context, idx, code, checks))
+    test_case.add_failure_info(message="\n\n".join(messages))
 
 
 def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:

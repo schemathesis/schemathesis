@@ -1,5 +1,6 @@
 import sys
 
+import hypothesis.errors
 import pytest
 from hypothesis import HealthCheck, Phase, given, settings
 
@@ -12,6 +13,8 @@ if sys.version_info < (3, 10):
 
 from hypothesis_openapi import openapis
 
+IGNORED_EXCEPTIONS = [hypothesis.errors.Unsatisfiable]
+
 
 @pytest.skip("Current implementation does not have enough schema validation", allow_module_level=True)
 @given(openapis(version="2.0") | openapis(version="3.0"))
@@ -21,6 +24,11 @@ def test_random_schemas(schema):
     for event in schemathesis.runner.from_schema(schema, dry_run=True).execute():
         assert not isinstance(event, events.InternalError), repr(event)
         if isinstance(event, events.AfterExecution):
-            if event.result.errors:
-                error = event.result.errors[0]
-                raise AssertionError(error.traceback)
+            errors = [
+                error
+                for error in event.result.errors
+                if all(f"{exc.__module__}.{exc.__name__}" not in error.exception for exc in IGNORED_EXCEPTIONS)
+            ]
+            if errors:
+                error = errors[0]
+                raise AssertionError(error.exception)

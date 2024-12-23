@@ -142,7 +142,6 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
-    # Note. There could be more than 3 calls, depends on Hypothesis internals
     assert len(cassette["http_interactions"]) >= 1
     # Then their statuses should be reflected in the "status" field
     # And it should not be overridden by the overall test status
