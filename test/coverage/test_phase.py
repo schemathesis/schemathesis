@@ -1125,19 +1125,20 @@ def test_negative_query_parameter(ctx):
     ]
 
 
-def test_unspecified_http_methods(ctx):
-    schema = ctx.openapi.build_schema(
-        {
-            "/foo": {
-                "post": {
-                    "responses": {"200": {"description": "OK"}},
-                },
-                "get": {
-                    "responses": {"200": {"description": "OK"}},
-                },
-            }
+@pytest.mark.openapi_version("3.0")
+def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
+    raw_schema = {
+        "/foo": {
+            "post": {
+                "parameters": [{"in": "query", "name": "key", "schema": {"type": "integer"}}],
+                "responses": {"200": {"description": "OK"}},
+            },
+            "get": {
+                "responses": {"200": {"description": "OK"}},
+            },
         }
-    )
+    }
+    schema = ctx.openapi.build_schema(raw_schema)
 
     schema = schemathesis.openapi.from_dict(schema)
 
@@ -1150,6 +1151,7 @@ def test_unspecified_http_methods(ctx):
         if not case.meta.phase.data.description.startswith("Unspecified"):
             return
         methods.add(case.method)
+        assert f"-X {case.method}" in case.as_curl_command()
 
     test_func = create_test(
         operation=operation,
@@ -1161,6 +1163,34 @@ def test_unspecified_http_methods(ctx):
     test_func()
 
     assert methods == {"HEAD", "PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+
+    module = ctx.write_pymodule(
+        """
+import schemathesis
+
+@schemathesis.check
+def failed(ctx, response, case):
+    if case.meta.description and "Unspecified" in case.meta.description:
+        raise AssertionError(f"Should be {case.meta.description}")
+"""
+    )
+    schema_path = ctx.openapi.write_schema(raw_schema)
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "-c",
+            "failed",
+            "--include-method=POST",
+            f"--base-url={openapi3_base_url}",
+            "--data-generation-method=negative",
+            "--hypothesis-max-examples=10",
+            "--experimental=coverage-phase",
+            "--show-trace",
+            hooks=module,
+        )
+        == snapshot_cli
+    )
 
 
 def test_no_missing_header_duplication(ctx):
