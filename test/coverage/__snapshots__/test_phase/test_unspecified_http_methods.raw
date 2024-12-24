@@ -20,20 +20,6 @@ ________________________________ POST /api/foo _________________________________
 
 - Custom check failed: `failed`
 
-    Should be Unspecified HTTP method: DELETE
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with: 
-
-    curl -X DELETE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-2. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `failed`
-
     Should be Unspecified HTTP method: HEAD
 
 [404] Not Found:
@@ -44,66 +30,10 @@ Reproduce with:
 
     curl -X HEAD 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
 
-3. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `failed`
-
-    Should be Unspecified HTTP method: OPTIONS
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with: 
-
-    curl -X OPTIONS 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-4. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `failed`
-
-    Should be Unspecified HTTP method: PATCH
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with: 
-
-    curl -X PATCH 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-5. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `failed`
-
-    Should be Unspecified HTTP method: PUT
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with: 
-
-    curl -X PUT 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-6. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `failed`
-
-    Should be Unspecified HTTP method: TRACE
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with: 
-
-    curl -X TRACE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
 =================================== SUMMARY ====================================
 
 Performed checks:
-    failed                    6 / 12 passed           FAILED 
+    failed                    1 / 2 passed          FAILED 
 
 WARNING: All API responses have a 404 status code. Did you specify the proper API location?
 
