@@ -396,7 +396,7 @@ def _iter_coverage_cases(
                 meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
                     components={},
-                    phase=PhaseInfo.coverage(description=f"Unspecified HTTP method: {method}"),
+                    phase=PhaseInfo.coverage(description=f"Unspecified HTTP method: {method.upper()}"),
                 ),
             )
         # Generate duplicate query parameters
