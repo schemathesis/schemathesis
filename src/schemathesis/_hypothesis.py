@@ -322,7 +322,7 @@ def _iter_coverage_cases(
             case = operation.make_case(**template)
             case._explicit_method = method
             case.data_generation_method = DataGenerationMethod.negative
-            case.meta = _make_meta(description=f"Unspecified HTTP method: {method}")
+            case.meta = _make_meta(description=f"Unspecified HTTP method: {method.upper()}")
             yield case
         # Generate duplicate query parameters
         if operation.query:
