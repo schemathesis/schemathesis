@@ -28,6 +28,11 @@ Tutorials
 Articles
 --------
 
+- `Create a Cracker of an Open API Contract with VS Code, Spectral, Prism and Schemathesis <https://blog.hungovercoders.com/datagriff/2024/12/22/create-a-cracker-of-an-open-api-contract-with-vs-code-spectral-prism-and-schemathesis.html>`_ by **dataGriff**
+
+  - **Description**: Contract-first API design and testing walkthrough.
+
+  - **Date**: 22 Dec 2024
 
 - `Boost Your FastAPI Reliability with Schemathesis Automated Testing <https://medium.com/@jeremy3/boost-your-fastapi-reliability-with-schemathesis-automated-testing-e8b70ff704f6>`_ by **Jeremy**
 
@@ -37,7 +42,7 @@ Articles
 
 - `Implementing Schemathesis at PayLead <https://medium.com/paylead/implementing-schemathesis-at-paylead-a469a5d43626>`_ by **Jérémy Pelletier** at **PayLead**
 
-  - **Description**: In-depth walkthrough including custom hooks, stateful testing and CI/CD integration.
+  - **Description**: In-depth walkthrough including custom hooks, stateful testing, and CI/CD integration.
 
   - **Date**: 29 May 2024
 
