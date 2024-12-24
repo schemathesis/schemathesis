@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.2...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Code sample containing incorrect HTTP method for the ``Unspecified HTTP method`` case in the coverage phase.
+
 .. _v3.39.2:
 
 :version:`3.39.2 <v3.39.1...v3.39.2>` - 2024-12-23

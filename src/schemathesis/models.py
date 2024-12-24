@@ -632,6 +632,7 @@ class Case:
             id=self.id,
             _auth=self._auth,
             _has_explicit_auth=self._has_explicit_auth,
+            _explicit_method=self._explicit_method,
         )
 
 
