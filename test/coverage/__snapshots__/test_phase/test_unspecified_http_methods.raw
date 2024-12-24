@@ -33,7 +33,7 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    failed                    6 / 7 passed          FAILED 
+    failed                    N / N passed          FAILED 
 
 WARNING: All API responses have a 404 status code. Did you specify the proper API location?
 
