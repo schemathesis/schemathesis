@@ -21,7 +21,7 @@ def prepare_urlencoded(data: Any) -> Any:
                 for key, value in item.items():
                     output.append((key, value))
             else:
-                output.append(item)
+                output.append((item, "arbitrary-value"))
         return output
     return data
 
