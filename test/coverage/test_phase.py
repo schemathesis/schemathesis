@@ -1170,8 +1170,8 @@ import schemathesis
 
 @schemathesis.check
 def failed(ctx, response, case):
-    if case.meta.description and "Unspecified" in case.meta.description:
-        raise AssertionError(f"Should be {case.meta.description}")
+    if case.meta.phase.data and "Unspecified" in getattr(case.meta.phase.data, "description", ""):
+        raise AssertionError(f"Should be {case.meta.phase.data.description}")
 """
     )
     schema_path = ctx.openapi.write_schema(raw_schema)
@@ -1183,10 +1183,9 @@ def failed(ctx, response, case):
             "failed",
             "--include-method=POST",
             f"--base-url={openapi3_base_url}",
-            "--data-generation-method=negative",
+            "--generation-mode=negative",
             "--hypothesis-max-examples=10",
             "--experimental=coverage-phase",
-            "--show-trace",
             hooks=module,
         )
         == snapshot_cli
