@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Code sample containing incorrect HTTP method for the ``Unspecified HTTP method`` case in the coverage phase.
+- ``TypeError`` on some ``x-www-form-urlencoded`` payloads during the coverage phase.
 
 .. _v3.39.2:
 
