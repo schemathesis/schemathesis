@@ -1195,6 +1195,50 @@ def failed(ctx, response, case):
     )
 
 
+def test_urlencoded_payloads_are_valid(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/x-www-form-urlencoded": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "key": {"type": "number", "example": 1},
+                                    },
+                                    "required": ["key"],
+                                },
+                                "example": {"key": 1},
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    schema = schemathesis.from_dict(schema, validate_schema=True)
+
+    operation = schema["/foo"]["post"]
+
+    def test(case):
+        if case.meta.phase != TestPhase.COVERAGE:
+            return
+        assert_requests_call(case)
+
+    test_func = create_test(
+        operation=operation,
+        test=test,
+        data_generation_methods=DataGenerationMethod.all(),
+        settings=settings(phases=[Phase.explicit]),
+    )
+
+    test_func()
+
+
 def test_no_missing_header_duplication(ctx):
     schema = ctx.openapi.build_schema(
         {

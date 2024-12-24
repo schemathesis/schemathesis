@@ -199,21 +199,26 @@ def add_examples(
             if invalid_headers:
                 add_invalid_example_header_mark(original_test, invalid_headers)
                 continue
-        if example.media_type is not None:
-            try:
-                media_type = parse_content_type(example.media_type)
-                if media_type == ("application", "x-www-form-urlencoded"):
-                    example.body = prepare_urlencoded(example.body)
-            except ValueError:
-                pass
+        adjust_urlencoded_payload(example)
         test = hypothesis.example(case=example)(test)
     return test
+
+
+def adjust_urlencoded_payload(case: Case) -> None:
+    if case.media_type is not None:
+        try:
+            media_type = parse_content_type(case.media_type)
+            if media_type == ("application", "x-www-form-urlencoded"):
+                case.body = prepare_urlencoded(case.body)
+        except ValueError:
+            pass
 
 
 def add_coverage(
     test: Callable, operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
 ) -> Callable:
     for example in _iter_coverage_cases(operation, data_generation_methods):
+        adjust_urlencoded_payload(example)
         test = hypothesis.example(case=example)(test)
     return test
 
@@ -518,7 +523,7 @@ def prepare_urlencoded(data: Any) -> Any:
                 for key, value in item.items():
                     output.append((key, value))
             else:
-                output.append(item)
+                output.append((item, "arbitrary-value"))
         return output
     return data
 
