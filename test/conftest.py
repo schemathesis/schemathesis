@@ -20,7 +20,7 @@ import pytest
 import requests
 import yaml
 from click.testing import CliRunner, Result
-from hypothesis import settings
+from hypothesis import Phase, settings
 from packaging import version
 from syrupy.extensions.single_file import SingleFileSnapshotExtension, WriteMode
 from urllib3 import HTTPResponse
@@ -54,6 +54,8 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", max_examples=1000)
+settings.register_profile("schemathesis", phases=[Phase.explicit, Phase.generate, Phase.reuse], deadline=None)
+settings.load_profile("schemathesis")
 
 
 @pytest.fixture(autouse=True)

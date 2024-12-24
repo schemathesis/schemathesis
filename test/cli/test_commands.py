@@ -418,7 +418,7 @@ def test_hypothesis_database_report(cli, schema_url):
     result = cli.run(schema_url, "--hypothesis-database=:memory:", "-v")
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = result.stdout.split("\n")
-    assert lines[3] == "Hypothesis: database=InMemoryExampleDatabase({}), deadline=timedelta(milliseconds=15000)"
+    assert "Hypothesis: database=InMemoryExampleDatabase({})" in lines[3]
 
 
 @pytest.mark.openapi_version("3.0")

@@ -168,7 +168,7 @@ def test_c(case):
     assert settings().deadline.microseconds == 100 * 1000
 
 def test_d():
-    assert settings().deadline.microseconds == 200 * 1000
+    assert settings().deadline is None
 """,
     )
     # When there is a test with Pytest

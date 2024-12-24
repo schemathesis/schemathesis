@@ -874,7 +874,7 @@ def test_(case):
     # And internal frames should not be displayed
     assert "def run_subtest" not in stdout
     assert "def collecting_wrapper" not in stdout
-    assert stdout.count("test_multiple_failures_non_check.py:37") == 1
+    assert stdout.count("test_multiple_failures_non_check.py:38") == 1
 
 
 @pytest.mark.operations("flaky")
