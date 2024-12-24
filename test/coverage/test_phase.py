@@ -1126,6 +1126,7 @@ def test_negative_query_parameter(ctx):
 
 
 @pytest.mark.openapi_version("3.0")
+@pytest.mark.snapshot(replace_statistic=True)
 def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     raw_schema = {
         "/foo": {
