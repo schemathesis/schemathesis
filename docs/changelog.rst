@@ -1,12 +1,18 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.2...HEAD>` - TBD
+:version:`Unreleased <v3.39.3...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.39.3:
+
+:version:`3.39.3 <v3.39.2...v3.39.3>` - 2024-12-24
+--------------------------------------------------
 
 **Fixed**
 
 - Code sample containing incorrect HTTP method for the ``Unspecified HTTP method`` case in the coverage phase.
+- ``TypeError`` on some ``x-www-form-urlencoded`` payloads during the coverage phase.
 
 .. _v3.39.2:
 

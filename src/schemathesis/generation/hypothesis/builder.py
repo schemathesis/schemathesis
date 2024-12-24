@@ -217,19 +217,24 @@ def add_examples(
             if invalid_headers:
                 InvalidHeadersExampleMark.set(original_test, invalid_headers)
                 continue
-        if example.media_type is not None:
-            try:
-                media_type = media_types.parse(example.media_type)
-                if media_type == ("application", "x-www-form-urlencoded"):
-                    example.body = prepare_urlencoded(example.body)
-            except ValueError:
-                pass
+        adjust_urlencoded_payload(example)
         test = hypothesis.example(case=example)(test)
     return test
 
 
+def adjust_urlencoded_payload(case: Case) -> None:
+    if case.media_type is not None:
+        try:
+            media_type = media_types.parse(case.media_type)
+            if media_type == ("application", "x-www-form-urlencoded"):
+                case.body = prepare_urlencoded(case.body)
+        except ValueError:
+            pass
+
+
 def add_coverage(test: Callable, operation: APIOperation, generation_modes: list[GenerationMode]) -> Callable:
     for example in _iter_coverage_cases(operation, generation_modes):
+        adjust_urlencoded_payload(example)
         test = hypothesis.example(case=example)(test)
     return test
 
