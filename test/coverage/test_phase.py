@@ -1172,7 +1172,7 @@ import schemathesis
 
 @schemathesis.check
 def failed(ctx, response, case):
-    if case.meta.description and "Unspecified" in case.meta.description:
+    if case.meta.description and case.meta.description == "Unspecified HTTP method: DELETE":
         raise AssertionError(f"Should be {case.meta.description}")
 """
     )
