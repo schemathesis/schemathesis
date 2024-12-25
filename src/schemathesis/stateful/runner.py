@@ -43,7 +43,7 @@ class StatefulTestRunner:
     # State machine class to use
     state_machine: type[APIStateMachine]
     # Test runner configuration that defines the runtime behavior
-    config: StatefulTestRunnerConfig = field(default_factory=StatefulTestRunnerConfig)
+    config: StatefulTestRunnerConfig
     # Event to stop the execution
     stop_event: threading.Event = field(default_factory=threading.Event)
     # Queue to communicate with the state machine execution

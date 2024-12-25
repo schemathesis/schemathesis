@@ -8,6 +8,7 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, cast
 from warnings import WarningMessage, catch_warnings
 
+import requests
 from hypothesis.errors import HypothesisException, InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
@@ -378,55 +379,46 @@ def cached_test_func(f: Callable) -> Callable:
 def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session: requests.Session) -> None:
     headers = ctx.config.network.headers
     if not ctx.config.execution.dry_run:
-        _network_test(case, ctx, result, session, headers)
+        check_results: list[Check] = []
+        kwargs: dict[str, Any] = {
+            "session": session,
+            "headers": headers,
+            "timeout": ctx.config.network.timeout,
+            "verify": ctx.config.network.tls_verify,
+            "cert": ctx.config.network.cert,
+        }
+        if ctx.config.network.proxy is not None:
+            kwargs["proxies"] = {"all": ctx.config.network.proxy}
+        try:
+            response = case.call(**kwargs)
+        except (requests.Timeout, requests.ConnectionError):
+            result.store_requests_response(case, None, Status.FAILURE, [], session=session)
+            raise
+        targets.run(ctx.config.execution.targets, case=case, response=response)
+        status = Status.SUCCESS
+
+        check_ctx = CheckContext(
+            override=ctx.config.override,
+            auth=ctx.config.network.auth,
+            headers=CaseInsensitiveDict(headers) if headers else None,
+            config=ctx.config.checks_config,
+            transport_kwargs=kwargs,
+            execution_graph=ctx.execution_graph,
+        )
+        try:
+            validate_response(
+                case=case,
+                ctx=check_ctx,
+                checks=ctx.config.execution.checks,
+                check_results=check_results,
+                result=result,
+                response=response,
+                no_failfast=ctx.config.execution.no_failfast,
+            )
+        except FailureGroup:
+            status = Status.FAILURE
+            raise
+        finally:
+            result.store_requests_response(case, response, status, check_results, session=session)
     else:
         result.store_requests_response(case, None, Status.SKIP, [], session=session)
-
-
-def _network_test(
-    case: Case, ctx: EngineContext, result: TestResult, session: requests.Session, headers: dict[str, Any] | None
-) -> Response:
-    import requests
-
-    check_results: list[Check] = []
-    kwargs: dict[str, Any] = {
-        "session": session,
-        "headers": headers,
-        "timeout": ctx.config.network.timeout,
-        "verify": ctx.config.network.tls_verify,
-        "cert": ctx.config.network.cert,
-    }
-    if ctx.config.network.proxy is not None:
-        kwargs["proxies"] = {"all": ctx.config.network.proxy}
-    try:
-        response = case.call(**kwargs)
-    except (requests.Timeout, requests.ConnectionError):
-        result.store_requests_response(case, None, Status.FAILURE, [], session=session)
-        raise
-    targets.run(ctx.config.execution.targets, case=case, response=response)
-    status = Status.SUCCESS
-
-    check_ctx = CheckContext(
-        override=ctx.config.override,
-        auth=ctx.config.network.auth,
-        headers=CaseInsensitiveDict(headers) if headers else None,
-        config=ctx.config.checks_config,
-        transport_kwargs=kwargs,
-        execution_graph=ctx.execution_graph,
-    )
-    try:
-        validate_response(
-            case=case,
-            ctx=check_ctx,
-            checks=ctx.config.execution.checks,
-            check_results=check_results,
-            result=result,
-            response=response,
-            no_failfast=ctx.config.execution.no_failfast,
-        )
-    except FailureGroup:
-        status = Status.FAILURE
-        raise
-    finally:
-        result.store_requests_response(case, response, status, check_results, session=session)
-    return response

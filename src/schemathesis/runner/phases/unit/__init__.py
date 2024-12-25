@@ -25,8 +25,6 @@ from ...models.status import Status
 from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:
-    from requests import Session
-
     from ....schemas import APIOperation
     from ...context import EngineContext
 
@@ -167,21 +165,10 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
 
 
 @contextmanager
-def get_session(auth: tuple[str, str] | None = None) -> Generator[Session, None, None]:
-    from requests import Session
-
-    with Session() as session:
-        if auth is not None:
-            session.auth = auth
-        yield session
-
-
-@contextmanager
 def network_test_function(ctx: EngineContext) -> Generator[Callable, None, None]:
     from ._executor import network_test
 
-    with get_session(ctx.config.network.auth) as session:
-        yield partial(network_test, session=session)
+    yield partial(network_test, session=ctx.session)
 
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:

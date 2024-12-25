@@ -24,8 +24,6 @@ division by zero
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
         f(ctx=ctx, case=case, result=result, **kwargs)
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in network_test
-        _network_test(case, ctx, result, session, headers)
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
         validate_response(
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in validate_response
         failures = run_checks(
