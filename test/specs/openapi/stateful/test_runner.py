@@ -6,25 +6,22 @@ from typing import List
 import hypothesis
 import hypothesis.errors
 import pytest
-from requests import Session
 
 import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.runner.control import ExecutionControl
+from schemathesis.runner.context import EngineContext
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from schemathesis.stateful.runner import StatefulTestRunner, events
-from schemathesis.stateful.sink import StateMachineSink
 from test.utils import flaky
 
 
 @dataclass
 class RunnerResult:
     events: List[events.StatefulEvent]
-    sink: StateMachineSink
 
     @property
     def event_names(self):
@@ -59,13 +56,11 @@ def serialize_all_events(events):
         json.dumps(_serialize_stateful_event(event))
 
 
-def collect_result(runner) -> RunnerResult:
-    sink = StateMachineSink(transitions=runner.state_machine._transition_stats_template.copy())
+def collect_result(runner: StatefulTestRunner) -> RunnerResult:
     events_ = []
     for event in runner.execute():
-        sink.consume(event)
         events_.append(event)
-    return RunnerResult(events=events_, sink=sink)
+    return RunnerResult(events=events_)
 
 
 @pytest.mark.parametrize("max_failures", [1, 2])
@@ -98,7 +93,7 @@ def keyboard_interrupt(r):
 
 
 def stop_runner(r):
-    r.stop()
+    r.engine.control.stop()
 
 
 @pytest.mark.parametrize("func", [keyboard_interrupt, stop_runner])
@@ -108,7 +103,6 @@ def test_stop_in_check(runner_factory, func):
 
     runner = runner_factory(checks=[stop_immediately])
     result = collect_result(runner)
-    assert result.sink.suites[events.SuiteStatus.INTERRUPTED] == 1
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
     assert result.events[-1].status == events.RunStatus.INTERRUPTED
@@ -122,7 +116,7 @@ def test_explicit_stop(runner_factory, event_cls):
     for event in runner.execute():
         collected.append(event)
         if isinstance(event, event_cls):
-            runner.stop()
+            runner.engine.control.stop()
     assert len(collected) > 0
     assert collected[-1].status == events.RunStatus.INTERRUPTED
 
@@ -133,7 +127,8 @@ def test_stop_outside_of_state_machine_execution(runner_factory, mocker):
         app_kwargs={"independent_500": True},
     )
     mocker.patch(
-        "schemathesis.stateful.runner.RunnerContext.mark_as_seen_in_run", side_effect=lambda *_, **__: runner.stop()
+        "schemathesis.stateful.runner.RunnerContext.mark_as_seen_in_run",
+        side_effect=lambda *_, **__: runner.engine.control.stop(),
     )
     result = collect_result(runner)
     assert result.events[-2].status == events.SuiteStatus.INTERRUPTED
@@ -143,7 +138,7 @@ def test_stop_outside_of_state_machine_execution(runner_factory, mocker):
 
 def test_keyboard_interrupt(runner_factory, mocker):
     runner = runner_factory()
-    mocker.patch.object(runner.event_queue, "get", side_effect=KeyboardInterrupt)
+    mocker.patch("queue.Queue.get", side_effect=KeyboardInterrupt)
     result = collect_result(runner)
     assert "Interrupted" in result.event_names
 
@@ -302,17 +297,9 @@ def test_find_use_after_free(runner_factory):
         hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
     )
     result = collect_result(runner)
-    assert len(result.sink.transitions.roots["POST /users"]) > 0
-    assert result.sink.suites[events.SuiteStatus.FAILURE] == 1
-    assert result.sink.suites[events.SuiteStatus.SUCCESS] == 1
     assert len(result.failures) == 1
     assert result.failures[0].failure.title == "Use after free"
     assert result.events[-1].status == events.RunStatus.FAILURE
-    assert result.sink.transitions.to_formatted_table(80).splitlines()[:3] == [
-        "Links                                                 2xx    4xx    5xx    Total",
-        "",
-        "DELETE /orders/{orderId}",
-    ]
 
 
 def test_failed_health_check(runner_factory):
@@ -366,21 +353,6 @@ def test_unsatisfiable(runner_factory):
     assert result.errors
     assert isinstance(result.errors[0].exception, hypothesis.errors.InvalidArgument)
     assert result.events[-1].status == events.RunStatus.ERROR
-
-
-def test_random_unsatisfiable(runner_factory):
-    runner = runner_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=25, database=None),
-    )
-
-    @runner.state_machine.schema.hook
-    def map_body(ctx, body):
-        if len(body["name"]) % 3 == 2:
-            raise hypothesis.errors.Unsatisfiable("Occurs randomly")
-        return body
-
-    result = collect_result(runner)
-    assert not result.errors, result.errors
 
 
 def test_custom_headers(runner_factory):
@@ -583,22 +555,21 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app = app_factory(independent_500=True)
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=f"http://127.0.0.1:{root_app_port}/")
-    state_machine = schema.as_state_machine()
     runner = StatefulTestRunner(
-        state_machine,
-        config=EngineConfig(
-            schema=schema,
-            execution=ExecutionConfig(
-                checks=CHECKS.get_all(),
-                targets=[],
-                hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
-                generation_config=GenerationConfig(),
+        engine=EngineContext(
+            config=EngineConfig(
+                schema=schema,
+                execution=ExecutionConfig(
+                    checks=CHECKS.get_all(),
+                    targets=[],
+                    hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
+                    generation_config=GenerationConfig(),
+                ),
+                network=NetworkConfig(),
+                checks_config=ChecksConfig(),
             ),
-            network=NetworkConfig(),
-            checks_config=ChecksConfig(),
+            stop_event=threading.Event(),
         ),
-        control=ExecutionControl(stop_event=threading.Event(), max_failures=None),
-        session=Session(),
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE

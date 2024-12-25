@@ -3,17 +3,14 @@ from __future__ import annotations
 import time
 import unittest
 import uuid
-from dataclasses import dataclass
-from types import TracebackType
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Literal, cast
+from typing import TYPE_CHECKING, Any, Callable, Iterable
 from warnings import WarningMessage, catch_warnings
 
 import requests
-from hypothesis.errors import HypothesisException, InvalidArgument
+from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
-from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.compat import BaseExceptionGroup
@@ -311,45 +308,9 @@ def validate_response(
         raise FailureGroup(list(failures)) from None
 
 
-@dataclass
-class ErrorCollector:
-    """Collect exceptions that are not related to failed checks.
-
-    Such exceptions may be considered as multiple failures or flakiness by Hypothesis. In both cases, Hypothesis hides
-    exception information that, in our case, is helpful for the end-user. It either indicates errors in user-defined
-    extensions, network-related errors, or internal Schemathesis errors. In all cases, this information is useful for
-    debugging.
-
-    To mitigate this, we gather all exceptions manually via this context manager to avoid interfering with the test
-    function signatures, which are used by Hypothesis.
-    """
-
-    errors: list[Exception]
-
-    def __enter__(self) -> ErrorCollector:
-        return self
-
-    def __exit__(
-        self, exc_type: type[BaseException] | None, exc_val: BaseException | None, exc_tb: TracebackType | None
-    ) -> Literal[False]:
-        # Don't do anything special if:
-        #   - Tests are successful
-        #   - Checks failed
-        #   - The testing process is interrupted
-        if not exc_type or issubclass(exc_type, Failure) or not issubclass(exc_type, Exception):
-            return False
-        # These exceptions are needed for control flow on the Hypothesis side. E.g. rejecting unsatisfiable examples
-        if isinstance(exc_val, HypothesisException):
-            raise
-        # Exception value is not `None` and is a subclass of `Exception` at this point
-        exc_val = cast(Exception, exc_val)
-        self.errors.append(exc_val.with_traceback(exc_tb))
-        raise UnexpectedError from None
-
-
 def cached_test_func(f: Callable) -> Callable:
     def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], result: TestResult, **kwargs: Any) -> None:
-        with ErrorCollector(errors):
+        try:
             if ctx.is_stopped:
                 raise KeyboardInterrupt
             if ctx.config.execution.unique_data:
@@ -369,6 +330,11 @@ def cached_test_func(f: Callable) -> Callable:
             else:
                 result.mark_executed()
                 f(ctx=ctx, case=case, result=result, **kwargs)
+        except (KeyboardInterrupt, Failure):
+            raise
+        except Exception as exc:
+            errors.append(exc)
+            raise UnexpectedError from None
 
     wrapped.__name__ = f.__name__
 
@@ -376,39 +342,20 @@ def cached_test_func(f: Callable) -> Callable:
 
 
 @cached_test_func
-def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session: requests.Session) -> None:
-    headers = ctx.config.network.headers
+def test_func(*, ctx: EngineContext, case: Case, result: TestResult) -> None:
     if not ctx.config.execution.dry_run:
-        check_results: list[Check] = []
-        kwargs: dict[str, Any] = {
-            "session": session,
-            "headers": headers,
-            "timeout": ctx.config.network.timeout,
-            "verify": ctx.config.network.tls_verify,
-            "cert": ctx.config.network.cert,
-        }
-        if ctx.config.network.proxy is not None:
-            kwargs["proxies"] = {"all": ctx.config.network.proxy}
         try:
-            response = case.call(**kwargs)
+            response = case.call(**ctx.transport_kwargs)
         except (requests.Timeout, requests.ConnectionError):
-            result.store_requests_response(case, None, Status.FAILURE, [], session=session)
+            result.store_requests_response(case, None, Status.FAILURE, [], session=ctx.session)
             raise
         targets.run(ctx.config.execution.targets, case=case, response=response)
         status = Status.SUCCESS
-
-        check_ctx = CheckContext(
-            override=ctx.config.override,
-            auth=ctx.config.network.auth,
-            headers=CaseInsensitiveDict(headers) if headers else None,
-            config=ctx.config.checks_config,
-            transport_kwargs=kwargs,
-            execution_graph=ctx.execution_graph,
-        )
+        check_results: list[Check] = []
         try:
             validate_response(
                 case=case,
-                ctx=check_ctx,
+                ctx=ctx.check_context,
                 checks=ctx.config.execution.checks,
                 check_results=check_results,
                 result=result,
@@ -419,6 +366,6 @@ def network_test(*, ctx: EngineContext, case: Case, result: TestResult, session:
             status = Status.FAILURE
             raise
         finally:
-            result.store_requests_response(case, response, status, check_results, session=session)
+            result.store_requests_response(case, response, status, check_results, session=ctx.session)
     else:
-        result.store_requests_response(case, None, Status.SKIP, [], session=session)
+        result.store_requests_response(case, None, Status.SKIP, [], session=ctx.session)

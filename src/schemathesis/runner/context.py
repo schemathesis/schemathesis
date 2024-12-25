@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar
 
+from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.stateful.graph import ExecutionGraph
 
@@ -69,7 +70,9 @@ class EngineContext:
     phase_data: PhaseStorage
     start_time: float
 
-    def __init__(self, *, stop_event: threading.Event, config: EngineConfig) -> None:
+    def __init__(
+        self, *, stop_event: threading.Event, config: EngineConfig, session: requests.Session | None = None
+    ) -> None:
         self.data = TestResultSet(seed=config.execution.seed)
         self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
         self.outcome_cache = {}
@@ -77,6 +80,7 @@ class EngineContext:
         self.phase_data = PhaseStorage()
         self.start_time = time.monotonic()
         self.execution_graph = ExecutionGraph()
+        self._session = session
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -125,6 +129,8 @@ class EngineContext:
 
     @cached_property
     def session(self) -> requests.Session:
+        if self._session is not None:
+            return self._session
         import requests
 
         session = requests.Session()
@@ -137,6 +143,32 @@ class EngineContext:
         if config.cert is not None:
             session.cert = config.cert
         return session
+
+    @property
+    def transport_kwargs(self) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {
+            "session": self.session,
+            "headers": self.config.network.headers,
+            "timeout": self.config.network.timeout,
+            "verify": self.config.network.tls_verify,
+            "cert": self.config.network.cert,
+        }
+        if self.config.network.proxy is not None:
+            kwargs["proxies"] = {"all": self.config.network.proxy}
+        return kwargs
+
+    @property
+    def check_context(self) -> CheckContext:
+        from requests.models import CaseInsensitiveDict
+
+        return CheckContext(
+            override=self.config.override,
+            auth=self.config.network.auth,
+            headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
+            config=self.config.checks_config,
+            transport_kwargs=self.transport_kwargs,
+            execution_graph=self.execution_graph,
+        )
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
