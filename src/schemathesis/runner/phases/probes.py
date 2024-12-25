@@ -36,7 +36,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
     yield events.BeforeProbing()
     results = None
     if not ctx.config.execution.dry_run:
-        results = run(ctx.config.schema, ctx.config.network)
+        results = run(ctx.config.schema, ctx.session, ctx.config.network)
         for result in results:
             if isinstance(result.probe, NullByteInHeader) and result.is_failure:
                 from ...specs.openapi import formats
@@ -47,18 +47,8 @@ def execute(ctx: EngineContext) -> EventGenerator:
     yield events.AfterProbing(probes=results)
 
 
-def run(schema: BaseSchema, config: NetworkConfig) -> list[ProbeRun]:
+def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:
     """Run all probes against the given schema."""
-    from requests import Session
-
-    session = Session()
-    session.headers.update(config.headers or {})
-    session.verify = config.tls_verify
-    if config.cert is not None:
-        session.cert = config.cert
-    if config.auth is not None:
-        session.auth = config.auth
-
     return [send(probe(), session, schema, config) for probe in PROBES]
 
 

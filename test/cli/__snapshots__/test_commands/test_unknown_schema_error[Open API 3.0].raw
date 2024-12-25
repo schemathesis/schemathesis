@@ -24,8 +24,6 @@ Something bad happen
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
         f(ctx=ctx, case=case, result=result, **kwargs)
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in network_test
-        _network_test(case, ctx, result, session, headers)
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in _network_test
         targets.run(ctx.config.execution.targets, case=case, response=response)
       File "/package-root/generation/targets.py", line XXX, in run
         value = target(context)

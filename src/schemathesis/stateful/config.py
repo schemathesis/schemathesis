@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import timedelta
-from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CHECKS, CheckFunction, ChecksConfig
@@ -45,6 +44,7 @@ def _default_request_config_factory() -> NetworkConfig:
 class StatefulTestRunnerConfig:
     """Configuration for the stateful test runner."""
 
+    session: requests.Session
     # Checks to run against each response
     checks: list[CheckFunction] = field(default_factory=CHECKS.get_all)
     checks_config: ChecksConfig = field(default_factory=dict)
@@ -69,17 +69,6 @@ class StatefulTestRunnerConfig:
         kwargs = _get_hypothesis_settings_kwargs_override(self.hypothesis_settings)
         if kwargs:
             self.hypothesis_settings = hypothesis.settings(self.hypothesis_settings, **kwargs)
-
-    @cached_property
-    def session(self) -> requests.Session:
-        import requests
-
-        session = requests.Session()
-        if self.auth is not None:
-            session.auth = self.auth
-        if self.headers:
-            session.headers.update(self.headers)
-        return session
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
