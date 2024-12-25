@@ -18,21 +18,17 @@ class CIProvider(enum.Enum):
 class Environment(Protocol):
     provider: CIProvider
     variable_name: str
-    verbose_name: str
+    name: str
 
     @classmethod
-    def is_set(cls) -> bool:
-        pass
+    def is_set(cls) -> bool: ...
 
     @classmethod
-    def from_env(cls) -> Environment:
-        pass
+    def from_env(cls) -> Environment: ...
 
-    def asdict(self) -> dict[str, str | None]:
-        pass
+    def asdict(self) -> dict[str, str | None]: ...
 
-    def as_env(self) -> dict[str, str | None]:
-        pass
+    def as_env(self) -> dict[str, str | None]: ...
 
 
 def environment() -> Environment | None:
@@ -66,7 +62,7 @@ class GitHubActionsEnvironment:
 
     provider = CIProvider.GITHUB
     variable_name = "GITHUB_ACTIONS"
-    verbose_name = "GitHub Actions"
+    name = "GitHub Actions"
     asdict = _asdict
 
     # GitHub API URL.
@@ -141,7 +137,7 @@ class GitLabCIEnvironment:
 
     provider = CIProvider.GITLAB
     variable_name = "GITLAB_CI"
-    verbose_name = "GitLab CI"
+    name = "GitLab CI"
     asdict = _asdict
 
     # GitLab API URL

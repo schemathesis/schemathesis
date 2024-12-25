@@ -87,7 +87,7 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
             str(schema_path),
             f"--base-url={openapi3_base_url}",
             "--hypothesis-max-examples=5",
-            "--experimental=positive_data_acceptance",
+            "--experimental=positive-data-acceptance",
             *args,
         )
         == snapshot_cli

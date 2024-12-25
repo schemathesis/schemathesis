@@ -56,7 +56,7 @@ def status_code_conformance(ctx: CheckContext, response: Response, case: Case) -
         defined_status_codes = list(map(str, responses))
         responses_list = ", ".join(defined_status_codes)
         raise UndefinedStatusCode(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             status_code=response.status_code,
             defined_status_codes=defined_status_codes,
             allowed_status_codes=allowed_status_codes,
@@ -83,7 +83,7 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
     if not content_types:
         all_media_types = [f"\n- `{content_type}`" for content_type in documented_content_types]
         raise MissingContentType(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             message=f"The following media types are documented in the schema:{''.join(all_media_types)}",
             media_types=documented_content_types,
         )
@@ -105,7 +105,7 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
         ):
             return None
     raise UndefinedContentType(
-        operation=case.operation.verbose_name,
+        operation=case.operation.label,
         message=f"Received: {content_type}\nDocumented: {', '.join(documented_content_types)}",
         content_type=content_type,
         defined_content_types=documented_content_types,
@@ -114,7 +114,7 @@ def content_type_conformance(ctx: CheckContext, response: Response, case: Case) 
 
 def _reraise_malformed_media_type(case: Case, location: str, actual: str, defined: str) -> NoReturn:
     raise MalformedMediaType(
-        operation=case.operation.verbose_name,
+        operation=case.operation.label,
         message=f"Media type for {location} is incorrect\n\nReceived: {actual}\nDocumented: {defined}",
         actual=actual,
         defined=defined,
@@ -146,9 +146,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
     if missing_headers:
         formatted_headers = [f"\n- `{header}`" for header in missing_headers]
         message = f"The following required headers are missing from the response:{''.join(formatted_headers)}"
-        errors.append(
-            MissingHeaders(operation=case.operation.verbose_name, message=message, missing_headers=missing_headers)
-        )
+        errors.append(MissingHeaders(operation=case.operation.label, message=message, missing_headers=missing_headers))
     for name, definition in defined_headers.items():
         values = response.headers.get(name.lower())
         if values is not None:
@@ -176,7 +174,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                     errors.append(
                         JsonSchemaError.from_exception(
                             title="Response header does not conform to the schema",
-                            operation=case.operation.verbose_name,
+                            operation=case.operation.label,
                             exc=exc,
                             output_config=case.operation.schema.output_config,
                         )
@@ -231,7 +229,7 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
         and not has_only_additional_properties_in_non_body_parameters(case)
     ):
         raise AcceptedNegativeData(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
             status_code=response.status_code,
             allowed_statuses=config.allowed_statuses,
@@ -251,7 +249,7 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
 
     if case.meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
         raise RejectedPositiveData(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
             status_code=response.status_code,
             allowed_statuses=config.allowed_statuses,
@@ -327,7 +325,7 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
                 usage = f"{case.operation.method.upper()} {prepare_path(case.path, case.path_parameters)}"
                 reason = http.client.responses.get(response.status_code, "Unknown")
                 raise UseAfterFree(
-                    operation=related_case.operation.verbose_name,
+                    operation=related_case.operation.label,
                     message=(
                         "The API did not return a `HTTP 404 Not Found` response "
                         f"(got `HTTP {response.status_code} {reason}`) for a resource that was previously deleted.\n\nThe resource was deleted with `{free}`"
@@ -364,8 +362,8 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
             ResourcePath(case.path, case.path_parameters or {}),
         )
     ):
-        created_with = parent.operation.verbose_name
-        not_available_with = case.operation.verbose_name
+        created_with = parent.operation.label
+        not_available_with = case.operation.label
         reason = http.client.responses.get(response.status_code, "Unknown")
         raise EnsureResourceAvailability(
             operation=created_with,
@@ -410,22 +408,22 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
             new_response = case.operation.schema.transport.send(case, **kwargs)
             if new_response.status_code != 401:
                 _update_response(response, new_response)
-                _raise_no_auth_error(new_response, case.operation.verbose_name, "that requires authentication")
+                _raise_no_auth_error(new_response, case.operation.label, "that requires authentication")
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
                 _set_auth_for_case(case, parameter)
                 new_response = case.operation.schema.transport.send(case, **kwargs)
                 if new_response.status_code != 401:
                     _update_response(response, new_response)
-                    _raise_no_auth_error(new_response, case.operation.verbose_name, "with any auth")
+                    _raise_no_auth_error(new_response, case.operation.label, "with any auth")
                 _remove_auth_from_case(case, security_parameters)
         elif auth == AuthKind.GENERATED:
             # If this auth is generated which means it is likely invalid, then
             # this request should have been an error
-            _raise_no_auth_error(response, case.operation.verbose_name, "with invalid auth")
+            _raise_no_auth_error(response, case.operation.label, "with invalid auth")
         else:
             # Successful response when there is no auth
-            _raise_no_auth_error(response, case.operation.verbose_name, "that requires authentication")
+            _raise_no_auth_error(response, case.operation.label, "that requires authentication")
     return None
 
 

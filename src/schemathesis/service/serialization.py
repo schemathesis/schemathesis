@@ -37,7 +37,7 @@ def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | No
 
 
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
-    return {"correlation_id": event.correlation_id, "verbose_name": event.verbose_name}
+    return {"correlation_id": event.correlation_id, "label": event.label}
 
 
 def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:

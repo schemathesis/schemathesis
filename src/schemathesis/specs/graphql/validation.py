@@ -17,7 +17,7 @@ def validate_graphql_response(case: Case, payload: Any) -> None:
 
     if not isinstance(payload, dict):
         raise UnexpectedGraphQLResponse(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             message="GraphQL response is not a JSON object",
             type_name=str(type(payload)),
         )
@@ -27,9 +27,9 @@ def validate_graphql_response(case: Case, payload: Any) -> None:
         data = payload.get("data")
         # There is no `path` pointing to some part of the input query, assuming client error
         if data is None and "path" not in errors[0]:
-            raise GraphQLClientError(operation=case.operation.verbose_name, message=errors[0]["message"], errors=errors)
+            raise GraphQLClientError(operation=case.operation.label, message=errors[0]["message"], errors=errors)
         if len(errors) > 1:
             message = "\n\n".join([f"{idx}. {error['message']}" for idx, error in enumerate(errors, 1)])
         else:
             message = errors[0]["message"]
-        raise GraphQLServerError(operation=case.operation.verbose_name, message=message, errors=errors)
+        raise GraphQLServerError(operation=case.operation.label, message=message, errors=errors)

@@ -226,7 +226,7 @@ def run_subtest(operation: APIOperation, fixtures: dict[str, Any], sub_test: Cal
     """Run the given subtest with pytest fixtures."""
     __tracebackhide__ = True
 
-    with subtests.test(verbose_name=operation.verbose_name):
+    with subtests.test(label=operation.label):
         sub_test(**fixtures)
 
 

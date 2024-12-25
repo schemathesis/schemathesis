@@ -58,7 +58,7 @@ def response():
 
 @pytest.fixture
 def results_set(operation):
-    statistic = TestResult(verbose_name=f"{operation.method} {operation.full_path}")
+    statistic = TestResult(label=f"{operation.method} {operation.full_path}")
     return TestResultSet(seed=42, results=[statistic])
 
 
@@ -149,7 +149,7 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
         operation.Case(body=body, media_type=media_type),
     )
     test_statistic = TestResult(
-        verbose_name=f"{operation.method} {operation.full_path}",
+        label=f"{operation.method} {operation.full_path}",
         checks=[
             success,
             success,

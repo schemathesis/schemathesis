@@ -70,7 +70,7 @@ def get_project_details(setup_server, openapi3_base_url, openapi3_schema):
                 "specification": {
                     "schema": openapi3_schema.raw_schema,
                     "type": "openapi",
-                    "version": openapi3_schema.spec_version,
+                    "version": openapi3_schema.specification.version,
                     "operations_count": openapi3_schema.operations_count,
                 },
                 "environments": [{"name": "Default", "description": "", "is_default": True, "url": openapi3_base_url}],

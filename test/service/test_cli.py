@@ -437,7 +437,7 @@ def test_ci_environment(monkeypatch, cli, schema_url, tmp_path, read_report, ser
     assert result.exit_code == ExitCode.OK, result.stdout
     # And CI information is displayed in stdout
     lines = get_stdout_lines(result.stdout)
-    assert lines[20] == f"{environment.verbose_name} detected:"
+    assert lines[20] == f"{environment.name} detected:"
     key, value = next(iter(environment.as_env().items()))
     assert lines[21] == f"  -> {key}: {value}"
     # And missing env vars are not displayed

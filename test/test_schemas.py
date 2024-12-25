@@ -13,8 +13,8 @@ def test_base_path_suffix(swagger_20, base_path):
     swagger_20.raw_schema["basePath"] = base_path
     # Then base path ends with "/" anyway in the swagger instance
     assert swagger_20.base_path == "/v1/"
-    assert swagger_20.verbose_name == "Swagger 2.0"
-    assert swagger_20.spec_version == "2.0"
+    assert swagger_20.specification.name == "Open API 2.0"
+    assert swagger_20.specification.version == "2.0"
 
 
 @pytest.mark.parametrize(
@@ -37,9 +37,9 @@ def test_open_api_base_path(openapi_30, server, base_path):
     assert openapi_30.base_path == base_path
 
 
-def test_open_api_verbose_name(openapi_30):
-    assert openapi_30.verbose_name == "Open API 3.0.0"
-    assert openapi_30.spec_version == "3.0.0"
+def test_open_api_specification(openapi_30):
+    assert openapi_30.specification.name == "Open API 3.0.0"
+    assert openapi_30.specification.version == "3.0.0"
 
 
 def test_resolver_cache(simple_schema, mocker):

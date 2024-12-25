@@ -61,7 +61,6 @@ def get_full_path(base_path: str, path: str) -> str:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
-    specification: Specification
     location: str | None = None
     base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
@@ -75,6 +74,10 @@ class BaseSchema(Mapping):
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
+
+    @property
+    def specification(self) -> Specification:
+        raise NotImplementedError
 
     @property
     def transport(self) -> transport.BaseTransport:
@@ -173,10 +176,6 @@ class BaseSchema(Mapping):
 
     def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
-
-    @property
-    def verbose_name(self) -> str:
-        raise NotImplementedError
 
     def get_full_path(self, path: str) -> str:
         """Compute full path for the given path."""
@@ -278,7 +277,6 @@ class BaseSchema(Mapping):
 
         return self.__class__(
             self.raw_schema,
-            specification=self.specification,
             location=self.location,
             base_url=self.base_url,
             app=self.app,
@@ -570,7 +568,7 @@ class APIOperation(Generic[P]):
     method: str
     definition: OperationDefinition = field(repr=False)
     schema: BaseSchema
-    verbose_name: str = None  # type: ignore
+    label: str = None  # type: ignore
     app: Any = None
     base_url: str | None = None
     path_parameters: ParameterSet[P] = field(default_factory=ParameterSet)
@@ -580,8 +578,8 @@ class APIOperation(Generic[P]):
     body: PayloadAlternatives[P] = field(default_factory=PayloadAlternatives)
 
     def __post_init__(self) -> None:
-        if self.verbose_name is None:
-            self.verbose_name = f"{self.method.upper()} {self.full_path}"  # type: ignore
+        if self.label is None:
+            self.label = f"{self.method.upper()} {self.full_path}"  # type: ignore
 
     @property
     def full_path(self) -> str:

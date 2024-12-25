@@ -189,7 +189,7 @@ def _find_request_body_examples_definition(
     from .schemas import BaseOpenAPISchema
 
     schema = cast(BaseOpenAPISchema, operation.schema)
-    if schema.spec_version == "2.0":
+    if schema.specification.version == "2.0":
         raw_schema = schema.raw_schema
         path_data = raw_schema["paths"][operation.path]
         parameters = chain(path_data[operation.method].get("parameters", []), path_data.get("parameters", []))

@@ -27,7 +27,7 @@ from test.utils import assert_requests_call
 
 
 def test_raw_schema(graphql_schema):
-    assert graphql_schema.verbose_name == "GraphQL"
+    assert graphql_schema.specification.name == "GraphQL"
 
 
 def test_tags(graphql_schema):
@@ -135,7 +135,7 @@ def test_multiple_server_error():
         ],
     }
     with pytest.raises(Failure, match="GraphQL server error") as exc:
-        validate_graphql_response(Mock(operation=Mock(verbose_name="GET/ foo")), payload)
+        validate_graphql_response(Mock(operation=Mock(label="GET/ foo")), payload)
 
     assert exc.value.message == "1. Hidden 1 / 0 bug\n\n2. Another bug\n\n3. Third bug"
 

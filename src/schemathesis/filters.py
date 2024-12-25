@@ -258,7 +258,7 @@ class FilterSet:
         if func is not None:
             matchers.append(Matcher.for_function(func))
         for attribute, expected, regex in (
-            ("verbose_name", name, name_regex),
+            ("label", name, name_regex),
             ("method", method, method_regex),
             ("path", path, path_regex),
             ("tag", tag, tag_regex),

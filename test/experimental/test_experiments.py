@@ -8,7 +8,7 @@ from schemathesis.experimental import COVERAGE_PHASE, ENV_PREFIX, ExperimentSet
 
 def test_experiments():
     experiments = ExperimentSet()
-    example = experiments.create_experiment("Example", "", "FOO", "", "")
+    example = experiments.create_experiment("Example", "FOO", "", "")
 
     del experiments
 
@@ -22,7 +22,7 @@ def test_experiments():
 @pytest.mark.parametrize(
     ("args", "kwargs"),
     [
-        ((f"--experimental={COVERAGE_PHASE.name}",), {}),
+        ((f"--experimental={COVERAGE_PHASE.label}",), {}),
         ((), {"env": {COVERAGE_PHASE.env_var: "true"}}),
     ],
 )
@@ -39,14 +39,14 @@ def test_enable_via_env_var(monkeypatch):
     env_var = "FOO"
     monkeypatch.setenv(f"{ENV_PREFIX}_{env_var}", "true")
     experiments = ExperimentSet()
-    example = experiments.create_experiment("Example", "", env_var, "", "")
+    example = experiments.create_experiment("Example", env_var, "", "")
     assert example.is_enabled
 
 
 @pytest.mark.parametrize("is_enabled", [True, False])
 def test_multiple_threads(is_enabled):
     experiments = ExperimentSet()
-    example = experiments.create_experiment("Example", "", "FOO", "", "")
+    example = experiments.create_experiment("Example", "FOO", "", "")
     if is_enabled:
         example.enable()
     error = None

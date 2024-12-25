@@ -13,8 +13,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
-
-from .config import _default_hypothesis_settings_factory
+from schemathesis.stateful.runner import DEFAULT_STATE_MACHINE_SETTINGS
 
 if TYPE_CHECKING:
     import hypothesis
@@ -72,7 +71,7 @@ class APIStateMachine(RuleBasedStateMachine):
         from . import run_state_machine_as_test
 
         class StateMachineTestCase(RuleBasedStateMachine.TestCase):
-            settings = _default_hypothesis_settings_factory()
+            settings = DEFAULT_STATE_MACHINE_SETTINGS
 
             def runTest(self) -> None:
                 run_state_machine_as_test(cls, settings=self.settings)

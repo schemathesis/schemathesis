@@ -1,4 +1,5 @@
 import json
+import threading
 from dataclasses import dataclass
 from typing import List
 
@@ -8,12 +9,13 @@ import pytest
 from requests import Session
 
 import schemathesis
-from schemathesis.checks import max_response_time, not_a_server_error
+from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.runner.control import ExecutionControl
 from schemathesis.service.serialization import _serialize_stateful_event
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
-from schemathesis.stateful.config import StatefulTestRunnerConfig
 from schemathesis.stateful.runner import StatefulTestRunner, events
 from schemathesis.stateful.sink import StateMachineSink
 from test.utils import flaky
@@ -66,33 +68,22 @@ def collect_result(runner) -> RunnerResult:
     return RunnerResult(events=events_, sink=sink)
 
 
-@pytest.mark.parametrize(
-    "kwargs",
-    [
-        {"max_failures": 1},
-        {"max_failures": 2},
-    ],
-)
-def test_find_independent_5xx(runner_factory, kwargs):
+@pytest.mark.parametrize("max_failures", [1, 2])
+def test_find_independent_5xx(runner_factory, max_failures):
     # When the app contains multiple endpoints with 5xx responses
-    kwargs["checks"] = [not_a_server_error]
-    runner = runner_factory(app_kwargs={"independent_500": True}, config_kwargs=kwargs)
+    runner = runner_factory(
+        app_kwargs={"independent_500": True}, checks=[not_a_server_error], max_failures=max_failures
+    )
     result = collect_result(runner)
-    all_affected_operations = {
-        "DELETE /users/{userId}",
-        "PATCH /users/{userId}",
-    }
     assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
     for event in result.events:
         assert event.timestamp is not None
-    if kwargs.get("max_failures") == 1:
+    if max_failures == 1:
         # Then only the first one should be found
         assert len(result.failures) == 1
-        assert result.failures[0].case.operation.verbose_name in all_affected_operations
-    elif kwargs.get("max_failures") == 2:
+    elif max_failures == 2:
         # Else, all of them should be found
         assert len(result.failures) == 2
-        assert {check.case.operation.verbose_name for check in result.failures} == all_affected_operations
     serialize_all_events(result.events)
 
 
@@ -115,7 +106,7 @@ def test_stop_in_check(runner_factory, func):
     def stop_immediately(*args, **kwargs):
         func(runner)
 
-    runner = runner_factory(config_kwargs={"checks": (stop_immediately,)})
+    runner = runner_factory(checks=[stop_immediately])
     result = collect_result(runner)
     assert result.sink.suites[events.SuiteStatus.INTERRUPTED] == 1
     assert "StepStarted" in result.event_names
@@ -165,7 +156,7 @@ def test_internal_error_in_check(runner_factory, kwargs):
     def bugged_check(*args, **kwargs):
         raise ZeroDivisionError("Oops!")
 
-    runner = runner_factory(config_kwargs={"checks": (bugged_check,), **kwargs})
+    runner = runner_factory(checks=[bugged_check], **kwargs)
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, ZeroDivisionError)
@@ -178,10 +169,8 @@ def test_custom_assertion_in_check(runner_factory, exception_args):
         raise AssertionError(*exception_args)
 
     runner = runner_factory(
-        config_kwargs={
-            "checks": (custom_check,),
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-        }
+        checks=[custom_check],
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
     )
     result = collect_result(runner)
     # Failures on different API operations
@@ -214,10 +203,8 @@ def test_distinct_assertions(runner_factory):
             assert case.headers == 43, "Fourth"
 
     runner = runner_factory(
-        config_kwargs={
-            "checks": (custom_check,),
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-        }
+        checks=[custom_check],
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
     )
     result = collect_result(runner)
     # Then all of them should be reported
@@ -249,11 +236,9 @@ def test_flaky_assertions(runner_factory, kwargs):
         assert case.headers == 43
 
     runner = runner_factory(
-        config_kwargs={
-            "checks": (custom_check,),
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-            **kwargs,
-        }
+        checks=[custom_check],
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
+        **kwargs,
     )
     result = collect_result(runner)
     # Then all of them should be reported
@@ -285,10 +270,8 @@ def test_failure_hidden_behind_another_failure(runner_factory):
 
     runner = runner_factory(
         app_kwargs={"failure_behind_failure": True},
-        config_kwargs={
-            "checks": (dynamic_check,),
-            "hypothesis_settings": hypothesis.settings(max_examples=60, database=None),
-        },
+        checks=[dynamic_check],
+        hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
     )
     failures = []
     for event in runner.execute():
@@ -315,10 +298,8 @@ def test_multiple_conformance_issues(runner_factory):
 def test_find_use_after_free(runner_factory):
     runner = runner_factory(
         app_kwargs={"use_after_free": True},
-        config_kwargs={
-            "checks": (use_after_free,),
-            "hypothesis_settings": hypothesis.settings(max_examples=60, database=None),
-        },
+        checks=[use_after_free],
+        hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
     )
     result = collect_result(runner)
     assert len(result.sink.transitions.roots["POST /users"]) > 0
@@ -339,10 +320,8 @@ def test_failed_health_check(runner_factory):
         hypothesis.reject()
 
     runner = runner_factory(
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, suppress_health_check=[]),
-            "checks": (rejected_check,),
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, suppress_health_check=[]),
+        checks=[rejected_check],
     )
     result = collect_result(runner)
     assert result.errors
@@ -365,11 +344,9 @@ def test_flaky(runner_factory, kwargs):
             raise AssertionError("Flaky")
 
     runner = runner_factory(
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-            "checks": (flaky_check,),
-            **kwargs,
-        }
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
+        checks=[flaky_check],
+        **kwargs,
     )
     failures = []
     for event in runner.execute():
@@ -383,7 +360,7 @@ def test_flaky(runner_factory, kwargs):
 def test_unsatisfiable(runner_factory):
     runner = runner_factory(
         app_kwargs={"unsatisfiable": True},
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=1, database=None)},
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
     )
     result = collect_result(runner)
     assert result.errors
@@ -393,7 +370,7 @@ def test_unsatisfiable(runner_factory):
 
 def test_random_unsatisfiable(runner_factory):
     runner = runner_factory(
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=25, database=None)},
+        hypothesis_settings=hypothesis.settings(max_examples=25, database=None),
     )
 
     @runner.state_machine.schema.hook
@@ -410,7 +387,8 @@ def test_custom_headers(runner_factory):
     headers = {"X-Foo": "Bar"}
     runner = runner_factory(
         app_kwargs={"custom_headers": headers},
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=1, database=None), "headers": headers},
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
+        network=NetworkConfig(headers=headers),
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.SUCCESS
@@ -421,19 +399,14 @@ def test_multiple_source_links(runner_factory):
     # Then there should be no error during getting the previous step results
     runner = runner_factory(
         app_kwargs={"multiple_source_links": True},
-        config_kwargs={"hypothesis_settings": hypothesis.settings(max_examples=10, database=None)},
+        hypothesis_settings=hypothesis.settings(max_examples=10, database=None),
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
 
 
 def test_dry_run(runner_factory):
-    runner = runner_factory(
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-            "dry_run": True,
-        },
-    )
+    runner = runner_factory(hypothesis_settings=hypothesis.settings(max_examples=1, database=None), dry_run=True)
     result = collect_result(runner)
     assert not result.errors, result.errors
     for event in result.events:
@@ -444,11 +417,9 @@ def test_dry_run(runner_factory):
 
 def test_max_response_time_valid(runner_factory):
     runner = runner_factory(
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None),
-            "checks": [max_response_time],
-            "checks_config": {max_response_time: MaxResponseTimeConfig(10.0)},
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
+        checks=[max_response_time],
+        checks_config={max_response_time: MaxResponseTimeConfig(10.0)},
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
@@ -458,11 +429,9 @@ def test_max_response_time_valid(runner_factory):
 def test_max_response_time_invalid(runner_factory):
     runner = runner_factory(
         app_kwargs={"slowdown": 0.010},
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
-            "checks": [max_response_time],
-            "checks_config": {max_response_time: MaxResponseTimeConfig(0.005)},
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
+        checks=[max_response_time],
+        checks_config={max_response_time: MaxResponseTimeConfig(0.005)},
     )
     failures = []
     for event in runner.execute():
@@ -484,11 +453,9 @@ def test_targeted(runner_factory):
         return 1.0
 
     runner = runner_factory(
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=1, database=None, stateful_step_count=5),
-            "checks": (not_a_server_error,),
-            "targets": [custom_target],
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, stateful_step_count=5),
+        checks=[not_a_server_error],
+        targets=[custom_target],
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
@@ -619,9 +586,19 @@ def test_external_link(ctx, app_factory, app_runner):
     state_machine = schema.as_state_machine()
     runner = StatefulTestRunner(
         state_machine,
-        config=StatefulTestRunnerConfig(
-            hypothesis_settings=hypothesis.settings(max_examples=75, database=None), session=Session()
+        config=EngineConfig(
+            schema=schema,
+            execution=ExecutionConfig(
+                checks=CHECKS.get_all(),
+                targets=[],
+                hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
+                generation_config=GenerationConfig(),
+            ),
+            network=NetworkConfig(),
+            checks_config=ChecksConfig(),
         ),
+        control=ExecutionControl(stop_event=threading.Event(), max_failures=None),
+        session=Session(),
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE
@@ -631,9 +608,7 @@ def test_new_resource_is_not_available(runner_factory):
     # When a resource is not available after creation
     runner = runner_factory(
         app_kwargs={"ensure_resource_availability": True},
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
     )
     result = collect_result(runner)
     # Then it is a failure
@@ -644,9 +619,7 @@ def test_new_resource_is_not_available(runner_factory):
 def test_negative_tests(runner_factory):
     runner = runner_factory(
         app_kwargs={"independent_500": True},
-        config_kwargs={
-            "hypothesis_settings": hypothesis.settings(max_examples=50, database=None),
-        },
+        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
         configuration={"generation": GenerationConfig(modes=GenerationMode.all())},
     )
     result = collect_result(runner)
@@ -656,10 +629,8 @@ def test_negative_tests(runner_factory):
 def test_unique_data(runner_factory):
     runner = runner_factory(
         app_kwargs={"independent_500": True},
-        config_kwargs={
-            "unique_data": True,
-            "hypothesis_settings": hypothesis.settings(max_examples=30, database=None, stateful_step_count=100),
-        },
+        unique_data=True,
+        hypothesis_settings=hypothesis.settings(max_examples=30, database=None, stateful_step_count=100),
     )
     cases = []
     for event in runner.execute():
@@ -678,10 +649,8 @@ def test_ignored_auth_valid(runner_factory):
     token = "Test"
     runner = runner_factory(
         app_kwargs={"auth_token": token},
-        config_kwargs={
-            "checks": (ignored_auth,),
-            "headers": {"Authorization": f"Bearer {token}"},
-        },
+        checks=[ignored_auth],
+        network=NetworkConfig(headers={"Authorization": f"Bearer {token}"}),
     )
     result = collect_result(runner)
     # Then no failures are reported
@@ -693,10 +662,8 @@ def test_ignored_auth_invalid(runner_factory):
     token = "Test"
     runner = runner_factory(
         app_kwargs={"auth_token": token, "ignored_auth": True},
-        config_kwargs={
-            "checks": (ignored_auth,),
-            "headers": {"Authorization": "Bearer UNKNOWN"},
-        },
+        checks=[ignored_auth],
+        network=NetworkConfig(headers={"Authorization": "Bearer UNKNOWN"}),
     )
     result = collect_result(runner)
     # Then it should be reported

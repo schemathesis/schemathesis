@@ -149,7 +149,7 @@ def get_container(
                 container_name = LOCATION_TO_CONTAINER[param.location]
                 break
         else:
-            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.verbose_name}`")
+            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.label}`")
     return location, getattr(case, container_name)
 
 

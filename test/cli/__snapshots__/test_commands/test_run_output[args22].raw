@@ -18,9 +18,9 @@ Options:
 
 Experimental options:
   --experimental                            Enable experimental features
-                                            [possible values: schema-analysis,
-                                            stateful-only, coverage-phase,
-                                            positive_data_acceptance]
+                                            [possible values: coverage-phase,
+                                            positive-data-acceptance, schema-
+                                            analysis, stateful-only]
   --experimental-no-failfast                Continue testing an API operation
                                             after a failure is found
   --experimental-missing-required-header-allowed-statuses 

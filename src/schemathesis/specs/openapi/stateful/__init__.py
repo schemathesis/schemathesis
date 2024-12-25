@@ -31,7 +31,7 @@ class OpenAPIStateMachine(APIStateMachine):
     _response_matchers: dict[str, Callable[[StepResult], str | None]]
 
     def _get_target_for_result(self, result: StepResult) -> str | None:
-        matcher = self._response_matchers.get(result.case.operation.verbose_name)
+        matcher = self._response_matchers.get(result.case.operation.label)
         if matcher is None:
             return None
         return matcher(result)
@@ -72,28 +72,28 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
         all_status_codes = tuple(operation.definition.raw["responses"])
         bundle_matchers = []
         for _, link in get_all_links(operation):
-            bundle_name = f"{operation.verbose_name} -> {link.status_code}"
+            bundle_name = f"{operation.label} -> {link.status_code}"
             bundles[bundle_name] = Bundle(bundle_name)
             target_operation = link.get_target_operation()
-            incoming_transitions[target_operation.verbose_name].append(link)
+            incoming_transitions[target_operation.label].append(link)
             response_targets = operation_links.setdefault(link.status_code, {})
-            target_links = response_targets.setdefault(target_operation.verbose_name, {})
+            target_links = response_targets.setdefault(target_operation.label, {})
             target_links[link.name] = {}
             bundle_matchers.append((bundle_name, make_response_filter(link.status_code, all_status_codes)))
         if operation_links:
-            transitions[operation.verbose_name] = operation_links
+            transitions[operation.label] = operation_links
         if bundle_matchers:
-            _response_matchers[operation.verbose_name] = make_response_matcher(bundle_matchers)
+            _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
     rules = {}
     catch_all = Bundle("catch_all")
 
     for target in operations:
-        incoming = incoming_transitions.get(target.verbose_name)
+        incoming = incoming_transitions.get(target.label)
         if incoming is not None:
             for link in incoming:
                 source = link.operation
-                bundle_name = f"{source.verbose_name} -> {link.status_code}"
-                name = _normalize_name(f"{target.verbose_name} -> {link.status_code}")
+                bundle_name = f"{source.label} -> {link.status_code}"
+                name = _normalize_name(f"{target.label} -> {link.status_code}")
                 case_strategy = strategies.combine(
                     [target.as_strategy(generation_mode=mode) for mode in schema.generation_config.modes]
                 )
@@ -106,7 +106,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                     link=st.just(link),
                 )
         elif any(
-            incoming.operation.verbose_name == target.verbose_name
+            incoming.operation.label == target.label
             for transitions in incoming_transitions.values()
             for incoming in transitions
         ):
@@ -114,7 +114,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             # For example, POST /users/ -> GET /users/{id}/
             # The source operation has no prerequisite, but we need to allow this rule to be executed
             # in order to reach other transitions
-            name = _normalize_name(f"{target.verbose_name} -> X")
+            name = _normalize_name(f"{target.label} -> X")
             if len(schema.generation_config.modes) == 1:
                 case_strategy = target.as_strategy(generation_mode=schema.generation_config.modes[0])
             else:

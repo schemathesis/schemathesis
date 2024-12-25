@@ -451,7 +451,7 @@ schema = schemathesis.openapi.from_dict(raw_schema)
 
 @schema.parametrize()
 def test_a(case):
-    link = schema.get_links(case.operation)[LINK_STATUS][case.operation.verbose_name]
+    link = schema.get_links(case.operation)[LINK_STATUS][case.operation.label]
     assert link.operation == case.operation
     assert link.parameters == [(None, KEY, EXPRESSION)]
     """,

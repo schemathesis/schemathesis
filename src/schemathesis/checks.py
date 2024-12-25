@@ -76,13 +76,13 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
 
     status_code = response.status_code
     if status_code >= 500:
-        raise ServerError(operation=case.operation.verbose_name, status_code=status_code)
+        raise ServerError(operation=case.operation.label, status_code=status_code)
     if isinstance(case.operation.schema, GraphQLSchema):
         try:
             data = response.json()
             validate_graphql_response(case, data)
         except json.JSONDecodeError as exc:
-            raise MalformedJson.from_exception(operation=case.operation.verbose_name, exc=exc) from None
+            raise MalformedJson.from_exception(operation=case.operation.label, exc=exc) from None
     return None
 
 
@@ -91,7 +91,7 @@ def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool
     elapsed = response.elapsed
     if elapsed > config.limit:
         raise ResponseTimeExceeded(
-            operation=case.operation.verbose_name,
+            operation=case.operation.label,
             message=f"Actual: {elapsed:.2f}ms\nLimit: {config.limit * 1000:.2f}ms",
             elapsed=elapsed,
             deadline=config.limit,
@@ -122,7 +122,7 @@ def run_checks(
         except AssertionError as exc:
             custom_failure = Failure.from_assertion(
                 name=name,
-                operation=case.operation.verbose_name,
+                operation=case.operation.label,
                 exc=exc,
             )
             on_failure(name, collected, custom_failure)

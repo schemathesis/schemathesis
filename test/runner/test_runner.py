@@ -1010,11 +1010,11 @@ def test_graphql(graphql_url):
     assert finished.results.passed_count == 4
     for event, expected in zip(other, ["Query.getBooks", "Query.getBooks", "Query.getAuthors", "Query.getAuthors"]):
         if isinstance(event, events.AfterExecution):
-            assert event.result.verbose_name == expected
+            assert event.result.label == expected
             for check in event.result.checks:
-                assert check.case.operation.verbose_name == expected
+                assert check.case.operation.label == expected
             else:
-                assert event.result.verbose_name == expected
+                assert event.result.label == expected
 
 
 @pytest.mark.operations("success")
@@ -1112,7 +1112,7 @@ def test_malformed_path_template(ctx, path, expected):
 
 @pytest.fixture
 def result():
-    return TestResult(verbose_name="POST /users/")
+    return TestResult(label="POST /users/")
 
 
 def make_check(status_code):

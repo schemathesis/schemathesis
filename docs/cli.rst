@@ -26,7 +26,7 @@ For example, if your API schema has three operations, then you will see a simila
     ================ Schemathesis test session starts ===============
     Schema location: http://127.0.0.1:8081/schema.yaml
     Base URL: http://127.0.0.1:8081/api
-    Specification version: Swagger 2.0
+    Specification version: Open API 2.0
     Workers: 1
     Collected API operations: 3
 
@@ -200,7 +200,7 @@ To make Schemathesis perform all built-in checks use ``--checks all`` CLI option
     ================ Schemathesis test session starts ===============
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: http://api.com/
-    Specification version: Swagger 2.0
+    Specification version: Open API 2.0
     Workers: 1
     Collected API operations: 3
 
@@ -226,7 +226,7 @@ You can also define a list of checks to exclude using the ``--exclude-checks`` C
     ================ Schemathesis test session starts ===============
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: http://api.com/
-    Specification version: Swagger 2.0
+    Specification version: Open API 2.0
     Workers: 1
     Collected API operations: 3
 
@@ -252,7 +252,7 @@ If any response will take longer than the provided value (in milliseconds) than 
     ================ Schemathesis test session starts ===============
     Schema location: https://example.schemathesis.io/openapi.json
     Base URL: https://example.schemathesis.io/api
-    Specification version: Swagger 2.0
+    Specification version: Open API 2.0
     Workers: 1
     Collected API operations: 1
 

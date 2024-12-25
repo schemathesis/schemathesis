@@ -3,22 +3,26 @@ from __future__ import annotations
 import queue
 import threading
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 import hypothesis
+import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 
 from schemathesis.checks import CheckContext, CheckFunction
 from schemathesis.core.failures import FailureGroup
 from schemathesis.core.transport import Response
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.targets import TargetMetricCollector
+from schemathesis.runner.config import EngineConfig
+from schemathesis.runner.control import ExecutionControl
 from schemathesis.stateful.graph import ExecutionGraph
 
 from . import events
-from .config import StatefulTestRunnerConfig
 from .context import RunnerContext
 from .validation import validate_response
 
@@ -30,6 +34,27 @@ if TYPE_CHECKING:
     from .state_machine import APIStateMachine, Direction, StepResult
 
 EVENT_QUEUE_TIMEOUT = 0.01
+DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
+    phases=[hypothesis.Phase.generate],
+    deadline=None,
+    stateful_step_count=6,
+    suppress_health_check=list(hypothesis.HealthCheck),
+)
+
+
+def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
+    """Get the settings that should be overridden to match the defaults for API state machines."""
+    kwargs = {}
+    hypothesis_default = hypothesis.settings()
+    if settings.phases == hypothesis_default.phases:
+        kwargs["phases"] = DEFAULT_STATE_MACHINE_SETTINGS.phases
+    if settings.stateful_step_count == hypothesis_default.stateful_step_count:
+        kwargs["stateful_step_count"] = DEFAULT_STATE_MACHINE_SETTINGS.stateful_step_count
+    if settings.deadline in (hypothesis_default.deadline, timedelta(milliseconds=DEFAULT_DEADLINE)):
+        kwargs["deadline"] = DEFAULT_STATE_MACHINE_SETTINGS.deadline
+    if settings.suppress_health_check == hypothesis_default.suppress_health_check:
+        kwargs["suppress_health_check"] = DEFAULT_STATE_MACHINE_SETTINGS.suppress_health_check
+    return kwargs
 
 
 @dataclass
@@ -43,25 +68,35 @@ class StatefulTestRunner:
     # State machine class to use
     state_machine: type[APIStateMachine]
     # Test runner configuration that defines the runtime behavior
-    config: StatefulTestRunnerConfig
-    # Event to stop the execution
-    stop_event: threading.Event = field(default_factory=threading.Event)
+    config: EngineConfig
+    control: ExecutionControl
+    session: requests.Session
     # Queue to communicate with the state machine execution
     event_queue: queue.Queue = field(default_factory=queue.Queue)
 
     def execute(self) -> Iterator[events.StatefulEvent]:
         """Execute a test run for a state machine."""
-        self.stop_event.clear()
-
         yield events.RunStarted(state_machine=self.state_machine)
 
+        kwargs = _get_hypothesis_settings_kwargs_override(self.config.execution.hypothesis_settings)
+        if kwargs:
+            config = replace(
+                self.config,
+                execution=replace(
+                    self.config.execution,
+                    hypothesis_settings=hypothesis.settings(self.config.execution.hypothesis_settings, **kwargs),
+                ),
+            )
+        else:
+            config = self.config
         runner_thread = threading.Thread(
             target=_execute_state_machine_loop,
             kwargs={
                 "state_machine": self.state_machine,
                 "event_queue": self.event_queue,
-                "config": self.config,
-                "stop_event": self.stop_event,
+                "config": config,
+                "control": self.control,
+                "session": self.session,
             },
         )
         run_status = events.RunStatus.SUCCESS
@@ -96,7 +131,7 @@ class StatefulTestRunner:
 
     def stop(self) -> None:
         """Stop the execution of the state machine."""
-        self.stop_event.set()
+        self.control.stop()
 
 
 @contextmanager
@@ -112,27 +147,29 @@ def _execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
     event_queue: queue.Queue,
-    config: StatefulTestRunnerConfig,
-    stop_event: threading.Event,
+    config: EngineConfig,
+    control: ExecutionControl,
+    session: requests.Session,
 ) -> None:
     """Execute the state machine testing loop."""
     from requests.structures import CaseInsensitiveDict
 
-    ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.targets))
+    ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.execution.targets))
 
     call_kwargs: dict[str, Any] = {
-        "headers": config.headers,
+        "session": session,
+        "headers": config.network.headers,
         "timeout": config.network.timeout,
         "verify": config.network.tls_verify,
         "cert": config.network.cert,
     }
     if config.network.proxy is not None:
         call_kwargs["proxies"] = {"all": config.network.proxy}
-    call_kwargs["session"] = config.session
+    # TODO: Pass it from the main engine
     check_ctx = CheckContext(
         override=config.override,
-        auth=config.auth,
-        headers=CaseInsensitiveDict(config.headers) if config.headers else None,
+        auth=config.network.auth,
+        headers=CaseInsensitiveDict(config.network.headers) if config.network.headers else None,
         config=config.checks_config,
         transport_kwargs=call_kwargs,
         # TODO: Pass it from the main engine
@@ -166,13 +203,13 @@ def _execute_state_machine_loop(
         def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
-            if stop_event.is_set():
+            if control.is_stopped:
                 raise KeyboardInterrupt
             event_queue.put(events.StepStarted())
             try:
-                if config.dry_run:
+                if config.execution.dry_run:
                     return None
-                if config.unique_data:
+                if config.execution.unique_data:
                     cached = ctx.get_step_outcome(case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -181,13 +218,13 @@ def _execute_state_machine_loop(
                 result = super().step(case, previous)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if config.unique_data:
+                if config.execution.unique_data:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if config.unique_data:
+                if config.execution.unique_data:
                     ctx.store_step_outcome(case, exc)
                 ctx.step_errored()
                 raise
@@ -195,11 +232,11 @@ def _execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if config.unique_data:
+                if config.execution.unique_data:
                     ctx.store_step_outcome(case, exc)
                 raise exc
             else:
-                if config.unique_data:
+                if config.execution.unique_data:
                     ctx.store_step_outcome(case, None)
             finally:
                 transition_id: events.TransitionId | None
@@ -208,7 +245,7 @@ def _execute_state_machine_loop(
                     transition_id = events.TransitionId(
                         name=transition.name,
                         status_code=transition.status_code,
-                        source=transition.operation.verbose_name,
+                        source=transition.operation.label,
                     )
                 else:
                     transition_id = None
@@ -216,7 +253,7 @@ def _execute_state_machine_loop(
                     events.StepFinished(
                         status=ctx.current_step_status,
                         transition_id=transition_id,
-                        target=case.operation.verbose_name,
+                        target=case.operation.label,
                         case=case,
                         response=ctx.current_response,
                         checks=ctx.checks_for_step,
@@ -235,7 +272,7 @@ def _execute_state_machine_loop(
                 case=case,
                 runner_ctx=ctx,
                 check_ctx=check_ctx,
-                checks=config.checks,
+                checks=config.execution.checks,
                 additional_checks=additional_checks,
             )
 
@@ -251,29 +288,30 @@ def _execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    if config.seed is not None:
-        InstrumentedStateMachine = hypothesis.seed(config.seed)(_InstrumentedStateMachine)
+    if config.execution.seed is not None:
+        InstrumentedStateMachine = hypothesis.seed(config.execution.seed)(_InstrumentedStateMachine)
     else:
         InstrumentedStateMachine = _InstrumentedStateMachine
 
     def should_stop() -> bool:
-        return config.max_failures is not None and ctx.failures_count >= config.max_failures
+        # TODO: Count failures directly on `control` + use its `control.is_stopped` instead
+        return control.max_failures is not None and ctx.failures_count >= control.max_failures
 
     while True:
         # This loop is running until no new failures are found in a single iteration
         event_queue.put(events.SuiteStarted())
-        if stop_event.is_set():
+        if control.is_stopped:
             event_queue.put(events.SuiteFinished(status=events.SuiteStatus.INTERRUPTED, failures=[]))
             break
         suite_status = events.SuiteStatus.SUCCESS
         try:
             with ignore_hypothesis_output():  # type: ignore
-                InstrumentedStateMachine.run(settings=config.hypothesis_settings)
+                InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code
             # that is placed in the base class of the state machine.
             # Therefore, set the stop event to cover the latter case
-            stop_event.set()
+            control.stop()
             suite_status = events.SuiteStatus.INTERRUPTED
             break
         except FailureGroup as exc:
@@ -297,7 +335,7 @@ def _execute_state_machine_loop(
             if isinstance(exc, Unsatisfiable) and ctx.completed_scenarios > 0:
                 # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
                 # values are possible to generate based on the previous observations, we retry the generation
-                if ctx.completed_scenarios >= config.hypothesis_settings.max_examples:
+                if ctx.completed_scenarios >= config.execution.hypothesis_settings.max_examples:
                     # Avoid infinite restarts
                     break
                 continue
