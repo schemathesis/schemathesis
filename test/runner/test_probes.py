@@ -3,6 +3,7 @@ from pathlib import Path
 from unittest.mock import ANY
 
 import pytest
+from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.runner.config import NetworkConfig
@@ -45,7 +46,10 @@ DEFAULT_HEADERS = {
 def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url, kwargs, headers):
     config = config_factory(**kwargs)
     openapi_30.base_url = openapi3_base_url
-    results = probes.run(openapi_30, config)
+    session = Session()
+    if "auth" in kwargs:
+        session.auth = kwargs["auth"]
+    results = probes.run(openapi_30, session, config)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -79,7 +83,7 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
 def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_base_url, response_factory):
     config = config_factory()
     openapi_30.base_url = openapi3_base_url
-    result = probes.run(openapi_30, config)[0]
+    result = probes.run(openapi_30, Session(), config)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
     assert result.serialize() == {
         "error": None,
@@ -120,7 +124,7 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
 def test_detect_null_byte_error(openapi_30, config_factory):
     config = config_factory()
     openapi_30.base_url = "http://127.0.0.1:1"
-    results = probes.run(openapi_30, config)
+    results = probes.run(openapi_30, Session(), config)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -165,7 +169,7 @@ def test_detect_null_byte_error(openapi_30, config_factory):
 
 def test_detect_null_byte_skipped(openapi_30, config_factory):
     config = config_factory()
-    results = probes.run(openapi_30, config)
+    results = probes.run(openapi_30, Session(), config)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),

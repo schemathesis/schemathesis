@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar
 
 from schemathesis.core import NOT_SET, NotSet
@@ -13,6 +14,8 @@ from .models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
     import threading
+
+    import requests
 
     from schemathesis.core.errors import InvalidSchema
     from schemathesis.generation.case import Case
@@ -65,8 +68,6 @@ class EngineContext:
     config: EngineConfig
     phase_data: PhaseStorage
     start_time: float
-
-    __slots__ = ("data", "control", "outcome_cache", "config", "phase_data", "start_time", "execution_graph")
 
     def __init__(self, *, stop_event: threading.Event, config: EngineConfig) -> None:
         self.data = TestResultSet(seed=config.execution.seed)
@@ -121,6 +122,21 @@ class EngineContext:
 
     def get_cached_outcome(self, case: Case) -> BaseException | None | NotSet:
         return self.outcome_cache.get(hash(case), NOT_SET)
+
+    @cached_property
+    def session(self) -> requests.Session:
+        import requests
+
+        session = requests.Session()
+        config = self.config.network
+        session.verify = config.tls_verify
+        if config.auth is not None:
+            session.auth = config.auth
+        if config.headers:
+            session.headers.update(config.headers)
+        if config.cert is not None:
+            session.cert = config.cert
+        return session
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"

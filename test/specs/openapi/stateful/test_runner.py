@@ -5,6 +5,7 @@ from typing import List
 import hypothesis
 import hypothesis.errors
 import pytest
+from requests import Session
 
 import schemathesis
 from schemathesis.checks import max_response_time, not_a_server_error
@@ -618,7 +619,9 @@ def test_external_link(ctx, app_factory, app_runner):
     state_machine = schema.as_state_machine()
     runner = StatefulTestRunner(
         state_machine,
-        config=StatefulTestRunnerConfig(hypothesis_settings=hypothesis.settings(max_examples=75, database=None)),
+        config=StatefulTestRunnerConfig(
+            hypothesis_settings=hypothesis.settings(max_examples=75, database=None), session=Session()
+        ),
     )
     result = collect_result(runner)
     assert result.events[-1].status == events.RunStatus.FAILURE

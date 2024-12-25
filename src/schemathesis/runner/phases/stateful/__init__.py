@@ -28,6 +28,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
         auth=ctx.config.network.auth,
         seed=ctx.config.execution.seed,
         override=ctx.config.override,
+        session=ctx.session,
     )
     state_machine = ctx.config.schema.as_state_machine()
     runner = StatefulTestRunner(state_machine, config=config)
@@ -48,8 +49,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
                 case=event.case,
                 response=event.response,
                 checks=event.checks,
-                # TODO: reuse engine-wide transport
-                session=config.session,
+                session=ctx.session,
             )
 
     test_start_time: float | None = None
