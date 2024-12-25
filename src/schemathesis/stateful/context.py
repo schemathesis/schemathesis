@@ -90,7 +90,6 @@ class RunnerContext:
 
     def add_failed_check(self, check: Check) -> None:
         self.failures_for_suite.append(check)
-        self.failures_count += 1
 
     def collect_metric(self, case: Case, response: Response) -> None:
         self.metric_collector.store(case, response)

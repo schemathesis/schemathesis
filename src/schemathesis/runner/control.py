@@ -35,20 +35,17 @@ class ExecutionControl:
             return True
 
         if self._is_failure_event(event):
-            # N failures limit
-            if self.max_failures is not None:
-                self._failures_counter += 1
-                if self._failures_counter >= self.max_failures:
-                    self._is_limit_hit = True
-                    return True
+            return self.count_failure()
         return False
 
-    @property
-    def remaining_failures(self) -> int | None:
-        """How many failures may happen before the engine is halted."""
-        if self.max_failures is None:
-            return None
-        return self.max_failures - self._failures_counter
+    def count_failure(self) -> bool:
+        # N failures limit
+        if self.max_failures is not None:
+            self._failures_counter += 1
+            if self._failures_counter >= self.max_failures:
+                self._is_limit_hit = True
+                return True
+        return False
 
     def _is_failure_event(self, event: events.ExecutionEvent) -> bool:
         """Determine if event should count towards failure limit."""

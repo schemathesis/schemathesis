@@ -23,7 +23,7 @@ division by zero
     Traceback (most recent call last):
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
         f(ctx=ctx, case=case, result=result, **kwargs)
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in network_test
+      File "/package-root/runner/phases/unit/_executor.py", line XXX, in test_func
         validate_response(
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in validate_response
         failures = run_checks(

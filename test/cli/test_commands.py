@@ -933,8 +933,9 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "= ERRORS =" not in result.stdout
 
-    with cassette_path.open() as fd:
-        cassette = yaml.safe_load(fd)
+    with cassette_path.open(encoding="utf-8") as fd:
+        raw = fd.read()
+        cassette = yaml.safe_load(raw)
 
     def decode(idx):
         request = cassette["http_interactions"][idx]["request"]

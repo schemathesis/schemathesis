@@ -7,13 +7,12 @@ from dataclasses import dataclass
 import hypothesis
 import pytest
 from flask import Flask, abort, jsonify, request
-from requests import Session
 
 import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.runner.control import ExecutionControl
+from schemathesis.runner.context import EngineContext
 from schemathesis.stateful.runner import StatefulTestRunner
 
 
@@ -384,24 +383,22 @@ def runner_factory(app_factory, app_runner):
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
             **(configuration or {})
         )
-        state_machine = schema.as_state_machine()
-        return StatefulTestRunner(
-            state_machine,
-            config=EngineConfig(
-                schema=schema,
-                execution=ExecutionConfig(
-                    checks=checks or CHECKS.get_all(),
-                    targets=targets or [],
-                    generation_config=GenerationConfig(),
-                    hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
-                    dry_run=dry_run,
-                    unique_data=unique_data,
-                ),
-                network=network or NetworkConfig(),
-                checks_config=checks_config or ChecksConfig(),
+        config = EngineConfig(
+            schema=schema,
+            execution=ExecutionConfig(
+                checks=checks or CHECKS.get_all(),
+                targets=targets or [],
+                generation_config=GenerationConfig(),
+                hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
+                dry_run=dry_run,
+                unique_data=unique_data,
+                max_failures=max_failures,
             ),
-            control=ExecutionControl(stop_event=threading.Event(), max_failures=max_failures),
-            session=Session(),
+            network=network or NetworkConfig(),
+            checks_config=checks_config or ChecksConfig(),
+        )
+        return StatefulTestRunner(
+            engine=EngineContext(stop_event=threading.Event(), config=config),
         )
 
     return _runner_factory

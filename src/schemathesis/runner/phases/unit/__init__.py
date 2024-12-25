@@ -8,10 +8,8 @@ from __future__ import annotations
 import queue
 import uuid
 import warnings
-from contextlib import contextmanager
-from functools import partial
 from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Generator
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
@@ -42,32 +40,31 @@ def execute(ctx: EngineContext) -> EventGenerator:
 def single_threaded(ctx: EngineContext) -> EventGenerator:
     from schemathesis.generation.hypothesis.builder import get_all_tests
 
-    from ._executor import run_test
+    from ._executor import run_test, test_func
 
-    with network_test_function(ctx) as test_func:
-        for result in get_all_tests(
-            schema=ctx.config.schema,
-            test_func=test_func,
-            settings=ctx.config.execution.hypothesis_settings,
-            generation_config=ctx.config.execution.generation_config,
-            seed=ctx.config.execution.seed,
-            as_strategy_kwargs=lambda op: get_strategy_kwargs(ctx, op),
-        ):
-            if isinstance(result, Ok):
-                operation, test_function = result.ok()
-                correlation_id = None
-                try:
-                    for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
-                        yield event
-                        ctx.on_event(event)
-                        if isinstance(event, events.BeforeExecution):
-                            correlation_id = event.correlation_id
-                        if isinstance(event, events.Interrupted) or ctx.is_stopped:
-                            return
-                except InvalidSchema as error:
-                    yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
-            else:
-                yield from on_schema_error(exc=result.err(), ctx=ctx)
+    for result in get_all_tests(
+        schema=ctx.config.schema,
+        test_func=test_func,
+        settings=ctx.config.execution.hypothesis_settings,
+        generation_config=ctx.config.execution.generation_config,
+        seed=ctx.config.execution.seed,
+        as_strategy_kwargs=lambda op: get_strategy_kwargs(ctx, op),
+    ):
+        if isinstance(result, Ok):
+            operation, test_function = result.ok()
+            correlation_id = None
+            try:
+                for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
+                    yield event
+                    ctx.on_event(event)
+                    if isinstance(event, events.BeforeExecution):
+                        correlation_id = event.correlation_id
+                    if isinstance(event, events.Interrupted) or ctx.is_stopped:
+                        return
+            except InvalidSchema as error:
+                yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
+        else:
+            yield from on_schema_error(exc=result.err(), ctx=ctx)
 
 
 def multi_threaded(ctx: EngineContext) -> EventGenerator:
@@ -104,10 +101,10 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
 
     from schemathesis.generation.hypothesis.builder import create_test
 
-    from ._executor import run_test
+    from ._executor import run_test, test_func
 
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
-    with network_test_function(ctx) as test_func, ignore_hypothesis_output():
+    with ignore_hypothesis_output():
         while not ctx.is_stopped:
             result = producer.next_operation()
             if result is None:
@@ -162,13 +159,6 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
         ctx.add_result(result)
     else:
         ctx.add_error(exc)
-
-
-@contextmanager
-def network_test_function(ctx: EngineContext) -> Generator[Callable, None, None]:
-    from ._executor import network_test
-
-    yield partial(network_test, session=ctx.session)
 
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
