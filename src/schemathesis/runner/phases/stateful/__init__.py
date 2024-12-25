@@ -16,8 +16,7 @@ def execute(ctx: EngineContext) -> EventGenerator:
     from ....stateful import events as stateful_events
 
     result = TestResult(label="Stateful tests")
-    state_machine = ctx.config.schema.as_state_machine()
-    runner = StatefulTestRunner(state_machine, config=ctx.config, control=ctx.control, session=ctx.session)
+    runner = StatefulTestRunner(ctx)
     status = Status.SUCCESS
 
     def from_step_status(step_status: stateful_events.StepStatus) -> Status:

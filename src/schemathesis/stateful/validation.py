@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
+from schemathesis.runner.control import ExecutionControl
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -18,6 +19,7 @@ def validate_response(
     case: Case,
     runner_ctx: RunnerContext,
     check_ctx: CheckContext,
+    control: ExecutionControl,
     checks: list[CheckFunction],
     additional_checks: tuple[CheckFunction, ...] = (),
 ) -> None:
@@ -38,6 +40,7 @@ def validate_response(
             failure=failure,
         )
         results.append(failed_check)
+        control.count_failure()
         runner_ctx.add_failed_check(failed_check)
         runner_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
