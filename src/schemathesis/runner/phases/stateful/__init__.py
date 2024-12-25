@@ -14,24 +14,10 @@ if TYPE_CHECKING:
 
 def execute(ctx: EngineContext) -> EventGenerator:
     from ....stateful import events as stateful_events
-    from ....stateful import runner as stateful_runner
 
-    result = TestResult(verbose_name="Stateful tests")
-    headers = ctx.config.network.headers or {}
-    config = stateful_runner.StatefulTestRunnerConfig(
-        checks=ctx.config.execution.checks,
-        checks_config=ctx.config.checks_config,
-        headers=headers,
-        hypothesis_settings=ctx.config.execution.hypothesis_settings,
-        max_failures=ctx.control.remaining_failures,
-        network=ctx.config.network,
-        auth=ctx.config.network.auth,
-        seed=ctx.config.execution.seed,
-        override=ctx.config.override,
-        session=ctx.session,
-    )
+    result = TestResult(label="Stateful tests")
     state_machine = ctx.config.schema.as_state_machine()
-    runner = StatefulTestRunner(state_machine, config=config)
+    runner = StatefulTestRunner(state_machine, config=ctx.config, control=ctx.control, session=ctx.session)
     status = Status.SUCCESS
 
     def from_step_status(step_status: stateful_events.StepStatus) -> Status:

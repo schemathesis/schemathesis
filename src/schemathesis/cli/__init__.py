@@ -238,14 +238,7 @@ REPORT_TO_SERVICE = ReportToService()
     "--experimental",
     "experiments",
     help="Enable experimental features",
-    type=click.Choice(
-        [
-            experimental.SCHEMA_ANALYSIS.name,
-            experimental.STATEFUL_ONLY.name,
-            experimental.COVERAGE_PHASE.name,
-            experimental.POSITIVE_DATA_ACCEPTANCE.name,
-        ]
-    ),
+    type=click.Choice(sorted([experiment.label for experiment in experimental.GLOBAL_EXPERIMENTS.available])),
     callback=validation.convert_experimental,
     multiple=True,
     metavar="",

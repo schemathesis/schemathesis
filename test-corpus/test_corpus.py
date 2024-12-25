@@ -201,9 +201,9 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
 
 def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
     if isinstance(event, events.AfterExecution):
-        assert not event.result.has_failures, event.result.verbose_name
+        assert not event.result.has_failures, event.result.label
         failures = [check for check in event.result.checks if check.status == Status.FAILURE]
-        assert not failures, event.result.verbose_name
+        assert not failures, event.result.label
         check_no_errors(schema_id, event)
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
@@ -222,13 +222,13 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
     if event.result.has_errors:
-        assert event.result.errors, event.result.verbose_name
+        assert event.result.errors, event.result.label
         for error in event.result.errors:
             if should_ignore_error(schema_id, error, event):
                 continue
-            raise AssertionError(f"{event.result.verbose_name}: {error.traceback}")
+            raise AssertionError(f"{event.result.label}: {error.traceback}")
     else:
-        assert not event.result.errors, event.result.verbose_name
+        assert not event.result.errors, event.result.label
 
 
 def should_ignore_error(schema_id: str, error: EngineErrorInfo, event: events.AfterExecution) -> bool:
@@ -260,6 +260,6 @@ def should_ignore_error(schema_id: str, error: EngineErrorInfo, event: events.Af
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in str(error):
         return True
-    if (schema_id, event.result.verbose_name) in KNOWN_ISSUES:
+    if (schema_id, event.result.label) in KNOWN_ISSUES:
         return True
     return False

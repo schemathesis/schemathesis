@@ -54,8 +54,6 @@ class Initialized(ExecutionEvent):
     base_url: str
     # The base path part of every operation
     base_path: str
-    # API schema specification name
-    specification_name: str
 
     @classmethod
     def from_schema(cls, *, schema: BaseSchema, seed: int | None) -> Initialized:
@@ -68,21 +66,19 @@ class Initialized(ExecutionEvent):
             location=schema.location,
             base_url=schema.get_base_url(),
             base_path=schema.base_path,
-            specification_name=schema.verbose_name,
             seed=seed,
         )
 
     def _asdict(self) -> dict[str, Any]:
         return {
             "schema": self.schema,
-            "specification": self.specification.name,
+            "specification": self.specification.asdict(),
             "operations_count": self.operations_count,
             "links_count": self.links_count,
             "location": self.location,
             "seed": self.seed,
             "base_url": self.base_url,
             "base_path": self.base_path,
-            "specification_name": self.specification_name,
         }
 
 
@@ -132,17 +128,17 @@ class BeforeExecution(ExecutionEvent):
     """
 
     # Specification-specific operation name
-    verbose_name: str
+    label: str
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: str
 
     @classmethod
     def from_operation(cls, operation: APIOperation, correlation_id: str) -> BeforeExecution:
-        return cls(verbose_name=operation.verbose_name, correlation_id=correlation_id)
+        return cls(label=operation.label, correlation_id=correlation_id)
 
     def _asdict(self) -> dict[str, Any]:
-        return {"verbose_name": self.verbose_name, "correlation_id": self.correlation_id}
+        return {"label": self.label, "correlation_id": self.correlation_id}
 
 
 @dataclass

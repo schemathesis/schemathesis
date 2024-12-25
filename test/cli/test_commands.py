@@ -1393,8 +1393,8 @@ def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snap
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
     assert events[5]["correlation_id"] == events[6]["correlation_id"]
-    # And they should have the same "verbose_name"
-    assert events[5]["verbose_name"] == events[6]["result"]["verbose_name"]
+    # And they should have the same "label"
+    assert events[5]["label"] == events[6]["result"]["label"]
 
 
 @pytest.mark.openapi_version("3.0")

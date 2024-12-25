@@ -63,7 +63,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
-    result = TestResult(verbose_name=operation.verbose_name)
+    result = TestResult(label=operation.label)
     # To simplify connecting `before` and `after` events in external systems
     correlation_id = uuid.uuid4().hex
     yield events.BeforeExecution.from_operation(operation=operation, correlation_id=correlation_id)
@@ -215,7 +215,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     ctx.add_result(result)
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result, status_code):
-            ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.verbose_name}`", status_code))
+            ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code))
     yield events.AfterExecution.from_result(
         result=result,
         status=status,
@@ -250,7 +250,7 @@ def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> No
     """
     # Hypothesis's function digest depends on the test function signature. To reflect it for the web API case,
     # we use all API operation parameters in the digest.
-    extra = operation.verbose_name.encode("utf8")
+    extra = operation.label.encode("utf8")
     for parameter in operation.iter_parameters():
         extra += parameter.serialize(operation).encode("utf8")
     test.hypothesis.inner_test._hypothesis_internal_add_digest = extra  # type: ignore

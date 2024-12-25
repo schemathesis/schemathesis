@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 import time
 from dataclasses import dataclass
 
@@ -9,7 +10,11 @@ from flask import Flask, abort, jsonify, request
 from requests import Session
 
 import schemathesis
-from schemathesis.stateful.runner import StatefulTestRunner, StatefulTestRunnerConfig
+from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.generation import GenerationConfig
+from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.runner.control import ExecutionControl
+from schemathesis.stateful.runner import StatefulTestRunner
 
 
 @dataclass
@@ -361,16 +366,42 @@ def app_factory(ctx):
 
 @pytest.fixture
 def runner_factory(app_factory, app_runner):
-    def _runner_factory(*, app_kwargs=None, config_kwargs=None, configuration=None):
+    def _runner_factory(
+        *,
+        app_kwargs=None,
+        hypothesis_settings=None,
+        checks=None,
+        checks_config=None,
+        targets=None,
+        network=None,
+        max_failures=None,
+        dry_run=False,
+        unique_data=False,
+        configuration=None,
+    ):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
             **(configuration or {})
         )
         state_machine = schema.as_state_machine()
-        config_kwargs = config_kwargs or {}
-        config_kwargs.setdefault("hypothesis_settings", hypothesis.settings(max_examples=55, database=None))
-        config_kwargs.setdefault("session", Session())
-        return StatefulTestRunner(state_machine, config=StatefulTestRunnerConfig(**config_kwargs))
+        return StatefulTestRunner(
+            state_machine,
+            config=EngineConfig(
+                schema=schema,
+                execution=ExecutionConfig(
+                    checks=checks or CHECKS.get_all(),
+                    targets=targets or [],
+                    generation_config=GenerationConfig(),
+                    hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
+                    dry_run=dry_run,
+                    unique_data=unique_data,
+                ),
+                network=network or NetworkConfig(),
+                checks_config=checks_config or ChecksConfig(),
+            ),
+            control=ExecutionControl(stop_event=threading.Event(), max_failures=max_failures),
+            session=Session(),
+        )
 
     return _runner_factory

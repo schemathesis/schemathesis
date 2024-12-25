@@ -57,7 +57,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
 
 
 def display_subsection(result: TestResult, color: str | None = "red") -> None:
-    display_section_name(result.verbose_name, "_", fg=color)
+    display_section_name(result.label, "_", fg=color)
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -141,7 +141,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
     if context.workers_num > 1:
         # Events may come out of order when multiple workers are involved
         # Sort them to get a stable output
-        results = sorted(context.results, key=lambda r: r.verbose_name)
+        results = sorted(context.results, key=lambda r: r.label)
     else:
         results = context.results
     for result in results:
@@ -362,7 +362,7 @@ def display_statistic(context: ExecutionContext, event: events.Finished) -> None
     if len(GLOBAL_EXPERIMENTS.enabled) > 0:
         click.secho("\nExperimental Features:", bold=True)
         for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
-            click.secho(f"  - {experiment.verbose_name}: {experiment.description}")
+            click.secho(f"  - {experiment.name}: {experiment.description}")
             click.secho(f"    Feedback: {experiment.discussion_url}")
         click.echo()
         click.echo(
@@ -434,7 +434,7 @@ def handle_service_integration(context: ServiceReportContext) -> None:
 
 def display_report_metadata(meta: service.Metadata) -> None:
     if meta.ci_environment is not None:
-        click.secho(f"{meta.ci_environment.verbose_name} detected:", bold=True)
+        click.secho(f"{meta.ci_environment.name} detected:", bold=True)
         for key, value in meta.ci_environment.as_env().items():
             if value is not None:
                 click.secho(f"  -> {key}: {value}")
@@ -635,7 +635,7 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
     if event.location is not None:
         click.secho(f"Schema location: {event.location}", bold=True)
     click.secho(f"Base URL: {event.base_url}", bold=True)
-    click.secho(f"Specification version: {event.specification_name}", bold=True)
+    click.secho(f"Specification version: {event.specification.name}", bold=True)
     if context.seed is not None:
         click.secho(f"Random seed: {context.seed}", bold=True)
     click.secho(f"Workers: {context.workers_num}", bold=True)
@@ -696,7 +696,7 @@ def handle_before_execution(context: ExecutionContext, event: events.BeforeExecu
     """Display what method / path will be tested next."""
     # We should display execution result + percentage in the end. For example:
     max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
-    message = event.verbose_name
+    message = event.label
     message = message[:max_length] + (message[max_length:] and "[...]") + " "
     context.current_line_length = len(message)
     click.echo(message, nl=False)

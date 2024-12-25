@@ -10,7 +10,7 @@ def test_get_container_invalid_location(swagger_20):
         path="/users/{user_id}",
         method="get",
         schema=swagger_20,
-        verbose_name="GET /users/{user_id}",
+        label="GET /users/{user_id}",
         definition=OperationDefinition(
             raw={},
             resolved={},

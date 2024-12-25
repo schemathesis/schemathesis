@@ -97,7 +97,7 @@ class SchemathesisCase(PyCollector):
         super().__init__(*args, **kwargs)
 
     def _get_test_name(self, operation: APIOperation) -> str:
-        return f"{self.name}[{operation.verbose_name}]"
+        return f"{self.name}[{operation.label}]"
 
     def _gen_items(self, result: Result[APIOperation, InvalidSchema]) -> Generator[SchemathesisFunction, None, None]:
         """Generate all tests for the given API operation.

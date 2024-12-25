@@ -78,7 +78,6 @@ class GraphQLOperationDefinition(OperationDefinition):
 
 @dataclass
 class GraphQLSchema(BaseSchema):
-    specification: Specification = Specification.GRAPHQL
     _operation_cache: OperationCache = field(default_factory=OperationCache)
 
     def __repr__(self) -> str:
@@ -123,8 +122,8 @@ class GraphQLSchema(BaseSchema):
         return self.base_path
 
     @property
-    def verbose_name(self) -> str:
-        return "GraphQL"
+    def specification(self) -> Specification:
+        return Specification.graphql(version="")
 
     @property
     def client_schema(self) -> graphql.GraphQLSchema:
@@ -193,7 +192,7 @@ class GraphQLSchema(BaseSchema):
         return APIOperation(
             base_url=self.get_base_url(),
             path=self.base_path,
-            verbose_name=f"{operation_type.name}.{field_name}",
+            label=f"{operation_type.name}.{field_name}",
             method="POST",
             app=self.app,
             schema=self,
