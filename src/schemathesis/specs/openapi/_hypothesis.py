@@ -142,7 +142,7 @@ def openapi_cases(
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if generation_config.modes == [GenerationMode.NEGATIVE]:
-            raise SkipTest(f"It is not possible to generate negative test cases for `{operation.verbose_name}`")
+            raise SkipTest(f"It is not possible to generate negative test cases for `{operation.label}`")
         else:
             reject()
 
@@ -203,7 +203,7 @@ def _get_body_strategy(
         return _BODY_STRATEGIES_CACHE[parameter][strategy_factory]
     schema = parameter.as_json_schema(operation)
     schema = operation.schema.prepare_schema(schema)
-    strategy = strategy_factory(schema, operation.verbose_name, "body", parameter.media_type, generation_config)
+    strategy = strategy_factory(schema, operation.label, "body", parameter.media_type, generation_config)
     if not parameter.is_required:
         strategy |= st.just(NOT_SET)
     _BODY_STRATEGIES_CACHE.setdefault(parameter, {})[strategy_factory] = strategy
@@ -356,7 +356,7 @@ def get_parameters_strategy(
             # Nothing to negate - all properties were excluded
             strategy = st.none()
         else:
-            strategy = strategy_factory(schema, operation.verbose_name, location, None, generation_config)
+            strategy = strategy_factory(schema, operation.label, location, None, generation_config)
             serialize = operation.get_parameter_serializer(location)
             if serialize is not None:
                 strategy = strategy.map(serialize)

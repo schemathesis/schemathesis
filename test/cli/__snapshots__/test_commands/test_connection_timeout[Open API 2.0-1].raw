@@ -4,7 +4,7 @@ Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: http://127.0.0.1/schema.yaml
 Base URL: http://127.0.0.1/api
-Specification version: Swagger 2.0
+Specification version: Open API 2.0
 Random seed: 42
 Workers: 1
 Collected API operations: 2

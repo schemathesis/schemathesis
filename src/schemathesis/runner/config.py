@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Sequence
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.generation.overrides import Override
 
@@ -22,7 +22,7 @@ class ExecutionConfig:
     """Configuration for test execution."""
 
     checks: list[CheckFunction]
-    targets: Sequence[TargetFunction]
+    targets: list[TargetFunction]
     hypothesis_settings: hypothesis.settings
     generation_config: GenerationConfig
     max_failures: int | None = None
@@ -38,7 +38,7 @@ class NetworkConfig:
     """Network-related configuration."""
 
     auth: tuple[str, str] | None = None
-    headers: dict[str, Any] | None = None
+    headers: dict[str, Any] = field(default_factory=dict)
     timeout: int | None = None
     tls_verify: bool | str = True
     proxy: str | None = None

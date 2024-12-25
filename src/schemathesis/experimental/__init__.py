@@ -7,11 +7,14 @@ from schemathesis.core import string_to_boolean
 @dataclass(eq=False)
 class Experiment:
     name: str
-    verbose_name: str
     env_var: str
     description: str
     discussion_url: str
     _storage: "ExperimentSet" = field(repr=False)
+
+    @property
+    def label(self) -> str:
+        return self.name.lower().replace(" ", "-")
 
     def enable(self) -> None:
         self._storage.enable(self)
@@ -33,12 +36,9 @@ class ExperimentSet:
     available: set = field(default_factory=set)
     enabled: set = field(default_factory=set)
 
-    def create_experiment(
-        self, name: str, verbose_name: str, env_var: str, description: str, discussion_url: str
-    ) -> Experiment:
+    def create_experiment(self, name: str, env_var: str, description: str, discussion_url: str) -> Experiment:
         instance = Experiment(
             name=name,
-            verbose_name=verbose_name,
             env_var=f"{ENV_PREFIX}_{env_var}",
             description=description,
             discussion_url=discussion_url,
@@ -66,29 +66,25 @@ ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
 
 SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
-    name="schema-analysis",
-    verbose_name="Schema Analysis",
+    name="Schema Analysis",
     env_var="SCHEMA_ANALYSIS",
     description="Analyzing API schemas via Schemathesis.io",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2056",
 )
 STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
-    name="stateful-only",
-    verbose_name="Stateful Only",
+    name="Stateful Only",
     env_var="STATEFUL_ONLY",
     description="Run only stateful tests",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
 )
 COVERAGE_PHASE = GLOBAL_EXPERIMENTS.create_experiment(
-    name="coverage-phase",
-    verbose_name="Coverage phase",
+    name="Coverage phase",
     env_var="COVERAGE_PHASE",
     description="Generate covering test cases",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2418",
 )
 POSITIVE_DATA_ACCEPTANCE = GLOBAL_EXPERIMENTS.create_experiment(
-    name="positive_data_acceptance",
-    verbose_name="Positive Data Acceptance",
+    name="Positive Data Acceptance",
     env_var="POSITIVE_DATA_ACCEPTANCE",
     description="Verifying schema-conformant data is accepted",
     discussion_url="https://github.com/schemathesis/schemathesis/discussions/2499",

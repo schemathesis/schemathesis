@@ -300,7 +300,7 @@ def convert_experimental(
     return [
         feature
         for feature in experimental.GLOBAL_EXPERIMENTS.available
-        if feature.name in value or feature.is_env_var_set
+        if feature.label in value or feature.is_env_var_set
     ]
 
 

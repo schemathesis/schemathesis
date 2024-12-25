@@ -625,7 +625,7 @@ def test_deduplication(ctx, response_factory):
     operation = schema["/data"]["GET"]
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
-    result = TestResult(verbose_name=operation.verbose_name)
+    result = TestResult(label=operation.label)
     checks = []
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):

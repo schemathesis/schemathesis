@@ -27,7 +27,7 @@ class JunitXMLHandler(EventHandler):
     def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
         if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
             event_: events.AfterExecution | events.AfterStatefulExecution = event
-            name = event_.result.verbose_name
+            name = event_.result.label
             if name in self.test_cases:
                 test_case = self.test_cases[name]
                 test_case.elapsed_sec += event_.elapsed_time

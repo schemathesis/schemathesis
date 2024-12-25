@@ -116,7 +116,7 @@ In CLI
 
 .. code-block:: bash
 
-   st run https://example.schemathesis.io/openapi.json --experimental=positive_data_acceptance
+   st run https://example.schemathesis.io/openapi.json --experimental=positive-data-acceptance
 
 Configuration options:
 

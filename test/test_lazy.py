@@ -68,9 +68,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            r"test_invalid_operation.py::test_\[GET /v1/valid\] \(verbose_name='GET /v1/valid'\) SUBPASS +\[ 25%\]",
-            r"test_invalid_operation.py::test_\[GET /v1/invalid\] \(verbose_name='GET /v1/invalid'\) SUBFAIL +\[ 50%\]",
-            r"test_invalid_operation.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS +\[ 75%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/valid\] \(label='GET /v1/valid'\) SUBPASS +\[ 25%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/invalid\] \(label='GET /v1/invalid'\) SUBFAIL +\[ 50%\]",
+            r"test_invalid_operation.py::test_\[GET /v1/users\] \(label='GET /v1/users'\) SUBPASS +\[ 75%\]",
             r"test_invalid_operation.py::test_ PASSED +\[100%\]",
         ]
     )
@@ -282,8 +282,8 @@ def test_(case):
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] \(verbose_name='GET /api/users'\) SUBPASS +\[ 33%\]",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] \(verbose_name='GET /api/users'\) SUBPASS +\[ 75%\]",
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] \(label='GET /api/users'\) SUBPASS +\[ 33%\]",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] \(label='GET /api/users'\) SUBPASS +\[ 75%\]",
         ]
     )
 
@@ -340,7 +340,7 @@ def pytest_terminal_summary(terminalreporter) -> None:
     # And it should be the same test in the end
     # We do not assert the outcome here, because it is not reported.
     result.stdout.re_match_lines(
-        [r"test_generation_modes.py::test_\[GET /v1/users\] \(verbose_name='GET /v1/users'\) SUBPASS"]
+        [r"test_generation_modes.py::test_\[GET /v1/users\] \(label='GET /v1/users'\) SUBPASS"]
     )
 
 

@@ -72,7 +72,6 @@ SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefReso
 
 @dataclass(eq=False, repr=False)
 class BaseOpenAPISchema(BaseSchema):
-    specification: Specification = Specification.OPENAPI
     nullable_name: ClassVar[str] = ""
     links_field: ClassVar[str] = ""
     header_required_field: ClassVar[str] = ""
@@ -85,7 +84,7 @@ class BaseOpenAPISchema(BaseSchema):
     component_locations: ClassVar[tuple[tuple[str, ...], ...]] = ()
 
     @property
-    def spec_version(self) -> str:
+    def specification(self) -> Specification:
         raise NotImplementedError
 
     def __repr__(self) -> str:
@@ -127,7 +126,7 @@ class BaseOpenAPISchema(BaseSchema):
             operation=APIOperation(
                 method="",
                 path="",
-                verbose_name="",
+                label="",
                 definition=OperationDefinition(raw=None, resolved=None, scope=""),
                 schema=None,  # type: ignore
             )
@@ -142,7 +141,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation = _ctx_cache.operation
         operation.method = method
         operation.path = path
-        operation.verbose_name = f"{method.upper()} {path}"
+        operation.label = f"{method.upper()} {path}"
         operation.definition.raw = definition
         operation.definition.resolved = definition
         operation.schema = self
@@ -251,7 +250,7 @@ class BaseOpenAPISchema(BaseSchema):
             paths = self.raw_schema["paths"]
         except KeyError as exc:
             # This field is optional in Open API 3.1
-            if version.parse(self.spec_version) >= version.parse("3.1"):
+            if version.parse(self.specification.version) >= version.parse("3.1"):
                 return
             # Missing `paths` is not recoverable
             self._raise_invalid_schema(exc)
@@ -604,7 +603,7 @@ class BaseOpenAPISchema(BaseSchema):
 
     @property
     def validator_cls(self) -> type[jsonschema.Validator]:
-        if self.spec_version.startswith("3.1"):
+        if self.specification.version.startswith("3.1"):
             return jsonschema.Draft202012Validator
         return jsonschema.Draft4Validator
 
@@ -628,9 +627,7 @@ class BaseOpenAPISchema(BaseSchema):
             all_media_types = self.get_content_types(operation, response)
             formatted_content_types = [f"\n- `{content_type}`" for content_type in all_media_types]
             message = f"The following media types are documented in the schema:{''.join(formatted_content_types)}"
-            failures.append(
-                MissingContentType(operation=operation.verbose_name, message=message, media_types=all_media_types)
-            )
+            failures.append(MissingContentType(operation=operation.label, message=message, media_types=all_media_types))
             content_type = None
         else:
             content_type = content_types[0]
@@ -640,7 +637,7 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             data = response.json()
         except JSONDecodeError as exc:
-            failures.append(MalformedJson.from_exception(operation=operation.verbose_name, exc=exc))
+            failures.append(MalformedJson.from_exception(operation=operation.label, exc=exc))
             _maybe_raise_one_or_more(failures)
         with self._validating_response(scopes) as resolver:
             try:
@@ -655,7 +652,7 @@ class BaseOpenAPISchema(BaseSchema):
             except jsonschema.ValidationError as exc:
                 failures.append(
                     JsonSchemaError.from_exception(
-                        operation=operation.verbose_name,
+                        operation=operation.label,
                         exc=exc,
                         output_config=operation.schema.output_config,
                     )
@@ -877,12 +874,9 @@ class SwaggerV20(BaseOpenAPISchema):
     links_field = "x-links"
 
     @property
-    def spec_version(self) -> str:
-        return self.raw_schema.get("swagger", "2.0")
-
-    @property
-    def verbose_name(self) -> str:
-        return f"Swagger {self.spec_version}"
+    def specification(self) -> Specification:
+        version = self.raw_schema.get("swagger", "2.0")
+        return Specification.openapi(version=version)
 
     def _validate(self) -> None:
         SWAGGER_20_VALIDATOR.validate(self.raw_schema)
@@ -1050,15 +1044,12 @@ class OpenApi30(SwaggerV20):
     links_field = "links"
 
     @property
-    def spec_version(self) -> str:
-        return self.raw_schema["openapi"]
-
-    @property
-    def verbose_name(self) -> str:
-        return f"Open API {self.spec_version}"
+    def specification(self) -> Specification:
+        version = self.raw_schema["openapi"]
+        return Specification.openapi(version=version)
 
     def _validate(self) -> None:
-        if self.spec_version.startswith("3.1"):
+        if self.specification.version.startswith("3.1"):
             # Currently we treat Open API 3.1 as 3.0 in some regard
             OPENAPI_31_VALIDATOR.validate(self.raw_schema)
         else:

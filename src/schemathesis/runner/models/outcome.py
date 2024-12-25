@@ -112,7 +112,7 @@ class TestResult:
 
     __test__ = False
 
-    verbose_name: str
+    label: str
     checks: list[Check] = field(default_factory=list)
     errors: list[EngineErrorInfo] = field(default_factory=list)
     interactions: list[Interaction] = field(default_factory=list)
@@ -126,7 +126,7 @@ class TestResult:
 
     def asdict(self) -> dict[str, Any]:
         return {
-            "verbose_name": self.verbose_name,
+            "label": self.label,
             "checks": [check.asdict() for check in self.checks],
             "errors": [error.asdict() for error in self.errors],
             "interactions": [interaction.asdict() for interaction in self.interactions],

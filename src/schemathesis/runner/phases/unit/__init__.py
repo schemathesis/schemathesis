@@ -144,14 +144,14 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
         assert exc.full_path is not None
 
         method = exc.method.upper()
-        verbose_name = f"{method} {exc.full_path}"
+        label = f"{method} {exc.full_path}"
 
-        result = TestResult(verbose_name=verbose_name)
+        result = TestResult(label=label)
         result.add_error(exc)
 
         if correlation_id is None:
             correlation_id = uuid.uuid4().hex
-            yield events.BeforeExecution(verbose_name=verbose_name, correlation_id=correlation_id)
+            yield events.BeforeExecution(label=label, correlation_id=correlation_id)
 
         yield events.AfterExecution(
             status=Status.ERROR,
