@@ -21,6 +21,7 @@ _______________________________ GET /api/success _______________________________
 - Custom check failed: `missing_required_header`
 
     Unexpected response status for a missing header: 200
+    Allowed statuses: 401
 
 [200] OK:
 

@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.4...HEAD>` - TBD
 --------------------------------------------
 
+**Changed**
+
+- Always expect HTTP 401 for the ``Authorization`` header in the experimental ``missing_required_header`` check.
+
 .. _v3.39.4:
 
 :version:`3.39.4 <v3.39.3...v3.39.4>` - 2024-12-26
