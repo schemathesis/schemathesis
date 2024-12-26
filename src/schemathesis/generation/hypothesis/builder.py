@@ -369,10 +369,8 @@ def _iter_coverage_cases(
             )
     if GenerationMode.NEGATIVE in generation_modes:
         # Generate HTTP methods that are not specified in the spec
-        methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"} - set(
-            operation.schema[operation.path]
-        )
-        for method in methods:
+        methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
+        for method in sorted(methods):
             instant = Instant()
             yield operation.Case(
                 **template,

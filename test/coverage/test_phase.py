@@ -1167,7 +1167,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     test_func()
 
-    assert methods == {"HEAD", "PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+    assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
 
     module = ctx.write_pymodule(
         """
@@ -1191,6 +1191,7 @@ def failed(ctx, response, case):
             "--generation-mode=negative",
             "--hypothesis-max-examples=10",
             "--experimental=coverage-phase",
+            "--experimental-no-failfast",
             hooks=module,
         )
         == snapshot_cli

@@ -12,36 +12,31 @@ Collected API links: 0
 API probing: SUCCESS
 Schema analysis: SKIP
 
-POST /api/foo F                                                           [100%]
+GET /api/success F                                                        [100%]
 
 =================================== FAILURES ===================================
-________________________________ POST /api/foo _________________________________
+_______________________________ GET /api/success _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `unsupported_method`
+- Custom check failed: `missing_required_header`
 
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
+    Unexpected response status for a missing header: 200
+    Allowed statuses: 406
 
-- Custom check failed: `failed`
+[200] OK:
 
-    Should be Unspecified HTTP method: DELETE
-
-[404] Not Found:
-
-    `404: Not Found`
+    `{"success": true}`
 
 Reproduce with: 
 
-    curl -X DELETE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
+    curl -X GET -H 'X-API-Key-2: [Filtered]' http://127.0.0.1/api/success
 
 =================================== SUMMARY ====================================
 
 Performed checks:
-    failed                                N / N passed          FAILED 
-    unsupported_method                    N / N passed          FAILED 
-
-WARNING: All API responses have a 404 status code. Did you specify the proper API location?
+    not_a_server_error                         N / N passed          PASSED 
+    missing_required_header                    N / N passed          FAILED 
+    unsupported_method                         N / N passed          PASSED 
 
 Experimental Features:
   - Coverage phase: Generate covering test cases

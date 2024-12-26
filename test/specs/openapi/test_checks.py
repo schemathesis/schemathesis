@@ -261,16 +261,24 @@ def test_positive_data_acceptance(
         assert positive_data_acceptance(ctx, response, case) is None
 
 
-@pytest.mark.parametrize("expected_status", ["406", "200"])
-@pytest.mark.operations("success")
+@pytest.mark.parametrize(
+    ["path", "header_name", "expected_status"],
+    [
+        ("/success", "X-API-Key-1", "200"),  # Does not fail
+        ("/success", "X-API-Key-1", "406"),  # Fails because the response is HTTP 200
+        ("/basic", "Authorization", "406"),  # Does not fail because Authorization has its own check
+        ("/success", "Authorization", "200"),  # Fails because response is not 401
+    ],
+)
+@pytest.mark.operations("success", "basic")
 @pytest.mark.snapshot(replace_statistic=True)
-def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, expected_status):
+def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path, header_name, expected_status):
     schema_path = ctx.openapi.write_schema(
         {
-            "/success": {
+            path: {
                 "get": {
                     "parameters": [
-                        {"name": "X-API-Key-1", "in": "header", "required": True, "schema": {"type": "string"}},
+                        {"name": header_name, "in": "header", "required": True, "schema": {"type": "string"}},
                         {"name": "X-API-Key-2", "in": "header", "schema": {"type": "string"}},
                     ],
                     "responses": {"200": {"description": "OK"}},
@@ -286,6 +294,31 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, expe
             "--generation-mode=negative",
             "--experimental=coverage-phase",
             f"--experimental-missing-required-header-allowed-statuses={expected_status}",
+        )
+        == snapshot_cli
+    )
+
+
+@pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
+@pytest.mark.operations("success")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, method):
+    schema_path = ctx.openapi.write_schema(
+        {
+            path: {
+                method: {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-phases=explicit",
+            "--generation-mode=negative",
+            "--experimental=coverage-phase",
         )
         == snapshot_cli
     )
