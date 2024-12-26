@@ -411,7 +411,8 @@ def find_matching_in_responses(examples: dict[str, list], param: str) -> Iterato
                         if found is not NOT_FOUND:
                             yield found
                     continue
-                example = inner
+                if isinstance(inner, dict):
+                    example = inner
             found = _find_matching_in_responses(example, schema_name, param, normalized, is_id_param)
             if found is not NOT_FOUND:
                 yield found
@@ -423,6 +424,8 @@ def _find_matching_in_responses(
     # Check for exact match
     if param in example:
         return example[param]
+    if is_id_param and param[:-2] in example:
+        return example[param[:-2]]
 
     # Check for case-insensitive match
     for key in example:

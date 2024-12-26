@@ -1,8 +1,17 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.3...HEAD>` - TBD
+:version:`Unreleased <v3.39.4...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.39.4:
+
+:version:`3.39.4 <v3.39.3...v3.39.4>` - 2024-12-26
+--------------------------------------------------
+
+**Fixed**
+
+- ``TypeError`` on extracting explicit examples.
 
 .. _v3.39.3:
 
