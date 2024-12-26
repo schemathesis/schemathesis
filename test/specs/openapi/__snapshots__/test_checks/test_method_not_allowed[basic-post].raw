@@ -12,31 +12,30 @@ Collected API links: 0
 API probing: SUCCESS
 Schema analysis: SKIP
 
-GET /api/success F                                                        [100%]
+POST /api/basic F                                                         [100%]
 
 =================================== FAILURES ===================================
-_______________________________ GET /api/success _______________________________
+_______________________________ POST /api/basic ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `missing_required_header`
+- Custom check failed: `unsupported_method`
 
-    Unexpected response status for a missing header: 200
-    Allowed statuses: 401
+    Unexpected response status for unspecified HTTP method: 401
+    Expected: 405
 
-[200] OK:
+[401] Unauthorized:
 
-    `{"success": true}`
+    `{"detail": "Unauthorized"}`
 
 Reproduce with: 
 
-    curl -X GET -H 'X-API-Key-2: [Filtered]' http://127.0.0.1/api/success
+    curl -X GET http://127.0.0.1/api/basic
 
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                         N / N passed          PASSED 
-    missing_required_header                    N / N passed          FAILED 
-    unsupported_method                         N / N passed          PASSED 
+    not_a_server_error                    N / N passed          PASSED 
+    unsupported_method                    N / N passed          FAILED 
 
 Experimental Features:
   - Coverage phase: Generate covering test cases

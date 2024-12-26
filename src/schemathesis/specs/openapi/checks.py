@@ -288,6 +288,19 @@ def missing_required_header(ctx: CheckContext, response: GenericResponse, case: 
     return None
 
 
+def unsupported_method(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
+    if case.meta and case.meta.description and case.meta.description.startswith("Unspecified HTTP method:"):
+        if response.status_code != 405:
+            raise AssertionError(
+                f"Unexpected response status for unspecified HTTP method: {response.status_code}\nExpected: 405"
+            )
+
+        allow_header = response.headers.get("Allow")
+        if not allow_header:
+            raise AssertionError("Missing 'Allow' header in 405 Method Not Allowed response")
+    return None
+
+
 def has_only_additional_properties_in_non_body_parameters(case: Case) -> bool:
     # Check if the case contains only additional properties in query, headers, or cookies.
     # This function is used to determine if negation is solely in the form of extra properties,
