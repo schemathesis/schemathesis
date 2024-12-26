@@ -263,11 +263,37 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData):
         return None
     data = meta.phase.data
-    if data.parameter_location == "header" and data.description and data.description.startswith("Missing "):
-        config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
-        allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+    if (
+        data.parameter
+        and data.parameter_location == "header"
+        and data.description
+        and data.description.startswith("Missing ")
+    ):
+        if data.parameter.lower() == "authorization":
+            allowed_statuses = {401}
+        else:
+            config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
+            allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
-            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}")
+            allowed = f"Allowed statuses: {', '.join(map(str,allowed_statuses))}"
+            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
+    return None
+
+
+def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> bool | None:
+    meta = case.meta
+    if meta is None or not isinstance(meta.phase.data, CoveragePhaseData):
+        return None
+    data = meta.phase.data
+    if data.description and data.description.startswith("Unspecified HTTP method:"):
+        if response.status_code != 405:
+            raise AssertionError(
+                f"Unexpected response status for unspecified HTTP method: {response.status_code}\nExpected: 405"
+            )
+
+        allow_header = response.headers.get("allow")
+        if not allow_header:
+            raise AssertionError("Missing 'Allow' header in 405 Method Not Allowed response")
     return None
 
 

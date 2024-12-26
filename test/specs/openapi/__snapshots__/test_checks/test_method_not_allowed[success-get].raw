@@ -17,8 +17,8 @@ GET /api/success .                                                        [100%]
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                         N / N passed          PASSED 
-    missing_required_header                    N / N passed          PASSED 
+    not_a_server_error                    N / N passed          PASSED 
+    unsupported_method                    N / N passed          PASSED 
 
 Experimental Features:
   - Coverage phase: Generate covering test cases

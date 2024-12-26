@@ -961,6 +961,10 @@ def run(
 
         checks_config[_max_response_time] = MaxResponseTimeConfig(max_response_time)
         selected_checks.append(_max_response_time)
+    if experimental.COVERAGE_PHASE.is_enabled:
+        from ..specs.openapi.checks import unsupported_method
+
+        selected_checks += (unsupported_method,)
 
     selected_checks = [check for check in selected_checks if check.__name__ not in excluded_check_names]
 
