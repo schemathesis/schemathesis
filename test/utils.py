@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import platform
 from functools import lru_cache, wraps
-from typing import Any, Callable
+from typing import Any, Callable, TypeVar
 
 import click
 import pytest
@@ -13,8 +13,11 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
+from schemathesis.runner import from_schema
+from schemathesis.runner.events import EngineEvent, Finished, Initialized
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -133,3 +136,34 @@ def flaky(*, max_runs: int, min_passes: int):
         return inner
 
     return decorate
+
+
+E = TypeVar("E", bound=EngineEvent)
+
+
+class EventStream:
+    def __init__(self, schema, **options):
+        options.setdefault("checks", [not_a_server_error])
+        self.schema = from_schema(schema, **options)
+
+    def execute(self) -> EventStream:
+        self.events = list(self.schema.execute())
+        return self
+
+    def find(self, ty: type[E], **attrs) -> E | None:
+        """Find first event of specified type matching all attribute predicates."""
+        return next(
+            (e for e in self.events if isinstance(e, ty) and all(getattr(e, k) == v for k, v in attrs.items())), None
+        )
+
+    def find_all(self, ty: type[E], **attrs) -> list[E]:
+        """Find all events of specified type matching all attribute predicates."""
+        return [e for e in self.events if isinstance(e, ty) and all(getattr(e, k) == v for k, v in attrs.items())]
+
+    @property
+    def started(self) -> Initialized | None:
+        return self.find(Initialized)
+
+    @property
+    def finished(self) -> Finished | None:
+        return self.find(Finished)

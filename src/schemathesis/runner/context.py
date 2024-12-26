@@ -93,7 +93,7 @@ class EngineContext:
         """Check if execution should stop."""
         return self.control.is_stopped
 
-    def on_event(self, event: events.ExecutionEvent) -> bool:
+    def on_event(self, event: events.EngineEvent) -> bool:
         """Process event and update execution state."""
         return self.control.on_event(event)
 

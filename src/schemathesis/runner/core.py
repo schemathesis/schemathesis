@@ -4,6 +4,8 @@ import threading
 from dataclasses import dataclass
 from typing import Sequence
 
+from schemathesis.runner.models.status import Status
+
 from .. import experimental
 from ..auths import unregister as unregister_auth
 from . import events
@@ -30,13 +32,10 @@ class Engine:
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
         phases = [
-            Phase(PhaseKind.PROBING, True),
-            Phase(PhaseKind.ANALYSIS, True),
+            Phase(PhaseKind.PROBING, not self.config.execution.dry_run),
+            Phase(PhaseKind.ANALYSIS, self.config.service_client is not None),
             Phase(PhaseKind.UNIT_TESTING, not experimental.STATEFUL_ONLY.is_enabled),
-            Phase(
-                PhaseKind.STATEFUL_TESTING,
-                self.config.schema.links_count > 0,
-            ),
+            Phase(PhaseKind.STATEFUL_TESTING, self.config.schema.links_count > 0),
         ]
         return ExecutionPlan(phases)
 
@@ -61,8 +60,11 @@ class ExecutionPlan:
 
             # Run main phases
             for phase in self.phases:
+                yield events.PhaseStarted(phase=phase.kind)
                 if phase.should_execute(ctx):
                     yield from phase.execute(ctx)
+                else:
+                    yield events.PhaseFinished(phase=phase.kind, status=Status.SKIP, payload=None)
                 if ctx.is_stopped:
                     break  # type: ignore[unreachable]
 
@@ -93,7 +95,7 @@ class EventStream:
     generator: EventGenerator
     stop_event: threading.Event
 
-    def __next__(self) -> events.ExecutionEvent:
+    def __next__(self) -> events.EngineEvent:
         return next(self.generator)
 
     def __iter__(self) -> EventGenerator:
@@ -106,7 +108,7 @@ class EventStream:
         """
         self.stop_event.set()
 
-    def finish(self) -> events.ExecutionEvent:
+    def finish(self) -> events.EngineEvent:
         """Stop the event stream & return the last event."""
         self.stop()
         return next(self)

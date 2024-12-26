@@ -1287,7 +1287,7 @@ def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
     sys.exit(1)
 
 
-def get_exit_code(event: events.ExecutionEvent) -> int:
+def get_exit_code(event: events.EngineEvent) -> int:
     if isinstance(event, events.Finished):
         if event.results.has_failures or event.results.has_errors:
             return 1

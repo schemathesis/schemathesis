@@ -1,4 +1,3 @@
-import os
 import pathlib
 import sys
 import threading
@@ -14,17 +13,14 @@ from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import CHECKS
-from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
+from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError
 from schemathesis.core.failures import Failure
-from schemathesis.core.result import Err, Ok
+from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.errors import EngineErrorInfo
 from schemathesis.runner.models import Status
-from schemathesis.service.client import ServiceClient
-from schemathesis.service.constants import TOKEN_ENV_VAR, URL_ENV_VAR
-from schemathesis.service.models import AnalysisError, SuccessState
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -37,9 +33,6 @@ CORPUS_FILE_NAMES = (
     "openapi-3.1",
 )
 CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
-VERIFY_SCHEMA_ANALYSIS = os.getenv("VERIFY_SCHEMA_ANALYSIS", "false").lower() in ("true", "1")
-SCHEMATHESIS_IO_URL = os.getenv(URL_ENV_VAR)
-SCHEMATHESIS_IO_TOKEN = os.getenv(TOKEN_ENV_VAR)
 
 
 app = Flask("test_app")
@@ -127,7 +120,7 @@ def app_port():
 
 def combined_check(ctx, response, case):
     case.as_curl_command()
-    for check in CHECKS:
+    for check in CHECKS.get_all():
         try:
             check(ctx, response, case)
         except Failure:
@@ -141,14 +134,9 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError):
         pass
 
-    service_client = None
-    if VERIFY_SCHEMA_ANALYSIS:
-        assert SCHEMATHESIS_IO_URL, "SCHEMATHESIS_IO_URL is not set"
-        assert SCHEMATHESIS_IO_TOKEN, "SCHEMATHESIS_IO_TOKEN is not set"
-        service_client = ServiceClient(base_url=SCHEMATHESIS_IO_URL, token=SCHEMATHESIS_IO_TOKEN)
     runner = from_schema(
         schema,
-        checks=(combined_check,),
+        checks=[combined_check],
         hypothesis_settings=hypothesis.settings(
             deadline=None,
             database=None,
@@ -157,7 +145,6 @@ def test_default(corpus, filename, app_port):
             phases=[Phase.explicit, Phase.generate],
             verbosity=Verbosity.quiet,
         ),
-        service_client=service_client,
     )
     for event in runner.execute():
         if isinstance(event, events.Interrupted):
@@ -199,7 +186,7 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
     raise exc
 
 
-def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
+def assert_event(schema_id: str, event: events.EngineEvent) -> None:
     if isinstance(event, events.AfterExecution):
         assert not event.result.has_failures, event.result.label
         failures = [check for check in event.result.checks if check.status == Status.FAILURE]
@@ -209,15 +196,6 @@ def assert_event(schema_id: str, event: events.ExecutionEvent) -> None:
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.InternalError):
         raise AssertionError(f"Internal Error: {event.exception_with_traceback}")
-    if VERIFY_SCHEMA_ANALYSIS and isinstance(event, events.AfterAnalysis):
-        assert event.analysis is not None
-        if isinstance(event.analysis, Err):
-            traceback = format_exception(event.analysis.err(), with_traceback=True)
-            raise AssertionError(f"Analysis failed: {traceback}")
-        analysis = event.analysis.ok()
-        assert not isinstance(analysis, AnalysisError)
-        for extension in analysis.extensions:
-            assert isinstance(extension.state, SuccessState), extension
 
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:

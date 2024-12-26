@@ -27,7 +27,7 @@ class ExecutionControl:
         """Signal to stop execution."""
         self.stop_event.set()
 
-    def on_event(self, event: events.ExecutionEvent) -> bool:
+    def on_event(self, event: events.EngineEvent) -> bool:
         """Process event and update execution state."""
         if isinstance(event, events.Interrupted):
             # Explicit CTRL+C
@@ -47,7 +47,7 @@ class ExecutionControl:
                 return True
         return False
 
-    def _is_failure_event(self, event: events.ExecutionEvent) -> bool:
+    def _is_failure_event(self, event: events.EngineEvent) -> bool:
         """Determine if event should count towards failure limit."""
         return (
             isinstance(event, events.AfterExecution) and event.status in (Status.ERROR, Status.FAILURE)

@@ -24,7 +24,7 @@ No checks were performed.
 Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
 We run additional conformance checks on reports from public repos.
 
-Counter: 50
+Counter: 54
 first
 second
 
