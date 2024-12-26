@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.3...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- ``TypeError`` on extracting explicit examples.
+
 .. _v3.39.3:
 
 :version:`3.39.3 <v3.39.2...v3.39.3>` - 2024-12-24
