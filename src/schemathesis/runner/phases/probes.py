@@ -29,22 +29,35 @@ if TYPE_CHECKING:
     from ..events import EventGenerator
 
 
+@dataclass
+class ProbingPayload:
+    data: list[ProbeRun]
+
+    def asdict(self) -> dict[str, Any]:
+        return {"probes": [probe.serialize() for probe in self.data]}
+
+
 def execute(ctx: EngineContext) -> EventGenerator:
     """Discover capabilities of the tested app."""
+    from schemathesis.runner.models.status import Status
+
     from ..phases import PhaseKind
 
-    yield events.BeforeProbing()
-    results = None
-    if not ctx.config.execution.dry_run:
-        results = run(ctx.config.schema, ctx.session, ctx.config.network)
-        for result in results:
-            if isinstance(result.probe, NullByteInHeader) and result.is_failure:
-                from ...specs.openapi import formats
-                from ...specs.openapi.formats import HEADER_FORMAT, header_values
+    assert not ctx.config.execution.dry_run
+    probes = run(ctx.config.schema, ctx.session, ctx.config.network)
+    status = Status.SUCCESS
+    for result in probes:
+        if isinstance(result.probe, NullByteInHeader) and result.is_failure:
+            from ...specs.openapi import formats
+            from ...specs.openapi.formats import HEADER_FORMAT, header_values
 
-                formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
-        ctx.phase_data.store(PhaseKind.PROBING, results)
-    yield events.AfterProbing(probes=results)
+            formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
+        if result.outcome == ProbeOutcome.ERROR:
+            status = Status.ERROR
+        else:
+            status = Status.SUCCESS
+    ctx.phase_data.store(PhaseKind.PROBING, probes)
+    yield events.PhaseFinished(phase=PhaseKind.PROBING, status=status, payload=ProbingPayload(data=probes))
 
 
 def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:

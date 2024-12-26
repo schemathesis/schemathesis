@@ -13,8 +13,8 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation import GenerationConfig
-from schemathesis.runner import from_schema
 from schemathesis.runner.config import NetworkConfig
+from schemathesis.runner.events import AfterExecution
 from schemathesis.runner.models import Status
 from schemathesis.specs.openapi.checks import (
     AuthKind,
@@ -24,17 +24,18 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.requests import RequestsTransport
+from test.utils import EventStream
 
 
 def run(schema_url, headers=None, network_config=None, **configuration):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
-    _, _, _, _, _, _, event, *_ = from_schema(
+    stream = EventStream(
         schema,
         checks=[ignored_auth],
         network=NetworkConfig(headers=headers, **(network_config or {})),
         hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
     ).execute()
-    return event
+    return stream.find(AfterExecution)
 
 
 @pytest.mark.parametrize("with_generated", [True, False])

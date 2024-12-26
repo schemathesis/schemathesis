@@ -7,37 +7,24 @@ from ..runner import events
 if TYPE_CHECKING:
     from ..stateful import events as stateful_events
 
-S = TypeVar("S", bound=events.ExecutionEvent)
+S = TypeVar("S", bound=events.EngineEvent)
 SerializeFunc = Callable[[S], Optional[Dict[str, Any]]]
 
 
 def serialize_initialized(event: events.Initialized) -> dict[str, Any] | None:
-    return {
-        "operations_count": event.operations_count,
-        "location": event.location or "",
-        "base_url": event.base_url,
-    }
+    return event.asdict()
 
 
-def serialize_before_probing(_: events.BeforeProbing) -> None:
-    return None
+def serialize_phase_started(event: events.PhaseStarted) -> dict[str, str]:
+    return event.asdict()
 
 
-def serialize_after_probing(event: events.AfterProbing) -> dict[str, Any] | None:
-    probes = event.probes or []
-    return {"probes": [probe.serialize() for probe in probes]}
-
-
-def serialize_before_analysis(_: events.BeforeAnalysis) -> None:
-    return None
-
-
-def serialize_after_analysis(event: events.AfterAnalysis) -> dict[str, Any] | None:
+def serialize_phase_finished(event: events.PhaseFinished) -> dict[str, str]:
     return event.asdict()
 
 
 def serialize_before_execution(event: events.BeforeExecution) -> dict[str, Any] | None:
-    return {"correlation_id": event.correlation_id, "label": event.label}
+    return event.asdict()
 
 
 def serialize_after_execution(event: events.AfterExecution) -> dict[str, Any] | None:
@@ -90,12 +77,10 @@ def serialize_after_stateful_execution(event: events.AfterStatefulExecution) -> 
     }
 
 
-SERIALIZER_MAP: dict[type[events.ExecutionEvent], SerializeFunc] = {
+SERIALIZER_MAP: dict[type[events.EngineEvent], SerializeFunc] = {
     events.Initialized: serialize_initialized,
-    events.BeforeProbing: serialize_before_probing,
-    events.AfterProbing: serialize_after_probing,
-    events.BeforeAnalysis: serialize_before_analysis,
-    events.AfterAnalysis: serialize_after_analysis,
+    events.PhaseStarted: serialize_phase_started,
+    events.PhaseFinished: serialize_phase_started,
     events.BeforeExecution: serialize_before_execution,
     events.AfterExecution: serialize_after_execution,
     events.Interrupted: serialize_interrupted,
@@ -107,7 +92,7 @@ SERIALIZER_MAP: dict[type[events.ExecutionEvent], SerializeFunc] = {
 
 
 def serialize_event(
-    event: events.ExecutionEvent,
+    event: events.EngineEvent,
 ) -> dict[str, dict[str, Any] | None]:
     """Turn an event into JSON-serializable structure."""
     serializer = SERIALIZER_MAP[event.__class__]

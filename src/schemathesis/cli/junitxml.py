@@ -24,7 +24,7 @@ class JunitXMLHandler(EventHandler):
     file_handle: LazyFile
     test_cases: dict = field(default_factory=dict)
 
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
             event_: events.AfterExecution | events.AfterStatefulExecution = event
             name = event_.result.label

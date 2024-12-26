@@ -96,8 +96,8 @@ def test_handle_initialized(capsys, mocker, execution_context, swagger_20):
     event = runner.events.Initialized.from_schema(schema=swagger_20, seed=42)
     # When this even is handled
     default.handle_initialized(execution_context, event)
-    default.handle_before_probing(execution_context, mocker.Mock(auto_spec=True))
-    default.handle_after_probing(execution_context, mocker.Mock(probes=None))
+    default.handle_before_probing()
+    default.handle_after_probing(execution_context, Status.SKIP, mocker.Mock())
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then initial title is displayed
