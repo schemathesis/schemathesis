@@ -273,13 +273,18 @@ def missing_required_header(ctx: CheckContext, response: GenericResponse, case: 
     if (
         case.meta
         and case.meta.parameter_location == "header"
+        and case.meta.parameter
         and case.meta.description
         and case.meta.description.startswith("Missing ")
     ):
-        config = ctx.config.missing_required_header
-        allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+        if case.meta.parameter.lower() == "authorization":
+            allowed_statuses = {401}
+        else:
+            config = ctx.config.missing_required_header
+            allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
-            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}")
+            allowed = f"Allowed statuses: {', '.join(map(str,allowed_statuses))}"
+            raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
     return None
 
 
