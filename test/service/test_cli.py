@@ -345,7 +345,7 @@ def test_save_to_file(cli, schema_url, tmp_path, read_report, service, name):
     # Then the report should be saved to a file
     payload = report_file.read_bytes()
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 10
+        assert len(tar.getmembers()) == 14
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         assert metadata["api_name"] == name
@@ -383,7 +383,7 @@ def test_report_via_env_var(cli, schema_url, tmp_path, read_report, service, mon
         assert f"Report is saved to {report_file}" in result.stdout
         assert not service.server.log
     with read_report(payload) as tar:
-        assert len(tar.getmembers()) == 10
+        assert len(tar.getmembers()) == 14
         metadata = json.load(tar.extractfile("metadata.json"))
         assert metadata["ci"] is None
         if telemetry == "true":

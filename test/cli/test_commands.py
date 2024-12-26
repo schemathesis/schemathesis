@@ -1393,9 +1393,11 @@ def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snap
     # And emitted Before / After event pairs have the same correlation ids
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
-    assert events[5]["correlation_id"] == events[6]["correlation_id"]
-    # And they should have the same "label"
-    assert events[5]["label"] == events[6]["result"]["label"]
+    for first, second in zip(events, events[1:]):
+        if first["event_type"] == "BeforeExecution":
+            assert first["correlation_id"] == second["correlation_id"]
+            # And they should have the same "label"
+            assert first["label"] == second["result"]["label"]
 
 
 @pytest.mark.openapi_version("3.0")

@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class DebugOutputHandler(EventHandler):
     file_handle: LazyFile
 
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         stream = self.file_handle.open()
         data = event.asdict()
         stream.write(json.dumps(data))

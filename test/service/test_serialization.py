@@ -1,23 +1,18 @@
 import pytest
 
 import schemathesis
-from schemathesis.runner import from_schema
-from schemathesis.runner.events import InternalError
+from schemathesis.runner.events import AfterExecution, InternalError, Interrupted
 from schemathesis.service.serialization import serialize_event
+from test.utils import EventStream
 
 
 @pytest.mark.operations("success", "multiple_failures")
 @pytest.mark.openapi_version("3.0")
 def test_serialize_event(schema_url):
     schema = schemathesis.openapi.from_url(schema_url)
-    events = from_schema(schema).execute()
-    next(events)
-    next(events)
-    next(events)
-    next(events)
-    next(events)
-    next(events)
-    event = serialize_event(next(events))
+    stream = EventStream(schema).execute()
+    after = stream.find(AfterExecution)
+    event = serialize_event(after)
     assert "interactions" not in event["AfterExecution"]["result"]
     assert "logs" not in event["AfterExecution"]["result"]
     assert event["AfterExecution"]["result"]["checks"][0]["case"]["query"] == {"id": 0}
@@ -28,13 +23,9 @@ def test_serialize_event(schema_url):
 def test_serialize_interrupted(mocker, schema_url):
     mocker.patch("schemathesis.runner.phases.unit.single_threaded", side_effect=KeyboardInterrupt)
     schema = schemathesis.openapi.from_url(schema_url)
-    events = from_schema(schema).execute()
-    next(events)
-    next(events)
-    next(events)
-    next(events)
-    next(events)
-    assert serialize_event(next(events)) == {"Interrupted": None}
+    stream = EventStream(schema).execute()
+    interrupted = stream.find(Interrupted)
+    assert serialize_event(interrupted) == {"Interrupted": None}
 
 
 def test_serialize_internal_error():

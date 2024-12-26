@@ -24,21 +24,29 @@ def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent
 
 
 class ShortOutputStyleHandler(EventHandler):
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         """Short output style shows single symbols in the progress bar.
 
         Otherwise, identical to the default output style.
         """
+        from schemathesis.runner.phases import PhaseKind
+        from schemathesis.runner.phases.analysis import AnalysisPayload
+        from schemathesis.runner.phases.probes import ProbingPayload
+
         if isinstance(event, events.Initialized):
             default.handle_initialized(context, event)
-        elif isinstance(event, events.BeforeProbing):
-            default.handle_before_probing(context, event)
-        elif isinstance(event, events.AfterProbing):
-            default.handle_after_probing(context, event)
-        elif isinstance(event, events.BeforeAnalysis):
-            default.handle_before_analysis(context, event)
-        elif isinstance(event, events.AfterAnalysis):
-            default.handle_after_analysis(context, event)
+        elif isinstance(event, events.PhaseStarted):
+            if event.phase == PhaseKind.PROBING:
+                default.handle_before_probing()
+            elif event.phase == PhaseKind.ANALYSIS:
+                default.handle_before_analysis()
+        elif isinstance(event, events.PhaseFinished):
+            if event.phase == PhaseKind.PROBING:
+                assert isinstance(event.payload, ProbingPayload) or event.payload is None
+                default.handle_after_probing(context, event.status, event.payload)
+            if event.phase == PhaseKind.ANALYSIS:
+                assert isinstance(event.payload, AnalysisPayload) or event.payload is None
+                default.handle_after_analysis(context, event.status, event.payload)
         elif isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         elif isinstance(event, events.AfterExecution):

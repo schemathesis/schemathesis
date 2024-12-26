@@ -67,8 +67,12 @@ class OpenAPILinkStats(TransitionStats):
         if isinstance(event, events.StepFinished):
             if event.transition_id is not None:
                 transition_id = event.transition_id
-                source = self.transitions[transition_id.source]
-                transition = source[transition_id.status_code][event.target][transition_id.name]
+                source = self.transitions.setdefault(transition_id.source, {})
+                transition = (
+                    source.setdefault(transition_id.status_code, {})
+                    .setdefault(event.target, {})
+                    .setdefault(transition_id.name, {})
+                )
                 if event.response is not None:
                     key = event.response.status_code
                 else:

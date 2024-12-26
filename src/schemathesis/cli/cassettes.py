@@ -77,7 +77,7 @@ class CassetteWriter(EventHandler):
         self.worker = threading.Thread(name="SchemathesisCassetteWriter", target=writer, kwargs=kwargs)
         self.worker.start()
 
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.Initialized):
             # In the beginning we write metadata and start `http_interactions` list
             self.queue.put(Initialize(seed=event.seed))

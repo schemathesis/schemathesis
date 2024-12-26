@@ -38,6 +38,9 @@ if TYPE_CHECKING:
 
     import requests
 
+    from schemathesis.runner.phases.analysis import AnalysisPayload
+    from schemathesis.runner.phases.probes import ProbingPayload
+
 SPINNER_REPETITION_NUMBER = 10
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
@@ -650,39 +653,23 @@ def handle_initialized(context: ExecutionContext, event: events.Initialized) -> 
         _print_lines(context.initialization_lines)
 
 
-def handle_before_probing(context: ExecutionContext, event: events.BeforeProbing) -> None:
+def handle_before_probing() -> None:
     click.secho("API probing: ...\r", bold=True, nl=False)
 
 
-def handle_after_probing(context: ExecutionContext, event: events.AfterProbing) -> None:
-    from ...runner.phases.probes import ProbeOutcome
-
-    context.probes = event.probes
-    status = "SKIP"
-    if event.probes is not None:
-        for probe in event.probes:
-            if probe.outcome in (ProbeOutcome.SUCCESS, ProbeOutcome.FAILURE):
-                # The probe itself has been executed
-                status = "SUCCESS"
-            elif probe.outcome == ProbeOutcome.ERROR:
-                status = "ERROR"
-    click.secho(f"API probing: {status}", bold=True, nl=False)
+def handle_after_probing(context: ExecutionContext, status: Status, payload: ProbingPayload | None) -> None:
+    context.probes = payload.data if payload else None
+    click.secho(f"API probing: {status.name}", bold=True, nl=False)
     click.echo()
 
 
-def handle_before_analysis(context: ExecutionContext, event: events.BeforeAnalysis) -> None:
+def handle_before_analysis() -> None:
     click.secho("Schema analysis: ...\r", bold=True, nl=False)
 
 
-def handle_after_analysis(context: ExecutionContext, event: events.AfterAnalysis) -> None:
-    context.analysis = event.analysis
-    status = "SKIP"
-    if event.analysis is not None:
-        if isinstance(event.analysis, Ok) and isinstance(event.analysis.ok(), AnalysisSuccess):
-            status = "SUCCESS"
-        else:
-            status = "ERROR"
-    click.secho(f"Schema analysis: {status}", bold=True, nl=False)
+def handle_after_analysis(context: ExecutionContext, status: Status, payload: AnalysisPayload | None) -> None:
+    context.analysis = payload.data if payload else None
+    click.secho(f"Schema analysis: {status.name}", bold=True, nl=False)
     click.echo()
     operations_count = cast(int, context.operations_count)  # INVARIANT: should not be `None`
     if operations_count >= 1:
@@ -773,18 +760,26 @@ def handle_after_stateful_execution(context: ExecutionContext, event: events.Aft
 
 
 class DefaultOutputStyleHandler(EventHandler):
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         """Choose and execute a proper handler for the given event."""
+        from schemathesis.runner.phases import PhaseKind
+        from schemathesis.runner.phases.analysis import AnalysisPayload
+        from schemathesis.runner.phases.probes import ProbingPayload
+
         if isinstance(event, events.Initialized):
             handle_initialized(context, event)
-        elif isinstance(event, events.BeforeProbing):
-            handle_before_probing(context, event)
-        elif isinstance(event, events.AfterProbing):
-            handle_after_probing(context, event)
-        elif isinstance(event, events.BeforeAnalysis):
-            handle_before_analysis(context, event)
-        elif isinstance(event, events.AfterAnalysis):
-            handle_after_analysis(context, event)
+        elif isinstance(event, events.PhaseStarted):
+            if event.phase == PhaseKind.PROBING:
+                handle_before_probing()
+            elif event.phase == PhaseKind.ANALYSIS:
+                handle_before_analysis()
+        elif isinstance(event, events.PhaseFinished):
+            if event.phase == PhaseKind.PROBING:
+                assert isinstance(event.payload, ProbingPayload) or event.payload is None
+                handle_after_probing(context, event.status, event.payload)
+            if event.phase == PhaseKind.ANALYSIS:
+                assert isinstance(event.payload, AnalysisPayload) or event.payload is None
+                handle_after_analysis(context, event.status, event.payload)
         elif isinstance(event, events.BeforeExecution):
             handle_before_execution(context, event)
         elif isinstance(event, events.AfterExecution):

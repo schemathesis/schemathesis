@@ -5,25 +5,25 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception
-from schemathesis.core.result import Err, Ok, Result
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
+    from schemathesis.runner.phases import PhaseKind
+    from schemathesis.runner.phases.analysis import AnalysisPayload
+    from schemathesis.runner.phases.probes import ProbingPayload
 
     from ..schemas import APIOperation, BaseSchema
-    from ..service.models import AnalysisResult
     from ..stateful import events
     from .models import Status, TestResult, TestResultSet
-    from .phases import probes
 
-EventGenerator = Generator["ExecutionEvent", None, None]
+EventGenerator = Generator["EngineEvent", None, None]
 
 
 @dataclass
-class ExecutionEvent:
-    """Generic execution event."""
+class EngineEvent:
+    """An event within the engine's lifecycle."""
 
-    # Whether this event is expected to be the last one in the event stream
+    # Indicates whether this event is the last in the event stream
     is_terminal = False
 
     def _asdict(self) -> dict[str, Any]:
@@ -38,9 +38,39 @@ class ExecutionEvent:
 
 
 @dataclass
-class Initialized(ExecutionEvent):
-    """Runner is initialized, settings are prepared, requests session is ready."""
+class PhaseEvent(EngineEvent):
+    """Event associated with a specific execution phase."""
 
+    phase: PhaseKind
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.name}
+
+
+@dataclass
+class PhaseStarted(PhaseEvent):
+    """Start of an execution phase."""
+
+
+@dataclass
+class PhaseFinished(PhaseEvent):
+    """End of an execution phase."""
+
+    status: Status
+    payload: ProbingPayload | AnalysisPayload | None
+
+    def _asdict(self) -> dict[str, Any]:
+        data = super()._asdict()
+        data["status"] = self.status.name
+        if self.payload is None:
+            data["payload"] = None
+        else:
+            data["payload"] = self.payload.asdict()
+        return data
+
+
+@dataclass
+class Initialized(EngineEvent):
     schema: dict[str, Any]
     specification: Specification
     # Total number of operations in the schema
@@ -83,45 +113,7 @@ class Initialized(ExecutionEvent):
 
 
 @dataclass
-class BeforeProbing(ExecutionEvent):
-    pass
-
-
-@dataclass
-class AfterProbing(ExecutionEvent):
-    probes: list[probes.ProbeRun] | None
-
-    def asdict(self, **kwargs: Any) -> dict[str, Any]:
-        probes = self.probes or []
-        return {"probes": [probe.serialize() for probe in probes], "events_type": self.__class__.__name__}
-
-
-@dataclass
-class BeforeAnalysis(ExecutionEvent):
-    pass
-
-
-@dataclass
-class AfterAnalysis(ExecutionEvent):
-    analysis: Result[AnalysisResult, Exception] | None
-
-    def _asdict(self) -> dict[str, Any]:
-        from ..service.models import AnalysisSuccess
-
-        data = {}
-        if isinstance(self.analysis, Ok):
-            result = self.analysis.ok()
-            if isinstance(result, AnalysisSuccess):
-                data["analysis_id"] = result.id
-            else:
-                data["error"] = result.message
-        elif isinstance(self.analysis, Err):
-            data["error"] = format_exception(self.analysis.err())
-        return data
-
-
-@dataclass
-class BeforeExecution(ExecutionEvent):
+class BeforeExecution(EngineEvent):
     """Happens before each tested API operation.
 
     It happens before a single hypothesis test, that may contain many examples inside.
@@ -142,7 +134,7 @@ class BeforeExecution(ExecutionEvent):
 
 
 @dataclass
-class AfterExecution(ExecutionEvent):
+class AfterExecution(EngineEvent):
     """Happens after each tested API operation."""
 
     # APIOperation test status - success / failure / error
@@ -177,7 +169,7 @@ class AfterExecution(ExecutionEvent):
 
 
 @dataclass
-class Interrupted(ExecutionEvent):
+class Interrupted(EngineEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
 
 
@@ -191,7 +183,7 @@ DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run
 
 
 @dataclass
-class InternalError(ExecutionEvent):
+class InternalError(EngineEvent):
     """An error that happened inside the runner."""
 
     is_terminal = True
@@ -268,7 +260,7 @@ class InternalError(ExecutionEvent):
 
 
 @dataclass
-class StatefulEvent(ExecutionEvent):
+class StatefulEvent(EngineEvent):
     """Represents an event originating from the state machine runner."""
 
     data: events.StatefulEvent
@@ -280,7 +272,7 @@ class StatefulEvent(ExecutionEvent):
 
 
 @dataclass
-class AfterStatefulExecution(ExecutionEvent):
+class AfterStatefulExecution(EngineEvent):
     """Happens after the stateful test run."""
 
     status: Status
@@ -296,7 +288,7 @@ class AfterStatefulExecution(ExecutionEvent):
 
 
 @dataclass
-class Finished(ExecutionEvent):
+class Finished(EngineEvent):
     """The final event of the run.
 
     No more events after this point.

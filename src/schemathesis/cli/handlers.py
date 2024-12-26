@@ -11,7 +11,7 @@ class EventHandler:
     def __init__(self, *args: Any, **params: Any) -> None:
         pass
 
-    def handle_event(self, context: ExecutionContext, event: events.ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         raise NotImplementedError
 
     def shutdown(self) -> None:

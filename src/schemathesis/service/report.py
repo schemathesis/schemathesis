@@ -24,7 +24,7 @@ if TYPE_CHECKING:
     import click
 
     from ..cli.context import ExecutionContext
-    from ..runner.events import ExecutionEvent
+    from ..runner.events import EngineEvent
     from .client import ServiceClient
     from .hosts import HostData
 
@@ -88,7 +88,7 @@ class ReportWriter:
         }
         self.add_json_file("metadata.json", data)
 
-    def add_event(self, event: ExecutionEvent) -> None:
+    def add_event(self, event: EngineEvent) -> None:
         """Add an execution event to the report."""
         self._events_count += 1
         filename = f"events/{self._events_count}-{event.__class__.__name__}.json"
@@ -99,7 +99,7 @@ class BaseReportHandler(EventHandler):
     in_queue: Queue
     worker: threading.Thread
 
-    def handle_event(self, context: ExecutionContext, event: ExecutionEvent) -> None:
+    def handle_event(self, context: ExecutionContext, event: EngineEvent) -> None:
         self.in_queue.put(event)
 
     def shutdown(self) -> None:

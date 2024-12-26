@@ -23,17 +23,25 @@ def test_add_events(openapi3_schema_url, read_report):
     data = payload.getvalue()
     with read_report(data) as tar:
         members = tar.getmembers()
-        assert len(members) == 10
+        assert len(members) == 14
         expected = (
             "Initialized",
-            "BeforeProbing",
-            "AfterProbing",
-            "BeforeAnalysis",
-            "AfterAnalysis",
+            # Probing
+            "PhaseStarted",
+            "PhaseFinished",
+            # Analysis
+            "PhaseStarted",
+            "PhaseFinished",
+            # Unit testing
+            "PhaseStarted",
             "BeforeExecution",
             "AfterExecution",
             "BeforeExecution",
             "AfterExecution",
+            "PhaseFinished",
+            # Stateful testing
+            "PhaseStarted",
+            "PhaseFinished",
             "Finished",
         )
         for event_type, member in zip(expected, members):

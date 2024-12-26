@@ -15,9 +15,10 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.runner.phases import PhaseKind
 
 from ... import events
-from ...events import EventGenerator
+from ...events import EventGenerator, PhaseFinished
 from ...models.outcome import TestResult
 from ...models.status import Status
 from ._pool import TaskProducer, WorkerPool
@@ -65,6 +66,7 @@ def single_threaded(ctx: EngineContext) -> EventGenerator:
                 yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
         else:
             yield from on_schema_error(exc=result.err(), ctx=ctx)
+    yield PhaseFinished(phase=PhaseKind.UNIT_TESTING, status=Status.SUCCESS, payload=None)
 
 
 def multi_threaded(ctx: EngineContext) -> EventGenerator:
@@ -91,6 +93,7 @@ def multi_threaded(ctx: EngineContext) -> EventGenerator:
                     if all(not worker.is_alive() for worker in pool.workers):
                         break
                     continue
+            yield PhaseFinished(phase=PhaseKind.UNIT_TESTING, status=Status.SUCCESS, payload=None)
         except KeyboardInterrupt:
             ctx.control.stop()
             yield events.Interrupted()
