@@ -1199,6 +1199,10 @@ def run(
         checks_config.missing_required_header.allowed_statuses = missing_required_header_allowed_statuses
     if negative_data_rejection_allowed_statuses:
         checks_config.negative_data_rejection.allowed_statuses = negative_data_rejection_allowed_statuses
+    if experimental.COVERAGE_PHASE.is_enabled:
+        from ..specs.openapi.checks import unsupported_method
+
+        selected_checks += (unsupported_method,)
 
     selected_checks = tuple(check for check in selected_checks if check.__name__ not in exclude_checks)
 

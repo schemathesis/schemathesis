@@ -1165,7 +1165,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     test_func()
 
-    assert methods == {"HEAD", "PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+    assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
 
     module = ctx.write_pymodule(
         """

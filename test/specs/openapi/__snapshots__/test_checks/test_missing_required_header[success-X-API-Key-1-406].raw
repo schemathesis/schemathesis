@@ -36,6 +36,7 @@ Reproduce with:
 Performed checks:
     not_a_server_error                         N / N passed          PASSED 
     missing_required_header                    N / N passed          FAILED 
+    unsupported_method                         N / N passed          PASSED 
 
 Experimental Features:
   - Coverage phase: Generate covering test cases
