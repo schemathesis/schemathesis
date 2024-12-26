@@ -83,13 +83,13 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     if data_generation_method == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in interactions)
-    assert len(interactions[0]["checks"]) == 1
+    assert len(interactions[0]["checks"]) == 2
     assert interactions[0]["checks"][0] == {
         "name": "not_a_server_error",
         "status": "SUCCESS",
         "message": None,
     }
-    assert len(interactions[1]["checks"]) == 1
+    assert len(interactions[1]["checks"]) == 2
     for interaction in interactions:
         if interaction["phase"] == "coverage":
             if interaction["data_generation_method"] == "negative" and not interaction["meta"][

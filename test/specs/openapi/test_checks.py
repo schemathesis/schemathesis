@@ -265,3 +265,28 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])
+@pytest.mark.operations("success")
+@pytest.mark.snapshot(replace_statistic=True)
+def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, method):
+    schema_path = ctx.openapi.write_schema(
+        {
+            path: {
+                method: {
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert (
+        cli.run(
+            str(schema_path),
+            f"--base-url={openapi3_base_url}",
+            "--hypothesis-phases=explicit",
+            "--data-generation-method=negative",
+            "--experimental=coverage-phase",
+        )
+        == snapshot_cli
+    )

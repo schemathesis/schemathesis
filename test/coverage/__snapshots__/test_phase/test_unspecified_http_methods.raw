@@ -18,6 +18,11 @@ POST /api/foo F                                                           [100%]
 ________________________________ POST /api/foo _________________________________
 1. Test Case ID: <PLACEHOLDER>
 
+- Custom check failed: `unsupported_method`
+
+    Unexpected response status for unspecified HTTP method: 404
+    Expected: 405
+
 - Custom check failed: `failed`
 
     Should be Unspecified HTTP method: DELETE
@@ -33,7 +38,8 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    failed                    N / N passed          FAILED 
+    failed                                N / N passed          FAILED 
+    unsupported_method                    N / N passed          FAILED 
 
 WARNING: All API responses have a 404 status code. Did you specify the proper API location?
 

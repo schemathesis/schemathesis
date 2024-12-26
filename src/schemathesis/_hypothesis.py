@@ -320,10 +320,9 @@ def _iter_coverage_cases(
             yield case
     if DataGenerationMethod.negative in data_generation_methods:
         # Generate HTTP methods that are not specified in the spec
-        methods = {"get", "put", "post", "delete", "options", "head", "patch", "trace"} - set(
-            operation.schema[operation.path]
-        )
-        for method in methods:
+        # NOTE: The HEAD method is excluded
+        methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
+        for method in sorted(methods):
             case = operation.make_case(**template)
             case._explicit_method = method
             case.data_generation_method = DataGenerationMethod.negative
