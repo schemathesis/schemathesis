@@ -42,7 +42,7 @@ def test_add_events(openapi3_schema_url, read_report):
             # Stateful testing
             "PhaseStarted",
             "PhaseFinished",
-            "Finished",
+            "EngineFinished",
         )
         for event_type, member in zip(expected, members):
             event = json.load(tar.extractfile(member.name))
@@ -78,8 +78,8 @@ def test_do_not_send_incomplete_report_service(service_report_handler, service, 
     # When the test process is interrupted or there is an internal error
     context = mock.create_autospec(ExecutionContext)
     for event in generate_events(openapi3_schema_url):
-        if isinstance(event, events.Finished):
-            service_report_handler.handle_event(context, events.Interrupted())
+        if isinstance(event, events.EngineFinished):
+            service_report_handler.handle_event(context, events.Interrupted(phase=None))
         else:
             service_report_handler.handle_event(context, event)
     # Then the report should not be sent
@@ -91,8 +91,8 @@ def test_do_not_send_incomplete_report_file(file_report_handler, openapi3_schema
     # When the test process is interrupted or there is an internal error
     context = mock.create_autospec(ExecutionContext)
     for event in generate_events(openapi3_schema_url):
-        if isinstance(event, events.Finished):
-            file_report_handler.handle_event(context, events.Interrupted())
+        if isinstance(event, events.EngineFinished):
+            file_report_handler.handle_event(context, events.Interrupted(phase=None))
         else:
             file_report_handler.handle_event(context, event)
     file_report_handler.shutdown()

@@ -8,6 +8,8 @@ from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from schemathesis.core.failures import format_failures
 from schemathesis.runner.models import group_failures_by_code_sample
+from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
 from ..runner import events
 from ..runner.models import Check, Status
@@ -25,22 +27,33 @@ class JunitXMLHandler(EventHandler):
     test_cases: dict = field(default_factory=dict)
 
     def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, (events.AfterExecution, events.AfterStatefulExecution)):
-            event_: events.AfterExecution | events.AfterStatefulExecution = event
-            name = event_.result.label
+        # TODO: store cases on each step
+        if isinstance(event, (events.AfterExecution, events.PhaseFinished)):
+            if isinstance(event, events.PhaseFinished):
+                if event.phase.name == PhaseName.STATEFUL_TESTING and event.status != Status.SKIP:
+                    # TODO: Skipped event - looks inconsistent with AfterExecution
+                    assert isinstance(event.payload, StatefulTestingPayload)
+                    result = event.payload.result
+                    elapsed_time = event.payload.elapsed_time
+                else:
+                    return
+            else:
+                result = event.result
+                elapsed_time = event.elapsed_time
+            name = result.label
             if name in self.test_cases:
                 test_case = self.test_cases[name]
-                test_case.elapsed_sec += event_.elapsed_time
+                test_case.elapsed_sec += elapsed_time
             else:
-                test_case = TestCase(name, elapsed_sec=event_.elapsed_time, allow_multiple_subelements=True)
-            if event_.status == Status.FAILURE:
-                _add_failure(test_case, event_.result.checks, context)
-            elif event_.status == Status.ERROR:
-                test_case.add_error_info(output=event_.result.errors[-1].format())
-            elif event_.status == Status.SKIP:
-                test_case.add_skipped_info(output=event_.result.skip_reason)
+                test_case = TestCase(name, elapsed_sec=elapsed_time, allow_multiple_subelements=True)
+            if event.status == Status.FAILURE:
+                _add_failure(test_case, result.checks, context)
+            elif event.status == Status.ERROR:
+                test_case.add_error_info(output=result.errors[-1].format())
+            elif event.status == Status.SKIP:
+                test_case.add_skipped_info(output=result.skip_reason)
             self.test_cases[name] = test_case
-        elif isinstance(event, events.Finished):
+        elif isinstance(event, events.EngineFinished):
             test_suites = [
                 TestSuite("schemathesis", test_cases=list(self.test_cases.values()), hostname=platform.node())
             ]

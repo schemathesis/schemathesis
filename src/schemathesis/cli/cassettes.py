@@ -19,6 +19,9 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.meta import CoveragePhaseData
+from schemathesis.runner.models.status import Status
+from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
 from ..runner import events
 from .handlers import EventHandler
@@ -83,9 +86,14 @@ class CassetteWriter(EventHandler):
             self.queue.put(Initialize(seed=event.seed))
         elif isinstance(event, events.AfterExecution):
             self.queue.put(Process(interactions=event.result.interactions))
-        elif isinstance(event, events.AfterStatefulExecution):
-            self.queue.put(Process(interactions=event.result.interactions))
-        elif isinstance(event, events.Finished):
+        elif (
+            isinstance(event, events.PhaseFinished)
+            and event.phase.name == PhaseName.STATEFUL_TESTING
+            and event.status != Status.SKIP
+        ):
+            assert isinstance(event.payload, StatefulTestingPayload)
+            self.queue.put(Process(interactions=event.payload.result.interactions))
+        elif isinstance(event, events.EngineFinished):
             self.shutdown()
 
     def shutdown(self) -> None:

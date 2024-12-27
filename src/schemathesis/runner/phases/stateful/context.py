@@ -7,13 +7,11 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.generation.targets import TargetMetricCollector
-
-from . import events
+from schemathesis.runner.models.status import Status
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-
-    from ..runner.models import Check
+    from schemathesis.runner.models import Check
 
 
 @dataclass
@@ -29,7 +27,7 @@ class RunnerContext:
     # All checks executed in the current run
     checks_for_step: list[Check] = field(default_factory=list)
     # Status of the current step
-    current_step_status: events.StepStatus | None = None
+    current_step_status: Status | None = None
     # The currently processed response
     current_response: Response | None = None
     # Total number of failures
@@ -41,16 +39,8 @@ class RunnerContext:
     step_outcomes: dict[int, BaseException | None] = field(default_factory=dict)
 
     @property
-    def current_scenario_status(self) -> events.ScenarioStatus:
-        if self.current_step_status == events.StepStatus.SUCCESS:
-            return events.ScenarioStatus.SUCCESS
-        if self.current_step_status == events.StepStatus.FAILURE:
-            return events.ScenarioStatus.FAILURE
-        if self.current_step_status == events.StepStatus.ERROR:
-            return events.ScenarioStatus.ERROR
-        if self.current_step_status == events.StepStatus.INTERRUPTED:
-            return events.ScenarioStatus.INTERRUPTED
-        return events.ScenarioStatus.REJECTED
+    def current_scenario_status(self) -> Status | None:
+        return self.current_step_status
 
     def reset_scenario(self) -> None:
         self.completed_scenarios += 1
@@ -62,16 +52,16 @@ class RunnerContext:
         self.checks_for_step = []
 
     def step_succeeded(self) -> None:
-        self.current_step_status = events.StepStatus.SUCCESS
+        self.current_step_status = Status.SUCCESS
 
     def step_failed(self) -> None:
-        self.current_step_status = events.StepStatus.FAILURE
+        self.current_step_status = Status.FAILURE
 
     def step_errored(self) -> None:
-        self.current_step_status = events.StepStatus.ERROR
+        self.current_step_status = Status.ERROR
 
     def step_interrupted(self) -> None:
-        self.current_step_status = events.StepStatus.INTERRUPTED
+        self.current_step_status = Status.INTERRUPTED
 
     def mark_as_seen_in_run(self, exc: Failure) -> None:
         self.seen_in_run.add(exc)

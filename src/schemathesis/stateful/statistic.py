@@ -4,18 +4,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from . import events
+    from schemathesis.runner import events
 
 
 @dataclass
 class TransitionStats:
     """Statistic for transitions in a state machine."""
 
-    def consume(self, event: events.StatefulEvent) -> None:
-        raise NotImplementedError
-
-    def copy(self) -> TransitionStats:
-        """Create a copy of the statistic."""
+    def consume(self, event: events.TestEvent) -> None:
         raise NotImplementedError
 
     def to_formatted_table(self, width: int) -> str:

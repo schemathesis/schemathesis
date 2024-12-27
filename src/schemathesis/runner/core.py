@@ -4,15 +4,16 @@ import threading
 from dataclasses import dataclass
 from typing import Sequence
 
+from schemathesis.core import SpecificationFeature
 from schemathesis.runner.models.status import Status
 
 from .. import experimental
 from ..auths import unregister as unregister_auth
-from . import events
+from . import events, phases
 from .config import EngineConfig
 from .context import EngineContext
 from .events import EventGenerator
-from .phases import Phase, PhaseKind
+from .phases import Phase, PhaseName
 
 
 @dataclass
@@ -32,10 +33,14 @@ class Engine:
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
         phases = [
-            Phase(PhaseKind.PROBING, not self.config.execution.dry_run),
-            Phase(PhaseKind.ANALYSIS, self.config.service_client is not None),
-            Phase(PhaseKind.UNIT_TESTING, not experimental.STATEFUL_ONLY.is_enabled),
-            Phase(PhaseKind.STATEFUL_TESTING, self.config.schema.links_count > 0),
+            Phase(PhaseName.PROBING, is_supported=True, is_enabled=not self.config.execution.dry_run),
+            Phase(PhaseName.ANALYSIS, is_supported=True, is_enabled=self.config.service_client is not None),
+            Phase(PhaseName.UNIT_TESTING, is_supported=True, is_enabled=not experimental.STATEFUL_ONLY.is_enabled),
+            Phase(
+                PhaseName.STATEFUL_TESTING,
+                is_supported=self.config.schema.specification.supports_feature(SpecificationFeature.STATEFUL_TESTING),
+                is_enabled=self.config.schema.links_count > 0,
+            ),
         ]
         return ExecutionPlan(phases)
 
@@ -60,17 +65,17 @@ class ExecutionPlan:
 
             # Run main phases
             for phase in self.phases:
-                yield events.PhaseStarted(phase=phase.kind)
+                yield events.PhaseStarted(phase=phase)
                 if phase.should_execute(ctx):
-                    yield from phase.execute(ctx)
+                    yield from phases.execute(ctx, phase)
                 else:
-                    yield events.PhaseFinished(phase=phase.kind, status=Status.SKIP, payload=None)
+                    yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
                 if ctx.is_stopped:
                     break  # type: ignore[unreachable]
 
         except KeyboardInterrupt:
             ctx.control.stop()
-            yield events.Interrupted()
+            yield events.Interrupted(phase=None)
 
         # Always finish
         yield from self._finish(ctx)
@@ -79,7 +84,7 @@ class ExecutionPlan:
         """Finish the test run."""
         if ctx.has_all_not_found:
             ctx.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
-        yield events.Finished.from_results(results=ctx.data, running_time=ctx.running_time)
+        yield events.EngineFinished(results=ctx.data, running_time=ctx.running_time)
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
