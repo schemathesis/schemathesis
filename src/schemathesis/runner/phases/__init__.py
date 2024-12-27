@@ -3,45 +3,29 @@ from __future__ import annotations
 import enum
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from ..context import EngineContext
     from ..events import EventGenerator
 
 
-class PhaseKind(enum.Enum):
+class PhaseName(enum.Enum):
     """Available execution phases."""
 
-    PROBING = enum.auto()
-    ANALYSIS = enum.auto()
-    UNIT_TESTING = enum.auto()
-    STATEFUL_TESTING = enum.auto()
+    PROBING = "probing"
+    ANALYSIS = "analysis"
+    UNIT_TESTING = "unit_testing"
+    STATEFUL_TESTING = "stateful_testing"
 
 
 @dataclass
 class Phase:
     """A logically separate engine execution phase."""
 
-    kind: PhaseKind
+    name: PhaseName
+    is_supported: bool
     is_enabled: bool = True
-
-    def execute(self, ctx: EngineContext) -> EventGenerator:
-        from urllib3.exceptions import InsecureRequestWarning
-
-        from . import analysis, probes, stateful, unit
-
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore", InsecureRequestWarning)
-
-            if self.kind == PhaseKind.PROBING:
-                yield from probes.execute(ctx)
-            elif self.kind == PhaseKind.ANALYSIS:
-                yield from analysis.execute(ctx)
-            elif self.kind == PhaseKind.UNIT_TESTING:
-                yield from unit.execute(ctx)
-            elif self.kind == PhaseKind.STATEFUL_TESTING:
-                yield from stateful.execute(ctx)
 
     def should_execute(self, ctx: EngineContext) -> bool:
         """Determine if phase should run based on context & configuration."""
@@ -50,3 +34,28 @@ class Phase:
         if ctx.is_stopped:
             return False
         return True
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "name": self.name.name,
+            "is_supported": self.is_supported,
+            "is_enabled": self.is_enabled,
+        }
+
+
+def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
+    from urllib3.exceptions import InsecureRequestWarning
+
+    from . import analysis, probes, stateful, unit
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", InsecureRequestWarning)
+
+        if phase.name == PhaseName.PROBING:
+            yield from probes.execute(ctx, phase)
+        elif phase.name == PhaseName.ANALYSIS:
+            yield from analysis.execute(ctx, phase)
+        elif phase.name == PhaseName.UNIT_TESTING:
+            yield from unit.execute(ctx, phase)
+        elif phase.name == PhaseName.STATEFUL_TESTING:
+            yield from stateful.execute(ctx, phase)

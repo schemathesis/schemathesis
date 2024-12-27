@@ -4,7 +4,6 @@ from queue import Queue
 
 import pytest
 from _pytest.main import ExitCode
-from requests import Timeout
 
 from schemathesis.cli.output.default import SERVICE_ERROR_MESSAGE, wait_for_report_handler
 from schemathesis.core.transport import USER_AGENT
@@ -97,7 +96,7 @@ def test_server_timeout(cli, schema_url, service, mocker):
     assert result.exit_code == ExitCode.OK, result.stdout
     lines = get_stdout_lines(result.stdout)
     # And meta information should be displayed
-    assert lines[29] in ("Compressed report size: 1 KB", "Compressed report size: 2 KB")
+    assert lines[29] in ("Compressed report size: 1 KB", "Compressed report size: 2 KB", "Compressed report size: 3 KB")
     assert lines[30] == f"Uploading reports to {service.base_url} ..."
     # Then the output indicates timeout
     assert lines[31] == "Upload: TIMEOUT"
@@ -180,25 +179,6 @@ def test_client_error_on_project_details(cli, service, snapshot_cli):
         )
         == snapshot_cli
     )
-
-
-@pytest.mark.openapi_version("3.0")
-def test_connection_issue(cli, schema_url, service, mocker):
-    # When there is a connection issue
-    mocker.patch("schemathesis.service.report.serialize_event", side_effect=Timeout)
-    result = cli.run(
-        schema_url,
-        "my-api",
-        f"--schemathesis-io-token={service.token}",
-        f"--schemathesis-io-url={service.base_url}",
-        "--report",
-    )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then a proper error message should be displayed
-    lines = get_stdout_lines(result.stdout)
-    assert f"{SERVICE_ERROR_MESSAGE}:" in lines
-    assert "Please, consider" not in result.stdout
-    assert "Timeout" in result.stdout
 
 
 @pytest.mark.operations("success")

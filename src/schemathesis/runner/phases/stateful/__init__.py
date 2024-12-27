@@ -1,63 +1,113 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+import queue
+import threading
+import time
+from contextlib import contextmanager
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Generator
 
-from schemathesis.stateful.runner import StatefulTestRunner
+from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...models import Status, TestResult
 
 if TYPE_CHECKING:
+    from schemathesis.runner.phases import Phase
+
     from ...context import EngineContext
     from ...events import EventGenerator
 
+EVENT_QUEUE_TIMEOUT = 0.01
 
-def execute(ctx: EngineContext) -> EventGenerator:
-    from ....stateful import events as stateful_events
+
+@dataclass
+class StatefulTestingPayload:
+    result: TestResult
+    transitions: dict
+    elapsed_time: float
+
+    def asdict(self) -> dict[str, Any]:
+        return {
+            "result": self.result.asdict(),
+            "transitions": self.transitions,
+            "elapsed_time": self.elapsed_time,
+        }
+
+
+def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
+    from schemathesis.runner.phases.stateful._executor import execute_state_machine_loop
 
     result = TestResult(label="Stateful tests")
-    runner = StatefulTestRunner(ctx)
+    started_at = time.monotonic()
+
+    state_machine = engine.config.schema.as_state_machine()
+
+    event_queue: queue.Queue = queue.Queue()
+
+    runner_thread = threading.Thread(
+        target=execute_state_machine_loop,
+        kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine},
+    )
     status = Status.SUCCESS
 
-    def from_step_status(step_status: stateful_events.StepStatus) -> Status:
-        return {
-            stateful_events.StepStatus.SUCCESS: Status.SUCCESS,
-            stateful_events.StepStatus.FAILURE: Status.FAILURE,
-            stateful_events.StepStatus.ERROR: Status.ERROR,
-            stateful_events.StepStatus.INTERRUPTED: Status.ERROR,
-        }[step_status]
+    with thread_manager(runner_thread):
+        try:
+            while True:
+                try:
+                    event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
+                    # Set the run status based on the suite status
+                    # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
+                    if (
+                        isinstance(event, events.SuiteFinished)
+                        and status not in (Status.ERROR, Status.INTERRUPTED)
+                        and event.status
+                        in (
+                            Status.FAILURE,
+                            Status.ERROR,
+                            Status.INTERRUPTED,
+                        )
+                    ):
+                        status = event.status
+                    elif isinstance(event, events.StepFinished):
+                        result.checks.extend(event.checks)
+                        if event.response is not None and event.status is not None:
+                            result.store_requests_response(
+                                status=event.status,
+                                case=event.case,
+                                response=event.response,
+                                checks=event.checks,
+                                session=engine.session,
+                            )
+                    elif isinstance(event, events.Errored):
+                        status = Status.ERROR
+                        result.add_error(event.exception)
+                    yield event
+                except queue.Empty:
+                    if not runner_thread.is_alive():
+                        break
+        except KeyboardInterrupt:
+            # Immediately notify the runner thread to stop, even though that the event will be set below in `finally`
+            engine.control.stop()
+            status = Status.INTERRUPTED
+            yield events.Interrupted(phase=PhaseName.STATEFUL_TESTING)
 
-    def on_step_finished(event: stateful_events.StepFinished) -> None:
-        if event.response is not None and event.status is not None:
-            result.store_requests_response(
-                status=from_step_status(event.status),
-                case=event.case,
-                response=event.response,
-                checks=event.checks,
-                session=ctx.session,
-            )
-
-    test_start_time: float | None = None
-    test_elapsed_time: float | None = None
-
-    for stateful_event in runner.execute():
-        if isinstance(stateful_event, stateful_events.SuiteFinished):
-            if stateful_event.failures and status != Status.ERROR:
-                status = Status.FAILURE
-        elif isinstance(stateful_event, stateful_events.RunStarted):
-            test_start_time = stateful_event.timestamp
-        elif isinstance(stateful_event, stateful_events.RunFinished):
-            test_elapsed_time = stateful_event.timestamp - cast(float, test_start_time)
-        elif isinstance(stateful_event, stateful_events.StepFinished):
-            result.checks.extend(stateful_event.checks)
-            on_step_finished(stateful_event)
-        elif isinstance(stateful_event, stateful_events.Errored):
-            status = Status.ERROR
-            result.add_error(stateful_event.exception)
-        yield events.StatefulEvent(data=stateful_event)
-    ctx.add_result(result)
-    yield events.AfterStatefulExecution(
+    engine.add_result(result)
+    yield events.PhaseFinished(
+        phase=phase,
         status=status,
-        result=result,
-        elapsed_time=cast(float, test_elapsed_time),
+        payload=StatefulTestingPayload(
+            result=result,
+            transitions=state_machine._transition_stats_template.transitions,  # type: ignore[attr-defined]
+            elapsed_time=time.monotonic() - started_at,
+        ),
     )
+
+
+@contextmanager
+def thread_manager(thread: threading.Thread) -> Generator[None, None, None]:
+    thread.start()
+    try:
+        yield
+    finally:
+        thread.join()

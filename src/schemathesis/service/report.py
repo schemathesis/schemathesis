@@ -18,7 +18,6 @@ from . import ci, events, usage
 from .constants import REPORT_FORMAT_VERSION, STOP_MARKER, WORKER_JOIN_TIMEOUT
 from .metadata import Metadata
 from .models import UploadResponse
-from .serialization import serialize_event
 
 if TYPE_CHECKING:
     import click
@@ -92,7 +91,7 @@ class ReportWriter:
         """Add an execution event to the report."""
         self._events_count += 1
         filename = f"events/{self._events_count}-{event.__class__.__name__}.json"
-        self.add_json_file(filename, serialize_event(event))
+        self.add_json_file(filename, event.asdict())
 
 
 class BaseReportHandler(EventHandler):

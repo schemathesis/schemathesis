@@ -14,6 +14,12 @@ class NotSet:
 NOT_SET = NotSet()
 
 
+class SpecificationFeature(str, enum.Enum):
+    """Features that Schemathesis can provide for different specifications."""
+
+    STATEFUL_TESTING = "stateful_testing"
+
+
 @dataclass
 class Specification:
     kind: SpecificationKind
@@ -34,6 +40,12 @@ class Specification:
 
     def asdict(self) -> dict[str, Any]:
         return {"name": self.name, "kind": self.kind.value, "version": self.version}
+
+    def supports_feature(self, feature: SpecificationFeature) -> bool:
+        """Check if Schemathesis supports a given feature for this specification."""
+        if self.kind == SpecificationKind.OPENAPI:
+            return feature in {SpecificationFeature.STATEFUL_TESTING}
+        return False
 
 
 class SpecificationKind(str, enum.Enum):

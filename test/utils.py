@@ -17,7 +17,7 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
 from schemathesis.runner import from_schema
-from schemathesis.runner.events import EngineEvent, Finished, Initialized
+from schemathesis.runner.events import EngineEvent, EngineFinished, Initialized
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -153,17 +153,28 @@ class EventStream:
     def find(self, ty: type[E], **attrs) -> E | None:
         """Find first event of specified type matching all attribute predicates."""
         return next(
-            (e for e in self.events if isinstance(e, ty) and all(getattr(e, k) == v for k, v in attrs.items())), None
+            (
+                e
+                for e in self.events
+                if isinstance(e, ty)
+                and all(v(getattr(e, k)) if callable(v) else getattr(e, k) == v for k, v in attrs.items())
+            ),
+            None,
         )
 
     def find_all(self, ty: type[E], **attrs) -> list[E]:
         """Find all events of specified type matching all attribute predicates."""
-        return [e for e in self.events if isinstance(e, ty) and all(getattr(e, k) == v for k, v in attrs.items())]
+        return [
+            e
+            for e in self.events
+            if isinstance(e, ty)
+            and all(v(getattr(e, k)) if callable(v) else getattr(e, k) == v for k, v in attrs.items())
+        ]
 
     @property
     def started(self) -> Initialized | None:
         return self.find(Initialized)
 
     @property
-    def finished(self) -> Finished | None:
-        return self.find(Finished)
+    def finished(self) -> EngineFinished | None:
+        return self.find(EngineFinished)

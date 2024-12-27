@@ -7,8 +7,7 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
-from schemathesis.stateful.runner import DEFAULT_STATE_MACHINE_SETTINGS
-from schemathesis.stateful.state_machine import NO_LINKS_ERROR_MESSAGE, StepResult
+from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, NO_LINKS_ERROR_MESSAGE, StepResult
 
 
 @pytest.mark.parametrize(

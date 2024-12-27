@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from . import events
     from .config import EngineConfig
-    from .phases import PhaseKind
+    from .phases import PhaseName
 
 
 T = TypeVar("T")
@@ -44,13 +44,13 @@ class PhaseStorage:
     """Manages storage of phase-specific data."""
 
     def __init__(self) -> None:
-        self._storage: dict[PhaseKind, PhaseData[Any]] = {}
+        self._storage: dict[PhaseName, PhaseData[Any]] = {}
 
-    def store(self, phase: PhaseKind, data: object) -> None:
+    def store(self, phase: PhaseName, data: object) -> None:
         """Store phase-specific data."""
         self._storage[phase] = PhaseData(data)
 
-    def get(self, phase: PhaseKind, data_type: Type[T]) -> T | None:
+    def get(self, phase: PhaseName, data_type: Type[T]) -> T | None:
         """Get phase-specific data in a type-safe way."""
         if phase not in self._storage:
             return None
