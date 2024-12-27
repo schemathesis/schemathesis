@@ -41,6 +41,7 @@ from schemathesis.runner.errors import (
     UnsupportedRecursiveReference,
     deduplicate_errors,
 )
+from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...context import EngineContext
@@ -62,8 +63,8 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
 
     result = TestResult(label=operation.label)
     # To simplify connecting `before` and `after` events in external systems
-    correlation_id = uuid.uuid4().hex
-    yield events.BeforeExecution.from_operation(operation=operation, correlation_id=correlation_id)
+    correlation_id = uuid.uuid4()
+    yield events.BeforeExecution(label=operation.label, correlation_id=correlation_id)
     errors: list[Exception] = []
     test_start_time = time.monotonic()
     setup_hypothesis_database_key(test_function, operation)
@@ -124,7 +125,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = Status.ERROR
         result.add_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
-        yield events.Interrupted()
+        yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
         return
     except SkipTest as exc:
         status = Status.SKIP
@@ -213,7 +214,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result, status_code):
             ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code))
-    yield events.AfterExecution.from_result(
+    yield events.AfterExecution(
         result=result,
         status=status,
         elapsed_time=test_elapsed_time,

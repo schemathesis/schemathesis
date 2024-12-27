@@ -10,7 +10,7 @@ from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.core import NOT_SET
 from schemathesis.core.transport import Response
-from schemathesis.runner.events import Finished, InternalError
+from schemathesis.runner.events import EngineFinished, InternalError
 from schemathesis.runner.models import Check, Request, Status, TestResult, TestResultSet
 from schemathesis.schemas import APIOperation, OperationDefinition
 
@@ -64,7 +64,7 @@ def results_set(operation):
 
 @pytest.fixture
 def after_execution(results_set):
-    return runner.events.AfterExecution.from_result(
+    return runner.events.AfterExecution(
         result=results_set.results[0], status=Status.SUCCESS, elapsed_time=1.0, correlation_id="foo"
     )
 
@@ -95,9 +95,9 @@ def test_handle_initialized(capsys, mocker, execution_context, swagger_20):
     # Given Initialized event
     event = runner.events.Initialized.from_schema(schema=swagger_20, seed=42)
     # When this even is handled
-    default.handle_initialized(execution_context, event)
-    default.handle_before_probing()
-    default.handle_after_probing(execution_context, Status.SKIP, mocker.Mock())
+    default.on_initialized(execution_context, event)
+    default.on_probing_started()
+    default.on_probing_finished(execution_context, Status.SKIP, mocker.Mock())
     out = capsys.readouterr().out
     lines = out.split("\n")
     # Then initial title is displayed
@@ -112,7 +112,7 @@ def test_display_multiple_warnings(capsys, execution_context):
     results = TestResultSet(seed=42, results=[])
     results.add_warning("Foo")
     results.add_warning("Bar")
-    event = Finished.from_results(results, running_time=1.0)
+    event = EngineFinished(results, running_time=1.0)
     # When test results are displayed
     default.display_statistic(execution_context, event)
     lines = [click.unstyle(line) for line in capsys.readouterr().out.split("\n") if line]
@@ -175,13 +175,13 @@ def test_display_single_failure(capsys, execution_context, operation, body, resp
 
 def test_after_execution_attributes(execution_context, after_execution):
     # When `handle_after_execution` is executed
-    default.handle_after_execution(execution_context, after_execution)
+    default.on_after_execution(execution_context, after_execution)
     # Then number of operations processed grows by 1
     assert execution_context.operations_processed == 1
     # And the line length grows by 1 symbol
     assert execution_context.current_line_length == 1
 
-    default.handle_after_execution(execution_context, after_execution)
+    default.on_after_execution(execution_context, after_execution)
     assert execution_context.operations_processed == 2
     assert execution_context.current_line_length == 2
 

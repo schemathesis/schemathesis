@@ -1269,7 +1269,11 @@ def test_debug_output(tmp_path, cli, schema_url, hypothesis_max_examples):
     for line in lines:
         json.loads(line)
     # And statuses are encoded as strings
-    assert list(json.loads(lines[-1])["results"]["total"]["not_a_server_error"]) == ["success", "total", "failure"]
+    assert list(json.loads(lines[-1])["EngineFinished"]["results"]["total"]["not_a_server_error"]) == [
+        "success",
+        "total",
+        "failure",
+    ]
 
 
 @pytest.mark.operations("cp866")
@@ -1394,10 +1398,10 @@ def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snap
     with debug_file.open(encoding="utf-8") as fd:
         events = [json.loads(line) for line in fd]
     for first, second in zip(events, events[1:]):
-        if first["event_type"] == "BeforeExecution":
-            assert first["correlation_id"] == second["correlation_id"]
+        if "BeforeExecution" in first:
+            assert first["BeforeExecution"]["correlation_id"] == second["AfterExecution"]["correlation_id"]
             # And they should have the same "label"
-            assert first["label"] == second["result"]["label"]
+            assert first["BeforeExecution"]["label"] == second["AfterExecution"]["result"]["label"]
 
 
 @pytest.mark.openapi_version("3.0")
@@ -2009,7 +2013,7 @@ class EventCounter(cli.EventHandler):
         if isinstance(event, runner.events.Initialized):
             context.add_initialization_line("Counter initialized!")
             context.add_initialization_line(gen())
-        elif isinstance(event, runner.events.Finished):
+        elif isinstance(event, runner.events.EngineFinished):
             context.add_summary_line(
                 f"Counter: {self.counter}",
             )

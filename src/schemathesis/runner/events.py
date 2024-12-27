@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 import enum
+import time
+import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception
+from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
+from schemathesis.runner.models.check import Check
+from schemathesis.runner.phases import Phase, PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
-    from schemathesis.runner.phases import PhaseKind
     from schemathesis.runner.phases.analysis import AnalysisPayload
     from schemathesis.runner.phases.probes import ProbingPayload
+    from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
-    from ..schemas import APIOperation, BaseSchema
-    from ..stateful import events
+    from ..schemas import BaseSchema
     from .models import Status, TestResult, TestResultSet
 
 EventGenerator = Generator["EngineEvent", None, None]
@@ -23,6 +28,8 @@ EventGenerator = Generator["EngineEvent", None, None]
 class EngineEvent:
     """An event within the engine's lifecycle."""
 
+    id: uuid.UUID
+    timestamp: float
     # Indicates whether this event is the last in the event stream
     is_terminal = False
 
@@ -31,25 +38,32 @@ class EngineEvent:
 
     def asdict(self, **kwargs: Any) -> dict[str, Any]:
         data = self._asdict()
+        data["id"] = self.id.hex
+        data["timestamp"] = self.timestamp
         data.update(**kwargs)
-        # An internal tag for simpler type identification
-        data["event_type"] = self.__class__.__name__
-        return data
+        return {self.__class__.__name__: data}
 
 
 @dataclass
 class PhaseEvent(EngineEvent):
     """Event associated with a specific execution phase."""
 
-    phase: PhaseKind
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.name}
+    phase: Phase
 
 
 @dataclass
 class PhaseStarted(PhaseEvent):
     """Start of an execution phase."""
+
+    __slots__ = ("id", "timestamp", "phase")
+
+    def __init__(self, *, phase: Phase) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.asdict()}
 
 
 @dataclass
@@ -57,16 +71,211 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: ProbingPayload | AnalysisPayload | None
+    payload: ProbingPayload | AnalysisPayload | StatefulTestingPayload | None
+
+    __slots__ = ("id", "timestamp", "phase", "status", "payload")
+
+    def __init__(
+        self, *, phase: Phase, status: Status, payload: ProbingPayload | AnalysisPayload | StatefulTestingPayload | None
+    ) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.status = status
+        self.payload = payload
 
     def _asdict(self) -> dict[str, Any]:
-        data = super()._asdict()
-        data["status"] = self.status.name
+        data: dict[str, Any] = {
+            "phase": self.phase.asdict(),
+            "status": self.status.name,
+        }
         if self.payload is None:
             data["payload"] = None
         else:
             data["payload"] = self.payload.asdict()
         return data
+
+
+@dataclass
+class TestEvent(EngineEvent):
+    phase: PhaseName
+
+
+@dataclass
+class SuiteStarted(TestEvent):
+    """Before executing a set of scenarios."""
+
+    __slots__ = ("id", "timestamp", "phase")
+
+    def __init__(self, *, phase: PhaseName) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.name}
+
+
+@dataclass
+class SuiteFinished(TestEvent):
+    """After executing a set of test scenarios."""
+
+    status: Status
+    failures: list[Check]
+
+    __slots__ = ("id", "timestamp", "phase", "status", "failures")
+
+    def __init__(self, *, phase: PhaseName, status: Status, failures: list[Check]) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.status = status
+        self.failures = failures
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "phase": self.phase.name,
+            "status": self.status,
+            "failures": [failure.asdict() for failure in self.failures],
+        }
+
+
+@dataclass
+class ScenarioEvent(TestEvent):
+    pass
+
+
+@dataclass
+class ScenarioStarted(ScenarioEvent):
+    """Before executing a grouped set of test steps."""
+
+    # Whether this is a scenario that tries to reproduce a failure
+    is_final: bool
+
+    __slots__ = ("id", "timestamp", "phase", "is_final")
+
+    def __init__(self, *, phase: PhaseName, is_final: bool) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.is_final = is_final
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.name, "is_final": self.is_final}
+
+
+@dataclass
+class ScenarioFinished(ScenarioEvent):
+    """After executing a grouped set of test steps."""
+
+    status: Status | None
+    # Whether this is a scenario that tries to reproduce a failure
+    is_final: bool
+
+    __slots__ = ("id", "timestamp", "phase", "status", "is_final")
+
+    def __init__(self, *, phase: PhaseName, status: Status | None, is_final: bool) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.status = status
+        self.is_final = is_final
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"is_final": self.is_final, "status": self.status}
+
+
+@dataclass
+class StepEvent(ScenarioEvent):
+    pass
+
+
+@dataclass
+class StepStarted(StepEvent):
+    """Before executing a test case."""
+
+    __slots__ = ("id", "timestamp", "phase")
+
+    def __init__(self, *, phase: PhaseName) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+
+
+@dataclass
+class TransitionId:
+    """Id of the the that was hit."""
+
+    name: str
+    # Status code as defined in the transition, i.e. may be `default`
+    status_code: str
+    source: str
+
+    __slots__ = ("name", "status_code", "source")
+
+
+@dataclass
+class ResponseData:
+    """Common data for responses."""
+
+    status_code: int
+    elapsed: float
+    __slots__ = ("status_code", "elapsed")
+
+
+@dataclass
+class StepFinished(StepEvent):
+    """After executing a test case."""
+
+    status: Status | None
+    transition_id: TransitionId | None
+    target: str
+    case: Case
+    response: Response | None
+    checks: list[Check]
+
+    __slots__ = ("id", "timestamp", "phase", "status", "transition_id", "target", "case", "response", "checks")
+
+    def __init__(
+        self,
+        *,
+        phase: PhaseName,
+        status: Status | None,
+        transition_id: TransitionId | None,
+        target: str,
+        case: Case,
+        response: Response | None,
+        checks: list[Check],
+    ) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.status = status
+        self.transition_id = transition_id
+        self.target = target
+        self.case = case
+        self.response = response
+        self.checks = checks
+
+    def _asdict(self) -> dict[str, Any]:
+        return {
+            "phase": self.phase.name,
+            "status": self.status,
+            "transition_id": {
+                "name": self.transition_id.name,
+                "status_code": self.transition_id.status_code,
+                "source": self.transition_id.source,
+            }
+            if self.transition_id is not None
+            else None,
+            "target": self.target,
+            "response": {
+                "status_code": self.response.status_code,
+                "elapsed": self.response.elapsed,
+            }
+            if self.response is not None
+            else None,
+        }
 
 
 @dataclass
@@ -89,6 +298,8 @@ class Initialized(EngineEvent):
     def from_schema(cls, *, schema: BaseSchema, seed: int | None) -> Initialized:
         """Computes all needed data from a schema instance."""
         return cls(
+            id=uuid.uuid4(),
+            timestamp=time.time(),
             schema=schema.raw_schema,
             specification=schema.specification,
             operations_count=schema.operations_count,
@@ -123,14 +334,18 @@ class BeforeExecution(EngineEvent):
     label: str
     # A unique ID which connects events that happen during testing of the same API operation
     # It may be useful when multiple threads are involved where incoming events are not ordered
-    correlation_id: str
+    correlation_id: uuid.UUID
 
-    @classmethod
-    def from_operation(cls, operation: APIOperation, correlation_id: str) -> BeforeExecution:
-        return cls(label=operation.label, correlation_id=correlation_id)
+    __slots__ = ("id", "timestamp", "label", "correlation_id")
+
+    def __init__(self, *, label: str, correlation_id: uuid.UUID) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.label = label
+        self.correlation_id = correlation_id
 
     def _asdict(self) -> dict[str, Any]:
-        return {"label": self.label, "correlation_id": self.correlation_id}
+        return {"label": self.label, "correlation_id": self.correlation_id.hex}
 
 
 @dataclass
@@ -142,35 +357,58 @@ class AfterExecution(EngineEvent):
     result: TestResult
     # Test running time
     elapsed_time: float
-    correlation_id: str
+    correlation_id: uuid.UUID
 
-    @classmethod
-    def from_result(
-        cls,
-        result: TestResult,
-        status: Status,
-        elapsed_time: float,
-        correlation_id: str,
-    ) -> AfterExecution:
-        return cls(
-            result=result,
-            status=status,
-            elapsed_time=elapsed_time,
-            correlation_id=correlation_id,
-        )
+    def __init__(self, *, status: Status, result: TestResult, elapsed_time: float, correlation_id: uuid.UUID) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.status = status
+        self.result = result
+        self.elapsed_time = elapsed_time
+        self.correlation_id = correlation_id
 
     def _asdict(self) -> dict[str, Any]:
         return {
             "status": self.status.value,
             "result": self.result.asdict(),
             "elapsed_time": self.elapsed_time,
-            "correlation_id": self.correlation_id,
+            "correlation_id": self.correlation_id.hex,
         }
 
 
 @dataclass
 class Interrupted(EngineEvent):
     """If execution was interrupted by Ctrl-C, or a received SIGTERM."""
+
+    phase: PhaseName | None
+
+    __slots__ = ("id", "timestamp", "phase")
+
+    def __init__(self, *, phase: PhaseName | None) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.name if self.phase is not None else None}
+
+
+@dataclass
+class Errored(TestEvent):
+    """An error occurred during the state machine execution."""
+
+    exception: Exception
+
+    __slots__ = ("id", "timestamp", "phase", "exception")
+
+    def __init__(self, *, phase: PhaseName, exception: Exception) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.exception = exception
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"exception": format_exception(self.exception, with_traceback=True)}
 
 
 @enum.unique
@@ -201,7 +439,7 @@ class InternalError(EngineEvent):
     exception_with_traceback: str
 
     @classmethod
-    def from_schema_error(cls, error: LoaderError) -> InternalError:
+    def from_loader_error(cls, error: LoaderError) -> InternalError:
         return cls.with_exception(
             error,
             type_=InternalErrorType.SCHEMA,
@@ -236,6 +474,8 @@ class InternalError(EngineEvent):
         exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, with_traceback=True)
         return cls(
+            id=uuid.uuid4(),
+            timestamp=time.time(),
             type=type_,
             subtype=subtype,
             title=title,
@@ -260,35 +500,7 @@ class InternalError(EngineEvent):
 
 
 @dataclass
-class StatefulEvent(EngineEvent):
-    """Represents an event originating from the state machine runner."""
-
-    data: events.StatefulEvent
-
-    __slots__ = ("data",)
-
-    def asdict(self, **kwargs: Any) -> dict[str, Any]:
-        return {"data": self.data.asdict(**kwargs), "event_type": self.__class__.__name__}
-
-
-@dataclass
-class AfterStatefulExecution(EngineEvent):
-    """Happens after the stateful test run."""
-
-    status: Status
-    result: TestResult
-    elapsed_time: float
-
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "status": self.status.value,
-            "result": self.result.asdict(),
-            "elapsed_time": self.elapsed_time,
-        }
-
-
-@dataclass
-class Finished(EngineEvent):
+class EngineFinished(EngineEvent):
     """The final event of the run.
 
     No more events after this point.
@@ -298,9 +510,16 @@ class Finished(EngineEvent):
     results: TestResultSet
     running_time: float
 
-    @classmethod
-    def from_results(cls, results: TestResultSet, running_time: float) -> Finished:
-        return cls(results=results, running_time=running_time)
+    __slots__ = ("id", "timestamp", "results", "running_time")
+
+    def __init__(self, results: TestResultSet, running_time: float) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.results = results
+        self.running_time = running_time
 
     def _asdict(self) -> dict[str, Any]:
-        return {"results": self.results.asdict(), "running_time": self.running_time}
+        return {
+            "results": self.results.asdict(),
+            "running_time": self.running_time,
+        }

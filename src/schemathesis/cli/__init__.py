@@ -1075,7 +1075,7 @@ def into_event_stream(
         schema = loaders.load_schema(loader_config)
         schema.filter_set = filter_set
     except LoaderError as error:
-        yield events.InternalError.from_schema_error(error)
+        yield events.InternalError.from_loader_error(error)
         return
 
     try:
@@ -1288,7 +1288,7 @@ def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
 
 
 def get_exit_code(event: events.EngineEvent) -> int:
-    if isinstance(event, events.Finished):
+    if isinstance(event, events.EngineFinished):
         if event.results.has_failures or event.results.has_errors:
             return 1
         return 0

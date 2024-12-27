@@ -13,7 +13,7 @@ from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.runner.context import EngineContext
-from schemathesis.stateful.runner import StatefulTestRunner
+from schemathesis.runner.phases import Phase, PhaseName, stateful
 
 
 @dataclass
@@ -364,7 +364,12 @@ def app_factory(ctx):
 
 
 @pytest.fixture
-def runner_factory(app_factory, app_runner):
+def stop_event():
+    return threading.Event()
+
+
+@pytest.fixture
+def runner_factory(app_factory, app_runner, stop_event):
     def _runner_factory(
         *,
         app_kwargs=None,
@@ -397,8 +402,9 @@ def runner_factory(app_factory, app_runner):
             network=network or NetworkConfig(),
             checks_config=checks_config or ChecksConfig(),
         )
-        return StatefulTestRunner(
-            engine=EngineContext(stop_event=threading.Event(), config=config),
+        return stateful.execute(
+            engine=EngineContext(stop_event=stop_event, config=config),
+            phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 
     return _runner_factory

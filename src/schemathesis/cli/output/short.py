@@ -1,26 +1,19 @@
 import click
 
 from ...runner import events
-from ...stateful import events as stateful_events
 from ..context import ExecutionContext
 from ..handlers import EventHandler
 from . import default
 
 
-def handle_before_execution(context: ExecutionContext, event: events.BeforeExecution) -> None:
+def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) -> None:
     pass
 
 
-def handle_after_execution(context: ExecutionContext, event: events.AfterExecution) -> None:
-    context.operations_processed += 1
-    context.results.append(event.result)
-    default.display_execution_result(context, event.status.value)
-
-
-def handle_stateful_event(context: ExecutionContext, event: events.StatefulEvent) -> None:
-    if isinstance(event.data, stateful_events.RunStarted):
-        click.echo()
-    default.handle_stateful_event(context, event)
+def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
+    ctx.operations_processed += 1
+    ctx.results.append(event.result)
+    default.display_execution_result(ctx, event.status)
 
 
 class ShortOutputStyleHandler(EventHandler):
@@ -29,37 +22,42 @@ class ShortOutputStyleHandler(EventHandler):
 
         Otherwise, identical to the default output style.
         """
-        from schemathesis.runner.phases import PhaseKind
+        from schemathesis.runner.phases import PhaseName
         from schemathesis.runner.phases.analysis import AnalysisPayload
         from schemathesis.runner.phases.probes import ProbingPayload
+        from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
         if isinstance(event, events.Initialized):
-            default.handle_initialized(context, event)
+            default.on_initialized(context, event)
         elif isinstance(event, events.PhaseStarted):
-            if event.phase == PhaseKind.PROBING:
-                default.handle_before_probing()
-            elif event.phase == PhaseKind.ANALYSIS:
-                default.handle_before_analysis()
+            if event.phase.name == PhaseName.PROBING:
+                default.on_probing_started()
+            elif event.phase.name == PhaseName.ANALYSIS:
+                default.on_analysis_started()
+            elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
+                click.echo()
+                default.on_stateful_testing_started(context)
         elif isinstance(event, events.PhaseFinished):
-            if event.phase == PhaseKind.PROBING:
+            if event.phase.name == PhaseName.PROBING:
                 assert isinstance(event.payload, ProbingPayload) or event.payload is None
-                default.handle_after_probing(context, event.status, event.payload)
-            if event.phase == PhaseKind.ANALYSIS:
+                default.on_probing_finished(context, event.status, event.payload)
+            elif event.phase.name == PhaseName.ANALYSIS:
                 assert isinstance(event.payload, AnalysisPayload) or event.payload is None
-                default.handle_after_analysis(context, event.status, event.payload)
+                default.on_analysis_finished(context, event.status, event.payload)
+            elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
+                assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
+                default.on_stateful_testing_finished(context, event.payload)
         elif isinstance(event, events.BeforeExecution):
-            handle_before_execution(context, event)
+            on_before_execution(context, event)
         elif isinstance(event, events.AfterExecution):
-            handle_after_execution(context, event)
-        elif isinstance(event, events.Finished):
+            on_after_execution(context, event)
+        elif isinstance(event, events.EngineFinished):
             if context.operations_count == context.operations_processed:
                 click.echo()
-            default.handle_finished(context, event)
+            default.on_engine_finished(context, event)
         elif isinstance(event, events.Interrupted):
-            default.handle_interrupted(context, event)
+            default.on_interrupted(context, event)
         elif isinstance(event, events.InternalError):
-            default.handle_internal_error(context, event)
-        elif isinstance(event, events.StatefulEvent):
-            handle_stateful_event(context, event)
-        elif isinstance(event, events.AfterStatefulExecution):
-            default.handle_after_stateful_execution(context, event)
+            default.on_internal_error(context, event)
+        elif isinstance(event, events.TestEvent) and event.phase == PhaseName.STATEFUL_TESTING:
+            default.on_stateful_test_event(context, event)

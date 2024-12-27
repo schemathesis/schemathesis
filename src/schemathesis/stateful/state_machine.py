@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import TYPE_CHECKING, Any, ClassVar
 
+import hypothesis
 from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
@@ -13,7 +14,6 @@ from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
-from schemathesis.stateful.runner import DEFAULT_STATE_MACHINE_SETTINGS
 
 if TYPE_CHECKING:
     import hypothesis
@@ -27,6 +27,13 @@ NO_LINKS_ERROR_MESSAGE = (
     "Stateful testing requires at least one OpenAPI link in the schema, but no links detected. "
     "Please add OpenAPI links to enable stateful testing or use stateless tests instead. \n"
     "See https://schemathesis.readthedocs.io/en/stable/stateful.html#how-to-specify-connections for more information."
+)
+
+DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
+    phases=[hypothesis.Phase.generate],
+    deadline=None,
+    stateful_step_count=6,
+    suppress_health_check=list(hypothesis.HealthCheck),
 )
 
 

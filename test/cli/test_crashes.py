@@ -171,7 +171,7 @@ def check_result(result):
 
 def test_not_handled_error(mocker, cli, schema_url):
     # When there is an unhandled error in handlers
-    mocker.patch("schemathesis.cli.output.default.handle_finished", side_effect=ValueError("Fail"))
+    mocker.patch("schemathesis.cli.output.default.on_engine_finished", side_effect=ValueError("Fail"))
     result = cli.run(schema_url)
     # Then it is propagated as it
     assert isinstance(result.exception, ValueError)

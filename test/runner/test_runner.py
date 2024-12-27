@@ -25,6 +25,7 @@ from schemathesis.generation.overrides import Override
 from schemathesis.runner import events, from_schema
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.models import Check, Status, TestResult
+from schemathesis.runner.phases.stateful import StatefulTestingPayload
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
@@ -37,7 +38,7 @@ if TYPE_CHECKING:
     from aiohttp import web
 
 
-def execute(schema, **options) -> events.Finished | None:
+def execute(schema, **options) -> events.EngineFinished | None:
     return EventStream(schema, **options).execute().finished
 
 
@@ -1034,7 +1035,7 @@ def test_interrupted_in_test(openapi3_schema):
 def test_interrupted_outside_test(mocker, openapi3_schema):
     # See GH-1325
     # When an interrupt happens outside a test body
-    mocker.patch("schemathesis.runner.events.AfterExecution.from_result", side_effect=KeyboardInterrupt)
+    mocker.patch("schemathesis.runner.events.AfterExecution.__init__", side_effect=KeyboardInterrupt)
 
     try:
         interrupted = EventStream(openapi3_schema).execute().find(events.Interrupted)
@@ -1062,13 +1063,13 @@ def event_stream(runner):
 def test_stop_event_stream(event_stream):
     assert isinstance(next(event_stream), events.Initialized)
     event_stream.stop()
-    assert isinstance(next(event_stream), events.Finished)
+    assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
 
 
 def test_stop_event_stream_immediately(event_stream):
     event_stream.stop()
-    assert isinstance(next(event_stream), events.Finished)
+    assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
 
 
@@ -1079,14 +1080,14 @@ def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     next(event_stream)
     event_stream.stop()
-    assert isinstance(next(event_stream), events.Finished)
+    assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
 
 
 def test_finish(event_stream):
     assert isinstance(next(event_stream), events.Initialized)
     event = event_stream.finish()
-    assert isinstance(event, events.Finished)
+    assert isinstance(event, events.EngineFinished)
     assert next(event_stream, None) is None
 
 
@@ -1212,7 +1213,9 @@ def test_stateful_auth(real_app_schema):
     stream = EventStream(
         real_app_schema, network=NetworkConfig(auth=("admin", "password")), **STATEFUL_KWARGS
     ).execute()
-    interactions = stream.find(events.AfterStatefulExecution).result.interactions
+    interactions = stream.find(
+        events.PhaseFinished, payload=lambda p: isinstance(p, StatefulTestingPayload)
+    ).payload.result.interactions
     assert len(interactions) > 0
     for interaction in interactions:
         assert interaction.request.headers["Authorization"] == ["Basic YWRtaW46cGFzc3dvcmQ="]
@@ -1225,7 +1228,9 @@ def test_stateful_all_generation_modes(real_app_schema):
     method = GenerationMode.NEGATIVE
     real_app_schema.generation_config.modes = [method]
     stream = EventStream(real_app_schema, **STATEFUL_KWARGS).execute()
-    interactions = stream.find(events.AfterStatefulExecution).result.interactions
+    interactions = stream.find(
+        events.PhaseFinished, payload=lambda p: isinstance(p, StatefulTestingPayload)
+    ).payload.result.interactions
     assert len(interactions) > 0
     for interaction in interactions:
         for check in interaction.checks:
@@ -1240,7 +1245,10 @@ def test_stateful_seed(real_app_schema):
     for _ in range(3):
         stream = EventStream(real_app_schema, seed=42, **STATEFUL_KWARGS).execute()
         current = []
-        for interaction in stream.find(events.AfterStatefulExecution).result.interactions:
+        interactions = stream.find(
+            events.PhaseFinished, payload=lambda p: isinstance(p, StatefulTestingPayload)
+        ).payload.result.interactions
+        for interaction in interactions:
             data = interaction.request.__dict__
             del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
             current.append(data)
@@ -1257,7 +1265,9 @@ def test_stateful_override(real_app_schema):
         override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
-    interactions = stream.find(events.AfterStatefulExecution).result.interactions
+    interactions = stream.find(
+        events.PhaseFinished, payload=lambda p: isinstance(p, StatefulTestingPayload)
+    ).payload.result.interactions
     assert len(interactions) > 0
     get_requests = [i.request for i in interactions if i.request.method == "GET"]
     assert len(get_requests) > 0

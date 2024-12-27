@@ -15,7 +15,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.runner.phases import PhaseKind
+from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...events import EventGenerator, PhaseFinished
@@ -24,21 +24,23 @@ from ...models.status import Status
 from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:
+    from schemathesis.runner.phases import Phase
+
     from ....schemas import APIOperation
     from ...context import EngineContext
 
 WORKER_TIMEOUT = 0.1
 
 
-def execute(ctx: EngineContext) -> EventGenerator:
+def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Run a set of unit tests."""
     if ctx.config.execution.workers_num > 1:
-        yield from multi_threaded(ctx)
+        yield from multi_threaded(ctx, phase)
     else:
-        yield from single_threaded(ctx)
+        yield from single_threaded(ctx, phase)
 
 
-def single_threaded(ctx: EngineContext) -> EventGenerator:
+def single_threaded(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from schemathesis.generation.hypothesis.builder import get_all_tests
 
     from ._executor import run_test, test_func
@@ -66,10 +68,10 @@ def single_threaded(ctx: EngineContext) -> EventGenerator:
                 yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
         else:
             yield from on_schema_error(exc=result.err(), ctx=ctx)
-    yield PhaseFinished(phase=PhaseKind.UNIT_TESTING, status=Status.SUCCESS, payload=None)
+    yield PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)
 
 
-def multi_threaded(ctx: EngineContext) -> EventGenerator:
+def multi_threaded(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Execute tests in multiple threads.
 
     Implemented as a producer-consumer pattern via a task queue.
@@ -93,10 +95,10 @@ def multi_threaded(ctx: EngineContext) -> EventGenerator:
                     if all(not worker.is_alive() for worker in pool.workers):
                         break
                     continue
-            yield PhaseFinished(phase=PhaseKind.UNIT_TESTING, status=Status.SUCCESS, payload=None)
+            yield PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)
         except KeyboardInterrupt:
             ctx.control.stop()
-            yield events.Interrupted()
+            yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
 
 
 def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
@@ -137,7 +139,9 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     events_queue.put(event)
 
 
-def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: str | None = None) -> EventGenerator:
+def on_schema_error(
+    *, exc: InvalidSchema, ctx: EngineContext, correlation_id: uuid.UUID | None = None
+) -> EventGenerator:
     """Handle schema-related errors during test execution."""
     if exc.method is not None:
         assert exc.path is not None
@@ -150,7 +154,7 @@ def on_schema_error(*, exc: InvalidSchema, ctx: EngineContext, correlation_id: s
         result.add_error(exc)
 
         if correlation_id is None:
-            correlation_id = uuid.uuid4().hex
+            correlation_id = uuid.uuid4()
             yield events.BeforeExecution(label=label, correlation_id=correlation_id)
 
         yield events.AfterExecution(

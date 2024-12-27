@@ -3,12 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Iterator, Union
 
-from schemathesis.core.transforms import deepclone
-
 from ....stateful.statistic import TransitionStats
 
 if TYPE_CHECKING:
-    from ....stateful import events
+    from schemathesis.runner import events
+
     from .types import AggregatedResponseCounter, LinkName, ResponseCounter, SourceName, StatusCode, TargetName
 
 
@@ -55,14 +54,14 @@ class FormattedStatisticEntry:
 class OpenAPILinkStats(TransitionStats):
     """Statistics about link transitions for a state machine run."""
 
-    transitions: dict[SourceName, dict[StatusCode, dict[TargetName, dict[LinkName, ResponseCounter]]]]
+    transitions: dict[SourceName, dict[StatusCode, dict[TargetName, dict[LinkName, ResponseCounter]]]] = field(
+        default_factory=dict
+    )
 
     roots: dict[TargetName, ResponseCounter] = field(default_factory=dict)
 
-    __slots__ = ("transitions",)
-
-    def consume(self, event: events.StatefulEvent) -> None:
-        from ....stateful import events
+    def consume(self, event: events.TestEvent) -> None:
+        from schemathesis.runner import events
 
         if isinstance(event, events.StepFinished):
             if event.transition_id is not None:
@@ -88,9 +87,6 @@ class OpenAPILinkStats(TransitionStats):
                     key = None
                 counter = target.setdefault(key, 0)
                 target[key] = counter + 1
-
-    def copy(self) -> OpenAPILinkStats:
-        return self.__class__(transitions=deepclone(self.transitions))
 
     def iter(self) -> Iterator[StatisticEntry]:
         for source_idx, (source, responses) in enumerate(self.transitions.items()):

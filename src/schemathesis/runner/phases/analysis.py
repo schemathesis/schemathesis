@@ -13,6 +13,7 @@ from ..context import EngineContext
 
 if TYPE_CHECKING:
     from schemathesis.runner.events import EventGenerator
+    from schemathesis.runner.phases import Phase
 
 
 @dataclass
@@ -32,15 +33,13 @@ class AnalysisPayload:
         return data
 
 
-def execute(ctx: EngineContext) -> EventGenerator:
+def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from schemathesis.runner.models.status import Status
-
-    from ..phases import PhaseKind
 
     assert ctx.config.service_client is not None
     data: Result[AnalysisResult, Exception] | None = None
     try:
-        probes = ctx.phase_data.get(PhaseKind.PROBING, list) or []
+        probes = ctx.phase_data.get(phase.name, list) or []
         result = ctx.config.service_client.analyze_schema(probes, ctx.config.schema.raw_schema)
         if isinstance(result, AnalysisSuccess):
             status = Status.SUCCESS
@@ -51,4 +50,4 @@ def execute(ctx: EngineContext) -> EventGenerator:
     except Exception as exc:
         data = Err(exc)
         status = Status.ERROR
-    yield events.PhaseFinished(phase=PhaseKind.ANALYSIS, status=status, payload=AnalysisPayload(data=data))
+    yield events.PhaseFinished(phase=phase, status=status, payload=AnalysisPayload(data=data))

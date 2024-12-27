@@ -1,42 +1,32 @@
 from __future__ import annotations
 
 import queue
-import threading
-from contextlib import contextmanager
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import timedelta
-from typing import TYPE_CHECKING, Any, Generator, Iterator
+from typing import TYPE_CHECKING, Any
 
 import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
+from hypothesis.stateful import Rule
 
-from schemathesis.checks import CheckFunction
-from schemathesis.core.failures import FailureGroup
+from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.targets import TargetMetricCollector
+from schemathesis.runner import events
 from schemathesis.runner.context import EngineContext
-
-from . import events
-from .context import RunnerContext
-from .validation import validate_response
+from schemathesis.runner.control import ExecutionControl
+from schemathesis.runner.models import Check, Request, Status
+from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.phases.stateful.context import RunnerContext
+from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine, Direction, StepResult
 
 if TYPE_CHECKING:
-    from hypothesis.stateful import Rule
-
     from schemathesis.generation.case import Case
-
-    from .state_machine import APIStateMachine, Direction, StepResult
-
-EVENT_QUEUE_TIMEOUT = 0.01
-DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
-    phases=[hypothesis.Phase.generate],
-    deadline=None,
-    stateful_step_count=6,
-    suppress_health_check=list(hypothesis.HealthCheck),
-)
 
 
 def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> dict[str, Any]:
@@ -54,69 +44,7 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     return kwargs
 
 
-@dataclass
-class StatefulTestRunner:
-    """Stateful test runner for the given state machine.
-
-    By default, the test runner executes the state machine in a loop until there are no new failures are found.
-    The loop is executed in a separate thread for better control over the execution and reporting.
-    """
-
-    engine: EngineContext
-
-    def execute(self) -> Iterator[events.StatefulEvent]:
-        """Execute a test run for a state machine."""
-        state_machine = self.engine.config.schema.as_state_machine()
-
-        yield events.RunStarted(state_machine=state_machine)
-
-        event_queue: queue.Queue = queue.Queue()
-
-        runner_thread = threading.Thread(
-            target=_execute_state_machine_loop,
-            kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": self.engine},
-        )
-        run_status = events.RunStatus.SUCCESS
-
-        with thread_manager(runner_thread):
-            try:
-                while True:
-                    try:
-                        event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
-                        # Set the run status based on the suite status
-                        # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
-                        if isinstance(event, events.SuiteFinished):
-                            if event.status == events.SuiteStatus.FAILURE:
-                                run_status = events.RunStatus.FAILURE
-                            elif event.status == events.SuiteStatus.ERROR:
-                                run_status = events.RunStatus.ERROR
-                            elif event.status == events.SuiteStatus.INTERRUPTED:
-                                run_status = events.RunStatus.INTERRUPTED
-                        yield event
-                    except queue.Empty:
-                        if not runner_thread.is_alive():
-                            break
-            except KeyboardInterrupt:
-                # Immediately notify the runner thread to stop, even though that the event will be set below in `finally`
-                self.engine.control.stop()
-                run_status = events.RunStatus.INTERRUPTED
-                yield events.Interrupted()
-            finally:
-                self.engine.control.stop()
-
-            yield events.RunFinished(status=run_status)
-
-
-@contextmanager
-def thread_manager(thread: threading.Thread) -> Generator[None, None, None]:
-    thread.start()
-    try:
-        yield
-    finally:
-        thread.join()
-
-
-def _execute_state_machine_loop(
+def execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
     event_queue: queue.Queue,
@@ -145,7 +73,7 @@ def _execute_state_machine_loop(
 
         def setup(self) -> None:
             build_ctx = current_build_context()
-            event_queue.put(events.ScenarioStarted(is_final=build_ctx.is_final))
+            event_queue.put(events.ScenarioStarted(phase=PhaseName.STATEFUL_TESTING, is_final=build_ctx.is_final))
             self._execution_graph = check_ctx.execution_graph
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
@@ -169,7 +97,7 @@ def _execute_state_machine_loop(
             # The idea is to stop the execution as soon as possible
             if engine.control.is_stopped:
                 raise KeyboardInterrupt
-            event_queue.put(events.StepStarted())
+            event_queue.put(events.StepStarted(phase=PhaseName.STATEFUL_TESTING))
             try:
                 if config.execution.dry_run:
                     return None
@@ -215,6 +143,7 @@ def _execute_state_machine_loop(
                     transition_id = None
                 event_queue.put(
                     events.StepFinished(
+                        phase=PhaseName.STATEFUL_TESTING,
                         status=ctx.current_step_status,
                         transition_id=transition_id,
                         target=case.operation.label,
@@ -245,6 +174,7 @@ def _execute_state_machine_loop(
             build_ctx = current_build_context()
             event_queue.put(
                 events.ScenarioFinished(
+                    phase=PhaseName.STATEFUL_TESTING,
                     status=ctx.current_scenario_status,
                     is_final=build_ctx.is_final,
                 )
@@ -260,11 +190,13 @@ def _execute_state_machine_loop(
 
     while True:
         # This loop is running until no new failures are found in a single iteration
-        event_queue.put(events.SuiteStarted())
+        event_queue.put(events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING))
         if engine.control.is_stopped:
-            event_queue.put(events.SuiteFinished(status=events.SuiteStatus.INTERRUPTED, failures=[]))
+            event_queue.put(
+                events.SuiteFinished(phase=PhaseName.STATEFUL_TESTING, status=Status.INTERRUPTED, failures=[])
+            )
             break
-        suite_status = events.SuiteStatus.SUCCESS
+        suite_status = Status.SUCCESS
         try:
             with ignore_hypothesis_output():  # type: ignore
                 InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
@@ -273,20 +205,20 @@ def _execute_state_machine_loop(
             # that is placed in the base class of the state machine.
             # Therefore, set the stop event to cover the latter case
             engine.control.stop()
-            suite_status = events.SuiteStatus.INTERRUPTED
+            suite_status = Status.INTERRUPTED
             break
         except FailureGroup as exc:
             # When a check fails, the state machine is stopped
             # The failure is already sent to the queue by the state machine
             # Here we need to either exit or re-run the state machine with this failure marked as known
-            suite_status = events.SuiteStatus.FAILURE
+            suite_status = Status.FAILURE
             if engine.control.is_stopped:
                 break  # type: ignore[unreachable]
             for failure in exc.exceptions:
                 ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
-            suite_status = events.SuiteStatus.FAILURE
+            suite_status = Status.FAILURE
             if engine.control.is_stopped:
                 break  # type: ignore[unreachable]
             # Mark all failures in this suite as seen to prevent them being re-discovered
@@ -301,11 +233,69 @@ def _execute_state_machine_loop(
                     break
                 continue
             # Any other exception is an inner error and the test run should be stopped
-            suite_status = events.SuiteStatus.ERROR
-            event_queue.put(events.Errored(exception=exc))
+            suite_status = Status.ERROR
+            event_queue.put(events.Errored(phase=PhaseName.STATEFUL_TESTING, exception=exc))
             break
         finally:
-            event_queue.put(events.SuiteFinished(status=suite_status, failures=ctx.failures_for_suite))
+            event_queue.put(
+                events.SuiteFinished(
+                    phase=PhaseName.STATEFUL_TESTING, status=suite_status, failures=ctx.failures_for_suite
+                )
+            )
             ctx.reset()
         # Exit on the first successful state machine execution
         break
+
+
+def validate_response(
+    *,
+    response: Response,
+    case: Case,
+    runner_ctx: RunnerContext,
+    check_ctx: CheckContext,
+    control: ExecutionControl,
+    checks: list[CheckFunction],
+    additional_checks: tuple[CheckFunction, ...] = (),
+) -> None:
+    """Validate the response against the provided checks."""
+    results = runner_ctx.checks_for_step
+
+    def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+        if runner_ctx.is_seen_in_suite(failure) or runner_ctx.is_seen_in_run(failure):
+            return
+        failed_check = Check(
+            name=name,
+            status=Status.FAILURE,
+            request=Request.from_prepared_request(response.request),
+            response=response,
+            case=case,
+            failure=failure,
+        )
+        results.append(failed_check)
+        control.count_failure()
+        runner_ctx.add_failed_check(failed_check)
+        runner_ctx.mark_as_seen_in_suite(failure)
+        collected.add(failure)
+
+    def on_success(name: str, case: Case) -> None:
+        results.append(
+            Check(
+                name=name,
+                status=Status.SUCCESS,
+                request=Request.from_prepared_request(response.request),
+                response=response,
+                case=case,
+            )
+        )
+
+    failures = run_checks(
+        case=case,
+        response=response,
+        ctx=check_ctx,
+        checks=tuple(checks) + tuple(additional_checks),
+        on_failure=on_failure,
+        on_success=on_success,
+    )
+
+    if failures:
+        raise FailureGroup(list(failures)) from None

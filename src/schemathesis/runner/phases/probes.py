@@ -23,6 +23,8 @@ from ..models import Request
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.runner.phases import Phase
+
     from ...schemas import BaseSchema
     from ..config import NetworkConfig
     from ..context import EngineContext
@@ -37,11 +39,9 @@ class ProbingPayload:
         return {"probes": [probe.serialize() for probe in self.data]}
 
 
-def execute(ctx: EngineContext) -> EventGenerator:
+def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
     from schemathesis.runner.models.status import Status
-
-    from ..phases import PhaseKind
 
     assert not ctx.config.execution.dry_run
     probes = run(ctx.config.schema, ctx.session, ctx.config.network)
@@ -56,8 +56,8 @@ def execute(ctx: EngineContext) -> EventGenerator:
             status = Status.ERROR
         else:
             status = Status.SUCCESS
-    ctx.phase_data.store(PhaseKind.PROBING, probes)
-    yield events.PhaseFinished(phase=PhaseKind.PROBING, status=status, payload=ProbingPayload(data=probes))
+    ctx.phase_data.store(phase.name, probes)
+    yield events.PhaseFinished(phase=phase, status=status, payload=ProbingPayload(data=probes))
 
 
 def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:

@@ -1,7 +1,6 @@
 import json
 import threading
 from dataclasses import dataclass
-from typing import List
 
 import hypothesis
 import hypothesis.errors
@@ -11,37 +10,42 @@ import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.runner import events
 from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.runner.context import EngineContext
-from schemathesis.service.serialization import _serialize_stateful_event
+from schemathesis.runner.models.status import Status
+from schemathesis.runner.phases import Phase, PhaseName, stateful
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
-from schemathesis.stateful.runner import StatefulTestRunner, events
 from test.utils import flaky
 
 
 @dataclass
 class RunnerResult:
-    events: List[events.StatefulEvent]
+    events: list[events.EngineEvent]
+
+    @property
+    def test_events(self):
+        return [event for event in self.events if isinstance(event, events.TestEvent)]
 
     @property
     def event_names(self):
-        return [event.__class__.__name__ for event in self.events]
+        return [event.__class__.__name__ for event in self.test_events]
 
     @property
     def failures(self):
-        events_ = (event for event in self.events if isinstance(event, events.SuiteFinished))
+        events_ = (event for event in self.test_events if isinstance(event, events.SuiteFinished))
         return [failure for event in events_ for failure in event.failures]
 
     @property
     def errors(self):
-        return [event for event in self.events if isinstance(event, events.Errored)]
+        return [event for event in self.test_events if isinstance(event, events.Errored)]
 
     @property
     def steps_before_first_failure(self):
         steps = 0
-        for event in self.events:
+        for event in self.test_events:
             if isinstance(event, events.StepFinished):
-                if event.status == events.RunStatus.FAILURE:
+                if event.status == Status.FAILURE:
                     break
                 steps += 1
         return steps
@@ -53,14 +57,11 @@ class RunnerResult:
 
 def serialize_all_events(events):
     for event in events:
-        json.dumps(_serialize_stateful_event(event))
+        json.dumps(event.asdict())
 
 
-def collect_result(runner: StatefulTestRunner) -> RunnerResult:
-    events_ = []
-    for event in runner.execute():
-        events_.append(event)
-    return RunnerResult(events=events_)
+def collect_result(events) -> RunnerResult:
+    return RunnerResult(events=list(events))
 
 
 @pytest.mark.parametrize("max_failures", [1, 2])
@@ -70,9 +71,7 @@ def test_find_independent_5xx(runner_factory, max_failures):
         app_kwargs={"independent_500": True}, checks=[not_a_server_error], max_failures=max_failures
     )
     result = collect_result(runner)
-    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
-    for event in result.events:
-        assert event.timestamp is not None
+    assert result.events[-1].status == Status.FAILURE, result.errors
     if max_failures == 1:
         # Then only the first one should be found
         assert len(result.failures) == 1
@@ -85,62 +84,54 @@ def test_find_independent_5xx(runner_factory, max_failures):
 def test_works_on_single_link(runner_factory):
     runner = runner_factory(app_kwargs={"single_link": True, "independent_500": True})
     result = collect_result(runner)
-    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
+    assert result.events[-1].status == Status.FAILURE, result.errors
 
 
 def keyboard_interrupt(r):
     raise KeyboardInterrupt
 
 
-def stop_runner(r):
-    r.engine.control.stop()
+def stop_runner(e):
+    e.set()
 
 
 @pytest.mark.parametrize("func", [keyboard_interrupt, stop_runner])
-def test_stop_in_check(runner_factory, func):
+def test_stop_in_check(runner_factory, func, stop_event):
     def stop_immediately(*args, **kwargs):
-        func(runner)
+        func(stop_event)
 
     runner = runner_factory(checks=[stop_immediately])
     result = collect_result(runner)
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
-    assert result.events[-1].status == events.RunStatus.INTERRUPTED
+    assert result.events[-1].status == Status.INTERRUPTED
     serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize("event_cls", [events.ScenarioStarted, events.ScenarioFinished])
-def test_explicit_stop(runner_factory, event_cls):
+def test_explicit_stop(runner_factory, event_cls, stop_event):
     runner = runner_factory()
     collected = []
-    for event in runner.execute():
+    for event in runner:
         collected.append(event)
         if isinstance(event, event_cls):
-            runner.engine.control.stop()
+            stop_event.set()
     assert len(collected) > 0
-    assert collected[-1].status == events.RunStatus.INTERRUPTED
+    assert collected[-1].status == Status.INTERRUPTED
 
 
-def test_stop_outside_of_state_machine_execution(runner_factory, mocker):
+def test_stop_outside_of_state_machine_execution(runner_factory, mocker, stop_event):
     # When stop signal is received outside of state machine execution
     runner = runner_factory(
         app_kwargs={"independent_500": True},
     )
     mocker.patch(
-        "schemathesis.stateful.runner.RunnerContext.mark_as_seen_in_run",
-        side_effect=lambda *_, **__: runner.engine.control.stop(),
+        "schemathesis.runner.phases.stateful._executor.RunnerContext.mark_as_seen_in_run",
+        side_effect=lambda *_, **__: stop_event.set(),
     )
     result = collect_result(runner)
-    assert result.events[-2].status == events.SuiteStatus.INTERRUPTED
-    assert result.events[-1].status == events.RunStatus.INTERRUPTED
+    assert result.events[-1].status == Status.INTERRUPTED
     serialize_all_events(result.events)
-
-
-def test_keyboard_interrupt(runner_factory, mocker):
-    runner = runner_factory()
-    mocker.patch("queue.Queue.get", side_effect=KeyboardInterrupt)
-    result = collect_result(runner)
-    assert "Interrupted" in result.event_names
 
 
 @pytest.mark.parametrize(
@@ -269,7 +260,7 @@ def test_failure_hidden_behind_another_failure(runner_factory):
         hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
     )
     failures = []
-    for event in runner.execute():
+    for event in runner:
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
             suite_number += 1
@@ -299,7 +290,7 @@ def test_find_use_after_free(runner_factory):
     result = collect_result(runner)
     assert len(result.failures) == 1
     assert result.failures[0].failure.title == "Use after free"
-    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.events[-1].status == Status.FAILURE
 
 
 def test_failed_health_check(runner_factory):
@@ -313,7 +304,7 @@ def test_failed_health_check(runner_factory):
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, hypothesis.errors.FailedHealthCheck)
-    assert result.events[-1].status == events.RunStatus.ERROR
+    assert result.events[-1].status == Status.ERROR
     serialize_all_events(result.events)
 
 
@@ -336,8 +327,8 @@ def test_flaky(runner_factory, kwargs):
         **kwargs,
     )
     failures = []
-    for event in runner.execute():
-        assert not isinstance(event, events.Errored)
+    for event in runner:
+        assert not isinstance(event, events.InternalError)
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     assert len(failures) == 1
@@ -352,7 +343,7 @@ def test_unsatisfiable(runner_factory):
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].exception, hypothesis.errors.InvalidArgument)
-    assert result.events[-1].status == events.RunStatus.ERROR
+    assert result.events[-1].status == Status.ERROR
 
 
 def test_custom_headers(runner_factory):
@@ -363,7 +354,7 @@ def test_custom_headers(runner_factory):
         network=NetworkConfig(headers=headers),
     )
     result = collect_result(runner)
-    assert result.events[-1].status == events.RunStatus.SUCCESS
+    assert result.events[-1].status == Status.SUCCESS
 
 
 def test_multiple_source_links(runner_factory):
@@ -381,7 +372,7 @@ def test_dry_run(runner_factory):
     runner = runner_factory(hypothesis_settings=hypothesis.settings(max_examples=1, database=None), dry_run=True)
     result = collect_result(runner)
     assert not result.errors, result.errors
-    for event in result.events:
+    for event in result.test_events:
         if isinstance(event, events.StepFinished):
             assert event.response is None
             assert not event.checks
@@ -395,7 +386,7 @@ def test_max_response_time_valid(runner_factory):
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
-    assert result.events[-4].checks[0].name == "max_response_time"
+    assert result.test_events[-3].checks[0].name == "max_response_time"
 
 
 def test_max_response_time_invalid(runner_factory):
@@ -406,8 +397,8 @@ def test_max_response_time_invalid(runner_factory):
         checks_config={max_response_time: MaxResponseTimeConfig(0.005)},
     )
     failures = []
-    for event in runner.execute():
-        assert not isinstance(event, events.Errored)
+    for event in runner:
+        assert not isinstance(event, events.InternalError)
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     # Failures on different API operations
@@ -555,7 +546,7 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app = app_factory(independent_500=True)
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema).configure(base_url=f"http://127.0.0.1:{root_app_port}/")
-    runner = StatefulTestRunner(
+    runner = stateful.execute(
         engine=EngineContext(
             config=EngineConfig(
                 schema=schema,
@@ -570,9 +561,10 @@ def test_external_link(ctx, app_factory, app_runner):
             ),
             stop_event=threading.Event(),
         ),
+        phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
     )
     result = collect_result(runner)
-    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.events[-1].status == Status.FAILURE
 
 
 def test_new_resource_is_not_available(runner_factory):
@@ -583,7 +575,7 @@ def test_new_resource_is_not_available(runner_factory):
     )
     result = collect_result(runner)
     # Then it is a failure
-    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure.title == "Resource is not available after creation"
 
 
@@ -594,7 +586,7 @@ def test_negative_tests(runner_factory):
         configuration={"generation": GenerationConfig(modes=GenerationMode.all())},
     )
     result = collect_result(runner)
-    assert result.events[-1].status == events.RunStatus.FAILURE, result.errors
+    assert result.events[-1].status == Status.FAILURE, result.errors
 
 
 def test_unique_data(runner_factory):
@@ -604,15 +596,13 @@ def test_unique_data(runner_factory):
         hypothesis_settings=hypothesis.settings(max_examples=30, database=None, stateful_step_count=100),
     )
     cases = []
-    for event in runner.execute():
+    for event in runner:
         if isinstance(event, events.ScenarioStarted):
             cases.clear()
         elif isinstance(event, events.StepFinished) and event.transition_id is None:
             cases.append(event.case)
         elif isinstance(event, events.ScenarioFinished):
             assert len(cases) == len(set(cases)), "Duplicate cases found"
-        elif isinstance(event, events.RunFinished):
-            assert event.status == events.RunStatus.FAILURE
 
 
 def test_ignored_auth_valid(runner_factory):
@@ -625,7 +615,7 @@ def test_ignored_auth_valid(runner_factory):
     )
     result = collect_result(runner)
     # Then no failures are reported
-    assert result.events[-1].status == events.RunStatus.SUCCESS
+    assert result.events[-1].status == Status.SUCCESS
 
 
 def test_ignored_auth_invalid(runner_factory):
@@ -638,5 +628,5 @@ def test_ignored_auth_invalid(runner_factory):
     )
     result = collect_result(runner)
     # Then it should be reported
-    assert result.events[-1].status == events.RunStatus.FAILURE
+    assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure.title == "Authentication declared but not enforced for this operation"
