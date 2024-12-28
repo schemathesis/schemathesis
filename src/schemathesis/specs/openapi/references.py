@@ -75,12 +75,10 @@ class InliningResolver(jsonschema.RefResolver):
                 raise
 
     @overload
-    def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]:
-        pass
+    def resolve_all(self, item: dict[str, Any], recursion_level: int = 0) -> dict[str, Any]: ...
 
     @overload
-    def resolve_all(self, item: list, recursion_level: int = 0) -> list:
-        pass
+    def resolve_all(self, item: list, recursion_level: int = 0) -> list: ...
 
     def resolve_all(self, item: JSONType, recursion_level: int = 0) -> JSONType:
         """Recursively resolve all references in the given object."""

@@ -85,7 +85,6 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             result.add_errors(errors)
         else:
             status = Status.FAILURE
-            result.mark_flaky()
         return status
 
     try:

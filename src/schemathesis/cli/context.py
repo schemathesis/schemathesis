@@ -8,28 +8,12 @@ from schemathesis.core.output import OutputConfig
 
 if TYPE_CHECKING:
     import os
-    from queue import Queue
 
     import hypothesis
 
-    from schemathesis.core.result import Result
-
     from ..runner.models import TestResult
     from ..runner.phases.probes import ProbeRun
-    from ..service.models import AnalysisResult
     from ..stateful.sink import StateMachineSink
-
-
-@dataclass
-class ServiceReportContext:
-    queue: Queue
-    service_base_url: str
-
-
-@dataclass
-class FileReportContext:
-    queue: Queue
-    filename: str | None = None
 
 
 @dataclass
@@ -50,9 +34,7 @@ class ExecutionContext:
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     is_interrupted: bool = False
-    report: ServiceReportContext | FileReportContext | None = None
     probes: list[ProbeRun] | None = None
-    analysis: Result[AnalysisResult, Exception] | None = None
     output_config: OutputConfig = field(default_factory=OutputConfig)
     state_machine_sink: StateMachineSink | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)

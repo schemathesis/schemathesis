@@ -17,7 +17,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.targets import TargetFunction
 
     from ..schemas import BaseSchema
-    from ..service.client import ServiceClient
     from .core import Engine
 
 
@@ -37,7 +36,6 @@ def from_schema(
     dry_run: bool = False,
     network: NetworkConfig | None = None,
     checks_config: ChecksConfig | None = None,
-    service_client: ServiceClient | None = None,
 ) -> Engine:
     import hypothesis
 
@@ -68,6 +66,5 @@ def from_schema(
         network=network or NetworkConfig(),
         override=override,
         checks_config=checks_config,
-        service_client=service_client,
     )
     return Engine(config=config)

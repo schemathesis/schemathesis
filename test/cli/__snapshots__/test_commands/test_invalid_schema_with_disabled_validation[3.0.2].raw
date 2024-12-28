@@ -10,7 +10,6 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SKIP
-Schema analysis: SKIP
 
 POST /data E                                                              [100%]
 
@@ -39,8 +38,5 @@ Need more help?
 =================================== SUMMARY ====================================
 
 No checks were performed.
-
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
 
 ============================== 1 errored in 1.00s ==============================

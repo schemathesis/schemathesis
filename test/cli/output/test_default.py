@@ -91,23 +91,6 @@ def test_display_section_name(capsys, title, separator, expected):
     assert expected in out
 
 
-def test_handle_initialized(capsys, mocker, execution_context, swagger_20):
-    # Given Initialized event
-    event = runner.events.Initialized.from_schema(schema=swagger_20, seed=42)
-    # When this even is handled
-    default.on_initialized(execution_context, event)
-    default.on_probing_started()
-    default.on_probing_finished(execution_context, Status.SKIP, mocker.Mock())
-    out = capsys.readouterr().out
-    lines = out.split("\n")
-    # Then initial title is displayed
-    assert " Schemathesis test session starts " in lines[0]
-    # And number of collected operations
-    assert "Collected API operations: 1" in out
-    # And the output has an empty line in the end
-    assert out.endswith("\n")
-
-
 def test_display_multiple_warnings(capsys, execution_context):
     results = TestResultSet(seed=42, results=[])
     results.add_warning("Foo")

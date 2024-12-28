@@ -34,7 +34,6 @@ class Engine:
         """Create execution plan based on configuration."""
         phases = [
             Phase(PhaseName.PROBING, is_supported=True, is_enabled=not self.config.execution.dry_run),
-            Phase(PhaseName.ANALYSIS, is_supported=True, is_enabled=self.config.service_client is not None),
             Phase(PhaseName.UNIT_TESTING, is_supported=True, is_enabled=not experimental.STATEFUL_ONLY.is_enabled),
             Phase(
                 PhaseName.STATEFUL_TESTING,

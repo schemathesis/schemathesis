@@ -10,7 +10,6 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
-Schema analysis: SKIP
 
 GET /api/test F                                                           [100%]
 
@@ -47,8 +46,5 @@ Your feedback is crucial for experimental features. Please visit the provided UR
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 
 Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
-
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
 
 ============================== 1 failed in 1.00s ===============================

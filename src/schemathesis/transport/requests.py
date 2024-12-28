@@ -7,7 +7,7 @@ from io import BytesIO
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import deepclone, merge_at
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT, Response
@@ -30,12 +30,7 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
 
         final_headers = prepare_headers(case, headers)
 
-        # Determine media type
-        media_type: str | None = None
-        if case.body is not NOT_SET and case.media_type is None:
-            media_type = case.operation._get_default_media_type()
-        else:
-            media_type = case.media_type
+        media_type = case.media_type
 
         # Set content type header if needed
         if media_type and media_type != "multipart/form-data" and not isinstance(case.body, NotSet):

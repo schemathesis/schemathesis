@@ -10,7 +10,6 @@ Workers: 1
 Collected API operations: 9
 Collected API links: 0
 API probing: SKIP
-Schema analysis: SKIP
 
 Query.getByDate .                                                         [ 11%]
 Query.getByTime .                                                         [ 22%]
@@ -25,8 +24,5 @@ Query.getByUUID .                                                         [100%]
 =================================== SUMMARY ====================================
 
 No checks were performed.
-
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
 
 ============================== 9 passed in 1.00s ===============================

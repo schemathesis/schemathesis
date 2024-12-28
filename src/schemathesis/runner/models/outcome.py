@@ -117,7 +117,6 @@ class TestResult:
     errors: list[EngineErrorInfo] = field(default_factory=list)
     interactions: list[Interaction] = field(default_factory=list)
     is_errored: bool = False
-    is_flaky: bool = False
     is_skipped: bool = False
     skip_reason: str | None = None
     is_executed: bool = False
@@ -131,7 +130,6 @@ class TestResult:
             "errors": [error.asdict() for error in self.errors],
             "interactions": [interaction.asdict() for interaction in self.interactions],
             "is_errored": self.is_errored,
-            "is_flaky": self.is_flaky,
             "is_skipped": self.is_skipped,
             "skip_reason": self.skip_reason,
             "is_executed": self.is_executed,
@@ -139,9 +137,6 @@ class TestResult:
 
     def mark_errored(self) -> None:
         self.is_errored = True
-
-    def mark_flaky(self) -> None:
-        self.is_flaky = True
 
     def mark_skipped(self, exc: SkipTest | unittest.case.SkipTest | None) -> None:
         self.is_skipped = True

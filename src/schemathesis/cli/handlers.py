@@ -8,12 +8,11 @@ if TYPE_CHECKING:
 
 
 class EventHandler:
-    def __init__(self, *args: Any, **params: Any) -> None:
-        pass
+    def __init__(self, *args: Any, **params: Any) -> None: ...
 
     def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         raise NotImplementedError
 
     def shutdown(self) -> None:
         # Do nothing by default
-        pass
+        ...

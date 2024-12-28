@@ -13,13 +13,11 @@ from _pytest.main import ExitCode
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 def test_default(cli, schema_url, snapshot_cli, workers, tmp_path):
     debug = tmp_path / "debug.log"
-    report = tmp_path / "file.tar.gz"
     assert (
         cli.run(
             schema_url,
             f"--debug-output-file={debug}",
             "--hypothesis-max-examples=80",
-            f"--report={report}",
             "--exitfirst",
             f"--workers={workers}",
         )
@@ -63,11 +61,9 @@ def test_max_failures(cli, schema_url, snapshot_cli):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_with_cassette(tmp_path, cli, schema_url):
     cassette_path = tmp_path / "output.yaml"
-    report = tmp_path / "file.tar.gz"
     cli.run(
         schema_url,
         "--hypothesis-max-examples=40",
-        f"--report={report}",
         "--exitfirst",
         f"--cassette-path={cassette_path}",
     )

@@ -51,23 +51,19 @@ JsonValue = Union[Dict[str, Any], List, str, float, int]
 
 
 @overload
-def transform(schema: dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> dict[str, Any]:
-    pass
+def transform(schema: dict[str, Any], callback: Callable, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
 
 
 @overload
-def transform(schema: list, callback: Callable, *args: Any, **kwargs: Any) -> list:
-    pass
+def transform(schema: list, callback: Callable, *args: Any, **kwargs: Any) -> list: ...
 
 
 @overload
-def transform(schema: str, callback: Callable, *args: Any, **kwargs: Any) -> str:
-    pass
+def transform(schema: str, callback: Callable, *args: Any, **kwargs: Any) -> str: ...
 
 
 @overload
-def transform(schema: float, callback: Callable, *args: Any, **kwargs: Any) -> float:
-    pass
+def transform(schema: float, callback: Callable, *args: Any, **kwargs: Any) -> float: ...
 
 
 def transform(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args: Any, **kwargs: Any) -> JsonValue:
@@ -81,8 +77,7 @@ def transform(schema: JsonValue, callback: Callable[..., dict[str, Any]], *args:
     return schema
 
 
-class Unresolvable:
-    pass
+class Unresolvable: ...
 
 
 UNRESOLVABLE = Unresolvable()

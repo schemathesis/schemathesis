@@ -197,8 +197,9 @@ def test_get_command_representation(mocker):
     assert get_command_representation() == "st run http://example.com/schema.yaml"
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 @pytest.mark.operations("success")
-def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url):
+def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url, snapshot_cli):
     result = testdir.run(
         "schemathesis",
         "run",
@@ -206,9 +207,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
         f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
         schema_url,
     )
-    assert result.ret == ExitCode.OK
-    expected = f"Network log: {cassette_path}"
-    assert result.outlines[20] == expected or result.outlines[21]
+    assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
