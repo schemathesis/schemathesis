@@ -14,7 +14,6 @@ from schemathesis.runner.phases import Phase, PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
-    from schemathesis.runner.phases.analysis import AnalysisPayload
     from schemathesis.runner.phases.probes import ProbingPayload
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
@@ -71,12 +70,12 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: ProbingPayload | AnalysisPayload | StatefulTestingPayload | None
+    payload: ProbingPayload | StatefulTestingPayload | None
 
     __slots__ = ("id", "timestamp", "phase", "status", "payload")
 
     def __init__(
-        self, *, phase: Phase, status: Status, payload: ProbingPayload | AnalysisPayload | StatefulTestingPayload | None
+        self, *, phase: Phase, status: Status, payload: ProbingPayload | StatefulTestingPayload | None
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -141,8 +140,7 @@ class SuiteFinished(TestEvent):
 
 
 @dataclass
-class ScenarioEvent(TestEvent):
-    pass
+class ScenarioEvent(TestEvent): ...
 
 
 @dataclass
@@ -186,8 +184,7 @@ class ScenarioFinished(ScenarioEvent):
 
 
 @dataclass
-class StepEvent(ScenarioEvent):
-    pass
+class StepEvent(ScenarioEvent): ...
 
 
 @dataclass
@@ -434,8 +431,6 @@ class InternalError(EngineEvent):
     extras: list[str]
 
     # Exception info
-    exception_type: str
-    exception: str
     exception_with_traceback: str
 
     @classmethod
@@ -470,8 +465,6 @@ class InternalError(EngineEvent):
         message: str,
         extras: list[str],
     ) -> InternalError:
-        exception_type = f"{exc.__class__.__module__}.{exc.__class__.__qualname__}"
-        exception = format_exception(exc)
         exception_with_traceback = format_exception(exc, with_traceback=True)
         return cls(
             id=uuid.uuid4(),
@@ -481,8 +474,6 @@ class InternalError(EngineEvent):
             title=title,
             message=message,
             extras=extras,
-            exception_type=exception_type,
-            exception=exception,
             exception_with_traceback=exception_with_traceback,
         )
 
@@ -493,8 +484,6 @@ class InternalError(EngineEvent):
             "title": self.title,
             "message": self.message,
             "extras": self.extras,
-            "exception_type": self.exception_type,
-            "exception": self.exception,
             "exception_with_traceback": self.exception_with_traceback,
         }
 

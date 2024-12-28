@@ -27,13 +27,12 @@ import schemathesis.cli
 from schemathesis.cli import CUSTOM_HANDLERS
 from schemathesis.cli.env import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
-from schemathesis.service import HOSTS_PATH_ENV_VAR
 from schemathesis.specs.openapi import media_types
 
 from .apps import _graphql as graphql
 from .apps import openapi
 from .apps.openapi.schema import OpenAPIVersion, Operation
-from .utils import get_schema_path, make_schema
+from .utils import make_schema
 
 if TYPE_CHECKING:
     from _pytest.fixtures import FixtureRequest
@@ -52,15 +51,6 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
 settings.register_profile("CI", max_examples=1000)
-
-
-@pytest.fixture(autouse=True)
-def setup(tmp_path_factory):
-    # Avoid failing tests if the local schemathesis CLI is already authenticated with SaaS
-    config_dir = tmp_path_factory.mktemp(basename="schemathesis-config")
-    hosts_path = config_dir / "hosts.toml"
-    hosts_path.touch(exist_ok=True)
-    os.environ[HOSTS_PATH_ENV_VAR] = str(hosts_path)
 
 
 @pytest.fixture(autouse=True)
@@ -117,8 +107,6 @@ def pytest_generate_tests(metafunc):
 
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
-    config.addinivalue_line("markers", "service(**kwargs): Setup mock server for Schemathesis.io.")
-    config.addinivalue_line("markers", "analyze_schema(autouse=True, extensions=()): Configure schema analysis.")
     config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
     config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
     config.addinivalue_line(
@@ -293,8 +281,6 @@ TRANSITIONS_PATTERN = re.compile(r"(\d+)(?:\s+(\d+)\s+(\d+)\s+(\d+))$")
 class CliSnapshotConfig:
     request: FixtureRequest
     replace_server_host: bool = True
-    replace_service_host: bool = True
-    replace_service_error_report: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
     replace_multi_worker_progress: bool | str = True
@@ -327,12 +313,6 @@ class CliSnapshotConfig:
             and line not in ("API probing: ...", "Schema analysis: ...")
         ]
         data = "\n".join(lines)
-        if self.replace_service_host:
-            try:
-                host = self.request.getfixturevalue("hostname")
-                data = data.replace(host, "127.0.0.1")
-            except LookupError:
-                pass
         if self.replace_server_host:
             used_fixtures = self.request.fixturenames
             for fixture in ("graphql_server_host", "server_host"):
@@ -413,14 +393,6 @@ class CliSnapshotConfig:
         if self.replace_seed:
             data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
             data = re.sub(r"Random seed: \d+", "Random seed: 42", data)
-        if self.replace_service_error_report:
-            lines = data.splitlines()
-            for idx, line in enumerate(lines):
-                if line.startswith("Headers: "):
-                    lines[idx] = "Headers: {'X-Foo': 'Bar'}"
-                    break
-            lines = [line for line in lines if not (line.startswith("Upload: ") and line.endswith(tuple("⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏")))]
-            data = "\n".join(lines) + "\n"
         if self.replace_reproduce_with:
             lines = []
             replace_next_non_empty = False
@@ -457,17 +429,23 @@ def snapshot_cli(request, snapshot):
 
         def serialize(
             self,
-            data: Result,
+            data: Result | pytest.RunResult,
             *,
             exclude: PropertyFilter | None = None,
             include: PropertyFilter | None = None,
             matcher: PropertyMatcher | None = None,
         ) -> str:
-            serialized = f"Exit code: {data.exit_code}"
-            if data.stdout_bytes:
-                serialized += f"\n---\nStdout:\n{data.stdout}"
-            if data.stderr_bytes:
-                serialized += f"\n---\nStderr:\n{data.stderr}"
+            stdout = None
+            if isinstance(data, Result):
+                exit_code = data.exit_code
+                if data.stdout_bytes:
+                    stdout = data.stdout
+            else:
+                exit_code = data.ret
+                stdout = data.stdout.str()
+            serialized = f"Exit code: {exit_code}"
+            if stdout:
+                serialized += f"\n---\nStdout:\n{stdout}"
             return config.serialize(serialized).replace("\r\n", "\n").replace("\r", "\n")
 
     class SnapshotAssertion(snapshot.__class__):
@@ -501,19 +479,6 @@ def cli():
                 env = kwargs.setdefault("env", {})
                 env[HOOKS_MODULE_ENV_VAR] = hooks
             return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
-
-        @property
-        def auth(self):
-            return Auth()
-
-    class Auth:
-        @staticmethod
-        def login(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.login, args, **kwargs)
-
-        @staticmethod
-        def logout(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.logout, args, **kwargs)
 
     return Runner()
 
@@ -863,11 +828,6 @@ def schema_with_recursive_references():
             }
         },
     }
-
-
-@pytest.fixture(name="get_schema_path")
-def _get_schema_path():
-    return get_schema_path
 
 
 @pytest.fixture

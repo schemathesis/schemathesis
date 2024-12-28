@@ -10,7 +10,6 @@ Workers: 1
 Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
-Schema analysis: SKIP
 
 GET /api/test .                                                           [100%]
 
@@ -27,8 +26,5 @@ Experimental Features:
     Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
 
 ============================== 1 passed in 1.00s ===============================

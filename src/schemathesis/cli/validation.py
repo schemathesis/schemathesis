@@ -21,13 +21,11 @@ from schemathesis.generation.overrides import Override
 
 from .. import experimental
 from ..core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
-from ..service.hosts import get_temporary_hosts_file
 from .cassettes import CassetteFormat
 from .constants import DEFAULT_WORKERS
 
 if TYPE_CHECKING:
     import hypothesis
-    from click.types import LazyFile  # type: ignore[attr-defined]
 
 
 INVALID_DERANDOMIZE_MESSAGE = (
@@ -36,7 +34,7 @@ INVALID_DERANDOMIZE_MESSAGE = (
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
     "Missing argument, `--cassette-path` should be specified as well if you use `--cassette-preserve-exact-body-bytes`."
 )
-INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL, file path or an API name from Schemathesis.io."
+INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL or file path."
 FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
 INVALID_BASE_URL_MESSAGE = (
     "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
@@ -54,8 +52,6 @@ class SchemaInputKind(enum.Enum):
     URL = 1
     # Local path
     PATH = 2
-    # A name for API created in Schemathesis.io
-    NAME = 3
 
 
 def parse_schema_kind(schema: str) -> SchemaInputKind:
@@ -70,8 +66,7 @@ def parse_schema_kind(schema: str) -> SchemaInputKind:
         return SchemaInputKind.URL
     if file_exists(schema) or bool(pathlib.Path(schema).suffix):
         return SchemaInputKind.PATH
-    # Assume NAME if it is not a URL or PATH or APP_PATH
-    return SchemaInputKind.NAME
+    raise click.UsageError(INVALID_SCHEMA_MESSAGE)
 
 
 def validate_schema(
@@ -80,7 +75,6 @@ def validate_schema(
     *,
     base_url: str | None,
     dry_run: bool,
-    api_name: str | None,
 ) -> None:
     if kind == SchemaInputKind.URL:
         validate_url(schema)
@@ -90,9 +84,6 @@ def validate_schema(
         # Base URL is required if it is not a dry run
         if base_url is None and not dry_run:
             raise click.UsageError(MISSING_BASE_URL_MESSAGE)
-    if kind == SchemaInputKind.NAME:
-        if api_name is not None:
-            raise click.UsageError(f"Got unexpected extra argument ({api_name})")
 
 
 def validate_url(value: str) -> None:
@@ -360,34 +351,8 @@ def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter
     return [GenerationMode(value)]
 
 
-def _is_usable_dir(path: os.PathLike) -> bool:
-    if os.path.isfile(path):
-        path = os.path.dirname(path)
-    while not os.path.exists(path):
-        path = os.path.dirname(path)
-    return os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK | os.X_OK)
-
-
-def convert_hosts_file(ctx: click.core.Context, param: click.core.Parameter, value: os.PathLike) -> os.PathLike | str:
-    if not _is_usable_dir(value):
-        path = get_temporary_hosts_file()
-        click.secho(
-            "WARNING: The provided hosts.toml file location is unusable - using a temporary file for this session. "
-            f"path={str(value)!r}",
-            fg="yellow",
-        )
-        return path
-    return value
-
-
 def convert_boolean_string(ctx: click.core.Context, param: click.core.Parameter, value: str) -> str | bool:
     return string_to_boolean(value)
-
-
-def convert_report(ctx: click.core.Context, param: click.core.Option, value: LazyFile) -> LazyFile:
-    if param.resolve_envvar_value(ctx) is not None and string_to_boolean(value) is True:
-        value = param.flag_value
-    return value
 
 
 @contextmanager

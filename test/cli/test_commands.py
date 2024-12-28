@@ -20,7 +20,6 @@ from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDa
 from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.cli import execute, get_exit_code
 from schemathesis.cli.constants import HealthCheck, Phase
-from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
@@ -258,7 +257,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "no_failfast": False,
         "generation_config": GenerationConfig(),
         "network": NetworkConfig(headers={}, timeout=10),
-        "service_client": None,
         **expected,
     }
     hypothesis_settings = expected.pop("hypothesis_settings", None)
@@ -332,28 +330,6 @@ def test_hypothesis_parameters(cli, schema_url):
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
     # Parameters are validated in `hypothesis.settings`
     assert result.exit_code == ExitCode.OK, result.stdout
-
-
-@pytest.mark.operations("success")
-@pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_output_success(cli, schema_url, workers):
-    result = cli.run(schema_url, f"--workers={workers}")
-    assert result.exit_code == ExitCode.OK, result.stdout
-    lines = result.stdout.split("\n")
-    assert lines[5] == f"Workers: {workers}"
-    if workers == 1:
-        assert lines[11].startswith("GET /api/success .")
-    else:
-        assert lines[11] == "."
-    assert " HYPOTHESIS OUTPUT " not in result.stdout
-    assert " SUMMARY " in result.stdout
-
-    lines = result.stdout.strip().split("\n")
-    last_line = lines[-1]
-    assert "== 1 passed in " in last_line
-    # And the running time is a small positive number
-    time = float(last_line.split(" ")[-2].replace("s", ""))
-    assert 0 <= time < 5
 
 
 @pytest.mark.operations("failure")
@@ -450,22 +426,6 @@ def test_read_content_timeout(cli, mocker, schema_url, snapshot_cli):
     assert cli.run(schema_url) == snapshot_cli
 
 
-@pytest.mark.operations("success", "slow")
-@pytest.mark.parametrize("workers", [1, 2])
-def test_default_hypothesis_settings(cli, schema_url, workers):
-    # When there is a slow operation and if it is faster than 15s
-    result = cli.run(schema_url, f"--workers={workers}")
-    # Then the tests should pass, because of default 15s deadline
-    assert result.exit_code == ExitCode.OK, result.stdout
-    lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[11].startswith("GET /api/slow .")
-        assert lines[12].startswith("GET /api/success .")
-    else:
-        # It could be in any sequence, because of multiple threads
-        assert lines[11] == ".."
-
-
 @pytest.mark.operations("unsatisfiable")
 @pytest.mark.parametrize("workers", [1, 2])
 def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
@@ -476,53 +436,14 @@ def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
     assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
 
 
-@pytest.mark.operations("flaky")
-@pytest.mark.parametrize("workers", [1, 2])
-def test_flaky(cli, schema_url, workers):
-    # When the operation fails / succeeds randomly
-    # Derandomize is needed for reproducible test results
-    result = cli.run(schema_url, "--hypothesis-derandomize", f"--workers={workers}")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And standard Hypothesis error should not appear in the output
-    assert "Failed to reproduce exception. Expected:" not in result.stdout
-    # And this operation should be marked as failed in the progress line
-    lines = result.stdout.split("\n")
-    if workers == 1:
-        assert lines[10].startswith("GET /api/flaky F")
-    else:
-        assert lines[10] == "F"
-    # And it should be displayed only once in "FAILURES" section
-    assert "= FAILURES =" in result.stdout
-    assert "_ GET /api/flaky _" in result.stdout
-
-
 @pytest.mark.operations("invalid")
 @pytest.mark.parametrize("workers", [1])
-def test_invalid_operation(cli, schema_url, workers):
+@pytest.mark.snapshot(replace_statistic=True)
+def test_invalid_operation(cli, schema_url, workers, snapshot_cli):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    result = cli.run(schema_url, f"--workers={workers}")
-    # Then the whole Schemathesis run should fail
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # And standard Hypothesis error should not appear in the output
-    assert "You can add @seed" not in result.stdout
-    # And this operation should be marked as errored in the progress line
-    lines = result.stdout.split("\n")
-    assert lines[11].startswith("POST /api/invalid E")
-    assert " POST /api/invalid " in lines[14]
-    # There shouldn't be a section end immediately after section start - there should be error text
-    assert (
-        """Invalid definition for element at index 0 in `parameters`
-
-Location:
-    paths -> /invalid -> post -> parameters -> 0
-
-Problematic definition:
-"""
-        in result.stdout
-    )
+    assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("teapot")
@@ -710,7 +631,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
     ignored_exception = "Exception ignored in: " in lines[8]
-    assert lines[10] in expected or ignored_exception, lines
+    assert lines[9] in expected or ignored_exception, lines
     if not optional_interrupt:
         assert any("!! KeyboardInterrupt !!" in line for line in lines[10:]), lines
     assert any("=== SUMMARY ===" in line for line in lines[9:])
@@ -718,7 +639,7 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
 
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers):
+def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers, snapshot_cli):
     # When a Schemathesis run in interrupted by keyboard or via SIGINT
     operation = APIOperation("/success", "GET", {}, swagger_20, base_url=base_url)
     original = operation.Case().call
@@ -739,11 +660,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
     lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
-        assert lines[11].startswith("GET /api/failure .")
-        assert lines[11].endswith("[ 50%]")
-        assert lines[12] == "GET /api/success "
-        assert "!! KeyboardInterrupt !!" in lines[13]
-        assert "== SUMMARY ==" in lines[15]
+        assert result == snapshot_cli
     else:
         assert_threaded_executor_interruption(lines, ("", "."))
 
@@ -1351,10 +1268,6 @@ def assert_exit_code(event_stream, code):
             cassette_config=None,
             junit_xml=None,
             debug_output_file=None,
-            client=None,
-            report=None,
-            host_data=None,
-            report_config=None,
             output_config=None,
         )
     assert exc.value.code == code
@@ -1595,14 +1508,6 @@ def test_rate_limit(cli, schema_url):
     result = cli.run(schema_url, "--rate-limit=1/s")
     lines = result.stdout.splitlines()
     assert lines[6] == "Rate limit: 1/s"
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_disable_report_suggestion(monkeypatch, cli, schema_url):
-    monkeypatch.setenv(REPORT_SUGGESTION_ENV_VAR, "no")
-    result = cli.run(schema_url)
-    assert "You can visualize" not in result.stdout
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])

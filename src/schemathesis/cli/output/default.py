@@ -2,42 +2,30 @@ from __future__ import annotations
 
 import os
 import shutil
-import time
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, cast
 
 import click
 
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
-from schemathesis.cli.env import REPORT_SUGGESTION_ENV_VAR
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, string_to_boolean
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import (
-    format_exception,
-    get_request_error_extras,
-    get_request_error_message,
     split_traceback,
 )
 from schemathesis.core.failures import MessageBlock, format_failures
-from schemathesis.core.result import Ok
 from schemathesis.runner.models import group_failures_by_code_sample
 
-from ... import experimental, service
+from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
 from ...runner.events import InternalErrorType, LoaderErrorKind
 from ...runner.models import Status, TestResult
-from ...service.models import AnalysisSuccess, ErrorState, UnknownExtension
 from ...stateful.sink import StateMachineSink
-from ..context import ExecutionContext, FileReportContext, ServiceReportContext
+from ..context import ExecutionContext
 from ..handlers import EventHandler
 
 if TYPE_CHECKING:
-    from queue import Queue
-
-    import requests
-
-    from schemathesis.runner.phases.analysis import AnalysisPayload
     from schemathesis.runner.phases.probes import ProbingPayload
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
@@ -230,9 +218,6 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
 def display_failures_for_single_test(ctx: ExecutionContext, result: TestResult) -> None:
     """Display a failure for a single method / path."""
     display_subsection(result)
-    if result.is_flaky:
-        click.secho("[FLAKY] Schemathesis was not able to reliably reproduce this failure", fg="red")
-        click.echo()
     for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(result.checks), 1):
         # Make server errors appear first in the list of checks
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
@@ -249,82 +234,6 @@ def display_failures_for_single_test(ctx: ExecutionContext, result: TestResult) 
                 config=ctx.output_config,
             )
         )
-        click.echo()
-
-
-def display_analysis(ctx: ExecutionContext) -> None:
-    """Display schema analysis details."""
-    import requests.exceptions
-
-    if ctx.analysis is None:
-        return
-    display_section_name("SCHEMA ANALYSIS")
-    if isinstance(ctx.analysis, Ok):
-        analysis = ctx.analysis.ok()
-        click.echo()
-        if isinstance(analysis, AnalysisSuccess):
-            click.secho(analysis.message, bold=True)
-            click.echo(f"\nAnalysis took: {analysis.elapsed:.2f}ms")
-            if analysis.extensions:
-                known = []
-                failed = []
-                unknown = []
-                for extension in analysis.extensions:
-                    if isinstance(extension, UnknownExtension):
-                        unknown.append(extension)
-                    elif isinstance(extension.state, ErrorState):
-                        failed.append(extension)
-                    else:
-                        known.append(extension)
-                if known:
-                    click.echo("\nThe following extensions have been applied:\n")
-                    for extension in known:
-                        click.echo(f"  - {extension.summary}")
-                if failed:
-                    click.echo("\nThe following extensions errored:\n")
-                    for extension in failed:
-                        click.echo(f"  - {extension.summary}")
-                    suggestion = f"Please, consider reporting this to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
-                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
-                if unknown:
-                    noun = "extension" if len(unknown) == 1 else "extensions"
-                    specific_noun = "this extension" if len(unknown) == 1 else "these extensions"
-                    title = click.style("Compatibility Notice", bold=True)
-                    click.secho(f"\n{title}: {len(unknown)} {noun} not recognized:\n")
-                    for extension in unknown:
-                        click.echo(f"  - {extension.summary}")
-                    suggestion = f"Consider updating the CLI to add support for {specific_noun}."
-                    click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
-            else:
-                click.echo("\nNo extensions have been applied.")
-        else:
-            click.echo("An error happened during schema analysis:\n")
-            click.secho(f"  {analysis.message}", bold=True)
-        click.echo()
-    else:
-        exception = ctx.analysis.err()
-        suggestion = None
-        if isinstance(exception, requests.exceptions.HTTPError):
-            response = exception.response
-            click.secho("Error\n", fg="red", bold=True)
-            _display_service_network_error(response)
-            click.echo()
-            return
-        if isinstance(exception, requests.RequestException):
-            message = get_request_error_message(exception)
-            extras = get_request_error_extras(exception)
-            suggestion = "Please check your network connection and try again."
-            title = "Network Error"
-        else:
-            traceback = format_exception(exception, with_traceback=True)
-            extras = split_traceback(traceback)
-            title = "Internal Error"
-            message = f"We apologize for the inconvenience. This appears to be an internal issue.\nPlease, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}"
-            suggestion = "Please update your CLI to the latest version and try again."
-        click.secho(f"{title}\n", fg="red", bold=True)
-        click.echo(message)
-        _display_extras(extras)
-        _maybe_display_tip(suggestion)
         click.echo()
 
 
@@ -382,171 +291,6 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
         if ctx.seed is not None:
             seed_option = f"`--hypothesis-seed={ctx.seed}`"
             click.secho(f"\n{bold('Note')}: To replicate these test failures, rerun with {bold(seed_option)}")
-
-    if ctx.report is not None and not ctx.is_interrupted:
-        if isinstance(ctx.report, FileReportContext):
-            click.echo()
-            display_report_metadata(ctx.report.queue.get())
-            click.secho(f"Report is saved to {ctx.report.filename}", bold=True)
-        elif isinstance(ctx.report, ServiceReportContext):
-            click.echo()
-            handle_service_integration(ctx.report)
-    else:
-        env_var = os.getenv(REPORT_SUGGESTION_ENV_VAR)
-        if env_var is not None and string_to_boolean(env_var) is False:
-            return
-        click.echo(
-            f"\n{bold('Tip')}: Use the {bold('`--report`')} CLI option to visualize test results via Schemathesis.io.\n"
-            "We run additional conformance checks on reports from public repos."
-        )
-        if service.ci.detect() == service.ci.CIProvider.GITHUB:
-            click.echo(
-                "Optionally, for reporting results as PR comments, install the Schemathesis GitHub App:\n\n"
-                f"    {GITHUB_APP_LINK}"
-            )
-
-
-def handle_service_integration(ctx: ServiceReportContext) -> None:
-    """If Schemathesis.io integration is enabled, wait for the handler & print the resulting status."""
-    event = ctx.queue.get()
-    title = click.style("Upload", bold=True)
-    if isinstance(event, service.Metadata):
-        display_report_metadata(event)
-        click.secho(f"Uploading reports to {ctx.service_base_url} ...", bold=True)
-        event = wait_for_report_handler(ctx.queue, title)
-    color = {
-        service.Completed: "green",
-        service.Error: "red",
-        service.Failed: "red",
-        service.Timeout: "red",
-    }[event.__class__]
-    status = click.style(event.status, fg=color, bold=True)
-    click.echo(f"{title}: {status}\r", nl=False)
-    click.echo()
-    if isinstance(event, service.Error):
-        click.echo()
-        display_service_error(event)
-    if isinstance(event, service.Failed):
-        click.echo()
-        click.echo(event.detail)
-    if isinstance(event, service.Completed):
-        click.echo()
-        click.echo(event.message)
-        click.echo()
-        click.echo(event.next_url)
-
-
-def display_report_metadata(meta: service.Metadata) -> None:
-    if meta.ci_environment is not None:
-        click.secho(f"{meta.ci_environment.name} detected:", bold=True)
-        for key, value in meta.ci_environment.as_env().items():
-            if value is not None:
-                click.secho(f"  -> {key}: {value}")
-        click.echo()
-    click.secho(f"Compressed report size: {meta.size / 1024.0:,.0f} KB", bold=True)
-
-
-def display_service_unauthorized(hostname: str) -> None:
-    click.secho("\nTo authenticate:")
-    click.secho(f"1. Retrieve your token from {bold(hostname)}")
-    click.secho(f"2. Execute {bold('`st auth login <TOKEN>`')}")
-    env_var = bold(f"`{service.TOKEN_ENV_VAR}`")
-    click.secho(
-        f"\nAs an alternative, supply the token directly "
-        f"using the {bold('`--schemathesis-io-token`')} option "
-        f"or the {env_var} environment variable."
-    )
-    click.echo("\nFor more information, please visit: https://schemathesis.readthedocs.io/en/stable/service.html")
-
-
-def display_service_error(event: service.Error, message_prefix: str = "") -> None:
-    """Show information about an error during communication with Schemathesis.io."""
-    from requests import HTTPError, RequestException, Response
-
-    if isinstance(event.exception, HTTPError):
-        response = cast(Response, event.exception.response)
-        _display_service_network_error(response, message_prefix)
-    elif isinstance(event.exception, RequestException):
-        ask_to_report(event, report_to_issues=False)
-    else:
-        ask_to_report(event)
-
-
-def _display_service_network_error(response: requests.Response, message_prefix: str = "") -> None:
-    status_code = response.status_code
-    if 500 <= status_code <= 599:
-        click.secho(f"Schemathesis.io responded with HTTP {status_code}", fg="red")
-        # Server error, should be resolved soon
-        click.secho(
-            "\nIt is likely that we are already notified about the issue and working on a fix\n"
-            "Please, try again in 30 minutes",
-            fg="red",
-        )
-    elif status_code == 401:
-        # Likely an invalid token
-        click.echo("Your CLI is not authenticated.")
-        display_service_unauthorized("schemathesis.io")
-    else:
-        try:
-            data = response.json()
-            detail = data["detail"]
-            click.secho(f"{message_prefix}{detail}", fg="red")
-        except Exception:
-            # Other client-side errors are likely caused by a bug on the CLI side
-            click.secho(
-                "We apologize for the inconvenience. This appears to be an internal issue.\n"
-                "Please, consider reporting the following details to our issue "
-                f"tracker:\n\n  {ISSUE_TRACKER_URL}\n\nResponse: {response.text!r}\n"
-                f"Status: {response.status_code}\n"
-                f"Headers: {response.headers!r}",
-                fg="red",
-            )
-            _maybe_display_tip("Please update your CLI to the latest version and try again.")
-
-
-SERVICE_ERROR_MESSAGE = "An error happened during uploading reports to Schemathesis.io"
-
-
-def ask_to_report(event: service.Error, report_to_issues: bool = True, extra: str = "") -> None:
-    from requests import RequestException
-
-    # Likely an internal Schemathesis error
-    traceback = event.get_message(with_traceback=True)
-    if isinstance(event.exception, RequestException) and event.exception.response is not None:
-        response = f"Response: {event.exception.response.text}\n"
-    else:
-        response = ""
-    if report_to_issues:
-        ask = f"Please, consider reporting the following details to our issue tracker:\n\n  {ISSUE_TRACKER_URL}\n\n"
-    else:
-        ask = ""
-    click.secho(
-        f"{SERVICE_ERROR_MESSAGE}:\n{extra}{ask}{response}\n{traceback.strip()}",
-        fg="red",
-    )
-
-
-def wait_for_report_handler(queue: Queue, title: str, timeout: float = service.WORKER_FINISH_TIMEOUT) -> service.Event:
-    """Wait for the Schemathesis.io handler to finish its job."""
-    start = time.monotonic()
-    spinner = create_spinner(SPINNER_REPETITION_NUMBER)
-    # The testing process is done, and we need to wait for the Schemathesis.io handler to finish
-    # It might still have some data to send
-    while queue.empty():
-        if time.monotonic() - start >= timeout:
-            return service.Timeout()
-        click.echo(f"{title}: {next(spinner)}\r", nl=False)
-        time.sleep(service.WORKER_CHECK_PERIOD)
-    return queue.get()
-
-
-def create_spinner(repetitions: int) -> Generator[str, None, None]:
-    """A simple spinner that yields its individual characters."""
-    while True:
-        for ch in "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏":
-            # Skip branch coverage, as it is not possible because of the assertion above
-            for _ in range(repetitions):  # pragma: no branch
-                yield ch
 
 
 def display_checks_statistics(total: dict[str, dict[str | Status, int]]) -> None:
@@ -648,8 +392,6 @@ def on_initialized(ctx: ExecutionContext, event: events.Initialized) -> None:
     click.secho(f"Collected API operations: {ctx.operations_count}", bold=True)
     links_count = cast(int, event.links_count)
     click.secho(f"Collected API links: {links_count}", bold=True)
-    if isinstance(ctx.report, ServiceReportContext):
-        click.secho("Report to Schemathesis.io: ENABLED", bold=True)
     if ctx.initialization_lines:
         _print_lines(ctx.initialization_lines)
 
@@ -660,21 +402,7 @@ def on_probing_started() -> None:
 
 def on_probing_finished(ctx: ExecutionContext, status: Status, payload: ProbingPayload | None) -> None:
     ctx.probes = payload.data if payload else None
-    click.secho(f"API probing: {status.name}", bold=True, nl=False)
-    click.echo()
-
-
-def on_analysis_started() -> None:
-    click.secho("Schema analysis: ...\r", bold=True, nl=False)
-
-
-def on_analysis_finished(ctx: ExecutionContext, status: Status, payload: AnalysisPayload | None) -> None:
-    ctx.analysis = payload.data if payload else None
-    click.secho(f"Schema analysis: {status.name}", bold=True, nl=False)
-    click.echo()
-    operations_count = cast(int, ctx.operations_count)  # INVARIANT: should not be `None`
-    if operations_count >= 1:
-        click.echo()
+    click.secho(f"API probing: {status.name}\n\n", bold=True, nl=False)
 
 
 def on_stateful_testing_started(ctx: ExecutionContext) -> None:
@@ -737,7 +465,6 @@ def on_engine_finished(ctx: ExecutionContext, event: events.EngineFinished) -> N
     click.echo()
     display_errors(ctx, event)
     display_failures(ctx, event)
-    display_analysis(ctx)
     display_statistic(ctx, event)
     if ctx.summary_lines:
         click.echo()
@@ -785,7 +512,6 @@ class DefaultOutputStyleHandler(EventHandler):
     def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
         """Choose and execute a proper handler for the given event."""
         from schemathesis.runner.phases import PhaseName
-        from schemathesis.runner.phases.analysis import AnalysisPayload
         from schemathesis.runner.phases.probes import ProbingPayload
         from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
@@ -794,17 +520,12 @@ class DefaultOutputStyleHandler(EventHandler):
         elif isinstance(event, events.PhaseStarted):
             if event.phase.name == PhaseName.PROBING:
                 on_probing_started()
-            elif event.phase.name == PhaseName.ANALYSIS:
-                on_analysis_started()
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 on_stateful_testing_started(context)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
                 assert isinstance(event.payload, ProbingPayload) or event.payload is None
                 on_probing_finished(context, event.status, event.payload)
-            elif event.phase.name == PhaseName.ANALYSIS:
-                assert isinstance(event.payload, AnalysisPayload) or event.payload is None
-                on_analysis_finished(context, event.status, event.payload)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
                 on_stateful_testing_finished(context, event.payload)

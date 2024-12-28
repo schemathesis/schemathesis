@@ -5,11 +5,8 @@ import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from enum import Enum
-from queue import Queue
-from typing import TYPE_CHECKING, Any, Callable, Literal, NoReturn, Sequence, cast
-from urllib.parse import urlparse
+from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
 import click
 
@@ -25,30 +22,25 @@ from schemathesis.generation.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDE
 from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
 
-from .. import contrib, experimental, generation, runner, service
+from .. import contrib, experimental, generation, runner
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_GENERATOR_MODES, GenerationMode
 from ..runner import events
 from ..runner.config import NetworkConfig
 from . import cassettes, loaders, output, validation
 from .constants import DEFAULT_WORKERS, ISSUE_TRACKER_URL, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
-from .context import ExecutionContext, FileReportContext, ServiceReportContext
+from .context import ExecutionContext
 from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt, RegistryChoice
 
 if TYPE_CHECKING:
-    import io
-
     import hypothesis
-    import requests
 
     from schemathesis.checks import CheckFunction
     from schemathesis.core import NotSet
     from schemathesis.generation.targets import TargetFunction
-
-    from ..service.client import ServiceClient
 
 
 __all__ = [
@@ -156,14 +148,6 @@ with_request_cert_key = grouped_option(
     show_default=False,
     callback=validation.validate_request_cert_key,
 )
-with_hosts_file = grouped_option(
-    "--hosts-file",
-    help="Path to a file to store the Schemathesis.io auth configuration",
-    type=click.Path(dir_okay=False, writable=True),
-    default=service.DEFAULT_HOSTS_PATH,
-    envvar=service.HOSTS_PATH_ENV_VAR,
-    callback=validation.convert_hosts_file,
-)
 
 
 def _with_filter(*, by: str, mode: Literal["include", "exclude"], modifier: Literal["regex"] | None = None) -> Callable:
@@ -197,20 +181,12 @@ def with_filters(command: Callable) -> Callable:
     return command
 
 
-class ReportToService:
-    pass
-
-
-REPORT_TO_SERVICE = ReportToService()
-
-
 @schemathesis.command(
     short_help="Execute automated tests based on API specifications",
     cls=CommandWithGroupedOptions,
     context_settings={"terminal_width": output.default.get_terminal_width(), **CONTEXT_SETTINGS},
 )
 @click.argument("schema", type=str)
-@click.argument("api_name", type=str, required=False, envvar=env.API_NAME_ENV_VAR)
 @group("Options")
 @grouped_option(
     "--workers",
@@ -609,42 +585,6 @@ REPORT_TO_SERVICE = ReportToService()
     callback=validation.convert_verbosity,
     metavar="",
 )
-@group("Schemathesis.io options")
-@grouped_option(
-    "--report",
-    "report_value",
-    help="""Specify how the generated report should be handled.
-If used without an argument, the report data will automatically be uploaded to Schemathesis.io.
-If a file name is provided, the report will be stored in that file.
-The report data, consisting of a tar gz file with multiple JSON files, is subject to change""",
-    is_flag=False,
-    flag_value="",
-    envvar=service.REPORT_ENV_VAR,
-    callback=validation.convert_report,  # type: ignore
-)
-@grouped_option(
-    "--schemathesis-io-token",
-    help="Schemathesis.io authentication token",
-    type=str,
-    envvar=service.TOKEN_ENV_VAR,
-)
-@grouped_option(
-    "--schemathesis-io-url",
-    help="Schemathesis.io base URL",
-    default=service.DEFAULT_URL,
-    type=str,
-    envvar=service.URL_ENV_VAR,
-)
-@grouped_option(
-    "--schemathesis-io-telemetry",
-    help="Whether to send anonymized usage data to Schemathesis.io along with your report",
-    type=str,
-    default="true",
-    show_default=True,
-    callback=validation.convert_boolean_string,
-    envvar=service.TELEMETRY_ENV_VAR,
-)
-@with_hosts_file
 @group("Global options")
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
@@ -652,7 +592,6 @@ The report data, consisting of a tar gz file with multiple JSON files, is subjec
 def run(
     ctx: click.Context,
     schema: str,
-    api_name: str | None,
     auth: tuple[str, str] | None,
     headers: dict[str, str],
     set_query: dict[str, str],
@@ -724,23 +663,16 @@ def run(
     hypothesis_seed: int | None = None,
     hypothesis_verbosity: hypothesis.Verbosity | None = None,
     no_color: bool = False,
-    report_value: str | None = None,
     generation_allow_x00: bool = True,
     generation_graphql_allow_null: bool = True,
     generation_with_security_parameters: bool = True,
     generation_codec: str = "utf-8",
-    schemathesis_io_token: str | None = None,
-    schemathesis_io_url: str = service.DEFAULT_URL,
-    schemathesis_io_telemetry: bool = True,
-    hosts_file: os.PathLike = service.DEFAULT_HOSTS_PATH,
     force_color: bool = False,
-    **__kwargs,
+    **__kwargs: Any,
 ) -> None:
     """Run tests against an API using a specified SCHEMA.
 
     [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file, or a URL pointing to such specifications
-
-    [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io
     """
     _hypothesis_phases: list[hypothesis.Phase] | None = None
     if hypothesis_phases is not None:
@@ -776,15 +708,6 @@ def run(
         codec=generation_codec,
         with_security_parameters=generation_with_security_parameters,
     )
-
-    report: ReportToService | click.utils.LazyFile | None
-    if report_value is None:
-        report = None
-    elif report_value:
-        report = click.utils.LazyFile(report_value, mode="wb")
-    else:
-        report = REPORT_TO_SERVICE
-    started_at = datetime.now(timezone.utc).astimezone().isoformat()
 
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
@@ -865,65 +788,9 @@ def run(
     if exclude_deprecated:
         filter_set.exclude(is_deprecated)
 
-    schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
-    token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
     schema_kind = validation.parse_schema_kind(schema)
-    validation.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run, api_name=api_name)
-    client = None
+    validation.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run)
     schema_or_location: str | dict[str, Any] = schema
-    if schema_kind == validation.SchemaInputKind.NAME:
-        api_name = schema
-    if (
-        not isinstance(report, click.utils.LazyFile)
-        and api_name is not None
-        and schema_kind == validation.SchemaInputKind.NAME
-    ):
-        from ..service.client import ServiceClient
-
-        client = ServiceClient(base_url=schemathesis_io_url, token=token)
-        # It is assigned above
-        if token is not None or schema_kind == validation.SchemaInputKind.NAME:
-            if token is None:
-                hostname = (
-                    "Schemathesis.io"
-                    if schemathesis_io_hostname == service.DEFAULT_HOSTNAME
-                    else schemathesis_io_hostname
-                )
-                click.secho(f"Missing authentication for {hostname} upload", bold=True, fg="red")
-                click.echo(
-                    f"\nYou've specified an API name, suggesting you want to upload data to {bold(hostname)}. "
-                    "However, your CLI is not currently authenticated."
-                )
-                output.default.display_service_unauthorized(hostname)
-                raise click.exceptions.Exit(1) from None
-            name: str = cast(str, api_name)
-            import requests
-
-            try:
-                details = client.get_api_details(name)
-                # Replace config values with ones loaded from the service
-                schema_or_location = details.specification.schema
-                default_environment = details.default_environment
-                base_url = base_url or (default_environment.url if default_environment else None)
-            except requests.HTTPError as exc:
-                handle_service_error(exc, name)
-    if report is REPORT_TO_SERVICE and not client:
-        from ..service.client import ServiceClient
-
-        # Upload without connecting data to a certain API
-        client = ServiceClient(base_url=schemathesis_io_url, token=token)
-    if experimental.SCHEMA_ANALYSIS.is_enabled and not client:
-        from ..service.client import ServiceClient
-
-        client = ServiceClient(base_url=schemathesis_io_url, token=token)
-    host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
-    report_config = service.ReportConfig(
-        api_name=api_name,
-        location=schema,
-        base_url=base_url,
-        started_at=started_at,
-        telemetry=schemathesis_io_telemetry,
-    )
 
     if "all" in included_check_names:
         selected_checks = CHECKS.get_all()
@@ -1016,7 +883,6 @@ def run(
         generation_config=generation_config,
         checks_config=checks_config,
         loader_config=loader_config,
-        service_client=client,
         filter_set=filter_set,
     )
     execute(
@@ -1029,10 +895,6 @@ def run(
         cassette_config=cassette_config,
         junit_xml=junit_xml,
         debug_output_file=debug_output_file,
-        client=client,
-        report=report,
-        host_data=host_data,
-        report_config=report_config,
         output_config=output_config,
     )
 
@@ -1068,7 +930,6 @@ def into_event_stream(
     max_failures: int | None,
     unique_data: bool,
     dry_run: bool,
-    service_client: ServiceClient | None,
     loader_config: loaders.AutodetectConfig,
 ) -> events.EventGenerator:
     try:
@@ -1094,7 +955,6 @@ def into_event_stream(
             hypothesis_settings=hypothesis_settings,
             generation_config=generation_config,
             network=network_config,
-            service_client=service_client,
         ).execute()
     except Exception as exc:
         yield events.InternalError.from_exc(exc)
@@ -1147,29 +1007,10 @@ def execute(
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
     debug_output_file: click.utils.LazyFile | None,
-    client: ServiceClient | None,
-    report: ReportToService | click.utils.LazyFile | None,
-    host_data: service.hosts.HostData,
-    report_config: service.ReportConfig,
     output_config: OutputConfig,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
     handlers: list[EventHandler] = []
-    report_context: ServiceReportContext | FileReportContext | None = None
-    report_queue: Queue
-    if client:
-        report_queue = Queue()
-        report_context = ServiceReportContext(queue=report_queue, service_base_url=client.base_url)
-        handlers.append(
-            service.ServiceReportHandler(
-                client=client, host_data=host_data, config=report_config, out_queue=report_queue
-            )
-        )
-    elif isinstance(report, click.utils.LazyFile):
-        _open_file(report)
-        report_queue = Queue()
-        report_context = FileReportContext(queue=report_queue, filename=report.name)
-        handlers.append(service.FileReportHandler(file_handle=report, config=report_config, out_queue=report_queue))
     if junit_xml is not None:
         _open_file(junit_xml)
         handlers.append(JunitXMLHandler(junit_xml))
@@ -1190,7 +1031,6 @@ def execute(
         wait_for_schema=wait_for_schema,
         cassette_path=cassette_config.path.name if cassette_config is not None else None,
         junit_xml_file=junit_xml.name if junit_xml is not None else None,
-        report=report_context,
         output_config=output_config,
     )
 
@@ -1242,8 +1082,6 @@ def is_built_in_handler(handler: EventHandler) -> bool:
         for class_ in (
             output.default.DefaultOutputStyleHandler,
             output.short.ShortOutputStyleHandler,
-            service.FileReportHandler,
-            service.ServiceReportHandler,
             DebugOutputHandler,
             cassettes.CassetteWriter,
             JunitXMLHandler,
@@ -1272,19 +1110,6 @@ def display_handler_error(handler: EventHandler, exc: Exception) -> None:
         click.echo(
             f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
         )
-
-
-def handle_service_error(exc: requests.HTTPError, api_name: str) -> NoReturn:
-    import requests
-
-    response = cast(requests.Response, exc.response)
-    if response.status_code == 403:
-        error_message(response.json()["detail"])
-    elif response.status_code == 404:
-        error_message(f"API with name `{api_name}` not found!")
-    else:
-        output.default.display_service_error(service.Error(exc), message_prefix="❌ ")
-    sys.exit(1)
 
 
 def get_exit_code(event: events.EngineEvent) -> int:
@@ -1367,127 +1192,6 @@ def replay(
             click.secho(f"  {bold('Old payload')} : {old_body}")
             click.secho(f"  {bold('New payload')} : {replayed.response.text}")
         click.echo()
-
-
-@schemathesis.command(short_help="Upload report to Schemathesis.io.")
-@click.argument("report", type=click.File(mode="rb"))
-@click.option(
-    "--schemathesis-io-token",
-    help="Schemathesis.io authentication token",
-    type=str,
-    envvar=service.TOKEN_ENV_VAR,
-)
-@click.option(
-    "--schemathesis-io-url",
-    help="Schemathesis.io base URL",
-    default=service.DEFAULT_URL,
-    type=str,
-    envvar=service.URL_ENV_VAR,
-)
-@with_request_tls_verify
-@with_hosts_file
-def upload(
-    report: io.BufferedReader,
-    hosts_file: os.PathLike,
-    request_tls_verify: bool = True,
-    schemathesis_io_url: str = service.DEFAULT_URL,
-    schemathesis_io_token: str | None = None,
-) -> None:
-    """Upload report to Schemathesis.io."""
-    from ..service.client import ServiceClient
-    from ..service.models import UploadResponse, UploadSource
-
-    schemathesis_io_hostname = urlparse(schemathesis_io_url).netloc
-    host_data = service.hosts.HostData(schemathesis_io_hostname, hosts_file)
-    token = schemathesis_io_token or service.hosts.get_token(hostname=schemathesis_io_hostname, hosts_file=hosts_file)
-    client = ServiceClient(base_url=schemathesis_io_url, token=token, verify=request_tls_verify)
-    ci_environment = service.ci.environment()
-    provider = ci_environment.provider if ci_environment is not None else None
-    response = client.upload_report(
-        report=report.read(),
-        correlation_id=host_data.correlation_id,
-        ci_provider=provider,
-        source=UploadSource.UPLOAD_COMMAND,
-    )
-    if isinstance(response, UploadResponse):
-        host_data.store_correlation_id(response.correlation_id)
-        click.echo(f"{response.message}\n{response.next_url}")
-    else:
-        error_message(f"Failed to upload report to {schemathesis_io_hostname}: " + bold(response.detail))
-        sys.exit(1)
-
-
-@schemathesis.group(short_help="Authenticate with Schemathesis.io.")
-def auth() -> None:
-    pass
-
-
-@auth.command(short_help="Authenticate with a Schemathesis.io host.")
-@click.argument("token", type=str, envvar=service.TOKEN_ENV_VAR)
-@click.option(
-    "--hostname",
-    help="The hostname of the Schemathesis.io instance to authenticate with",
-    type=str,
-    default=service.DEFAULT_HOSTNAME,
-    envvar=service.HOSTNAME_ENV_VAR,
-)
-@click.option(
-    "--protocol",
-    type=click.Choice(["https", "http"]),
-    default=service.DEFAULT_PROTOCOL,
-    envvar=service.PROTOCOL_ENV_VAR,
-)
-@with_request_tls_verify
-@with_hosts_file
-def login(token: str, hostname: str, hosts_file: os.PathLike, protocol: str, request_tls_verify: bool = True) -> None:
-    """Authenticate with a Schemathesis.io host."""
-    import requests
-
-    try:
-        username = service.auth.login(token, hostname, protocol, request_tls_verify)
-        service.hosts.store(token, hostname, hosts_file)
-        success_message(f"Logged in into {hostname} as " + bold(username))
-    except requests.HTTPError as exc:
-        response = cast(requests.Response, exc.response)
-        detail = response.json()["detail"]
-        error_message(f"Failed to login into {hostname}: " + bold(detail))
-        sys.exit(1)
-
-
-@auth.command(short_help="Remove authentication for a Schemathesis.io host.")
-@click.option(
-    "--hostname",
-    help="The hostname of the Schemathesis.io instance to authenticate with",
-    type=str,
-    default=service.DEFAULT_HOSTNAME,
-    envvar=service.HOSTNAME_ENV_VAR,
-)
-@with_hosts_file
-def logout(hostname: str, hosts_file: os.PathLike) -> None:
-    """Remove authentication for a Schemathesis.io host."""
-    result = service.hosts.remove(hostname, hosts_file)
-    if result == service.hosts.RemoveAuth.SUCCESS:
-        success_message(f"Logged out of {hostname} account")
-    else:
-        if result == service.hosts.RemoveAuth.NO_MATCH:
-            warning_message(f"Not logged in to {hostname}")
-        if result == service.hosts.RemoveAuth.NO_HOSTS:
-            warning_message("Not logged in to any hosts")
-        if result == service.hosts.RemoveAuth.ERROR:
-            error_message(f"Failed to read the hosts file. Try to remove {hosts_file}")
-        sys.exit(1)
-
-
-def success_message(message: str) -> None:
-    click.secho(click.style("✔️", fg="green") + f" {message}")
-
-
-def warning_message(message: str) -> None:
-    click.secho(click.style("🟡️", fg="yellow") + f" {message}")
-
-
-def error_message(message: str) -> None:
-    click.secho(f"❌ {message}")
 
 
 def bold(message: str) -> str:

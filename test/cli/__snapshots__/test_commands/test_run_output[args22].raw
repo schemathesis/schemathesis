@@ -1,14 +1,12 @@
 Exit code: 0
 ---
 Stdout:
-Usage: run [OPTIONS] SCHEMA [API_NAME]
+Usage: run [OPTIONS] SCHEMA
 
   Run tests against an API using a specified SCHEMA.
 
   [Required] SCHEMA: Path to an OpenAPI (`.json`, `.yml`) or GraphQL SDL file,
   or a URL pointing to such specifications
-
-  [Optional] API_NAME: Identifier for uploading test data to Schemathesis.io
 
 Options:
   -w, --workers   Number of concurrent workers for testing. Auto-adjusts if
@@ -19,8 +17,8 @@ Options:
 Experimental options:
   --experimental                            Enable experimental features
                                             [possible values: coverage-phase,
-                                            positive-data-acceptance, schema-
-                                            analysis, stateful-only]
+                                            positive-data-acceptance, stateful-
+                                            only]
   --experimental-no-failfast                Continue testing an API operation
                                             after a failure is found
   --experimental-missing-required-header-allowed-statuses 
@@ -216,23 +214,6 @@ Hypothesis engine options:
   --hypothesis-verbosity                    Verbosity level of Hypothesis output
                                             [possible values: quiet, normal,
                                             verbose, debug]
-
-Schemathesis.io options:
-  --report TEXT                     Specify how the generated report should be
-                                    handled. If used without an argument, the
-                                    report data will automatically be uploaded
-                                    to Schemathesis.io. If a file name is
-                                    provided, the report will be stored in that
-                                    file. The report data, consisting of a tar
-                                    gz file with multiple JSON files, is subject
-                                    to change
-  --schemathesis-io-token TEXT      Schemathesis.io authentication token
-  --schemathesis-io-url TEXT        Schemathesis.io base URL
-  --schemathesis-io-telemetry TEXT  Whether to send anonymized usage data to
-                                    Schemathesis.io along with your report
-                                    [default: true]
-  --hosts-file FILE                 Path to a file to store the Schemathesis.io
-                                    auth configuration
 
 Global options:
   --no-color     Disable ANSI color escape codes

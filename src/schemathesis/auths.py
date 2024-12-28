@@ -152,8 +152,7 @@ class KeyedCachingAuthProvider(CachingAuthProvider[Auth]):
 class FilterableRegisterAuth(Protocol):
     """Protocol that adds filters to the return value of `register`."""
 
-    def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]:
-        pass
+    def __call__(self, provider_class: type[AuthProvider]) -> type[AuthProvider]: ...
 
     def apply_to(
         self,
@@ -165,8 +164,7 @@ class FilterableRegisterAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRegisterAuth:
-        pass
+    ) -> FilterableRegisterAuth: ...
 
     def skip_for(
         self,
@@ -178,15 +176,13 @@ class FilterableRegisterAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRegisterAuth:
-        pass
+    ) -> FilterableRegisterAuth: ...
 
 
 class FilterableApplyAuth(Protocol):
     """Protocol that adds filters to the return value of `apply`."""
 
-    def __call__(self, test: Callable) -> Callable:
-        pass
+    def __call__(self, test: Callable) -> Callable: ...
 
     def apply_to(
         self,
@@ -198,8 +194,7 @@ class FilterableApplyAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableApplyAuth:
-        pass
+    ) -> FilterableApplyAuth: ...
 
     def skip_for(
         self,
@@ -211,8 +206,7 @@ class FilterableApplyAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableApplyAuth:
-        pass
+    ) -> FilterableApplyAuth: ...
 
 
 class FilterableRequestsAuth(Protocol):
@@ -228,8 +222,7 @@ class FilterableRequestsAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRequestsAuth:
-        pass
+    ) -> FilterableRequestsAuth: ...
 
     def skip_for(
         self,
@@ -241,8 +234,7 @@ class FilterableRequestsAuth(Protocol):
         method_regex: str | None = None,
         path: FilterValue | None = None,
         path_regex: str | None = None,
-    ) -> FilterableRequestsAuth:
-        pass
+    ) -> FilterableRequestsAuth: ...
 
 
 @dataclass
@@ -278,8 +270,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
-    ) -> FilterableRegisterAuth:
-        pass
+    ) -> FilterableRegisterAuth: ...
 
     @overload
     def __call__(
@@ -288,8 +279,7 @@ class AuthStorage(Generic[Auth]):
         *,
         refresh_interval: int | None = DEFAULT_REFRESH_INTERVAL,
         cache_by_key: CacheKeyFunction | None = None,
-    ) -> FilterableApplyAuth:
-        pass
+    ) -> FilterableApplyAuth: ...
 
     def __call__(
         self,
@@ -307,8 +297,7 @@ class AuthStorage(Generic[Auth]):
         filter_set = FilterSet()
         self.providers.append(SelectiveAuthProvider(provider=RequestsAuth(auth), filter_set=filter_set))
 
-        class _FilterableRequestsAuth:
-            pass
+        class _FilterableRequestsAuth: ...
 
         attach_filter_chain(_FilterableRequestsAuth, "apply_to", filter_set.include)
         attach_filter_chain(_FilterableRequestsAuth, "skip_for", filter_set.exclude)

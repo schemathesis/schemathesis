@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..checks import CheckFunction
     from ..generation import GenerationConfig
     from ..schemas import BaseSchema
-    from ..service.client import ServiceClient
 
 
 @dataclass
@@ -54,4 +53,3 @@ class EngineConfig:
     network: NetworkConfig
     checks_config: ChecksConfig
     override: Override | None = None
-    service_client: ServiceClient | None = None
