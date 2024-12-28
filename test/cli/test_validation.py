@@ -14,12 +14,12 @@ from ..utils import SIMPLE_PATH
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
         kind = validation.parse_schema_kind(value)
-        validation.validate_schema(value, kind, base_url=None, dry_run=False, api_name=None)
+        validation.validate_schema(value, kind, base_url=None, dry_run=False)
 
 
 def test_validate_schema_path_without_base_url():
     with pytest.raises(click.UsageError):
-        validation.validate_schema(SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False, api_name=None)
+        validation.validate_schema(SIMPLE_PATH, SchemaInputKind.PATH, base_url=None, dry_run=False)
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))

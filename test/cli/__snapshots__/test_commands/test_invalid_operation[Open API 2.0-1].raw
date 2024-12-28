@@ -1,0 +1,44 @@
+Exit code: 1
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 2.0
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+
+POST /api/invalid E                                                       [100%]
+
+==================================== ERRORS ====================================
+______________________________ POST /api/invalid _______________________________
+Schema Error
+
+Invalid definition for element at index 0 in `parameters`
+
+Location:
+    paths -> /invalid -> post -> parameters -> 0
+
+Problematic definition:
+{
+    "in": "query",
+    "name": "id",
+    "required": true,
+    "type": "int"
+}
+
+Error details:
+    The provided definition doesn't match any of the expected formats or types.
+
+Ensure that the definition complies with the OpenAPI specification
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+No checks were performed.
+
+============================== in 1.00s ========================================

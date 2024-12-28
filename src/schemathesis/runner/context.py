@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Generic, Type, TypeVar
+from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
@@ -26,37 +26,20 @@ if TYPE_CHECKING:
     from .phases import PhaseName
 
 
-T = TypeVar("T")
-
-
-class PhaseData(Generic[T]):
-    """Type-safe container for phase-specific data."""
-
-    def __init__(self, data: T):
-        self._data = data
-
-    @property
-    def data(self) -> T:
-        return self._data
-
-
 class PhaseStorage:
     """Manages storage of phase-specific data."""
 
     def __init__(self) -> None:
-        self._storage: dict[PhaseName, PhaseData[Any]] = {}
+        self._storage: dict[PhaseName, object] = {}
 
     def store(self, phase: PhaseName, data: object) -> None:
         """Store phase-specific data."""
-        self._storage[phase] = PhaseData(data)
+        self._storage[phase] = data
 
-    def get(self, phase: PhaseName, data_type: Type[T]) -> T | None:
-        """Get phase-specific data in a type-safe way."""
+    def get(self, phase: PhaseName) -> object:
         if phase not in self._storage:
             return None
-        data = self._storage[phase].data
-        assert isinstance(data, data_type), f"Data type mismatch. Expected {data_type}, got {type(data)}"
-        return data
+        return self._storage[phase]
 
 
 @dataclass

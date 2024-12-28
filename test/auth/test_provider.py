@@ -67,8 +67,7 @@ def test_register_invalid(auth_storage):
     with pytest.raises(TypeError, match="`Invalid` is not a valid auth provider"):
 
         @auth_storage.register()
-        class Invalid:
-            pass
+        class Invalid: ...
 
 
 def test_apply_twice(openapi3_schema, auth_provider_class):

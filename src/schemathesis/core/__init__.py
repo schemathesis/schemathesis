@@ -7,8 +7,7 @@ from typing import Any
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 
 
-class NotSet:
-    pass
+class NotSet: ...
 
 
 NOT_SET = NotSet()

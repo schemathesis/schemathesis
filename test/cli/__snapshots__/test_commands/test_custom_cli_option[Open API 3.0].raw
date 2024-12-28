@@ -13,7 +13,6 @@ Counter initialized!
 first
 second
 API probing: SKIP
-Schema analysis: SKIP
 
 GET /api/success .                                                        [100%]
 
@@ -21,10 +20,7 @@ GET /api/success .                                                        [100%]
 
 No checks were performed.
 
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
-
-Counter: 54
+Counter: 52
 first
 second
 

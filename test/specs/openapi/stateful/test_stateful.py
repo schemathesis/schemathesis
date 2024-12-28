@@ -281,8 +281,7 @@ def test_format_rules(app_schema):
         name="CustomLink",
     )
 
-    class Workflow(schema.as_state_machine()):
-        pass
+    class Workflow(schema.as_state_machine()): ...
 
     assert (
         Workflow.format_rules()

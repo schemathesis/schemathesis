@@ -14,7 +14,6 @@ class PhaseName(enum.Enum):
     """Available execution phases."""
 
     PROBING = "probing"
-    ANALYSIS = "analysis"
     UNIT_TESTING = "unit_testing"
     STATEFUL_TESTING = "stateful_testing"
 
@@ -46,15 +45,13 @@ class Phase:
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     from urllib3.exceptions import InsecureRequestWarning
 
-    from . import analysis, probes, stateful, unit
+    from . import probes, stateful, unit
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
 
         if phase.name == PhaseName.PROBING:
             yield from probes.execute(ctx, phase)
-        elif phase.name == PhaseName.ANALYSIS:
-            yield from analysis.execute(ctx, phase)
         elif phase.name == PhaseName.UNIT_TESTING:
             yield from unit.execute(ctx, phase)
         elif phase.name == PhaseName.STATEFUL_TESTING:

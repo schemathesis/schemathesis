@@ -65,12 +65,6 @@ class ExperimentSet:
 ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
 
-SCHEMA_ANALYSIS = GLOBAL_EXPERIMENTS.create_experiment(
-    name="Schema Analysis",
-    env_var="SCHEMA_ANALYSIS",
-    description="Analyzing API schemas via Schemathesis.io",
-    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2056",
-)
 STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
     name="Stateful Only",
     env_var="STATEFUL_ONLY",

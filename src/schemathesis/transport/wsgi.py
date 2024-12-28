@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generator
 
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core import NotSet
 from schemathesis.core.rate_limit import ratelimit
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import Response
@@ -26,12 +26,7 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
 
         final_headers = prepare_headers(case, headers)
 
-        # Determine media type
-        media_type: str | None
-        if case.body is not NOT_SET and case.media_type is None:
-            media_type = case.operation._get_default_media_type()
-        else:
-            media_type = case.media_type
+        media_type = case.media_type
 
         # Set content type for payload
         if media_type and not isinstance(case.body, NotSet):
