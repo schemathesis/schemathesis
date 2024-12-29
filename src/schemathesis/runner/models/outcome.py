@@ -6,10 +6,10 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
+from schemathesis.runner import Status
 
 from ..errors import EngineErrorInfo, deduplicate_errors
 from .check import Check
-from .status import Status
 from .transport import Interaction, Request
 
 if TYPE_CHECKING:

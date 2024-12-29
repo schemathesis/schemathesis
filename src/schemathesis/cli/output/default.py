@@ -9,18 +9,16 @@ import click
 
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.core.errors import (
-    split_traceback,
-)
+from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, format_failures
+from schemathesis.runner import Status
 from schemathesis.runner.models import group_failures_by_code_sample
 
 from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
 from ...runner.errors import EngineErrorInfo
-from ...runner.events import InternalErrorType, LoaderErrorKind
-from ...runner.models import Status, TestResult
+from ...runner.models import TestResult
 from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext
 from ..handlers import EventHandler
@@ -340,7 +338,11 @@ LOADER_ERROR_SUGGESTIONS = {
 
 
 def should_skip_suggestion(ctx: ExecutionContext, event: events.InternalError) -> bool:
-    return event.subtype == LoaderErrorKind.CONNECTION_OTHER and ctx.wait_for_schema is not None
+    return (
+        isinstance(event.exception, LoaderError)
+        and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
+        and ctx.wait_for_schema is not None
+    )
 
 
 def _display_extras(extras: list[str]) -> None:
@@ -356,22 +358,26 @@ def _maybe_display_tip(suggestion: str | None) -> None:
         click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
 
 
+DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
+
+
 def display_internal_error(ctx: ExecutionContext, event: events.InternalError) -> None:
-    click.secho(event.title, fg="red", bold=True)
-    click.echo()
-    click.secho(event.message)
-    if event.type == InternalErrorType.SCHEMA:
-        extras = event.extras
+    if isinstance(event.exception, LoaderError):
+        title = "Schema Loading Error"
+        message = event.exception.message
+        extras = event.exception.extras
+        suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
     else:
-        extras = split_traceback(event.exception_with_traceback)
+        title = "Test Execution Error"
+        message = DEFAULT_INTERNAL_ERROR_MESSAGE
+        traceback = format_exception(event.exception, with_traceback=True)
+        extras = split_traceback(traceback)
+        suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
+    click.secho(title, fg="red", bold=True)
+    click.echo()
+    click.secho(message)
     _display_extras(extras)
     if not should_skip_suggestion(ctx, event):
-        if event.type == InternalErrorType.SCHEMA and isinstance(event.subtype, LoaderErrorKind):
-            suggestion = LOADER_ERROR_SUGGESTIONS.get(event.subtype)
-        else:
-            suggestion = (
-                f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-            )
         _maybe_display_tip(suggestion)
 
 

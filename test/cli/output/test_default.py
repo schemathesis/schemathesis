@@ -10,8 +10,9 @@ from schemathesis.cli.output import default
 from schemathesis.cli.output.default import display_internal_error
 from schemathesis.core import NOT_SET
 from schemathesis.core.transport import Response
+from schemathesis.runner import Status
 from schemathesis.runner.events import EngineFinished, InternalError
-from schemathesis.runner.models import Check, Request, Status, TestResult, TestResultSet
+from schemathesis.runner.models import Check, Request, TestResult, TestResultSet
 from schemathesis.schemas import APIOperation, OperationDefinition
 
 
@@ -95,7 +96,7 @@ def test_display_multiple_warnings(capsys, execution_context):
     results = TestResultSet(seed=42, results=[])
     results.add_warning("Foo")
     results.add_warning("Bar")
-    event = EngineFinished(results, running_time=1.0)
+    event = EngineFinished(results=results, running_time=1.0)
     # When test results are displayed
     default.display_statistic(execution_context, event)
     lines = [click.unstyle(line) for line in capsys.readouterr().out.split("\n") if line]
@@ -173,7 +174,7 @@ def test_display_internal_error(capsys, execution_context):
     try:
         raise ZeroDivisionError("division by zero")
     except ZeroDivisionError as exc:
-        event = InternalError.from_exc(exc)
+        event = InternalError(exception=exc)
         display_internal_error(execution_context, event)
         out = capsys.readouterr().out.strip()
         assert "Traceback (most recent call last):" in out
