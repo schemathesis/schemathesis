@@ -22,9 +22,9 @@ from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.generation.overrides import Override
-from schemathesis.runner import events, from_schema
+from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.models import Check, Status, TestResult
+from schemathesis.runner.models import Check, TestResult
 from schemathesis.runner.phases.stateful import StatefulTestingPayload
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.specs.openapi.checks import (

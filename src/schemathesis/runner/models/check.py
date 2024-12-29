@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
+from schemathesis.runner import Status
 
-from .status import Status
 from .transport import Request
 
 if TYPE_CHECKING:

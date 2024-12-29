@@ -67,6 +67,10 @@ class EngineErrorInfo:
     def __str__(self) -> str:
         return self._error_repr
 
+    @property
+    def error(self) -> Exception:
+        return self._error
+
     def asdict(self) -> dict[str, Any]:
         return {
             "type": self._kind,

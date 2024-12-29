@@ -13,9 +13,9 @@ import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
 from schemathesis.generation import GenerationConfig
+from schemathesis.runner import Status
 from schemathesis.runner.config import NetworkConfig
 from schemathesis.runner.events import AfterExecution
-from schemathesis.runner.models import Status
 from schemathesis.specs.openapi.checks import (
     AuthKind,
     _contains_auth,

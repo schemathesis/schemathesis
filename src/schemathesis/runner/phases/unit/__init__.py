@@ -15,12 +15,12 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.runner import Status
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...events import EventGenerator, PhaseFinished
 from ...models.outcome import TestResult
-from ...models.status import Status
 from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:

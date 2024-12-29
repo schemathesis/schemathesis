@@ -7,10 +7,12 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
+from schemathesis.core.result import Ok
+from schemathesis.runner import Status
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
-from ...models import Status, TestResult
+from ...models import TestResult
 
 if TYPE_CHECKING:
     from schemathesis.runner.phases import Phase
@@ -58,31 +60,33 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
                     event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
                     # Set the run status based on the suite status
                     # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
-                    if (
-                        isinstance(event, events.SuiteFinished)
-                        and status not in (Status.ERROR, Status.INTERRUPTED)
-                        and event.status
-                        in (
-                            Status.FAILURE,
-                            Status.ERROR,
-                            Status.INTERRUPTED,
-                        )
-                    ):
-                        status = event.status
-                    elif isinstance(event, events.StepFinished):
-                        result.checks.extend(event.checks)
-                        if event.response is not None and event.status is not None:
-                            result.store_requests_response(
-                                status=event.status,
-                                case=event.case,
-                                response=event.response,
-                                checks=event.checks,
-                                session=engine.session,
+                    if isinstance(event, Ok):
+                        event = event.ok()  # type: ignore[assignment]
+                        if (
+                            isinstance(event, events.SuiteFinished)
+                            and status not in (Status.ERROR, Status.INTERRUPTED)
+                            and event.status
+                            in (
+                                Status.FAILURE,
+                                Status.ERROR,
+                                Status.INTERRUPTED,
                             )
-                    elif isinstance(event, events.Errored):
+                        ):
+                            status = event.status
+                        elif isinstance(event, events.StepFinished):
+                            result.checks.extend(event.checks)
+                            if event.response is not None and event.status is not None:
+                                result.store_requests_response(
+                                    status=event.status,
+                                    case=event.case,
+                                    response=event.response,
+                                    checks=event.checks,
+                                    session=engine.session,
+                                )
+                        yield event
+                    else:
                         status = Status.ERROR
-                        result.add_error(event.exception)
-                    yield event
+                        result.add_error(event.err())
                 except queue.Empty:
                     if not runner_thread.is_alive():
                         break

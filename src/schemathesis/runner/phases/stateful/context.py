@@ -7,7 +7,7 @@ from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.generation.targets import TargetMetricCollector
-from schemathesis.runner.models.status import Status
+from schemathesis.runner import Status
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case

@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from schemathesis.core import SpecificationFeature
-from schemathesis.runner.models.status import Status
+from schemathesis.runner import Status
 
 from .. import experimental
 from ..auths import unregister as unregister_auth

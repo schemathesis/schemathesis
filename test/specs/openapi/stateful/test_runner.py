@@ -10,10 +10,9 @@ import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig, GenerationMode
-from schemathesis.runner import events
+from schemathesis.runner import Status, events
 from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.runner.context import EngineContext
-from schemathesis.runner.models.status import Status
 from schemathesis.runner.phases import Phase, PhaseName, stateful
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from test.utils import flaky
@@ -38,7 +37,9 @@ class RunnerResult:
 
     @property
     def errors(self):
-        return [event for event in self.test_events if isinstance(event, events.Errored)]
+        return sum(
+            [event.payload.result.errors for event in self.events if isinstance(event, events.PhaseFinished)], []
+        )
 
     @property
     def steps_before_first_failure(self):
@@ -145,7 +146,7 @@ def test_internal_error_in_check(runner_factory, kwargs):
     runner = runner_factory(checks=[bugged_check], **kwargs)
     result = collect_result(runner)
     assert result.errors
-    assert isinstance(result.errors[0].exception, ZeroDivisionError)
+    assert isinstance(result.errors[0].error, ZeroDivisionError)
     serialize_all_events(result.events)
 
 
@@ -303,7 +304,7 @@ def test_failed_health_check(runner_factory):
     )
     result = collect_result(runner)
     assert result.errors
-    assert isinstance(result.errors[0].exception, hypothesis.errors.FailedHealthCheck)
+    assert isinstance(result.errors[0].error, hypothesis.errors.FailedHealthCheck)
     assert result.events[-1].status == Status.ERROR
     serialize_all_events(result.events)
 
@@ -328,7 +329,6 @@ def test_flaky(runner_factory, kwargs):
     )
     failures = []
     for event in runner:
-        assert not isinstance(event, events.InternalError)
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     assert len(failures) == 1
@@ -342,7 +342,7 @@ def test_unsatisfiable(runner_factory):
     )
     result = collect_result(runner)
     assert result.errors
-    assert isinstance(result.errors[0].exception, hypothesis.errors.InvalidArgument)
+    assert isinstance(result.errors[0].error, hypothesis.errors.InvalidArgument)
     assert result.events[-1].status == Status.ERROR
 
 
@@ -398,7 +398,6 @@ def test_max_response_time_invalid(runner_factory):
     )
     failures = []
     for event in runner:
-        assert not isinstance(event, events.InternalError)
         if isinstance(event, events.SuiteFinished):
             failures.extend(event.failures)
     # Failures on different API operations
