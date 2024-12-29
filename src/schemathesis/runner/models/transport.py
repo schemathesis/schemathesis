@@ -8,10 +8,9 @@ from typing import TYPE_CHECKING, Any, cast
 
 from schemathesis.core.transport import Response
 from schemathesis.generation.meta import CaseMetadata
+from schemathesis.runner import Status
 from schemathesis.transport.prepare import normalize_base_url
 from schemathesis.transport.requests import REQUESTS_TRANSPORT
-
-from .status import Status
 
 if TYPE_CHECKING:
     import requests

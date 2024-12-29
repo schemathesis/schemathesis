@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import enum
 import time
 import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
-from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception
+from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.runner.models.check import Check
@@ -14,11 +13,12 @@ from schemathesis.runner.phases import Phase, PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
+    from schemathesis.runner import Status
     from schemathesis.runner.phases.probes import ProbingPayload
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
     from ..schemas import BaseSchema
-    from .models import Status, TestResult, TestResultSet
+    from .models import TestResult, TestResultSet
 
 EventGenerator = Generator["EngineEvent", None, None]
 
@@ -140,7 +140,8 @@ class SuiteFinished(TestEvent):
 
 
 @dataclass
-class ScenarioEvent(TestEvent): ...
+class ScenarioEvent(TestEvent):
+    suite_id: uuid.UUID
 
 
 @dataclass
@@ -150,12 +151,13 @@ class ScenarioStarted(ScenarioEvent):
     # Whether this is a scenario that tries to reproduce a failure
     is_final: bool
 
-    __slots__ = ("id", "timestamp", "phase", "is_final")
+    __slots__ = ("id", "timestamp", "phase", "suite_id", "is_final")
 
-    def __init__(self, *, phase: PhaseName, is_final: bool) -> None:
+    def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, is_final: bool) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
+        self.suite_id = suite_id
         self.is_final = is_final
 
     def _asdict(self) -> dict[str, Any]:
@@ -170,12 +172,13 @@ class ScenarioFinished(ScenarioEvent):
     # Whether this is a scenario that tries to reproduce a failure
     is_final: bool
 
-    __slots__ = ("id", "timestamp", "phase", "status", "is_final")
+    __slots__ = ("id", "timestamp", "phase", "suite_id", "status", "is_final")
 
-    def __init__(self, *, phase: PhaseName, status: Status | None, is_final: bool) -> None:
+    def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, status: Status | None, is_final: bool) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
+        self.suite_id = suite_id
         self.status = status
         self.is_final = is_final
 
@@ -184,19 +187,34 @@ class ScenarioFinished(ScenarioEvent):
 
 
 @dataclass
-class StepEvent(ScenarioEvent): ...
+class StepEvent(ScenarioEvent):
+    scenario_id: uuid.UUID
 
 
 @dataclass
 class StepStarted(StepEvent):
     """Before executing a test case."""
 
-    __slots__ = ("id", "timestamp", "phase")
+    __slots__ = (
+        "id",
+        "timestamp",
+        "phase",
+        "suite_id",
+        "scenario_id",
+    )
 
-    def __init__(self, *, phase: PhaseName) -> None:
+    def __init__(
+        self,
+        *,
+        phase: PhaseName,
+        suite_id: uuid.UUID,
+        scenario_id: uuid.UUID,
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
+        self.suite_id = suite_id
+        self.scenario_id = scenario_id
 
 
 @dataclass
@@ -231,13 +249,27 @@ class StepFinished(StepEvent):
     response: Response | None
     checks: list[Check]
 
-    __slots__ = ("id", "timestamp", "phase", "status", "transition_id", "target", "case", "response", "checks")
+    __slots__ = (
+        "id",
+        "timestamp",
+        "phase",
+        "status",
+        "suite_id",
+        "scenario_id",
+        "transition_id",
+        "target",
+        "case",
+        "response",
+        "checks",
+    )
 
     def __init__(
         self,
         *,
         phase: PhaseName,
         status: Status | None,
+        suite_id: uuid.UUID,
+        scenario_id: uuid.UUID,
         transition_id: TransitionId | None,
         target: str,
         case: Case,
@@ -248,6 +280,8 @@ class StepFinished(StepEvent):
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
+        self.suite_id = suite_id
+        self.scenario_id = scenario_id
         self.transition_id = transition_id
         self.target = target
         self.case = case
@@ -329,8 +363,6 @@ class BeforeExecution(EngineEvent):
 
     # Specification-specific operation name
     label: str
-    # A unique ID which connects events that happen during testing of the same API operation
-    # It may be useful when multiple threads are involved where incoming events are not ordered
     correlation_id: uuid.UUID
 
     __slots__ = ("id", "timestamp", "label", "correlation_id")
@@ -349,10 +381,8 @@ class BeforeExecution(EngineEvent):
 class AfterExecution(EngineEvent):
     """Happens after each tested API operation."""
 
-    # APIOperation test status - success / failure / error
     status: Status
     result: TestResult
-    # Test running time
     elapsed_time: float
     correlation_id: uuid.UUID
 
@@ -391,101 +421,21 @@ class Interrupted(EngineEvent):
 
 
 @dataclass
-class Errored(TestEvent):
-    """An error occurred during the state machine execution."""
+class InternalError(EngineEvent):
+    """Internal error in the engine."""
 
     exception: Exception
+    is_terminal = True
 
-    __slots__ = ("id", "timestamp", "phase", "exception")
+    __slots__ = ("id", "timestamp", "exception")
 
-    def __init__(self, *, phase: PhaseName, exception: Exception) -> None:
+    def __init__(self, *, exception: Exception) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
-        self.phase = phase
         self.exception = exception
 
     def _asdict(self) -> dict[str, Any]:
         return {"exception": format_exception(self.exception, with_traceback=True)}
-
-
-@enum.unique
-class InternalErrorType(str, enum.Enum):
-    SCHEMA = "schema"
-    OTHER = "other"
-
-
-DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
-
-
-@dataclass
-class InternalError(EngineEvent):
-    """An error that happened inside the runner."""
-
-    is_terminal = True
-
-    # Main error info
-    type: InternalErrorType
-    subtype: LoaderErrorKind | None
-    title: str
-    message: str
-    extras: list[str]
-
-    # Exception info
-    exception_with_traceback: str
-
-    @classmethod
-    def from_loader_error(cls, error: LoaderError) -> InternalError:
-        return cls.with_exception(
-            error,
-            type_=InternalErrorType.SCHEMA,
-            subtype=error.kind,
-            title="Schema Loading Error",
-            message=error.message,
-            extras=error.extras,
-        )
-
-    @classmethod
-    def from_exc(cls, exc: Exception) -> InternalError:
-        return cls.with_exception(
-            exc,
-            type_=InternalErrorType.OTHER,
-            subtype=None,
-            title="Test Execution Error",
-            message=DEFAULT_INTERNAL_ERROR_MESSAGE,
-            extras=[],
-        )
-
-    @classmethod
-    def with_exception(
-        cls,
-        exc: Exception,
-        type_: InternalErrorType,
-        subtype: LoaderErrorKind | None,
-        title: str,
-        message: str,
-        extras: list[str],
-    ) -> InternalError:
-        exception_with_traceback = format_exception(exc, with_traceback=True)
-        return cls(
-            id=uuid.uuid4(),
-            timestamp=time.time(),
-            type=type_,
-            subtype=subtype,
-            title=title,
-            message=message,
-            extras=extras,
-            exception_with_traceback=exception_with_traceback,
-        )
-
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "type": self.type.value,
-            "subtype": self.subtype.value if self.subtype else None,
-            "title": self.title,
-            "message": self.message,
-            "extras": self.extras,
-            "exception_with_traceback": self.exception_with_traceback,
-        }
 
 
 @dataclass
@@ -501,7 +451,7 @@ class EngineFinished(EngineEvent):
 
     __slots__ = ("id", "timestamp", "results", "running_time")
 
-    def __init__(self, results: TestResultSet, running_time: float) -> None:
+    def __init__(self, *, results: TestResultSet, running_time: float) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.results = results

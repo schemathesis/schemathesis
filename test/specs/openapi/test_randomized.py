@@ -27,8 +27,8 @@ def test_random_schemas(schema):
             errors = [
                 error
                 for error in event.result.errors
-                if all(f"{exc.__module__}.{exc.__name__}" not in error.exception for exc in IGNORED_EXCEPTIONS)
+                if all(f"{exc.__module__}.{exc.__name__}" not in str(error) for exc in IGNORED_EXCEPTIONS)
             ]
             if errors:
                 error = errors[0]
-                raise AssertionError(error.exception)
+                raise AssertionError(str(error))

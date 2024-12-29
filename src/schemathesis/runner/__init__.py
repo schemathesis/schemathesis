@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from random import Random
 from typing import TYPE_CHECKING
 
@@ -18,6 +19,14 @@ if TYPE_CHECKING:
 
     from ..schemas import BaseSchema
     from .core import Engine
+
+
+class Status(str, Enum):
+    SUCCESS = "success"
+    FAILURE = "failure"
+    ERROR = "error"
+    INTERRUPTED = "interrupted"
+    SKIP = "skip"
 
 
 def from_schema(

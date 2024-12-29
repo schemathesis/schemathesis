@@ -35,6 +35,7 @@ from schemathesis.generation.hypothesis.builder import (
     UnsatisfiableExampleMark,
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.runner import Status
 from schemathesis.runner.errors import (
     DeadlineExceeded,
     UnexpectedError,
@@ -47,7 +48,6 @@ from ... import events
 from ...context import EngineContext
 from ...models.check import Check
 from ...models.outcome import TestResult
-from ...models.status import Status
 from ...models.transport import Request
 
 if TYPE_CHECKING:

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.core.errors import format_exception
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transport import USER_AGENT, Response
+from schemathesis.runner import Status
 
 from .. import events
 from ..models import Request
@@ -41,8 +42,6 @@ class ProbingPayload:
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
-    from schemathesis.runner.models.status import Status
-
     assert not ctx.config.execution.dry_run
     probes = run(ctx.config.schema, ctx.session, ctx.config.network)
     status = Status.SUCCESS

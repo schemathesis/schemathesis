@@ -5,8 +5,9 @@ from __future__ import annotations
 import threading
 from dataclasses import dataclass
 
+from schemathesis.runner import Status
+
 from . import events
-from .models.status import Status
 
 
 @dataclass

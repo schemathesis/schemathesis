@@ -8,9 +8,9 @@ from requests import Response
 
 from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
+from schemathesis.cli.output.default import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
-from schemathesis.runner.events import DEFAULT_INTERNAL_ERROR_MESSAGE
 
 
 @pytest.fixture(scope="module")

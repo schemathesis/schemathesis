@@ -19,7 +19,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.meta import CoveragePhaseData
-from schemathesis.runner.models.status import Status
+from schemathesis.runner import Status
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.phases.stateful import StatefulTestingPayload
 

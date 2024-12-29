@@ -935,8 +935,8 @@ def into_event_stream(
     try:
         schema = loaders.load_schema(loader_config)
         schema.filter_set = filter_set
-    except LoaderError as error:
-        yield events.InternalError.from_loader_error(error)
+    except LoaderError as exc:
+        yield events.InternalError(exception=exc)
         return
 
     try:
@@ -957,7 +957,7 @@ def into_event_stream(
             network=network_config,
         ).execute()
     except Exception as exc:
-        yield events.InternalError.from_exc(exc)
+        yield events.InternalError(exception=exc)
 
 
 def get_output_handler(workers_num: int) -> EventHandler:

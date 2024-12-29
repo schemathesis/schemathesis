@@ -13,14 +13,13 @@ from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import CHECKS
-from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError
+from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
-from schemathesis.runner import events, from_schema
+from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.errors import EngineErrorInfo
-from schemathesis.runner.models import Status
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -195,7 +194,7 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.InternalError):
-        raise AssertionError(f"Internal Error: {event.exception_with_traceback}")
+        raise AssertionError(f"Internal Error: {format_exception(event.exception, with_traceback=True)}")
 
 
 def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
