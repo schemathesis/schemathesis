@@ -6,13 +6,12 @@ from typing import TYPE_CHECKING, Generator
 
 from schemathesis.core.output import OutputConfig
 from schemathesis.runner.events import NonFatalError
+from schemathesis.runner.models.check import Check
 
 if TYPE_CHECKING:
     import os
 
     import hypothesis
-
-    from schemathesis.runner.models.outcome import TestResult
 
     from ..stateful.sink import StateMachineSink
 
@@ -31,7 +30,7 @@ class ExecutionContext:
     seed: int | None = None
     current_line_length: int = 0
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
-    results: list[TestResult] = field(default_factory=list)
+    checks: list[tuple[str, list[Check]]] = field(default_factory=list)
     errors: list[NonFatalError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     cassette_path: str | None = None

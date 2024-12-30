@@ -66,6 +66,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     correlation_id = uuid.uuid4()
     yield events.BeforeExecution(label=operation.label, correlation_id=correlation_id)
     errors: list[Exception] = []
+    skip_reason = None
     test_start_time = time.monotonic()
 
     def non_fatal_error(error: Exception) -> events.NonFatalError:
@@ -79,7 +80,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
         status = Status.SKIP
-        result.mark_skipped(exc)
+        skip_reason = str(exc)
     except (FailureGroup, Failure):
         status = Status.FAILURE
     except UnexpectedError:
@@ -194,7 +195,6 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = Status.ERROR
         yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
-    ctx.add_result(result)
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result.checks, status_code):
             yield events.Warning(
@@ -208,6 +208,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status=status,
         elapsed_time=test_elapsed_time,
         correlation_id=correlation_id,
+        skip_reason=skip_reason,
     )
 
 
@@ -257,33 +258,20 @@ def validate_response(
     ctx: CheckContext,
     checks: Iterable[CheckFunction],
     check_results: list[Check],
-    result: TestResult,
     response: Response,
     no_failfast: bool,
 ) -> None:
     failures = set()
+    request = Request.from_prepared_request(response.request)
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
         collected.add(failure)
         check_results.append(
-            result.add_failure(
-                name=name,
-                case=case,
-                request=Request.from_prepared_request(response.request),
-                response=response,
-                failure=failure,
-            )
+            Check(name=name, status=Status.FAILURE, case=case, request=request, response=response, failure=failure)
         )
 
     def on_success(name: str, _case: Case) -> None:
-        check_results.append(
-            result.add_success(
-                name=name,
-                case=_case,
-                request=Request.from_prepared_request(response.request),
-                response=response,
-            )
-        )
+        check_results.append(Check(name=name, status=Status.SUCCESS, request=request, response=response, case=_case))
 
     failures = run_checks(
         case=case,
@@ -335,7 +323,7 @@ def test_func(*, ctx: EngineContext, case: Case, result: TestResult) -> None:
         try:
             response = case.call(**ctx.transport_kwargs)
         except (requests.Timeout, requests.ConnectionError):
-            result.store_requests_response(case, None, Status.FAILURE, [], session=ctx.session)
+            result.record(case, None, Status.FAILURE, [], session=ctx.session)
             raise
         targets.run(ctx.config.execution.targets, case=case, response=response)
         status = Status.SUCCESS
@@ -346,7 +334,6 @@ def test_func(*, ctx: EngineContext, case: Case, result: TestResult) -> None:
                 ctx=ctx.check_context,
                 checks=ctx.config.execution.checks,
                 check_results=check_results,
-                result=result,
                 response=response,
                 no_failfast=ctx.config.execution.no_failfast,
             )
@@ -354,6 +341,6 @@ def test_func(*, ctx: EngineContext, case: Case, result: TestResult) -> None:
             status = Status.FAILURE
             raise
         finally:
-            result.store_requests_response(case, response, status, check_results, session=ctx.session)
+            result.record(case, response, status, check_results, session=ctx.session)
     else:
-        result.store_requests_response(case, None, Status.SKIP, [], session=ctx.session)
+        result.record(case, None, Status.SKIP, [], session=ctx.session)

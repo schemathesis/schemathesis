@@ -13,7 +13,6 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
-from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases.unit._executor import validate_response
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
@@ -625,7 +624,6 @@ def test_deduplication(ctx, response_factory):
     operation = schema["/data"]["GET"]
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
-    result = TestResult(label=operation.label)
     checks = []
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):
@@ -634,7 +632,6 @@ def test_deduplication(ctx, response_factory):
             ctx=CTX,
             checks=(content_type_conformance, response_schema_conformance),
             check_results=checks,
-            result=result,
             response=response,
             no_failfast=False,
         )

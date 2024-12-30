@@ -14,12 +14,10 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
-from schemathesis.runner import Status
+from schemathesis.runner import Status, events
 from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases import PhaseName
 
-from ... import events
-from ...events import EventGenerator, PhaseFinished
 from ._pool import TaskProducer, WorkerPool
 
 if TYPE_CHECKING:
@@ -31,7 +29,7 @@ if TYPE_CHECKING:
 WORKER_TIMEOUT = 0.1
 
 
-def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
+def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     """Run a set of unit tests.
 
     Implemented as a producer-consumer pattern via a task queue.
@@ -46,8 +44,6 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
 
     status = Status.SUCCESS
 
-    failures = []
-
     with WorkerPool(workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine) as pool:
         try:
             while True:
@@ -58,7 +54,6 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
                     yield event
                     engine.on_event(event)
                     if isinstance(event, events.AfterExecution):
-                        failures.extend(event.result.checks)
                         engine.record_item(event.status)
                         if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
                             Status.FAILURE,
@@ -77,8 +72,8 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
             yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
 
     # NOTE: Right now there is just one suite, hence two events go one after another
-    yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status, failures=failures)
-    yield PhaseFinished(phase=phase, status=status, payload=None)
+    yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
+    yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
 def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
@@ -132,9 +127,9 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                                 result=test_result,
                                 elapsed_time=0.0,
                                 correlation_id=correlation_id,
+                                skip_reason=None,
                             )
                         )
-                        ctx.add_result(test_result)
                     else:
                         assert error.full_path is not None
                         events_queue.put(

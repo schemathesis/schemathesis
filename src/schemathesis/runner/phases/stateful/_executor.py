@@ -211,7 +211,6 @@ def execute_state_machine_loop(
                     id=suite_started.id,
                     phase=PhaseName.STATEFUL_TESTING,
                     status=Status.INTERRUPTED,
-                    failures=ctx.failures_for_suite.copy(),
                 )
             )
             break
@@ -261,7 +260,6 @@ def execute_state_machine_loop(
                     id=suite_started.id,
                     phase=PhaseName.STATEFUL_TESTING,
                     status=suite_status,
-                    failures=ctx.failures_for_suite.copy(),
                 )
             )
             ctx.reset()
@@ -295,7 +293,6 @@ def validate_response(
         )
         results.append(failed_check)
         control.count_failure()
-        runner_ctx.add_failed_check(failed_check)
         runner_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
 

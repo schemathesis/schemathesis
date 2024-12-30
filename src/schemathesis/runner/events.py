@@ -118,22 +118,19 @@ class SuiteFinished(TestEvent):
     """After executing a set of test scenarios."""
 
     status: Status
-    failures: list[Check]
 
-    __slots__ = ("id", "timestamp", "phase", "status", "failures")
+    __slots__ = ("id", "timestamp", "phase", "status")
 
-    def __init__(self, *, id: uuid.UUID, phase: PhaseName, status: Status, failures: list[Check]) -> None:
+    def __init__(self, *, id: uuid.UUID, phase: PhaseName, status: Status) -> None:
         self.id = id
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
-        self.failures = failures
 
     def _asdict(self) -> dict[str, Any]:
         return {
             "phase": self.phase.name,
             "status": self.status,
-            "failures": [failure.asdict() for failure in self.failures],
         }
 
 
@@ -386,6 +383,7 @@ class AfterExecution(EngineEvent):
     result: TestResult
     elapsed_time: float
     correlation_id: uuid.UUID
+    skip_reason: str | None = None
 
     def __init__(
         self,
@@ -394,6 +392,7 @@ class AfterExecution(EngineEvent):
         result: TestResult,
         elapsed_time: float,
         correlation_id: uuid.UUID,
+        skip_reason: str | None,
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -401,11 +400,11 @@ class AfterExecution(EngineEvent):
         self.result = result
         self.elapsed_time = elapsed_time
         self.correlation_id = correlation_id
+        self.skip_reason = skip_reason
 
     def _asdict(self) -> dict[str, Any]:
         return {
             "status": self.status.value,
-            "result": self.result.asdict(),
             "elapsed_time": self.elapsed_time,
             "correlation_id": self.correlation_id.hex,
         }
@@ -492,21 +491,16 @@ class EngineFinished(EngineEvent):
     """
 
     is_terminal = True
-    results: list[TestResult]
     running_time: float
     outcome_statistic: dict[Status, int]
 
-    __slots__ = ("id", "timestamp", "results", "running_time", "outcome_statistic")
+    __slots__ = ("id", "timestamp", "running_time", "outcome_statistic")
 
-    def __init__(self, *, results: list[TestResult], running_time: float, outcome_statistic: dict[Status, int]) -> None:
+    def __init__(self, *, running_time: float, outcome_statistic: dict[Status, int]) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
-        self.results = results
         self.running_time = running_time
         self.outcome_statistic = outcome_statistic
 
     def _asdict(self) -> dict[str, Any]:
-        return {
-            "results": [result.asdict() for result in self.results],
-            "running_time": self.running_time,
-        }
+        return {"running_time": self.running_time}

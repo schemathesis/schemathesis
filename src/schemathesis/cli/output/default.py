@@ -15,6 +15,7 @@ from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.runner import Status
 from schemathesis.runner.models import group_failures_by_code_sample
 from schemathesis.runner.models.check import Check
+from schemathesis.runner.phases import PhaseName
 
 from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
@@ -136,15 +137,15 @@ def bold(option: str) -> str:
 DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
 
 
-def display_failures(ctx: ExecutionContext, event: events.EngineFinished) -> None:
+def display_failures(ctx: ExecutionContext) -> None:
     """Display all failures in the test run."""
-    if Status.FAILURE not in event.outcome_statistic:
+    if not any(check.status == Status.FAILURE for _, checks in ctx.checks for check in checks):
         return
     display_section_name("FAILURES")
-    for result in ctx.results:
-        if not any(check.status == Status.FAILURE for check in result.checks):
+    for label, checks in ctx.checks:
+        if not any(check.status == Status.FAILURE for check in checks):
             continue
-        display_failures_for_single_test(ctx, result.label, result.checks)
+        display_failures_for_single_test(ctx, label, checks)
 
 
 if IO_ENCODING != "utf-8":
@@ -196,8 +197,8 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
     display_section_name("SUMMARY")
     click.echo()
     output: dict[str, dict[str | Status, int]] = {}
-    for item in event.results:
-        for check in item.checks:
+    for _, checks in ctx.checks:
+        for check in checks:
             output.setdefault(check.name, Counter())
             output[check.name][check.status] += 1
             output[check.name]["total"] += 1
@@ -379,7 +380,9 @@ def on_stateful_testing_started(ctx: ExecutionContext) -> None:
 def on_stateful_testing_finished(ctx: ExecutionContext, payload: StatefulTestingPayload | None) -> None:
     if payload is None:
         return
-    ctx.results.append(payload.result)
+
+    if payload.result.checks:
+        ctx.checks.append((payload.result.label, payload.result.checks))
 
     # Merge execution data from sink into the complete transition table
     sink = ctx.state_machine_sink
@@ -417,7 +420,8 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
 def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
     """Display the execution result + current progress at the same line with the method / path names."""
     ctx.operations_processed += 1
-    ctx.results.append(event.result)
+    if event.result.checks:
+        ctx.checks.append((event.result.label, event.result.checks))
     display_execution_result(ctx, event.status)
     display_percentage(ctx, event)
 
@@ -426,7 +430,7 @@ def on_engine_finished(ctx: ExecutionContext, event: events.EngineFinished) -> N
     """Show the outcome of the whole testing session."""
     click.echo()
     display_errors(ctx)
-    display_failures(ctx, event)
+    display_failures(ctx)
     display_statistic(ctx, event)
     if ctx.summary_lines:
         click.echo()
@@ -473,9 +477,6 @@ def on_stateful_test_event(ctx: ExecutionContext, event: events.TestEvent) -> No
 class DefaultOutputStyleHandler(EventHandler):
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         """Choose and execute a proper handler for the given event."""
-        from schemathesis.runner.phases import PhaseName
-        from schemathesis.runner.phases.stateful import StatefulTestingPayload
-
         if isinstance(event, events.Initialized):
             on_initialized(ctx, event)
         elif isinstance(event, events.PhaseStarted):
@@ -487,7 +488,6 @@ class DefaultOutputStyleHandler(EventHandler):
             if event.phase.name == PhaseName.PROBING:
                 on_probing_finished(ctx, event.status)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
-                assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
                 on_stateful_testing_finished(ctx, event.payload)
                 if not ctx.is_interrupted:
                     click.echo()

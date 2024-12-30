@@ -1,6 +1,8 @@
 import click
 
-from ...runner import events
+from schemathesis.runner import events
+from schemathesis.runner.phases import PhaseName
+
 from ..context import ExecutionContext
 from ..handlers import EventHandler
 from . import default
@@ -12,7 +14,8 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
 
 def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
     ctx.operations_processed += 1
-    ctx.results.append(event.result)
+    if event.result.checks:
+        ctx.checks.append((event.result.label, event.result.checks))
     default.display_execution_result(ctx, event.status)
 
 
@@ -22,9 +25,6 @@ class ShortOutputStyleHandler(EventHandler):
 
         Otherwise, identical to the default output style.
         """
-        from schemathesis.runner.phases import PhaseName
-        from schemathesis.runner.phases.stateful import StatefulTestingPayload
-
         if isinstance(event, events.Initialized):
             default.on_initialized(ctx, event)
         elif isinstance(event, events.PhaseStarted):
@@ -37,7 +37,6 @@ class ShortOutputStyleHandler(EventHandler):
             if event.phase.name == PhaseName.PROBING:
                 default.on_probing_finished(ctx, event.status)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
-                assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
                 default.on_stateful_testing_finished(ctx, event.payload)
         elif isinstance(event, events.NonFatalError):
             ctx.errors.append(event)
