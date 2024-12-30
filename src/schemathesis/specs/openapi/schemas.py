@@ -1029,6 +1029,8 @@ class SwaggerV20(BaseOpenAPISchema):
 
     def _get_payload_schema(self, definition: dict[str, Any], media_type: str) -> dict[str, Any] | None:
         for parameter in definition.get("parameters", []):
+            if "$ref" in parameter:
+                _, parameter = self.resolver.resolve(parameter["$ref"])
             if parameter["in"] == "body":
                 return parameter["schema"]
         return None

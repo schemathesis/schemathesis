@@ -83,7 +83,9 @@ class ExecutionPlan:
         """Finish the test run."""
         if ctx.has_all_not_found:
             ctx.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
-        yield events.EngineFinished(results=ctx.data, running_time=ctx.running_time)
+        yield events.EngineFinished(
+            results=ctx.data, running_time=ctx.running_time, outcome_statistic=ctx.outcome_statistic
+        )
 
 
 ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"

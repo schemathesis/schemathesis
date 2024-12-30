@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 class EventHandler:
     def __init__(self, *args: Any, **params: Any) -> None: ...
 
-    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         raise NotImplementedError
 
     def shutdown(self) -> None:

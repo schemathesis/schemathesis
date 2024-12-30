@@ -21,11 +21,11 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, settings
 from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
+from schemathesis.runner import Status, events
 
 from .. import contrib, experimental, generation, runner
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
 from ..generation import DEFAULT_GENERATOR_MODES, GenerationMode
-from ..runner import events
 from ..runner.config import NetworkConfig
 from . import cassettes, loaders, output, validation
 from .constants import DEFAULT_WORKERS, ISSUE_TRACKER_URL, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
@@ -936,7 +936,7 @@ def into_event_stream(
         schema = loaders.load_schema(loader_config)
         schema.filter_set = filter_set
     except LoaderError as exc:
-        yield events.InternalError(exception=exc)
+        yield events.FatalError(exception=exc)
         return
 
     try:
@@ -957,7 +957,7 @@ def into_event_stream(
             network=network_config,
         ).execute()
     except Exception as exc:
-        yield events.InternalError(exception=exc)
+        yield events.FatalError(exception=exc)
 
 
 def get_output_handler(workers_num: int) -> EventHandler:
@@ -1057,8 +1057,11 @@ def execute(
     finally:
         shutdown()
     if event is not None and event.is_terminal:
-        exit_code = get_exit_code(event)
-        sys.exit(exit_code)
+        if execution_context.errors:
+            sys.exit(1)
+        else:
+            exit_code = get_exit_code(event)
+            sys.exit(exit_code)
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)
@@ -1114,7 +1117,7 @@ def display_handler_error(handler: EventHandler, exc: Exception) -> None:
 
 def get_exit_code(event: events.EngineEvent) -> int:
     if isinstance(event, events.EngineFinished):
-        if event.results.has_failures or event.results.has_errors:
+        if Status.FAILURE in event.outcome_statistic:
             return 1
         return 0
     # Practically not possible. May occur only if the output handler is broken - in this case we still will have the

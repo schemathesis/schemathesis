@@ -14,6 +14,12 @@ API probing: ERROR
 EE
 
 ==================================== ERRORS ====================================
+_______________________________ API Probe errors _______________________________
+Network Error
+
+Connection failed
+
+    Failed to establish a new connection: [Error NUM] Connection refused
 _______________________________ GET /api/failure _______________________________
 Network Error
 
@@ -26,12 +32,6 @@ Network Error
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
-_______________________________ API Probe errors _______________________________
-Network Error
-
-Connection failed
-
-    Failed to establish a new connection: [Error NUM] Connection refused
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -39,4 +39,4 @@ Need more help?
 
 No checks were performed.
 
-============================== 2 errored in 1.00s ==============================
+============================== 3 errored in 1.00s ==============================

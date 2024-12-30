@@ -38,8 +38,8 @@ if TYPE_CHECKING:
     from aiohttp import web
 
 
-def execute(schema, **options) -> events.EngineFinished | None:
-    return EventStream(schema, **options).execute().finished
+def execute(schema, **options) -> EventStream:
+    return EventStream(schema, **options).execute()
 
 
 def assert_request(
@@ -82,7 +82,7 @@ def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
 
 def test_execute(app, real_app_schema):
     # When the runner is executed against the default test app
-    stream = EventStream(real_app_schema).execute()
+    EventStream(real_app_schema).execute()
 
     # Then there are three executed cases
     # Two errors - the second one is a flakiness check
@@ -93,9 +93,6 @@ def test_execute(app, real_app_schema):
     assert_incoming_requests_num(app, 2)
     assert_request(app, 0, "GET", "/api/failure", headers)
     assert_request(app, 1, "GET", "/api/success", headers)
-
-    # And statistic is showing the breakdown of cases types
-    assert stream.finished.results.total == {"not_a_server_error": {Status.SUCCESS: 1, Status.FAILURE: 1, "total": 2}}
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -220,8 +217,8 @@ def test_root_url():
         assert response.status_code == 200
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app=app)
-    finished = execute(schema, checks=(check,))
-    assert not finished.results.has_failures
+    stream = execute(schema, checks=(check,))
+    assert Status.FAILURE not in stream.finished.outcome_statistic
 
 
 def test_execute_with_headers(app, real_app_schema):
@@ -274,14 +271,14 @@ def test_form_data(app, real_app_schema):
 
     # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(is_ok, check_content),
         hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None),
     )
     # And there should be no errors or failures
-    assert not finished.results.has_errors
-    assert not finished.results.has_failures
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
     # And the application should receive 3 requests as specified in `max_examples`
     assert_incoming_requests_num(app, 3)
     # And the Content-Type of incoming requests should be `multipart/form-data`
@@ -295,14 +292,14 @@ def test_headers_override(real_app_schema):
         data = response.json()
         assert data["X-Token"] == "test"
 
-    finished = execute(
+    stream = EventStream(
         real_app_schema,
         checks=(check_headers,),
         network=NetworkConfig(headers={"X-Token": "test"}),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    )
-    assert not finished.results.has_failures
-    assert not finished.results.has_errors
+    ).execute()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 @pytest.mark.operations("teapot")
@@ -316,7 +313,7 @@ def test_unknown_response_code(real_app_schema):
     ).execute()
 
     # Then there should be a failure
-    assert stream.finished.results.has_failures
+    assert Status.FAILURE in stream.finished.outcome_statistic
     check = stream.find(events.AfterExecution).result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.FAILURE
@@ -335,7 +332,7 @@ def test_unknown_response_code_with_default(real_app_schema):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # Then there should be no failure
-    assert not stream.finished.results.has_failures
+    assert Status.FAILURE not in stream.finished.outcome_statistic
     check = stream.find(events.AfterExecution).result.checks[0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.SUCCESS
@@ -351,7 +348,7 @@ def test_unknown_content_type(real_app_schema):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # Then there should be a failure
-    assert stream.finished.results.has_failures
+    assert Status.FAILURE in stream.finished.outcome_statistic
     check = stream.find(events.AfterExecution).result.checks[0]
     assert check.name == "content_type_conformance"
     assert check.status == Status.FAILURE
@@ -363,13 +360,13 @@ def test_unknown_content_type(real_app_schema):
 def test_known_content_type(real_app_schema):
     # When API operation returns a response with a proper content type
     # And "content_type_conformance" is specified
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(content_type_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     )
     # Then there should be no failures
-    assert not finished.results.has_failures
+    assert Status.FAILURE not in stream.finished.outcome_statistic
 
 
 @pytest.mark.operations("invalid_response")
@@ -382,7 +379,7 @@ def test_response_conformance_invalid(real_app_schema):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # Then there should be a failure
-    assert stream.finished.results.has_failures
+    assert Status.FAILURE in stream.finished.outcome_statistic
     check = stream.find(events.AfterExecution).result.checks[-1]
     assert check.failure.title == "Response violates schema"
     assert (
@@ -424,42 +421,42 @@ Value:
 def test_response_conformance_valid(real_app_schema):
     # When API operation returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     )
     # Then there should be no failures or errors
-    assert not finished.results.has_failures
-    assert not finished.results.has_errors
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 @pytest.mark.operations("recursive")
 def test_response_conformance_recursive_valid(real_app_schema):
     # When API operation contains a response that have recursive references
     # And "response_schema_conformance" is specified
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     )
     # Then there should be no failures or errors
-    assert not finished.results.has_failures
-    assert not finished.results.has_errors
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 @pytest.mark.operations("text")
 def test_response_conformance_text(real_app_schema):
     # When API operation returns a response that is not JSON
     # And "response_schema_conformance" is specified
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(response_schema_conformance,),
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     )
     # Then the check should be ignored if the response headers are not application/json
-    assert not finished.results.has_failures
-    assert not finished.results.has_errors
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 @pytest.mark.operations("malformed_json")
@@ -472,8 +469,8 @@ def test_response_conformance_malformed_json(real_app_schema):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # Then there should be a failure
-    assert stream.finished.results.has_failures
-    assert not stream.finished.results.has_errors
+    assert Status.FAILURE in stream.finished.outcome_statistic
+    stream.assert_no_errors()
     check = stream.find(events.AfterExecution).result.checks[-1]
     assert check.failure.title == "JSON deserialization error"
     assert check.failure.validation_message == "Expecting property name enclosed in double quotes"
@@ -499,15 +496,15 @@ def filter_path_parameters():
 def test_path_parameters_encoding(real_app_schema):
     # NOTE. WSGI and ASGI applications decode %2F as / and returns 404
     # When API operation has a path parameter
-    finished = execute(
+    stream = execute(
         real_app_schema,
         checks=(status_code_conformance,),
         hypothesis_settings=hypothesis.settings(derandomize=True, deadline=None),
     )
     # Then there should be no failures
     # since all path parameters are quoted
-    assert not finished.results.has_errors, finished
-    assert not finished.results.has_failures, finished
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
 
 
 @pytest.mark.parametrize(
@@ -520,7 +517,7 @@ def test_path_parameters_encoding(real_app_schema):
 @pytest.mark.operations("slow")
 def test_exceptions(schema_url, configuration, from_schema_options):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
-    stream = EventStream(schema, **from_schema_options).execute()
+    stream = execute(schema, **from_schema_options)
     assert any(event.status == Status.ERROR for event in stream.find_all(events.AfterExecution))
 
 
@@ -530,13 +527,11 @@ def test_internal_exceptions(real_app_schema, mocker):
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
-    stream = EventStream(
-        real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
-    ).execute()
+    stream = execute(real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None))
     # Then the execution result should indicate errors
-    assert stream.finished.results.has_errors
+    stream.assert_errors()
     # And an error from the buggy code should be collected
-    exceptions = [str(error) for error in stream.find(events.AfterExecution).result.errors]
+    exceptions = [error.value.__class__.__name__ for error in stream.find_all(events.NonFatalError)]
     assert "ValueError" in exceptions
     assert len(exceptions) == 1
 
@@ -544,10 +539,10 @@ def test_internal_exceptions(real_app_schema, mocker):
 @pytest.mark.operations("payload")
 async def test_payload_explicit_example(app, real_app_schema):
     # When API operation has an example specified
-    result = execute(real_app_schema, hypothesis_settings=hypothesis.settings(phases=[Phase.explicit], deadline=None))
+    stream = execute(real_app_schema, hypothesis_settings=hypothesis.settings(phases=[Phase.explicit], deadline=None))
     # Then run should be successful
-    assert not result.results.has_errors
-    assert not result.results.has_failures
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
     incoming_requests = app["incoming_requests"]
 
     body = await incoming_requests[0].json()
@@ -596,12 +591,12 @@ async def test_explicit_example_disable(app, real_app_schema, mocker):
     # When API operation has an example specified
     # And the `explicit` phase is excluded
     spy = mocker.patch("schemathesis.generation.hypothesis.builder.add_examples", wraps=add_examples)
-    finished = execute(
+    stream = execute(
         real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=1, phases=[Phase.generate], deadline=None)
     )
     # Then run should be successful
-    assert not finished.results.has_errors
-    assert not finished.results.has_failures
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
     incoming_requests = app["incoming_requests"]
     assert len(incoming_requests) == 1
 
@@ -620,11 +615,11 @@ def test_plain_text_body(app, real_app_schema):
         data = response.content
         assert case.body.encode("utf8") == data
 
-    result = execute(
+    stream = execute(
         real_app_schema, checks=(check_content,), hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     )
-    assert not result.results.has_errors
-    assert not result.results.has_failures
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
 
 
 @pytest.mark.operations("invalid_path_parameter")
@@ -632,10 +627,10 @@ def test_invalid_path_parameter(schema_url):
     # When a path parameter is marked as not required
     # And schema validation is disabled
     schema = schemathesis.openapi.from_url(schema_url)
-    finished = execute(schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None))
+    stream = execute(schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None))
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
-    assert not finished.results.has_errors
+    stream.assert_no_errors()
 
 
 @pytest.mark.operations("missing_path_parameter")
@@ -645,19 +640,18 @@ def test_missing_path_parameter(real_app_schema):
         real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
     ).execute()
     # Then it leads to an error
-    assert stream.finished.results.has_errors
-    assert "InvalidSchema: Path parameter 'id' is not defined" in str(
-        stream.find(events.AfterExecution).result.errors[0]
-    )
+    stream.assert_errors()
+    assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
 
 
 @pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")
 def test_max_failures(real_app_schema):
     # When `max_failures` is specified
-    finished = execute(real_app_schema, max_failures=2)
+    stream = execute(real_app_schema, max_failures=2)
     # Then the total numbers of failures and errors should not exceed this number
-    assert finished.results.has_failures is True
-    assert finished.results.failed_count + finished.results.errored_count == 2
+    assert Status.FAILURE in stream.finished.outcome_statistic
+    errors = stream.find_all(events.NonFatalError)
+    assert stream.finished.outcome_statistic.get(Status.FAILURE, 0) + len(errors) == 2
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
@@ -666,9 +660,8 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
     schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
-    after = stream.find(events.AfterExecution)
-    assert after.status == Status.ERROR
-    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in str(after.result.errors[0])
+    stream.assert_after_execution_status(Status.ERROR)
+    assert RECURSIVE_REFERENCE_ERROR_MESSAGE in str(stream.find(events.NonFatalError).info)
 
 
 @pytest.mark.parametrize(
@@ -717,10 +710,10 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
     # And the tests are failing because of the unsatisfiable schema
-    assert stream.finished.results.has_errors
-    after = stream.find(events.AfterExecution)
-    assert expected in str(after.result.errors[0])
-    assert len(after.result.errors) == total_errors
+    stream.assert_errors()
+    errors = stream.find_all(events.NonFatalError)
+    assert expected in [str(err.value) for err in errors]
+    assert len(errors) == total_errors
 
 
 @pytest.mark.parametrize(
@@ -763,10 +756,10 @@ def test_non_serializable_example(ctx, phases, expected):
         schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
     ).execute()
     # And the tests are failing because of the serialization error
-    assert stream.finished.results.has_errors
-    after = stream.find(events.AfterExecution)
-    assert expected in str(after.result.errors[0])
-    assert len(after.result.errors) == 1
+    stream.assert_errors()
+    errors = stream.find_all(events.NonFatalError)
+    assert len(errors) == 1
+    assert expected in str(errors[0].info)
 
 
 @pytest.mark.parametrize(
@@ -825,10 +818,10 @@ def test_invalid_regex_example(ctx, phases, expected):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases),
     ).execute()
     # And the tests are failing because of the invalid regex error
-    assert stream.finished.results.has_errors
-    after = stream.find(events.AfterExecution)
-    assert expected in str(after.result.errors[0])
-    assert len(after.result.errors) == 1
+    stream.assert_errors()
+    errors = stream.find_all(events.NonFatalError)
+    assert len(errors) == 1
+    assert expected in str(errors[0].info)
 
 
 def test_invalid_header_in_example(ctx):
@@ -858,13 +851,13 @@ def test_invalid_header_in_example(ctx):
         dry_run=True,
     ).execute()
     # And the tests are failing
-    assert stream.finished.results.has_errors
-    after = stream.find(events.AfterExecution)
-    assert (
+    stream.assert_errors()
+    expected = (
         "Failed to generate test cases from examples for this API operation because of some header examples are invalid"
-        in str(after.result.errors[0])
     )
-    assert len(after.result.errors) == 1
+    errors = stream.find_all(events.NonFatalError)
+    assert len(errors) == 1
+    assert expected in str(errors[0].info)
 
 
 @pytest.mark.operations("success")
@@ -904,10 +897,11 @@ def test_connection_error(ctx):
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # And the tests are failing
-    assert stream.finished.results.has_errors
-    after = stream.find(events.AfterExecution)
-    assert "Max retries exceeded with url" in str(after.result.errors[0])
-    assert len(after.result.errors) == 1
+    stream.assert_errors()
+    expected = "Max retries exceeded with url"
+    errors = stream.find_all(events.NonFatalError)
+    assert len(errors) == 2
+    assert expected in str(errors[0].info)
 
 
 @pytest.mark.operations("reserved")
@@ -918,10 +912,10 @@ def test_reserved_characters_in_operation_name(real_app_schema):
         assert response.status_code == 200
 
     # When there is `:` in the API operation path
-    finished = execute(real_app_schema, checks=(check,))
+    stream = execute(real_app_schema, checks=(check,))
     # Then it should be reachable
-    assert not finished.results.has_errors
-    assert not finished.results.has_failures
+    stream.assert_no_errors()
+    assert Status.FAILURE not in stream.finished.outcome_statistic
 
 
 def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
@@ -967,8 +961,8 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     assert after.status == Status.SUCCESS
     # And there should be requested amount of test examples
     assert len(after.result.checks) == max_examples
-    assert not stream.finished.results.has_failures
-    assert not stream.finished.results.has_errors
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 def test_encoding_octet_stream(ctx, openapi3_base_url):
@@ -1001,17 +995,15 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
     ).execute()
     # Then the test outcomes should not contain errors
     # And it should not lead to encoding errors
-    after = stream.find(events.AfterExecution)
-    assert after.status == Status.SUCCESS
-    assert not stream.finished.results.has_failures
-    assert not stream.finished.results.has_errors
+    stream.assert_after_execution_status(Status.SUCCESS)
+    assert Status.FAILURE not in stream.finished.outcome_statistic
+    stream.assert_no_errors()
 
 
 def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
     stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     assert stream.started.operations_count == 4
-    assert stream.finished.results.passed_count == 4
     for event, expected in zip(stream.find_all(events.AfterExecution), ["Query.getBooks", "Query.getAuthors"]):
         assert event.result.label == expected
         for check in event.result.checks:
@@ -1037,8 +1029,9 @@ def test_interrupted_outside_test(mocker, openapi3_schema):
     # When an interrupt happens outside a test body
     mocker.patch("schemathesis.runner.events.AfterExecution.__init__", side_effect=KeyboardInterrupt)
 
+    stream = EventStream(openapi3_schema).execute()
     try:
-        interrupted = EventStream(openapi3_schema).execute().find(events.Interrupted)
+        interrupted = stream.find(events.Interrupted)
         # Then the `Interrupted` event should be emitted
         assert interrupted is not None
     except KeyboardInterrupt:
@@ -1080,6 +1073,8 @@ def test_stop_event_stream_after_second_event(event_stream):
     next(event_stream)
     next(event_stream)
     event_stream.stop()
+    next(event_stream)
+    next(event_stream)
     assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
 
@@ -1104,13 +1099,9 @@ def test_malformed_path_template(ctx, path, expected):
     schema = schemathesis.openapi.from_dict(schema)
     # Then it should not cause a fatal error
     stream = EventStream(schema).execute()
-    after = stream.find(events.AfterExecution)
-    assert after.status == Status.ERROR
+    stream.assert_after_execution_status(Status.ERROR)
     # And should produce the proper error message
-    assert (
-        str(after.result.errors[0])
-        == f"schemathesis.core.errors.InvalidSchema: Malformed path template: `{path}`\n\n  {expected}"
-    )
+    assert str(stream.find(events.NonFatalError).value) == f"Malformed path template: `{path}`\n\n  {expected}"
 
 
 @pytest.fixture
@@ -1173,8 +1164,8 @@ def test_explicit_header_negative(ctx, parameters, expected):
     ).execute()
 
     # There should not be unsatisfiable
-    assert stream.finished.results.errored_count == 0
-    assert stream.find(events.AfterExecution).status == expected
+    stream.assert_no_errors()
+    stream.assert_after_execution_status(expected)
 
 
 def test_skip_non_negated_headers(ctx):
@@ -1197,8 +1188,8 @@ def test_skip_non_negated_headers(ctx):
         hypothesis_settings=hypothesis.settings(max_examples=1),
     ).execute()
     # There should not be unsatisfiable
-    assert stream.finished.results.errored_count == 0
-    assert stream.find(events.AfterExecution).status == Status.SKIP
+    stream.assert_no_errors()
+    stream.assert_after_execution_status(Status.SKIP)
 
 
 STATEFUL_KWARGS = {

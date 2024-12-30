@@ -14,18 +14,18 @@ API probing: ERROR
 POST /test E                                                              [100%]
 
 ==================================== ERRORS ====================================
-__________________________________ POST /test __________________________________
-Serialization not possible
-
-Schemathesis can't serialize data to any of the defined media types: text/csv, application/x-json-smile 
-You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
-See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
 _______________________________ API Probe errors _______________________________
 Network Error
 
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
+__________________________________ POST /test __________________________________
+Serialization not possible
+
+Schemathesis can't serialize data to any of the defined media types: text/csv, application/x-json-smile 
+You can register your own serializer with `schemathesis.serializer` and Schemathesis will be able to make API calls with this media type. 
+See https://schemathesis.readthedocs.io/en/stable/how.html#payload-serialization for more information.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -33,4 +33,4 @@ Need more help?
 
 No checks were performed.
 
-============================== 1 errored in 1.00s ==============================
+============================== 2 errored in 1.00s ==============================

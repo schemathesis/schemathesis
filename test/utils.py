@@ -16,8 +16,8 @@ from schemathesis import Case
 from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
-from schemathesis.runner import from_schema
-from schemathesis.runner.events import EngineEvent, EngineFinished, Initialized
+from schemathesis.runner import Status, from_schema
+from schemathesis.runner.events import AfterExecution, EngineEvent, EngineFinished, Initialized, NonFatalError
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -170,6 +170,15 @@ class EventStream:
             if isinstance(e, ty)
             and all(v(getattr(e, k)) if callable(v) else getattr(e, k) == v for k, v in attrs.items())
         ]
+
+    def assert_errors(self):
+        assert self.find(NonFatalError) is not None
+
+    def assert_no_errors(self):
+        assert self.find(NonFatalError) is None
+
+    def assert_after_execution_status(self, status: Status) -> None:
+        assert self.find(AfterExecution).status == status
 
     @property
     def started(self) -> Initialized | None:

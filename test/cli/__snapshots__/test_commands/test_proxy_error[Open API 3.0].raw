@@ -14,13 +14,13 @@ API probing: ERROR
 GET /api/success E                                                        [100%]
 
 ==================================== ERRORS ====================================
-_______________________________ GET /api/success _______________________________
+_______________________________ API Probe errors _______________________________
 Network Error
 
 Connection failed
 
     Unable to connect to proxy
-_______________________________ API Probe errors _______________________________
+_______________________________ GET /api/success _______________________________
 Network Error
 
 Connection failed
@@ -33,4 +33,4 @@ Need more help?
 
 No checks were performed.
 
-============================== 1 errored in 1.00s ==============================
+============================== 2 errored in 1.00s ==============================
