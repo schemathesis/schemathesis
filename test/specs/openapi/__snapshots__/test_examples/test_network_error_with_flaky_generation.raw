@@ -14,13 +14,13 @@ API probing: ERROR
 POST /success E                                                           [100%]
 
 ==================================== ERRORS ====================================
-________________________________ POST /success _________________________________
+_______________________________ API Probe errors _______________________________
 Network Error
 
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
-_______________________________ API Probe errors _______________________________
+________________________________ POST /success _________________________________
 Network Error
 
 Connection failed
@@ -33,4 +33,4 @@ Need more help?
 
 No checks were performed.
 
-============================== 1 errored in 1.00s ==============================
+============================== 2 errored in 1.00s ==============================

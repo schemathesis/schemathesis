@@ -12,7 +12,6 @@ from hypothesis.stateful import Rule
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
-from schemathesis.core.result import Err, Ok
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
@@ -78,7 +77,7 @@ def execute_state_machine_loop(
                 phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, is_final=build_ctx.is_final
             )
             self._scenario_id = scenario_started.id
-            event_queue.put(Ok(scenario_started))
+            event_queue.put(scenario_started)
             self._execution_graph = check_ctx.execution_graph
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
@@ -102,13 +101,10 @@ def execute_state_machine_loop(
             # The idea is to stop the execution as soon as possible
             if engine.control.is_stopped:
                 raise KeyboardInterrupt
-            event_queue.put(
-                Ok(
-                    events.StepStarted(
-                        phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, scenario_id=self._scenario_id
-                    )
-                )
+            step_started = events.StepStarted(
+                phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, scenario_id=self._scenario_id
             )
+            event_queue.put(step_started)
             try:
                 if config.execution.dry_run:
                     return None
@@ -153,18 +149,17 @@ def execute_state_machine_loop(
                 else:
                     transition_id = None
                 event_queue.put(
-                    Ok(
-                        events.StepFinished(
-                            phase=PhaseName.STATEFUL_TESTING,
-                            suite_id=suite_id,
-                            scenario_id=self._scenario_id,
-                            status=ctx.current_step_status,
-                            transition_id=transition_id,
-                            target=case.operation.label,
-                            case=case,
-                            response=ctx.current_response,
-                            checks=ctx.checks_for_step,
-                        )
+                    events.StepFinished(
+                        id=step_started.id,
+                        suite_id=suite_id,
+                        scenario_id=self._scenario_id,
+                        phase=PhaseName.STATEFUL_TESTING,
+                        status=ctx.current_step_status,
+                        transition_id=transition_id,
+                        target=case.operation.label,
+                        case=case,
+                        response=ctx.current_response,
+                        checks=ctx.checks_for_step,
                     )
                 )
                 ctx.reset_step()
@@ -188,13 +183,12 @@ def execute_state_machine_loop(
         def teardown(self) -> None:
             build_ctx = current_build_context()
             event_queue.put(
-                Ok(
-                    events.ScenarioFinished(
-                        phase=PhaseName.STATEFUL_TESTING,
-                        suite_id=suite_id,
-                        status=ctx.current_scenario_status,
-                        is_final=build_ctx.is_final,
-                    )
+                events.ScenarioFinished(
+                    id=self._scenario_id,
+                    suite_id=suite_id,
+                    phase=PhaseName.STATEFUL_TESTING,
+                    status=ctx.current_scenario_status,
+                    is_final=build_ctx.is_final,
                 )
             )
             ctx.maximize_metrics()
@@ -210,10 +204,15 @@ def execute_state_machine_loop(
         # This loop is running until no new failures are found in a single iteration
         suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
         suite_id = suite_started.id
-        event_queue.put(Ok(suite_started))
+        event_queue.put(suite_started)
         if engine.control.is_stopped:
             event_queue.put(
-                Ok(events.SuiteFinished(phase=PhaseName.STATEFUL_TESTING, status=Status.INTERRUPTED, failures=[]))
+                events.SuiteFinished(
+                    id=suite_started.id,
+                    phase=PhaseName.STATEFUL_TESTING,
+                    status=Status.INTERRUPTED,
+                    failures=ctx.failures_for_suite.copy(),
+                )
             )
             break
         suite_status = Status.SUCCESS
@@ -254,14 +253,15 @@ def execute_state_machine_loop(
                 continue
             # Any other exception is an inner error and the test run should be stopped
             suite_status = Status.ERROR
-            event_queue.put(Err(exc))
+            event_queue.put(events.NonFatalError(error=exc, phase=PhaseName.STATEFUL_TESTING, label="Stateful tests"))
             break
         finally:
             event_queue.put(
-                Ok(
-                    events.SuiteFinished(
-                        phase=PhaseName.STATEFUL_TESTING, status=suite_status, failures=ctx.failures_for_suite
-                    )
+                events.SuiteFinished(
+                    id=suite_started.id,
+                    phase=PhaseName.STATEFUL_TESTING,
+                    status=suite_status,
+                    failures=ctx.failures_for_suite.copy(),
                 )
             )
             ctx.reset()

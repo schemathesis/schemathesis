@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Generator
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
+from schemathesis.runner.errors import EngineErrorInfo
 from schemathesis.runner.models.check import Check
 from schemathesis.runner.phases import Phase, PhaseName
 
@@ -124,8 +125,8 @@ class SuiteFinished(TestEvent):
 
     __slots__ = ("id", "timestamp", "phase", "status", "failures")
 
-    def __init__(self, *, phase: PhaseName, status: Status, failures: list[Check]) -> None:
-        self.id = uuid.uuid4()
+    def __init__(self, *, id: uuid.UUID, phase: PhaseName, status: Status, failures: list[Check]) -> None:
+        self.id = id
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
@@ -174,8 +175,10 @@ class ScenarioFinished(ScenarioEvent):
 
     __slots__ = ("id", "timestamp", "phase", "suite_id", "status", "is_final")
 
-    def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, status: Status | None, is_final: bool) -> None:
-        self.id = uuid.uuid4()
+    def __init__(
+        self, *, id: uuid.UUID, phase: PhaseName, suite_id: uuid.UUID, status: Status | None, is_final: bool
+    ) -> None:
+        self.id = id
         self.timestamp = time.time()
         self.phase = phase
         self.suite_id = suite_id
@@ -267,16 +270,17 @@ class StepFinished(StepEvent):
         self,
         *,
         phase: PhaseName,
-        status: Status | None,
+        id: uuid.UUID,
         suite_id: uuid.UUID,
         scenario_id: uuid.UUID,
+        status: Status | None,
         transition_id: TransitionId | None,
         target: str,
         case: Case,
         response: Response | None,
         checks: list[Check],
     ) -> None:
-        self.id = uuid.uuid4()
+        self.id = id
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
@@ -386,7 +390,14 @@ class AfterExecution(EngineEvent):
     elapsed_time: float
     correlation_id: uuid.UUID
 
-    def __init__(self, *, status: Status, result: TestResult, elapsed_time: float, correlation_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        *,
+        status: Status,
+        result: TestResult,
+        elapsed_time: float,
+        correlation_id: uuid.UUID,
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.status = status
@@ -421,7 +432,25 @@ class Interrupted(EngineEvent):
 
 
 @dataclass
-class InternalError(EngineEvent):
+class NonFatalError(EngineEvent):
+    """Error that doesn't halt execution but should be reported."""
+
+    info: EngineErrorInfo
+    value: Exception
+    phase: PhaseName
+    label: str
+
+    def __init__(self, *, error: Exception, phase: PhaseName, label: str) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.info = EngineErrorInfo(error=error)
+        self.value = error
+        self.phase = phase
+        self.label = label
+
+
+@dataclass
+class FatalError(EngineEvent):
     """Internal error in the engine."""
 
     exception: Exception
@@ -448,14 +477,16 @@ class EngineFinished(EngineEvent):
     is_terminal = True
     results: TestResultSet
     running_time: float
+    outcome_statistic: dict[Status, int]
 
-    __slots__ = ("id", "timestamp", "results", "running_time")
+    __slots__ = ("id", "timestamp", "results", "running_time", "outcome_statistic")
 
-    def __init__(self, *, results: TestResultSet, running_time: float) -> None:
+    def __init__(self, *, results: TestResultSet, running_time: float, outcome_statistic: dict[Status, int]) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.results = results
         self.running_time = running_time
+        self.outcome_statistic = outcome_statistic
 
     def _asdict(self) -> dict[str, Any]:
         return {

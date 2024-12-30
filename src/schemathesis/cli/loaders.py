@@ -67,7 +67,7 @@ def detect_loader(schema_or_location: str | dict[str, Any], module: Any) -> Call
         if file_exists(schema_or_location):
             return module.from_path  # type: ignore
         return module.from_url  # type: ignore
-    return module.from_dict  # type: ignore
+    raise NotImplementedError
 
 
 def _try_load_schema(config: AutodetectConfig, first_module: Any, second_module: Any) -> BaseSchema:

@@ -51,7 +51,8 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             from ...specs.openapi.formats import HEADER_FORMAT, header_values
 
             formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
-        if result.outcome == ProbeOutcome.ERROR:
+        if result.error is not None:
+            yield events.NonFatalError(error=result.error, phase=phase.name, label="API Probe errors")
             status = Status.ERROR
         else:
             status = Status.SUCCESS
