@@ -42,12 +42,12 @@ from schemathesis.runner.errors import (
     UnsupportedRecursiveReference,
     deduplicate_errors,
 )
+from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...context import EngineContext
 from ...models.check import Check
-from ...models.outcome import TestResult
 from ...models.transport import Request
 
 if TYPE_CHECKING:
@@ -196,8 +196,11 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     test_elapsed_time = time.monotonic() - test_start_time
     ctx.add_result(result)
     for status_code in (401, 403):
-        if has_too_many_responses_with_status(result, status_code):
-            ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code))
+        if has_too_many_responses_with_status(result.checks, status_code):
+            yield events.Warning(
+                phase=PhaseName.UNIT_TESTING,
+                message=TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code),
+            )
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
     yield events.AfterExecution(
@@ -214,11 +217,11 @@ TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
 TOO_MANY_RESPONSES_THRESHOLD = 0.9
 
 
-def has_too_many_responses_with_status(result: TestResult, status_code: int) -> bool:
+def has_too_many_responses_with_status(checks: list[Check], status_code: int) -> bool:
     # It is faster than creating an intermediate list
     unauthorized_count = 0
     total = 0
-    for check in result.checks:
+    for check in checks:
         if check.response.status_code == status_code:
             unauthorized_count += 1
         total += 1

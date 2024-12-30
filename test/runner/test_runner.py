@@ -24,7 +24,7 @@ from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.generation.overrides import Override
 from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.models import Check, TestResult
+from schemathesis.runner.models import Check
 from schemathesis.runner.phases.stateful import StatefulTestingPayload
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.specs.openapi.checks import (
@@ -1008,8 +1008,6 @@ def test_graphql(graphql_url):
         assert event.result.label == expected
         for check in event.result.checks:
             assert check.case.operation.label == expected
-        else:
-            assert event.result.label == expected
 
 
 @pytest.mark.operations("success")
@@ -1104,33 +1102,26 @@ def test_malformed_path_template(ctx, path, expected):
     assert str(stream.find(events.NonFatalError).value) == f"Malformed path template: `{path}`\n\n  {expected}"
 
 
-@pytest.fixture
-def result():
-    return TestResult(label="POST /users/")
-
-
 def make_check(status_code):
     response = requests.Response()
     response.status_code = status_code
     return Check(name="not_a_server_error", status=Status.SUCCESS, request=None, response=response, case=None)
 
 
-def test_authorization_warning_no_checks(result):
+def test_authorization_warning_no_checks():
     # When there are no checks
     # Then the warning should not be added
-    assert not has_too_many_responses_with_status(result, 401)
+    assert not has_too_many_responses_with_status([], 401)
 
 
-def test_authorization_warning_missing_threshold(result):
+def test_authorization_warning_missing_threshold():
     # When there are not enough 401 responses to meet the threshold
-    result.checks.extend(
-        [
-            make_check(201),
-            make_check(401),
-        ]
-    )
+    checks = [
+        make_check(201),
+        make_check(401),
+    ]
     # Then the warning should not be added
-    assert not has_too_many_responses_with_status(result, 401)
+    assert not has_too_many_responses_with_status(checks, 401)
 
 
 @pytest.mark.parametrize(

@@ -40,8 +40,6 @@ Performed checks:
     failed                                N / N passed          FAILED 
     unsupported_method                    N / N passed          FAILED 
 
-WARNING: All API responses have a 404 status code. Did you specify the proper API location?
-
 Experimental Features:
   - Coverage phase: Generate covering test cases
     Feedback: https://github.com/schemathesis/schemathesis/discussions/2418

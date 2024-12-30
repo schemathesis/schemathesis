@@ -13,7 +13,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
-from schemathesis.runner.models import TestResult
+from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases.unit._executor import validate_response
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (

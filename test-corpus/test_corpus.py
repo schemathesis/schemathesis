@@ -190,7 +190,7 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
             raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.AfterExecution):
         failures = [check for check in event.result.checks if check.status == Status.FAILURE]
-        assert not failures, event.result.label
+        assert not failures
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
     if isinstance(event, events.FatalError):
