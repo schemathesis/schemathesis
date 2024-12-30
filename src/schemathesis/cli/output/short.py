@@ -15,7 +15,7 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
 def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
     ctx.operations_processed += 1
     if event.result.checks:
-        ctx.checks.append((event.result.label, event.result.checks))
+        ctx.statistic.record_checks(event.result.label, event.result.checks)
     default.display_execution_result(ctx, event.status)
 
 
