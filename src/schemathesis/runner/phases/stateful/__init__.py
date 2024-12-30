@@ -6,17 +6,14 @@ import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.runner import Status
+from schemathesis.runner import Status, events
 from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases import PhaseName
-
-from ... import events
 
 if TYPE_CHECKING:
     from schemathesis.runner.phases import Phase
 
     from ...context import EngineContext
-    from ...events import EventGenerator
 
 EVENT_QUEUE_TIMEOUT = 0.01
 
@@ -29,13 +26,12 @@ class StatefulTestingPayload:
 
     def asdict(self) -> dict[str, Any]:
         return {
-            "result": self.result.asdict(),
             "transitions": self.transitions,
             "elapsed_time": self.elapsed_time,
         }
 
 
-def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
+def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.runner.phases.stateful._executor import execute_state_machine_loop
 
     result = TestResult(label="Stateful tests")
@@ -74,9 +70,8 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
                 ):
                     status = event.status
                 elif isinstance(event, events.StepFinished):
-                    result.checks.extend(event.checks)
                     if event.response is not None and event.status is not None:
-                        result.store_requests_response(
+                        result.record(
                             status=event.status,
                             case=event.case,
                             response=event.response,
@@ -96,7 +91,6 @@ def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
         thread.join()
 
     engine.record_item(status)
-    engine.add_result(result)
     yield events.PhaseFinished(
         phase=phase,
         status=status,

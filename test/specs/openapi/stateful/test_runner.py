@@ -32,8 +32,8 @@ class RunnerResult:
 
     @property
     def failures(self):
-        events_ = (event for event in self.test_events if isinstance(event, events.SuiteFinished))
-        return [failure for event in events_ for failure in event.failures]
+        event = next(event for event in self.events if isinstance(event, events.PhaseFinished))
+        return [check for check in event.payload.result.checks if check.status == Status.FAILURE]
 
     @property
     def errors(self):
@@ -261,8 +261,9 @@ def test_failure_hidden_behind_another_failure(runner_factory):
     failures = []
     for event in runner:
         if isinstance(event, events.SuiteFinished):
-            failures.extend(event.failures)
             suite_number += 1
+        if isinstance(event, events.PhaseFinished):
+            failures.extend([check for check in event.payload.result.checks if check.status == Status.FAILURE])
     assert len(failures) == 2
     assert {check.failure.title for check in failures} == {"Response violates schema", "Server error"}
 
@@ -325,10 +326,8 @@ def test_flaky(runner_factory, kwargs):
         checks=[flaky_check],
         **kwargs,
     )
-    failures = []
-    for event in runner:
-        if isinstance(event, events.SuiteFinished):
-            failures.extend(event.failures)
+    result = collect_result(runner)
+    failures = result.failures
     assert len(failures) == 1
     assert failures[0].failure.message == "Flaky"
 
@@ -394,10 +393,8 @@ def test_max_response_time_invalid(runner_factory):
         checks=[max_response_time],
         checks_config={max_response_time: MaxResponseTimeConfig(0.005)},
     )
-    failures = []
-    for event in runner:
-        if isinstance(event, events.SuiteFinished):
-            failures.extend(event.failures)
+    result = collect_result(runner)
+    failures = result.failures
     # Failures on different API operations
     assert len(failures) == 2
     assert failures[0].failure.message.startswith("Actual")

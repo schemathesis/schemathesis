@@ -36,17 +36,19 @@ class JunitXMLHandler(EventHandler):
                     assert isinstance(event.payload, StatefulTestingPayload)
                     result = event.payload.result
                     elapsed_time = event.payload.elapsed_time
+                    skip_reason = None
                 else:
                     return
             else:
                 result = event.result
                 elapsed_time = event.elapsed_time
+                skip_reason = event.skip_reason
             test_case = self.get_or_create_test_case(result.label)
             test_case.elapsed_sec += elapsed_time
             if event.status == Status.FAILURE:
                 _add_failure(test_case, result.checks, ctx)
             elif event.status == Status.SKIP:
-                test_case.add_skipped_info(output=result.skip_reason)
+                test_case.add_skipped_info(output=skip_reason)
         elif isinstance(event, events.NonFatalError):
             test_case = self.get_or_create_test_case(event.label)
             test_case.add_error_info(output=event.info.format())
