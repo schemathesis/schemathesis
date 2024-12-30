@@ -23,7 +23,6 @@ class ShortOutputStyleHandler(EventHandler):
         Otherwise, identical to the default output style.
         """
         from schemathesis.runner.phases import PhaseName
-        from schemathesis.runner.phases.probes import ProbingPayload
         from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
         if isinstance(event, events.Initialized):
@@ -36,13 +35,14 @@ class ShortOutputStyleHandler(EventHandler):
                 default.on_stateful_testing_started(ctx)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
-                assert isinstance(event.payload, ProbingPayload) or event.payload is None
-                default.on_probing_finished(ctx, event.status, event.payload)
+                default.on_probing_finished(ctx, event.status)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
                 default.on_stateful_testing_finished(ctx, event.payload)
         elif isinstance(event, events.NonFatalError):
             ctx.errors.append(event)
+        elif isinstance(event, events.Warning):
+            ctx.warnings.append(event.message)
         elif isinstance(event, events.BeforeExecution):
             on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):

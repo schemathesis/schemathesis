@@ -14,17 +14,16 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_except
 from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.runner import Status
 from schemathesis.runner.models import group_failures_by_code_sample
+from schemathesis.runner.models.check import Check
 
 from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
-from ...runner.models import TestResult
 from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext
 from ..handlers import EventHandler
 
 if TYPE_CHECKING:
-    from schemathesis.runner.phases.probes import ProbingPayload
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
 SPINNER_REPETITION_NUMBER = 10
@@ -43,10 +42,6 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
     click.secho(message, **kwargs)
-
-
-def display_subsection(result: TestResult, color: str | None = "red") -> None:
-    display_section_name(result.label, "_", fg=color)
 
 
 def get_percentage(position: int, length: int) -> str:
@@ -149,7 +144,7 @@ def display_failures(ctx: ExecutionContext, event: events.EngineFinished) -> Non
     for result in ctx.results:
         if not any(check.status == Status.FAILURE for check in result.checks):
             continue
-        display_failures_for_single_test(ctx, result)
+        display_failures_for_single_test(ctx, result.label, result.checks)
 
 
 if IO_ENCODING != "utf-8":
@@ -175,10 +170,10 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
     return _style(content.replace("Reproduce with", bold("Reproduce with")))
 
 
-def display_failures_for_single_test(ctx: ExecutionContext, result: TestResult) -> None:
+def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: list[Check]) -> None:
     """Display a failure for a single method / path."""
-    display_subsection(result)
-    for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(result.checks), 1):
+    display_section_name(label, "_", fg="red")
+    for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(checks), 1):
         # Make server errors appear first in the list of checks
         checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
 
@@ -198,11 +193,10 @@ def display_failures_for_single_test(ctx: ExecutionContext, result: TestResult) 
 
 
 def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> None:
-    """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
     output: dict[str, dict[str | Status, int]] = {}
-    for item in event.results.results:
+    for item in event.results:
         for check in item.checks:
             output.setdefault(check.name, Counter())
             output[check.name][check.status] += 1
@@ -228,16 +222,10 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
         category = click.style("JUnit XML file", bold=True)
         click.secho(f"{category}: {ctx.junit_xml_file}")
 
-    if event.results.warnings:
-        click.echo()
-        if len(event.results.warnings) == 1:
-            title = click.style("WARNING:", bold=True, fg="yellow")
-            warning = click.style(event.results.warnings[0], fg="yellow")
-            click.secho(f"{title} {warning}")
-        else:
-            click.secho("WARNINGS:", bold=True, fg="yellow")
-            for warning in event.results.warnings:
-                click.secho(f"  - {warning}", fg="yellow")
+    if ctx.warnings:
+        click.secho("\nWARNINGS:", bold=True, fg="yellow")
+        for warning in ctx.warnings:
+            click.secho(f"  - {warning}", fg="yellow")
 
     if len(GLOBAL_EXPERIMENTS.enabled) > 0:
         click.secho("\nExperimental Features:", bold=True)
@@ -375,8 +363,7 @@ def on_probing_started() -> None:
     click.secho("API probing: ...\r", bold=True, nl=False)
 
 
-def on_probing_finished(ctx: ExecutionContext, status: Status, payload: ProbingPayload | None) -> None:
-    ctx.probes = payload.data if payload else None
+def on_probing_finished(ctx: ExecutionContext, status: Status) -> None:
     click.secho(f"API probing: {status.name}\n\n", bold=True, nl=False)
 
 
@@ -487,7 +474,6 @@ class DefaultOutputStyleHandler(EventHandler):
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         """Choose and execute a proper handler for the given event."""
         from schemathesis.runner.phases import PhaseName
-        from schemathesis.runner.phases.probes import ProbingPayload
         from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
         if isinstance(event, events.Initialized):
@@ -499,8 +485,7 @@ class DefaultOutputStyleHandler(EventHandler):
                 on_stateful_testing_started(ctx)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
-                assert isinstance(event.payload, ProbingPayload) or event.payload is None
-                on_probing_finished(ctx, event.status, event.payload)
+                on_probing_finished(ctx, event.status)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
                 on_stateful_testing_finished(ctx, event.payload)
@@ -508,6 +493,8 @@ class DefaultOutputStyleHandler(EventHandler):
                     click.echo()
         elif isinstance(event, events.NonFatalError):
             ctx.errors.append(event)
+        elif isinstance(event, events.Warning):
+            ctx.warnings.append(event.message)
         elif isinstance(event, events.BeforeExecution):
             on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):

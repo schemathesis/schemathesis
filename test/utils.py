@@ -1,11 +1,9 @@
 from __future__ import annotations
 
 import os
-import platform
 from functools import lru_cache, wraps
 from typing import Any, Callable, TypeVar
 
-import click
 import pytest
 import requests
 import urllib3
@@ -94,17 +92,6 @@ def assert_requests_call(case: Case):
     with pytest.raises((requests.exceptions.ConnectionError, urllib3.exceptions.NewConnectionError)):
         # On Windows it may take time to get the connection error, hence we set a timeout
         case.call(base_url="http://127.0.0.1:1", timeout=0.001)
-
-
-def strip_style_win32(styled_output: str) -> str:
-    """Strip text style on Windows.
-
-    `click.style` produces ANSI sequences, however they were not supported
-    by PowerShell until recently and colored output is created differently.
-    """
-    if platform.system() == "Windows":
-        return click.unstyle(styled_output)
-    return styled_output
 
 
 def flaky(*, max_runs: int, min_passes: int):

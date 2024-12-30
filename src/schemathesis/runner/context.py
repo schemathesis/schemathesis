@@ -8,10 +8,10 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.runner import Status
+from schemathesis.runner.models.outcome import TestResult
 from schemathesis.stateful.graph import ExecutionGraph
 
 from .control import ExecutionControl
-from .models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
     import threading
@@ -22,45 +22,26 @@ if TYPE_CHECKING:
 
     from . import events
     from .config import EngineConfig
-    from .phases import PhaseName
-
-
-class PhaseStorage:
-    """Manages storage of phase-specific data."""
-
-    def __init__(self) -> None:
-        self._storage: dict[PhaseName, object] = {}
-
-    def store(self, phase: PhaseName, data: object) -> None:
-        """Store phase-specific data."""
-        self._storage[phase] = data
-
-    def get(self, phase: PhaseName) -> object:
-        if phase not in self._storage:
-            return None
-        return self._storage[phase]
 
 
 @dataclass
 class EngineContext:
     """Holds context shared for a test run."""
 
-    data: TestResultSet
+    data: list[TestResult]
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
     config: EngineConfig
-    phase_data: PhaseStorage
     start_time: float
     outcome_statistic: dict[Status, int]
 
     def __init__(
         self, *, stop_event: threading.Event, config: EngineConfig, session: requests.Session | None = None
     ) -> None:
-        self.data = TestResultSet()
+        self.data = []
         self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
         self.outcome_cache = {}
         self.config = config
-        self.phase_data = PhaseStorage()
         self.start_time = time.monotonic()
         self.execution_graph = ExecutionGraph()
         self.outcome_statistic = {}
@@ -85,26 +66,8 @@ class EngineContext:
         """Process event and update execution state."""
         return self.control.on_event(event)
 
-    @property
-    def has_all_not_found(self) -> bool:
-        """Check if all responses are 404."""
-        has_not_found = False
-        for entry in self.data.results:
-            for check in entry.checks:
-                if check.response.status_code == 404:
-                    has_not_found = True
-                else:
-                    # There are non-404 responses, no reason to check any other response
-                    return False
-        # Only happens if all responses are 404, or there are no responses at all.
-        # In the first case, it returns True, for the latter - False
-        return has_not_found
-
     def add_result(self, result: TestResult) -> None:
         self.data.append(result)
-
-    def add_warning(self, message: str) -> None:
-        self.data.add_warning(message)
 
     def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
         self.outcome_cache[hash(case)] = outcome
@@ -154,6 +117,3 @@ class EngineContext:
             transport_kwargs=self.transport_kwargs,
             execution_graph=self.execution_graph,
         )
-
-
-ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"

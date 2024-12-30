@@ -35,8 +35,6 @@ Performed checks:
     not_a_server_error                          1 / 1 passed          PASSED 
     positive_data_acceptance                    0 / 1 passed          FAILED 
 
-WARNING: All API responses have a 404 status code. Did you specify the proper API location?
-
 Experimental Features:
   - Positive Data Acceptance: Verifying schema-conformant data is accepted
     Feedback: https://github.com/schemathesis/schemathesis/discussions/2499

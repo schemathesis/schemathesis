@@ -44,7 +44,8 @@ Performed checks:
     ensure_resource_availability                    N / N passed          PASSED 
     ignored_auth                                    N / N passed          PASSED 
 
-WARNING: Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
+WARNINGS:
+  - Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

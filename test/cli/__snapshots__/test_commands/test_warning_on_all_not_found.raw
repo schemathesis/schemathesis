@@ -1,0 +1,22 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api/v4
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 2
+Collected API links: 0
+API probing: SUCCESS
+
+GET /api/v4/failure .                                                     [ 50%]
+GET /api/v4/success .                                                     [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    N / N passed          PASSED 
+
+============================== in 1.00s ========================================

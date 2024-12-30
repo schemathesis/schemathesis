@@ -15,11 +15,10 @@ from schemathesis.runner.phases import Phase, PhaseName
 if TYPE_CHECKING:
     from schemathesis.core import Specification
     from schemathesis.runner import Status
-    from schemathesis.runner.phases.probes import ProbingPayload
+    from schemathesis.runner.models.outcome import TestResult
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
     from ..schemas import BaseSchema
-    from .models import TestResult, TestResultSet
 
 EventGenerator = Generator["EngineEvent", None, None]
 
@@ -71,13 +70,11 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: ProbingPayload | StatefulTestingPayload | None
+    payload: StatefulTestingPayload | None
 
     __slots__ = ("id", "timestamp", "phase", "status", "payload")
 
-    def __init__(
-        self, *, phase: Phase, status: Status, payload: ProbingPayload | StatefulTestingPayload | None
-    ) -> None:
+    def __init__(self, *, phase: Phase, status: Status, payload: StatefulTestingPayload | None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
@@ -450,6 +447,26 @@ class NonFatalError(EngineEvent):
 
 
 @dataclass
+class Warning(EngineEvent):
+    """Warning about API behavior that might indicate incorrect Schemathesis configuration.
+
+    For example, too many 401 responses might suggest missing authentication.
+    """
+
+    message: str
+    phase: PhaseName | None
+
+    def __init__(self, *, phase: PhaseName | None, message: str) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+        self.phase = phase
+        self.message = message
+
+    def _asdict(self) -> dict[str, Any]:
+        return {"phase": self.phase.name if self.phase is not None else None, "message": self.message}
+
+
+@dataclass
 class FatalError(EngineEvent):
     """Internal error in the engine."""
 
@@ -475,13 +492,13 @@ class EngineFinished(EngineEvent):
     """
 
     is_terminal = True
-    results: TestResultSet
+    results: list[TestResult]
     running_time: float
     outcome_statistic: dict[Status, int]
 
     __slots__ = ("id", "timestamp", "results", "running_time", "outcome_statistic")
 
-    def __init__(self, *, results: TestResultSet, running_time: float, outcome_statistic: dict[Status, int]) -> None:
+    def __init__(self, *, results: list[TestResult], running_time: float, outcome_statistic: dict[Status, int]) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.results = results
@@ -490,6 +507,6 @@ class EngineFinished(EngineEvent):
 
     def _asdict(self) -> dict[str, Any]:
         return {
-            "results": self.results.asdict(),
+            "results": [result.asdict() for result in self.results],
             "running_time": self.running_time,
         }
