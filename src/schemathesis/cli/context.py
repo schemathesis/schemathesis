@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import shutil
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
 from schemathesis.core.output import OutputConfig
+from schemathesis.runner import Status
 from schemathesis.runner.events import NonFatalError
 from schemathesis.runner.models.check import Check
 
@@ -14,6 +16,33 @@ if TYPE_CHECKING:
     import hypothesis
 
     from ..stateful.sink import StateMachineSink
+
+
+@dataclass
+class Statistic:
+    """Running statistics about test execution."""
+
+    totals: dict[str, dict[str, int]]  # Per-check statistics
+    failures: list[tuple[str, list[Check]]]
+
+    __slots__ = ("totals", "failures")
+
+    def __init__(self) -> None:
+        self.totals = {}
+        self.failures = []
+
+    def record_checks(self, label: str, checks: list[Check]) -> None:
+        """Update statistics and store failures from a new batch of checks."""
+        # Update totals incrementally
+        for check in checks:
+            self.totals.setdefault(check.name, Counter())
+            self.totals[check.name][check.status] += 1
+            self.totals[check.name]["total"] += 1
+
+        # Store only failures
+        failed_checks = [check for check in checks if check.status == Status.FAILURE]
+        if failed_checks:
+            self.failures.append((label, failed_checks))
 
 
 @dataclass
@@ -30,7 +59,7 @@ class ExecutionContext:
     seed: int | None = None
     current_line_length: int = 0
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
-    checks: list[tuple[str, list[Check]]] = field(default_factory=list)
+    statistic: Statistic = field(default_factory=Statistic)
     errors: list[NonFatalError] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     cassette_path: str | None = None

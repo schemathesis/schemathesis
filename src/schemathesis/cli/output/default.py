@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import shutil
-from collections import Counter
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, cast
 
@@ -139,13 +138,11 @@ DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-ve
 
 def display_failures(ctx: ExecutionContext) -> None:
     """Display all failures in the test run."""
-    if not any(check.status == Status.FAILURE for _, checks in ctx.checks for check in checks):
+    if not ctx.statistic.failures:
         return
     display_section_name("FAILURES")
-    for label, checks in ctx.checks:
-        if not any(check.status == Status.FAILURE for check in checks):
-            continue
-        display_failures_for_single_test(ctx, label, checks)
+    for label, failures in ctx.statistic.failures:
+        display_failures_for_single_test(ctx, label, failures)
 
 
 if IO_ENCODING != "utf-8":
@@ -196,13 +193,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
 def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> None:
     display_section_name("SUMMARY")
     click.echo()
-    output: dict[str, dict[str | Status, int]] = {}
-    for _, checks in ctx.checks:
-        for check in checks:
-            output.setdefault(check.name, Counter())
-            output[check.name][check.status] += 1
-            output[check.name]["total"] += 1
-    total = {key: dict(value) for key, value in output.items()}
+    total = {key: dict(value) for key, value in ctx.statistic.totals.items()}
 
     if ctx.state_machine_sink is not None:
         click.echo(ctx.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
@@ -382,7 +373,7 @@ def on_stateful_testing_finished(ctx: ExecutionContext, payload: StatefulTesting
         return
 
     if payload.result.checks:
-        ctx.checks.append((payload.result.label, payload.result.checks))
+        ctx.statistic.record_checks(payload.result.label, payload.result.checks)
 
     # Merge execution data from sink into the complete transition table
     sink = ctx.state_machine_sink
@@ -421,7 +412,7 @@ def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> N
     """Display the execution result + current progress at the same line with the method / path names."""
     ctx.operations_processed += 1
     if event.result.checks:
-        ctx.checks.append((event.result.label, event.result.checks))
+        ctx.statistic.record_checks(event.result.label, event.result.checks)
     display_execution_result(ctx, event.status)
     display_percentage(ctx, event)
 
