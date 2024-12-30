@@ -31,7 +31,7 @@ from schemathesis.specs.openapi import unregister_string_format
 from schemathesis.specs.openapi.checks import status_code_conformance
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
-from test.utils import HERE, SIMPLE_PATH, flaky, strip_style_win32
+from test.utils import HERE, SIMPLE_PATH, flaky
 
 PHASES = ", ".join(x.name for x in Phase)
 HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)
@@ -1380,15 +1380,11 @@ def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url):
 
 
 @pytest.mark.operations("basic")
-def test_warning_on_unauthorized(cli, openapi3_schema_url):
+@pytest.mark.snapshot(replace_statistic=True)
+def test_warning_on_unauthorized(cli, openapi3_schema_url, snapshot_cli):
     # When endpoint returns only 401
-    result = cli.run(openapi3_schema_url)
     # Then the output should contain a warning about it
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert (
-        "WARNING: Most of the responses from `GET /api/basic` have a 401 status code. "
-        "Did you specify proper API credentials?" in strip_style_win32(result.stdout)
-    )
+    assert cli.run(openapi3_schema_url) == snapshot_cli
 
 
 @pytest.fixture
@@ -1428,15 +1424,11 @@ def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_che
 
 
 @pytest.mark.operations("success", "failure")
-def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url):
+@pytest.mark.snapshot(replace_statistic=True)
+def test_warning_on_all_not_found(cli, openapi3_schema_url, openapi3_base_url, snapshot_cli):
     # When all endpoints return 404
-    result = cli.run(openapi3_schema_url, f"--base-url={openapi3_base_url}/v4/")
     # Then the output should contain a warning about it
-    assert result.exit_code == ExitCode.OK, result.stdout
-    assert (
-        "WARNING: All API responses have a 404 status code. "
-        "Did you specify the proper API location?" in strip_style_win32(result.stdout)
-    )
+    assert cli.run(openapi3_schema_url, f"--base-url={openapi3_base_url}/v4/") == snapshot_cli
 
 
 @pytest.mark.parametrize(

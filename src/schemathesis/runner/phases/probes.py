@@ -32,14 +32,6 @@ if TYPE_CHECKING:
     from ..events import EventGenerator
 
 
-@dataclass
-class ProbingPayload:
-    data: list[ProbeRun]
-
-    def asdict(self) -> dict[str, Any]:
-        return {"probes": [probe.serialize() for probe in self.data]}
-
-
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
     assert not ctx.config.execution.dry_run
@@ -56,8 +48,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             status = Status.ERROR
         else:
             status = Status.SUCCESS
-    ctx.phase_data.store(phase.name, probes)
-    yield events.PhaseFinished(phase=phase, status=status, payload=ProbingPayload(data=probes))
+    yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
 def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:

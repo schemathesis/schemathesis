@@ -12,8 +12,8 @@ if TYPE_CHECKING:
 
     import hypothesis
 
-    from ..runner.models import TestResult
-    from ..runner.phases.probes import ProbeRun
+    from schemathesis.runner.models.outcome import TestResult
+
     from ..stateful.sink import StateMachineSink
 
 
@@ -33,10 +33,10 @@ class ExecutionContext:
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
     results: list[TestResult] = field(default_factory=list)
     errors: list[NonFatalError] = field(default_factory=list)
+    warnings: list[str] = field(default_factory=list)
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     is_interrupted: bool = False
-    probes: list[ProbeRun] | None = None
     output_config: OutputConfig = field(default_factory=OutputConfig)
     state_machine_sink: StateMachineSink | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)

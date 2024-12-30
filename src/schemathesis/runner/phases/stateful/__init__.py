@@ -7,10 +7,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.runner import Status
+from schemathesis.runner.models.outcome import TestResult
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
-from ...models import TestResult
 
 if TYPE_CHECKING:
     from schemathesis.runner.phases import Phase

@@ -20,27 +20,6 @@ if TYPE_CHECKING:
 
 
 @dataclass(repr=False)
-class TestResultSet:
-    __test__ = False
-
-    results: list[TestResult] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-
-    def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
-
-    def asdict(self) -> dict[str, Any]:
-        return {"warnings": self.warnings}
-
-    def append(self, item: TestResult) -> None:
-        """Add a new item to the results list."""
-        self.results.append(item)
-
-    def add_warning(self, warning: str) -> None:
-        """Add a new warning to the warnings list."""
-        self.warnings.append(warning)
-
-
-@dataclass(repr=False)
 class TestResult:
     """Result of a single test."""
 
