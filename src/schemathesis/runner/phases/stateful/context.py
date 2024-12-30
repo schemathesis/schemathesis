@@ -22,8 +22,6 @@ class RunnerContext:
     seen_in_run: set[Failure] = field(default_factory=set)
     # Failures keys seen in the current suite
     seen_in_suite: set[Failure] = field(default_factory=set)
-    # Unique failures collected in the current suite
-    failures_for_suite: list[Check] = field(default_factory=list)
     # All checks executed in the current run
     checks_for_step: list[Check] = field(default_factory=list)
     # Status of the current step
@@ -78,9 +76,6 @@ class RunnerContext:
     def is_seen_in_suite(self, exc: Failure) -> bool:
         return exc in self.seen_in_suite
 
-    def add_failed_check(self, check: Check) -> None:
-        self.failures_for_suite.append(check)
-
     def collect_metric(self, case: Case, response: Response) -> None:
         self.metric_collector.store(case, response)
 
@@ -88,7 +83,6 @@ class RunnerContext:
         self.metric_collector.maximize()
 
     def reset(self) -> None:
-        self.failures_for_suite.clear()
         self.seen_in_suite.clear()
         self.reset_scenario()
         self.metric_collector.reset()

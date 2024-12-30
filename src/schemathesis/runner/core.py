@@ -81,9 +81,7 @@ class ExecutionPlan:
 
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
-        yield events.EngineFinished(
-            results=ctx.data, running_time=ctx.running_time, outcome_statistic=ctx.outcome_statistic
-        )
+        yield events.EngineFinished(running_time=ctx.running_time, outcome_statistic=ctx.outcome_statistic)
 
 
 @dataclass

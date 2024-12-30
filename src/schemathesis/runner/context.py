@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.runner import Status
-from schemathesis.runner.models.outcome import TestResult
 from schemathesis.stateful.graph import ExecutionGraph
 
 from .control import ExecutionControl
@@ -28,7 +27,6 @@ if TYPE_CHECKING:
 class EngineContext:
     """Holds context shared for a test run."""
 
-    data: list[TestResult]
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
     config: EngineConfig
@@ -38,7 +36,6 @@ class EngineContext:
     def __init__(
         self, *, stop_event: threading.Event, config: EngineConfig, session: requests.Session | None = None
     ) -> None:
-        self.data = []
         self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
         self.outcome_cache = {}
         self.config = config
@@ -65,9 +62,6 @@ class EngineContext:
     def on_event(self, event: events.EngineEvent) -> bool:
         """Process event and update execution state."""
         return self.control.on_event(event)
-
-    def add_result(self, result: TestResult) -> None:
-        self.data.append(result)
 
     def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
         self.outcome_cache[hash(case)] = outcome
