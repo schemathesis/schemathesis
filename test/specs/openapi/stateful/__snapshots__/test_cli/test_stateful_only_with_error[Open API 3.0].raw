@@ -16,13 +16,13 @@ Stateful tests
 ...
 
 ==================================== ERRORS ====================================
-________________________________ Stateful tests ________________________________
+_______________________________ API Probe errors _______________________________
 Network Error
 
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
-_______________________________ API Probe errors _______________________________
+________________________________ Stateful tests ________________________________
 Network Error
 
 Connection failed
@@ -52,4 +52,4 @@ Experimental Features:
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
-============================== 1 errored in 1.00s ==============================
+============================== 2 errored in 1.00s ==============================

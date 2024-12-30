@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+from collections import Counter
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, cast
 
@@ -17,7 +18,6 @@ from schemathesis.runner.models import group_failures_by_code_sample
 from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
-from ...runner.errors import EngineErrorInfo
 from ...runner.models import TestResult
 from ...stateful.sink import StateMachineSink
 from ..context import ExecutionContext
@@ -80,89 +80,58 @@ def display_percentage(ctx: ExecutionContext, event: events.AfterExecution) -> N
     click.echo(template.format(styled))
 
 
-def display_summary(event: events.EngineFinished) -> None:
-    message, color = get_summary_output(event)
+def display_summary(ctx: ExecutionContext, event: events.EngineFinished) -> None:
+    message, color = get_summary_output(ctx, event)
     display_section_name(message, fg=color)
 
 
-def get_summary_message_parts(event: events.EngineFinished) -> list[str]:
+def get_summary_message_parts(ctx: ExecutionContext, event: events.EngineFinished) -> list[str]:
     parts = []
-    passed = event.results.passed_count
+    passed = event.outcome_statistic.get(Status.SUCCESS)
     if passed:
         parts.append(f"{passed} passed")
-    failed = event.results.failed_count
+    failed = event.outcome_statistic.get(Status.FAILURE)
     if failed:
         parts.append(f"{failed} failed")
-    errored = event.results.errored_count
+    errored = len(ctx.errors)
     if errored:
         parts.append(f"{errored} errored")
-    skipped = event.results.skipped_count
+    skipped = event.outcome_statistic.get(Status.SKIP)
     if skipped:
         parts.append(f"{skipped} skipped")
     return parts
 
 
-def get_summary_output(event: events.EngineFinished) -> tuple[str, str]:
-    parts = get_summary_message_parts(event)
+def get_summary_output(ctx: ExecutionContext, event: events.EngineFinished) -> tuple[str, str]:
+    parts = get_summary_message_parts(ctx, event)
     if not parts:
         message = "Empty test suite"
         color = "yellow"
     else:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-        if event.results.has_failures or event.results.has_errors:
+        if Status.FAILURE in event.outcome_statistic or Status.ERROR in event.outcome_statistic:
             color = "red"
-        elif event.results.skipped_count > 0:
+        elif Status.SKIP in event.outcome_statistic:
             color = "yellow"
         else:
             color = "green"
     return message, color
 
 
-def display_errors(ctx: ExecutionContext, event: events.EngineFinished) -> None:
+def display_errors(ctx: ExecutionContext) -> None:
     """Display all errors in the test run."""
-    from ...runner.phases.probes import ProbeOutcome
-
-    probes = ctx.probes or []
-    has_probe_errors = any(probe.outcome == ProbeOutcome.ERROR for probe in probes)
-    if not event.results.has_errors and not has_probe_errors:
+    if not ctx.errors:
         return
 
     display_section_name("ERRORS")
-    if ctx.workers_num > 1:
-        # Events may come out of order when multiple workers are involved
-        # Sort them to get a stable output
-        results = sorted(ctx.results, key=lambda r: r.label)
-    else:
-        results = ctx.results
-    for result in results:
-        if not result.has_errors:
-            continue
-        display_single_error(ctx, result)
-    if event.results.errors:
-        for error in event.results.errors:
-            display_section_name(error.title or "Schema error", "_", fg="red")
-            _display_error(ctx, error)
-    if has_probe_errors:
-        display_section_name("API Probe errors", "_", fg="red")
-        for probe in probes:
-            if probe.error is not None:
-                error = EngineErrorInfo(probe.error)
-                _display_error(ctx, error)
+    errors = sorted(ctx.errors, key=lambda r: (r.phase.value, r.label))
+    for error in errors:
+        display_section_name(error.label, "_", fg="red")
+        click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
     click.secho(
         f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}",
         fg="red",
     )
-
-
-def display_single_error(ctx: ExecutionContext, result: TestResult) -> None:
-    display_subsection(result)
-    first = True
-    for error in result.errors:
-        if first:
-            first = False
-        else:
-            click.echo()
-        _display_error(ctx, error)
 
 
 def bold(option: str) -> str:
@@ -172,20 +141,13 @@ def bold(option: str) -> str:
 DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
 
 
-def _display_error(ctx: ExecutionContext, error: EngineErrorInfo) -> None:
-    click.echo(error.format(bold=lambda x: click.style(x, bold=True)))
-
-
 def display_failures(ctx: ExecutionContext, event: events.EngineFinished) -> None:
     """Display all failures in the test run."""
-    if not event.results.has_failures:
-        return
-    relevant_results = [result for result in ctx.results if not result.is_errored]
-    if not relevant_results:
+    if Status.FAILURE not in event.outcome_statistic:
         return
     display_section_name("FAILURES")
-    for result in relevant_results:
-        if not result.has_failures:
+    for result in ctx.results:
+        if not any(check.status == Status.FAILURE for check in result.checks):
             continue
         display_failures_for_single_test(ctx, result)
 
@@ -239,11 +201,18 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
     """Format and print statistic collected by :obj:`models.TestResult`."""
     display_section_name("SUMMARY")
     click.echo()
-    total = event.results.total
+    output: dict[str, dict[str | Status, int]] = {}
+    for item in event.results.results:
+        for check in item.checks:
+            output.setdefault(check.name, Counter())
+            output[check.name][check.status] += 1
+            output[check.name]["total"] += 1
+    total = {key: dict(value) for key, value in output.items()}
+
     if ctx.state_machine_sink is not None:
         click.echo(ctx.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
         click.echo()
-    if event.results.is_empty or not total:
+    if not event.outcome_statistic or not total:
         click.secho("No checks were performed.", bold=True)
 
     if total:
@@ -281,7 +250,7 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
             "Please visit the provided URL(s) to share your thoughts."
         )
 
-    if event.results.failed_count > 0:
+    if Status.FAILURE in event.outcome_statistic:
         click.echo(
             f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
             "from failure messages with server logs for debugging."
@@ -337,7 +306,7 @@ LOADER_ERROR_SUGGESTIONS = {
 }
 
 
-def should_skip_suggestion(ctx: ExecutionContext, event: events.InternalError) -> bool:
+def should_skip_suggestion(ctx: ExecutionContext, event: events.FatalError) -> bool:
     return (
         isinstance(event.exception, LoaderError)
         and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
@@ -361,7 +330,7 @@ def _maybe_display_tip(suggestion: str | None) -> None:
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 
 
-def display_internal_error(ctx: ExecutionContext, event: events.InternalError) -> None:
+def display_internal_error(ctx: ExecutionContext, event: events.FatalError) -> None:
     if isinstance(event.exception, LoaderError):
         title = "Schema Loading Error"
         message = event.exception.message
@@ -469,14 +438,14 @@ def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> N
 def on_engine_finished(ctx: ExecutionContext, event: events.EngineFinished) -> None:
     """Show the outcome of the whole testing session."""
     click.echo()
-    display_errors(ctx, event)
+    display_errors(ctx)
     display_failures(ctx, event)
     display_statistic(ctx, event)
     if ctx.summary_lines:
         click.echo()
         _print_lines(ctx.summary_lines)
     click.echo()
-    display_summary(event)
+    display_summary(ctx, event)
 
 
 def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
@@ -498,7 +467,7 @@ def _handle_interrupted(ctx: ExecutionContext) -> None:
     display_section_name("KeyboardInterrupt", "!", bold=False)
 
 
-def on_internal_error(ctx: ExecutionContext, event: events.InternalError) -> None:
+def on_internal_error(ctx: ExecutionContext, event: events.FatalError) -> None:
     display_internal_error(ctx, event)
     raise click.Abort
 
@@ -515,37 +484,40 @@ def on_stateful_test_event(ctx: ExecutionContext, event: events.TestEvent) -> No
 
 
 class DefaultOutputStyleHandler(EventHandler):
-    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         """Choose and execute a proper handler for the given event."""
         from schemathesis.runner.phases import PhaseName
         from schemathesis.runner.phases.probes import ProbingPayload
         from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
         if isinstance(event, events.Initialized):
-            on_initialized(context, event)
+            on_initialized(ctx, event)
         elif isinstance(event, events.PhaseStarted):
             if event.phase.name == PhaseName.PROBING:
                 on_probing_started()
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
-                on_stateful_testing_started(context)
+                on_stateful_testing_started(ctx)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
                 assert isinstance(event.payload, ProbingPayload) or event.payload is None
-                on_probing_finished(context, event.status, event.payload)
+                on_probing_finished(ctx, event.status, event.payload)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
-                on_stateful_testing_finished(context, event.payload)
-                if not context.is_interrupted:
+                on_stateful_testing_finished(ctx, event.payload)
+                if not ctx.is_interrupted:
                     click.echo()
+        elif isinstance(event, events.NonFatalError):
+            ctx.errors.append(event)
         elif isinstance(event, events.BeforeExecution):
-            on_before_execution(context, event)
+            on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):
-            on_after_execution(context, event)
+            on_after_execution(ctx, event)
         elif isinstance(event, events.EngineFinished):
-            on_engine_finished(context, event)
+            on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
-            on_interrupted(context, event)
-        elif isinstance(event, events.InternalError):
-            on_internal_error(context, event)
-        elif isinstance(event, events.TestEvent) and event.phase == PhaseName.STATEFUL_TESTING:
-            on_stateful_test_event(context, event)
+            on_interrupted(ctx, event)
+        elif isinstance(event, events.FatalError):
+            on_internal_error(ctx, event)
+        elif isinstance(event, events.TestEvent):
+            if event.phase == PhaseName.STATEFUL_TESTING:
+                on_stateful_test_event(ctx, event)

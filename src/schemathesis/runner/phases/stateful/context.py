@@ -88,7 +88,7 @@ class RunnerContext:
         self.metric_collector.maximize()
 
     def reset(self) -> None:
-        self.failures_for_suite = []
+        self.failures_for_suite.clear()
         self.seen_in_suite.clear()
         self.reset_scenario()
         self.metric_collector.reset()

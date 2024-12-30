@@ -7,10 +7,10 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.runner import Status
 from schemathesis.stateful.graph import ExecutionGraph
 
 from .control import ExecutionControl
-from .errors import EngineErrorInfo
 from .models import TestResult, TestResultSet
 
 if TYPE_CHECKING:
@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
     import requests
 
-    from schemathesis.core.errors import InvalidSchema
     from schemathesis.generation.case import Case
 
     from . import events
@@ -52,17 +51,19 @@ class EngineContext:
     config: EngineConfig
     phase_data: PhaseStorage
     start_time: float
+    outcome_statistic: dict[Status, int]
 
     def __init__(
         self, *, stop_event: threading.Event, config: EngineConfig, session: requests.Session | None = None
     ) -> None:
-        self.data = TestResultSet(seed=config.execution.seed)
+        self.data = TestResultSet()
         self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
         self.outcome_cache = {}
         self.config = config
         self.phase_data = PhaseStorage()
         self.start_time = time.monotonic()
         self.execution_graph = ExecutionGraph()
+        self.outcome_statistic = {}
         self._session = session
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -75,6 +76,10 @@ class EngineContext:
     def is_stopped(self) -> bool:
         """Check if execution should stop."""
         return self.control.is_stopped
+
+    def record_item(self, status: Status) -> None:
+        value = self.outcome_statistic.setdefault(status, 0)
+        self.outcome_statistic[status] = value + 1
 
     def on_event(self, event: events.EngineEvent) -> bool:
         """Process event and update execution state."""
@@ -97,9 +102,6 @@ class EngineContext:
 
     def add_result(self, result: TestResult) -> None:
         self.data.append(result)
-
-    def add_error(self, error: InvalidSchema) -> None:
-        self.data.errors.append(EngineErrorInfo(error, title=error.full_path))
 
     def add_warning(self, message: str) -> None:
         self.data.add_warning(message)

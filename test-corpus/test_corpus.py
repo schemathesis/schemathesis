@@ -19,7 +19,6 @@ from schemathesis.core.result import Ok
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 from schemathesis.runner import Status, events, from_schema
-from schemathesis.runner.errors import EngineErrorInfo
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -186,57 +185,54 @@ def assert_invalid_schema(exc: LoaderError) -> NoReturn:
 
 
 def assert_event(schema_id: str, event: events.EngineEvent) -> None:
+    if isinstance(event, events.NonFatalError):
+        if not should_ignore_error(schema_id, event):
+            raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.AfterExecution):
-        assert not event.result.has_failures, event.result.label
         failures = [check for check in event.result.checks if check.status == Status.FAILURE]
         assert not failures, event.result.label
-        check_no_errors(schema_id, event)
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
-    if isinstance(event, events.InternalError):
+    if isinstance(event, events.FatalError):
         raise AssertionError(f"Internal Error: {format_exception(event.exception, with_traceback=True)}")
 
 
-def check_no_errors(schema_id: str, event: events.AfterExecution) -> None:
-    if event.result.has_errors:
-        assert event.result.errors, event.result.label
-        for error in event.result.errors:
-            if should_ignore_error(schema_id, error, event):
-                continue
-            raise AssertionError(f"{event.result.label}: {error.traceback}")
-    else:
-        assert not event.result.errors, event.result.label
-
-
-def should_ignore_error(schema_id: str, error: EngineErrorInfo, event: events.AfterExecution) -> bool:
+def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
+    formatted = event.info.format()
     if (
         schema_id == "launchdarkly.com/3.10.0.json" or schema_id == "launchdarkly.com/5.3.0.json"
-    ) and "'<' not supported between instances" in str(error):
+    ) and "'<' not supported between instances" in formatted:
         return True
     if (
-        "is not a 'regex'" in str(error)
-        or "Invalid regular expression" in str(error)
-        or "Invalid `pattern` value: expected a string" in str(error)
+        "is not a 'regex'" in formatted
+        or "Invalid regular expression" in formatted
+        or "Invalid `pattern` value: expected a string" in formatted
     ):
         return True
-    if "Failed to generate test cases for this API operation" in str(error):
+    if "Failed to generate test cases for this API operation" in formatted:
         return True
-    if "Failed to generate test cases from examples for this API operation" in str(error):
+    if "Failed to generate test cases from examples for this API operation" in formatted:
         return True
-    if "FailedHealthCheck" in str(error):
+    if "FailedHealthCheck" in formatted:
         return True
-    if "Schemathesis can't serialize data" in str(error):
+    if "Schemathesis can't serialize data" in formatted:
         return True
-    if "Malformed media type" in str(error):
+    if "Malformed media type" in formatted:
         return True
-    if "Path parameter" in str(error) and str(error).endswith("is not defined"):
+    if "Path parameter" in formatted and formatted.endswith("is not defined"):
         return True
-    if "Malformed path template" in str(error):
+    if "Malformed path template" in formatted:
         return True
-    if "Unresolvable JSON pointer in the schema" in str(error):
+    if "Unresolvable JSON pointer" in formatted:
         return True
-    if RECURSIVE_REFERENCE_ERROR_MESSAGE in str(error):
+    if "No progress can be made from" in formatted:
         return True
-    if (schema_id, event.result.label) in KNOWN_ISSUES:
+    if "Ensure that the definition complies with the OpenAPI specification" in formatted:
+        return True
+    if "Invalid Open API link definition" in formatted:
+        return True
+    if RECURSIVE_REFERENCE_ERROR_MESSAGE in formatted:
+        return True
+    if (schema_id, event.label) in KNOWN_ISSUES:
         return True
     return False

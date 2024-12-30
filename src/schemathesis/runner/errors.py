@@ -60,16 +60,11 @@ class EngineErrorInfo:
     It serves as a caching wrapper around exceptions to avoid repeated computations.
     """
 
-    def __init__(self, error: Exception, *, title: str | None = None) -> None:
+    def __init__(self, error: Exception) -> None:
         self._error = error
-        self._title = title
 
     def __str__(self) -> str:
         return self._error_repr
-
-    @property
-    def error(self) -> Exception:
-        return self._error
 
     def asdict(self) -> dict[str, Any]:
         return {
@@ -89,8 +84,6 @@ class EngineErrorInfo:
     @property
     def title(self) -> str:
         """A general error description."""
-        if self._title is not None:
-            return self._title
         import requests
 
         if isinstance(self._error, requests.RequestException):

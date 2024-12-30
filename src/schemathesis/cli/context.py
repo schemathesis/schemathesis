@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
 from schemathesis.core.output import OutputConfig
+from schemathesis.runner.events import NonFatalError
 
 if TYPE_CHECKING:
     import os
@@ -31,6 +32,7 @@ class ExecutionContext:
     current_line_length: int = 0
     terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
     results: list[TestResult] = field(default_factory=list)
+    errors: list[NonFatalError] = field(default_factory=list)
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     is_interrupted: bool = False

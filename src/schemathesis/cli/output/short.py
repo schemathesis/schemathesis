@@ -17,7 +17,7 @@ def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> N
 
 
 class ShortOutputStyleHandler(EventHandler):
-    def handle_event(self, context: ExecutionContext, event: events.EngineEvent) -> None:
+    def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         """Short output style shows single symbols in the progress bar.
 
         Otherwise, identical to the default output style.
@@ -27,31 +27,34 @@ class ShortOutputStyleHandler(EventHandler):
         from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
         if isinstance(event, events.Initialized):
-            default.on_initialized(context, event)
+            default.on_initialized(ctx, event)
         elif isinstance(event, events.PhaseStarted):
             if event.phase.name == PhaseName.PROBING:
                 default.on_probing_started()
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 click.echo()
-                default.on_stateful_testing_started(context)
+                default.on_stateful_testing_started(ctx)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
                 assert isinstance(event.payload, ProbingPayload) or event.payload is None
-                default.on_probing_finished(context, event.status, event.payload)
+                default.on_probing_finished(ctx, event.status, event.payload)
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 assert isinstance(event.payload, StatefulTestingPayload) or event.payload is None
-                default.on_stateful_testing_finished(context, event.payload)
+                default.on_stateful_testing_finished(ctx, event.payload)
+        elif isinstance(event, events.NonFatalError):
+            ctx.errors.append(event)
         elif isinstance(event, events.BeforeExecution):
-            on_before_execution(context, event)
+            on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):
-            on_after_execution(context, event)
+            on_after_execution(ctx, event)
         elif isinstance(event, events.EngineFinished):
-            if context.operations_count == context.operations_processed:
+            if ctx.operations_count == ctx.operations_processed:
                 click.echo()
-            default.on_engine_finished(context, event)
+            default.on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
-            default.on_interrupted(context, event)
-        elif isinstance(event, events.InternalError):
-            default.on_internal_error(context, event)
-        elif isinstance(event, events.TestEvent) and event.phase == PhaseName.STATEFUL_TESTING:
-            default.on_stateful_test_event(context, event)
+            default.on_interrupted(ctx, event)
+        elif isinstance(event, events.FatalError):
+            default.on_internal_error(ctx, event)
+        elif isinstance(event, events.TestEvent):
+            if event.phase == PhaseName.STATEFUL_TESTING:
+                default.on_stateful_test_event(ctx, event)

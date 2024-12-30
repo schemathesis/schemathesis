@@ -11,7 +11,6 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
@@ -32,73 +31,54 @@ if TYPE_CHECKING:
 WORKER_TIMEOUT = 0.1
 
 
-def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
-    """Run a set of unit tests."""
-    if ctx.config.execution.workers_num > 1:
-        yield from multi_threaded(ctx, phase)
-    else:
-        yield from single_threaded(ctx, phase)
-
-
-def single_threaded(ctx: EngineContext, phase: Phase) -> EventGenerator:
-    from schemathesis.generation.hypothesis.builder import get_all_tests
-
-    from ._executor import run_test, test_func
-
-    for result in get_all_tests(
-        schema=ctx.config.schema,
-        test_func=test_func,
-        settings=ctx.config.execution.hypothesis_settings,
-        generation_config=ctx.config.execution.generation_config,
-        seed=ctx.config.execution.seed,
-        as_strategy_kwargs=lambda op: get_strategy_kwargs(ctx, op),
-    ):
-        if isinstance(result, Ok):
-            operation, test_function = result.ok()
-            correlation_id = None
-            try:
-                for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
-                    yield event
-                    ctx.on_event(event)
-                    if isinstance(event, events.BeforeExecution):
-                        correlation_id = event.correlation_id
-                    if isinstance(event, events.Interrupted) or ctx.is_stopped:
-                        return
-            except InvalidSchema as error:
-                yield from on_schema_error(exc=error, ctx=ctx, correlation_id=correlation_id)
-        else:
-            yield from on_schema_error(exc=result.err(), ctx=ctx)
-    yield PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)
-
-
-def multi_threaded(ctx: EngineContext, phase: Phase) -> EventGenerator:
-    """Execute tests in multiple threads.
+def execute(engine: EngineContext, phase: Phase) -> EventGenerator:
+    """Run a set of unit tests.
 
     Implemented as a producer-consumer pattern via a task queue.
     The main thread provides an iterator over API operations and worker threads create test functions and run them.
     """
-    producer = TaskProducer(ctx)
-    workers_num = ctx.config.execution.workers_num
+    producer = TaskProducer(engine)
+    workers_num = engine.config.execution.workers_num
 
-    with WorkerPool(workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=ctx) as pool:
+    suite_started = events.SuiteStarted(phase=phase.name)
+
+    yield suite_started
+
+    status = Status.SUCCESS
+
+    failures = []
+
+    with WorkerPool(workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine) as pool:
         try:
             while True:
                 try:
                     event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
-                    if ctx.is_stopped:
+                    if engine.is_stopped:
                         break
                     yield event
-                    ctx.on_event(event)
-                    if ctx.is_stopped:
+                    engine.on_event(event)
+                    if isinstance(event, events.AfterExecution):
+                        failures.extend(event.result.checks)
+                        engine.record_item(event.status)
+                        if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
+                            Status.FAILURE,
+                            Status.ERROR,
+                            Status.INTERRUPTED,
+                        ):
+                            status = event.status
+                    if engine.is_stopped:
                         return  # type: ignore[unreachable]
                 except queue.Empty:
                     if all(not worker.is_alive() for worker in pool.workers):
                         break
                     continue
-            yield PhaseFinished(phase=phase, status=Status.SUCCESS, payload=None)
         except KeyboardInterrupt:
-            ctx.control.stop()
+            engine.control.stop()
             yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
+
+    # NOTE: Right now there is just one suite, hence two events go one after another
+    yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status, failures=failures)
+    yield PhaseFinished(phase=phase, status=status, payload=None)
 
 
 def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
@@ -110,62 +90,58 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
 
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
     with ignore_hypothesis_output():
-        while not ctx.is_stopped:
-            result = producer.next_operation()
-            if result is None:
-                break
+        try:
+            while not ctx.is_stopped:
+                result = producer.next_operation()
+                if result is None:
+                    break
 
-            if isinstance(result, Ok):
-                operation = result.ok()
-                as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
-                test_function = create_test(
-                    operation=operation,
-                    test_func=test_func,
-                    config=HypothesisTestConfig(
-                        settings=ctx.config.execution.hypothesis_settings,
-                        seed=ctx.config.execution.seed,
-                        generation=ctx.config.execution.generation_config,
-                        as_strategy_kwargs=as_strategy_kwargs,
-                    ),
-                )
+                if isinstance(result, Ok):
+                    operation = result.ok()
+                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
+                    test_function = create_test(
+                        operation=operation,
+                        test_func=test_func,
+                        config=HypothesisTestConfig(
+                            settings=ctx.config.execution.hypothesis_settings,
+                            seed=ctx.config.execution.seed,
+                            generation=ctx.config.execution.generation_config,
+                            as_strategy_kwargs=as_strategy_kwargs,
+                        ),
+                    )
 
-                # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
-                # executing. However, as we set a stop event, it will be checked before the next network request.
-                # However, this is still suboptimal, as there could be slow requests and they will block for longer
-                for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
-                    events_queue.put(event)
-            else:
-                for event in on_schema_error(exc=result.err(), ctx=ctx):
-                    events_queue.put(event)
+                    # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
+                    # executing. However, as we set a stop event, it will be checked before the next network request.
+                    # However, this is still suboptimal, as there could be slow requests and they will block for longer
+                    for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
+                        events_queue.put(event)
+                else:
+                    error = result.err()
+                    if error.method:
+                        label = f"{error.method.upper()} {error.full_path}"
+                        test_result = TestResult(label=label)
 
+                        correlation_id = uuid.uuid4()
+                        events_queue.put(events.BeforeExecution(label=label, correlation_id=correlation_id))
 
-def on_schema_error(
-    *, exc: InvalidSchema, ctx: EngineContext, correlation_id: uuid.UUID | None = None
-) -> EventGenerator:
-    """Handle schema-related errors during test execution."""
-    if exc.method is not None:
-        assert exc.path is not None
-        assert exc.full_path is not None
+                        events_queue.put(events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=label))
 
-        method = exc.method.upper()
-        label = f"{method} {exc.full_path}"
-
-        result = TestResult(label=label)
-        result.add_error(exc)
-
-        if correlation_id is None:
-            correlation_id = uuid.uuid4()
-            yield events.BeforeExecution(label=label, correlation_id=correlation_id)
-
-        yield events.AfterExecution(
-            status=Status.ERROR,
-            result=result,
-            elapsed_time=0.0,
-            correlation_id=correlation_id,
-        )
-        ctx.add_result(result)
-    else:
-        ctx.add_error(exc)
+                        events_queue.put(
+                            events.AfterExecution(
+                                status=Status.ERROR,
+                                result=test_result,
+                                elapsed_time=0.0,
+                                correlation_id=correlation_id,
+                            )
+                        )
+                        ctx.add_result(test_result)
+                    else:
+                        assert error.full_path is not None
+                        events_queue.put(
+                            events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=error.full_path)
+                        )
+        except KeyboardInterrupt:
+            events_queue.put(events.Interrupted(phase=PhaseName.UNIT_TESTING))
 
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:

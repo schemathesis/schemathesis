@@ -67,37 +67,17 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     yield events.BeforeExecution(label=operation.label, correlation_id=correlation_id)
     errors: list[Exception] = []
     test_start_time = time.monotonic()
-    setup_hypothesis_database_key(test_function, operation)
 
-    def _on_flaky(exc: Exception) -> Status:
-        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
-            status = Status.ERROR
-            result.add_error(DeadlineExceeded.from_exc(exc.__cause__))
-        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
-            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
-        ):
-            for sub_exc in exc.exceptions:
-                if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
-                    result.add_error(DeadlineExceeded.from_exc(sub_exc))
-            status = Status.ERROR
-        elif errors:
-            status = Status.ERROR
-            result.add_errors(errors)
-        else:
-            status = Status.FAILURE
-        return status
+    def non_fatal_error(error: Exception) -> events.NonFatalError:
+        return events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=operation.label)
 
     try:
+        setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
             test_function(ctx=ctx, result=result, errors=errors)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
-        if not result.is_executed:
-            status = Status.SKIP
-            result.mark_skipped(None)
-        else:
-            status = Status.SUCCESS
-    except unittest.case.SkipTest as exc:
-        # Newer Hypothesis versions raise this exception if no tests were executed
+        status = Status.SUCCESS
+    except (SkipTest, unittest.case.SkipTest) as exc:
         status = Status.SKIP
         result.mark_skipped(exc)
     except (FailureGroup, Failure):
@@ -105,30 +85,33 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     except UnexpectedError:
         # It could be an error in user-defined extensions, network errors or internal Schemathesis errors
         status = Status.ERROR
-        result.mark_errored()
-        for error in deduplicate_errors(errors):
-            if isinstance(error, MalformedMediaType):
-                result.add_error(InvalidSchema(str(error)))
-            else:
-                result.add_error(error)
+        for idx, err in enumerate(errors):
+            if isinstance(err, MalformedMediaType):
+                errors[idx] = InvalidSchema(str(err))
     except hypothesis.errors.Flaky as exc:
-        status = _on_flaky(exc)
-    except BaseExceptionGroup:
-        if errors:
+        if isinstance(exc.__cause__, hypothesis.errors.DeadlineExceeded):
             status = Status.ERROR
-            result.add_errors(errors)
+            yield non_fatal_error(DeadlineExceeded.from_exc(exc.__cause__))
+        elif isinstance(exc, hypothesis.errors.FlakyFailure) and any(
+            isinstance(subexc, hypothesis.errors.DeadlineExceeded) for subexc in exc.exceptions
+        ):
+            for sub_exc in exc.exceptions:
+                if isinstance(sub_exc, hypothesis.errors.DeadlineExceeded):
+                    yield non_fatal_error(DeadlineExceeded.from_exc(sub_exc))
+            status = Status.ERROR
+        elif errors:
+            status = Status.ERROR
         else:
             status = Status.FAILURE
+    except BaseExceptionGroup:
+        status = Status.ERROR
     except hypothesis.errors.Unsatisfiable:
         # We need more clear error message here
         status = Status.ERROR
-        result.add_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
+        yield non_fatal_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
         yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
         return
-    except SkipTest as exc:
-        status = Status.SKIP
-        result.mark_skipped(exc)
     except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
         status = Status.ERROR
         try:
@@ -140,44 +123,45 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             try:
                 raise InternalError(msg) from exc
             except InternalError as exc:
-                error = exc
+                yield non_fatal_error(exc)
         except ValidationError as exc:
-            error = InvalidSchema.from_jsonschema_error(
-                exc,
-                path=operation.path,
-                method=operation.method,
-                full_path=operation.schema.get_full_path(operation.path),
+            yield non_fatal_error(
+                InvalidSchema.from_jsonschema_error(
+                    exc,
+                    path=operation.path,
+                    method=operation.method,
+                    full_path=operation.schema.get_full_path(operation.path),
+                )
             )
-        result.add_error(error)
     except HypothesisRefResolutionError:
         status = Status.ERROR
-        result.add_error(UnsupportedRecursiveReference())
-    except InvalidArgument as error:
+        yield non_fatal_error(UnsupportedRecursiveReference())
+    except InvalidArgument as exc:
         status = Status.ERROR
         message = get_invalid_regular_expression_message(warnings)
         if message:
             # `hypothesis-jsonschema` emits a warning on invalid regular expression syntax
-            result.add_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
+            yield non_fatal_error(InvalidRegexPattern.from_hypothesis_jsonschema_message(message))
         else:
-            result.add_error(error)
-    except hypothesis.errors.DeadlineExceeded as error:
+            yield non_fatal_error(exc)
+    except hypothesis.errors.DeadlineExceeded as exc:
         status = Status.ERROR
-        result.add_error(DeadlineExceeded.from_exc(error))
-    except JsonSchemaError as error:
+        yield non_fatal_error(DeadlineExceeded.from_exc(exc))
+    except JsonSchemaError as exc:
         status = Status.ERROR
-        result.add_error(InvalidRegexPattern.from_schema_error(error, from_examples=False))
-    except Exception as error:
+        yield non_fatal_error(InvalidRegexPattern.from_schema_error(exc, from_examples=False))
+    except Exception as exc:
         status = Status.ERROR
         # Likely a YAML parsing issue. E.g. `00:00:00.00` (without quotes) is parsed as float `0.0`
-        if str(error) == "first argument must be string or compiled pattern":
-            result.add_error(
+        if str(exc) == "first argument must be string or compiled pattern":
+            yield non_fatal_error(
                 InvalidRegexType(
                     "Invalid `pattern` value: expected a string. "
                     "If your schema is in YAML, ensure `pattern` values are quoted",
                 )
             )
         else:
-            result.add_error(error)
+            yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
         and ctx.config.execution.no_failfast
@@ -186,33 +170,36 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         status = Status.FAILURE
     if UnsatisfiableExampleMark.is_set(test_function):
         status = Status.ERROR
-        result.add_error(
+        yield non_fatal_error(
             hypothesis.errors.Unsatisfiable("Failed to generate test cases from examples for this API operation")
         )
     non_serializable = NonSerializableMark.get(test_function)
     if non_serializable is not None and status != Status.ERROR:
         status = Status.ERROR
         media_types = ", ".join(non_serializable.media_types)
-        result.add_error(
+        yield non_fatal_error(
             SerializationNotPossible(
                 "Failed to generate test cases from examples for this API operation because of"
                 f" unsupported payload media types: {media_types}\n{SERIALIZERS_SUGGESTION_MESSAGE}",
                 media_types=non_serializable.media_types,
             )
         )
+
     invalid_regex = InvalidRegexMark.get(test_function)
     if invalid_regex is not None and status != Status.ERROR:
         status = Status.ERROR
-        result.add_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
+        yield non_fatal_error(InvalidRegexPattern.from_schema_error(invalid_regex, from_examples=True))
     invalid_headers = InvalidHeadersExampleMark.get(test_function)
     if invalid_headers:
         status = Status.ERROR
-        result.add_error(InvalidHeadersExample.from_headers(invalid_headers))
+        yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
     ctx.add_result(result)
     for status_code in (401, 403):
         if has_too_many_responses_with_status(result, status_code):
             ctx.add_warning(TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code))
+    for error in deduplicate_errors(errors):
+        yield non_fatal_error(error)
     yield events.AfterExecution(
         result=result,
         status=status,
@@ -320,7 +307,6 @@ def cached_test_func(f: Callable) -> Callable:
                 elif cached is None:
                     return None
                 try:
-                    result.mark_executed()
                     f(ctx=ctx, case=case, result=result, **kwargs)
                 except BaseException as exc:
                     ctx.cache_outcome(case, exc)
@@ -328,7 +314,6 @@ def cached_test_func(f: Callable) -> Callable:
                 else:
                     ctx.cache_outcome(case, None)
             else:
-                result.mark_executed()
                 f(ctx=ctx, case=case, result=result, **kwargs)
         except (KeyboardInterrupt, Failure):
             raise

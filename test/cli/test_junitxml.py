@@ -30,7 +30,7 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
 @pytest.mark.operations("success", "failure", "unsatisfiable", "empty_string")
 def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path, server_host):
     xml_path = tmp_path / path
-    cli.run(
+    result = cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
         f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
@@ -38,6 +38,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
         "--checks=all",
         "--exclude-checks=positive_data_acceptance",
     )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     tree = ElementTree.parse(xml_path)
     # Inspect root element `testsuites`
     root = tree.getroot()
