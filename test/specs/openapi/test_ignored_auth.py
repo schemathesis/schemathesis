@@ -52,10 +52,10 @@ def test_auth_is_not_checked(with_generated, schema_url):
     assert check.status == Status.FAILURE
     assert check.name == "ignored_auth"
     if with_generated:
-        assert "Authorization" in check.request.headers
+        assert "Authorization" in check.headers
         assert check.response.json() == {"has_auth": True}
     else:
-        assert "Authorization" not in check.request.headers
+        assert "Authorization" not in check.headers
         assert check.response.json() == {"has_auth": False}
 
 

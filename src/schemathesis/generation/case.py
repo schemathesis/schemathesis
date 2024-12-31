@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Mapping
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
@@ -83,7 +83,7 @@ class Case:
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
-    def as_curl_command(self, headers: dict[str, Any] | None = None, verify: bool = True) -> str:
+    def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
         request_data = prepare_request(self, headers, self.operation.schema.output_config.sanitize)
         return curl.generate(

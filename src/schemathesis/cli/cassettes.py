@@ -30,7 +30,8 @@ if TYPE_CHECKING:
     import click
     import requests
 
-    from ..runner.models import Check, Interaction, Request
+    from schemathesis.runner.models import Check, Interaction, Request
+
     from .context import ExecutionContext
 
 # Wait until the worker terminates
