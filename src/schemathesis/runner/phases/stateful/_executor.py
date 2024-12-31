@@ -20,7 +20,7 @@ from schemathesis.generation.targets import TargetMetricCollector
 from schemathesis.runner import Status, events
 from schemathesis.runner.context import EngineContext
 from schemathesis.runner.control import ExecutionControl
-from schemathesis.runner.models import Check, Request
+from schemathesis.runner.models import Check
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.phases.stateful.context import RunnerContext
 from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine, Direction, StepResult
@@ -286,7 +286,7 @@ def validate_response(
         failed_check = Check(
             name=name,
             status=Status.FAILURE,
-            request=Request.from_prepared_request(response.request),
+            headers=response.request.headers,
             response=response,
             case=case,
             failure=failure,
@@ -301,9 +301,10 @@ def validate_response(
             Check(
                 name=name,
                 status=Status.SUCCESS,
-                request=Request.from_prepared_request(response.request),
+                headers=response.request.headers,
                 response=response,
                 case=case,
+                failure=None,
             )
         )
 

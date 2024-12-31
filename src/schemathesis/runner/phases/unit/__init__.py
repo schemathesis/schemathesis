@@ -15,7 +15,7 @@ from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.runner import Status, events
-from schemathesis.runner.models.outcome import TestResult
+from schemathesis.runner.models import TestResult
 from schemathesis.runner.phases import PhaseName
 
 from ._pool import TaskProducer, WorkerPool

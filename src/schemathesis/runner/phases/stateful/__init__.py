@@ -7,12 +7,10 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.runner import Status, events
-from schemathesis.runner.models.outcome import TestResult
-from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.models import TestResult
+from schemathesis.runner.phases import Phase, PhaseName
 
 if TYPE_CHECKING:
-    from schemathesis.runner.phases import Phase
-
     from ...context import EngineContext
 
 EVENT_QUEUE_TIMEOUT = 0.01

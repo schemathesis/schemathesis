@@ -42,13 +42,11 @@ from schemathesis.runner.errors import (
     UnsupportedRecursiveReference,
     deduplicate_errors,
 )
-from schemathesis.runner.models.outcome import TestResult
+from schemathesis.runner.models import Check, TestResult
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
 from ...context import EngineContext
-from ...models.check import Check
-from ...models.transport import Request
 
 if TYPE_CHECKING:
     import requests
@@ -262,16 +260,24 @@ def validate_response(
     no_failfast: bool,
 ) -> None:
     failures = set()
-    request = Request.from_prepared_request(response.request)
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
         collected.add(failure)
         check_results.append(
-            Check(name=name, status=Status.FAILURE, case=case, request=request, response=response, failure=failure)
+            Check(
+                name=name,
+                status=Status.FAILURE,
+                case=case,
+                headers=response.request.headers,
+                response=response,
+                failure=failure,
+            )
         )
 
     def on_success(name: str, _case: Case) -> None:
-        check_results.append(Check(name=name, status=Status.SUCCESS, request=request, response=response, case=_case))
+        check_results.append(
+            Check(name=name, status=Status.SUCCESS, headers=response.request.headers, response=response, case=_case)
+        )
 
     failures = run_checks(
         case=case,

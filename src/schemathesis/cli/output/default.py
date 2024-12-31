@@ -12,8 +12,7 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.runner import Status
-from schemathesis.runner.models import group_failures_by_code_sample
-from schemathesis.runner.models.check import Check
+from schemathesis.runner.models import Check, group_failures_by_code_sample
 from schemathesis.runner.phases import PhaseName
 
 from ... import experimental

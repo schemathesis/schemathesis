@@ -8,12 +8,11 @@ from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from schemathesis.core.failures import format_failures
 from schemathesis.runner import Status
-from schemathesis.runner.models import group_failures_by_code_sample
+from schemathesis.runner.models import Check, group_failures_by_code_sample
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
 from ..runner import events
-from ..runner.models import Check
 from .handlers import EventHandler
 
 if TYPE_CHECKING:

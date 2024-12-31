@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any, Mapping, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
@@ -81,7 +81,7 @@ def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
         raise InvalidSchema(f"Malformed path template: `{path}`\n\n  {exc}") from exc
 
 
-def prepare_request(case: Case, headers: dict[str, Any] | None, sanitize: bool) -> PreparedRequest:
+def prepare_request(case: Case, headers: Mapping[str, Any] | None, sanitize: bool) -> PreparedRequest:
     import requests
 
     from schemathesis.transport.requests import REQUESTS_TRANSPORT

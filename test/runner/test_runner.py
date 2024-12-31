@@ -24,7 +24,7 @@ from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.generation.overrides import Override
 from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.models import Check
+from schemathesis.runner.models import Check, Request
 from schemathesis.runner.phases.stateful import StatefulTestingPayload
 from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.specs.openapi.checks import (
@@ -1105,7 +1105,7 @@ def test_malformed_path_template(ctx, path, expected):
 def make_check(status_code):
     response = requests.Response()
     response.status_code = status_code
-    return Check(name="not_a_server_error", status=Status.SUCCESS, request=None, response=response, case=None)
+    return Check(name="not_a_server_error", status=Status.SUCCESS, headers={}, response=response, case=None)
 
 
 def test_authorization_warning_no_checks():
@@ -1231,7 +1231,7 @@ def test_stateful_seed(real_app_schema):
             events.PhaseFinished, payload=lambda p: isinstance(p, StatefulTestingPayload)
         ).payload.result.interactions
         for interaction in interactions:
-            data = interaction.request.__dict__
+            data = {key: getattr(interaction.request, key) for key in Request.__slots__}
             del data["headers"][SCHEMATHESIS_TEST_CASE_HEADER]
             current.append(data)
         requests.append(current)

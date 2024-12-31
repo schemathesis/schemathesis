@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Generator
 from schemathesis.core.output import OutputConfig
 from schemathesis.runner import Status
 from schemathesis.runner.events import NonFatalError
-from schemathesis.runner.models.check import Check
+from schemathesis.runner.models import Check
 
 if TYPE_CHECKING:
     import os
