@@ -9,13 +9,12 @@ from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.runner.errors import EngineErrorInfo
-from schemathesis.runner.models.check import Check
+from schemathesis.runner.models import Check, TestResult
 from schemathesis.runner.phases import Phase, PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
     from schemathesis.runner import Status
-    from schemathesis.runner.models.outcome import TestResult
     from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
     from ..schemas import BaseSchema
