@@ -19,10 +19,9 @@ from schemathesis.runner.events import AfterExecution
 from schemathesis.specs.openapi.checks import (
     AuthKind,
     _contains_auth,
-    _remove_auth_from_case,
     ignored_auth,
+    remove_auth,
 )
-from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream
 
@@ -48,15 +47,19 @@ def test_auth_is_not_checked(with_generated, schema_url):
     # And endpoint declares auth as a requirement but doesn't actually require it
     event = run(schema_url, **kwargs)
     # Then it is a failure
-    check = event.result.checks[-1]
+    recorder = event.recorder
+    case = list(recorder.cases.values())[-1].value
+    check = recorder.checks[case.id][-1]
     assert check.status == Status.FAILURE
     assert check.name == "ignored_auth"
+    headers = recorder.cases[case.id].value.headers or {}
+    response = recorder.interactions[case.id].response
     if with_generated:
-        assert "Authorization" in check.headers
-        assert check.response.json() == {"has_auth": True}
+        assert "Authorization" in headers
+        assert response.json() == {"has_auth": True}
     else:
-        assert "Authorization" not in check.headers
-        assert check.response.json() == {"has_auth": False}
+        assert "Authorization" not in headers
+        assert response.json() == {"has_auth": False}
 
 
 @pytest.mark.operations("basic")
@@ -123,7 +126,6 @@ def test_keep_tls_verification(schema_url, mocker):
                 headers=None,
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
@@ -136,7 +138,6 @@ def test_keep_tls_verification(schema_url, mocker):
                 headers={"Foo": "Bar"},
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
@@ -149,40 +150,31 @@ def test_keep_tls_verification(schema_url, mocker):
                 headers={"A": "V"},
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "A", "in": "header"}],
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-            ),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-            ),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-            ),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-            ),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
@@ -194,7 +186,6 @@ def test_keep_tls_verification(schema_url, mocker):
                 headers={"Cookie": "A=v;"},
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
@@ -207,16 +198,13 @@ def test_keep_tls_verification(schema_url, mocker):
                 headers={"Cookie": "B=v;"},
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(
-                override=None, auth=None, headers={}, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-            ),
+            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,
@@ -240,7 +228,7 @@ def test_contains_auth(ctx, request_kwargs, parameters, expected):
 def test_remove_auth_from_case(schema_url, key, parameters):
     schema = schemathesis.openapi.from_url(schema_url)
     case = schema["/success"]["GET"].Case(**{key: {"A": "V"}})
-    _remove_auth_from_case(case, parameters)
+    case = remove_auth(case, parameters)
     assert not getattr(case, key)
 
 

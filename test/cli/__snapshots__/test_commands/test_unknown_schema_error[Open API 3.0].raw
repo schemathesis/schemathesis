@@ -21,7 +21,7 @@ Something bad happen
 
     Traceback (most recent call last):
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
-        f(ctx=ctx, case=case, result=result, **kwargs)
+        f(ctx=ctx, case=case, recorder=recorder)
       File "/package-root/runner/phases/unit/_executor.py", line XXX, in test_func
         targets.run(ctx.config.execution.targets, case=case, response=response)
       File "/package-root/generation/targets.py", line XXX, in run

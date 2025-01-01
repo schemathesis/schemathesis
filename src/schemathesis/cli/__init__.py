@@ -1041,6 +1041,7 @@ def execute(
     event = None
     try:
         for event in event_stream:
+            execution_context.on_event(event)
             for handler in handlers:
                 try:
                     handler.handle_event(execution_context, event)
@@ -1057,11 +1058,9 @@ def execute(
     finally:
         shutdown()
     if event is not None and event.is_terminal:
-        if execution_context.errors:
+        if execution_context.errors or Status.FAILURE in execution_context.statistic.outcomes:
             sys.exit(1)
-        else:
-            exit_code = get_exit_code(event)
-            sys.exit(exit_code)
+        sys.exit(0)
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)
@@ -1113,16 +1112,6 @@ def display_handler_error(handler: EventHandler, exc: Exception) -> None:
         click.echo(
             f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
         )
-
-
-def get_exit_code(event: events.EngineEvent) -> int:
-    if isinstance(event, events.EngineFinished):
-        if Status.FAILURE in event.outcome_statistic:
-            return 1
-        return 0
-    # Practically not possible. May occur only if the output handler is broken - in this case we still will have the
-    # right exit code.
-    return 1
 
 
 @schemathesis.command(short_help="Replay requests from a saved cassette.")

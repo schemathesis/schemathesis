@@ -6,11 +6,9 @@ from typing import TYPE_CHECKING
 
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
+from schemathesis.cli.context import GroupedFailures
 from schemathesis.core.failures import format_failures
 from schemathesis.runner import Status
-from schemathesis.runner.models import Check, group_failures_by_code_sample
-from schemathesis.runner.phases import PhaseName
-from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
 from ..runner import events
 from .handlers import EventHandler
@@ -27,27 +25,14 @@ class JunitXMLHandler(EventHandler):
     test_cases: dict = field(default_factory=dict)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
-        # TODO: store cases on each step
-        if isinstance(event, (events.AfterExecution, events.PhaseFinished)):
-            if isinstance(event, events.PhaseFinished):
-                if event.phase.name == PhaseName.STATEFUL_TESTING and event.status != Status.SKIP:
-                    # TODO: Skipped event - looks inconsistent with AfterExecution
-                    assert isinstance(event.payload, StatefulTestingPayload)
-                    result = event.payload.result
-                    elapsed_time = event.payload.elapsed_time
-                    skip_reason = None
-                else:
-                    return
-            else:
-                result = event.result
-                elapsed_time = event.elapsed_time
-                skip_reason = event.skip_reason
-            test_case = self.get_or_create_test_case(result.label)
-            test_case.elapsed_sec += elapsed_time
+        if isinstance(event, (events.AfterExecution, events.ScenarioFinished)):
+            label = event.recorder.label
+            test_case = self.get_or_create_test_case(label)
+            test_case.elapsed_sec += event.elapsed_time
             if event.status == Status.FAILURE:
-                _add_failure(test_case, result.checks, ctx)
+                add_failure(test_case, ctx.statistic.failures[label], ctx)
             elif event.status == Status.SKIP:
-                test_case.add_skipped_info(output=skip_reason)
+                test_case.add_skipped_info(output=event.skip_reason)
         elif isinstance(event, events.NonFatalError):
             test_case = self.get_or_create_test_case(event.label)
             test_case.add_error_info(output=event.info.format())
@@ -61,20 +46,15 @@ class JunitXMLHandler(EventHandler):
         return self.test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
 
 
-def _add_failure(test_case: TestCase, checks: list[Check], context: ExecutionContext) -> None:
-    messages = []
-    for idx, (code, group) in enumerate(group_failures_by_code_sample(checks), 1):
-        checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-        messages.append(build_failure_message(context, idx, code, checks))
+def add_failure(test_case: TestCase, checks: list[GroupedFailures], context: ExecutionContext) -> None:
+    messages = [
+        format_failures(
+            case_id=f"{idx}. Test Case ID: {group.case_id}",
+            response=group.response,
+            failures=group.failures,
+            curl=group.code_sample,
+            config=context.output_config,
+        )
+        for idx, group in enumerate(checks, 1)
+    ]
     test_case.add_failure_info(message="\n\n".join(messages))
-
-
-def build_failure_message(context: ExecutionContext, idx: int, code_sample: str, checks: list[Check]) -> str:
-    check = checks[0]
-    return format_failures(
-        case_id=f"{idx}. Test Case ID: {check.case.id}",
-        response=check.response,
-        failures=[check.failure for check in checks if check.failure is not None],
-        curl=code_sample,
-        config=context.output_config,
-    )

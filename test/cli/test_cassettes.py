@@ -26,7 +26,7 @@ from schemathesis.cli.cassettes import (
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.generation import GenerationMode
-from schemathesis.runner.models import Request
+from schemathesis.runner.recorder import Request
 
 
 @pytest.fixture
@@ -91,43 +91,29 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
                 assert interaction["phase"]["data"]["parameter_location"] is not None
 
 
-@pytest.mark.operations("success", "upload_file")
-def test_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
-    hypothesis_max_examples = hypothesis_max_examples or 2
-    result = cli.run(
-        schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples}",
-        "--experimental=coverage-phase",
-        "--hypothesis-seed=1",
-        "--dry-run",
-    )
-    assert result.exit_code == ExitCode.OK, result.stdout
-    cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["status"] == "SKIP"
-    assert cassette["seed"] == 1
-    assert cassette["http_interactions"][0]["phase"]["name"] in ("explicit", "coverage", "generate")
-    assert all("checks" in interaction for interaction in cassette["http_interactions"])
-    assert cassette["http_interactions"][0]["response"] is None
-    assert len(cassette["http_interactions"][0]["checks"]) == 0
-    assert len(cassette["http_interactions"][1]["checks"]) == 0
-
-
+@pytest.mark.parametrize("format", ["vcr", "har"])
 @pytest.mark.operations("slow")
 @pytest.mark.openapi_version("3.0")
-def test_store_timeout(cli, schema_url, cassette_path):
+def test_store_timeout(cli, schema_url, cassette_path, format):
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
+        f"--cassette-format={format}",
         "--hypothesis-max-examples=1",
         "--request-timeout=0.001",
         "--hypothesis-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    cassette = load_cassette(cassette_path)
-    assert cassette["http_interactions"][0]["status"] == "FAILURE"
-    assert cassette["seed"] == 1
-    assert cassette["http_interactions"][0]["response"] is None
+    if format == "vcr":
+        cassette = load_cassette(cassette_path)
+        assert cassette["http_interactions"][0]["status"] == "ERROR"
+        assert cassette["seed"] == 1
+        assert cassette["http_interactions"][0]["response"] is None
+    else:
+        with cassette_path.open(encoding="utf-8") as fd:
+            data = json.load(fd)
+            assert len(data["log"]["entries"]) == 2
+            assert data["log"]["entries"][1]["response"]["bodySize"] == -1
 
 
 @pytest.mark.operations("flaky")
@@ -320,29 +306,6 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
                     assert header["value"] != auth
                 else:
                     assert header["value"] == auth
-
-
-@pytest.mark.operations("__all__")
-def test_har_format_dry_run(cli, schema_url, cassette_path, hypothesis_max_examples):
-    cassette_path = cassette_path.with_suffix(".har")
-    result = cli.run(
-        schema_url,
-        f"--cassette-path={cassette_path}",
-        "--cassette-format=har",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
-        "--checks=all",
-        "--dry-run",
-    )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    assert str(cassette_path) in result.stdout
-    assert cassette_path.exists()
-    with cassette_path.open(encoding="utf-8") as fd:
-        data = json.load(fd)
-    assert "log" in data
-    assert "entries" in data["log"]
-    assert len(data["log"]["entries"]) > 1
-    assert data["log"]["entries"][0]["response"]["status"] == 0
 
 
 def test_invalid_format():

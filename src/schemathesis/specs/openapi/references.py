@@ -7,8 +7,8 @@ from urllib.request import urlopen
 
 import jsonschema
 import requests
-from jsonschema.exceptions import RefResolutionError
 
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT

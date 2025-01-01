@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-from functools import cached_property
 from typing import TYPE_CHECKING
 
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, Severity
 
 if TYPE_CHECKING:
     from graphql.error import GraphQLFormattedError
@@ -11,6 +10,8 @@ if TYPE_CHECKING:
 
 class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
+
+    __slots__ = ("operation", "type_name", "title", "message", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -20,12 +21,15 @@ class UnexpectedGraphQLResponse(Failure):
         title: str = "Unexpected GraphQL Response",
         message: str,
         code: str = "graphql_unexpected_response",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.type_name = type_name
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -35,6 +39,8 @@ class UnexpectedGraphQLResponse(Failure):
 class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
 
+    __slots__ = ("operation", "errors", "title", "message", "code", "case_id", "_unique_key_cache", "severity")
+
     def __init__(
         self,
         *,
@@ -43,24 +49,28 @@ class GraphQLClientError(Failure):
         errors: list[GraphQLFormattedError],
         title: str = "GraphQL client error",
         code: str = "graphql_client_error",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self._unique_key_cache: str | None = None
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
-        return self._cached_unique_key
-
-    @cached_property
-    def _cached_unique_key(self) -> str:
-        return _group_graphql_errors(self.errors)
+        if self._unique_key_cache is None:
+            self._unique_key_cache = _group_graphql_errors(self.errors)
+        return self._unique_key_cache
 
 
 class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
+
+    __slots__ = ("operation", "errors", "title", "message", "code", "case_id", "_unique_key_cache", "severity")
 
     def __init__(
         self,
@@ -70,20 +80,22 @@ class GraphQLServerError(Failure):
         errors: list[GraphQLFormattedError],
         title: str = "GraphQL server error",
         code: str = "graphql_server_error",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self._unique_key_cache: str | None = None
+        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
-        return self._cached_unique_key
-
-    @cached_property
-    def _cached_unique_key(self) -> str:
-        return _group_graphql_errors(self.errors)
+        if self._unique_key_cache is None:
+            self._unique_key_cache = _group_graphql_errors(self.errors)
+        return self._unique_key_cache
 
 
 def _group_graphql_errors(errors: list[GraphQLFormattedError]) -> str:

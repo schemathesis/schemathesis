@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
 from schemathesis.core.failures import (
     Failure,
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
     from schemathesis.generation.case import Case
-    from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
+    from schemathesis.runner.recorder import ScenarioRecorder
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 ChecksConfig = dict[CheckFunction, Any]
@@ -36,9 +36,9 @@ class CheckContext:
     headers: CaseInsensitiveDict | None
     config: ChecksConfig
     transport_kwargs: dict[str, Any] | None
-    execution_graph: ExecutionGraph
+    recorder: ScenarioRecorder | None
 
-    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "execution_graph")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "recorder")
 
     def __init__(
         self,
@@ -47,21 +47,36 @@ class CheckContext:
         headers: CaseInsensitiveDict | None,
         config: ChecksConfig,
         transport_kwargs: dict[str, Any] | None,
-        execution_graph: ExecutionGraph,
+        recorder: ScenarioRecorder | None = None,
     ) -> None:
         self.override = override
         self.auth = auth
         self.headers = headers
         self.config = config
         self.transport_kwargs = transport_kwargs
-        self.execution_graph = execution_graph
+        self.recorder = recorder
 
-    def find_parent(self, case: Case) -> Case | None:
-        return self.execution_graph.find_parent(case)
+    def find_parent(self, *, case_id: str) -> Case | None:
+        if self.recorder is not None:
+            return self.recorder.find_parent(case_id=case_id)
+        return None
 
-    def get_metadata(self, case: Case) -> ExecutionMetadata | None:
-        node = self.execution_graph._nodes.get(case.id)
-        return node.metadata if node else None
+    def find_related(self, *, case_id: str) -> Iterator[Case]:
+        if self.recorder is not None:
+            yield from self.recorder.find_related(case_id=case_id)
+
+    def find_response(self, *, case_id: str) -> Response | None:
+        if self.recorder is not None:
+            return self.recorder.find_response(case_id=case_id)
+        return None
+
+    def record_case(self, *, parent_id: str, case: Case) -> None:
+        if self.recorder is not None:
+            self.recorder.record_case(parent_id=parent_id, case=case)
+
+    def record_response(self, *, case_id: str, response: Response) -> None:
+        if self.recorder is not None:
+            self.recorder.record_response(case_id=case_id, response=response)
 
 
 CHECKS = Registry[CheckFunction]()

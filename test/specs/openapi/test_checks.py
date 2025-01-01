@@ -19,7 +19,6 @@ from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
 )
-from schemathesis.stateful.graph import ExecutionGraph
 
 
 @pytest.mark.parametrize(
@@ -195,7 +194,6 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
                 headers=None,
                 config={},
                 transport_kwargs=None,
-                execution_graph=ExecutionGraph(),
             ),
             response,
             case,
@@ -250,7 +248,6 @@ def test_positive_data_acceptance(
         headers=None,
         config={positive_data_acceptance: PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)},
         transport_kwargs=None,
-        execution_graph=ExecutionGraph(),
     )
 
     if should_raise:

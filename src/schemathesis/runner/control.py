@@ -22,7 +22,11 @@ class ExecutionControl:
     @property
     def is_stopped(self) -> bool:
         """Check if execution should stop."""
-        return self.stop_event.is_set() or self._is_limit_hit
+        return self.is_interrupted or self._is_limit_hit
+
+    @property
+    def is_interrupted(self) -> bool:
+        return self.stop_event.is_set()
 
     def stop(self) -> None:
         """Signal to stop execution."""

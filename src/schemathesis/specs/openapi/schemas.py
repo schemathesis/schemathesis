@@ -28,6 +28,7 @@ from packaging import version
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.core import NOT_SET, NotSet, Specification, media_types
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
 from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
@@ -67,7 +68,7 @@ if TYPE_CHECKING:
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, jsonschema.exceptions.RefResolutionError)
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError)
 
 
 @dataclass(eq=False, repr=False)
@@ -313,7 +314,7 @@ class BaseOpenAPISchema(BaseSchema):
         method: str | None = None,
     ) -> NoReturn:
         __tracebackhide__ = True
-        if isinstance(error, jsonschema.exceptions.RefResolutionError):
+        if isinstance(error, RefResolutionError):
             raise InvalidSchema.from_reference_resolution_error(
                 error, path=path, method=method, full_path=full_path
             ) from None

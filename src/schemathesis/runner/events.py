@@ -9,8 +9,8 @@ from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.runner.errors import EngineErrorInfo
-from schemathesis.runner.models import Check, TestResult
 from schemathesis.runner.phases import Phase, PhaseName
+from schemathesis.runner.recorder import ScenarioRecorder
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
@@ -163,19 +163,44 @@ class ScenarioFinished(ScenarioEvent):
     """After executing a grouped set of test steps."""
 
     status: Status | None
+    recorder: ScenarioRecorder
+    elapsed_time: float
+    skip_reason: str | None
     # Whether this is a scenario that tries to reproduce a failure
     is_final: bool
 
-    __slots__ = ("id", "timestamp", "phase", "suite_id", "status", "is_final")
+    __slots__ = (
+        "id",
+        "timestamp",
+        "phase",
+        "suite_id",
+        "status",
+        "recorder",
+        "elapsed_time",
+        "skip_reason",
+        "is_final",
+    )
 
     def __init__(
-        self, *, id: uuid.UUID, phase: PhaseName, suite_id: uuid.UUID, status: Status | None, is_final: bool
+        self,
+        *,
+        id: uuid.UUID,
+        phase: PhaseName,
+        suite_id: uuid.UUID,
+        status: Status | None,
+        recorder: ScenarioRecorder,
+        elapsed_time: float,
+        skip_reason: str | None,
+        is_final: bool,
     ) -> None:
         self.id = id
         self.timestamp = time.time()
         self.phase = phase
         self.suite_id = suite_id
         self.status = status
+        self.recorder = recorder
+        self.elapsed_time = elapsed_time
+        self.skip_reason = skip_reason
         self.is_final = is_final
 
     def _asdict(self) -> dict[str, Any]:
@@ -243,7 +268,6 @@ class StepFinished(StepEvent):
     target: str
     case: Case
     response: Response | None
-    checks: list[Check]
 
     __slots__ = (
         "id",
@@ -256,7 +280,6 @@ class StepFinished(StepEvent):
         "target",
         "case",
         "response",
-        "checks",
     )
 
     def __init__(
@@ -271,7 +294,6 @@ class StepFinished(StepEvent):
         target: str,
         case: Case,
         response: Response | None,
-        checks: list[Check],
     ) -> None:
         self.id = id
         self.timestamp = time.time()
@@ -283,7 +305,6 @@ class StepFinished(StepEvent):
         self.target = target
         self.case = case
         self.response = response
-        self.checks = checks
 
     def _asdict(self) -> dict[str, Any]:
         return {
@@ -379,24 +400,26 @@ class AfterExecution(EngineEvent):
     """Happens after each tested API operation."""
 
     status: Status
-    result: TestResult
+    recorder: ScenarioRecorder
     elapsed_time: float
     correlation_id: uuid.UUID
-    skip_reason: str | None = None
+    skip_reason: str | None
+
+    __slots__ = ("id", "timestamp", "status", "recorder", "elapsed_time", "correlation_id", "skip_reason")
 
     def __init__(
         self,
         *,
         status: Status,
-        result: TestResult,
+        recorder: ScenarioRecorder,
         elapsed_time: float,
         correlation_id: uuid.UUID,
-        skip_reason: str | None,
+        skip_reason: str | None = None,
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.status = status
-        self.result = result
+        self.recorder = recorder
         self.elapsed_time = elapsed_time
         self.correlation_id = correlation_id
         self.skip_reason = skip_reason
@@ -491,15 +514,13 @@ class EngineFinished(EngineEvent):
 
     is_terminal = True
     running_time: float
-    outcome_statistic: dict[Status, int]
 
-    __slots__ = ("id", "timestamp", "running_time", "outcome_statistic")
+    __slots__ = ("id", "timestamp", "running_time")
 
-    def __init__(self, *, running_time: float, outcome_statistic: dict[Status, int]) -> None:
+    def __init__(self, *, running_time: float) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.running_time = running_time
-        self.outcome_statistic = outcome_statistic
 
     def _asdict(self) -> dict[str, Any]:
         return {"running_time": self.running_time}

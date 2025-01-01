@@ -15,8 +15,8 @@ from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.runner import Status, events
-from schemathesis.runner.models import TestResult
 from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.recorder import ScenarioRecorder
 
 from ._pool import TaskProducer, WorkerPool
 
@@ -54,21 +54,23 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                     yield event
                     engine.on_event(event)
                     if isinstance(event, events.AfterExecution):
-                        engine.record_item(event.status)
                         if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
                             Status.FAILURE,
                             Status.ERROR,
                             Status.INTERRUPTED,
                         ):
                             status = event.status
+                    if engine.is_interrupted:
+                        status = Status.INTERRUPTED
                     if engine.is_stopped:
-                        return  # type: ignore[unreachable]
+                        break  # type: ignore[unreachable]
                 except queue.Empty:
                     if all(not worker.is_alive() for worker in pool.workers):
                         break
                     continue
         except KeyboardInterrupt:
-            engine.control.stop()
+            engine.stop()
+            status = Status.INTERRUPTED
             yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
 
     # NOTE: Right now there is just one suite, hence two events go one after another
@@ -114,8 +116,6 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     error = result.err()
                     if error.method:
                         label = f"{error.method.upper()} {error.full_path}"
-                        test_result = TestResult(label=label)
-
                         correlation_id = uuid.uuid4()
                         events_queue.put(events.BeforeExecution(label=label, correlation_id=correlation_id))
 
@@ -124,7 +124,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                         events_queue.put(
                             events.AfterExecution(
                                 status=Status.ERROR,
-                                result=test_result,
+                                recorder=ScenarioRecorder(label="Error"),
                                 elapsed_time=0.0,
                                 correlation_id=correlation_id,
                                 skip_reason=None,

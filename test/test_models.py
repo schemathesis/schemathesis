@@ -8,13 +8,12 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transforms import merge_at
 from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
-from schemathesis.runner.models import Request
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
 
@@ -389,20 +388,6 @@ def test_response_from_requests(base_url):
     assert serialized.http_version == "1.1"
     assert serialized.message == "OK"
     assert serialized.headers["set-cookie"] == ["foo=bar; Path=/", "baz=spam; Path=/"]
-
-
-@pytest.mark.parametrize(("body", "expected"), [(NOT_SET, None), (b"example", b"example")])
-def test_from_case(swagger_20, body, expected):
-    operation = APIOperation("/users/{name}", "GET", {}, swagger_20, base_url="http://127.0.0.1/api/v3")
-    case = operation.Case(
-        path_parameters={"name": "test"},
-        body=body,
-        media_type="application/octet-stream",
-    )
-    session = requests.Session()
-    request = Request.from_case(case, session)
-    assert request.body == expected
-    assert request.uri == "http://127.0.0.1/api/v3/users/test"
 
 
 @pytest.mark.parametrize(
