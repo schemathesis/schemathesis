@@ -13,7 +13,6 @@ from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
-from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
 
 if TYPE_CHECKING:
     import hypothesis
@@ -116,7 +115,6 @@ class APIStateMachine(RuleBasedStateMachine):
 
     def setup(self) -> None:
         """Hook method that runs unconditionally in the beginning of each test scenario."""
-        self._execution_graph = ExecutionGraph()
 
     def teardown(self) -> None:
         pass
@@ -124,7 +122,7 @@ class APIStateMachine(RuleBasedStateMachine):
     # To provide the return type in the rendered documentation
     teardown.__doc__ = RuleBasedStateMachine.teardown.__doc__
 
-    def transform(self, execution_graph: ExecutionGraph, result: StepResult, direction: Direction, case: Case) -> Case:
+    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
         raise NotImplementedError
 
     def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult | None:
@@ -150,15 +148,10 @@ class APIStateMachine(RuleBasedStateMachine):
         __tracebackhide__ = True
         if previous is not None:
             result, direction = previous
-            case = self.transform(self._execution_graph, result, direction, case)
+            case = self.transform(result, direction, case)
         self.before_call(case)
         kwargs = self.get_call_kwargs(case)
         response = self.call(case, **kwargs)
-        if previous is None:
-            self._execution_graph.add_node(
-                case=case,
-                metadata=ExecutionMetadata(response=response, overrides_all_parameters=False, transition_id=None),
-            )
         self.after_call(response, case)
         self.validate_response(response, case, additional_checks=[use_after_free])
         return self.store_result(response, case)

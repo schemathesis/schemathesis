@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import unittest
 import uuid
-from typing import TYPE_CHECKING, Any, Callable, Iterable
+from typing import TYPE_CHECKING, Callable, Iterable
 from warnings import WarningMessage, catch_warnings
 
 import requests
@@ -36,13 +36,13 @@ from schemathesis.generation.hypothesis.builder import (
 )
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.runner import Status
+from schemathesis.runner.dataforest import DataForest, InteractionNode
 from schemathesis.runner.errors import (
     DeadlineExceeded,
     UnexpectedError,
     UnsupportedRecursiveReference,
     deduplicate_errors,
 )
-from schemathesis.runner.models import Check, TestResult
 from schemathesis.runner.phases import PhaseName
 
 from ... import events
@@ -59,13 +59,13 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
-    result = TestResult(label=operation.label)
     # To simplify connecting `before` and `after` events in external systems
     correlation_id = uuid.uuid4()
     yield events.BeforeExecution(label=operation.label, correlation_id=correlation_id)
     errors: list[Exception] = []
     skip_reason = None
     test_start_time = time.monotonic()
+    forest = DataForest(label=operation.label)
 
     def non_fatal_error(error: Exception) -> events.NonFatalError:
         return events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=operation.label)
@@ -73,7 +73,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     try:
         setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
-            test_function(ctx=ctx, result=result, errors=errors)
+            test_function(ctx=ctx, errors=errors, forest=forest)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
@@ -164,7 +164,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     if (
         status == Status.SUCCESS
         and ctx.config.execution.no_failfast
-        and any(check.status == Status.FAILURE for check in result.checks)
+        and any(check.status == Status.FAILURE for checks in forest.checks.values() for check in checks)
     ):
         status = Status.FAILURE
     if UnsatisfiableExampleMark.is_set(test_function):
@@ -194,7 +194,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
         yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
     for status_code in (401, 403):
-        if has_too_many_responses_with_status(result.checks, status_code):
+        if has_too_many_responses_with_status(forest.interactions.values(), status_code):
             yield events.Warning(
                 phase=PhaseName.UNIT_TESTING,
                 message=TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code),
@@ -202,7 +202,7 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
     yield events.AfterExecution(
-        result=result,
+        forest=forest,
         status=status,
         elapsed_time=test_elapsed_time,
         correlation_id=correlation_id,
@@ -216,14 +216,15 @@ TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
 TOO_MANY_RESPONSES_THRESHOLD = 0.9
 
 
-def has_too_many_responses_with_status(checks: list[Check], status_code: int) -> bool:
+def has_too_many_responses_with_status(interactions: Iterable[InteractionNode], status_code: int) -> bool:
     # It is faster than creating an intermediate list
     unauthorized_count = 0
     total = 0
-    for check in checks:
-        if check.response.status_code == status_code:
-            unauthorized_count += 1
-        total += 1
+    for interaction in interactions:
+        if isinstance(interaction.response, Response):
+            if interaction.response.status_code == status_code:
+                unauthorized_count += 1
+            total += 1
     if not total:
         return False
     return unauthorized_count / total >= TOO_MANY_RESPONSES_THRESHOLD
@@ -250,50 +251,8 @@ def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> st
     return None
 
 
-def validate_response(
-    *,
-    case: Case,
-    ctx: CheckContext,
-    checks: Iterable[CheckFunction],
-    check_results: list[Check],
-    response: Response,
-    no_failfast: bool,
-) -> None:
-    failures = set()
-
-    def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
-        collected.add(failure)
-        check_results.append(
-            Check(
-                name=name,
-                status=Status.FAILURE,
-                case=case,
-                headers=response.request.headers,
-                response=response,
-                failure=failure,
-            )
-        )
-
-    def on_success(name: str, _case: Case) -> None:
-        check_results.append(
-            Check(name=name, status=Status.SUCCESS, headers=response.request.headers, response=response, case=_case)
-        )
-
-    failures = run_checks(
-        case=case,
-        response=response,
-        ctx=ctx,
-        checks=checks,
-        on_failure=on_failure,
-        on_success=on_success,
-    )
-
-    if failures and not no_failfast:
-        raise FailureGroup(list(failures)) from None
-
-
 def cached_test_func(f: Callable) -> Callable:
-    def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], result: TestResult, **kwargs: Any) -> None:
+    def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], forest: DataForest) -> None:
         try:
             if ctx.is_stopped:
                 raise KeyboardInterrupt
@@ -304,14 +263,14 @@ def cached_test_func(f: Callable) -> Callable:
                 elif cached is None:
                     return None
                 try:
-                    f(ctx=ctx, case=case, result=result, **kwargs)
+                    f(ctx=ctx, case=case, forest=forest)
                 except BaseException as exc:
                     ctx.cache_outcome(case, exc)
                     raise
                 else:
                     ctx.cache_outcome(case, None)
             else:
-                f(ctx=ctx, case=case, result=result, **kwargs)
+                f(ctx=ctx, case=case, forest=forest)
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
@@ -324,29 +283,62 @@ def cached_test_func(f: Callable) -> Callable:
 
 
 @cached_test_func
-def test_func(*, ctx: EngineContext, case: Case, result: TestResult) -> None:
+def test_func(*, ctx: EngineContext, case: Case, forest: DataForest) -> None:
+    forest.add_root(case=case)
     if not ctx.config.execution.dry_run:
         try:
             response = case.call(**ctx.transport_kwargs)
-        except (requests.Timeout, requests.ConnectionError):
-            result.record(case, None, Status.FAILURE, [], session=ctx.session)
+        except (requests.Timeout, requests.ConnectionError) as error:
+            if isinstance(error.request, requests.Request):
+                forest.add_network_error(case_id=case.id, request=error.request.prepare(), error=error)
+            elif isinstance(error.request, requests.PreparedRequest):
+                forest.add_network_error(case_id=case.id, request=error.request, error=error)
             raise
+        forest.add_response(case_id=case.id, response=response)
         targets.run(ctx.config.execution.targets, case=case, response=response)
-        status = Status.SUCCESS
-        check_results: list[Check] = []
-        try:
-            validate_response(
-                case=case,
-                ctx=ctx.check_context,
-                checks=ctx.config.execution.checks,
-                check_results=check_results,
-                response=response,
-                no_failfast=ctx.config.execution.no_failfast,
-            )
-        except FailureGroup:
-            status = Status.FAILURE
-            raise
-        finally:
-            result.record(case, response, status, check_results, session=ctx.session)
-    else:
-        result.record(case, None, Status.SKIP, [], session=ctx.session)
+        validate_response(
+            case=case,
+            ctx=ctx.get_check_context(forest),
+            checks=ctx.config.execution.checks,
+            response=response,
+            no_failfast=ctx.config.execution.no_failfast,
+            forest=forest,
+        )
+
+
+def validate_response(
+    *,
+    case: Case,
+    ctx: CheckContext,
+    checks: Iterable[CheckFunction],
+    response: Response,
+    no_failfast: bool,
+    forest: DataForest,
+) -> None:
+    failures = set()
+
+    def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
+        collected.add(failure)
+        failure_data = forest.get_failure_data(parent_id=case.id, failure=failure)
+        forest.add_check(
+            name=name,
+            case_id=failure_data.case.id,
+            status=Status.FAILURE,
+            code_sample=failure_data.case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify),
+            failure=failure,
+        )
+
+    def on_success(name: str, _case: Case) -> None:
+        forest.add_check(name=name, case_id=_case.id, status=Status.SUCCESS, code_sample=None, failure=None)
+
+    failures = run_checks(
+        case=case,
+        response=response,
+        ctx=ctx,
+        checks=checks,
+        on_failure=on_failure,
+        on_success=on_success,
+    )
+
+    if failures and not no_failfast:
+        raise FailureGroup(list(failures)) from None

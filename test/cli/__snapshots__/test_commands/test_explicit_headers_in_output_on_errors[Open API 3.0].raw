@@ -19,14 +19,14 @@ ________________________________ GET /api/flaky ________________________________
 
 - Server error
 
+- Rejected positive data
+
+    Allowed statuses: 2xx, 401, 403, 404
+
 - Undocumented HTTP status code
 
     Received: 500
     Documented: 200
-
-- Rejected positive data
-
-    Allowed statuses: 2xx, 401, 403, 404
 
 [500] Internal Server Error:
 

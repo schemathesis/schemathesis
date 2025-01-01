@@ -6,24 +6,28 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from json import JSONDecodeError
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import OutputConfig, prepare_response_payload
 from schemathesis.core.transport import Response
+
+if TYPE_CHECKING:
+    import requests
 
 
 @dataclass
 class Failure(AssertionError):
     """API check failure."""
 
-    __slots__ = ("operation", "title", "message", "code")
+    __slots__ = ("operation", "title", "message", "code", "case_id")
 
-    def __init__(self, *, operation: str, title: str, message: str, code: str) -> None:
+    def __init__(self, *, operation: str, title: str, message: str, code: str, case_id: str | None = None) -> None:
         self.operation = operation
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
 
     def __str__(self) -> str:
         if not self.message:
@@ -180,7 +184,7 @@ def failure_report_title(failures: Sequence[Failure]) -> str:
 def format_failures(
     *,
     case_id: str | None,
-    response: Response,
+    response: Response | requests.Timeout | requests.ConnectionError,
     failures: Sequence[Failure],
     curl: str,
     formatter: BlockFormatter | None = None,
@@ -204,18 +208,20 @@ def format_failures(
             output += "\n"
 
     # Response status
-    reason = http.client.responses.get(response.status_code, "Unknown")
-    output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
-
-    # Response payload
-    if response.content is None or not response.content:
-        output += "\n    <EMPTY>"
+    if isinstance(response, Response):
+        reason = http.client.responses.get(response.status_code, "Unknown")
+        output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
+        # Response payload
+        if response.content is None or not response.content:
+            output += "\n    <EMPTY>"
+        else:
+            try:
+                payload = prepare_response_payload(response.text, config=config)
+                output += textwrap.indent(f"\n`{payload}`", prefix="    ")
+            except UnicodeDecodeError:
+                output += "\n    <BINARY>"
     else:
-        try:
-            payload = prepare_response_payload(response.text, config=config)
-            output += textwrap.indent(f"\n`{payload}`", prefix="    ")
-        except UnicodeDecodeError:
-            output += "\n    <BINARY>"
+        output += "\n    <ERROR>"
 
     # cURL
     output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n    {curl}")

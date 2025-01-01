@@ -32,8 +32,14 @@ class RunnerResult:
 
     @property
     def failures(self):
-        event = next(event for event in self.events if isinstance(event, events.PhaseFinished))
-        return [check for check in event.payload.result.checks if check.status == Status.FAILURE]
+        return [
+            check
+            for event in self.events
+            if isinstance(event, events.ScenarioFinished)
+            for checks in event.forest.checks.values()
+            for check in checks
+            if check.status == Status.FAILURE
+        ]
 
     @property
     def errors(self):
@@ -262,8 +268,10 @@ def test_failure_hidden_behind_another_failure(runner_factory):
     for event in runner:
         if isinstance(event, events.SuiteFinished):
             suite_number += 1
-        if isinstance(event, events.PhaseFinished):
-            failures.extend([check for check in event.payload.result.checks if check.status == Status.FAILURE])
+        if isinstance(event, events.ScenarioFinished):
+            failures.extend(
+                [check for checks in event.forest.checks.values() for check in checks if check.status == Status.FAILURE]
+            )
     assert len(failures) == 2
     assert {check.failure.title for check in failures} == {"Response violates schema", "Server error"}
 
@@ -372,7 +380,8 @@ def test_dry_run(runner_factory):
     for event in result.test_events:
         if isinstance(event, events.StepFinished):
             assert event.response is None
-            assert not event.checks
+        if isinstance(event, events.ScenarioFinished):
+            assert not event.forest.checks
 
 
 def test_max_response_time_valid(runner_factory):
@@ -383,7 +392,7 @@ def test_max_response_time_valid(runner_factory):
     )
     result = collect_result(runner)
     assert not result.errors, result.errors
-    assert result.test_events[-3].checks[0].name == "max_response_time"
+    assert list(result.test_events[-2].forest.checks.values())[0][0].name == "max_response_time"
 
 
 def test_max_response_time_invalid(runner_factory):

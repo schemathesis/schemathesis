@@ -1041,6 +1041,7 @@ def execute(
     event = None
     try:
         for event in event_stream:
+            execution_context.on_event(event)
             for handler in handlers:
                 try:
                     handler.handle_event(execution_context, event)

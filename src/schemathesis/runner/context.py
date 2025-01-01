@@ -3,12 +3,13 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from functools import cached_property
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Iterator
 
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.transport import Response
 from schemathesis.runner import Status
-from schemathesis.stateful.graph import ExecutionGraph
+from schemathesis.runner.dataforest import DataForest
 
 from .control import ExecutionControl
 
@@ -40,7 +41,6 @@ class EngineContext:
         self.outcome_cache = {}
         self.config = config
         self.start_time = time.monotonic()
-        self.execution_graph = ExecutionGraph()
         self.outcome_statistic = {}
         self._session = session
 
@@ -56,6 +56,7 @@ class EngineContext:
         return self.control.is_stopped
 
     def record_item(self, status: Status) -> None:
+        # TODO: Move out of engine?
         value = self.outcome_statistic.setdefault(status, 0)
         self.outcome_statistic[status] = value + 1
 
@@ -99,8 +100,7 @@ class EngineContext:
             kwargs["proxies"] = {"all": self.config.network.proxy}
         return kwargs
 
-    @property
-    def check_context(self) -> CheckContext:
+    def get_check_context(self, forest: DataForest) -> CheckContext:
         from requests.models import CaseInsensitiveDict
 
         return CheckContext(
@@ -109,5 +109,32 @@ class EngineContext:
             headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
             config=self.config.checks_config,
             transport_kwargs=self.transport_kwargs,
-            execution_graph=self.execution_graph,
+            tracker=CheckTracker(forest),
         )
+
+
+@dataclass
+class CheckTracker:
+    forest: DataForest
+
+    __slots__ = ("forest",)
+
+    def on_new_case(self, *, parent_id: str | None, case: Case) -> None:
+        self.forest.add_case(parent_id=parent_id, case=case)
+
+    def on_new_response(self, *, case_id: str, response: Response) -> None:
+        self.forest.add_response(case_id=case_id, response=response)
+
+    def find_parent(self, *, case_id: str) -> Case | None:
+        return self.forest.find_parent(case_id=case_id)
+
+    def find_ancestors_and_their_children(self, *, case_id: str) -> Iterator[Case]:
+        return self.forest.find_ancestors_and_their_children(case_id=case_id)
+
+    def find_response(self, *, case_id: str) -> Response | None:
+        interaction = self.forest.interactions.get(case_id)
+        if interaction is None:
+            return None
+        if isinstance(interaction.response, Response):
+            return interaction.response
+        return None

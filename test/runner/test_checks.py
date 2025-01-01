@@ -13,6 +13,7 @@ from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
 from schemathesis.openapi.checks import JsonSchemaError, UndefinedContentType, UndefinedStatusCode
+from schemathesis.runner.dataforest import DataForest
 from schemathesis.runner.phases.unit._executor import validate_response
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi.checks import (
@@ -22,14 +23,11 @@ from schemathesis.specs.openapi.checks import (
     response_schema_conformance,
     status_code_conformance,
 )
-from schemathesis.stateful.graph import ExecutionGraph
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(
-    override=None, auth=None, headers=None, config={}, transport_kwargs=None, execution_graph=ExecutionGraph()
-)
+CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None)
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
@@ -624,19 +622,21 @@ def test_deduplication(ctx, response_factory):
     operation = schema["/data"]["GET"]
     case = operation.Case()
     response = Response.from_requests(response_factory.requests(), True)
-    checks = []
+    forest = DataForest(label="test")
+    forest.add_root(case=case)
+    forest.add_response(case_id=case.id, response=response)
     # When there are two checks that raise the same failure
     with pytest.raises(FailureGroup):
         validate_response(
             case=case,
             ctx=CTX,
             checks=(content_type_conformance, response_schema_conformance),
-            check_results=checks,
+            forest=forest,
             response=response,
             no_failfast=False,
         )
     # Then the resulting output should be deduplicated
-    assert len([check for check in checks if check.failure is not None]) == 1
+    assert len([check for checks in forest.checks.values() for check in checks if check.failure is not None]) == 1
 
 
 @pytest.fixture(params=["2.0", "3.0"])

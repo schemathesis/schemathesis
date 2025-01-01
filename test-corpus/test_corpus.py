@@ -9,10 +9,10 @@ import pytest
 from aiohttp.test_utils import unused_port
 from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
-from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok

@@ -20,8 +20,7 @@ from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation.meta import CoveragePhaseData
 from schemathesis.runner import Status
-from schemathesis.runner.phases import PhaseName
-from schemathesis.runner.phases.stateful import StatefulTestingPayload
+from schemathesis.runner.dataforest import CheckNode, DataForest
 
 from ..runner import events
 from .handlers import EventHandler
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
     import click
     import requests
 
-    from schemathesis.runner.models import Check, Interaction, Request
+    from schemathesis.runner.models import Request
 
     from .context import ExecutionContext
 
@@ -85,15 +84,8 @@ class CassetteWriter(EventHandler):
         if isinstance(event, events.Initialized):
             # In the beginning we write metadata and start `http_interactions` list
             self.queue.put(Initialize(seed=event.seed))
-        elif isinstance(event, events.AfterExecution):
-            self.queue.put(Process(interactions=event.result.interactions))
-        elif (
-            isinstance(event, events.PhaseFinished)
-            and event.phase.name == PhaseName.STATEFUL_TESTING
-            and event.status != Status.SKIP
-        ):
-            assert isinstance(event.payload, StatefulTestingPayload)
-            self.queue.put(Process(interactions=event.payload.result.interactions))
+        elif isinstance(event, (events.AfterExecution, events.ScenarioFinished)):
+            self.queue.put(Process(forest=event.forest))
         elif isinstance(event, events.EngineFinished):
             self.shutdown()
 
@@ -116,7 +108,7 @@ class Initialize:
 class Process:
     """A new chunk of data should be processed."""
 
-    interactions: list[Interaction]
+    forest: DataForest
 
 
 @dataclass
@@ -164,9 +156,9 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
     def format_check_message(message: str | None) -> str:
         return "~" if message is None else f"{message!r}"
 
-    def format_checks(checks: list[Check]) -> str:
+    def format_checks(checks: list[CheckNode]) -> str:
         if not checks:
-            return "  checks: []"
+            return "\n  checks: []"
         items = "\n".join(
             f"    - name: '{check.name}'\n      status: '{check.status.name.upper()}'\n      message: {format_check_message(check.failure.title if check.failure else None)}"
             for check in checks
@@ -228,49 +220,60 @@ seed: {item.seed}
 http_interactions:"""
             )
         elif isinstance(item, Process):
-            for interaction in item.interactions:
-                status = interaction.status.name.upper()
+            for case_id, interaction in item.forest.interactions.items():
+                case = item.forest.cases[case_id]
+                if isinstance(interaction.response, Response):
+                    checks = item.forest.checks[case_id]
+                    status = Status.SUCCESS
+                    for check in checks:
+                        if check.status == Status.FAILURE:
+                            status = check.status
+                            break
+                else:
+                    checks = []
+                    status = Status.ERROR
                 # Body payloads are handled via separate `stream.write` calls to avoid some allocations
                 stream.write(
-                    f"""\n- id: '{interaction.id}'
-  status: '{status}'"""
+                    f"""\n- id: '{case_id}'
+  status: '{status.name}'"""
                 )
-                if interaction.meta is not None:
+                meta = case.value.meta
+                if meta is not None:
                     # Start metadata block
                     stream.write(f"""
   generation:
-    time: {interaction.meta.generation.time}
-    mode: {interaction.meta.generation.mode.value}
+    time: {meta.generation.time}
+    mode: {meta.generation.mode.value}
   components:""")
 
                     # Write components
-                    for kind, info in interaction.meta.components.items():
+                    for kind, info in meta.components.items():
                         stream.write(f"""
     {kind.value}:
       mode: '{info.mode.value}'""")
                     # Write phase info
                     stream.write("\n  phase:")
-                    stream.write(f"\n    name: '{interaction.meta.phase.name.value}'")
+                    stream.write(f"\n    name: '{meta.phase.name.value}'")
                     stream.write("\n    data: ")
 
                     # Write phase-specific data
-                    if isinstance(interaction.meta.phase.data, CoveragePhaseData):
+                    if isinstance(meta.phase.data, CoveragePhaseData):
                         stream.write("""
       description: """)
-                        write_double_quoted(stream, interaction.meta.phase.data.description)
+                        write_double_quoted(stream, meta.phase.data.description)
                         stream.write("""
       location: """)
-                        write_double_quoted(stream, interaction.meta.phase.data.location)
+                        write_double_quoted(stream, meta.phase.data.location)
                         stream.write("""
       parameter: """)
-                        if interaction.meta.phase.data.parameter is not None:
-                            write_double_quoted(stream, interaction.meta.phase.data.parameter)
+                        if meta.phase.data.parameter is not None:
+                            write_double_quoted(stream, meta.phase.data.parameter)
                         else:
                             stream.write("null")
                         stream.write("""
       parameter_location: """)
-                        if interaction.meta.phase.data.parameter_location is not None:
-                            write_double_quoted(stream, interaction.meta.phase.data.parameter_location)
+                        if meta.phase.data.parameter_location is not None:
+                            write_double_quoted(stream, meta.phase.data.parameter_location)
                         else:
                             stream.write("null")
                     else:
@@ -285,8 +288,7 @@ http_interactions:"""
                     uri = interaction.request.uri
                 stream.write(
                     f"""
-  recorded_at: '{interaction.recorded_at}'
-{format_checks(interaction.checks)}
+  recorded_at: '{interaction.recorded_at}'{format_checks(checks)}
   request:
     uri: '{uri}'
     method: '{interaction.request.method}'
@@ -294,7 +296,7 @@ http_interactions:"""
 {format_headers(interaction.request.headers)}"""
                 )
                 format_request_body(stream, interaction.request)
-                if interaction.response is not None:
+                if isinstance(interaction.response, Response):
                     stream.write(
                         f"""
   response:
@@ -368,7 +370,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
         while True:
             item = queue.get()
             if isinstance(item, Process):
-                for interaction in item.interactions:
+                for interaction in item.forest.interactions.values():
                     if config.sanitize_output:
                         uri = sanitize_url(interaction.request.uri)
                     else:
@@ -383,7 +385,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                         )
                     else:
                         post_data = None
-                    if interaction.response is not None:
+                    if isinstance(interaction.response, Response):
                         content_type = interaction.response.headers.get("Content-Type", [""])[0]
                         content = harfile.Content(
                             size=interaction.response.body_size or 0,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any, Callable, Iterable, Optional
+from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional, Protocol
 
 from schemathesis.core.failures import (
     Failure,
@@ -19,10 +19,17 @@ if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
     from schemathesis.generation.case import Case
-    from schemathesis.stateful.graph import ExecutionGraph, ExecutionMetadata
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 ChecksConfig = dict[CheckFunction, Any]
+
+
+class TrackerProtocol(Protocol):
+    def on_new_case(self, *, parent_id: str, case: Case) -> None: ...
+    def on_new_response(self, *, case_id: str, response: Response) -> None: ...
+    def find_parent(self, *, case_id: str) -> Case | None: ...
+    def find_ancestors_and_their_children(self, *, case_id: str) -> Iterator[Case]: ...
+    def find_response(self, *, case_id: str) -> Response | None: ...
 
 
 class CheckContext:
@@ -36,9 +43,9 @@ class CheckContext:
     headers: CaseInsensitiveDict | None
     config: ChecksConfig
     transport_kwargs: dict[str, Any] | None
-    execution_graph: ExecutionGraph
+    tracker: TrackerProtocol | None
 
-    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "execution_graph")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "tracker")
 
     def __init__(
         self,
@@ -47,21 +54,36 @@ class CheckContext:
         headers: CaseInsensitiveDict | None,
         config: ChecksConfig,
         transport_kwargs: dict[str, Any] | None,
-        execution_graph: ExecutionGraph,
+        tracker: TrackerProtocol | None = None,
     ) -> None:
         self.override = override
         self.auth = auth
         self.headers = headers
         self.config = config
         self.transport_kwargs = transport_kwargs
-        self.execution_graph = execution_graph
+        self.tracker = tracker
 
-    def find_parent(self, case: Case) -> Case | None:
-        return self.execution_graph.find_parent(case)
+    def find_parent(self, *, case_id: str) -> Case | None:
+        if self.tracker is not None:
+            return self.tracker.find_parent(case_id=case_id)
+        return None
 
-    def get_metadata(self, case: Case) -> ExecutionMetadata | None:
-        node = self.execution_graph._nodes.get(case.id)
-        return node.metadata if node else None
+    def find_ancestors_and_their_children(self, *, case_id: str) -> Iterator[Case]:
+        if self.tracker is not None:
+            yield from self.tracker.find_ancestors_and_their_children(case_id=case_id)
+
+    def find_response(self, *, case_id: str) -> Response | None:
+        if self.tracker is not None:
+            return self.tracker.find_response(case_id=case_id)
+        return None
+
+    def on_new_case(self, *, parent_id: str, case: Case) -> None:
+        if self.tracker is not None:
+            self.tracker.on_new_case(parent_id=parent_id, case=case)
+
+    def on_new_response(self, *, case_id: str, response: Response) -> None:
+        if self.tracker is not None:
+            self.tracker.on_new_response(case_id=case_id, response=response)
 
 
 CHECKS = Registry[CheckFunction]()

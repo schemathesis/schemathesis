@@ -78,13 +78,14 @@ def test_with_cassette(tmp_path, cli, schema_url):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_junit(tmp_path, cli, schema_url):
     junit_path = tmp_path / "junit.xml"
-    cli.run(
+    result = cli.run(
         schema_url,
         "--experimental=stateful-only",
         "--hypothesis-max-examples=80",
         "--exitfirst",
         f"--junit-xml={junit_path}",
     )
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert junit_path.exists()
     tree = ElementTree.parse(junit_path)
     root = tree.getroot()

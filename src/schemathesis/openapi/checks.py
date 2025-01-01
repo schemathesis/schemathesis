@@ -265,11 +265,13 @@ class IgnoredAuth(Failure):
         message: str,
         title: str = "Authentication declared but not enforced for this operation",
         code: str = "ignored_auth",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
 
     @property
     def _unique_key(self) -> str:
