@@ -4,7 +4,7 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.failures import Failure
+from schemathesis.core.failures import Failure, Severity
 from schemathesis.core.output import OutputConfig, truncate_json
 
 if TYPE_CHECKING:
@@ -30,6 +30,18 @@ class MissingRequiredHeaderConfig:
 class UndefinedStatusCode(Failure):
     """Response has a status code that is not defined in the schema."""
 
+    __slots__ = (
+        "operation",
+        "status_code",
+        "defined_status_codes",
+        "allowed_status_codes",
+        "message",
+        "title",
+        "code",
+        "case_id",
+        "severity",
+    )
+
     def __init__(
         self,
         *,
@@ -40,6 +52,7 @@ class UndefinedStatusCode(Failure):
         message: str,
         title: str = "Undocumented HTTP status code",
         code: str = "undefined_status_code",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.status_code = status_code
@@ -48,6 +61,8 @@ class UndefinedStatusCode(Failure):
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -57,6 +72,8 @@ class UndefinedStatusCode(Failure):
 class MissingHeaders(Failure):
     """Some required headers are missing."""
 
+    __slots__ = ("operation", "missing_headers", "message", "title", "code", "case_id", "severity")
+
     def __init__(
         self,
         *,
@@ -65,16 +82,33 @@ class MissingHeaders(Failure):
         message: str,
         title: str = "Missing required headers",
         code: str = "missing_headers",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.missing_headers = missing_headers
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
 
 class JsonSchemaError(Failure):
     """Additional information about JSON Schema validation errors."""
+
+    __slots__ = (
+        "operation",
+        "validation_message",
+        "schema_path",
+        "schema",
+        "instance_path",
+        "instance",
+        "message",
+        "title",
+        "code",
+        "case_id",
+        "severity",
+    )
 
     def __init__(
         self,
@@ -88,6 +122,7 @@ class JsonSchemaError(Failure):
         message: str,
         title: str = "Response violates schema",
         code: str = "json_schema",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.validation_message = validation_message
@@ -98,6 +133,8 @@ class JsonSchemaError(Failure):
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.HIGH
 
     @property
     def _unique_key(self) -> str:
@@ -139,6 +176,8 @@ class JsonSchemaError(Failure):
 class MissingContentType(Failure):
     """Content type header is missing."""
 
+    __slots__ = ("operation", "media_types", "message", "title", "code", "case_id", "severity")
+
     def __init__(
         self,
         *,
@@ -147,12 +186,15 @@ class MissingContentType(Failure):
         message: str,
         title: str = "Missing Content-Type header",
         code: str = "missing_content_type",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.media_types = media_types
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -161,6 +203,8 @@ class MissingContentType(Failure):
 
 class MalformedMediaType(Failure):
     """Media type name is malformed."""
+
+    __slots__ = ("operation", "actual", "defined", "message", "title", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -171,6 +215,7 @@ class MalformedMediaType(Failure):
         message: str,
         title: str = "Malformed media type",
         code: str = "malformed_media_type",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.actual = actual
@@ -178,10 +223,23 @@ class MalformedMediaType(Failure):
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
 
 class UndefinedContentType(Failure):
     """Response has Content-Type that is not documented in the schema."""
+
+    __slots__ = (
+        "operation",
+        "content_type",
+        "defined_content_types",
+        "message",
+        "title",
+        "code",
+        "case_id",
+        "severity",
+    )
 
     def __init__(
         self,
@@ -192,6 +250,7 @@ class UndefinedContentType(Failure):
         message: str,
         title: str = "Undocumented Content-Type",
         code: str = "undefined_content_type",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.content_type = content_type
@@ -199,6 +258,8 @@ class UndefinedContentType(Failure):
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -207,6 +268,8 @@ class UndefinedContentType(Failure):
 
 class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
+
+    __slots__ = ("operation", "message", "free", "usage", "title", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -217,6 +280,7 @@ class UseAfterFree(Failure):
         usage: str,
         title: str = "Use after free",
         code: str = "use_after_free",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
@@ -224,6 +288,8 @@ class UseAfterFree(Failure):
         self.usage = usage
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -232,6 +298,8 @@ class UseAfterFree(Failure):
 
 class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""
+
+    __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -242,6 +310,7 @@ class EnsureResourceAvailability(Failure):
         not_available_with: str,
         title: str = "Resource is not available after creation",
         code: str = "ensure_resource_availability",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
@@ -249,6 +318,8 @@ class EnsureResourceAvailability(Failure):
         self.not_available_with = not_available_with
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -258,6 +329,8 @@ class EnsureResourceAvailability(Failure):
 class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
+    __slots__ = ("operation", "message", "title", "code", "case_id", "severity")
+
     def __init__(
         self,
         *,
@@ -265,11 +338,14 @@ class IgnoredAuth(Failure):
         message: str,
         title: str = "Authentication declared but not enforced for this operation",
         code: str = "ignored_auth",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -278,6 +354,8 @@ class IgnoredAuth(Failure):
 
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
+
+    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -288,6 +366,7 @@ class AcceptedNegativeData(Failure):
         allowed_statuses: list[str],
         title: str = "Accepted negative data",
         code: str = "accepted_negative_data",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
@@ -295,6 +374,8 @@ class AcceptedNegativeData(Failure):
         self.allowed_statuses = allowed_statuses
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -303,6 +384,8 @@ class AcceptedNegativeData(Failure):
 
 class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
+
+    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "code", "case_id", "severity")
 
     def __init__(
         self,
@@ -313,6 +396,7 @@ class RejectedPositiveData(Failure):
         allowed_statuses: list[str],
         title: str = "Rejected positive data",
         code: str = "rejected_positive_data",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
@@ -320,6 +404,8 @@ class RejectedPositiveData(Failure):
         self.allowed_statuses = allowed_statuses
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:

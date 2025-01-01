@@ -7,8 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckContext
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.runner import Status
-from schemathesis.stateful.graph import ExecutionGraph
+from schemathesis.runner.recorder import ScenarioRecorder
 
 from .control import ExecutionControl
 
@@ -31,7 +30,6 @@ class EngineContext:
     outcome_cache: dict[int, BaseException | None]
     config: EngineConfig
     start_time: float
-    outcome_statistic: dict[Status, int]
 
     def __init__(
         self, *, stop_event: threading.Event, config: EngineConfig, session: requests.Session | None = None
@@ -40,8 +38,6 @@ class EngineContext:
         self.outcome_cache = {}
         self.config = config
         self.start_time = time.monotonic()
-        self.execution_graph = ExecutionGraph()
-        self.outcome_statistic = {}
         self._session = session
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
@@ -55,9 +51,12 @@ class EngineContext:
         """Check if execution should stop."""
         return self.control.is_stopped
 
-    def record_item(self, status: Status) -> None:
-        value = self.outcome_statistic.setdefault(status, 0)
-        self.outcome_statistic[status] = value + 1
+    @property
+    def is_interrupted(self) -> bool:
+        return self.control.is_interrupted
+
+    def stop(self) -> None:
+        self.control.stop()
 
     def on_event(self, event: events.EngineEvent) -> bool:
         """Process event and update execution state."""
@@ -99,8 +98,7 @@ class EngineContext:
             kwargs["proxies"] = {"all": self.config.network.proxy}
         return kwargs
 
-    @property
-    def check_context(self) -> CheckContext:
+    def get_check_context(self, recorder: ScenarioRecorder) -> CheckContext:
         from requests.models import CaseInsensitiveDict
 
         return CheckContext(
@@ -109,5 +107,5 @@ class EngineContext:
             headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
             config=self.config.checks_config,
             transport_kwargs=self.transport_kwargs,
-            execution_graph=self.execution_graph,
+            recorder=recorder,
         )

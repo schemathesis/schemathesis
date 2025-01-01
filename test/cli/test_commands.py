@@ -18,7 +18,7 @@ from aiohttp.test_utils import unused_port
 from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
 from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
-from schemathesis.cli import execute, get_exit_code
+from schemathesis.cli import execute
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.generation import GenerationConfig
@@ -1036,25 +1036,11 @@ def test_max_response_time_valid(cli, schema_url):
 @pytest.mark.parametrize("workers_num", [1, 2])
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "success")
-def test_exit_first(cli, schema_url, workers_num):
+@pytest.mark.snapshot(replace_multi_worker_progress="??", replace_statistic=True, remove_last_line=True)
+def test_exit_first(cli, schema_url, workers_num, snapshot_cli):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    result = cli.run(schema_url, "--exitfirst", "-w", str(workers_num))
-    # Then tests are failed
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    if workers_num == 1:
-        lines = result.stdout.split("\n")
-        # And the execution should stop on the first failure
-        for idx, line in enumerate(lines):  # noqa: B007
-            if line.startswith("GET /api/failure F"):
-                assert line.endswith("[ 50%]")
-                break
-        else:
-            pytest.fail("Line is not found")
-        # the "FAILURES" sections goes after a new line, rather than continuing to the next operation
-        next_line = lines[idx + 1]
-        assert next_line == ""
-        assert "FAILURES" in lines[idx + 2]
+    assert cli.run(schema_url, "--exitfirst", "-w", str(workers_num)) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1273,13 +1259,6 @@ def test_cli_execute(swagger_20, capsys):
         pass
     assert_exit_code(event_stream, 1)
     assert capsys.readouterr().out.strip() == "Unexpected error"
-
-
-def test_get_exit_code(swagger_20):
-    event_stream = from_schema(swagger_20).execute()
-    next(event_stream)
-    event = next(event_stream)
-    assert get_exit_code(event) == 1
 
 
 @pytest.mark.parametrize("base_url", [None, "http://127.0.0.1/apiv2"])

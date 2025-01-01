@@ -17,6 +17,7 @@ from hypothesis_jsonschema._canonicalise import canonicalish
 from hypothesis_jsonschema._from_schema import STRING_FORMATS as BUILT_IN_STRING_FORMATS
 
 from schemathesis.core import NOT_SET
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
@@ -297,7 +298,7 @@ def _ignore_unfixable(
     *,
     # Cache exception types here as `jsonschema` uses a custom `__getattr__` on the module level
     # and it may cause errors during the interpreter shutdown
-    ref_error: type[Exception] = jsonschema.RefResolutionError,
+    ref_error: type[Exception] = RefResolutionError,
     schema_error: type[Exception] = jsonschema.SchemaError,
 ) -> Generator:
     try:

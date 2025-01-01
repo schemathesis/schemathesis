@@ -12,6 +12,7 @@ from schemathesis.checks import CheckContext
 from schemathesis.core import media_types, string_to_boolean
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
+from schemathesis.generation.case import Case
 from schemathesis.generation.meta import ComponentKind, CoveragePhaseData
 from schemathesis.openapi.checks import (
     AcceptedNegativeData,
@@ -29,14 +30,13 @@ from schemathesis.openapi.checks import (
     UndefinedStatusCode,
     UseAfterFree,
 )
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.transport.prepare import prepare_path
 
 from .utils import expand_status_code, expand_status_codes
 
 if TYPE_CHECKING:
     from requests import PreparedRequest
-
-    from schemathesis.generation.case import Case
 
     from ...schemas import APIOperation
 
@@ -337,12 +337,18 @@ def use_after_free(ctx: CheckContext, response: Response, case: Case) -> bool | 
     if response.status_code == 404 or response.status_code >= 500:
         return None
 
-    for related_case in ctx.execution_graph.find_ancestors_and_their_children(case):
-        metadata = ctx.get_metadata(related_case)
-        if not metadata:
+    for related_case in ctx.find_related(case_id=case.id):
+        parent = ctx.find_parent(case_id=related_case.id)
+        if not parent:
             continue
 
-        if related_case.operation.method.lower() == "delete" and 200 <= metadata.response.status_code < 300:
+        parent_response = ctx.find_response(case_id=parent.id)
+
+        if (
+            related_case.operation.method.lower() == "delete"
+            and parent_response is not None
+            and 200 <= parent_response.status_code < 300
+        ):
             if _is_prefix_operation(
                 ResourcePath(related_case.path, related_case.path_parameters or {}),
                 ResourcePath(case.path, case.path_parameters or {}),
@@ -370,19 +376,29 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
 
-    parent = ctx.find_parent(case)
-    metadata = ctx.get_metadata(case) if parent else None
+    parent = ctx.find_parent(case_id=case.id)
+    if parent is None:
+        return None
+    parent_response = ctx.find_response(case_id=parent.id)
+    if not isinstance(parent_response, Response):
+        return None
+
+    overrides = case._override
+    overrides_all_parameters = True
+    for parameter in case.operation.iter_parameters():
+        container = LOCATION_TO_CONTAINER[parameter.location]
+        if parameter.name not in getattr(overrides, container, {}):
+            overrides_all_parameters = False
+            break
 
     if (
         # Response indicates a client error, even though all available parameters were taken from links
         # and comes from a POST request. This case likely means that the POST request actually did not
         # save the resource and it is not available for subsequent operations
         400 <= response.status_code < 500
-        and parent is not None
         and parent.operation.method.upper() == "POST"
-        and metadata is not None
-        and 200 <= metadata.response.status_code < 400
-        and metadata.overrides_all_parameters
+        and 200 <= parent_response.status_code < 400
+        and overrides_all_parameters
         and _is_prefix_operation(
             ResourcePath(parent.path, parent.path_parameters or {}),
             ResourcePath(case.path, case.path_parameters or {}),
@@ -423,7 +439,7 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
         if auth == AuthKind.EXPLICIT:
             # Auth is explicitly set, it is expected to be valid
             # Check if invalid auth will give an error
-            _remove_auth_from_case(case, security_parameters)
+            no_auth_case = remove_auth(case, security_parameters)
             kwargs = ctx.transport_kwargs or {}
             kwargs.copy()
             if "headers" in kwargs:
@@ -431,38 +447,36 @@ def ignored_auth(ctx: CheckContext, response: Response, case: Case) -> bool | No
                 _remove_auth_from_explicit_headers(headers, security_parameters)
                 kwargs["headers"] = headers
             kwargs.pop("session", None)
-            new_response = case.operation.schema.transport.send(case, **kwargs)
-            if new_response.status_code != 401:
-                _update_response(response, new_response)
-                _raise_no_auth_error(new_response, case.operation.label, "that requires authentication")
+            ctx.record_case(parent_id=case.id, case=no_auth_case)
+            no_auth_response = case.operation.schema.transport.send(no_auth_case, **kwargs)
+            ctx.record_response(case_id=no_auth_case.id, response=no_auth_response)
+            if no_auth_response.status_code != 401:
+                _raise_no_auth_error(no_auth_response, no_auth_case, "that requires authentication")
             # Try to set invalid auth and check if it succeeds
             for parameter in security_parameters:
-                _set_auth_for_case(case, parameter)
-                new_response = case.operation.schema.transport.send(case, **kwargs)
-                if new_response.status_code != 401:
-                    _update_response(response, new_response)
-                    _raise_no_auth_error(new_response, case.operation.label, "with any auth")
-                _remove_auth_from_case(case, security_parameters)
+                invalid_auth_case = remove_auth(case, security_parameters)
+                _set_auth_for_case(invalid_auth_case, parameter)
+                ctx.record_case(parent_id=case.id, case=invalid_auth_case)
+                invalid_auth_response = case.operation.schema.transport.send(invalid_auth_case, **kwargs)
+                ctx.record_response(case_id=invalid_auth_case.id, response=invalid_auth_response)
+                if invalid_auth_response.status_code != 401:
+                    _raise_no_auth_error(invalid_auth_response, invalid_auth_case, "with any auth")
         elif auth == AuthKind.GENERATED:
             # If this auth is generated which means it is likely invalid, then
             # this request should have been an error
-            _raise_no_auth_error(response, case.operation.label, "with invalid auth")
+            _raise_no_auth_error(response, case, "with invalid auth")
         else:
             # Successful response when there is no auth
-            _raise_no_auth_error(response, case.operation.label, "that requires authentication")
+            _raise_no_auth_error(response, case, "that requires authentication")
     return None
 
 
-def _update_response(old: Response, new: Response) -> None:
-    for key in Response.__slots__:
-        setattr(old, key, getattr(new, key))
-
-
-def _raise_no_auth_error(response: Response, operation: str, suffix: str) -> NoReturn:
+def _raise_no_auth_error(response: Response, case: Case, suffix: str) -> NoReturn:
     reason = http.client.responses.get(response.status_code, "Unknown")
     raise IgnoredAuth(
-        operation=operation,
-        message=f"The API returned `{response.status_code} {reason}` for `{operation}` {suffix}.",
+        operation=case.operation.label,
+        message=f"The API returned `{response.status_code} {reason}` for `{case.operation.label}` {suffix}.",
+        case_id=case.id,
     )
 
 
@@ -530,19 +544,34 @@ def _contains_auth(
     return None
 
 
-def _remove_auth_from_case(case: Case, security_parameters: list[SecurityParameter]) -> None:
+def remove_auth(case: Case, security_parameters: list[SecurityParameter]) -> Case:
     """Remove security parameters from a generated case.
 
     It mutates `case` in place.
     """
+    headers = case.headers.copy() if case.headers else None
+    query = case.query.copy() if case.query else None
+    cookies = case.cookies.copy() if case.cookies else None
     for parameter in security_parameters:
         name = parameter["name"]
-        if parameter["in"] == "header" and case.headers:
-            case.headers.pop(name, None)
-        if parameter["in"] == "query" and case.query:
-            case.query.pop(name, None)
-        if parameter["in"] == "cookie" and case.cookies:
-            case.cookies.pop(name, None)
+        if parameter["in"] == "header" and headers:
+            headers.pop(name, None)
+        if parameter["in"] == "query" and query:
+            query.pop(name, None)
+        if parameter["in"] == "cookie" and cookies:
+            cookies.pop(name, None)
+    return Case(
+        operation=case.operation,
+        method=case.method,
+        path=case.path,
+        path_parameters=case.path_parameters.copy() if case.path_parameters else None,
+        headers=headers,
+        cookies=cookies,
+        query=query,
+        body=case.body.copy() if isinstance(case.body, (list, dict)) else case.body,
+        media_type=case.media_type,
+        meta=case.meta,
+    )
 
 
 def _remove_auth_from_explicit_headers(headers: dict, security_parameters: list[SecurityParameter]) -> None:

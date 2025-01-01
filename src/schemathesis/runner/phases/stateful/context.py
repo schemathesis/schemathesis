@@ -11,7 +11,6 @@ from schemathesis.runner import Status
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.runner.models import Check
 
 
 @dataclass
@@ -22,8 +21,6 @@ class RunnerContext:
     seen_in_run: set[Failure] = field(default_factory=set)
     # Failures keys seen in the current suite
     seen_in_suite: set[Failure] = field(default_factory=set)
-    # All checks executed in the current run
-    checks_for_step: list[Check] = field(default_factory=list)
     # Status of the current step
     current_step_status: Status | None = None
     # The currently processed response
@@ -45,9 +42,6 @@ class RunnerContext:
         self.current_step_status = None
         self.current_response = None
         self.step_outcomes.clear()
-
-    def reset_step(self) -> None:
-        self.checks_for_step = []
 
     def step_succeeded(self) -> None:
         self.current_step_status = Status.SUCCESS

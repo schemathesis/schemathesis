@@ -292,6 +292,7 @@ class CliSnapshotConfig:
     replace_seed: bool = True
     replace_reproduce_with: bool = False
     replace_stateful_progress: bool = True
+    remove_last_line: bool = False
 
     @classmethod
     def from_request(cls, request: FixtureRequest) -> CliSnapshotConfig:
@@ -307,10 +308,7 @@ class CliSnapshotConfig:
     def serialize(self, data: str) -> str:
         lines = data.splitlines()
         lines = [
-            line
-            for line in lines
-            if not any(marker in line for marker in FLASK_MARKERS)
-            and line not in ("API probing: ...", "Schema analysis: ...")
+            line for line in lines if not any(marker in line for marker in FLASK_MARKERS) and line != "API probing: ..."
         ]
         data = "\n".join(lines)
         if self.replace_server_host:
@@ -333,7 +331,6 @@ class CliSnapshotConfig:
         data = data.replace(str(PACKAGE_ROOT), package_root)
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
-        data = re.sub(r"Compressed report size: \d+ [KMG]B", "Compressed report size: XX KB", data)
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
             comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
@@ -379,6 +376,9 @@ class CliSnapshotConfig:
             if "in 1.00s" in lines[-1]:
                 lines[-1] = lines[-1].ljust(80, "=")
             data = "\n".join(lines) + "\n"
+        if self.remove_last_line:
+            lines = data.splitlines()
+            data = "\n".join(lines[:-1])
         if self.replace_test_case_id:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
