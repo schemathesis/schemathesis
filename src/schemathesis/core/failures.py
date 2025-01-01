@@ -4,7 +4,7 @@ import http.client
 import textwrap
 from collections.abc import Sequence
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, auto
 from json import JSONDecodeError
 from typing import Callable
 
@@ -13,22 +13,55 @@ from schemathesis.core.output import OutputConfig, prepare_response_payload
 from schemathesis.core.transport import Response
 
 
+class Severity(Enum):
+    # For server errors, security issues like ignored auth
+    CRITICAL = auto()
+    # For schema violations
+    HIGH = auto()
+    # For content type issues, header problems
+    MEDIUM = auto()
+    # For performance issues, minor inconsistencies
+    LOW = auto()
+
+    def __lt__(self, other: Severity) -> bool:
+        # Lower values are more severe
+        return self.value < other.value
+
+
 @dataclass
 class Failure(AssertionError):
     """API check failure."""
 
-    __slots__ = ("operation", "title", "message", "code")
+    __slots__ = ("operation", "title", "message", "code", "case_id", "severity")
 
-    def __init__(self, *, operation: str, title: str, message: str, code: str) -> None:
+    def __init__(
+        self,
+        *,
+        operation: str,
+        title: str,
+        message: str,
+        code: str,
+        case_id: str | None = None,
+        severity: Severity = Severity.MEDIUM,
+    ) -> None:
         self.operation = operation
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self.severity = severity
 
     def __str__(self) -> str:
         if not self.message:
             return self.title
         return f"{self.title}\n\n{self.message}"
+
+    def __lt__(self, other: Failure) -> bool:
+        return (
+            self.severity,
+            self.__class__.__name__,
+            self.message,
+        ) < (other.severity, other.__class__.__name__, other.message)
 
     # Comparison & hashing is done purely on classes to simplify keeping the minimized failure during shrinking
     def __hash__(self) -> int:
@@ -61,6 +94,8 @@ class MaxResponseTimeConfig:
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
 
+    __slots__ = ("operation", "elapsed", "deadline", "title", "message", "code", "case_id", "severity")
+
     def __init__(
         self,
         *,
@@ -70,6 +105,7 @@ class ResponseTimeExceeded(Failure):
         message: str,
         title: str = "Response time limit exceeded",
         code: str = "response_time_exceeded",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.elapsed = elapsed
@@ -77,6 +113,8 @@ class ResponseTimeExceeded(Failure):
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.LOW
 
     @property
     def _unique_key(self) -> str:
@@ -86,6 +124,8 @@ class ResponseTimeExceeded(Failure):
 class ServerError(Failure):
     """Server responded with an error."""
 
+    __slots__ = ("operation", "status_code", "title", "message", "code", "case_id", "severity")
+
     def __init__(
         self,
         *,
@@ -94,12 +134,15 @@ class ServerError(Failure):
         title: str = "Server error",
         message: str = "",
         code: str = "server_error",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.status_code = status_code
         self.title = title
         self.message = message
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.CRITICAL
 
     @property
     def _unique_key(self) -> str:
@@ -108,6 +151,20 @@ class ServerError(Failure):
 
 class MalformedJson(Failure):
     """Failed to deserialize JSON."""
+
+    __slots__ = (
+        "operation",
+        "validation_message",
+        "document",
+        "position",
+        "lineno",
+        "colno",
+        "message",
+        "title",
+        "code",
+        "case_id",
+        "severity",
+    )
 
     def __init__(
         self,
@@ -121,6 +178,7 @@ class MalformedJson(Failure):
         message: str,
         title: str = "JSON deserialization error",
         code: str = "malformed_json",
+        case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.validation_message = validation_message
@@ -131,6 +189,8 @@ class MalformedJson(Failure):
         self.message = message
         self.title = title
         self.code = code
+        self.case_id = case_id
+        self.severity = Severity.MEDIUM
 
     @property
     def _unique_key(self) -> str:
@@ -180,7 +240,7 @@ def failure_report_title(failures: Sequence[Failure]) -> str:
 def format_failures(
     *,
     case_id: str | None,
-    response: Response,
+    response: Response | None,
     failures: Sequence[Failure],
     curl: str,
     formatter: BlockFormatter | None = None,
@@ -204,18 +264,20 @@ def format_failures(
             output += "\n"
 
     # Response status
-    reason = http.client.responses.get(response.status_code, "Unknown")
-    output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
-
-    # Response payload
-    if response.content is None or not response.content:
-        output += "\n    <EMPTY>"
+    if isinstance(response, Response):
+        reason = http.client.responses.get(response.status_code, "Unknown")
+        output += formatter(MessageBlock.STATUS, f"\n[{response.status_code}] {reason}:\n")
+        # Response payload
+        if response.content is None or not response.content:
+            output += "\n    <EMPTY>"
+        else:
+            try:
+                payload = prepare_response_payload(response.text, config=config)
+                output += textwrap.indent(f"\n`{payload}`", prefix="    ")
+            except UnicodeDecodeError:
+                output += "\n    <BINARY>"
     else:
-        try:
-            payload = prepare_response_payload(response.text, config=config)
-            output += textwrap.indent(f"\n`{payload}`", prefix="    ")
-        except UnicodeDecodeError:
-            output += "\n    <BINARY>"
+        output += "\n    <NO RESPONSE>"
 
     # cURL
     output += "\n" + formatter(MessageBlock.CURL, f"\nReproduce with: \n\n    {curl}")

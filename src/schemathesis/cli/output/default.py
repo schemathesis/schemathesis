@@ -12,14 +12,12 @@ from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.runner import Status
-from schemathesis.runner.models import Check, group_failures_by_code_sample
 from schemathesis.runner.phases import PhaseName
 
-from ... import experimental
 from ...experimental import GLOBAL_EXPERIMENTS
 from ...runner import events
 from ...stateful.sink import StateMachineSink
-from ..context import ExecutionContext
+from ..context import ExecutionContext, GroupedFailures
 from ..handlers import EventHandler
 
 if TYPE_CHECKING:
@@ -81,16 +79,16 @@ def display_summary(ctx: ExecutionContext, event: events.EngineFinished) -> None
 
 def get_summary_message_parts(ctx: ExecutionContext, event: events.EngineFinished) -> list[str]:
     parts = []
-    passed = event.outcome_statistic.get(Status.SUCCESS)
+    passed = ctx.statistic.outcomes.get(Status.SUCCESS)
     if passed:
         parts.append(f"{passed} passed")
-    failed = event.outcome_statistic.get(Status.FAILURE)
+    failed = ctx.statistic.outcomes.get(Status.FAILURE)
     if failed:
         parts.append(f"{failed} failed")
     errored = len(ctx.errors)
     if errored:
         parts.append(f"{errored} errored")
-    skipped = event.outcome_statistic.get(Status.SKIP)
+    skipped = ctx.statistic.outcomes.get(Status.SKIP)
     if skipped:
         parts.append(f"{skipped} skipped")
     return parts
@@ -103,9 +101,9 @@ def get_summary_output(ctx: ExecutionContext, event: events.EngineFinished) -> t
         color = "yellow"
     else:
         message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-        if Status.FAILURE in event.outcome_statistic or Status.ERROR in event.outcome_statistic:
+        if Status.FAILURE in ctx.statistic.outcomes or Status.ERROR in ctx.statistic.outcomes:
             color = "red"
-        elif Status.SKIP in event.outcome_statistic:
+        elif Status.SKIP in ctx.statistic.outcomes:
             color = "yellow"
         else:
             color = "green"
@@ -123,7 +121,7 @@ def display_errors(ctx: ExecutionContext) -> None:
         display_section_name(error.label, "_", fg="red")
         click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
     click.secho(
-        f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}",
+        f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
         fg="red",
     )
 
@@ -139,8 +137,9 @@ def display_failures(ctx: ExecutionContext) -> None:
     """Display all failures in the test run."""
     if not ctx.statistic.failures:
         return
+
     display_section_name("FAILURES")
-    for label, failures in ctx.statistic.failures:
+    for label, failures in ctx.statistic.failures.items():
         display_failures_for_single_test(ctx, label, failures)
 
 
@@ -167,21 +166,16 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
     return _style(content.replace("Reproduce with", bold("Reproduce with")))
 
 
-def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: list[Check]) -> None:
+def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: list[GroupedFailures]) -> None:
     """Display a failure for a single method / path."""
     display_section_name(label, "_", fg="red")
-    for idx, (code_sample, group) in enumerate(group_failures_by_code_sample(checks), 1):
-        # Make server errors appear first in the list of checks
-        checks = sorted(group, key=lambda c: c.name != "not_a_server_error")
-
-        check = checks[0]
-
+    for idx, group in enumerate(checks, 1):
         click.echo(
             format_failures(
-                case_id=f"{idx}. Test Case ID: {check.case.id}",
-                response=check.response,
-                failures=[check.failure for check in checks if check.failure is not None],
-                curl=code_sample,
+                case_id=f"{idx}. Test Case ID: {group.case_id}",
+                response=group.response,
+                failures=group.failures,
+                curl=group.code_sample,
                 formatter=failure_formatter,
                 config=ctx.output_config,
             )
@@ -197,7 +191,7 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
     if ctx.state_machine_sink is not None:
         click.echo(ctx.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
         click.echo()
-    if not event.outcome_statistic or not total:
+    if not ctx.statistic.outcomes or not total:
         click.secho("No checks were performed.", bold=True)
 
     if total:
@@ -229,7 +223,7 @@ def display_statistic(ctx: ExecutionContext, event: events.EngineFinished) -> No
             "Please visit the provided URL(s) to share your thoughts."
         )
 
-    if Status.FAILURE in event.outcome_statistic:
+    if Status.FAILURE in ctx.statistic.outcomes:
         click.echo(
             f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
             "from failure messages with server logs for debugging."
@@ -331,8 +325,6 @@ def display_internal_error(ctx: ExecutionContext, event: events.FatalError) -> N
 
 def on_initialized(ctx: ExecutionContext, event: events.Initialized) -> None:
     """Display information about the test session."""
-    ctx.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
-    ctx.seed = event.seed
     display_section_name("Schemathesis test session starts")
     if event.location is not None:
         click.secho(f"Schema location: {event.location}", bold=True)
@@ -355,24 +347,16 @@ def on_probing_started() -> None:
 
 
 def on_probing_finished(ctx: ExecutionContext, status: Status) -> None:
-    click.secho(f"API probing: {status.name}\n\n", bold=True, nl=False)
+    click.secho(f"API probing: {status.name}", bold=True, nl=False)
 
 
 def on_stateful_testing_started(ctx: ExecutionContext) -> None:
-    from schemathesis.specs.openapi.stateful.statistic import OpenAPILinkStats
-
-    if not experimental.STATEFUL_ONLY.is_enabled:
-        click.echo()
-    ctx.state_machine_sink = StateMachineSink(transitions=OpenAPILinkStats())
     click.secho("Stateful tests\n", bold=True)
 
 
 def on_stateful_testing_finished(ctx: ExecutionContext, payload: StatefulTestingPayload | None) -> None:
     if payload is None:
         return
-
-    if payload.result.checks:
-        ctx.statistic.record_checks(payload.result.label, payload.result.checks)
 
     # Merge execution data from sink into the complete transition table
     sink = ctx.state_machine_sink
@@ -409,16 +393,12 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
 
 def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
     """Display the execution result + current progress at the same line with the method / path names."""
-    ctx.operations_processed += 1
-    if event.result.checks:
-        ctx.statistic.record_checks(event.result.label, event.result.checks)
     display_execution_result(ctx, event.status)
     display_percentage(ctx, event)
 
 
 def on_engine_finished(ctx: ExecutionContext, event: events.EngineFinished) -> None:
     """Show the outcome of the whole testing session."""
-    click.echo()
     display_errors(ctx)
     display_failures(ctx)
     display_statistic(ctx, event)
@@ -440,11 +420,6 @@ def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
 
 def on_interrupted(ctx: ExecutionContext, event: events.Interrupted) -> None:
     click.echo()
-    _handle_interrupted(ctx)
-
-
-def _handle_interrupted(ctx: ExecutionContext) -> None:
-    ctx.is_interrupted = True
     display_section_name("KeyboardInterrupt", "!", bold=False)
 
 
@@ -455,10 +430,9 @@ def on_internal_error(ctx: ExecutionContext, event: events.FatalError) -> None:
 
 def on_stateful_test_event(ctx: ExecutionContext, event: events.TestEvent) -> None:
     if isinstance(event, events.ScenarioFinished) and not event.is_final:
-        if event.status == Status.INTERRUPTED:
-            _handle_interrupted(ctx)
-        elif event.status is not None:
+        if event.status != Status.INTERRUPTED and event.status is not None:
             display_execution_result(ctx, event.status)
+
     # It is initialized in `PhaseStarted`
     sink = cast(StateMachineSink, ctx.state_machine_sink)
     sink.consume(event)
@@ -477,14 +451,14 @@ class DefaultOutputStyleHandler(EventHandler):
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
                 on_probing_finished(ctx, event.status)
+                click.echo("\n")
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 on_stateful_testing_finished(ctx, event.payload)
-                if not ctx.is_interrupted:
+                if event.status != Status.INTERRUPTED:
+                    click.echo("\n")
+            elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
+                if event.status != Status.INTERRUPTED:
                     click.echo()
-        elif isinstance(event, events.NonFatalError):
-            ctx.errors.append(event)
-        elif isinstance(event, events.Warning):
-            ctx.warnings.append(event.message)
         elif isinstance(event, events.BeforeExecution):
             on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):
@@ -493,6 +467,7 @@ class DefaultOutputStyleHandler(EventHandler):
             on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
             on_interrupted(ctx, event)
+            click.echo()
         elif isinstance(event, events.FatalError):
             on_internal_error(ctx, event)
         elif isinstance(event, events.TestEvent):

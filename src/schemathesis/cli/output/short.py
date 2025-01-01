@@ -13,9 +13,6 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
 
 
 def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
-    ctx.operations_processed += 1
-    if event.result.checks:
-        ctx.statistic.record_checks(event.result.label, event.result.checks)
     default.display_execution_result(ctx, event.status)
 
 
@@ -31,24 +28,21 @@ class ShortOutputStyleHandler(EventHandler):
             if event.phase.name == PhaseName.PROBING:
                 default.on_probing_started()
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
-                click.echo()
                 default.on_stateful_testing_started(ctx)
         elif isinstance(event, events.PhaseFinished):
             if event.phase.name == PhaseName.PROBING:
                 default.on_probing_finished(ctx, event.status)
+                click.echo("\n")
             elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 default.on_stateful_testing_finished(ctx, event.payload)
-        elif isinstance(event, events.NonFatalError):
-            ctx.errors.append(event)
-        elif isinstance(event, events.Warning):
-            ctx.warnings.append(event.message)
+                click.echo("\n")
+            elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
+                click.echo("\n")
         elif isinstance(event, events.BeforeExecution):
             on_before_execution(ctx, event)
         elif isinstance(event, events.AfterExecution):
             on_after_execution(ctx, event)
         elif isinstance(event, events.EngineFinished):
-            if ctx.operations_count == ctx.operations_processed:
-                click.echo()
             default.on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
             default.on_interrupted(ctx, event)

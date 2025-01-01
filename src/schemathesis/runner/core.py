@@ -50,38 +50,38 @@ class ExecutionPlan:
 
     phases: Sequence[Phase]
 
-    def execute(self, ctx: EngineContext) -> EventGenerator:
+    def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
         try:
-            if ctx.is_stopped:
-                yield from self._finish(ctx)
+            if engine.is_stopped:
+                yield from self._finish(engine)
                 return
             # Initialize
-            yield events.Initialized.from_schema(schema=ctx.config.schema, seed=ctx.config.execution.seed)
-            if ctx.is_stopped:
-                yield from self._finish(ctx)  # type: ignore[unreachable]
+            yield events.Initialized.from_schema(schema=engine.config.schema, seed=engine.config.execution.seed)
+            if engine.is_stopped:
+                yield from self._finish(engine)  # type: ignore[unreachable]
                 return
 
             # Run main phases
             for phase in self.phases:
                 yield events.PhaseStarted(phase=phase)
-                if phase.should_execute(ctx):
-                    yield from phases.execute(ctx, phase)
+                if phase.should_execute(engine):
+                    yield from phases.execute(engine, phase)
                 else:
                     yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
-                if ctx.is_stopped:
+                if engine.is_stopped:
                     break  # type: ignore[unreachable]
 
         except KeyboardInterrupt:
-            ctx.control.stop()
+            engine.stop()
             yield events.Interrupted(phase=None)
 
         # Always finish
-        yield from self._finish(ctx)
+        yield from self._finish(engine)
 
     def _finish(self, ctx: EngineContext) -> EventGenerator:
         """Finish the test run."""
-        yield events.EngineFinished(running_time=ctx.running_time, outcome_statistic=ctx.outcome_statistic)
+        yield events.EngineFinished(running_time=ctx.running_time)
 
 
 @dataclass

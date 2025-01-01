@@ -5,7 +5,6 @@ import pytest
 import schemathesis
 from schemathesis.core.errors import LoaderError
 from schemathesis.specs.openapi import expressions
-from schemathesis.stateful.graph import ExecutionGraph
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 
@@ -187,7 +186,6 @@ def test_misspelled_parameter(schema_url, parameter, message):
             case,
             elapsed=1.0,
             context=expressions.ExpressionContext(case=case, response=None),
-            execution_graph=ExecutionGraph(),
         )
 
 

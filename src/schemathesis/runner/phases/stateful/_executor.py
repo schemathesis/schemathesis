@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import queue
+import time
 from dataclasses import replace
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -20,9 +21,9 @@ from schemathesis.generation.targets import TargetMetricCollector
 from schemathesis.runner import Status, events
 from schemathesis.runner.context import EngineContext
 from schemathesis.runner.control import ExecutionControl
-from schemathesis.runner.models import Check
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.phases.stateful.context import RunnerContext
+from schemathesis.runner.recorder import ScenarioRecorder
 from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine, Direction, StepResult
 
 if TYPE_CHECKING:
@@ -66,7 +67,6 @@ def execute_state_machine_loop(
     ctx = RunnerContext(metric_collector=TargetMetricCollector(targets=config.execution.targets))
 
     transport_kwargs = engine.transport_kwargs
-    check_ctx = engine.check_context
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -76,9 +76,11 @@ def execute_state_machine_loop(
             scenario_started = events.ScenarioStarted(
                 phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, is_final=build_ctx.is_final
             )
+            self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
-            self._execution_graph = check_ctx.execution_graph
+            self.recorder = ScenarioRecorder(label="Stateful tests")
+            self._check_ctx = engine.get_check_context(self.recorder)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return transport_kwargs
@@ -99,7 +101,12 @@ def execute_state_machine_loop(
         def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
-            if engine.control.is_stopped:
+            if previous is not None:
+                step_result, _ = previous
+                self.recorder.record_case(parent_id=step_result.case.id, case=case)
+            else:
+                self.recorder.record_case(parent_id=None, case=case)
+            if engine.is_stopped:
                 raise KeyboardInterrupt
             step_started = events.StepStarted(
                 phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, scenario_id=self._scenario_id
@@ -159,24 +166,24 @@ def execute_state_machine_loop(
                         target=case.operation.label,
                         case=case,
                         response=ctx.current_response,
-                        checks=ctx.checks_for_step,
                     )
                 )
-                ctx.reset_step()
             return result
 
         def validate_response(
             self, response: Response, case: Case, additional_checks: tuple[CheckFunction, ...] = ()
         ) -> None:
+            self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
             validate_response(
                 response=response,
                 case=case,
                 runner_ctx=ctx,
-                check_ctx=check_ctx,
+                check_ctx=self._check_ctx,
                 checks=config.execution.checks,
                 control=engine.control,
+                recorder=self.recorder,
                 additional_checks=additional_checks,
             )
 
@@ -188,6 +195,9 @@ def execute_state_machine_loop(
                     suite_id=suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
                     status=ctx.current_scenario_status,
+                    recorder=self.recorder,
+                    elapsed_time=time.monotonic() - self._start_time,
+                    skip_reason=None,
                     is_final=build_ctx.is_final,
                 )
             )
@@ -205,7 +215,8 @@ def execute_state_machine_loop(
         suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
         suite_id = suite_started.id
         event_queue.put(suite_started)
-        if engine.control.is_stopped:
+        if engine.is_stopped:
+            event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
             event_queue.put(
                 events.SuiteFinished(
                     id=suite_started.id,
@@ -222,22 +233,23 @@ def execute_state_machine_loop(
             # Raised in the state machine when the stop event is set or it is raised by the user's code
             # that is placed in the base class of the state machine.
             # Therefore, set the stop event to cover the latter case
-            engine.control.stop()
+            engine.stop()
             suite_status = Status.INTERRUPTED
+            event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
             break
         except FailureGroup as exc:
             # When a check fails, the state machine is stopped
             # The failure is already sent to the queue by the state machine
             # Here we need to either exit or re-run the state machine with this failure marked as known
             suite_status = Status.FAILURE
-            if engine.control.is_stopped:
+            if engine.is_stopped:
                 break  # type: ignore[unreachable]
             for failure in exc.exceptions:
                 ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
             suite_status = Status.FAILURE
-            if engine.control.is_stopped:
+            if engine.is_stopped:
                 break  # type: ignore[unreachable]
             # Mark all failures in this suite as seen to prevent them being re-discovered
             ctx.mark_current_suite_as_seen_in_run()
@@ -275,38 +287,27 @@ def validate_response(
     check_ctx: CheckContext,
     control: ExecutionControl,
     checks: list[CheckFunction],
+    recorder: ScenarioRecorder,
     additional_checks: tuple[CheckFunction, ...] = (),
 ) -> None:
     """Validate the response against the provided checks."""
-    results = runner_ctx.checks_for_step
 
     def on_failure(name: str, collected: set[Failure], failure: Failure) -> None:
         if runner_ctx.is_seen_in_suite(failure) or runner_ctx.is_seen_in_run(failure):
             return
-        failed_check = Check(
+        failure_data = recorder.find_failure_data(parent_id=case.id, failure=failure)
+        recorder.record_check_failure(
             name=name,
-            status=Status.FAILURE,
-            headers=response.request.headers,
-            response=response,
-            case=case,
+            case_id=failure_data.case.id,
+            code_sample=failure_data.case.as_curl_command(headers=failure_data.headers, verify=failure_data.verify),
             failure=failure,
         )
-        results.append(failed_check)
         control.count_failure()
         runner_ctx.mark_as_seen_in_suite(failure)
         collected.add(failure)
 
     def on_success(name: str, case: Case) -> None:
-        results.append(
-            Check(
-                name=name,
-                status=Status.SUCCESS,
-                headers=response.request.headers,
-                response=response,
-                case=case,
-                failure=None,
-            )
-        )
+        recorder.record_check_success(name=name, case_id=case.id)
 
     failures = run_checks(
         case=case,

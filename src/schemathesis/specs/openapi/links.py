@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cas
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.generation.case import Case
 from schemathesis.schemas import APIOperation
-from schemathesis.stateful.graph import ExecutionMetadata, TransitionId
 
 from ...stateful.state_machine import Direction
 from . import expressions
@@ -63,35 +62,10 @@ class OpenAPILink(Direction):
     def set_data(self, case: Case, **kwargs: Any) -> None:
         """Assign all linked definitions to the new case instance."""
         context = kwargs["context"]
-        execution_graph = kwargs["execution_graph"]
-        overrides = self.set_parameters(case, context)
-        self.set_body(case, context, overrides)
-        overrides_all_parameters = True
-        if case.operation.body and "body" not in overrides.get("body", []):
-            overrides_all_parameters = False
-        if overrides_all_parameters:
-            for parameter in case.operation.iter_parameters():
-                if parameter.name not in overrides.get(parameter.location, []):
-                    overrides_all_parameters = False
-                    break
+        self.set_parameters(case, context)
+        self.set_body(case, context)
 
-        execution_graph.add_node(
-            case=case,
-            parent_id=context.case.id,
-            metadata=ExecutionMetadata(
-                response=context.response,
-                overrides_all_parameters=overrides_all_parameters,
-                transition_id=TransitionId(
-                    name=self.name,
-                    status_code=self.status_code,
-                ),
-            ),
-        )
-
-    def set_parameters(
-        self, case: Case, context: expressions.ExpressionContext
-    ) -> dict[Literal["path", "query", "header", "cookie", "body"], list[str]]:
-        overrides: dict[Literal["path", "query", "header", "cookie", "body"], list[str]] = {}
+    def set_parameters(self, case: Case, context: expressions.ExpressionContext) -> None:
         for location, name, expression in self.parameters:
             location, container = get_container(case, location, name)
             # Might happen if there is directly specified container,
@@ -107,18 +81,14 @@ class OpenAPILink(Direction):
             value = expressions.evaluate(expression, context)
             if value is not None:
                 container[name] = value
-                overrides.setdefault(location, []).append(name)
-        return overrides
 
     def set_body(
         self,
         case: Case,
         context: expressions.ExpressionContext,
-        overrides: dict[Literal["path", "query", "header", "cookie", "body"], list[str]],
     ) -> None:
         if self.body is not NOT_SET:
             evaluated = expressions.evaluate(self.body, context, evaluate_nested=True)
-            overrides["body"] = ["body"]
             if self.merge_body:
                 case.body = merge_body(case.body, evaluated)
             else:

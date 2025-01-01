@@ -11,7 +11,6 @@ from schemathesis.generation import generate_random_case_id
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, store_components
 from schemathesis.hooks import HookContext, dispatch
-from schemathesis.stateful.graph import ExecutionGraph
 from schemathesis.transport.prepare import prepare_request
 
 if TYPE_CHECKING:
@@ -158,7 +157,7 @@ class Case:
             headers=CaseInsensitiveDict(headers) if headers else None,
             config={},
             transport_kwargs=transport_kwargs,
-            execution_graph=ExecutionGraph(),
+            recorder=None,
         )
         failures = run_checks(
             case=self,

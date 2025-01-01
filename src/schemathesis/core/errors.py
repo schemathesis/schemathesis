@@ -11,9 +11,11 @@ from typing import TYPE_CHECKING, Any, Callable, NoReturn
 from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
-    from jsonschema import RefResolutionError, ValidationError
     from jsonschema import SchemaError as JsonSchemaError
+    from jsonschema import ValidationError
     from requests import RequestException
+
+    from schemathesis.core.compat import RefResolutionError
 
 
 SCHEMA_ERROR_SUGGESTION = "Ensure that the definition complies with the OpenAPI specification"

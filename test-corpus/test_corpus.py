@@ -9,10 +9,10 @@ import pytest
 from aiohttp.test_utils import unused_port
 from flask import Flask
 from hypothesis import HealthCheck, Phase, Verbosity
-from jsonschema import RefResolutionError
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
@@ -189,7 +189,9 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
         if not should_ignore_error(schema_id, event):
             raise AssertionError(f"{event.label}: {event.info.format()}")
     if isinstance(event, events.AfterExecution):
-        failures = [check for check in event.result.checks if check.status == Status.FAILURE]
+        failures = [
+            check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
+        ]
         assert not failures
         # Errors are checked above and unknown ones cause a test failure earlier
         assert event.status in (Status.SUCCESS, Status.SKIP, Status.ERROR)
