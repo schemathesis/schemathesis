@@ -98,7 +98,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     stream = EventStream(real_app_schema, workers_num=workers).execute()
 
     # failure
-    interactions = list(stream.find(events.AfterExecution, status=Status.FAILURE).recorder.interactions.values())
+    interactions = list(stream.find(events.ScenarioFinished, status=Status.FAILURE).recorder.interactions.values())
     assert len(interactions) == 1
     failure = interactions[0]
     assert asdict(failure.request) == {
@@ -119,7 +119,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
     assert failure.response.headers["content-type"] == ["text/plain; charset=utf-8"]
     assert failure.response.headers["content-length"] == ["26"]
     # success
-    interactions = list(stream.find(events.AfterExecution, status=Status.SUCCESS).recorder.interactions.values())
+    interactions = list(stream.find(events.ScenarioFinished, status=Status.SUCCESS).recorder.interactions.values())
     assert len(interactions) == 1
     success = interactions[0]
     assert asdict(success.request) == {
@@ -146,7 +146,7 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
 def test_asgi_interactions(fastapi_app):
     schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     stream = EventStream(schema).execute()
-    event = stream.find(events.AfterExecution)
+    event = stream.find(events.ScenarioFinished)
     interaction = list(event.recorder.interactions.values())[0]
     assert interaction.request.uri == "http://localhost/users"
 
@@ -155,7 +155,7 @@ def test_asgi_interactions(fastapi_app):
 def test_empty_response_interaction(real_app_schema):
     # When there is a GET request and a response that doesn't return content (e.g. 204)
     stream = EventStream(real_app_schema).execute()
-    interactions = list(stream.find(events.AfterExecution).recorder.interactions.values())
+    interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
     for interaction in interactions:  # There could be multiple calls
         # Then the stored request has no body
         assert interaction.request.body is None
@@ -168,7 +168,7 @@ def test_empty_response_interaction(real_app_schema):
 def test_empty_string_response_interaction(real_app_schema):
     # When there is a response that returns payload of length 0
     stream = EventStream(real_app_schema).execute()
-    interactions = stream.find(events.AfterExecution).recorder.interactions.values()
+    interactions = stream.find(events.ScenarioFinished).recorder.interactions.values()
     for interaction in interactions:  # There could be multiple calls
         # Then the stored response body should be an empty string
         assert interaction.response.content == b""
@@ -311,7 +311,7 @@ def test_unknown_response_code(real_app_schema):
 
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.AfterExecution).recorder.checks.values())[0][0]
+    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.status_code == 418
@@ -330,7 +330,7 @@ def test_unknown_response_code_with_default(real_app_schema):
     ).execute()
     # Then there should be no failure
     stream.assert_no_failures()
-    check = list(stream.find(events.AfterExecution).recorder.checks.values())[0][0]
+    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.SUCCESS
 
@@ -346,7 +346,7 @@ def test_unknown_content_type(real_app_schema):
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.AfterExecution).recorder.checks.values())[0][0]
+    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
     assert check.name == "content_type_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.content_type == "text/plain"
@@ -377,7 +377,7 @@ def test_response_conformance_invalid(real_app_schema):
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.AfterExecution).recorder.checks.values())[-1][-1]
+    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[-1][-1]
     assert check.failure_info.failure.title == "Response violates schema"
     assert (
         check.failure_info.failure.message
@@ -468,7 +468,7 @@ def test_response_conformance_malformed_json(real_app_schema):
     # Then there should be a failure
     assert stream.failures_count == 1
     stream.assert_no_errors()
-    check = list(stream.find(events.AfterExecution).recorder.checks.values())[-1][-1]
+    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[-1][-1]
     assert check.failure_info.failure.title == "JSON deserialization error"
     assert check.failure_info.failure.validation_message == "Expecting property name enclosed in double quotes"
     assert check.failure_info.failure.position == 1
@@ -515,7 +515,7 @@ def test_path_parameters_encoding(real_app_schema):
 def test_exceptions(schema_url, configuration, from_schema_options):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     stream = execute(schema, **from_schema_options)
-    assert any(event.status == Status.ERROR for event in stream.find_all(events.AfterExecution))
+    assert any(event.status == Status.ERROR for event in stream.find_all(events.ScenarioFinished))
 
 
 @pytest.mark.operations("multipart")
@@ -577,7 +577,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         schema,
         hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
     ).execute()
-    assert [case.value.path_parameters for case in stream.find(events.AfterExecution).recorder.cases.values()] == [
+    assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
         {"itemId": "456789"},
         {"itemId": "123456"},
     ]
@@ -954,7 +954,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
         checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
-    after = stream.find(events.AfterExecution)
+    after = stream.find(events.ScenarioFinished)
     assert after.status == Status.SUCCESS
     # And there should be requested amount of test examples
     assert sum(len(checks) for checks in after.recorder.checks.values()) == max_examples
@@ -1001,7 +1001,7 @@ def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
     stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
     assert stream.started.operations_count == 4
-    for event, expected in zip(stream.find_all(events.AfterExecution), ["Query.getBooks", "Query.getAuthors"]):
+    for event, expected in zip(stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"]):
         assert event.recorder.label == expected
         for case in event.recorder.cases.values():
             assert case.value.operation.label == expected
@@ -1022,7 +1022,7 @@ def test_interrupted_in_test(openapi3_schema):
 def test_interrupted_outside_test(mocker, openapi3_schema):
     # See GH-1325
     # When an interrupt happens outside a test body
-    mocker.patch("schemathesis.runner.events.AfterExecution.__init__", side_effect=KeyboardInterrupt)
+    mocker.patch("schemathesis.runner.events.ScenarioFinished.__init__", side_effect=KeyboardInterrupt)
 
     stream = EventStream(openapi3_schema).execute()
     try:
@@ -1282,7 +1282,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         ),
     ).execute()
     for event in stream.events:
-        if isinstance(event, events.AfterExecution):
+        if isinstance(event, events.ScenarioFinished):
             for case in event.recorder.cases.values():
                 for header in case.value.headers.values():
                     if header:

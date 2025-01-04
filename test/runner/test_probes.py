@@ -1,4 +1,3 @@
-import platform
 from pathlib import Path
 from unittest.mock import ANY
 
@@ -7,7 +6,6 @@ from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.errors import canonicalize_error_message
 from schemathesis.runner.phases import probes
 
 
@@ -60,24 +58,6 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
             error=None,
         )
     ]
-    assert results[0].serialize() == {
-        "error": None,
-        "name": "NULL_BYTE_IN_HEADER",
-        "request": {
-            "body": None,
-            "body_size": None,
-            "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
-                **DEFAULT_HEADERS,
-                **headers,
-            },
-            "method": "GET",
-            "uri": openapi3_base_url,
-        },
-        "response": None,
-        "outcome": "failure",
-    }
 
 
 def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_base_url, response_factory):
@@ -85,40 +65,6 @@ def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_bas
     openapi_30.base_url = openapi3_base_url
     result = probes.run(openapi_30, Session(), config)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
-    assert result.serialize() == {
-        "error": None,
-        "name": "NULL_BYTE_IN_HEADER",
-        "request": {
-            "body": None,
-            "body_size": None,
-            "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
-                **DEFAULT_HEADERS,
-            },
-            "method": "GET",
-            "uri": openapi3_base_url,
-        },
-        "response": {
-            "body": "eyJzdWNjZXNzIjogdHJ1ZX0=",
-            "body_size": 17,
-            "elapsed": 0.0,
-            "encoding": None,
-            "headers": {
-                "content-length": [
-                    "17",
-                ],
-                "content-type": [
-                    "application/json",
-                ],
-            },
-            "http_version": "1.1",
-            "message": None,
-            "status_code": 200,
-            "verify": False,
-        },
-        "outcome": "failure",
-    }
 
 
 def test_detect_null_byte_error(openapi_30, config_factory):
@@ -135,36 +81,6 @@ def test_detect_null_byte_error(openapi_30, config_factory):
             error=ANY,
         )
     ]
-    serialized = results[0].serialize()
-    serialized["error"] = canonicalize_error_message(results[0].error, False)
-    system = platform.system()
-    if system == "Windows":
-        inner_error = "[WinError 10061] No connection could be made because the target machine actively refused it"
-    elif system == "Darwin":
-        inner_error = "[Errno 61] Connection refused"
-    else:
-        inner_error = "[Errno 111] Connection refused"
-    assert serialized == {
-        "error": (
-            "requests.exceptions.ConnectionError: HTTPConnectionPool(host='127.0.0.1', port=1):  "
-            "NewConnectionError('<urllib3.connection.HTTPConnection object at 0xbaaaaaaaaaad>: "
-            f"Failed to establish a new connection: {inner_error}'))"
-        ),
-        "name": "NULL_BYTE_IN_HEADER",
-        "request": {
-            "body": None,
-            "body_size": None,
-            "headers": {
-                "X-Schemathesis-Probe": ["NULL_BYTE_IN_HEADER"],
-                "X-Schemathesis-Probe-Null": ["\x00"],
-                **DEFAULT_HEADERS,
-            },
-            "method": "GET",
-            "uri": "http://127.0.0.1:1/",
-        },
-        "response": None,
-        "outcome": "error",
-    }
 
 
 def test_detect_null_byte_skipped(openapi_30, config_factory):
@@ -180,10 +96,3 @@ def test_detect_null_byte_skipped(openapi_30, config_factory):
             error=None,
         )
     ]
-    assert results[0].serialize() == {
-        "error": None,
-        "name": "NULL_BYTE_IN_HEADER",
-        "request": None,
-        "response": None,
-        "outcome": "skip",
-    }

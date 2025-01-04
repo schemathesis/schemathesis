@@ -106,16 +106,3 @@ class Response:
         if self._encoded_body is None and self.content:
             self._encoded_body = base64.b64encode(self.content).decode()
         return self._encoded_body
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "status_code": self.status_code,
-            "message": self.message,
-            "headers": self.headers,
-            "body": self.encoded_body,
-            "body_size": self.body_size,
-            "encoding": self.encoding,
-            "http_version": self.http_version,
-            "elapsed": self.elapsed,
-            "verify": self.verify,
-        }

@@ -55,5 +55,5 @@ class ExecutionControl:
     def _is_failure_event(self, event: events.EngineEvent) -> bool:
         """Determine if event should count towards failure limit."""
         return (
-            isinstance(event, events.AfterExecution) and event.status in (Status.ERROR, Status.FAILURE)
+            isinstance(event, events.ScenarioFinished) and event.status in (Status.ERROR, Status.FAILURE)
         ) or isinstance(event, events.FatalError)
