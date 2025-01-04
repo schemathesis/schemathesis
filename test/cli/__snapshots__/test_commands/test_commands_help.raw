@@ -10,5 +10,4 @@ Options:
   -h, --help  Show this message and exit.
 
 Commands:
-  replay  Replay requests from a saved cassette.
-  run     Execute automated tests based on API specifications
+  run  Execute automated tests based on API specifications

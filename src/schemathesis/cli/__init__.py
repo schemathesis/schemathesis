@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import os
 import sys
 from collections import defaultdict
@@ -13,7 +12,6 @@ import schemathesis.specs.openapi.checks as checks
 from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.cli import env
 from schemathesis.cli.output import OutputHandler
-from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, format_exception
 from schemathesis.core.fs import ensure_parent
 from schemathesis.core.output import OutputConfig
@@ -21,7 +19,7 @@ from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, settings
 from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
-from schemathesis.runner import Status, events
+from schemathesis.runner import events
 
 from .. import contrib, experimental, generation, runner
 from ..filters import FilterSet, expression_to_filter_function, is_deprecated
@@ -1029,9 +1027,7 @@ def execute(
     finally:
         shutdown()
     if event is not None and event.is_terminal:
-        if execution_context.errors or Status.FAILURE in execution_context.statistic.outcomes:
-            sys.exit(1)
-        sys.exit(0)
+        sys.exit(execution_context.get_exit_code())
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)
@@ -1074,78 +1070,6 @@ def display_handler_error(handler: EventHandler, exc: Exception) -> None:
         click.echo(
             f"\nFor more information on implementing extensions for Schemathesis CLI, visit {EXTENSIONS_DOCUMENTATION_URL}"
         )
-
-
-@schemathesis.command(short_help="Replay requests from a saved cassette.")
-@click.argument("cassette_path", type=click.Path(exists=True))
-@click.option("--id", "id_", help="ID of interaction to replay", type=str)
-@click.option("--status", help="Status of interactions to replay", type=str)
-@click.option("--uri", help="A regexp that filters interactions by their request URI", type=str)
-@click.option("--method", help="A regexp that filters interactions by their request method", type=str)
-@click.option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
-@click.option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
-@click.option("--verbosity", "-v", help="Increase verbosity of the output", count=True)
-@with_request_tls_verify
-@with_request_proxy
-@with_request_cert
-@with_request_cert_key
-@click.pass_context
-def replay(
-    ctx: click.Context,
-    cassette_path: str,
-    id_: str | None,
-    status: str | None = None,
-    uri: str | None = None,
-    method: str | None = None,
-    no_color: bool = False,
-    verbosity: int = 0,
-    request_tls_verify: bool = True,
-    request_cert: str | None = None,
-    request_cert_key: str | None = None,
-    request_proxy: str | None = None,
-    force_color: bool = False,
-) -> None:
-    """Replay a cassette.
-
-    Cassettes in VCR-compatible format can be replayed.
-    For example, ones that are recorded with the ``--cassette-path`` option of the `st run` command.
-    """
-    if no_color and force_color:
-        raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
-    decide_color_output(ctx, no_color, force_color)
-
-    click.secho(f"{bold('Replaying cassette')}: {cassette_path}")
-    with open(cassette_path, "rb") as fd:
-        cassette = deserialize_yaml(fd)
-    click.secho(f"{bold('Total interactions')}: {len(cassette['http_interactions'])}\n")
-    for replayed in cassettes.replay(
-        cassette,
-        id_=id_,
-        status=status,
-        uri=uri,
-        method=method,
-        request_tls_verify=request_tls_verify,
-        request_cert=prepare_request_cert(request_cert, request_cert_key),
-        request_proxy=request_proxy,
-    ):
-        click.secho(f"  {bold('ID')}              : {replayed.interaction['id']}")
-        click.secho(f"  {bold('URI')}             : {replayed.interaction['request']['uri']}")
-        click.secho(f"  {bold('Old status code')} : {replayed.interaction['response']['status']['code']}")
-        click.secho(f"  {bold('New status code')} : {replayed.response.status_code}")
-        if verbosity > 0:
-            data = replayed.interaction["response"]
-            old_body = ""
-            # Body may be missing for 204 responses
-            if "body" in data:
-                if "base64_string" in data["body"]:
-                    content = data["body"]["base64_string"]
-                    if content:
-                        old_body = base64.b64decode(content).decode(errors="replace")
-                else:
-                    old_body = data["body"]["string"]
-            click.secho(f"  {bold('Old payload')} : {old_body}")
-            click.secho(f"  {bold('New payload')} : {replayed.response.text}")
-        click.echo()
 
 
 def bold(message: str) -> str:

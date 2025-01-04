@@ -1,16 +1,14 @@
 from __future__ import annotations
 
-import base64
 import datetime
 import enum
 import json
-import re
 import sys
 import threading
 from dataclasses import dataclass, field
 from http.cookies import SimpleCookie
 from queue import Queue
-from typing import IO, TYPE_CHECKING, Any, Callable, Generator, Iterator, cast
+from typing import IO, TYPE_CHECKING, Callable, Iterator
 from urllib.parse import parse_qsl, urlparse
 
 import harfile
@@ -27,7 +25,6 @@ from .handlers import EventHandler
 
 if TYPE_CHECKING:
     import click
-    import requests
 
     from .context import ExecutionContext
 
@@ -487,102 +484,3 @@ def _cookie_to_har(cookie: str) -> Iterator[harfile.Cookie]:
             httpOnly=data["httponly"] or None,
             secure=data["secure"] or None,
         )
-
-
-@dataclass
-class Replayed:
-    interaction: dict[str, Any]
-    response: requests.Response
-
-
-def replay(
-    cassette: dict[str, Any],
-    id_: str | None = None,
-    status: str | None = None,
-    uri: str | None = None,
-    method: str | None = None,
-    request_tls_verify: bool = True,
-    request_cert: str | tuple[str, str] | None = None,
-    request_proxy: str | None = None,
-) -> Generator[Replayed, None, None]:
-    """Replay saved interactions."""
-    import requests
-
-    session = requests.Session()
-    session.verify = request_tls_verify
-    session.cert = request_cert
-    kwargs = {}
-    if request_proxy is not None:
-        kwargs["proxies"] = {"all": request_proxy}
-    for interaction in filter_cassette(cassette["http_interactions"], id_, status, uri, method):
-        request = get_prepared_request(interaction["request"])
-        response = session.send(request, **kwargs)  # type: ignore
-        yield Replayed(interaction, response)
-
-
-def filter_cassette(
-    interactions: list[dict[str, Any]],
-    id_: str | None = None,
-    status: str | None = None,
-    uri: str | None = None,
-    method: str | None = None,
-) -> Iterator[dict[str, Any]]:
-    filters = []
-
-    def id_filter(item: dict[str, Any]) -> bool:
-        return item["id"] == id_
-
-    def status_filter(item: dict[str, Any]) -> bool:
-        status_ = cast(str, status)
-        return item["status"].upper() == status_.upper()
-
-    def uri_filter(item: dict[str, Any]) -> bool:
-        uri_ = cast(str, uri)
-        return bool(re.search(uri_, item["request"]["uri"]))
-
-    def method_filter(item: dict[str, Any]) -> bool:
-        method_ = cast(str, method)
-        return bool(re.search(method_, item["request"]["method"]))
-
-    if id_ is not None:
-        filters.append(id_filter)
-
-    if status is not None:
-        filters.append(status_filter)
-
-    if uri is not None:
-        filters.append(uri_filter)
-
-    if method is not None:
-        filters.append(method_filter)
-
-    def is_match(interaction: dict[str, Any]) -> bool:
-        return all(filter_(interaction) for filter_ in filters)
-
-    return filter(is_match, interactions)
-
-
-def get_prepared_request(data: dict[str, Any]) -> requests.PreparedRequest:
-    """Create a `requests.PreparedRequest` from a serialized one."""
-    import requests
-    from requests.cookies import RequestsCookieJar
-    from requests.structures import CaseInsensitiveDict
-
-    prepared = requests.PreparedRequest()
-    prepared.method = data["method"]
-    prepared.url = data["uri"]
-    prepared._cookies = RequestsCookieJar()  # type: ignore
-    if "body" in data:
-        body = data["body"]
-        if "base64_string" in body:
-            content = body["base64_string"]
-            if content:
-                prepared.body = base64.b64decode(content)
-        else:
-            content = body["string"]
-            if content:
-                prepared.body = content.encode("utf8")
-    # There is always 1 value in a request
-    headers = [(key, value[0]) for key, value in data["headers"].items()]
-    prepared.headers = CaseInsensitiveDict(headers)
-    return prepared

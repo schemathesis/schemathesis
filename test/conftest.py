@@ -470,10 +470,6 @@ def cli():
             return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
 
         @staticmethod
-        def replay(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.replay, args, **kwargs)
-
-        @staticmethod
         def main(*args, hooks=None, **kwargs):
             if hooks is not None:
                 env = kwargs.setdefault("env", {})

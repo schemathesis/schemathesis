@@ -2,31 +2,17 @@ import base64
 import io
 import json
 import platform
-import re
 from unittest.mock import ANY
-from urllib.parse import parse_qsl, quote_plus, unquote_plus, urlencode, urlparse, urlunparse
 
 import harfile
 import pytest
-import requests
 import yaml
 from _pytest.main import ExitCode
 from hypothesis import example, given
 from hypothesis import strategies as st
-from urllib3._collections import HTTPHeaderDict
 
-from schemathesis.cli.cassettes import (
-    CassetteFormat,
-    _cookie_to_har,
-    filter_cassette,
-    get_command_representation,
-    get_prepared_request,
-    write_double_quoted,
-)
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
-from schemathesis.core.transport import USER_AGENT
+from schemathesis.cli.cassettes import CassetteFormat, _cookie_to_har, get_command_representation, write_double_quoted
 from schemathesis.generation import GenerationMode
-from schemathesis.runner.recorder import Request
 
 
 @pytest.fixture
@@ -204,77 +190,6 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
 
 
 @pytest.mark.operations("__all__")
-@pytest.mark.parametrize("verbose", [True, False])
-@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
-async def test_replay(
-    openapi_version, cli, schema_url, app, reset_app, cassette_path, hypothesis_max_examples, verbose, args
-):
-    # Record a cassette
-    result = cli.run(
-        schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
-        "--checks=all",
-        *args,
-    )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    case_ids = re.findall("Test Case ID: (\\w+)", result.stdout)
-    # these requests are not needed
-    reset_app(openapi_version)
-    assert not app["incoming_requests"]
-    # When a valid cassette is replayed
-    replay_args = []
-    if verbose:
-        replay_args.append("-v")
-    result = cli.replay(str(cassette_path), *replay_args)
-    assert result.exit_code == ExitCode.OK, result.stdout
-    if verbose:
-        assert "Old payload : {" in result.stdout
-        assert "New payload : {" in result.stdout
-    cassette = load_cassette(cassette_path)
-    interactions = cassette["http_interactions"]
-    for case_id in case_ids:
-        found = False
-        existing_ids = []
-        for interaction in interactions:
-            current_case_id = interaction["request"]["headers"][SCHEMATHESIS_TEST_CASE_HEADER][0]
-            existing_ids.append(current_case_id)
-            if current_case_id == case_id:
-                found = True
-                break
-        if not found:
-            raise AssertionError(
-                f"Test case with ID `{case_id}` is not found in the cassette. Existing IDs: {existing_ids}"
-            )
-    # Then there should be the same number or fewer of requests made to the app as there are in the cassette
-    # Note. Some requests that Schemathesis can send aren't parsed by aiohttp, because of e.g. invalid characters in
-    # headers
-    assert len(app["incoming_requests"]) <= len(interactions)
-    # And if there were no requests that aiohttp failed to parse, we can compare cassette & app records
-    if len(app["incoming_requests"]) == len(interactions):
-        for interaction, request in zip(interactions, app["incoming_requests"]):
-            # And these requests should be equal
-            serialized = interaction["request"]
-            assert request.method == serialized["method"]
-            parsed = urlparse(str(request.url))
-            encoded_query = urlencode(parse_qsl(parsed.query, keep_blank_values=True))
-            encoded_path = quote_plus(unquote_plus(parsed.path), "/")
-            url = urlunparse(
-                (parsed.scheme, parsed.netloc, encoded_path, parsed.params, encoded_query, parsed.fragment)
-            )
-            assert unquote_plus(url) == unquote_plus(serialized["uri"]), request.url
-            content = await request.read()
-            if "body" in serialized:
-                if "base64_string" in serialized["body"]:
-                    assert content == base64.b64decode(serialized["body"]["base64_string"])
-                else:
-                    stored_content = serialized["body"]["string"].encode()
-                    assert content == stored_content or content == stored_content.strip()
-                compare_headers(request, serialized["headers"])
-
-
-@pytest.mark.operations("__all__")
 @pytest.mark.parametrize("value", ["true", "false"])
 @pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
 def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args, value):
@@ -362,44 +277,6 @@ def request_args(request, tmp_path):
         return ["--request-proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
 
 
-@pytest.mark.openapi_version("3.0")
-def test_replay_requests_options(cli, schema_url, cassette_path, request_args, mocker):
-    # Record a cassette
-    cli.run(
-        schema_url,
-        f"--cassette-path={cassette_path}",
-        "--hypothesis-max-examples=1",
-        "--hypothesis-seed=1",
-        "--checks=all",
-    )
-    send = mocker.spy(requests.adapters.HTTPAdapter, "send")
-    # When parameters for `requests` are passed via command line
-    args, key, expected, exit_code = request_args
-    result = cli.replay(str(cassette_path), *args)
-    assert result.exit_code == exit_code, result.stdout
-    # Then they should properly setup replayed requests
-    for _, kwargs in send.call_args_list:
-        assert kwargs[key] == expected
-
-
-@pytest.mark.operations("headers")
-def test_headers_serialization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path):
-    # See GH-783
-    # When headers contain control characters that are not directly representable in YAML
-    result = cli.run(
-        openapi2_schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
-        "--hypothesis-seed=1",
-    )
-    # Then tests should pass
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # And cassette can be replayed
-    result = cli.replay(str(cassette_path))
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # And should be loadable
-
-
 @pytest.mark.parametrize("value", ["true", "false"])
 @pytest.mark.operations("headers")
 def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, cassette_path, value):
@@ -428,59 +305,6 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         for entry in interactions
         if "X-Token" in entry["response"]["headers"]
     )
-
-
-def test_multiple_cookies(base_url):
-    headers = {"User-Agent": USER_AGENT}
-    response = requests.get(f"{base_url}/success", cookies={"foo": "bar", "baz": "spam"}, headers=headers, timeout=1)
-    request = Request.from_prepared_request(response.request)
-    serialized = {
-        "uri": request.uri,
-        "method": request.method,
-        "headers": request.headers,
-        "body": {"encoding": "utf-8", "base64_string": request.body},
-    }
-    assert USER_AGENT in serialized["headers"]["User-Agent"]
-    prepared = get_prepared_request(serialized)
-    compare_headers(prepared, serialized["headers"])
-
-
-def compare_headers(request, serialized):
-    headers = HTTPHeaderDict()
-    for name, value in serialized.items():
-        for sub in value:
-            headers.add(name, sub)
-        assert request.headers[name] == headers[name]
-
-
-def test_empty_body():
-    # When `body` is an empty string
-    request = get_prepared_request({"method": "POST", "uri": "http://127.0.0.1", "body": {"string": ""}, "headers": {}})
-    # Then the resulting request will not have a body
-    assert request.body is None
-
-
-@pytest.mark.parametrize(
-    ("filters", "expected"),
-    [
-        ({"id_": "1"}, ["1"]),
-        ({"id_": "2"}, ["2"]),
-        ({"status": "SUCCESS"}, ["1"]),
-        ({"status": "success"}, ["1"]),
-        ({"status": "ERROR"}, ["2"]),
-        ({"uri": "succe.*"}, ["1"]),
-        ({"method": "PO"}, ["2"]),
-        ({"uri": "error|failure"}, ["2", "3"]),
-        ({"uri": "error|failure", "method": "POST"}, ["2"]),
-    ],
-)
-def test_filter_cassette(filters, expected):
-    cassette = [
-        {"id": "1", "status": "SUCCESS", "request": {"uri": "http://127.0.0.1/api/success", "method": "GET"}},
-        {"id": "2", "status": "ERROR", "request": {"uri": "http://127.0.0.1/api/error", "method": "POST"}},
-        {"id": "3", "status": "FAILURE", "request": {"uri": "http://127.0.0.1/api/failure", "method": "PUT"}},
-    ]
-    assert list(filter_cassette(cassette, **filters)) == [item for item in cassette if item["id"] in expected]
 
 
 @pytest.mark.openapi_version("3.0")
