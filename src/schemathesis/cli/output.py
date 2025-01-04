@@ -42,60 +42,6 @@ def get_percentage(position: int, length: int) -> str:
     return f"[{percentage_message}]"
 
 
-def display_summary(ctx: ExecutionContext, event: events.EngineFinished) -> None:
-    message, color = get_summary_output(ctx, event)
-    display_section_name(message, fg=color)
-
-
-def get_summary_message_parts(ctx: ExecutionContext) -> list[str]:
-    parts = []
-    passed = ctx.statistic.outcomes.get(Status.SUCCESS)
-    if passed:
-        parts.append(f"{passed} passed")
-    failed = ctx.statistic.outcomes.get(Status.FAILURE)
-    if failed:
-        parts.append(f"{failed} failed")
-    errored = len(ctx.errors)
-    if errored:
-        parts.append(f"{errored} errored")
-    skipped = ctx.statistic.outcomes.get(Status.SKIP)
-    if skipped:
-        parts.append(f"{skipped} skipped")
-    return parts
-
-
-def get_summary_output(ctx: ExecutionContext, event: events.EngineFinished) -> tuple[str, str]:
-    parts = get_summary_message_parts(ctx)
-    if not parts:
-        message = "Empty test suite"
-        color = "yellow"
-    else:
-        message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-        if Status.FAILURE in ctx.statistic.outcomes or Status.ERROR in ctx.statistic.outcomes:
-            color = "red"
-        elif Status.SKIP in ctx.statistic.outcomes:
-            color = "yellow"
-        else:
-            color = "green"
-    return message, color
-
-
-def display_errors(ctx: ExecutionContext) -> None:
-    """Display all errors in the test run."""
-    if not ctx.errors:
-        return
-
-    display_section_name("ERRORS")
-    errors = sorted(ctx.errors, key=lambda r: (r.phase.value, r.label))
-    for error in errors:
-        display_section_name(error.label, "_", fg="red")
-        click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
-    click.secho(
-        f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
-        fg="red",
-    )
-
-
 def bold(option: str) -> str:
     return click.style(option, bold=True)
 
@@ -233,6 +179,7 @@ class OutputHandler(EventHandler):
     cassette_path: str | None = None
     junit_xml_file: str | None = None
     warnings: list[str] = field(default_factory=list)
+    errors: list[events.NonFatalError] = field(default_factory=list)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.Initialized):
@@ -251,6 +198,8 @@ class OutputHandler(EventHandler):
             self._on_interrupted()
         elif isinstance(event, events.FatalError):
             self._on_fatal_error(event)
+        elif isinstance(event, events.NonFatalError):
+            self.errors.append(event)
         elif isinstance(event, events.Warning):
             self.warnings.append(event.message)
 
@@ -383,7 +332,16 @@ class OutputHandler(EventHandler):
         raise click.Abort
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
-        display_errors(ctx)
+        if self.errors:
+            display_section_name("ERRORS")
+            errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label))
+            for error in errors:
+                display_section_name(error.label, "_", fg="red")
+                click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+            click.secho(
+                f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
+                fg="red",
+            )
         display_failures(ctx)
         display_section_name("SUMMARY")
         click.echo()
@@ -437,7 +395,31 @@ class OutputHandler(EventHandler):
             click.echo()
             _print_lines(ctx.summary_lines)
         click.echo()
-        display_summary(ctx, event)
+        parts = []
+        passed = ctx.statistic.outcomes.get(Status.SUCCESS)
+        if passed:
+            parts.append(f"{passed} passed")
+        failed = ctx.statistic.outcomes.get(Status.FAILURE)
+        if failed:
+            parts.append(f"{failed} failed")
+        errored = len(self.errors)
+        if errored:
+            parts.append(f"{errored} errored")
+        skipped = ctx.statistic.outcomes.get(Status.SKIP)
+        if skipped:
+            parts.append(f"{skipped} skipped")
+        if not parts:
+            message = "Empty test suite"
+            color = "yellow"
+        else:
+            message = f'{", ".join(parts)} in {event.running_time:.2f}s'
+            if Status.FAILURE in ctx.statistic.outcomes or Status.ERROR in ctx.statistic.outcomes:
+                color = "red"
+            elif Status.SKIP in ctx.statistic.outcomes:
+                color = "yellow"
+            else:
+                color = "green"
+        display_section_name(message, fg=color)
 
     def display_percentage(self) -> None:
         """Add the current progress in % to the right side of the current line."""

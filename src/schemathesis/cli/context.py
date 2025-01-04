@@ -8,7 +8,6 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.transport import Response
 from schemathesis.runner import Status, events
-from schemathesis.runner.events import NonFatalError
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.recorder import ScenarioRecorder
 from schemathesis.stateful.sink import StateMachineSink
@@ -79,11 +78,16 @@ class ExecutionContext:
     """Storage for the current context of the execution."""
 
     statistic: Statistic = field(default_factory=Statistic)
-    errors: list[NonFatalError] = field(default_factory=list)
+    _exit_code: int = 0
     output_config: OutputConfig = field(default_factory=OutputConfig)
     state_machine_sink: StateMachineSink | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
+
+    def get_exit_code(self) -> int:
+        if Status.FAILURE in self.statistic.outcomes:
+            return 1
+        return self._exit_code
 
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)
@@ -100,7 +104,7 @@ class ExecutionContext:
             if event.phase == PhaseName.UNIT_TESTING:
                 self.statistic.record_outcome(event.status)
         elif isinstance(event, events.NonFatalError):
-            self.errors.append(event)
+            self._exit_code = 1
         elif isinstance(event, events.PhaseStarted):
             if event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 from schemathesis.specs.openapi.stateful.statistic import OpenAPILinkStats
