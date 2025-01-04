@@ -134,8 +134,6 @@ Output options:
                                         [default: True]
   --output-truncate TEXT                Truncate schemas and responses in error
                                         messages  [default: true]
-  --debug-output-file FILENAME          Save debugging information in a JSONL
-                                        format at the specified file path
 
 Data generation options:
   --generation-mode                         Specify the approach Schemathesis

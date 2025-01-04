@@ -131,15 +131,13 @@ def csv_strategy(enum, exclude=()):
 @example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[], csv_params=[])
 @example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
-def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params, tmp_path):
-    debug = tmp_path / "debug.log"
+def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(
         schema_url,
         *params,
         *multiple_params,
         *flags,
         *csv_params,
-        f"--debug-output-file={debug}",
     )
     check_result(result)
 

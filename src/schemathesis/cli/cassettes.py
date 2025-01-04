@@ -82,7 +82,7 @@ class CassetteWriter(EventHandler):
         if isinstance(event, events.Initialized):
             # In the beginning we write metadata and start `http_interactions` list
             self.queue.put(Initialize(seed=event.seed))
-        elif isinstance(event, (events.AfterExecution, events.ScenarioFinished)):
+        elif isinstance(event, events.ScenarioFinished):
             self.queue.put(Process(recorder=event.recorder))
         elif isinstance(event, events.EngineFinished):
             self.shutdown()

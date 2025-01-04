@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import uuid
 from queue import Queue
 from types import TracebackType
 from typing import TYPE_CHECKING, Callable
@@ -27,11 +28,19 @@ class TaskProducer:
 class WorkerPool:
     """Manages a pool of worker threads."""
 
-    def __init__(self, workers_num: int, producer: TaskProducer, worker_factory: Callable, ctx: EngineContext) -> None:
+    def __init__(
+        self,
+        workers_num: int,
+        producer: TaskProducer,
+        worker_factory: Callable,
+        ctx: EngineContext,
+        suite_id: uuid.UUID,
+    ) -> None:
         self.workers_num = workers_num
         self.producer = producer
         self.worker_factory = worker_factory
         self.ctx = ctx
+        self.suite_id = suite_id
         self.workers: list[threading.Thread] = []
         self.events_queue: Queue = Queue()
 
@@ -44,6 +53,7 @@ class WorkerPool:
                     "ctx": self.ctx,
                     "events_queue": self.events_queue,
                     "producer": self.producer,
+                    "suite_id": self.suite_id,
                 },
                 name=f"schemathesis_{i}",
                 daemon=True,

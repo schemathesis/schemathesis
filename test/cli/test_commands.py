@@ -1,5 +1,4 @@
 import http.client
-import json
 import os
 import pathlib
 import platform
@@ -1152,27 +1151,6 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--checks=all", "--sanitize-output=false", f"-H Authorization: {auth}") == snapshot_cli
 
 
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("__all__")
-def test_debug_output(tmp_path, cli, schema_url, hypothesis_max_examples):
-    # When the `--debug-output-file` option is passed
-    debug_file = tmp_path / "debug.jsonl"
-    cassette_path = tmp_path / "output.yaml"
-    result = cli.run(
-        schema_url,
-        f"--debug-output-file={debug_file}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        f"--cassette-path={cassette_path}",
-    )
-    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
-    # Then all underlying runner events should be stored as JSONL file
-    assert debug_file.exists()
-    with debug_file.open(encoding="utf-8") as fd:
-        lines = fd.readlines()
-    for line in lines:
-        json.loads(line)
-
-
 @pytest.mark.operations("cp866")
 def test_response_payload_encoding(cli, schema_url, snapshot_cli):
     # See GH-1073
@@ -1247,7 +1225,6 @@ def assert_exit_code(event_stream, code):
             wait_for_schema=None,
             cassette_config=None,
             junit_xml=None,
-            debug_output_file=None,
             output_config=None,
         )
     assert exc.value.code == code
@@ -1263,15 +1240,13 @@ def test_cli_execute(swagger_20, capsys):
 
 @pytest.mark.parametrize("base_url", [None, "http://127.0.0.1/apiv2"])
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
-def test_missing_content_and_schema(ctx, cli, base_url, tmp_path, location, snapshot_cli):
-    debug_file = tmp_path / "debug.jsonl"
+def test_missing_content_and_schema(ctx, cli, base_url, location, snapshot_cli):
     # When an Open API 3 parameter is missing `schema` & `content`
     schema_path = ctx.openapi.write_schema(
         {"/foo": {"get": {"parameters": [{"in": location, "name": "X-Foo", "required": True}]}}}
     )
     args = [
         str(schema_path),
-        f"--debug-output-file={debug_file}",
         "--dry-run",
         "--hypothesis-max-examples=1",
     ]

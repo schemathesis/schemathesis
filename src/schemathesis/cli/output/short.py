@@ -8,11 +8,7 @@ from ..handlers import EventHandler
 from . import default
 
 
-def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) -> None:
-    pass
-
-
-def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
+def on_scenario_finished(ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
     default.display_execution_result(ctx, event.status)
 
 
@@ -38,10 +34,6 @@ class ShortOutputStyleHandler(EventHandler):
                 click.echo("\n")
             elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
                 click.echo("\n")
-        elif isinstance(event, events.BeforeExecution):
-            on_before_execution(ctx, event)
-        elif isinstance(event, events.AfterExecution):
-            on_after_execution(ctx, event)
         elif isinstance(event, events.EngineFinished):
             default.on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
@@ -51,3 +43,5 @@ class ShortOutputStyleHandler(EventHandler):
         elif isinstance(event, events.TestEvent):
             if event.phase == PhaseName.STATEFUL_TESTING:
                 default.on_stateful_test_event(ctx, event)
+            elif event.phase == PhaseName.UNIT_TESTING and isinstance(event, events.ScenarioFinished):
+                on_scenario_finished(ctx, event)

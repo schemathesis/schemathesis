@@ -72,10 +72,7 @@ def execute_state_machine_loop(
         """State machine with additional hooks for emitting events."""
 
         def setup(self) -> None:
-            build_ctx = current_build_context()
-            scenario_started = events.ScenarioStarted(
-                phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, is_final=build_ctx.is_final
-            )
+            scenario_started = events.ScenarioStarted(label=None, phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id)
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
@@ -164,7 +161,6 @@ def execute_state_machine_loop(
                         status=ctx.current_step_status,
                         transition_id=transition_id,
                         target=case.operation.label,
-                        case=case,
                         response=ctx.current_response,
                     )
                 )
@@ -194,7 +190,8 @@ def execute_state_machine_loop(
                     id=self._scenario_id,
                     suite_id=suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
-                    status=ctx.current_scenario_status,
+                    # With dry run there will be no status
+                    status=ctx.current_scenario_status or Status.SKIP,
                     recorder=self.recorder,
                     elapsed_time=time.monotonic() - self._start_time,
                     skip_reason=None,

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any
 
 from schemathesis.generation import GenerationMode
 
@@ -114,22 +113,3 @@ class CaseMetadata:
         self.generation = generation
         self.components = components
         self.phase = phase
-
-    def asdict(self) -> dict[str, Any]:
-        data: dict[str, Any] = {
-            "generation": {"time": self.generation.time, "mode": self.generation.mode.value},
-            "phase": {"name": self.phase.name.value},
-            "components": {kind.value: {"mode": info.mode} for kind, info in self.components.items()},
-        }
-
-        if isinstance(self.phase.data, CoveragePhaseData):
-            data["phase"]["data"] = {
-                "description": self.phase.data.description,
-                "location": self.phase.data.location,
-                "parameter": self.phase.data.parameter,
-                "parameter_location": self.phase.data.parameter_location,
-            }
-        elif isinstance(self.phase.data, (GeneratePhaseData, ExplicitPhaseData)):
-            data["phase"]["data"] = {}
-
-        return data

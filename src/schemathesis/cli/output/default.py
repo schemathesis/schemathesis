@@ -60,7 +60,7 @@ def display_execution_result(ctx: ExecutionContext, status: Status) -> None:
     click.secho(symbol, nl=False, fg=color)
 
 
-def display_percentage(ctx: ExecutionContext, event: events.AfterExecution) -> None:
+def display_percentage(ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
     """Add the current progress in % to the right side of the current line."""
     operations_count = cast(int, ctx.operations_count)  # is already initialized via `Initialized` event
     current_percentage = get_percentage(ctx.operations_processed, operations_count)
@@ -381,9 +381,10 @@ def on_stateful_testing_finished(ctx: ExecutionContext, payload: StatefulTesting
 TRUNCATION_PLACEHOLDER = "[...]"
 
 
-def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) -> None:
+def on_scenario_started(ctx: ExecutionContext, event: events.ScenarioStarted) -> None:
     """Display what method / path will be tested next."""
     # We should display execution result + percentage in the end. For example:
+    assert event.label is not None
     max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
     message = event.label
     message = message[:max_length] + (message[max_length:] and "[...]") + " "
@@ -391,7 +392,7 @@ def on_before_execution(ctx: ExecutionContext, event: events.BeforeExecution) ->
     click.echo(message, nl=False)
 
 
-def on_after_execution(ctx: ExecutionContext, event: events.AfterExecution) -> None:
+def on_scenario_finished(ctx: ExecutionContext, event: events.ScenarioFinished) -> None:
     """Display the execution result + current progress at the same line with the method / path names."""
     display_execution_result(ctx, event.status)
     display_percentage(ctx, event)
@@ -459,10 +460,6 @@ class DefaultOutputStyleHandler(EventHandler):
             elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
                 if event.status != Status.INTERRUPTED:
                     click.echo()
-        elif isinstance(event, events.BeforeExecution):
-            on_before_execution(ctx, event)
-        elif isinstance(event, events.AfterExecution):
-            on_after_execution(ctx, event)
         elif isinstance(event, events.EngineFinished):
             on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
@@ -473,3 +470,8 @@ class DefaultOutputStyleHandler(EventHandler):
         elif isinstance(event, events.TestEvent):
             if event.phase == PhaseName.STATEFUL_TESTING:
                 on_stateful_test_event(ctx, event)
+            elif event.phase == PhaseName.UNIT_TESTING:
+                if isinstance(event, events.ScenarioStarted):
+                    on_scenario_started(ctx, event)
+                elif isinstance(event, events.ScenarioFinished):
+                    on_scenario_finished(ctx, event)

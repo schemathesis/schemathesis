@@ -5,9 +5,7 @@ import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Generator
 
-from schemathesis.core.errors import format_exception
 from schemathesis.core.transport import Response
-from schemathesis.generation.case import Case
 from schemathesis.runner.errors import EngineErrorInfo
 from schemathesis.runner.phases import Phase, PhaseName
 from schemathesis.runner.recorder import ScenarioRecorder
@@ -31,16 +29,6 @@ class EngineEvent:
     # Indicates whether this event is the last in the event stream
     is_terminal = False
 
-    def _asdict(self) -> dict[str, Any]:
-        return {}
-
-    def asdict(self, **kwargs: Any) -> dict[str, Any]:
-        data = self._asdict()
-        data["id"] = self.id.hex
-        data["timestamp"] = self.timestamp
-        data.update(**kwargs)
-        return {self.__class__.__name__: data}
-
 
 @dataclass
 class PhaseEvent(EngineEvent):
@@ -60,9 +48,6 @@ class PhaseStarted(PhaseEvent):
         self.timestamp = time.time()
         self.phase = phase
 
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.asdict()}
-
 
 @dataclass
 class PhaseFinished(PhaseEvent):
@@ -79,17 +64,6 @@ class PhaseFinished(PhaseEvent):
         self.phase = phase
         self.status = status
         self.payload = payload
-
-    def _asdict(self) -> dict[str, Any]:
-        data: dict[str, Any] = {
-            "phase": self.phase.asdict(),
-            "status": self.status.name,
-        }
-        if self.payload is None:
-            data["payload"] = None
-        else:
-            data["payload"] = self.payload.asdict()
-        return data
 
 
 @dataclass
@@ -108,9 +82,6 @@ class SuiteStarted(TestEvent):
         self.timestamp = time.time()
         self.phase = phase
 
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.name}
-
 
 @dataclass
 class SuiteFinished(TestEvent):
@@ -126,12 +97,6 @@ class SuiteFinished(TestEvent):
         self.phase = phase
         self.status = status
 
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "phase": self.phase.name,
-            "status": self.status,
-        }
-
 
 @dataclass
 class ScenarioEvent(TestEvent):
@@ -142,27 +107,21 @@ class ScenarioEvent(TestEvent):
 class ScenarioStarted(ScenarioEvent):
     """Before executing a grouped set of test steps."""
 
-    # Whether this is a scenario that tries to reproduce a failure
-    is_final: bool
+    __slots__ = ("id", "timestamp", "phase", "suite_id", "label")
 
-    __slots__ = ("id", "timestamp", "phase", "suite_id", "is_final")
-
-    def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, is_final: bool) -> None:
+    def __init__(self, *, phase: PhaseName, suite_id: uuid.UUID, label: str | None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
         self.suite_id = suite_id
-        self.is_final = is_final
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.name, "is_final": self.is_final}
+        self.label = label
 
 
 @dataclass
 class ScenarioFinished(ScenarioEvent):
     """After executing a grouped set of test steps."""
 
-    status: Status | None
+    status: Status
     recorder: ScenarioRecorder
     elapsed_time: float
     skip_reason: str | None
@@ -187,7 +146,7 @@ class ScenarioFinished(ScenarioEvent):
         id: uuid.UUID,
         phase: PhaseName,
         suite_id: uuid.UUID,
-        status: Status | None,
+        status: Status,
         recorder: ScenarioRecorder,
         elapsed_time: float,
         skip_reason: str | None,
@@ -202,9 +161,6 @@ class ScenarioFinished(ScenarioEvent):
         self.elapsed_time = elapsed_time
         self.skip_reason = skip_reason
         self.is_final = is_final
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"is_final": self.is_final, "status": self.status}
 
 
 @dataclass
@@ -266,7 +222,6 @@ class StepFinished(StepEvent):
     status: Status | None
     transition_id: TransitionId | None
     target: str
-    case: Case
     response: Response | None
 
     __slots__ = (
@@ -278,7 +233,6 @@ class StepFinished(StepEvent):
         "scenario_id",
         "transition_id",
         "target",
-        "case",
         "response",
     )
 
@@ -292,7 +246,6 @@ class StepFinished(StepEvent):
         status: Status | None,
         transition_id: TransitionId | None,
         target: str,
-        case: Case,
         response: Response | None,
     ) -> None:
         self.id = id
@@ -303,28 +256,7 @@ class StepFinished(StepEvent):
         self.scenario_id = scenario_id
         self.transition_id = transition_id
         self.target = target
-        self.case = case
         self.response = response
-
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "phase": self.phase.name,
-            "status": self.status,
-            "transition_id": {
-                "name": self.transition_id.name,
-                "status_code": self.transition_id.status_code,
-                "source": self.transition_id.source,
-            }
-            if self.transition_id is not None
-            else None,
-            "target": self.target,
-            "response": {
-                "status_code": self.response.status_code,
-                "elapsed": self.response.elapsed,
-            }
-            if self.response is not None
-            else None,
-        }
 
 
 @dataclass
@@ -359,78 +291,6 @@ class Initialized(EngineEvent):
             seed=seed,
         )
 
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "schema": self.schema,
-            "specification": self.specification.asdict(),
-            "operations_count": self.operations_count,
-            "links_count": self.links_count,
-            "location": self.location,
-            "seed": self.seed,
-            "base_url": self.base_url,
-            "base_path": self.base_path,
-        }
-
-
-@dataclass
-class BeforeExecution(EngineEvent):
-    """Happens before each tested API operation.
-
-    It happens before a single hypothesis test, that may contain many examples inside.
-    """
-
-    # Specification-specific operation name
-    label: str
-    correlation_id: uuid.UUID
-
-    __slots__ = ("id", "timestamp", "label", "correlation_id")
-
-    def __init__(self, *, label: str, correlation_id: uuid.UUID) -> None:
-        self.id = uuid.uuid4()
-        self.timestamp = time.time()
-        self.label = label
-        self.correlation_id = correlation_id
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"label": self.label, "correlation_id": self.correlation_id.hex}
-
-
-@dataclass
-class AfterExecution(EngineEvent):
-    """Happens after each tested API operation."""
-
-    status: Status
-    recorder: ScenarioRecorder
-    elapsed_time: float
-    correlation_id: uuid.UUID
-    skip_reason: str | None
-
-    __slots__ = ("id", "timestamp", "status", "recorder", "elapsed_time", "correlation_id", "skip_reason")
-
-    def __init__(
-        self,
-        *,
-        status: Status,
-        recorder: ScenarioRecorder,
-        elapsed_time: float,
-        correlation_id: uuid.UUID,
-        skip_reason: str | None = None,
-    ) -> None:
-        self.id = uuid.uuid4()
-        self.timestamp = time.time()
-        self.status = status
-        self.recorder = recorder
-        self.elapsed_time = elapsed_time
-        self.correlation_id = correlation_id
-        self.skip_reason = skip_reason
-
-    def _asdict(self) -> dict[str, Any]:
-        return {
-            "status": self.status.value,
-            "elapsed_time": self.elapsed_time,
-            "correlation_id": self.correlation_id.hex,
-        }
-
 
 @dataclass
 class Interrupted(EngineEvent):
@@ -444,9 +304,6 @@ class Interrupted(EngineEvent):
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.name if self.phase is not None else None}
 
 
 @dataclass
@@ -483,9 +340,6 @@ class Warning(EngineEvent):
         self.phase = phase
         self.message = message
 
-    def _asdict(self) -> dict[str, Any]:
-        return {"phase": self.phase.name if self.phase is not None else None, "message": self.message}
-
 
 @dataclass
 class FatalError(EngineEvent):
@@ -500,9 +354,6 @@ class FatalError(EngineEvent):
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.exception = exception
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"exception": format_exception(self.exception, with_traceback=True)}
 
 
 @dataclass
@@ -521,6 +372,3 @@ class EngineFinished(EngineEvent):
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.running_time = running_time
-
-    def _asdict(self) -> dict[str, Any]:
-        return {"running_time": self.running_time}

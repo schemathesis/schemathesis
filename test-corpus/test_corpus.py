@@ -188,7 +188,7 @@ def assert_event(schema_id: str, event: events.EngineEvent) -> None:
     if isinstance(event, events.NonFatalError):
         if not should_ignore_error(schema_id, event):
             raise AssertionError(f"{event.label}: {event.info.format()}")
-    if isinstance(event, events.AfterExecution):
+    if isinstance(event, events.ScenarioFinished):
         failures = [
             check for checks in event.recorder.checks.values() for check in checks if check.status == Status.FAILURE
         ]

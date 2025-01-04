@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from typing import Any
 
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
 
@@ -36,9 +35,6 @@ class Specification:
     def name(self) -> str:
         name = {SpecificationKind.GRAPHQL: "GraphQL", SpecificationKind.OPENAPI: "Open API"}[self.kind]
         return f"{name} {self.version}".strip()
-
-    def asdict(self) -> dict[str, Any]:
-        return {"name": self.name, "kind": self.kind.value, "version": self.version}
 
     def supports_feature(self, feature: SpecificationFeature) -> bool:
         """Check if Schemathesis supports a given feature for this specification."""

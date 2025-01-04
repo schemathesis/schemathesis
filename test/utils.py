@@ -15,7 +15,7 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
 from schemathesis.runner import Status, events, from_schema
-from schemathesis.runner.events import AfterExecution, EngineEvent, EngineFinished, Initialized, NonFatalError
+from schemathesis.runner.events import EngineEvent, EngineFinished, Initialized, NonFatalError, ScenarioFinished
 from schemathesis.runner.phases import PhaseName
 from schemathesis.schemas import BaseSchema
 
@@ -166,7 +166,7 @@ class EventStream:
         assert self.find(NonFatalError) is None
 
     def assert_after_execution_status(self, status: Status) -> None:
-        assert self.find(AfterExecution).status == status
+        assert self.find(ScenarioFinished).status == status
 
     @property
     def started(self) -> Initialized | None:
@@ -176,7 +176,7 @@ class EventStream:
     def failures_count(self) -> int:
         result = 0
         for event in self.events:
-            if (isinstance(event, events.AfterExecution) and event.status == Status.FAILURE) or (
+            if (isinstance(event, events.ScenarioFinished) and event.status == Status.FAILURE) or (
                 isinstance(event, events.PhaseFinished)
                 and event.phase.name == PhaseName.STATEFUL_TESTING
                 and event.phase.is_enabled

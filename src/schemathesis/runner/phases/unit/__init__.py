@@ -44,7 +44,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     status = Status.SUCCESS
 
-    with WorkerPool(workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine) as pool:
+    with WorkerPool(
+        workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine, suite_id=suite_started.id
+    ) as pool:
         try:
             while True:
                 try:
@@ -53,7 +55,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                         break
                     yield event
                     engine.on_event(event)
-                    if isinstance(event, events.AfterExecution):
+                    if isinstance(event, events.ScenarioFinished):
                         if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
                             Status.FAILURE,
                             Status.ERROR,
@@ -78,7 +80,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
-def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext) -> None:
+def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext, suite_id: uuid.UUID) -> None:
     from hypothesis.errors import HypothesisWarning
 
     from schemathesis.generation.hypothesis.builder import create_test
@@ -110,24 +112,29 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
                     # executing. However, as we set a stop event, it will be checked before the next network request.
                     # However, this is still suboptimal, as there could be slow requests and they will block for longer
-                    for event in run_test(operation=operation, test_function=test_function, ctx=ctx):
+                    for event in run_test(operation=operation, test_function=test_function, ctx=ctx, suite_id=suite_id):
                         events_queue.put(event)
                 else:
                     error = result.err()
                     if error.method:
                         label = f"{error.method.upper()} {error.full_path}"
-                        correlation_id = uuid.uuid4()
-                        events_queue.put(events.BeforeExecution(label=label, correlation_id=correlation_id))
+                        scenario_started = events.ScenarioStarted(
+                            label=label, phase=PhaseName.UNIT_TESTING, suite_id=suite_id
+                        )
+                        events_queue.put(scenario_started)
 
                         events_queue.put(events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=label))
 
                         events_queue.put(
-                            events.AfterExecution(
+                            events.ScenarioFinished(
+                                id=scenario_started.id,
+                                suite_id=suite_id,
+                                phase=PhaseName.UNIT_TESTING,
                                 status=Status.ERROR,
                                 recorder=ScenarioRecorder(label="Error"),
                                 elapsed_time=0.0,
-                                correlation_id=correlation_id,
                                 skip_reason=None,
+                                is_final=True,
                             )
                         )
                     else:

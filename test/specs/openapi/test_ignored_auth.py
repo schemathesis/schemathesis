@@ -15,7 +15,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.generation import GenerationConfig
 from schemathesis.runner import Status
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.events import AfterExecution
+from schemathesis.runner.events import ScenarioFinished
 from schemathesis.specs.openapi.checks import (
     AuthKind,
     _contains_auth,
@@ -34,7 +34,7 @@ def run(schema_url, headers=None, network_config=None, **configuration):
         network=NetworkConfig(headers=headers, **(network_config or {})),
         hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
     ).execute()
-    return stream.find(AfterExecution)
+    return stream.find(ScenarioFinished)
 
 
 @pytest.mark.parametrize("with_generated", [True, False])

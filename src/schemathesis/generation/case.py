@@ -51,19 +51,6 @@ class Case:
     def _override(self) -> Override:
         return Override.from_components(self._components, self)
 
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "id": self.id,
-            "path": self.path,
-            "method": self.method,
-            "path_parameters": self.path_parameters,
-            "query": self.query,
-            "headers": dict(self.headers) if self.headers is not None else self.headers,
-            "cookies": self.cookies,
-            "media_type": self.media_type,
-            "meta": self.meta.asdict() if self.meta is not None else None,
-        }
-
     def __repr__(self) -> str:
         output = f"{self.__class__.__name__}("
         first = True
