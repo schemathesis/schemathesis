@@ -30,7 +30,6 @@ from ..runner.config import NetworkConfig
 from . import cassettes, loaders, output, validation
 from .constants import DEFAULT_WORKERS, ISSUE_TRACKER_URL, MAX_WORKERS, MIN_WORKERS, HealthCheck, Phase, Verbosity
 from .context import ExecutionContext
-from .debug import DebugOutputHandler
 from .handlers import EventHandler
 from .junitxml import JunitXMLHandler
 from .options import CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, OptionalInt, RegistryChoice
@@ -413,11 +412,6 @@ def with_filters(command: Callable) -> Callable:
     show_default=True,
     callback=validation.convert_boolean_string,
 )
-@grouped_option(
-    "--debug-output-file",
-    help="Save debugging information in a JSONL format at the specified file path",
-    type=click.File("w", encoding="utf-8"),
-)
 @group("Data generation options")
 @grouped_option(
     "--generation-mode",
@@ -642,7 +636,6 @@ def run(
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
     junit_xml: click.utils.LazyFile | None = None,
-    debug_output_file: click.utils.LazyFile | None = None,
     cassette_path: click.utils.LazyFile | None = None,
     cassette_format: cassettes.CassetteFormat = cassettes.CassetteFormat.VCR,
     cassette_preserve_exact_body_bytes: bool = False,
@@ -894,7 +887,6 @@ def run(
         wait_for_schema=wait_for_schema,
         cassette_config=cassette_config,
         junit_xml=junit_xml,
-        debug_output_file=debug_output_file,
         output_config=output_config,
     )
 
@@ -1006,7 +998,6 @@ def execute(
     wait_for_schema: float | None,
     cassette_config: cassettes.CassetteConfig | None,
     junit_xml: click.utils.LazyFile | None,
-    debug_output_file: click.utils.LazyFile | None,
     output_config: OutputConfig,
 ) -> None:
     """Execute a prepared runner by drawing events from it and passing to a proper handler."""
@@ -1014,9 +1005,6 @@ def execute(
     if junit_xml is not None:
         _open_file(junit_xml)
         handlers.append(JunitXMLHandler(junit_xml))
-    if debug_output_file is not None:
-        _open_file(debug_output_file)
-        handlers.append(DebugOutputHandler(debug_output_file))
     if cassette_config is not None:
         # This handler should be first to have logs writing completed when the output handler will display statistic
         _open_file(cassette_config.path)
@@ -1084,7 +1072,6 @@ def is_built_in_handler(handler: EventHandler) -> bool:
         for class_ in (
             output.default.DefaultOutputStyleHandler,
             output.short.ShortOutputStyleHandler,
-            DebugOutputHandler,
             cassettes.CassetteWriter,
             JunitXMLHandler,
         )

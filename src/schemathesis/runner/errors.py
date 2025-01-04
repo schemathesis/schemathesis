@@ -9,7 +9,7 @@ from __future__ import annotations
 import enum
 import re
 from functools import cached_property
-from typing import TYPE_CHECKING, Any, Callable, Iterator, Sequence, cast
+from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 
 from schemathesis import errors
 from schemathesis.core.errors import (
@@ -65,16 +65,6 @@ class EngineErrorInfo:
 
     def __str__(self) -> str:
         return self._error_repr
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "type": self._kind,
-            "title": self.title,
-            "message": self.message,
-            "extras": self.extras,
-            "exception": self._error_repr,
-            "exception_with_traceback": self.traceback,
-        }
 
     @cached_property
     def _kind(self) -> RuntimeErrorKind:

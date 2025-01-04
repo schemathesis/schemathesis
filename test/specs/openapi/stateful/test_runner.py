@@ -1,4 +1,3 @@
-import json
 import threading
 from dataclasses import dataclass
 
@@ -60,11 +59,6 @@ class RunnerResult:
         return [event.response for event in self.events if isinstance(event, events.StepFinished)]
 
 
-def serialize_all_events(events):
-    for event in events:
-        json.dumps(event.asdict())
-
-
 def collect_result(events) -> RunnerResult:
     return RunnerResult(events=list(events))
 
@@ -83,7 +77,6 @@ def test_find_independent_5xx(runner_factory, max_failures):
     elif max_failures == 2:
         # Else, all of them should be found
         assert len(result.failures) == 2
-    serialize_all_events(result.events)
 
 
 def test_works_on_single_link(runner_factory):
@@ -110,7 +103,6 @@ def test_stop_in_check(runner_factory, func, stop_event):
     assert "StepStarted" in result.event_names
     assert "StepFinished" in result.event_names
     assert result.events[-1].status == Status.INTERRUPTED
-    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize("event_cls", [events.ScenarioStarted, events.ScenarioFinished])
@@ -136,7 +128,6 @@ def test_stop_outside_of_state_machine_execution(runner_factory, mocker, stop_ev
     )
     result = collect_result(runner)
     assert result.events[-1].status == Status.INTERRUPTED
-    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize(
@@ -151,7 +142,6 @@ def test_internal_error_in_check(runner_factory, kwargs):
     result = collect_result(runner)
     assert result.errors
     assert isinstance(result.errors[0].value, ZeroDivisionError)
-    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize("exception_args", [(), ("Oops!",)])
@@ -172,7 +162,6 @@ def test_custom_assertion_in_check(runner_factory, exception_args):
         assert failure.failure_info.failure.message == ""
     else:
         assert failure.failure_info.failure.message == "Oops!"
-    serialize_all_events(result.events)
 
 
 def test_distinct_assertions(runner_factory):
@@ -318,7 +307,6 @@ def test_failed_health_check(runner_factory):
     assert result.errors
     assert isinstance(result.errors[0].value, hypothesis.errors.FailedHealthCheck)
     assert result.events[-1].status == Status.ERROR
-    serialize_all_events(result.events)
 
 
 @pytest.mark.parametrize(
@@ -607,8 +595,6 @@ def test_unique_data(runner_factory):
     for event in runner:
         if isinstance(event, events.ScenarioStarted):
             cases.clear()
-        elif isinstance(event, events.StepFinished) and event.transition_id is None:
-            cases.append(event.case)
         elif isinstance(event, events.ScenarioFinished):
             assert len(cases) == len(set(cases)), "Duplicate cases found"
 

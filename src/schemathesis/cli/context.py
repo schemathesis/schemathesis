@@ -111,13 +111,11 @@ class ExecutionContext:
         self.summary_lines.append(line)
 
     def on_event(self, event: events.EngineEvent) -> None:
-        if isinstance(event, events.AfterExecution):
-            self.statistic.record_outcome(event.status)
-        if isinstance(event, events.AfterExecution) or (
-            isinstance(event, events.ScenarioFinished) and not event.is_final
-        ):
+        if isinstance(event, events.ScenarioFinished):
             self.operations_processed += 1
             self.statistic.record_checks(event.recorder)
+            if event.phase == PhaseName.UNIT_TESTING:
+                self.statistic.record_outcome(event.status)
         elif isinstance(event, events.Initialized):
             self.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
             self.seed = event.seed

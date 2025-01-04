@@ -13,11 +13,8 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.core.errors import format_exception
-from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
-from schemathesis.core.transport import USER_AGENT, Response
+from schemathesis.core.transport import USER_AGENT
 from schemathesis.runner import Status, events
-from schemathesis.runner.recorder import Request
 
 if TYPE_CHECKING:
     import requests
@@ -95,32 +92,6 @@ class ProbeRun:
     @property
     def is_failure(self) -> bool:
         return self.outcome == ProbeOutcome.FAILURE
-
-    def serialize(self) -> dict[str, Any]:
-        """Serialize probe results so it can be sent over the network."""
-        if self.request:
-            _request = Request.from_prepared_request(self.request)
-            _request.uri = sanitize_url(_request.uri)
-            sanitize_value(_request.headers)
-            request = _request.asdict()
-        else:
-            request = None
-        if self.response:
-            sanitize_value(self.response.headers)
-            response = Response.from_requests(self.response, verify=bool(self.config.tls_verify)).asdict()
-        else:
-            response = None
-        if self.error:
-            error = format_exception(self.error)
-        else:
-            error = None
-        return {
-            "name": self.probe.name,
-            "outcome": self.outcome.value,
-            "request": request,
-            "response": response,
-            "error": error,
-        }
 
 
 @dataclass

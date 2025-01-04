@@ -53,13 +53,15 @@ if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
 
 
-def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineContext) -> events.EventGenerator:
+def run_test(
+    *, operation: APIOperation, test_function: Callable, ctx: EngineContext, suite_id: uuid.UUID
+) -> events.EventGenerator:
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
     # To simplify connecting `before` and `after` events in external systems
-    correlation_id = uuid.uuid4()
-    yield events.BeforeExecution(label=operation.label, correlation_id=correlation_id)
+    scenario_started = events.ScenarioStarted(label=operation.label, phase=PhaseName.UNIT_TESTING, suite_id=suite_id)
+    yield scenario_started
     errors: list[Exception] = []
     skip_reason = None
     test_start_time = time.monotonic()
@@ -199,12 +201,15 @@ def run_test(*, operation: APIOperation, test_function: Callable, ctx: EngineCon
             )
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
-    yield events.AfterExecution(
+    yield events.ScenarioFinished(
+        id=scenario_started.id,
+        suite_id=suite_id,
+        phase=PhaseName.UNIT_TESTING,
         recorder=recorder,
         status=status,
         elapsed_time=test_elapsed_time,
-        correlation_id=correlation_id,
         skip_reason=skip_reason,
+        is_final=False,
     )
 
 
