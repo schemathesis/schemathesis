@@ -1219,7 +1219,6 @@ def assert_exit_code(event_stream, code):
         execute(
             event_stream,
             ctx=None,
-            hypothesis_settings=hypothesis.settings(),
             workers_num=1,
             rate_limit=None,
             wait_for_schema=None,
