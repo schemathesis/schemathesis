@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import shutil
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Generator, cast
+from typing import Generator, cast
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.output import OutputConfig
@@ -13,11 +12,6 @@ from schemathesis.runner.events import NonFatalError
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.recorder import ScenarioRecorder
 from schemathesis.stateful.sink import StateMachineSink
-
-if TYPE_CHECKING:
-    import os
-
-    import hypothesis
 
 
 @dataclass
@@ -84,21 +78,8 @@ class GroupedFailures:
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
-    hypothesis_settings: hypothesis.settings
-    workers_num: int = 1
-    rate_limit: str | None = None
-    wait_for_schema: float | None = None
-    operations_processed: int = 0
-    # It is set in runtime, from the `Initialized` event
-    operations_count: int | None = None
-    seed: int | None = None
-    current_line_length: int = 0
-    terminal_size: os.terminal_size = field(default_factory=shutil.get_terminal_size)
     statistic: Statistic = field(default_factory=Statistic)
     errors: list[NonFatalError] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    cassette_path: str | None = None
-    junit_xml_file: str | None = None
     output_config: OutputConfig = field(default_factory=OutputConfig)
     state_machine_sink: StateMachineSink | None = None
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
@@ -111,18 +92,15 @@ class ExecutionContext:
         self.summary_lines.append(line)
 
     def on_event(self, event: events.EngineEvent) -> None:
+        if isinstance(event, events.TestEvent) and event.phase == PhaseName.STATEFUL_TESTING:
+            sink = cast(StateMachineSink, self.state_machine_sink)
+            sink.consume(event)
         if isinstance(event, events.ScenarioFinished):
-            self.operations_processed += 1
             self.statistic.record_checks(event.recorder)
             if event.phase == PhaseName.UNIT_TESTING:
                 self.statistic.record_outcome(event.status)
-        elif isinstance(event, events.Initialized):
-            self.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
-            self.seed = event.seed
         elif isinstance(event, events.NonFatalError):
             self.errors.append(event)
-        elif isinstance(event, events.Warning):
-            self.warnings.append(event.message)
         elif isinstance(event, events.PhaseStarted):
             if event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
                 from schemathesis.specs.openapi.stateful.statistic import OpenAPILinkStats

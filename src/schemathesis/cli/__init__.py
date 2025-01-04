@@ -5,7 +5,6 @@ import os
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from enum import Enum
 from typing import TYPE_CHECKING, Any, Callable, Literal, Sequence
 
 import click
@@ -13,6 +12,7 @@ import click
 import schemathesis.specs.openapi.checks as checks
 from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.cli import env
+from schemathesis.cli.output import OutputHandler
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, format_exception
 from schemathesis.core.fs import ensure_parent
@@ -183,7 +183,7 @@ def with_filters(command: Callable) -> Callable:
 @schemathesis.command(
     short_help="Execute automated tests based on API specifications",
     cls=CommandWithGroupedOptions,
-    context_settings={"terminal_width": output.default.get_terminal_width(), **CONTEXT_SETTINGS},
+    context_settings={"terminal_width": output.get_terminal_width(), **CONTEXT_SETTINGS},
 )
 @click.argument("schema", type=str)
 @group("Options")
@@ -881,7 +881,6 @@ def run(
     execute(
         event_stream,
         ctx=ctx,
-        hypothesis_settings=hypothesis_settings,
         workers_num=workers_num,
         rate_limit=rate_limit,
         wait_for_schema=wait_for_schema,
@@ -952,14 +951,6 @@ def into_event_stream(
         yield events.FatalError(exception=exc)
 
 
-def get_output_handler(workers_num: int) -> EventHandler:
-    if workers_num > 1:
-        output_style = OutputStyle.short
-    else:
-        output_style = OutputStyle.default
-    return output_style.value()
-
-
 def load_hook(module_name: str) -> None:
     """Load the given hook by importing it."""
     try:
@@ -981,18 +972,10 @@ def load_hook(module_name: str) -> None:
         raise click.exceptions.Exit(1) from None
 
 
-class OutputStyle(Enum):
-    """Provide different output styles."""
-
-    default = output.default.DefaultOutputStyleHandler
-    short = output.short.ShortOutputStyleHandler
-
-
 def execute(
     event_stream: events.EventGenerator,
     *,
     ctx: click.Context,
-    hypothesis_settings: hypothesis.settings,
     workers_num: int,
     rate_limit: str | None,
     wait_for_schema: float | None,
@@ -1011,16 +994,16 @@ def execute(
         handlers.append(cassettes.CassetteWriter(config=cassette_config))
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*ctx.args, **ctx.params))
-    handlers.append(get_output_handler(workers_num))
-    execution_context = ExecutionContext(
-        hypothesis_settings=hypothesis_settings,
-        workers_num=workers_num,
-        rate_limit=rate_limit,
-        wait_for_schema=wait_for_schema,
-        cassette_path=cassette_config.path.name if cassette_config is not None else None,
-        junit_xml_file=junit_xml.name if junit_xml is not None else None,
-        output_config=output_config,
+    handlers.append(
+        OutputHandler(
+            workers_num=workers_num,
+            rate_limit=rate_limit,
+            wait_for_schema=wait_for_schema,
+            cassette_path=cassette_config.path.name if cassette_config is not None else None,
+            junit_xml_file=junit_xml.name if junit_xml is not None else None,
+        )
     )
+    execution_context = ExecutionContext(output_config=output_config)
 
     def shutdown() -> None:
         for _handler in handlers:
@@ -1067,15 +1050,7 @@ def _open_file(file: click.utils.LazyFile) -> None:
 
 def is_built_in_handler(handler: EventHandler) -> bool:
     # Look for exact instances, not subclasses
-    return any(
-        type(handler) is class_
-        for class_ in (
-            output.default.DefaultOutputStyleHandler,
-            output.short.ShortOutputStyleHandler,
-            cassettes.CassetteWriter,
-            JunitXMLHandler,
-        )
-    )
+    return any(type(handler) is class_ for class_ in (cassettes.CassetteWriter, JunitXMLHandler))
 
 
 def display_handler_error(handler: EventHandler, exc: Exception) -> None:
