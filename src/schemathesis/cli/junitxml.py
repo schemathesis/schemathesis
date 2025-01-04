@@ -25,7 +25,7 @@ class JunitXMLHandler(EventHandler):
     test_cases: dict = field(default_factory=dict)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, (events.AfterExecution, events.ScenarioFinished)):
+        if isinstance(event, events.ScenarioFinished):
             label = event.recorder.label
             test_case = self.get_or_create_test_case(label)
             test_case.elapsed_sec += event.elapsed_time

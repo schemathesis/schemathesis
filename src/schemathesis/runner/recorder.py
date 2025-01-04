@@ -4,7 +4,7 @@ import base64
 import time
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Iterator, cast
+from typing import TYPE_CHECKING, Iterator, cast
 
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
@@ -212,15 +212,6 @@ class Request:
                 self._encoded_body_cache = serialize_payload(self.body)
             return self._encoded_body_cache
         return None
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "method": self.method,
-            "uri": self.uri,
-            "body": self.encoded_body,
-            "body_size": self.body_size,
-            "headers": self.headers,
-        }
 
 
 @dataclass

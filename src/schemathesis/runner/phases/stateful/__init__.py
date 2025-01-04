@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import queue
 import threading
-import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from schemathesis.runner import Status, events
 from schemathesis.runner.phases import Phase, PhaseName
@@ -18,21 +17,12 @@ EVENT_QUEUE_TIMEOUT = 0.01
 @dataclass
 class StatefulTestingPayload:
     transitions: dict
-    elapsed_time: float
 
-    __slots__ = ("transitions", "elapsed_time")
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "transitions": self.transitions,
-            "elapsed_time": self.elapsed_time,
-        }
+    __slots__ = ("transitions",)
 
 
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     from schemathesis.runner.phases.stateful._executor import execute_state_machine_loop
-
-    started_at = time.monotonic()
 
     try:
         state_machine = engine.config.schema.as_state_machine()
@@ -83,6 +73,5 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         status=status,
         payload=StatefulTestingPayload(
             transitions=state_machine._transition_stats_template.transitions,  # type: ignore[attr-defined]
-            elapsed_time=time.monotonic() - started_at,
         ),
     )

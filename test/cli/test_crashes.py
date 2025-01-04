@@ -8,7 +8,7 @@ from requests import Response
 
 from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
-from schemathesis.cli.output.default import DEFAULT_INTERNAL_ERROR_MESSAGE
+from schemathesis.cli.output import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
 
@@ -131,15 +131,13 @@ def csv_strategy(enum, exclude=()):
 @example(params=["--hypothesis-deadline=86399999999999993"], flags=[], multiple_params=[], csv_params=[])
 @example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
-def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params, tmp_path):
-    debug = tmp_path / "debug.log"
+def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(
         schema_url,
         *params,
         *multiple_params,
         *flags,
         *csv_params,
-        f"--debug-output-file={debug}",
     )
     check_result(result)
 
@@ -169,7 +167,7 @@ def check_result(result):
 
 def test_not_handled_error(mocker, cli, schema_url):
     # When there is an unhandled error in handlers
-    mocker.patch("schemathesis.cli.output.default.on_engine_finished", side_effect=ValueError("Fail"))
+    mocker.patch("schemathesis.cli.output.OutputHandler._on_engine_finished", side_effect=ValueError("Fail"))
     result = cli.run(schema_url)
     # Then it is propagated as it
     assert isinstance(result.exception, ValueError)

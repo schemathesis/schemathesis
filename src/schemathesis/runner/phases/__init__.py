@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..context import EngineContext
@@ -33,13 +33,6 @@ class Phase:
         if ctx.is_stopped:
             return False
         return True
-
-    def asdict(self) -> dict[str, Any]:
-        return {
-            "name": self.name.name,
-            "is_supported": self.is_supported,
-            "is_enabled": self.is_enabled,
-        }
 
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
