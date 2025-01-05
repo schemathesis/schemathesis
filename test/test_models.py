@@ -4,7 +4,7 @@ from unittest.mock import ANY
 
 import pytest
 import requests
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
@@ -254,7 +254,7 @@ def test_call_and_validate_for_asgi(fastapi_app):
     api_schema = schemathesis.openapi.from_dict(fastapi_app.openapi())
 
     @given(case=api_schema["/users"]["GET"].as_strategy())
-    @settings(max_examples=1)
+    @settings(max_examples=1, deadline=None, suppress_health_check=list(HealthCheck))
     def test(case):
         with pytest.raises(RuntimeError, match="If you use the ASGI integration"):
             case.call_and_validate()

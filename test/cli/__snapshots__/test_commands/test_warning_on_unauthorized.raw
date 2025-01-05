@@ -13,12 +13,21 @@ API probing: SUCCESS
 
 GET /api/basic .                                                          [100%]
 
+=================================== WARNINGS ===================================
+
+Missing or invalid API credentials: 1 API operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  • GET /api/basic
+
+Tip: Use --auth or -H to provide authentication credentials
+
 =================================== SUMMARY ====================================
 
 Performed checks:
     not_a_server_error                    N / N passed          PASSED 
 
-WARNINGS:
-  - Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
+Warnings:
+  ⚠️ Authentication: 1
 
 ============================== in 1.00s ========================================

@@ -15,6 +15,7 @@ from hypothesis import strategies as st
 import schemathesis
 from schemathesis import experimental
 from schemathesis.checks import not_a_server_error
+from schemathesis.cli.output import has_too_many_responses_with_status
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
@@ -23,7 +24,6 @@ from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.generation.overrides import Override
 from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.phases.unit._executor import has_too_many_responses_with_status
 from schemathesis.runner.recorder import Request
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
