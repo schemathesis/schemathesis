@@ -336,7 +336,7 @@ class IgnoredAuth(Failure):
         *,
         operation: str,
         message: str,
-        title: str = "Authentication declared but not enforced for this operation",
+        title: str = "Authentication declared but not enforced",
         code: str = "ignored_auth",
         case_id: str | None = None,
     ) -> None:

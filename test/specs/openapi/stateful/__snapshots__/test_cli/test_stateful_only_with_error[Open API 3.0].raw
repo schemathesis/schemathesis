@@ -31,6 +31,13 @@ Connection failed
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+================================= EXPERIMENTS ==================================
+
+🧪 Stateful Only: Run only stateful tests
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
 =================================== SUMMARY ====================================
 
 Links                                                 2xx    4xx    5xx    Total
@@ -44,12 +51,20 @@ GET /api/users/{user_id}
 └── 200
     └── PATCH /api/users/{user_id}
 
-No checks were performed.
+API Operations:
+  Selected: 3/3
+  Tested: 0
+  Skipped: 3
 
-Experimental Features:
-  - Stateful Only: Run only stateful tests
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+Test Phases:
+  🚫 API probing
+  ⏭️  Unit testing (disabled)
+  🚫 Stateful testing
 
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+Errors:
+  🚫 Network Error: 2
 
-============================== 2 errored in 1.00s ==============================
+Test cases:
+  N generated, N skipped
+
+============================== 2 errors in 1.00s ===============================

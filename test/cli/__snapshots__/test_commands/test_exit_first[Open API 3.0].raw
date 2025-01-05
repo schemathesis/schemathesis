@@ -29,9 +29,18 @@ Reproduce with:
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    N / N passed          FAILED 
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Skipped: 1
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+Test Phases:
+  ✅ API probing
+  ❌ Unit testing
+  ⏭️  Stateful testing
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+Failures:
+  ❌ Server error: 1
+
+Test cases:
+  N generated, N found N unique failures

@@ -485,7 +485,7 @@ def test_jsonify_python_specific_types(value, expected):
     assert jsonify_python_specific_types(value) == expected
 
 
-def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
+def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(
         {
             "/data": {
@@ -504,4 +504,4 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli):
         }
     )
     # Then it should be able to generate requests
-    assert cli.run(str(schema_path), "--dry-run", "--hypothesis-max-examples=1") == snapshot_cli
+    assert cli.run(str(schema_path), "--hypothesis-max-examples=1", f"--base-url={openapi3_base_url}") == snapshot_cli

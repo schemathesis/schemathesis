@@ -46,12 +46,19 @@ GET /api/users/{user_id}
 └── 200
     └── PATCH /api/users/{user_id}
 
-Performed checks:
-    not_a_server_error                    N / N passed          FAILED 
-    use_after_free                        N / N passed          PASSED 
+API Operations:
+  Selected: 3/3
+  Tested: 3
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ❌ Stateful testing
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+Failures:
+  ❌ Server error: 1
 
-========================= 1 failed in 1.00s ====================================
+Test cases:
+  N generated, N found N unique failures
+
+============================= 1 failures in 1.00s ==============================

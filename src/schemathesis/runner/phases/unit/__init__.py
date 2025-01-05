@@ -55,6 +55,8 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                         break
                     yield event
                     engine.on_event(event)
+                    if isinstance(event, events.NonFatalError):
+                        status = Status.ERROR
                     if isinstance(event, events.ScenarioFinished):
                         if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
                             Status.FAILURE,
@@ -123,7 +125,11 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                         )
                         events_queue.put(scenario_started)
 
-                        events_queue.put(events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=label))
+                        events_queue.put(
+                            events.NonFatalError(
+                                error=error, phase=PhaseName.UNIT_TESTING, label=label, related_to_operation=True
+                            )
+                        )
 
                         events_queue.put(
                             events.ScenarioFinished(
@@ -140,7 +146,12 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                     else:
                         assert error.full_path is not None
                         events_queue.put(
-                            events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=error.full_path)
+                            events.NonFatalError(
+                                error=error,
+                                phase=PhaseName.UNIT_TESTING,
+                                label=error.full_path,
+                                related_to_operation=False,
+                            )
                         )
         except KeyboardInterrupt:
             events_queue.put(events.Interrupted(phase=PhaseName.UNIT_TESTING))

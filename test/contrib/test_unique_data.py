@@ -102,14 +102,12 @@ def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_example
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
-@pytest.mark.snapshot(replace_statistic=True)
 def test_cli(ctx, unique_hook, raw_schema, cli, openapi3_base_url, hypothesis_max_examples, snapshot_cli):
     assert run(ctx, cli, unique_hook, raw_schema, openapi3_base_url, hypothesis_max_examples) == snapshot_cli
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows")
 @pytest.mark.operations("failure")
-@pytest.mark.snapshot(replace_statistic=True)
 def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examples, snapshot_cli):
     assert (
         cli.main(
@@ -143,7 +141,6 @@ def test_graphql_url(cli, unique_hook, graphql_url, snapshot_cli):
 
 
 @pytest.mark.parametrize("workers", [1, 2])
-@pytest.mark.snapshot(replace_statistic=True)
 def test_explicit_headers(
     ctx,
     unique_hook,

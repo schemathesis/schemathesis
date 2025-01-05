@@ -3,13 +3,13 @@ Exit code: 1
 Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/schema.gql
-Base URL: file:///tmp/schema.gql
+Base URL: http://127.0.0.1/graphql
 Specification version: GraphQL
 Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
 Query.getByDate E                                                         [100%]
 
@@ -26,6 +26,20 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
 
-============================== 1 errored in 1.00s ==============================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not supported)
+
+Errors:
+  🚫 Unknown GraphQL Scalar: 1
+
+Test cases:
+  No test cases were generated
+
+============================== 1 errors in 1.00s ===============================

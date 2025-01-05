@@ -39,7 +39,9 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
 
             formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
         if result.error is not None:
-            yield events.NonFatalError(error=result.error, phase=phase.name, label="API Probe errors")
+            yield events.NonFatalError(
+                error=result.error, phase=phase.name, label="API Probe errors", related_to_operation=False
+            )
             status = Status.ERROR
         else:
             status = Status.SUCCESS

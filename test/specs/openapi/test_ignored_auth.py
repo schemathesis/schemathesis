@@ -254,7 +254,7 @@ def test_proper_session(ignores_auth):
     if ignores_auth:
         with pytest.raises(FailureGroup) as exc:
             test()
-        assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced for this operation")
+        assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced")
     else:
         test()
 
@@ -286,7 +286,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
 
     with pytest.raises(FailureGroup) as exc:
         test()
-    assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced for this operation")
+    assert str(exc.value.exceptions[0]).startswith("Authentication declared but not enforced")
 
 
 @pytest.mark.openapi_version("3.0")
@@ -297,7 +297,6 @@ def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.parametrize("with_error", [True, False])
-@pytest.mark.snapshot(replace_statistic=True)
 def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
     target = "ignored" if with_error else "valid"
     schema_path = ctx.openapi.write_schema(
@@ -359,7 +358,7 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
             "-c",
             "ignored_auth",
             "--header=Authorization: Basic dGVzdDp0ZXN0",
-            "--hypothesis-max-examples=100",
+            "--hypothesis-max-examples=10",
             "--experimental=stateful-only",
         )
         == snapshot_cli
