@@ -277,14 +277,13 @@ SITE_PACKAGES = requests.__file__.split("requests")[0]
 TRANSITIONS_PATTERN = re.compile(r"(\d+)(?:\s+(\d+)\s+(\d+)\s+(\d+))$")
 
 
-@dataclass()
+@dataclass
 class CliSnapshotConfig:
     request: FixtureRequest
     replace_server_host: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
     replace_multi_worker_progress: bool | str = True
-    replace_statistic: bool = False
     replace_error_codes: bool = True
     replace_test_case_id: bool = True
     replace_uuid: bool = True
@@ -292,6 +291,7 @@ class CliSnapshotConfig:
     replace_seed: bool = True
     replace_reproduce_with: bool = False
     replace_stateful_progress: bool = True
+    replace_test_cases: bool = True
     remove_last_line: bool = False
 
     @classmethod
@@ -311,6 +311,28 @@ class CliSnapshotConfig:
             line for line in lines if not any(marker in line for marker in FLASK_MARKERS) and line != "API probing: ..."
         ]
         data = "\n".join(lines)
+        if self.replace_test_cases:
+            data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated, N skipped", data)
+            # Cases with failures and skips
+            data = re.sub(
+                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures, (\d+) skipped",
+                "Test cases:\n  N generated, N found N unique failures, N skipped",
+                data,
+            )
+            # Cases with passed and skips
+            data = re.sub(
+                r"Test cases:\n  (\d+) generated, (\d+) passed, (\d+) skipped",
+                "Test cases:\n  N generated, N passed, N skipped",
+                data,
+            )
+            # Only passed cases
+            data = re.sub(r"Test cases:\n  (\d+) generated, (\d+) passed", "Test cases:\n  N generated, N passed", data)
+            # Cases with failures but no skips
+            data = re.sub(
+                r"Test cases:\n  (\d+) generated, (\d+) found (\d+) unique failures",
+                "Test cases:\n  N generated, N found N unique failures",
+                data,
+            )
         if self.replace_server_host:
             used_fixtures = self.request.fixturenames
             for fixture in ("graphql_server_host", "server_host"):
@@ -354,11 +376,6 @@ class CliSnapshotConfig:
             data = "\n".join(lines) + "\n"
         if self.replace_stateful_progress:
             data = re.sub(r"(?<=Stateful tests\n\n)([.FES]+)", "...", data)
-        if self.replace_statistic:
-            data = re.sub("[0-9]+ / [0-9]+ passed", "N / N passed", data)
-            data = re.sub("N / N passed +PASSED", "N / N passed          PASSED", data)
-            data = re.sub("N / N passed +FAILED", "N / N passed          FAILED", data)
-            data = re.sub("([0-9]+ passed,? )|([0-9]+ errored,? )", "", data)
         if self.replace_error_codes:
             data = (
                 data.replace("Errno 111", "Error NUM")

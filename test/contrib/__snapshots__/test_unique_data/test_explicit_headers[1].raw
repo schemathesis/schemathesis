@@ -15,7 +15,16 @@ GET /api/success .                                                        [100%]
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    unique_test_cases                    N / N passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-============================== in 1.00s ========================================
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

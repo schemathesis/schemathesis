@@ -13,16 +13,25 @@ API probing: SUCCESS
 
 GET /api/test .                                                           [100%]
 
-=================================== SUMMARY ====================================
+================================= EXPERIMENTS ==================================
 
-Performed checks:
-    not_a_server_error                          1 / 1 passed          PASSED 
-    positive_data_acceptance                    1 / 1 passed          PASSED 
-
-Experimental Features:
-  - Positive Data Acceptance: Verifying schema-conformant data is accepted
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
+🧪 Positive Data Acceptance: Verifying schema-conformant data is accepted
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
-============================== 1 passed in 1.00s ===============================
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

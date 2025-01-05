@@ -444,7 +444,7 @@ def test_(case):
     # Then it should be skipped
     result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
-    result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
+    result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
 
 
 def test_skip_impossible_to_negate(testdir):
@@ -483,7 +483,7 @@ def test_(case):
     # Then it should be skipped
     result = testdir.runpytest("-v", "-rs", "-s")
     result.assert_outcomes(skipped=1)
-    result.stdout.re_match_lines([r".*It is not possible to generate negative test cases for.*"])
+    result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
 
 
 def test_do_not_skip_partially_negated(testdir):

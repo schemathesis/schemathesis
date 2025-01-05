@@ -68,7 +68,9 @@ def run_test(
     recorder = ScenarioRecorder(label=operation.label)
 
     def non_fatal_error(error: Exception) -> events.NonFatalError:
-        return events.NonFatalError(error=error, phase=PhaseName.UNIT_TESTING, label=operation.label)
+        return events.NonFatalError(
+            error=error, phase=PhaseName.UNIT_TESTING, label=operation.label, related_to_operation=True
+        )
 
     try:
         setup_hypothesis_database_key(test_function, operation)
@@ -78,7 +80,9 @@ def run_test(
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
         status = Status.SKIP
-        skip_reason = str(exc)
+        skip_reason = {"Hypothesis has been told to run no examples for this test.": "No examples in schema"}.get(
+            str(exc), str(exc)
+        )
     except (FailureGroup, Failure):
         status = Status.FAILURE
     except UnexpectedError:

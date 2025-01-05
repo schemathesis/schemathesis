@@ -58,6 +58,24 @@ def get_full_path(base_path: str, path: str) -> str:
     return unquote(urljoin(base_path, quote(path.lstrip("/"))))
 
 
+@dataclass
+class ApiOperationsCount:
+    """Statistics about API operations."""
+
+    total: int
+    selected: int
+
+    __slots__ = ("total", "selected")
+
+    def __init__(self) -> None:
+        self.total = 0
+        self.selected = 0
+
+    @property
+    def filtered_out(self) -> int:
+        return self.total - self.selected
+
+
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
@@ -71,6 +89,7 @@ class BaseSchema(Mapping):
     generation_config: GenerationConfig = field(default_factory=GenerationConfig)
     output_config: OutputConfig = field(default_factory=OutputConfig)
     rate_limiter: Limiter | None = None
+    _operations_count: ApiOperationsCount | None = None
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -211,9 +230,19 @@ class BaseSchema(Mapping):
     def validate(self) -> None:
         raise NotImplementedError
 
+    def count_operations(self) -> ApiOperationsCount:
+        """Count total and selected operations."""
+        if self._operations_count is None:
+            self._operations_count = self._do_count_operations()
+        return self._operations_count
+
+    def _do_count_operations(self) -> ApiOperationsCount:
+        """Implementation-specific counting logic."""
+        raise NotImplementedError
+
     @property
     def operations_count(self) -> int:
-        raise NotImplementedError
+        return self.count_operations().selected
 
     @property
     def links_count(self) -> int:

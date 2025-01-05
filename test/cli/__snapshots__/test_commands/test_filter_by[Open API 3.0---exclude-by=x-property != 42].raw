@@ -9,12 +9,22 @@ Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
 POST /api/upload_file .                                                   [100%]
 
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 1/2
+  Tested: 1
 
-============================== 1 passed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

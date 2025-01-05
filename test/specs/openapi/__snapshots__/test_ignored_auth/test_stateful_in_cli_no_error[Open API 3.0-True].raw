@@ -19,7 +19,7 @@ Stateful tests
 ________________________________ Stateful tests ________________________________
 1. Test Case ID: <PLACEHOLDER>
 
-- Authentication declared but not enforced for this operation
+- Authentication declared but not enforced
 
     The API returned `200 OK` for `GET /api/ignored_auth` that requires authentication.
 
@@ -31,6 +31,13 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/ignored_auth
 
+================================= EXPERIMENTS ==================================
+
+🧪 Stateful Only: Run only stateful tests
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
 =================================== SUMMARY ====================================
 
 Links                                                 2xx    4xx    5xx    Total
@@ -39,18 +46,20 @@ POST /api/users/
 └── 201
     └── GET /api/ignored_auth
 
-Performed checks:
-    ignored_auth                      N / N passed          FAILED 
-    use_after_free                    N / N passed          PASSED 
+API Operations:
+  Selected: 3/3
+  Tested: 2
+  Skipped: 1
 
-Experimental Features:
-  - Stateful Only: Run only stateful tests
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+Test Phases:
+  ✅ API probing
+  ⏭️  Unit testing (disabled)
+  ❌ Stateful testing
 
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+Failures:
+  ❌ Authentication declared but not enforced: 1
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+Test cases:
+  N generated, N found N unique failures, N skipped
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
-
-============================== 1 failed in 1.00s ===============================
+============================= 1 failures in 1.00s ==============================

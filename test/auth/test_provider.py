@@ -175,9 +175,9 @@ MULTI_SCOPE_SCHEMA = {
 }
 
 
-def test_auth_cache_with_scopes():
+def test_auth_cache_with_scopes(openapi3_base_url):
     # See GH-1775
-    schema = schemathesis.openapi.from_dict(MULTI_SCOPE_SCHEMA)
+    schema = schemathesis.openapi.from_dict(MULTI_SCOPE_SCHEMA).configure(base_url=openapi3_base_url)
 
     counts = {}
 
@@ -210,6 +210,6 @@ def test_auth_cache_with_scopes():
                 return
             case.headers["Authorization"] = f"Bearer {data}"
 
-    _, *ev_ = from_schema(schema, dry_run=True).execute()
+    _, *ev_ = from_schema(schema).execute()
     assert counts["list"] == 1
     assert counts["create"] == 1
