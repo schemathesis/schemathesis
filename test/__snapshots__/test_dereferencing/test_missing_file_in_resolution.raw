@@ -3,17 +3,17 @@ Exit code: 1
 Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/root/openapi.json
-Base URL: file:///
+Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
 Collected API operations: 0
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
 
 ==================================== ERRORS ====================================
-____________________________________ /test _____________________________________
+__________________________________ /api/test ___________________________________
 Schema Error
 
 Unresolvable JSON pointer in the schema
@@ -28,6 +28,19 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 0/0
+  Tested: 0
 
-============================== 1 errored in 1.00s ==============================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  No test cases were generated
+
+============================== 1 errors in 1.00s ===============================

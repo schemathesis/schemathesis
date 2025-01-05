@@ -11,7 +11,7 @@ Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
 
-GET /api/health .                                                         [100%]
+GET /api/foo:bar .                                                        [100%]
 
 =================================== SUMMARY ====================================
 

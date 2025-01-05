@@ -3,18 +3,18 @@ Exit code: 1
 Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/schema.json
-Base URL: file:///
+Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
 Collected API operations: 1
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
-POST /data E                                                              [100%]
+POST /api/data E                                                          [100%]
 
 ==================================== ERRORS ====================================
-__________________________________ POST /data __________________________________
+________________________________ POST /api/data ________________________________
 Failed Health Check
 
 A health check has identified that the smallest example derived from the schema
@@ -32,6 +32,20 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
 
-============================== 1 errored in 1.00s ==============================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Failed Health Check: 1
+
+Test cases:
+  No test cases were generated
+
+============================== 1 errors in 1.00s ===============================

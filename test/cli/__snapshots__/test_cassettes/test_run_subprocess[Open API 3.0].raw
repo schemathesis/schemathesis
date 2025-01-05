@@ -15,9 +15,19 @@ GET /api/success .                                                        [100%]
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    1 / 1 passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-Network log: /tmp/test_run_subprocess_Open_API_30/output.yaml
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
 
-============================== 1 passed in 1.00s ===============================
+Test cases:
+  N generated, N passed
+
+Reports:
+  • VCR: /tmp/test_run_subprocess_Open_API_30/output.yaml
+
+=========================== No issues found in 1.00s ===========================

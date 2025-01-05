@@ -46,20 +46,20 @@ Reproduce with:
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                              1 / 1 passed          PASSED 
-    status_code_conformance                         1 / 1 passed          PASSED 
-    content_type_conformance                        0 / 1 passed          FAILED 
-    response_headers_conformance                    1 / 1 passed          PASSED 
-    response_schema_conformance                     0 / 2 passed          FAILED 
-    negative_data_rejection                         1 / 1 passed          PASSED 
-    positive_data_acceptance                        1 / 1 passed          PASSED 
-    use_after_free                                  1 / 1 passed          PASSED 
-    ensure_resource_availability                    1 / 1 passed          PASSED 
-    ignored_auth                                    1 / 1 passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+Test Phases:
+  ✅ API probing
+  ❌ Unit testing
+  ⏭️  Stateful testing (not applicable)
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+Failures:
+  ❌ Response violates schema: 1
+  ❌ Missing Content-Type header: 1
 
-============================== 1 failed in 1.00s ===============================
+Test cases:
+  N generated, N found N unique failures
+
+============================= 2 failures in 1.00s ==============================

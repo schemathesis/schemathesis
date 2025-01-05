@@ -336,8 +336,7 @@ def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
     assert result.exit_code == ExitCode.OK, result.stdout
     # The request body has the 3 examples defined. Because 3 is the most examples defined
     # for any parameter, we expect to generate 3 requests.
-    not_a_server_line = next(filter(lambda line: "not_a_server_error" in line, result.stdout.split("\n")))
-    assert "9 / 9 passed" in not_a_server_line
+    assert "9 generated" in result.stdout
 
 
 def test_network_error_with_flaky_generation(ctx, cli, snapshot_cli, schema_with_examples):

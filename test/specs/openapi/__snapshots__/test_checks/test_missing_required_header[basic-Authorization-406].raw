@@ -13,17 +13,25 @@ API probing: SUCCESS
 
 GET /api/basic .                                                          [100%]
 
-=================================== SUMMARY ====================================
+================================= EXPERIMENTS ==================================
 
-Performed checks:
-    not_a_server_error                         N / N passed          PASSED 
-    missing_required_header                    N / N passed          PASSED 
-    unsupported_method                         N / N passed          PASSED 
-
-Experimental Features:
-  - Coverage phase: Generate covering test cases
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
+🧪 Coverage phase: Generate covering test cases
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
-============================== in 1.00s ========================================
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

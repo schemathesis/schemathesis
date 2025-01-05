@@ -805,7 +805,7 @@ def test_uncommon_type_in_generation(ctx, testdir, key, expected):
         test()
 
 
-def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_cli):
+def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
     # See GH-2300
     schema = ctx.openapi.build_schema(
         {
@@ -840,13 +840,13 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     (security_schemes / "bearerAuth.json").write_text(json.dumps(bearer), "utf8")
     (tests / "test.json").write_text(json.dumps(operation), "utf8")
 
-    assert cli.run(str(raw_schema_path), "--dry-run") == snapshot_cli
+    assert cli.run(str(raw_schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
-def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli):
+def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
     schema = ctx.openapi.build_schema({"/test": {"$ref": "paths/test.json"}})
     root = testdir.mkdir("root")
     raw_schema_path = root / "openapi.json"
     raw_schema_path.write_text(json.dumps(schema), "utf8")
 
-    assert cli.run(str(raw_schema_path), "--dry-run") == snapshot_cli
+    assert cli.run(str(raw_schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli

@@ -421,7 +421,7 @@ def test_(case):
     )
     # Then it should be skipped
     result = testdir.runpytest("-v", "-rs")
-    result.stdout.re_match_lines([r".*It is not possible to generate negative test cases.*"])
+    result.stdout.re_match_lines([r".*Impossible to generate negative test cases.*"])
 
 
 def test_trimmed_output(testdir):

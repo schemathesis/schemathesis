@@ -41,7 +41,7 @@ from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
-from ...schemas import APIOperation, APIOperationMap, BaseSchema, OperationDefinition
+from ...schemas import APIOperation, APIOperationMap, ApiOperationsCount, BaseSchema, OperationDefinition
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import openapi_cases
@@ -148,6 +148,30 @@ class BaseOpenAPISchema(BaseSchema):
         operation.schema = self
         return not self.filter_set.match(_ctx_cache)
 
+    def _do_count_operations(self) -> ApiOperationsCount:
+        counter = ApiOperationsCount()
+        try:
+            paths = self.raw_schema["paths"]
+        except KeyError:
+            return counter
+
+        resolve = self.resolver.resolve
+        should_skip = self._should_skip
+
+        for path, path_item in paths.items():
+            try:
+                if "$ref" in path_item:
+                    _, path_item = resolve(path_item["$ref"])
+                for method, definition in path_item.items():
+                    if method not in HTTP_METHODS:
+                        continue
+                    counter.total += 1
+                    if not should_skip(path, method, definition):
+                        counter.selected += 1
+            except SCHEMA_PARSING_ERRORS:
+                continue
+        return counter
+
     def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
         try:
             paths = self.raw_schema["paths"]
@@ -167,14 +191,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 # Ignore errors
                 continue
-
-    @property
-    def operations_count(self) -> int:
-        total = 0
-        # Do not build a list from it
-        for _ in self._operation_iter():
-            total += 1
-        return total
 
     @property
     def links_count(self) -> int:

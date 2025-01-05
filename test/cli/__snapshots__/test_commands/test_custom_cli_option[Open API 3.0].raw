@@ -12,16 +12,26 @@ Collected API links: 0
 Counter initialized!
 first
 second
-API probing: SKIP
+API probing: SUCCESS
 
 GET /api/success .                                                        [100%]
 
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
 
 Counter: 54
 first
 second
 
-============================== 1 passed in 1.00s ===============================
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

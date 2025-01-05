@@ -31,11 +31,19 @@ Reproduce with:
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    response_schema_conformance                    0 / 1 passed          FAILED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+Test Phases:
+  ✅ API probing
+  ❌ Unit testing
+  ⏭️  Stateful testing (not applicable)
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+Failures:
+  ❌ JSON deserialization error: 1
 
-============================== 1 failed in 1.00s ===============================
+Test cases:
+  N generated, N found N unique failures
+
+============================= 1 failures in 1.00s ==============================

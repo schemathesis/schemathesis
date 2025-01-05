@@ -3,19 +3,19 @@ Exit code: 1
 Stdout:
 ======================= Schemathesis test session starts =======================
 Schema location: file:///tmp/schema.json
-Base URL: file:///
+Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
 Collected API operations: 2
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
-POST /foo E                                                               [ 50%]
-POST /bar .                                                               [100%]
+POST /api/foo E                                                           [ 50%]
+POST /api/bar .                                                           [100%]
 
 ==================================== ERRORS ====================================
-__________________________________ POST /foo ___________________________________
+________________________________ POST /api/foo _________________________________
 Schema Error
 
 Invalid regular expression. Pattern `\\p{Alpha}` is not recognized - `bad escape \p at position 0`
@@ -27,6 +27,20 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Errored: 1
 
-========================= 1 passed, 1 errored in 1.00s =========================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Schema Error: 1
+
+Test cases:
+  N generated, N passed
+
+============================== 1 errors in 1.00s ===============================

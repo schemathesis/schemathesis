@@ -17,7 +17,17 @@ GET /api/success
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    1 / 1 passed          PASSED 
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Skipped: 1
 
-============================== 1 passed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ⚡ Unit testing
+  ⏭️  Stateful testing
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

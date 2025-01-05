@@ -997,7 +997,7 @@ def execute(
             workers_num=workers_num,
             rate_limit=rate_limit,
             wait_for_schema=wait_for_schema,
-            cassette_path=cassette_config.path.name if cassette_config is not None else None,
+            cassette_config=cassette_config,
             junit_xml_file=junit_xml.name if junit_xml is not None else None,
         )
     )
@@ -1046,7 +1046,7 @@ def _open_file(file: click.utils.LazyFile) -> None:
 
 def is_built_in_handler(handler: EventHandler) -> bool:
     # Look for exact instances, not subclasses
-    return any(type(handler) is class_ for class_ in (cassettes.CassetteWriter, JunitXMLHandler))
+    return any(type(handler) is class_ for class_ in (cassettes.CassetteWriter, JunitXMLHandler, OutputHandler))
 
 
 def display_handler_error(handler: EventHandler, exc: Exception) -> None:

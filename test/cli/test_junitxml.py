@@ -197,7 +197,7 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
     assert testcases[0].attrib["name"] == "GET /api/success"
     assert testcases[0][0].tag == "skipped"
     assert testcases[0][0].attrib["type"] == "skipped"
-    assert extract_message(testcases[0][0], server_host) == "Hypothesis has been told to run no examples for this test."
+    assert extract_message(testcases[0][0], server_host) == "No examples in schema"
 
 
 @pytest.mark.parametrize("path", ["junit.xml", "does-not-exist/junit.xml"])

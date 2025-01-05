@@ -142,7 +142,7 @@ def openapi_cases(
     # If we need to generate negative cases but no generated values were negated, then skip the whole test
     if generation_mode.is_negative and not any_negated_values([query_, cookies_, headers_, path_parameters_, body_]):
         if generation_config.modes == [GenerationMode.NEGATIVE]:
-            raise SkipTest(f"It is not possible to generate negative test cases for `{operation.label}`")
+            raise SkipTest("Impossible to generate negative test cases")
         else:
             reject()
 

@@ -13,9 +13,18 @@ if TYPE_CHECKING:
 class PhaseName(enum.Enum):
     """Available execution phases."""
 
-    PROBING = "probing"
-    UNIT_TESTING = "unit_testing"
-    STATEFUL_TESTING = "stateful_testing"
+    PROBING = "API probing"
+    UNIT_TESTING = "Unit testing"
+    STATEFUL_TESTING = "Stateful testing"
+
+
+class PhaseSkipReason(str, enum.Enum):
+    """Reasons why a phase might not be executed."""
+
+    DISABLED = "disabled"  # Explicitly disabled via config
+    NOT_SUPPORTED = "not supported"  # Feature not supported by schema
+    NOT_APPLICABLE = "not applicable"  # No relevant data (e.g., no links for stateful)
+    DRY_RUN = "dry run"  # Skipped due to dry run mode
 
 
 @dataclass
@@ -25,6 +34,7 @@ class Phase:
     name: PhaseName
     is_supported: bool
     is_enabled: bool = True
+    skip_reason: PhaseSkipReason | None = None
 
     def should_execute(self, ctx: EngineContext) -> bool:
         """Determine if phase should run based on context & configuration."""

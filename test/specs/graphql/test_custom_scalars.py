@@ -35,7 +35,7 @@ type Query {
     test()
 
 
-def test_custom_scalar_in_cli(testdir, cli, snapshot_cli):
+def test_custom_scalar_in_cli(testdir, cli, snapshot_cli, graphql_url):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar FooBar
@@ -45,10 +45,10 @@ type Query {
 }
     """,
     )
-    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
+    assert cli.run(str(schema_file), f"--base-url={graphql_url}") == snapshot_cli
 
 
-def test_built_in_scalars_in_cli(testdir, cli, snapshot_cli):
+def test_built_in_scalars_in_cli(testdir, cli, graphql_url):
     schema_file = testdir.make_graphql_schema_file(
         """
 scalar Date
@@ -73,7 +73,9 @@ type Query {
   getByUUID(value: UUID!): Int!
 }""",
     )
-    assert cli.run(str(schema_file), "--dry-run", "--hypothesis-max-examples=5") == snapshot_cli
+    result = cli.run(str(schema_file), "--hypothesis-max-examples=5", f"--base-url={graphql_url}")
+    # Queries can be constructed, but the backend does not implement the fields
+    assert result.stdout.count("Cannot query field") == 18
 
 
 @pytest.mark.parametrize(

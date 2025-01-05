@@ -24,10 +24,19 @@ Tip: Use --auth or -H to provide authentication credentials
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    N / N passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
 
 Warnings:
-  ⚠️ Authentication: 1
+  ⚠️ Missing authentication: 1
 
-============================== in 1.00s ========================================
+Test cases:
+  N generated, N passed
+
+============================= 1 warnings in 1.00s ==============================

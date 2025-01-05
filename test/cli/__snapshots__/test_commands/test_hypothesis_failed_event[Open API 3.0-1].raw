@@ -26,7 +26,19 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    N / N passed          PASSED 
+API Operations:
+  Selected: 2/2
+  Tested: 2
 
-========================= in 1.00s =============================================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Runtime Error: 1
+
+Test cases:
+  N generated, N passed
+
+============================== 1 errors in 1.00s ===============================

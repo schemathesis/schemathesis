@@ -229,17 +229,17 @@ type Query {
         ),
     ],
 )
-def test_schema_error(testdir, cli, snapshot_cli, schema, extension):
+def test_schema_error(testdir, cli, snapshot_cli, schema, extension, graphql_url):
     schema_file = testdir.make_graphql_schema_file(schema, extension=extension)
-    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
+    assert cli.run(str(schema_file), f"--base-url={graphql_url}") == snapshot_cli
 
 
 @pytest.mark.parametrize("arg", ["--include-name=Query.getBooks", "--exclude-name=Query.getBooks"])
 def test_filter_operations(cli, graphql_url, snapshot_cli, arg):
-    assert cli.run(graphql_url, "--hypothesis-max-examples=1", "--dry-run", arg) == snapshot_cli
+    assert cli.run(graphql_url, "--hypothesis-max-examples=1", arg) == snapshot_cli
 
 
-def test_disallow_null(ctx, cli, testdir, snapshot_cli):
+def test_disallow_null(ctx, cli, testdir, snapshot_cli, graphql_url):
     schema = """type Query {
     getValue(value: Int): Int
 }
@@ -260,7 +260,7 @@ def filter_body(context, body):
         cli.main(
             "run",
             str(schema_file),
-            "--dry-run",
+            f"--base-url={graphql_url}",
             "--generation-graphql-allow-null=false",
             hooks=module,
         )

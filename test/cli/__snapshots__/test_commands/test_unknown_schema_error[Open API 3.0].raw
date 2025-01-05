@@ -34,6 +34,20 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 1/1
+  Tested: 0
+  Errored: 1
 
-============================== in 1.00s ========================================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Runtime Error: 1
+
+Test cases:
+  N generated, N skipped
+
+============================== 1 errors in 1.00s ===============================

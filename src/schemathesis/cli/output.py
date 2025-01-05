@@ -8,13 +8,14 @@ from typing import Any, Generator, Iterable, cast
 
 import click
 
+from schemathesis.cli.cassettes import CassetteConfig
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
-from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
-from schemathesis.core.failures import MessageBlock, format_failures
+from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.runner import Status
-from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.phases import PhaseName, PhaseSkipReason
 from schemathesis.runner.recorder import Interaction
+from schemathesis.schemas import ApiOperationsCount
 
 from ..experimental import GLOBAL_EXPERIMENTS
 from ..runner import events
@@ -97,30 +98,6 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
         click.echo()
 
 
-def display_checks_statistics(total: dict[str, dict[str | Status, int]]) -> None:
-    padding = 20
-    col1_len = max(map(len, total.keys())) + padding
-    col2_len = len(str(max(total.values(), key=lambda v: v["total"])["total"])) * 2 + padding
-    col3_len = padding
-    click.secho("Performed checks:", bold=True)
-    template = f"    {{:{col1_len}}}{{:{col2_len}}}{{:{col3_len}}}"
-    for check_name, results in total.items():
-        display_check_result(check_name, results, template)
-
-
-def display_check_result(check_name: str, results: dict[str | Status, int], template: str) -> None:
-    """Show results of single check execution."""
-    if Status.FAILURE in results:
-        verdict = "FAILED"
-        color = "red"
-    else:
-        verdict = "PASSED"
-        color = "green"
-    success = results.get(Status.SUCCESS, 0)
-    total = results.get("total", 0)
-    click.echo(template.format(check_name, f"{success} / {total} passed", click.style(verdict, fg=color, bold=True)))
-
-
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema"
 DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
 LOADER_ERROR_SUGGESTIONS = {
@@ -179,13 +156,16 @@ class OutputHandler(EventHandler):
     rate_limit: str | None
     wait_for_schema: float | None
     operations_processed: int = 0
-    operations_count: int | None = None
-    seed: int | None = None
+    operations_count: ApiOperationsCount | None = None
+    skip_reasons: list[str] = field(default_factory=list)
     current_line_length: int = 0
-    cassette_path: str | None = None
+    cassette_config: CassetteConfig | None = None
     junit_xml_file: str | None = None
     warnings: WarningData = field(default_factory=WarningData)
     errors: list[events.NonFatalError] = field(default_factory=list)
+    phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
+        default_factory=lambda: {phase: (Status.SKIP, None) for phase in PhaseName}
+    )
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.Initialized):
@@ -209,19 +189,18 @@ class OutputHandler(EventHandler):
 
     def _on_initialized(self, ctx: ExecutionContext, event: events.Initialized) -> None:
         """Display initialization info, including any lines added by other handlers."""
-        self.operations_count = cast(int, event.operations_count)  # INVARIANT: should not be `None`
-        self.seed = event.seed
+        self.operations_count = event.operations_count
         display_section_name("Schemathesis test session starts")
         if event.location is not None:
             click.secho(f"Schema location: {event.location}", bold=True)
         click.secho(f"Base URL: {event.base_url}", bold=True)
         click.secho(f"Specification version: {event.specification.name}", bold=True)
-        if self.seed is not None:
-            click.secho(f"Random seed: {self.seed}", bold=True)
+        if event.seed is not None:
+            click.secho(f"Random seed: {event.seed}", bold=True)
         click.secho(f"Workers: {self.workers_num}", bold=True)
         if self.rate_limit is not None:
             click.secho(f"Rate limit: {self.rate_limit}", bold=True)
-        click.secho(f"Collected API operations: {self.operations_count}", bold=True)
+        click.secho(f"Collected API operations: {self.operations_count.selected}", bold=True)
         links_count = cast(int, event.links_count)
         click.secho(f"Collected API links: {links_count}", bold=True)
         if ctx.initialization_lines:
@@ -234,6 +213,7 @@ class OutputHandler(EventHandler):
             click.secho("Stateful tests\n", bold=True)
 
     def _on_phase_finished(self, ctx: ExecutionContext, event: events.PhaseFinished) -> None:
+        self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
         if event.phase.name == PhaseName.PROBING:
             click.secho(f"API probing: {event.status.name}", bold=True, nl=False)
             click.echo("\n")
@@ -280,6 +260,8 @@ class OutputHandler(EventHandler):
     def _on_scenario_finished(self, event: events.ScenarioFinished) -> None:
         self.operations_processed += 1
         if event.phase == PhaseName.UNIT_TESTING:
+            if event.status == Status.SKIP and event.skip_reason is not None:
+                self.skip_reasons.append(event.skip_reason)
             self._display_execution_result(event.status)
             self._check_warnings(event)
             if self.workers_num == 1:
@@ -370,6 +352,175 @@ class OutputHandler(EventHandler):
         click.secho("to provide authentication credentials", fg="yellow")
         click.echo()
 
+    def display_experiments(self) -> None:
+        display_section_name("EXPERIMENTS")
+
+        click.echo()
+        for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
+            click.secho(f"🧪 {experiment.name}: ", bold=True, nl=False)
+            click.secho(experiment.description)
+            click.secho(f"   Feedback: {experiment.discussion_url}")
+            click.echo()
+
+        click.secho(
+            "Your feedback is crucial for experimental features. "
+            "Please visit the provided URL(s) to share your thoughts.",
+            dim=True,
+        )
+        click.echo()
+
+    def display_api_operations(self, ctx: ExecutionContext) -> None:
+        assert self.operations_count is not None
+        click.secho("API Operations:", bold=True)
+        click.secho(
+            f"  Selected: {click.style(str(self.operations_count.selected), bold=True)}/"
+            f"{click.style(str(self.operations_count.total), bold=True)}"
+        )
+        click.secho(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}")
+        errors = len(
+            {
+                err.label
+                for err in self.errors
+                # Some API operations may have some tests before they have an error
+                if err.phase == PhaseName.UNIT_TESTING
+                and err.label not in ctx.statistic.tested_operations
+                and err.related_to_operation
+            }
+        )
+        if errors:
+            click.secho(f"  Errored: {click.style(str(errors), bold=True)}")
+
+        # API operations that are skipped due to fail-fast are counted here as well
+        total_skips = self.operations_count.selected - len(ctx.statistic.tested_operations) - errors
+        if total_skips:
+            click.secho(f"  Skipped: {click.style(str(total_skips), bold=True)}")
+            for reason in sorted(set(self.skip_reasons)):
+                click.secho(f"    - {reason.rstrip('.')}")
+        click.echo()
+
+    def display_phases(self) -> None:
+        click.secho("Test Phases:", bold=True)
+
+        for phase in PhaseName:
+            status, skip_reason = self.phases[phase]
+
+            if status == Status.SKIP:
+                click.secho(f"  ⏭️  {phase.value}", fg="yellow", nl=False)
+                if skip_reason:
+                    click.secho(f" ({skip_reason.value})", fg="yellow")
+                else:
+                    click.echo()
+            elif status == Status.SUCCESS:
+                click.secho(f"  ✅ {phase.value}", fg="green")
+            elif status == Status.FAILURE:
+                click.secho(f"  ❌ {phase.value}", fg="red")
+            elif status == Status.ERROR:
+                click.secho(f"  🚫 {phase.value}", fg="red")
+            elif status == Status.INTERRUPTED:
+                click.secho(f"  ⚡ {phase.value}", fg="yellow")
+        click.echo()
+
+    def display_test_cases(self, ctx: ExecutionContext) -> None:
+        if ctx.statistic.total_cases == 0:
+            click.secho("Test cases:", bold=True)
+            click.secho("  No test cases were generated\n")
+            return
+
+        unique_failures = sum(len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped)
+        click.secho("Test cases:", bold=True)
+
+        parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
+
+        # Don't show pass/fail status if all cases were skipped
+        if ctx.statistic.cases_without_checks == ctx.statistic.total_cases:
+            parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
+        else:
+            if unique_failures > 0:
+                parts.append(
+                    f"{click.style(str(ctx.statistic.cases_with_failures), bold=True)} found "
+                    f"{click.style(str(unique_failures), bold=True)} unique failures"
+                )
+            else:
+                parts.append(f"{click.style(str(ctx.statistic.total_cases), bold=True)} passed")
+
+            if ctx.statistic.cases_without_checks > 0:
+                parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
+
+        click.secho(", ".join(parts) + "\n")
+
+    def display_failures_summary(self, ctx: ExecutionContext) -> None:
+        # Collect all unique failures and their counts by title
+        failure_counts: dict[str, tuple[Severity, int]] = {}
+        for grouped in ctx.statistic.failures.values():
+            for group in grouped:
+                for failure in group.failures:
+                    data = failure_counts.get(failure.title, (failure.severity, 0))
+                    failure_counts[failure.title] = (failure.severity, data[1] + 1)
+
+        click.secho("Failures:", bold=True)
+
+        # Sort by severity first, then by title
+        sorted_failures = sorted(failure_counts.items(), key=lambda x: (x[1][0], x[0]))
+
+        for title, (_, count) in sorted_failures:
+            click.secho(f"  ❌ {title}: ", nl=False)
+            click.secho(str(count), bold=True)
+        click.echo()
+
+    def display_errors_summary(self) -> None:
+        # Group errors by title and count occurrences
+        error_counts: dict[str, int] = {}
+        for error in self.errors:
+            title = error.info.title
+            error_counts[title] = error_counts.get(title, 0) + 1
+
+        click.secho("Errors:", bold=True)
+
+        for title in sorted(error_counts):
+            click.secho(f"  🚫 {title}: ", nl=False)
+            click.secho(str(error_counts[title]), bold=True)
+        click.echo()
+
+    def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
+        parts = []
+
+        unique_failures = sum(len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped)
+        if unique_failures:
+            parts.append(f"{unique_failures} failures")
+
+        if self.errors:
+            parts.append(f"{len(self.errors)} errors")
+
+        total_warnings = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
+        if total_warnings:
+            parts.append(f"{total_warnings} warnings")
+
+        if parts:
+            message = f'{", ".join(parts)} in {event.running_time:.2f}s'
+            color = "red" if (unique_failures or self.errors) else "yellow"
+        elif ctx.statistic.total_cases == 0:
+            message = "Empty test suite"
+            color = "yellow"
+        else:
+            message = f"No issues found in {event.running_time:.2f}s"
+            color = "green"
+
+        display_section_name(message, fg=color)
+
+    def display_reports(self) -> None:
+        reports = []
+        if self.cassette_config is not None:
+            format_name = self.cassette_config.format.name.upper()
+            reports.append((format_name, self.cassette_config.path.name))
+        if self.junit_xml_file is not None:
+            reports.append(("JUnit XML", self.junit_xml_file))
+
+        if reports:
+            click.secho("Reports:", bold=True)
+            for report_type, path in reports:
+                click.secho(f"  • {report_type}: {path}")
+            click.echo()
+
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         if self.errors:
             display_section_name("ERRORS")
@@ -384,87 +535,45 @@ class OutputHandler(EventHandler):
         display_failures(ctx)
         if self.warnings.missing_auth:
             self.display_warnings()
+        if GLOBAL_EXPERIMENTS.enabled:
+            self.display_experiments()
         display_section_name("SUMMARY")
         click.echo()
-        total = {key: dict(value) for key, value in ctx.statistic.totals.items()}
 
         if ctx.state_machine_sink is not None:
             click.echo(ctx.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
             click.echo()
-        if not ctx.statistic.outcomes or not total:
-            click.secho("No checks were performed.", bold=True)
 
-        if total:
-            display_checks_statistics(total)
+        if self.operations_count:
+            self.display_api_operations(ctx)
 
-        if self.cassette_path:
-            click.echo()
-            category = click.style("Network log", bold=True)
-            click.secho(f"{category}: {self.cassette_path}")
+        self.display_phases()
 
-        if self.junit_xml_file:
-            click.echo()
-            category = click.style("JUnit XML file", bold=True)
-            click.secho(f"{category}: {self.junit_xml_file}")
+        if ctx.statistic.failures:
+            self.display_failures_summary(ctx)
+
+        if self.errors:
+            self.display_errors_summary()
+
         if self.warnings.missing_auth:
             affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
-            click.secho("\nWarnings:", bold=True)
-            click.secho(f"  ⚠️ Authentication: {bold(str(affected))}", fg="yellow")
-
-        if len(GLOBAL_EXPERIMENTS.enabled) > 0:
-            click.secho("\nExperimental Features:", bold=True)
-            for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
-                click.secho(f"  - {experiment.name}: {experiment.description}")
-                click.secho(f"    Feedback: {experiment.discussion_url}")
+            click.secho("Warnings:", bold=True)
+            click.secho(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow")
             click.echo()
-            click.echo(
-                "Your feedback is crucial for experimental features. "
-                "Please visit the provided URL(s) to share your thoughts."
-            )
-
-        if Status.FAILURE in ctx.statistic.outcomes:
-            click.echo(
-                f"\n{bold('Note')}: Use the '{SCHEMATHESIS_TEST_CASE_HEADER}' header to correlate test case ids "
-                "from failure messages with server logs for debugging."
-            )
-            if self.seed is not None:
-                seed_option = f"`--hypothesis-seed={self.seed}`"
-                click.secho(f"\n{bold('Note')}: To replicate these test failures, rerun with {bold(seed_option)}")
 
         if ctx.summary_lines:
-            click.echo()
             _print_lines(ctx.summary_lines)
-        click.echo()
-        parts = []
-        passed = ctx.statistic.outcomes.get(Status.SUCCESS)
-        if passed:
-            parts.append(f"{passed} passed")
-        failed = ctx.statistic.outcomes.get(Status.FAILURE)
-        if failed:
-            parts.append(f"{failed} failed")
-        errored = len(self.errors)
-        if errored:
-            parts.append(f"{errored} errored")
-        skipped = ctx.statistic.outcomes.get(Status.SKIP)
-        if skipped:
-            parts.append(f"{skipped} skipped")
-        if not parts:
-            message = "Empty test suite"
-            color = "yellow"
-        else:
-            message = f'{", ".join(parts)} in {event.running_time:.2f}s'
-            if Status.FAILURE in ctx.statistic.outcomes or Status.ERROR in ctx.statistic.outcomes:
-                color = "red"
-            elif Status.SKIP in ctx.statistic.outcomes:
-                color = "yellow"
-            else:
-                color = "green"
-        display_section_name(message, fg=color)
+            click.echo()
+
+        self.display_test_cases(ctx)
+        self.display_reports()
+        self.display_final_line(ctx, event)
 
     def display_percentage(self) -> None:
         """Add the current progress in % to the right side of the current line."""
-        operations_count = cast(int, self.operations_count)  # is already initialized via `Initialized` event
-        current_percentage = get_percentage(self.operations_processed, operations_count)
+        assert self.operations_count is not None
+        selected = self.operations_count.selected
+        current_percentage = get_percentage(self.operations_processed, selected)
         styled = click.style(current_percentage, fg="cyan")
         # Total length of the message, so it will fill to the right border of the terminal.
         # Padding is already taken into account in `ctx.current_line_length`

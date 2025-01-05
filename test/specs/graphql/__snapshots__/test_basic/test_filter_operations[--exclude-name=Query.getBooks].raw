@@ -7,16 +7,26 @@ Base URL: http://127.0.0.1/graphql
 Specification version: GraphQL
 Random seed: 42
 Workers: 1
-Collected API operations: 4
+Collected API operations: 3
 Collected API links: 0
-API probing: SKIP
+API probing: SUCCESS
 
-Query.getAuthors .                                                        [ 25%]
-Mutation.addBook .                                                        [ 50%]
-Mutation.addAuthor .                                                      [ 75%]
+Query.getAuthors .                                                        [ 33%]
+Mutation.addBook .                                                        [ 66%]
+Mutation.addAuthor .                                                      [100%]
 
 =================================== SUMMARY ====================================
 
-No checks were performed.
+API Operations:
+  Selected: 3/4
+  Tested: 3
 
-============================== 3 passed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not supported)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

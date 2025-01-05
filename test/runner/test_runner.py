@@ -821,7 +821,7 @@ def test_invalid_regex_example(ctx, phases, expected):
     assert expected in str(errors[0].info)
 
 
-def test_invalid_header_in_example(ctx):
+def test_invalid_header_in_example(ctx, openapi3_base_url):
     schema = ctx.openapi.build_schema(
         {
             "/success": {
@@ -841,12 +841,8 @@ def test_invalid_header_in_example(ctx):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = schemathesis.openapi.from_dict(schema)
-    stream = EventStream(
-        schema,
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-        dry_run=True,
-    ).execute()
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)).execute()
     # And the tests are failing
     stream.assert_errors()
     expected = (
@@ -1000,7 +996,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
 def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
     stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
-    assert stream.started.operations_count == 4
+    assert stream.started.operations_count.total == 4
     for event, expected in zip(stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"]):
         assert event.recorder.label == expected
         for case in event.recorder.cases.values():
@@ -1122,7 +1118,7 @@ def test_authorization_warning_missing_threshold(response_factory):
         ([], Status.SKIP),
     ],
 )
-def test_explicit_header_negative(ctx, parameters, expected):
+def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
     schema = ctx.openapi.build_schema(
         {
             "/test": {
@@ -1136,12 +1132,11 @@ def test_explicit_header_negative(ctx, parameters, expected):
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
     schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
+        generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]), base_url=openapi3_base_url
     )
     stream = EventStream(
         schema,
         network=NetworkConfig(headers={"Authorization": "TEST"}),
-        dry_run=True,
         hypothesis_settings=hypothesis.settings(max_examples=1),
     ).execute()
 
@@ -1166,7 +1161,6 @@ def test_skip_non_negated_headers(ctx):
     )
     stream = EventStream(
         schema,
-        dry_run=True,
         hypothesis_settings=hypothesis.settings(max_examples=1),
     ).execute()
     # There should not be unsatisfiable

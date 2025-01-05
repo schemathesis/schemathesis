@@ -2,7 +2,7 @@ Exit code: 0
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
-Schema location: file:///tmp/schema.json
+Schema location: http://127.0.0.1/schema.yaml
 Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
@@ -11,13 +11,15 @@ Collected API operations: 1
 Collected API links: 0
 API probing: SUCCESS
 
-GET /api/health .                                                         [100%]
+GET /api/success S                                                        [100%]
 
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 1/1
-  Tested: 1
+  Tested: 0
+  Skipped: 1
+    - No examples in schema
 
 Test Phases:
   ✅ API probing
@@ -25,6 +27,6 @@ Test Phases:
   ⏭️  Stateful testing (not applicable)
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
-=========================== No issues found in 1.00s ===========================
+=============================== Empty test suite ===============================

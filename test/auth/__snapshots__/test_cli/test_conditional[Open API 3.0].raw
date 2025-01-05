@@ -16,7 +16,16 @@ GET /api/text .                                                           [100%]
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    verify_auth                    2 / 2 passed          PASSED 
+API Operations:
+  Selected: 2/2
+  Tested: 2
 
-============================== 2 passed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

@@ -623,6 +623,4 @@ def test_ignored_auth_invalid(runner_factory):
     result = collect_result(runner)
     # Then it should be reported
     assert result.events[-1].status == Status.FAILURE
-    assert (
-        result.failures[0].failure_info.failure.title == "Authentication declared but not enforced for this operation"
-    )
+    assert result.failures[0].failure_info.failure.title == "Authentication declared but not enforced"

@@ -261,7 +261,11 @@ def execute_state_machine_loop(
                 continue
             # Any other exception is an inner error and the test run should be stopped
             suite_status = Status.ERROR
-            event_queue.put(events.NonFatalError(error=exc, phase=PhaseName.STATEFUL_TESTING, label="Stateful tests"))
+            event_queue.put(
+                events.NonFatalError(
+                    error=exc, phase=PhaseName.STATEFUL_TESTING, label="Stateful tests", related_to_operation=False
+                )
+            )
             break
         finally:
             event_queue.put(

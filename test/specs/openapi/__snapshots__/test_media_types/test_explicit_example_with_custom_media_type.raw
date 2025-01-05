@@ -25,7 +25,19 @@ Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    1 / 1 passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-============================== 1 errored in 1.00s ==============================
+Test Phases:
+  ✅ API probing
+  🚫 Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Errors:
+  🚫 Serialization not possible: 1
+
+Test cases:
+  N generated, N passed
+
+============================== 1 errors in 1.00s ===============================

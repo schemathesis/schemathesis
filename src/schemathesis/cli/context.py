@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
 from dataclasses import dataclass, field
 from typing import Generator, cast
 
@@ -17,16 +16,31 @@ from schemathesis.stateful.sink import StateMachineSink
 class Statistic:
     """Running statistics about test execution."""
 
-    totals: dict[str, dict[str, int]]  # Per-check statistics
     outcomes: dict[Status, int]
     failures: dict[str, list[GroupedFailures]]
 
-    __slots__ = ("totals", "outcomes", "failures")
+    tested_operations: set[str]
+
+    total_cases: int
+    cases_with_failures: int
+    cases_without_checks: int
+
+    __slots__ = (
+        "outcomes",
+        "failures",
+        "tested_operations",
+        "total_cases",
+        "cases_with_failures",
+        "cases_without_checks",
+    )
 
     def __init__(self) -> None:
-        self.totals = {}
         self.outcomes = {}
         self.failures = {}
+        self.tested_operations = set()
+        self.total_cases = 0
+        self.cases_with_failures = 0
+        self.cases_without_checks = 0
 
     def record_outcome(self, status: Status) -> None:
         value = self.outcomes.setdefault(status, 0)
@@ -35,18 +49,24 @@ class Statistic:
     def record_checks(self, recorder: ScenarioRecorder) -> None:
         """Update statistics and store failures from a new batch of checks."""
         failures = {}
-        # Process all checks in a single pass
-        for case_id in recorder.cases:
+
+        self.total_cases += len(recorder.cases)
+
+        for case_id, case in recorder.cases.items():
             checks = recorder.checks.get(case_id, [])
+
+            if not checks:
+                self.cases_without_checks += 1
+                continue
+
+            self.tested_operations.add(case.value.operation.label)
+            has_failures = False
             for check in checks:
                 response = recorder.interactions[case_id].response
-                # Update totals
-                totals = self.totals.setdefault(check.name, Counter())
-                totals[check.status] += 1
-                totals["total"] += 1
 
                 # Collect failures
                 if check.failure_info is not None:
+                    has_failures = True
                     if case_id not in failures:
                         failures[case_id] = GroupedFailures(
                             case_id=case_id,
@@ -55,6 +75,8 @@ class Statistic:
                             response=response,
                         )
                     failures[case_id].failures.append(check.failure_info.failure)
+            if has_failures:
+                self.cases_with_failures += 1
         if failures:
             for group in failures.values():
                 group.failures = sorted(set(group.failures))

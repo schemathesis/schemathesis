@@ -17,7 +17,16 @@ Bearer EXPLICIT
 
 =================================== SUMMARY ====================================
 
-Performed checks:
-    not_a_server_error                    1 / 1 passed          PASSED 
+API Operations:
+  Selected: 1/1
+  Tested: 1
 
-============================== 1 passed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Test cases:
+  N generated, N passed
+
+=========================== No issues found in 1.00s ===========================

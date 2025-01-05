@@ -13,7 +13,7 @@ from . import events, phases
 from .config import EngineConfig
 from .context import EngineContext
 from .events import EventGenerator
-from .phases import Phase, PhaseName
+from .phases import Phase, PhaseName, PhaseSkipReason
 
 
 @dataclass
@@ -33,15 +33,66 @@ class Engine:
     def _create_execution_plan(self) -> ExecutionPlan:
         """Create execution plan based on configuration."""
         phases = [
-            Phase(PhaseName.PROBING, is_supported=True, is_enabled=not self.config.execution.dry_run),
-            Phase(PhaseName.UNIT_TESTING, is_supported=True, is_enabled=not experimental.STATEFUL_ONLY.is_enabled),
-            Phase(
+            self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_links=False),
+            self.get_phase_config(PhaseName.UNIT_TESTING, is_supported=True, requires_links=False),
+            self.get_phase_config(
                 PhaseName.STATEFUL_TESTING,
                 is_supported=self.config.schema.specification.supports_feature(SpecificationFeature.STATEFUL_TESTING),
-                is_enabled=self.config.schema.links_count > 0,
+                requires_links=True,
             ),
         ]
         return ExecutionPlan(phases)
+
+    def get_phase_config(
+        self,
+        phase_name: PhaseName,
+        *,
+        is_supported: bool = True,
+        requires_links: bool = False,
+    ) -> Phase:
+        """Helper to determine phase configuration with proper skip reasons."""
+        # Dry run takes precedence
+        if self.config.execution.dry_run:
+            return Phase(
+                name=phase_name,
+                is_supported=is_supported,
+                is_enabled=False,
+                skip_reason=PhaseSkipReason.DRY_RUN,
+            )
+
+        # Check if feature is supported by the schema
+        if not is_supported:
+            return Phase(
+                name=phase_name,
+                is_supported=False,
+                is_enabled=False,
+                skip_reason=PhaseSkipReason.NOT_SUPPORTED,
+            )
+
+        # Check if stateful-only mode is enabled (only affects unit testing)
+        if experimental.STATEFUL_ONLY.is_enabled and phase_name == PhaseName.UNIT_TESTING:
+            return Phase(
+                name=phase_name,
+                is_supported=True,
+                is_enabled=False,
+                skip_reason=PhaseSkipReason.DISABLED,
+            )
+
+        if requires_links and self.config.schema.links_count == 0:
+            return Phase(
+                name=phase_name,
+                is_supported=True,
+                is_enabled=False,
+                skip_reason=PhaseSkipReason.NOT_APPLICABLE,
+            )
+
+        # Phase can be executed
+        return Phase(
+            name=phase_name,
+            is_supported=True,
+            is_enabled=True,
+            skip_reason=None,
+        )
 
 
 @dataclass

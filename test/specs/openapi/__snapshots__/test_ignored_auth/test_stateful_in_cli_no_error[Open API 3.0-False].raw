@@ -15,6 +15,13 @@ Stateful tests
 
 ...
 
+================================= EXPERIMENTS ==================================
+
+🧪 Stateful Only: Run only stateful tests
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+
+Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+
 =================================== SUMMARY ====================================
 
 Links                                                 2xx    4xx    5xx    Total
@@ -23,14 +30,17 @@ POST /api/users/
 └── 201
     └── GET /api/basic
 
-Performed checks:
-    ignored_auth                      N / N passed          PASSED 
-    use_after_free                    N / N passed          PASSED 
+API Operations:
+  Selected: 3/3
+  Tested: 2
+  Skipped: 1
 
-Experimental Features:
-  - Stateful Only: Run only stateful tests
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2262
+Test Phases:
+  ✅ API probing
+  ⏭️  Unit testing (disabled)
+  ✅ Stateful testing
 
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
+Test cases:
+  N generated, N passed, N skipped
 
-============================== in 1.00s ========================================
+=========================== No issues found in 1.00s ===========================

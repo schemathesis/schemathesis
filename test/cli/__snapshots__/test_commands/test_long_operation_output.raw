@@ -7,17 +7,18 @@ Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2
 Random seed: 42
 Workers: 1
-Collected API operations: 1
+Collected API operations: 2
 Collected API links: 0
 API probing: SUCCESS
 
-GET /api/health .                                                         [100%]
+GET /api/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa[...] . [ 50%]
+GET /api/aaaaaaaaaa .                                                     [100%]
 
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 2/2
+  Tested: 2
 
 Test Phases:
   ✅ API probing

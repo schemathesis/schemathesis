@@ -9,6 +9,7 @@ from schemathesis.core.transport import Response
 from schemathesis.runner.errors import EngineErrorInfo
 from schemathesis.runner.phases import Phase, PhaseName
 from schemathesis.runner.recorder import ScenarioRecorder
+from schemathesis.schemas import ApiOperationsCount
 
 if TYPE_CHECKING:
     from schemathesis.core import Specification
@@ -263,8 +264,7 @@ class StepFinished(StepEvent):
 class Initialized(EngineEvent):
     schema: dict[str, Any]
     specification: Specification
-    # Total number of operations in the schema
-    operations_count: int | None
+    operations_count: ApiOperationsCount
     # Total number of links in the schema
     links_count: int | None
     # The place, where the API schema is located
@@ -283,7 +283,7 @@ class Initialized(EngineEvent):
             timestamp=time.time(),
             schema=schema.raw_schema,
             specification=schema.specification,
-            operations_count=schema.operations_count,
+            operations_count=schema.count_operations(),
             links_count=schema.links_count,
             location=schema.location,
             base_url=schema.get_base_url(),
@@ -314,14 +314,18 @@ class NonFatalError(EngineEvent):
     value: Exception
     phase: PhaseName
     label: str
+    related_to_operation: bool
 
-    def __init__(self, *, error: Exception, phase: PhaseName, label: str) -> None:
+    __slots__ = ("id", "timestamp", "info", "value", "phase", "label", "related_to_operation")
+
+    def __init__(self, *, error: Exception, phase: PhaseName, label: str, related_to_operation: bool) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.info = EngineErrorInfo(error=error)
         self.value = error
         self.phase = phase
         self.label = label
+        self.related_to_operation = related_to_operation
 
 
 @dataclass

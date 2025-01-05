@@ -94,20 +94,29 @@ Reproduce with:
 
     curl -X DELETE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
 
-=================================== SUMMARY ====================================
+================================= EXPERIMENTS ==================================
 
-Performed checks:
-    failed                                N / N passed          FAILED 
-    unsupported_method                    N / N passed          FAILED 
-
-Experimental Features:
-  - Coverage phase: Generate covering test cases
-    Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
+🧪 Coverage phase: Generate covering test cases
+   Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
 
 Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
-Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
+=================================== SUMMARY ====================================
 
-Note: To replicate these test failures, rerun with `--hypothesis-seed=42`
+API Operations:
+  Selected: 1/2
+  Tested: 1
 
-============================== 1 failed in 1.00s ===============================
+Test Phases:
+  ✅ API probing
+  ❌ Unit testing
+  ⏭️  Stateful testing (not applicable)
+
+Failures:
+  ❌ Custom check failed: `failed`: 1
+  ❌ Custom check failed: `unsupported_method`: 5
+
+Test cases:
+  N generated, N found N unique failures
+
+============================= 6 failures in 1.00s ==============================

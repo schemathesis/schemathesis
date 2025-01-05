@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis import Case
 from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
+from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
 from schemathesis.runner import Status, events, from_schema
 from schemathesis.runner.events import EngineEvent, EngineFinished, Initialized, NonFatalError, ScenarioFinished
@@ -163,7 +164,8 @@ class EventStream:
         assert self.find(NonFatalError) is not None
 
     def assert_no_errors(self):
-        assert self.find(NonFatalError) is None
+        event = self.find(NonFatalError)
+        assert event is None, format_exception(event.value)
 
     def assert_after_execution_status(self, status: Status) -> None:
         assert self.find(ScenarioFinished).status == status
