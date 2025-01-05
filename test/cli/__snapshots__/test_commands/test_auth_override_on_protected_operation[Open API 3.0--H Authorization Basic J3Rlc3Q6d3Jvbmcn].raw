@@ -30,6 +30,15 @@ Reproduce with:
 
     curl -X GET -H 'Authorization: Basic J3Rlc3Q6d3Jvbmcn' http://127.0.0.1/api/basic
 
+=================================== WARNINGS ===================================
+
+Missing or invalid API credentials: 1 API operation returned authentication errors
+
+401 Unauthorized (1 operation):
+  • GET /api/basic
+
+Tip: Use --auth or -H to provide authentication credentials
+
 =================================== SUMMARY ====================================
 
 Performed checks:
@@ -44,8 +53,8 @@ Performed checks:
     ensure_resource_availability                    N / N passed          PASSED 
     ignored_auth                                    N / N passed          PASSED 
 
-WARNINGS:
-  - Most of the responses from `GET /api/basic` have a 401 status code. Did you specify proper API credentials?
+Warnings:
+  ⚠️ Authentication: 1
 
 Note: Use the 'X-Schemathesis-TestCaseId' header to correlate test case ids from failure messages with server logs for debugging.
 

@@ -4,7 +4,7 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from types import GeneratorType
-from typing import Any, Generator, cast
+from typing import Any, Generator, Iterable, cast
 
 import click
 
@@ -14,6 +14,7 @@ from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_except
 from schemathesis.core.failures import MessageBlock, format_failures
 from schemathesis.runner import Status
 from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.recorder import Interaction
 
 from ..experimental import GLOBAL_EXPERIMENTS
 from ..runner import events
@@ -168,6 +169,11 @@ def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
 
 
 @dataclass
+class WarningData:
+    missing_auth: dict[int, list[str]] = field(default_factory=dict)
+
+
+@dataclass
 class OutputHandler(EventHandler):
     workers_num: int
     rate_limit: str | None
@@ -178,7 +184,7 @@ class OutputHandler(EventHandler):
     current_line_length: int = 0
     cassette_path: str | None = None
     junit_xml_file: str | None = None
-    warnings: list[str] = field(default_factory=list)
+    warnings: WarningData = field(default_factory=WarningData)
     errors: list[events.NonFatalError] = field(default_factory=list)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
@@ -200,8 +206,6 @@ class OutputHandler(EventHandler):
             self._on_fatal_error(event)
         elif isinstance(event, events.NonFatalError):
             self.errors.append(event)
-        elif isinstance(event, events.Warning):
-            self.warnings.append(event.message)
 
     def _on_initialized(self, ctx: ExecutionContext, event: events.Initialized) -> None:
         """Display initialization info, including any lines added by other handlers."""
@@ -277,6 +281,7 @@ class OutputHandler(EventHandler):
         self.operations_processed += 1
         if event.phase == PhaseName.UNIT_TESTING:
             self._display_execution_result(event.status)
+            self._check_warnings(event)
             if self.workers_num == 1:
                 self.display_percentage()
         elif (
@@ -286,6 +291,11 @@ class OutputHandler(EventHandler):
             and event.status is not None
         ):
             self._display_execution_result(event.status)
+
+    def _check_warnings(self, event: events.ScenarioFinished) -> None:
+        for status_code in (401, 403):
+            if has_too_many_responses_with_status(event.recorder.interactions.values(), status_code):
+                self.warnings.missing_auth.setdefault(status_code, []).append(event.recorder.label)
 
     def _display_execution_result(self, status: Status) -> None:
         """Display an appropriate symbol for the given event's execution result."""
@@ -331,6 +341,35 @@ class OutputHandler(EventHandler):
 
         raise click.Abort
 
+    def display_warnings(self) -> None:
+        display_section_name("WARNINGS")
+        total = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
+        suffix = "" if total == 1 else "s"
+        click.secho(
+            f"\nMissing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
+            fg="yellow",
+        )
+
+        for status_code, operations in self.warnings.missing_auth.items():
+            status_text = "Unauthorized" if status_code == 401 else "Forbidden"
+            count = len(operations)
+            suffix = "" if count == 1 else "s"
+            click.secho(
+                f"{status_code} {status_text} ({count} operation{suffix}):",
+                fg="yellow",
+            )
+            # Show first few API operations
+            for endpoint in operations[:3]:
+                click.secho(f"  • {endpoint}", fg="yellow")
+            if len(operations) > 3:
+                click.secho(f"  + {len(operations) - 3} more", fg="yellow")
+            click.echo()
+        click.secho("Tip: ", bold=True, fg="yellow", nl=False)
+        click.secho(f"Use {bold('--auth')} ", fg="yellow", nl=False)
+        click.secho(f"or {bold('-H')} ", fg="yellow", nl=False)
+        click.secho("to provide authentication credentials", fg="yellow")
+        click.echo()
+
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         if self.errors:
             display_section_name("ERRORS")
@@ -343,6 +382,8 @@ class OutputHandler(EventHandler):
                 fg="red",
             )
         display_failures(ctx)
+        if self.warnings.missing_auth:
+            self.display_warnings()
         display_section_name("SUMMARY")
         click.echo()
         total = {key: dict(value) for key, value in ctx.statistic.totals.items()}
@@ -365,11 +406,10 @@ class OutputHandler(EventHandler):
             click.echo()
             category = click.style("JUnit XML file", bold=True)
             click.secho(f"{category}: {self.junit_xml_file}")
-
-        if self.warnings:
-            click.secho("\nWARNINGS:", bold=True, fg="yellow")
-            for warning in self.warnings:
-                click.secho(f"  - {warning}", fg="yellow")
+        if self.warnings.missing_auth:
+            affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
+            click.secho("\nWarnings:", bold=True)
+            click.secho(f"  ⚠️ Authentication: {bold(str(affected))}", fg="yellow")
 
         if len(GLOBAL_EXPERIMENTS.enabled) > 0:
             click.secho("\nExperimental Features:", bold=True)
@@ -431,3 +471,22 @@ class OutputHandler(EventHandler):
         length = max(get_terminal_width() - self.current_line_length + len(styled) - len(current_percentage), 1)
         template = f"{{:>{length}}}"
         click.echo(template.format(styled))
+
+
+TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
+    "Most of the responses from {} have a {} status code. Did you specify proper API credentials?"
+)
+TOO_MANY_RESPONSES_THRESHOLD = 0.9
+
+
+def has_too_many_responses_with_status(interactions: Iterable[Interaction], status_code: int) -> bool:
+    matched = 0
+    total = 0
+    for interaction in interactions:
+        if interaction.response is not None:
+            if interaction.response.status_code == status_code:
+                matched += 1
+            total += 1
+    if not total:
+        return False
+    return matched / total >= TOO_MANY_RESPONSES_THRESHOLD
