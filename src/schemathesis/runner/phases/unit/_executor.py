@@ -43,7 +43,7 @@ from schemathesis.runner.errors import (
     deduplicate_errors,
 )
 from schemathesis.runner.phases import PhaseName
-from schemathesis.runner.recorder import Interaction, ScenarioRecorder
+from schemathesis.runner.recorder import ScenarioRecorder
 
 from ... import events
 from ...context import EngineContext
@@ -193,12 +193,6 @@ def run_test(
         status = Status.ERROR
         yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
     test_elapsed_time = time.monotonic() - test_start_time
-    for status_code in (401, 403):
-        if has_too_many_responses_with_status(recorder.interactions.values(), status_code):
-            yield events.Warning(
-                phase=PhaseName.UNIT_TESTING,
-                message=TOO_MANY_RESPONSES_WARNING_TEMPLATE.format(f"`{operation.label}`", status_code),
-            )
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
     yield events.ScenarioFinished(
@@ -211,26 +205,6 @@ def run_test(
         skip_reason=skip_reason,
         is_final=False,
     )
-
-
-TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
-    "Most of the responses from {} have a {} status code. Did you specify proper API credentials?"
-)
-TOO_MANY_RESPONSES_THRESHOLD = 0.9
-
-
-def has_too_many_responses_with_status(interactions: Iterable[Interaction], status_code: int) -> bool:
-    # It is faster than creating an intermediate list
-    unauthorized_count = 0
-    total = 0
-    for interaction in interactions:
-        if interaction.response is not None:
-            if interaction.response.status_code == status_code:
-                unauthorized_count += 1
-            total += 1
-    if not total:
-        return False
-    return unauthorized_count / total >= TOO_MANY_RESPONSES_THRESHOLD
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:

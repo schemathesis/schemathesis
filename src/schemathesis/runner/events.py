@@ -325,23 +325,6 @@ class NonFatalError(EngineEvent):
 
 
 @dataclass
-class Warning(EngineEvent):
-    """Warning about API behavior that might indicate incorrect Schemathesis configuration.
-
-    For example, too many 401 responses might suggest missing authentication.
-    """
-
-    message: str
-    phase: PhaseName | None
-
-    def __init__(self, *, phase: PhaseName | None, message: str) -> None:
-        self.id = uuid.uuid4()
-        self.timestamp = time.time()
-        self.phase = phase
-        self.message = message
-
-
-@dataclass
 class FatalError(EngineEvent):
     """Internal error in the engine."""
 
