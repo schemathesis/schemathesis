@@ -380,7 +380,7 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if parent is None:
         return None
     parent_response = ctx.find_response(case_id=parent.id)
-    if not isinstance(parent_response, Response):
+    if parent_response is None:
         return None
 
     overrides = case._override

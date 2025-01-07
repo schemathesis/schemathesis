@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 
     from schemathesis.schemas import APIOperation, BaseSchema
 
-    from .statistic import TransitionStats
 
 NO_LINKS_ERROR_MESSAGE = (
     "Stateful testing requires at least one OpenAPI link in the schema, but no links detected. "
@@ -59,8 +58,6 @@ class APIStateMachine(RuleBasedStateMachine):
     # attribute will be renamed in the future
     bundles: ClassVar[dict[str, CaseInsensitiveDict]]  # type: ignore
     schema: BaseSchema
-    # A template for transition statistics that can be filled with data from the state machine during its execution
-    _transition_stats_template: ClassVar[TransitionStats]
 
     def __init__(self) -> None:
         try:
@@ -101,10 +98,6 @@ class APIStateMachine(RuleBasedStateMachine):
         target = self._get_target_for_result(result)
         if target is not None:
             super()._add_result_to_targets((target,), result)
-
-    @classmethod
-    def format_rules(cls) -> str:
-        raise NotImplementedError
 
     @classmethod
     def run(cls, *, settings: hypothesis.settings | None = None) -> None:

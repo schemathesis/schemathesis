@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import queue
 import threading
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.runner import Status, events
@@ -12,13 +11,6 @@ if TYPE_CHECKING:
     from ...context import EngineContext
 
 EVENT_QUEUE_TIMEOUT = 0.01
-
-
-@dataclass
-class StatefulTestingPayload:
-    transitions: dict
-
-    __slots__ = ("transitions",)
 
 
 def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
@@ -68,10 +60,4 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     finally:
         thread.join()
 
-    yield events.PhaseFinished(
-        phase=phase,
-        status=status,
-        payload=StatefulTestingPayload(
-            transitions=state_machine._transition_stats_template.transitions,  # type: ignore[attr-defined]
-        ),
-    )
+    yield events.PhaseFinished(phase=phase, status=status)

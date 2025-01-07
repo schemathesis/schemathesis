@@ -6,7 +6,6 @@ import schemathesis
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
-from schemathesis.specs.openapi.stateful.statistic import _aggregate_responses
 from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, NO_LINKS_ERROR_MESSAGE, StepResult
 
 
@@ -258,48 +257,3 @@ def test_custom_config_in_test_case(app_factory):
     settings = schema.as_state_machine().TestCase.settings
     for key, value in DEFAULT_STATE_MACHINE_SETTINGS.__dict__.items():
         assert getattr(settings, key) == value
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_format_rules(app_schema):
-    schema = schemathesis.openapi.from_dict(app_schema)
-
-    for status_code in (200, 201):
-        schema.add_link(
-            source=schema["/users/{user_id}"]["GET"],
-            target=schema["/users/{user_id}"]["GET"],
-            status_code=status_code,
-            parameters={"user_id": "$response.body#/id"},
-            name="CustomLink",
-        )
-    schema.add_link(
-        source=schema["/users/"]["POST"],
-        target=schema["/users/{user_id}"]["GET"],
-        status_code=201,
-        parameters={"user_id": "$response.body#/id"},
-        name="CustomLink",
-    )
-
-    class Workflow(schema.as_state_machine()): ...
-
-    assert (
-        Workflow.format_rules()
-        == """POST /api/users/
-└── 201
-    ├── GetUserByUserId -> GET /api/users/{user_id}
-    ├── CustomLink -> GET /api/users/{user_id}
-    └── PATCH /api/users/{user_id}
-
-GET /api/users/{user_id}
-├── 200
-│   ├── PATCH /api/users/{user_id}
-│   └── GET /api/users/{user_id}
-└── 201
-    └── GET /api/users/{user_id}"""
-    )
-
-
-def test_aggregate_responses():
-    responses = {201: 2, 204: 3, 301: 1, 400: 1, 404: 1, 500: 1, 503: 1, None: 5}
-    assert _aggregate_responses(responses) == {"2xx": 5, "4xx": 2, "5xx": 2, "Total": 9}

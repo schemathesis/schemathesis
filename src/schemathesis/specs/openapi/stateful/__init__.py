@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Callable, ClassVar, Iterator
+from typing import TYPE_CHECKING, Any, Callable, Iterator
 
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
@@ -16,17 +16,17 @@ from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
-from .statistic import OpenAPILinkStats
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
+    from ....stateful.state_machine import StepResult
     from ..schemas import BaseOpenAPISchema
-    from .types import FilterFunction, LinkName, StatusCode, TargetName
+
+FilterFunction = Callable[["StepResult"], bool]
 
 
 class OpenAPIStateMachine(APIStateMachine):
-    _transition_stats_template: ClassVar[OpenAPILinkStats]
     _response_matchers: dict[str, Callable[[StepResult], str | None]]
 
     def _get_target_for_result(self, result: StepResult) -> str | None:
@@ -39,10 +39,6 @@ class OpenAPIStateMachine(APIStateMachine):
         context = expressions.ExpressionContext(case=result.case, response=result.response)
         direction.set_data(case, context=context)
         return case
-
-    @classmethod
-    def format_rules(cls) -> str:
-        return "\n".join(item.line for item in cls._transition_stats_template.iter_with_format())
 
 
 # The proportion of negative tests generated for "root" transitions
@@ -65,9 +61,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     incoming_transitions = defaultdict(list)
     _response_matchers: dict[str, Callable[[StepResult], str | None]] = {}
     # Statistic structure follows the links and count for each response status code
-    transitions = {}
     for operation in operations:
-        operation_links: dict[StatusCode, dict[TargetName, dict[LinkName, dict[int | None, int]]]] = {}
         all_status_codes = tuple(operation.definition.raw["responses"])
         bundle_matchers = []
         for _, link in get_all_links(operation):
@@ -75,12 +69,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             bundles[bundle_name] = Bundle(bundle_name)
             target_operation = link.get_target_operation()
             incoming_transitions[target_operation.label].append(link)
-            response_targets = operation_links.setdefault(link.status_code, {})
-            target_links = response_targets.setdefault(target_operation.label, {})
-            target_links[link.name] = {}
             bundle_matchers.append((bundle_name, make_response_filter(link.status_code, all_status_codes)))
-        if operation_links:
-            transitions[operation.label] = operation_links
         if bundle_matchers:
             _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
     rules = {}
@@ -146,7 +135,6 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
         {
             "schema": schema,
             "bundles": bundles,
-            "_transition_stats_template": OpenAPILinkStats(transitions=transitions),
             "_response_matchers": _response_matchers,
             **rules,
         },
