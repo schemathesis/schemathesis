@@ -45,7 +45,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             status = Status.ERROR
         else:
             status = Status.SUCCESS
-    yield events.PhaseFinished(phase=phase, status=status, payload=None)
+    yield events.PhaseFinished(phase=phase, status=status)
 
 
 def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:

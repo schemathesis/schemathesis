@@ -1027,7 +1027,7 @@ def execute(
     finally:
         shutdown()
     if event is not None and event.is_terminal:
-        sys.exit(execution_context.get_exit_code())
+        sys.exit(execution_context.exit_code)
     # Event stream did not finish with a terminal event. Only possible if the handler is broken
     click.secho("Unexpected error", fg="red")
     sys.exit(1)

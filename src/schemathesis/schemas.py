@@ -71,10 +71,6 @@ class ApiOperationsCount:
         self.total = 0
         self.selected = 0
 
-    @property
-    def filtered_out(self) -> int:
-        return self.total - self.selected
-
 
 @dataclass(eq=False)
 class BaseSchema(Mapping):
@@ -191,7 +187,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def __len__(self) -> int:
-        return self.operations_count
+        return self.count_operations().total
 
     def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
@@ -239,10 +235,6 @@ class BaseSchema(Mapping):
     def _do_count_operations(self) -> ApiOperationsCount:
         """Implementation-specific counting logic."""
         raise NotImplementedError
-
-    @property
-    def operations_count(self) -> int:
-        return self.count_operations().selected
 
     @property
     def links_count(self) -> int:

@@ -173,7 +173,7 @@ class OutputHandler(EventHandler):
         elif isinstance(event, events.PhaseStarted):
             self._on_phase_started(event)
         elif isinstance(event, events.PhaseFinished):
-            self._on_phase_finished(ctx, event)
+            self._on_phase_finished(event)
         elif isinstance(event, events.ScenarioStarted):
             self._on_scenario_started(event)
         elif isinstance(event, events.ScenarioFinished):
@@ -212,33 +212,12 @@ class OutputHandler(EventHandler):
         elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
             click.secho("Stateful tests\n", bold=True)
 
-    def _on_phase_finished(self, ctx: ExecutionContext, event: events.PhaseFinished) -> None:
+    def _on_phase_finished(self, event: events.PhaseFinished) -> None:
         self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
         if event.phase.name == PhaseName.PROBING:
             click.secho(f"API probing: {event.status.name}", bold=True, nl=False)
             click.echo("\n")
         elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
-            if event.payload is None:
-                return
-
-            # Merge execution data from sink into the complete transition table
-            sink = ctx.state_machine_sink
-            assert sink is not None
-            transitions = sink.transitions.transitions  # type: ignore[attr-defined]
-
-            for source, status_codes in event.payload.transitions.items():
-                # Ensure source exists in sink
-                sink_source = transitions.setdefault(source, {})
-                for status_code, targets in status_codes.items():
-                    # Ensure status_code exists in sink
-                    sink_status = sink_source.setdefault(status_code, {})
-                    for target, links in targets.items():
-                        # Ensure target exists in sink
-                        sink_target = sink_status.setdefault(target, {})
-                        for link_name, counters in links.items():
-                            # If sink doesn't have this link, add it with zero counters
-                            if link_name not in sink_target:
-                                sink_target[link_name] = counters
             if event.status != Status.INTERRUPTED:
                 click.echo("\n")
         elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
@@ -539,10 +518,6 @@ class OutputHandler(EventHandler):
             self.display_experiments()
         display_section_name("SUMMARY")
         click.echo()
-
-        if ctx.state_machine_sink is not None:
-            click.echo(ctx.state_machine_sink.transitions.to_formatted_table(get_terminal_width()))
-            click.echo()
 
         if self.operations_count:
             self.display_api_operations(ctx)
