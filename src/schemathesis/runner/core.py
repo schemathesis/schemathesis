@@ -119,7 +119,7 @@ class ExecutionPlan:
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)
                 else:
-                    yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
+                    yield events.PhaseFinished(phase=phase, status=Status.SKIP)
                 if engine.is_stopped:
                     break  # type: ignore[unreachable]
 

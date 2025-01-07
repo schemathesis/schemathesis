@@ -14,7 +14,6 @@ from schemathesis.schemas import ApiOperationsCount
 if TYPE_CHECKING:
     from schemathesis.core import Specification
     from schemathesis.runner import Status
-    from schemathesis.runner.phases.stateful import StatefulTestingPayload
 
     from ..schemas import BaseSchema
 
@@ -55,16 +54,14 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
-    payload: StatefulTestingPayload | None
 
-    __slots__ = ("id", "timestamp", "phase", "status", "payload")
+    __slots__ = ("id", "timestamp", "phase", "status")
 
-    def __init__(self, *, phase: Phase, status: Status, payload: StatefulTestingPayload | None) -> None:
+    def __init__(self, *, phase: Phase, status: Status) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
-        self.payload = payload
 
 
 @dataclass

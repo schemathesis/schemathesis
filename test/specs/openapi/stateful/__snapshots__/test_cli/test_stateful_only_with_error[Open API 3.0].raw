@@ -40,17 +40,6 @@ Your feedback is crucial for experimental features. Please visit the provided UR
 
 =================================== SUMMARY ====================================
 
-Links                                                 2xx    4xx    5xx    Total
-
-POST /api/users/
-└── 201
-    ├── GET /api/users/{user_id}
-    └── PATCH /api/users/{user_id}
-
-GET /api/users/{user_id}
-└── 200
-    └── PATCH /api/users/{user_id}
-
 API Operations:
   Selected: 3/3
   Tested: 0
