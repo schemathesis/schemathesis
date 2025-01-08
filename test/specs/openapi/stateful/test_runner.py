@@ -366,17 +366,6 @@ def test_multiple_source_links(runner_factory):
     assert not result.errors, result.errors
 
 
-def test_dry_run(runner_factory):
-    runner = runner_factory(hypothesis_settings=hypothesis.settings(max_examples=1, database=None), dry_run=True)
-    result = collect_result(runner)
-    assert not result.errors, result.errors
-    for event in result.test_events:
-        if isinstance(event, events.StepFinished):
-            assert event.response is None
-        if isinstance(event, events.ScenarioFinished):
-            assert not event.recorder.checks
-
-
 def test_max_response_time_valid(runner_factory):
     runner = runner_factory(
         hypothesis_settings=hypothesis.settings(max_examples=1, database=None),

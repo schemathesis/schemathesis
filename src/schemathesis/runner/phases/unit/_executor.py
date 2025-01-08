@@ -235,7 +235,7 @@ def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> st
 def cached_test_func(f: Callable) -> Callable:
     def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], recorder: ScenarioRecorder) -> None:
         try:
-            if ctx.is_stopped:
+            if ctx.has_to_stop:
                 raise KeyboardInterrupt
             if ctx.config.execution.unique_data:
                 cached = ctx.get_cached_outcome(case)
@@ -266,25 +266,24 @@ def cached_test_func(f: Callable) -> Callable:
 @cached_test_func
 def test_func(*, ctx: EngineContext, case: Case, recorder: ScenarioRecorder) -> None:
     recorder.record_case(parent_id=None, case=case)
-    if not ctx.config.execution.dry_run:
-        try:
-            response = case.call(**ctx.transport_kwargs)
-        except (requests.Timeout, requests.ConnectionError) as error:
-            if isinstance(error.request, requests.Request):
-                recorder.record_request(case_id=case.id, request=error.request.prepare())
-            elif isinstance(error.request, requests.PreparedRequest):
-                recorder.record_request(case_id=case.id, request=error.request)
-            raise
-        recorder.record_response(case_id=case.id, response=response)
-        targets.run(ctx.config.execution.targets, case=case, response=response)
-        validate_response(
-            case=case,
-            ctx=ctx.get_check_context(recorder),
-            checks=ctx.config.execution.checks,
-            response=response,
-            no_failfast=ctx.config.execution.no_failfast,
-            recorder=recorder,
-        )
+    try:
+        response = case.call(**ctx.transport_kwargs)
+    except (requests.Timeout, requests.ConnectionError) as error:
+        if isinstance(error.request, requests.Request):
+            recorder.record_request(case_id=case.id, request=error.request.prepare())
+        elif isinstance(error.request, requests.PreparedRequest):
+            recorder.record_request(case_id=case.id, request=error.request)
+        raise
+    recorder.record_response(case_id=case.id, response=response)
+    targets.run(ctx.config.execution.targets, case=case, response=response)
+    validate_response(
+        case=case,
+        ctx=ctx.get_check_context(recorder),
+        checks=ctx.config.execution.checks,
+        response=response,
+        no_failfast=ctx.config.execution.no_failfast,
+        recorder=recorder,
+    )
 
 
 def validate_response(

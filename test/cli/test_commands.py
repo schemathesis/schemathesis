@@ -249,7 +249,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "targets": [],
         "workers_num": 1,
         "max_failures": None,
-        "dry_run": False,
         "override": Override({}, {}, {}, {}),
         "seed": None,
         "unique_data": False,
@@ -759,11 +758,11 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
     assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
-def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli):
+def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, openapi3_base_url):
     schema = yaml.dump(simple_openapi)
     schema += "\x00"
     schema_file = testdir.makefile(".yaml", schema=schema)
-    assert cli.run(str(schema_file), "--dry-run") == snapshot_cli
+    assert cli.run(str(schema_file), f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.fixture
@@ -1035,13 +1034,6 @@ def test_exit_first(cli, schema_url, snapshot_cli):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
     assert cli.run(schema_url, "--exitfirst") == snapshot_cli
-
-
-@pytest.mark.openapi_version("3.0")
-def test_base_url_not_required_for_dry_run(ctx, cli):
-    schema_path = ctx.openapi.write_schema({})
-    result = cli.run(str(schema_path), "--dry-run")
-    assert result.exit_code == ExitCode.OK, result.stdout
 
 
 def test_long_operation_output(ctx, cli, openapi3_base_url, snapshot_cli):

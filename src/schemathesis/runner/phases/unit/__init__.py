@@ -51,10 +51,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
             while True:
                 try:
                     event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
-                    if engine.is_stopped:
-                        break
+                    if engine.is_interrupted:
+                        raise KeyboardInterrupt
                     yield event
-                    engine.on_event(event)
                     if isinstance(event, events.NonFatalError):
                         status = Status.ERROR
                     if isinstance(event, events.ScenarioFinished):
@@ -64,9 +63,12 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
                             Status.INTERRUPTED,
                         ):
                             status = event.status
-                    if engine.is_interrupted:
+                        if event.status in (Status.ERROR, Status.FAILURE):
+                            engine.control.count_failure()
+                    if isinstance(event, events.Interrupted) or engine.is_interrupted:
                         status = Status.INTERRUPTED
-                    if engine.is_stopped:
+                        engine.stop()
+                    if engine.has_to_stop:
                         break  # type: ignore[unreachable]
                 except queue.Empty:
                     if all(not worker.is_alive() for worker in pool.workers):
@@ -92,7 +94,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
     with ignore_hypothesis_output():
         try:
-            while not ctx.is_stopped:
+            while not ctx.has_to_stop:
                 result = producer.next_operation()
                 if result is None:
                     break

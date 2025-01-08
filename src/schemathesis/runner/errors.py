@@ -374,12 +374,13 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
 def deduplicate_errors(errors: Sequence[Exception]) -> Iterator[Exception]:
     """Deduplicate a list of errors."""
     seen = set()
-    serialization_media_types = []
+    serialization_media_types = set()
 
     for error in errors:
         # Collect media types
         if isinstance(error, SerializationNotPossible):
-            serialization_media_types.extend(error.media_types)
+            for media_type in error.media_types:
+                serialization_media_types.add(media_type)
             continue
 
         message = canonicalize_error_message(error)
@@ -388,7 +389,7 @@ def deduplicate_errors(errors: Sequence[Exception]) -> Iterator[Exception]:
             yield error
 
     if serialization_media_types:
-        yield SerializationNotPossible.from_media_types(*serialization_media_types)
+        yield SerializationNotPossible.from_media_types(*sorted(serialization_media_types))
 
 
 MEMORY_ADDRESS_RE = re.compile("0x[0-9a-fA-F]+")

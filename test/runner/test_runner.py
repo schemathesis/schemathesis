@@ -853,35 +853,6 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
     assert expected in str(errors[0].info)
 
 
-@pytest.mark.operations("success")
-def test_dry_run(real_app_schema):
-    called = False
-
-    def check(ctx, response, case):
-        nonlocal called
-        called = True
-
-    # When the user passes `dry_run=True`
-    execute(real_app_schema, checks=(check,), dry_run=True)
-    # Then no requests should be sent & no responses checked
-    assert not called
-
-
-@pytest.mark.operations("root")
-def test_dry_run_asgi(fastapi_app):
-    called = False
-
-    def check(ctx, response, case):
-        nonlocal called
-        called = True
-
-    # When the user passes `dry_run=True`
-    schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
-    execute(schema, checks=(check,), dry_run=True)
-    # Then no requests should be sent & no responses checked
-    assert not called
-
-
 def test_connection_error(ctx):
     schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
     schema = schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1:1")
@@ -1045,6 +1016,7 @@ def event_stream(runner):
 
 
 def test_stop_event_stream(event_stream):
+    assert isinstance(next(event_stream), events.EngineStarted)
     assert isinstance(next(event_stream), events.Initialized)
     event_stream.stop()
     assert isinstance(next(event_stream), events.EngineFinished)
@@ -1053,11 +1025,13 @@ def test_stop_event_stream(event_stream):
 
 def test_stop_event_stream_immediately(event_stream):
     event_stream.stop()
+    assert isinstance(next(event_stream), events.EngineStarted)
     assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
 
 
 def test_stop_event_stream_after_second_event(event_stream):
+    next(event_stream)
     next(event_stream)
     next(event_stream)
     next(event_stream)
@@ -1071,6 +1045,7 @@ def test_stop_event_stream_after_second_event(event_stream):
 
 
 def test_finish(event_stream):
+    assert isinstance(next(event_stream), events.EngineStarted)
     assert isinstance(next(event_stream), events.Initialized)
     event = event_stream.finish()
     assert isinstance(event, events.EngineFinished)

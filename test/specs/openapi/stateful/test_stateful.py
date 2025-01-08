@@ -5,8 +5,12 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.stateful.state_machine import (
+    DEFAULT_STATE_MACHINE_SETTINGS,
+    NO_LINKS_ERROR_MESSAGE,
+    StepResult,
+)
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
-from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, NO_LINKS_ERROR_MESSAGE, StepResult
 
 
 @pytest.mark.parametrize(

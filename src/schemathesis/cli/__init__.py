@@ -199,13 +199,6 @@ def with_filters(command: Callable) -> Callable:
     callback=validation.convert_workers,
     metavar="",
 )
-@grouped_option(
-    "--dry-run",
-    "dry_run",
-    is_flag=True,
-    default=False,
-    help="Simulate test execution without making any actual requests, useful for validating data generation",
-)
 @group("Experimental options")
 @grouped_option(
     "--experimental",
@@ -602,7 +595,6 @@ def run(
     included_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
     max_failures: int | None = None,
-    dry_run: bool = False,
     include_path: Sequence[str] = (),
     include_path_regex: str | None = None,
     include_method: Sequence[str] = (),
@@ -780,7 +772,7 @@ def run(
         filter_set.exclude(is_deprecated)
 
     schema_kind = validation.parse_schema_kind(schema)
-    validation.validate_schema(schema, schema_kind, base_url=base_url, dry_run=dry_run)
+    validation.validate_schema(schema, schema_kind, base_url=base_url)
     schema_or_location: str | dict[str, Any] = schema
 
     if "all" in included_check_names:
@@ -866,7 +858,6 @@ def run(
         no_failfast=no_failfast,
         max_failures=max_failures,
         unique_data=contrib_unique_data,
-        dry_run=dry_run,
         checks=selected_checks,
         targets=selected_targets,
         workers_num=workers_num,
@@ -918,7 +909,6 @@ def into_event_stream(
     no_failfast: bool,
     max_failures: int | None,
     unique_data: bool,
-    dry_run: bool,
     loader_config: loaders.AutodetectConfig,
 ) -> events.EventGenerator:
     try:
@@ -936,7 +926,6 @@ def into_event_stream(
             no_failfast=no_failfast,
             max_failures=max_failures,
             unique_data=unique_data,
-            dry_run=dry_run,
             checks=checks,
             checks_config=checks_config,
             targets=targets,

@@ -32,7 +32,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   🚫 Unit testing
-  ⏭️  Stateful testing (not applicable)
+  ⏭️ Stateful testing (not applicable)
 
 Errors:
   🚫 Serialization not possible: 1

@@ -34,7 +34,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   🚫 Unit testing
-  ⏭️  Stateful testing (not supported)
+  ⏭️ Stateful testing (not supported)
 
 Errors:
   🚫 Unknown GraphQL Scalar: 1

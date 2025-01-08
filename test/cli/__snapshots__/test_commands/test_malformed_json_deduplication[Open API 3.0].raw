@@ -38,7 +38,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   ❌ Unit testing
-  ⏭️  Stateful testing (not applicable)
+  ⏭️ Stateful testing (not applicable)
 
 Failures:
   ❌ JSON deserialization error: 1

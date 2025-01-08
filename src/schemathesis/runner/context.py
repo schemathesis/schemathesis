@@ -18,7 +18,6 @@ if TYPE_CHECKING:
 
     from schemathesis.generation.case import Case
 
-    from . import events
     from .config import EngineConfig
 
 
@@ -47,7 +46,7 @@ class EngineContext:
         return time.monotonic() - self.start_time
 
     @property
-    def is_stopped(self) -> bool:
+    def has_to_stop(self) -> bool:
         """Check if execution should stop."""
         return self.control.is_stopped
 
@@ -55,12 +54,12 @@ class EngineContext:
     def is_interrupted(self) -> bool:
         return self.control.is_interrupted
 
+    @property
+    def has_reached_the_failure_limit(self) -> bool:
+        return self.control.has_reached_the_failure_limit
+
     def stop(self) -> None:
         self.control.stop()
-
-    def on_event(self, event: events.EngineEvent) -> bool:
-        """Process event and update execution state."""
-        return self.control.on_event(event)
 
     def cache_outcome(self, case: Case, outcome: BaseException | None) -> None:
         self.outcome_cache[hash(case)] = outcome
@@ -83,6 +82,8 @@ class EngineContext:
             session.headers.update(config.headers)
         if config.cert is not None:
             session.cert = config.cert
+        if config.proxy is not None:
+            session.proxies["all"] = config.proxy
         return session
 
     @property
