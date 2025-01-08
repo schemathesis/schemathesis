@@ -51,15 +51,6 @@ class Engine:
         requires_links: bool = False,
     ) -> Phase:
         """Helper to determine phase configuration with proper skip reasons."""
-        # Dry run takes precedence
-        if self.config.execution.dry_run:
-            return Phase(
-                name=phase_name,
-                is_supported=is_supported,
-                is_enabled=False,
-                skip_reason=PhaseSkipReason.DRY_RUN,
-            )
-
         # Check if feature is supported by the schema
         if not is_supported:
             return Phase(
@@ -103,13 +94,13 @@ class ExecutionPlan:
 
     def execute(self, engine: EngineContext) -> EventGenerator:
         """Execute all phases in sequence."""
+        yield events.EngineStarted()
         try:
-            if engine.is_stopped:
+            if engine.is_interrupted:
                 yield from self._finish(engine)
                 return
-            # Initialize
             yield events.Initialized.from_schema(schema=engine.config.schema, seed=engine.config.execution.seed)
-            if engine.is_stopped:
+            if engine.is_interrupted:
                 yield from self._finish(engine)  # type: ignore[unreachable]
                 return
 
@@ -119,8 +110,10 @@ class ExecutionPlan:
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)
                 else:
+                    if engine.has_reached_the_failure_limit:
+                        phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
                     yield events.PhaseFinished(phase=phase, status=Status.SKIP)
-                if engine.is_stopped:
+                if engine.is_interrupted:
                     break  # type: ignore[unreachable]
 
         except KeyboardInterrupt:

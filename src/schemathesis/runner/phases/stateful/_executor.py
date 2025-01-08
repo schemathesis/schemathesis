@@ -17,6 +17,12 @@ from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
+from schemathesis.generation.stateful.state_machine import (
+    DEFAULT_STATE_MACHINE_SETTINGS,
+    APIStateMachine,
+    Direction,
+    StepResult,
+)
 from schemathesis.generation.targets import TargetMetricCollector
 from schemathesis.runner import Status, events
 from schemathesis.runner.context import EngineContext
@@ -24,7 +30,6 @@ from schemathesis.runner.control import ExecutionControl
 from schemathesis.runner.phases import PhaseName
 from schemathesis.runner.phases.stateful.context import RunnerContext
 from schemathesis.runner.recorder import ScenarioRecorder
-from schemathesis.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, APIStateMachine, Direction, StepResult
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
@@ -103,15 +108,13 @@ def execute_state_machine_loop(
                 self.recorder.record_case(parent_id=step_result.case.id, case=case)
             else:
                 self.recorder.record_case(parent_id=None, case=case)
-            if engine.is_stopped:
+            if engine.has_to_stop:
                 raise KeyboardInterrupt
             step_started = events.StepStarted(
                 phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, scenario_id=self._scenario_id
             )
             event_queue.put(step_started)
             try:
-                if config.execution.dry_run:
-                    return None
                 if config.execution.unique_data:
                     cached = ctx.get_step_outcome(case)
                     if isinstance(cached, BaseException):
@@ -212,7 +215,7 @@ def execute_state_machine_loop(
         suite_started = events.SuiteStarted(phase=PhaseName.STATEFUL_TESTING)
         suite_id = suite_started.id
         event_queue.put(suite_started)
-        if engine.is_stopped:
+        if engine.is_interrupted:
             event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
             event_queue.put(
                 events.SuiteFinished(
@@ -239,14 +242,14 @@ def execute_state_machine_loop(
             # The failure is already sent to the queue by the state machine
             # Here we need to either exit or re-run the state machine with this failure marked as known
             suite_status = Status.FAILURE
-            if engine.is_stopped:
+            if engine.has_reached_the_failure_limit:
                 break  # type: ignore[unreachable]
             for failure in exc.exceptions:
                 ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
             suite_status = Status.FAILURE
-            if engine.is_stopped:
+            if engine.has_reached_the_failure_limit:
                 break  # type: ignore[unreachable]
             # Mark all failures in this suite as seen to prevent them being re-discovered
             ctx.mark_current_suite_as_seen_in_run()

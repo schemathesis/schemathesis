@@ -379,7 +379,6 @@ def runner_factory(app_factory, app_runner, stop_event):
         targets=None,
         network=None,
         max_failures=None,
-        dry_run=False,
         unique_data=False,
         configuration=None,
     ):
@@ -395,7 +394,6 @@ def runner_factory(app_factory, app_runner, stop_event):
                 targets=targets or [],
                 generation_config=GenerationConfig(),
                 hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
-                dry_run=dry_run,
                 unique_data=unique_data,
                 max_failures=max_failures,
             ),

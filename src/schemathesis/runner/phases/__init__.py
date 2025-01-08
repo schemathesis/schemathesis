@@ -24,7 +24,7 @@ class PhaseSkipReason(str, enum.Enum):
     DISABLED = "disabled"  # Explicitly disabled via config
     NOT_SUPPORTED = "not supported"  # Feature not supported by schema
     NOT_APPLICABLE = "not applicable"  # No relevant data (e.g., no links for stateful)
-    DRY_RUN = "dry run"  # Skipped due to dry run mode
+    FAILURE_LIMIT_REACHED = "failure limit reached"
 
 
 @dataclass
@@ -38,11 +38,7 @@ class Phase:
 
     def should_execute(self, ctx: EngineContext) -> bool:
         """Determine if phase should run based on context & configuration."""
-        if not self.is_enabled:
-            return False
-        if ctx.is_stopped:
-            return False
-        return True
+        return self.is_enabled and not ctx.has_to_stop
 
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:

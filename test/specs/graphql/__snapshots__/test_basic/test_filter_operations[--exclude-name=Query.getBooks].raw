@@ -24,7 +24,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   ✅ Unit testing
-  ⏭️  Stateful testing (not supported)
+  ⏭️ Stateful testing (not supported)
 
 Test cases:
   N generated, N passed

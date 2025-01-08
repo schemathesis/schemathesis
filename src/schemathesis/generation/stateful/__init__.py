@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     import hypothesis
 
-    from .state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine
 
 
 def run_state_machine_as_test(

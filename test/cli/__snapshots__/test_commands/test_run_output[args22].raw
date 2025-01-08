@@ -11,8 +11,6 @@ Usage: run [OPTIONS] SCHEMA
 Options:
   -w, --workers   Number of concurrent workers for testing. Auto-adjusts if
                   'auto' is specified  [default: 1][auto, 1-64]
-  --dry-run       Simulate test execution without making any actual requests,
-                  useful for validating data generation
 
 Experimental options:
   --experimental                            Enable experimental features

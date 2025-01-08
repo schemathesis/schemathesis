@@ -25,7 +25,9 @@ from urllib.parse import urlsplit
 
 import jsonschema
 from packaging import version
+from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
+from requests.utils import check_header_validity
 
 from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
@@ -34,6 +36,7 @@ from schemathesis.core.failures import Failure, FailureGroup, MalformedJson
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transforms import UNRESOLVABLE, deepclone, resolve_pointer, transform
 from schemathesis.core.transport import Response
+from schemathesis.core.validation import INVALID_HEADER_RE
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
@@ -68,7 +71,22 @@ if TYPE_CHECKING:
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
-SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError)
+SCHEMA_PARSING_ERRORS = (KeyError, AttributeError, RefResolutionError, InvalidSchema)
+
+
+def check_header(parameter: dict[str, Any]) -> None:
+    name = parameter["name"]
+    if not name:
+        raise InvalidSchema("Header name should not be empty")
+    if not name.isascii():
+        # `urllib3` encodes header names to ASCII
+        raise InvalidSchema(f"Header name should be ASCII: {name}")
+    try:
+        check_header_validity((name, ""))
+    except InvalidHeader as exc:
+        raise InvalidSchema(str(exc)) from None
+    if bool(INVALID_HEADER_RE.search(name)):
+        raise InvalidSchema(f"Invalid header name: {name}")
 
 
 @dataclass(eq=False, repr=False)
@@ -929,6 +947,8 @@ class SwaggerV20(BaseOpenAPISchema):
                 for media_type in body_media_types:
                     collected.append(OpenAPI20Body(definition=parameter, media_type=media_type))
             else:
+                if parameter["in"] in ("header", "cookie"):
+                    check_header(parameter)
                 collected.append(OpenAPI20Parameter(definition=parameter))
 
         if form_parameters:
@@ -1087,7 +1107,12 @@ class OpenApi30(SwaggerV20):
         self, parameters: Iterable[dict[str, Any]], definition: dict[str, Any]
     ) -> list[OpenAPIParameter]:
         # Open API 3.0 has the `requestBody` keyword, which may contain multiple different payload variants.
-        collected: list[OpenAPIParameter] = [OpenAPI30Parameter(definition=parameter) for parameter in parameters]
+        collected: list[OpenAPIParameter] = []
+
+        for parameter in parameters:
+            if parameter["in"] in ("header", "cookie"):
+                check_header(parameter)
+            collected.append(OpenAPI30Parameter(definition=parameter))
         if "requestBody" in definition:
             required = definition["requestBody"].get("required", False)
             description = definition["requestBody"].get("description")

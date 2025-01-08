@@ -55,7 +55,7 @@ def display_failures(ctx: ExecutionContext) -> None:
 
     display_section_name("FAILURES")
     for label, failures in ctx.statistic.failures.items():
-        display_failures_for_single_test(ctx, label, failures)
+        display_failures_for_single_test(ctx, label, failures.values())
 
 
 if IO_ENCODING != "utf-8":
@@ -81,7 +81,7 @@ def failure_formatter(block: MessageBlock, content: str) -> str:
     return _style(content.replace("Reproduce with", bold("Reproduce with")))
 
 
-def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: list[GroupedFailures]) -> None:
+def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: Iterable[GroupedFailures]) -> None:
     """Display a failure for a single method / path."""
     display_section_name(label, "_", fg="red")
     for idx, group in enumerate(checks, 1):
@@ -384,7 +384,7 @@ class OutputHandler(EventHandler):
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
-                click.secho(f"  ⏭️  {phase.value}", fg="yellow", nl=False)
+                click.secho(f"  ⏭️ {phase.value}", fg="yellow", nl=False)
                 if skip_reason:
                     click.secho(f" ({skip_reason.value})", fg="yellow")
                 else:
@@ -405,7 +405,9 @@ class OutputHandler(EventHandler):
             click.secho("  No test cases were generated\n")
             return
 
-        unique_failures = sum(len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped)
+        unique_failures = sum(
+            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
+        )
         click.secho("Test cases:", bold=True)
 
         parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
@@ -431,7 +433,7 @@ class OutputHandler(EventHandler):
         # Collect all unique failures and their counts by title
         failure_counts: dict[str, tuple[Severity, int]] = {}
         for grouped in ctx.statistic.failures.values():
-            for group in grouped:
+            for group in grouped.values():
                 for failure in group.failures:
                     data = failure_counts.get(failure.title, (failure.severity, 0))
                     failure_counts[failure.title] = (failure.severity, data[1] + 1)
@@ -463,7 +465,9 @@ class OutputHandler(EventHandler):
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         parts = []
 
-        unique_failures = sum(len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped)
+        unique_failures = sum(
+            len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
+        )
         if unique_failures:
             parts.append(f"{unique_failures} failures")
 

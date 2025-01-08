@@ -27,7 +27,6 @@ class ExecutionConfig:
     max_failures: int | None = None
     unique_data: bool = False
     no_failfast: bool = False
-    dry_run: bool = False
     seed: int | None = None
     workers_num: int = 1
 

@@ -6,6 +6,7 @@ from hypothesis import HealthCheck, Phase, given, settings
 
 import schemathesis
 import schemathesis.runner
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.runner import events
 
 if sys.version_info < (3, 10):
@@ -13,16 +14,14 @@ if sys.version_info < (3, 10):
 
 from hypothesis_openapi import openapis
 
-IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable,)
+IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema)
 
 
-@pytest.skip("Current implementation does not have enough schema validation", allow_module_level=True)
-@given(openapis(version="2.0") | openapis(version="3.0"))
+@given(schema=openapis(version="2.0") | openapis(version="3.0"))
 @settings(max_examples=25, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
-def test_random_schemas(schema):
-    schema = schemathesis.openapi.from_dict(schema)
-    for event in schemathesis.runner.from_schema(schema, dry_run=True).execute():
+def test_random_schemas(schema, openapi3_base_url):
+    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    for event in schemathesis.runner.from_schema(schema).execute():
         assert not isinstance(event, events.FatalError), repr(event)
-        if isinstance(event, events.NonFatalError):
-            if not isinstance(event.info, IGNORED_EXCEPTIONS):
-                raise AssertionError(str(event.info))
+        if isinstance(event, events.NonFatalError) and not isinstance(event.value, IGNORED_EXCEPTIONS):
+            raise AssertionError(str(event.info)) from event.value

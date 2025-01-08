@@ -32,7 +32,7 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ⏭️  Unit testing (disabled)
+  ⏭️ Unit testing (disabled)
   ⚡ Stateful testing
 
 Test cases:

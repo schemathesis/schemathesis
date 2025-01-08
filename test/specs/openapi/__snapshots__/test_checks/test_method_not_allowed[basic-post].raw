@@ -46,7 +46,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   ❌ Unit testing
-  ⏭️  Stateful testing (not applicable)
+  ⏭️ Stateful testing (not applicable)
 
 Failures:
   ❌ Custom check failed: `unsupported_method`: 1

@@ -71,7 +71,7 @@ class APIStateMachine(RuleBasedStateMachine):
     @classmethod
     @lru_cache
     def _to_test_case(cls) -> type:
-        from . import run_state_machine_as_test
+        from schemathesis.generation.stateful import run_state_machine_as_test
 
         class StateMachineTestCase(RuleBasedStateMachine.TestCase):
             settings = DEFAULT_STATE_MACHINE_SETTINGS
