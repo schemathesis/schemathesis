@@ -11,9 +11,9 @@ from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cas
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.generation.case import Case
+from schemathesis.generation.stateful.state_machine import Direction
 from schemathesis.schemas import APIOperation
 
-from ...stateful.state_machine import Direction
 from . import expressions
 from .constants import LOCATION_TO_CONTAINER
 from .references import RECURSION_DEPTH_LIMIT

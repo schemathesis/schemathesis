@@ -11,7 +11,7 @@ from __future__ import annotations
 import enum
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.runner import Status, events
@@ -29,7 +29,6 @@ if TYPE_CHECKING:
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
-    assert not ctx.config.execution.dry_run
     probes = run(ctx.config.schema, ctx.session, ctx.config.network)
     status = Status.SUCCESS
     for result in probes:
@@ -129,12 +128,9 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
         request = probe.prepare_request(session, Request(), schema, config)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
-        kwargs: dict[str, Any] = {"timeout": config.timeout or 2, "verify": config.tls_verify}
-        if config.proxy is not None:
-            kwargs["proxies"] = {"all": config.proxy}
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = session.send(request, **kwargs)
+            response = session.send(request, timeout=config.timeout or 2)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented

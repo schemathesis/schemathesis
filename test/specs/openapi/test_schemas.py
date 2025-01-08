@@ -1,8 +1,10 @@
 import pytest
 
 import schemathesis
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.parameters import OpenAPI20Parameter, OpenAPI30Parameter
+from schemathesis.specs.openapi.schemas import check_header
 
 
 @pytest.mark.operations("get_user", "update_user")
@@ -62,3 +64,16 @@ def test_operation_cache_sharing(mocker, schema_url):
     second = schema.get_operation_by_id("getUser")
     assert first is second
     assert len(schema._operation_cache._operations) == 2
+
+
+@pytest.mark.parametrize(
+    ["parameter", "expected"],
+    [
+        ({"name": ""}, "Header name should not be empty"),
+        ({"name": "Invalid\x80Name"}, "Header name should be ASCII: Invalid\x80Name"),
+        ({"name": "\nInvalid"}, "Invalid leading whitespace"),
+    ],
+)
+def test_check_header_errors(parameter, expected):
+    with pytest.raises(InvalidSchema, match=expected):
+        check_header(parameter)

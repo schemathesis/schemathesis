@@ -74,15 +74,13 @@ def validate_schema(
     kind: SchemaInputKind,
     *,
     base_url: str | None,
-    dry_run: bool,
 ) -> None:
     if kind == SchemaInputKind.URL:
         validate_url(schema)
     if kind == SchemaInputKind.PATH:
         if not file_exists(schema):
             raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)
-        # Base URL is required if it is not a dry run
-        if base_url is None and not dry_run:
+        if base_url is None:
             raise click.UsageError(MISSING_BASE_URL_MESSAGE)
 
 

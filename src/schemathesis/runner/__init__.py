@@ -42,7 +42,6 @@ def from_schema(
     no_failfast: bool = False,
     max_failures: int | None = None,
     unique_data: bool = False,
-    dry_run: bool = False,
     network: NetworkConfig | None = None,
     checks_config: ChecksConfig | None = None,
 ) -> Engine:
@@ -68,7 +67,6 @@ def from_schema(
             max_failures=max_failures,
             no_failfast=no_failfast,
             unique_data=unique_data,
-            dry_run=dry_run,
             seed=seed,
             workers_num=workers_num,
         ),

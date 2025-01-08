@@ -10,17 +10,17 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis import strategies
+from schemathesis.generation.stateful.state_machine import APIStateMachine, Direction, StepResult, _normalize_name
 
 from ....generation import GenerationMode
-from ....stateful.state_machine import APIStateMachine, Direction, StepResult
 from .. import expressions
 from ..links import get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
+    from schemathesis.generation.stateful.state_machine import StepResult
 
-    from ....stateful.state_machine import StepResult
     from ..schemas import BaseOpenAPISchema
 
 FilterFunction = Callable[["StepResult"], bool]
@@ -54,8 +54,6 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
 
     This state machine won't make calls to (2) without having a proper response from (1) first.
     """
-    from ....stateful.state_machine import _normalize_name
-
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     incoming_transitions = defaultdict(list)

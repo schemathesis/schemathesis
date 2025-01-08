@@ -31,6 +31,17 @@ class EngineEvent:
 
 
 @dataclass
+class EngineStarted(EngineEvent):
+    """Start of an engine."""
+
+    __slots__ = ("id", "timestamp")
+
+    def __init__(self) -> None:
+        self.id = uuid.uuid4()
+        self.timestamp = time.time()
+
+
+@dataclass
 class PhaseEvent(EngineEvent):
     """Event associated with a specific execution phase."""
 

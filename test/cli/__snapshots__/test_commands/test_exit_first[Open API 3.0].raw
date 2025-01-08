@@ -37,7 +37,7 @@ API Operations:
 Test Phases:
   ✅ API probing
   ❌ Unit testing
-  ⏭️  Stateful testing
+  ⏭️ Stateful testing (failure limit reached)
 
 Failures:
   ❌ Server error: 1

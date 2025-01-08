@@ -15,7 +15,7 @@ class Statistic:
     """Running statistics about test execution."""
 
     outcomes: dict[Status, int]
-    failures: dict[str, list[GroupedFailures]]
+    failures: dict[str, dict[str, GroupedFailures]]
 
     tested_operations: set[str]
 
@@ -42,7 +42,7 @@ class Statistic:
 
     def record_checks(self, recorder: ScenarioRecorder) -> None:
         """Update statistics and store failures from a new batch of checks."""
-        failures = {}
+        failures = self.failures.get(recorder.label, {})
 
         self.total_cases += len(recorder.cases)
 
@@ -74,7 +74,7 @@ class Statistic:
         if failures:
             for group in failures.values():
                 group.failures = sorted(set(group.failures))
-            self.failures[recorder.label] = list(failures.values())
+            self.failures[recorder.label] = failures
 
 
 @dataclass
