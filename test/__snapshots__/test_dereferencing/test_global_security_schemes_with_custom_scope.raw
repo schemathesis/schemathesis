@@ -1,7 +1,9 @@
 Exit code: 0
 ---
 Stdout:
-======================= Schemathesis test session starts =======================
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
 Schema location: file:///tmp/root/openapi.json
 Base URL: http://127.0.0.1/api
 Specification version: Open API 3.0.2

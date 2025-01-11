@@ -862,7 +862,6 @@ def run(
         targets=selected_targets,
         workers_num=workers_num,
         hypothesis_settings=hypothesis_settings,
-        generation_config=generation_config,
         checks_config=checks_config,
         loader_config=loader_config,
         filter_set=filter_set,
@@ -904,7 +903,6 @@ def into_event_stream(
     targets: list[TargetFunction],
     workers_num: int,
     hypothesis_settings: hypothesis.settings | None,
-    generation_config: generation.GenerationConfig,
     seed: int | None,
     no_failfast: bool,
     max_failures: int | None,
@@ -931,7 +929,6 @@ def into_event_stream(
             targets=targets,
             workers_num=workers_num,
             hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config,
             network=network_config,
         ).execute()
     except Exception as exc:

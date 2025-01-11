@@ -12,6 +12,7 @@ from schemathesis.cli.cassettes import CassetteConfig
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
+from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.runner import Status
 from schemathesis.runner.phases import PhaseName, PhaseSkipReason
 from schemathesis.runner.recorder import Interaction
@@ -132,6 +133,14 @@ def _maybe_display_tip(suggestion: str | None) -> None:
         click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
 
 
+def display_header(version: str) -> None:
+    prefix = "v" if version != "dev" else ""
+    header = f"Schemathesis {prefix}{version}"
+    click.secho(header, bold=True)
+    click.secho("━" * len(header), bold=True)
+    click.echo()
+
+
 DEFAULT_INTERNAL_ERROR_MESSAGE = "An internal error occurred during the test run"
 TRUNCATION_PLACEHOLDER = "[...]"
 
@@ -190,7 +199,7 @@ class OutputHandler(EventHandler):
     def _on_initialized(self, ctx: ExecutionContext, event: events.Initialized) -> None:
         """Display initialization info, including any lines added by other handlers."""
         self.operations_count = event.operations_count
-        display_section_name("Schemathesis test session starts")
+        display_header(SCHEMATHESIS_VERSION)
         if event.location is not None:
             click.secho(f"Schema location: {event.location}", bold=True)
         click.secho(f"Base URL: {event.base_url}", bold=True)
@@ -207,20 +216,22 @@ class OutputHandler(EventHandler):
             _print_lines(ctx.initialization_lines)
 
     def _on_phase_started(self, event: events.PhaseStarted) -> None:
-        if event.phase.name == PhaseName.PROBING:
+        phase = event.phase
+        if phase.name == PhaseName.PROBING:
             click.secho("API probing: ...\r", bold=True, nl=False)
-        elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             click.secho("Stateful tests\n", bold=True)
 
     def _on_phase_finished(self, event: events.PhaseFinished) -> None:
-        self.phases[event.phase.name] = (event.status, event.phase.skip_reason)
-        if event.phase.name == PhaseName.PROBING:
+        phase = event.phase
+        self.phases[phase.name] = (event.status, phase.skip_reason)
+        if phase.name == PhaseName.PROBING:
             click.secho(f"API probing: {event.status.name}", bold=True, nl=False)
             click.echo("\n")
-        elif event.phase.name == PhaseName.STATEFUL_TESTING and event.phase.is_enabled:
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             if event.status != Status.INTERRUPTED:
                 click.echo("\n")
-        elif event.phase.name == PhaseName.UNIT_TESTING and event.phase.is_enabled:
+        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled and phase.skip_reason is None:
             if event.status != Status.INTERRUPTED:
                 click.echo()
             if self.workers_num > 1:
