@@ -8,7 +8,7 @@ from requests import Response
 
 from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
-from schemathesis.cli.output import DEFAULT_INTERNAL_ERROR_MESSAGE
+from schemathesis.cli.commands.run.handlers.output import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
 
@@ -163,12 +163,3 @@ def test_schema_validity(cli, schema, base_url):
 def check_result(result):
     assert not (result.exception and not isinstance(result.exception, SystemExit)), result.stdout
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
-
-
-def test_not_handled_error(mocker, cli, schema_url):
-    # When there is an unhandled error in handlers
-    mocker.patch("schemathesis.cli.output.OutputHandler._on_engine_finished", side_effect=ValueError("Fail"))
-    result = cli.run(schema_url)
-    # Then it is propagated as it
-    assert isinstance(result.exception, ValueError)
-    assert str(result.exception) == "Fail"

@@ -4,6 +4,7 @@ import pathlib
 import platform
 import sys
 import time
+from unittest.mock import Mock
 from urllib.parse import urljoin
 
 import hypothesis
@@ -14,19 +15,11 @@ import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
-from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
-from schemathesis.cli import execute
-from schemathesis.cli.constants import HealthCheck, Phase
-from schemathesis.core.failures import MaxResponseTimeConfig
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
-from schemathesis.generation.overrides import Override
-from schemathesis.runner import from_schema
-from schemathesis.runner.config import NetworkConfig
+from schemathesis.cli.commands.run.handlers.output import has_too_many_responses_with_status
+from schemathesis.cli.commands.run.hypothesis import HealthCheck, Phase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
-from schemathesis.specs.openapi.checks import status_code_conformance
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky
@@ -183,131 +176,6 @@ def test_certificates(cli, schema_url, mocker):
 @pytest.mark.operations("success")
 def test_hypothesis_database_with_derandomize(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize") == snapshot_cli
-
-
-SCHEMA_URI = "https://example.schemathesis.io/openapi.json"
-
-
-@pytest.mark.parametrize(
-    ("args", "expected"),
-    [
-        ([], {}),
-        (["--exitfirst"], {"max_failures": 1}),
-        (["--workers=2"], {"workers_num": 2}),
-        (["--hypothesis-seed=123"], {"seed": 123}),
-        (
-            [
-                "--hypothesis-deadline=1000",
-                "--hypothesis-derandomize",
-                "--hypothesis-max-examples=1000",
-                "--hypothesis-phases=explicit,generate",
-                "--hypothesis-report-multiple-bugs=0",
-                "--hypothesis-suppress-health-check=too_slow,filter_too_much",
-                "--hypothesis-verbosity=normal",
-            ],
-            {
-                "hypothesis_settings": hypothesis.settings(
-                    deadline=1000,
-                    derandomize=True,
-                    max_examples=1000,
-                    phases=[hypothesis.Phase.explicit, hypothesis.Phase.generate],
-                    report_multiple_bugs=False,
-                    suppress_health_check=[hypothesis.HealthCheck.too_slow, hypothesis.HealthCheck.filter_too_much],
-                    verbosity=hypothesis.Verbosity.normal,
-                )
-            },
-        ),
-        (["--hypothesis-deadline=None"], {"hypothesis_settings": hypothesis.settings(deadline=None)}),
-        (
-            ["--hypothesis-no-phases=explicit"],
-            {
-                "hypothesis_settings": hypothesis.settings(
-                    deadline=DEFAULT_DEADLINE,
-                    phases=list(set(hypothesis.Phase) - {hypothesis.Phase.explicit, hypothesis.Phase.explain}),
-                )
-            },
-        ),
-        (
-            ["--max-response-time=10"],
-            {
-                "checks_config": {max_response_time: MaxResponseTimeConfig(limit=10.0)},
-                "checks": [not_a_server_error, max_response_time],
-            },
-        ),
-    ],
-)
-def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
-    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
-    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-
-    cli.run(SCHEMA_URI, *args)
-
-    expected = {
-        "checks": [not_a_server_error],
-        "checks_config": {},
-        "targets": [],
-        "workers_num": 1,
-        "max_failures": None,
-        "override": Override({}, {}, {}, {}),
-        "seed": None,
-        "unique_data": False,
-        "no_failfast": False,
-        "network": NetworkConfig(headers={}, timeout=10),
-        **expected,
-    }
-    hypothesis_settings = expected.pop("hypothesis_settings", None)
-    call_kwargs = execute.call_args[1]
-    executed_hypothesis_settings = call_kwargs.pop("hypothesis_settings", None)
-    if hypothesis_settings is not None:
-        # Compare non-default Hypothesis settings as `hypothesis.settings` can't be compared
-        assert executed_hypothesis_settings.show_changed() == hypothesis_settings.show_changed()
-    assert call_kwargs == expected
-
-
-@pytest.mark.parametrize(
-    ("factory", "cls"),
-    [
-        (lambda r: None, DirectoryBasedExampleDatabase),
-        (lambda r: "none", type(None)),
-        (lambda r: ":memory:", InMemoryExampleDatabase),
-        (lambda r: r.getfixturevalue("tmpdir"), DirectoryBasedExampleDatabase),
-    ],
-)
-def test_hypothesis_database_parsing(request, cli, mocker, swagger_20, factory, cls):
-    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
-    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-    database = factory(request)
-    if database:
-        args = (f"--hypothesis-database={database}",)
-    else:
-        args = ()
-    cli.run(SCHEMA_URI, *args)
-    hypothesis_settings = execute.call_args[1]["hypothesis_settings"]
-    assert isinstance(hypothesis_settings.database, cls)
-
-
-def test_all_checks(cli, mocker, swagger_20):
-    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
-    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-    cli.run(SCHEMA_URI, "--checks=all")
-    assert execute.call_args[1]["checks"] == CHECKS.get_all()
-
-
-def test_comma_separated_checks(cli, mocker, swagger_20):
-    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
-    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-    cli.run(SCHEMA_URI, "--checks=not_a_server_error,status_code_conformance")
-    assert execute.call_args[1]["checks"] == [not_a_server_error, status_code_conformance]
-
-
-def test_comma_separated_exclude_checks(cli, mocker, swagger_20):
-    excluded_checks = "not_a_server_error,status_code_conformance"
-    mocker.patch("schemathesis.cli.loaders.load_schema", return_value=swagger_20)
-    execute = mocker.patch("schemathesis.runner.from_schema", autospec=True)
-    cli.run(SCHEMA_URI, "--checks=all", f"--exclude-checks={excluded_checks}")
-    assert execute.call_args[1]["checks"] == [
-        check for check in CHECKS.get_all() if check.__name__ not in excluded_checks.split(",")
-    ]
 
 
 @pytest.mark.operations
@@ -656,7 +524,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
-    from schemathesis.runner.phases.unit import TaskProducer
+    from schemathesis.engine.phases.unit import TaskProducer
 
     original = TaskProducer.next_operation
     counter = 0
@@ -668,7 +536,7 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
             raise KeyboardInterrupt
         return original(*args, **kwargs)
 
-    mocker.patch("schemathesis.runner.phases.unit.TaskProducer.next_operation", wraps=mocked)
+    mocker.patch("schemathesis.engine.phases.unit.TaskProducer.next_operation", wraps=mocked)
     result = cli.run(schema_url, "--workers=2", "--hypothesis-derandomize")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
@@ -1188,29 +1056,6 @@ def test_force_color(cli, schema_url):
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
     assert cli.run(graphql_url, "--hypothesis-max-examples=5", *args) == snapshot_cli
-
-
-def assert_exit_code(event_stream, code):
-    with pytest.raises(SystemExit) as exc:
-        execute(
-            event_stream,
-            ctx=None,
-            workers_num=1,
-            rate_limit=None,
-            wait_for_schema=None,
-            cassette_config=None,
-            junit_xml=None,
-            output_config=None,
-        )
-    assert exc.value.code == code
-
-
-def test_cli_execute(swagger_20, capsys):
-    event_stream = from_schema(swagger_20).execute()
-    for _ in event_stream:
-        pass
-    assert_exit_code(event_stream, 1)
-    assert capsys.readouterr().out.strip() == "Unexpected error"
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
@@ -1781,7 +1626,7 @@ def buggy(ctx):
 def test_custom_cli_option(ctx, cli, schema_url, snapshot_cli):
     module = ctx.write_pymodule(
         r"""
-from schemathesis import cli, runner
+from schemathesis import cli, engine
 
 
 group = cli.add_group("My custom group")
@@ -1802,10 +1647,10 @@ class EventCounter(cli.EventHandler):
 
     def handle_event(self, ctx, event) -> None:
         self.counter += 1
-        if isinstance(event, runner.events.Initialized):
+        if isinstance(event, engine.events.Initialized):
             ctx.add_initialization_line("Counter initialized!")
             ctx.add_initialization_line(gen())
-        elif isinstance(event, runner.events.EngineFinished):
+        elif isinstance(event, engine.events.EngineFinished):
             ctx.add_summary_line(f"Counter: {self.counter}")
             ctx.add_summary_line(gen())
 """
@@ -1820,3 +1665,19 @@ class EventCounter(cli.EventHandler):
         )
         == snapshot_cli
     )
+
+
+def test_authorization_warning_no_checks():
+    # When there are no checks
+    # Then the warning should not be added
+    assert not has_too_many_responses_with_status([], 401)
+
+
+def test_authorization_warning_missing_threshold(response_factory):
+    # When there are not enough 401 responses to meet the threshold
+    responses = [
+        Mock(response=response_factory.requests(status_code=201)),
+        Mock(response=response_factory.requests(status_code=401)),
+    ]
+    # Then the warning should not be added
+    assert not has_too_many_responses_with_status(responses, 401)

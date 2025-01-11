@@ -12,10 +12,10 @@ from starlette_testclient import TestClient
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import FailureGroup
+from schemathesis.engine import Status
+from schemathesis.engine.config import NetworkConfig
+from schemathesis.engine.events import ScenarioFinished
 from schemathesis.generation import GenerationConfig
-from schemathesis.runner import Status
-from schemathesis.runner.config import NetworkConfig
-from schemathesis.runner.events import ScenarioFinished
 from schemathesis.specs.openapi.checks import (
     AuthKind,
     _contains_auth,

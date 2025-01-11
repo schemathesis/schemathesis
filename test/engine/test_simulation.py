@@ -8,11 +8,11 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from requests.exceptions import HTTPError, Timeout
 
+from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.context import EngineContext
+from schemathesis.engine.core import Engine
+from schemathesis.engine.events import FatalError
 from schemathesis.generation import GenerationConfig
-from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.runner.context import EngineContext
-from schemathesis.runner.core import Engine
-from schemathesis.runner.events import FatalError
 
 
 class FaultInjectingSession(requests.Session):
@@ -36,13 +36,12 @@ class FaultInjectingSession(requests.Session):
     seed=st.integers(),
     config=st.builds(
         EngineConfig,
-        schema=st.none(),
         execution=st.builds(
             ExecutionConfig,
             checks=st.just([]),
             targets=st.just([]),
             hypothesis_settings=st.just(hypothesis.settings(max_examples=1, deadline=None, database=None)),
-            generation_config=st.builds(GenerationConfig),
+            generation=st.builds(GenerationConfig),
         ),
         network=st.builds(NetworkConfig, headers=st.just({})),
         checks_config=st.just({}),
@@ -51,10 +50,9 @@ class FaultInjectingSession(requests.Session):
 @pytest.mark.operations("__all__")
 @settings(max_examples=6, suppress_health_check=list(HealthCheck), deadline=None)
 def test_engine_with_faults(seed, config, openapi3_schema):
-    config.schema = openapi3_schema
     session = FaultInjectingSession(random=random.Random(seed))
-    ctx = EngineContext(stop_event=threading.Event(), config=config, session=session)
-    engine = Engine(config)
+    ctx = EngineContext(schema=openapi3_schema, stop_event=threading.Event(), config=config, session=session)
+    engine = Engine(schema=openapi3_schema, config=config)
     plan = engine._create_execution_plan()
     for event in plan.execute(ctx):
         assert not isinstance(event, FatalError)

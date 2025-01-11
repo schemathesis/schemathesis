@@ -10,10 +10,10 @@ from flask import Flask, abort, jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.context import EngineContext
+from schemathesis.engine.phases import Phase, PhaseName, stateful
 from schemathesis.generation import GenerationConfig
-from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.runner.context import EngineContext
-from schemathesis.runner.phases import Phase, PhaseName, stateful
 
 
 @dataclass
@@ -369,8 +369,8 @@ def stop_event():
 
 
 @pytest.fixture
-def runner_factory(app_factory, app_runner, stop_event):
-    def _runner_factory(
+def engine_factory(app_factory, app_runner, stop_event):
+    def _engine_factory(
         *,
         app_kwargs=None,
         hypothesis_settings=None,
@@ -388,11 +388,10 @@ def runner_factory(app_factory, app_runner, stop_event):
             **(configuration or {})
         )
         config = EngineConfig(
-            schema=schema,
             execution=ExecutionConfig(
                 checks=checks or CHECKS.get_all(),
                 targets=targets or [],
-                generation_config=GenerationConfig(),
+                generation=GenerationConfig(),
                 hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
                 unique_data=unique_data,
                 max_failures=max_failures,
@@ -401,8 +400,8 @@ def runner_factory(app_factory, app_runner, stop_event):
             checks_config=checks_config or ChecksConfig(),
         )
         return stateful.execute(
-            engine=EngineContext(stop_event=stop_event, config=config),
+            engine=EngineContext(schema=schema, stop_event=stop_event, config=config),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 
-    return _runner_factory
+    return _engine_factory

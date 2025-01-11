@@ -7,7 +7,8 @@ from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
 from schemathesis.core.transforms import deepclone
-from schemathesis.runner import from_schema
+from schemathesis.engine import from_schema
+from schemathesis.engine.config import EngineConfig, ExecutionConfig
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -190,20 +191,24 @@ def test_as_json_schema(operations):
 
 @pytest.mark.benchmark
 def test_events():
-    runner = from_schema(
+    engine = from_schema(
         BBCI_SCHEMA,
-        checks=(),
-        hypothesis_settings=hypothesis.settings(
-            deadline=None,
-            database=None,
-            max_examples=1,
-            derandomize=True,
-            suppress_health_check=list(HealthCheck),
-            phases=[Phase.explicit, Phase.generate],
-            verbosity=Verbosity.quiet,
+        config=EngineConfig(
+            execution=ExecutionConfig(
+                checks=(),
+                hypothesis_settings=hypothesis.settings(
+                    deadline=None,
+                    database=None,
+                    max_examples=1,
+                    derandomize=True,
+                    suppress_health_check=list(HealthCheck),
+                    phases=[Phase.explicit, Phase.generate],
+                    verbosity=Verbosity.quiet,
+                ),
+            )
         ),
     )
-    for _ in runner.execute():
+    for _ in engine.execute():
         pass
 
 
