@@ -1241,14 +1241,16 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         },
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi2_base_url)
-    stream = EventStream(
-        schema,
-        hypothesis_settings=settings(max_examples=10),
-        generation_config=GenerationConfig(
+    schema = schemathesis.openapi.from_dict(schema).configure(
+        base_url=openapi2_base_url,
+        generation=GenerationConfig(
             with_security_parameters=False,
             headers=HeaderConfig(strategy=st.text(alphabet=st.characters(whitelist_characters="a", categories=()))),
         ),
+    )
+    stream = EventStream(
+        schema,
+        hypothesis_settings=settings(max_examples=10),
     ).execute()
     for event in stream.events:
         if isinstance(event, events.ScenarioFinished):

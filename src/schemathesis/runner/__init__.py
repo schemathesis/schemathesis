@@ -7,18 +7,16 @@ from typing import TYPE_CHECKING
 from schemathesis.checks import CHECKS, ChecksConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.overrides import Override
-
-from ..generation import GenerationConfig
-from .config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.runner.config import EngineConfig, ExecutionConfig, NetworkConfig
 
 if TYPE_CHECKING:
     import hypothesis
 
     from schemathesis.generation.case import CheckFunction
     from schemathesis.generation.targets import TargetFunction
+    from schemathesis.runner.core import Engine
 
     from ..schemas import BaseSchema
-    from .core import Engine
 
 
 class Status(str, Enum):
@@ -27,6 +25,12 @@ class Status(str, Enum):
     ERROR = "error"
     INTERRUPTED = "interrupted"
     SKIP = "skip"
+
+    def __lt__(self, other: Status) -> bool:  # type: ignore[override]
+        return _STATUS_ORDER[self] < _STATUS_ORDER[other]
+
+
+_STATUS_ORDER = {Status.SUCCESS: 0, Status.FAILURE: 1, Status.ERROR: 2, Status.INTERRUPTED: 3, Status.SKIP: 4}
 
 
 def from_schema(
@@ -37,7 +41,6 @@ def from_schema(
     targets: list[TargetFunction] | None = None,
     workers_num: int = 1,
     hypothesis_settings: hypothesis.settings | None = None,
-    generation_config: GenerationConfig | None = None,
     seed: int | None = None,
     no_failfast: bool = False,
     max_failures: int | None = None,
@@ -63,7 +66,7 @@ def from_schema(
             checks=checks,
             targets=targets or [],
             hypothesis_settings=hypothesis_settings,
-            generation_config=generation_config or schema.generation_config,
+            generation_config=schema.generation_config,
             max_failures=max_failures,
             no_failfast=no_failfast,
             unique_data=unique_data,

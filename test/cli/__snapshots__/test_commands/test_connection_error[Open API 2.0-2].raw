@@ -1,7 +1,9 @@
 Exit code: 1
 ---
 Stdout:
-======================= Schemathesis test session starts =======================
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
 Schema location: http://127.0.0.1/schema.yaml
 Base URL: http://127.0.0.1:1/api
 Specification version: Open API 2.0

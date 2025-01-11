@@ -20,7 +20,6 @@ from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.cli import execute
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.core.failures import MaxResponseTimeConfig
-from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.overrides import Override
 from schemathesis.runner import from_schema
@@ -253,7 +252,6 @@ def test_from_schema_arguments(cli, mocker, swagger_20, args, expected):
         "seed": None,
         "unique_data": False,
         "no_failfast": False,
-        "generation_config": GenerationConfig(),
         "network": NetworkConfig(headers={}, timeout=10),
         **expected,
     }
@@ -359,15 +357,12 @@ def test_cli_run_output_empty(cli, schema_url, workers):
     assert "= Empty test suite =" in lines[-1]
 
 
-@pytest.mark.operations
-@pytest.mark.parametrize("workers", [1, 2])
-def test_cli_run_changed_base_url(cli, schema_url, server, workers):
+@pytest.mark.openapi_version("3.0")
+def test_cli_run_changed_base_url(cli, schema_url, server, snapshot_cli):
     # When the CLI receives custom base URL
     base_url = f"http://127.0.0.1:{server['port']}/api"
-    result = cli.run(schema_url, "--base-url", base_url, f"--workers={workers}")
     # Then the base URL should be correctly displayed in the CLI output
-    lines = result.stdout.strip().split("\n")
-    assert lines[2] == f"Base URL: {base_url}"
+    assert cli.run(schema_url, "--base-url", base_url) == snapshot_cli
 
 
 @pytest.mark.parametrize(
@@ -623,11 +618,11 @@ def assert_threaded_executor_interruption(lines, expected, optional_interrupt=Fa
     # way around
     # The app under test was killed ungracefully and since we run it in a child or the main thread
     # its output might occur in the captured stdout.
-    ignored_exception = "Exception ignored in: " in lines[8]
-    assert lines[9] in expected or ignored_exception, lines
+    ignored_exception = "Exception ignored in: " in lines[9]
+    assert lines[11] in expected or ignored_exception, lines
     if not optional_interrupt:
-        assert any("!! KeyboardInterrupt !!" in line for line in lines[10:]), lines
-    assert any("=== SUMMARY ===" in line for line in lines[9:])
+        assert any("!! KeyboardInterrupt !!" in line for line in lines[12:]), lines
+    assert any("=== SUMMARY ===" in line for line in lines[12:])
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -650,11 +645,11 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
     result = cli.run(schema_url, f"--workers={workers}")
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then execution stops, and a message about interruption is displayed
-    lines = result.stdout.strip().split("\n")
     # And summary is still displayed in the end of the output
     if workers == 1:
         assert result == snapshot_cli
     else:
+        lines = result.stdout.strip().split("\n")
         assert_threaded_executor_interruption(lines, ("", "."))
 
 
@@ -1400,7 +1395,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
 def test_rate_limit(cli, schema_url):
     result = cli.run(schema_url, "--rate-limit=1/s")
     lines = result.stdout.splitlines()
-    assert lines[6] == "Rate limit: 1/s"
+    assert lines[8] == "Rate limit: 1/s"
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])

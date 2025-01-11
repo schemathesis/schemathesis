@@ -5,7 +5,7 @@ import threading
 from typing import TYPE_CHECKING
 
 from schemathesis.runner import Status, events
-from schemathesis.runner.phases import Phase, PhaseName
+from schemathesis.runner.phases import Phase, PhaseName, PhaseSkipReason
 
 if TYPE_CHECKING:
     from ...context import EngineContext
@@ -28,24 +28,21 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         target=execute_state_machine_loop,
         kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine},
     )
-    status = Status.SUCCESS
+    status: Status | None = None
+    is_executed = False
 
     thread.start()
     try:
         while True:
             try:
                 event = event_queue.get(timeout=EVENT_QUEUE_TIMEOUT)
+                is_executed = True
                 # Set the run status based on the suite status
                 # ERROR & INTERRUPTED statuses are terminal, therefore they should not be overridden
                 if (
                     isinstance(event, events.SuiteFinished)
-                    and status not in (Status.ERROR, Status.INTERRUPTED)
-                    and event.status
-                    in (
-                        Status.FAILURE,
-                        Status.ERROR,
-                        Status.INTERRUPTED,
-                    )
+                    and event.status != Status.SKIP
+                    and (status is None or status < event.status)
                 ):
                     status = event.status
                 yield event
@@ -60,4 +57,9 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     finally:
         thread.join()
 
+    if not is_executed:
+        phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
+        status = Status.SKIP
+    elif status is None:
+        status = Status.SKIP
     yield events.PhaseFinished(phase=phase, status=status)
