@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, cast
+from typing import Any, List, cast
 
+from schemathesis.generation.case import Case
 from schemathesis.graphql.checks import GraphQLClientError, GraphQLServerError, UnexpectedGraphQLResponse
-
-if TYPE_CHECKING:
-    from schemathesis.generation.case import Case
 
 
 def validate_graphql_response(case: Case, payload: Any) -> None:

@@ -11,7 +11,7 @@ from _pytest.main import ExitCode
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from schemathesis.cli.cassettes import CassetteFormat, _cookie_to_har, get_command_representation, write_double_quoted
+from schemathesis.cli.commands.run.handlers.cassettes import CassetteFormat, _cookie_to_har, write_double_quoted
 from schemathesis.generation import GenerationMode
 
 
@@ -164,11 +164,6 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
     assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
 
 
-def test_get_command_representation(mocker):
-    mocker.patch("schemathesis.cli.cassettes.sys.argv", ["schemathesis", "run", "http://example.com/schema.yaml"])
-    assert get_command_representation() == "st run http://example.com/schema.yaml"
-
-
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 @pytest.mark.operations("success")
 def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_url, snapshot_cli):
@@ -183,8 +178,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
-        f"st run --cassette-path={cassette_path} "
-        f"--hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
+        f"st run --cassette-path={cassette_path} --hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
     )
     assert cassette["command"] == command
 

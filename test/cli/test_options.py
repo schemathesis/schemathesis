@@ -5,7 +5,7 @@ import pytest
 from hypothesis import example, given, settings
 from hypothesis import strategies as st
 
-from schemathesis.cli import CsvEnumChoice
+from schemathesis.cli.ext.options import CsvEnumChoice
 
 
 class Options(Enum):

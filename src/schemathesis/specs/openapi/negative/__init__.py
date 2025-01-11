@@ -13,7 +13,8 @@ from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 
 if TYPE_CHECKING:
-    from ....generation import GenerationConfig
+    from schemathesis.generation import GenerationConfig
+
     from .types import Draw, Schema
 
 

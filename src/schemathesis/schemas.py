@@ -46,8 +46,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 
     from schemathesis.core import Specification
-
-    from .stateful.state_machine import APIStateMachine
+    from schemathesis.generation.stateful.state_machine import APIStateMachine
 
 
 C = TypeVar("C", bound=Case)

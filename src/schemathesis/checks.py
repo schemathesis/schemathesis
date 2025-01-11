@@ -18,8 +18,8 @@ from schemathesis.generation.overrides import Override
 if TYPE_CHECKING:
     from requests.models import CaseInsensitiveDict
 
+    from schemathesis.engine.recorder import ScenarioRecorder
     from schemathesis.generation.case import Case
-    from schemathesis.runner.recorder import ScenarioRecorder
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
 ChecksConfig = dict[CheckFunction, Any]

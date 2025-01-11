@@ -16,9 +16,10 @@ from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
+from schemathesis.engine import Status, events, from_schema
+from schemathesis.engine.config import EngineConfig, ExecutionConfig
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
-from schemathesis.runner import Status, events, from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
@@ -132,19 +133,23 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError):
         pass
 
-    runner = from_schema(
+    engine = from_schema(
         schema,
-        checks=[combined_check],
-        hypothesis_settings=hypothesis.settings(
-            deadline=None,
-            database=None,
-            max_examples=1,
-            suppress_health_check=list(HealthCheck),
-            phases=[Phase.explicit, Phase.generate],
-            verbosity=Verbosity.quiet,
+        config=EngineConfig(
+            execution=ExecutionConfig(
+                checks=[combined_check],
+                hypothesis_settings=hypothesis.settings(
+                    deadline=None,
+                    database=None,
+                    max_examples=1,
+                    suppress_health_check=list(HealthCheck),
+                    phases=[Phase.explicit, Phase.generate],
+                    verbosity=Verbosity.quiet,
+                ),
+            )
         ),
     )
-    for event in runner.execute():
+    for event in engine.execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
         assert_event(filename, event)
