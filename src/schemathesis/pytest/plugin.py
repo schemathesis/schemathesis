@@ -39,7 +39,7 @@ from schemathesis.schemas import APIOperation
 if TYPE_CHECKING:
     from _pytest.fixtures import FuncFixtureInfo
 
-    from ..schemas import BaseSchema
+    from schemathesis.schemas import BaseSchema
 
 GIVEN_AND_EXPLICIT_EXAMPLES_ERROR_MESSAGE = (
     "Unsupported test setup. Tests using `@schema.given` cannot be combined with explicit schema examples in the same "

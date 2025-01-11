@@ -50,7 +50,7 @@ from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from ...auths import AuthStorage
+    from schemathesis.auths import AuthStorage
 
 
 @unique

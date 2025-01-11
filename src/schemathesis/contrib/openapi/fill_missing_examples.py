@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from ...hooks import HookContext, register, unregister
-
-if TYPE_CHECKING:
-    from schemathesis.generation.case import Case
+from schemathesis.generation.case import Case
+from schemathesis.hooks import HookContext, register, unregister
 
 
 def install() -> None:

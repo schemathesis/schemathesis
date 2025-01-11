@@ -9,6 +9,7 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
+from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.stateful.state_machine import APIStateMachine, Direction, StepResult, _normalize_name
 
@@ -18,7 +19,6 @@ from ..links import get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
-    from schemathesis.generation.case import Case
     from schemathesis.generation.stateful.state_machine import StepResult
 
     from ..schemas import BaseOpenAPISchema

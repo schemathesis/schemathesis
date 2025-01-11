@@ -22,11 +22,11 @@ Runtime Error
 division by zero
 
     Traceback (most recent call last):
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in wrapped
+      File "/package-root/engine/phases/unit/_executor.py", line XXX, in wrapped
         f(ctx=ctx, case=case, recorder=recorder)
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in test_func
+      File "/package-root/engine/phases/unit/_executor.py", line XXX, in test_func
         validate_response(
-      File "/package-root/runner/phases/unit/_executor.py", line XXX, in validate_response
+      File "/package-root/engine/phases/unit/_executor.py", line XXX, in validate_response
         failures = run_checks(
       File "/package-root/checks.py", line XXX, in run_checks
         skip_check = check(ctx, response, case)

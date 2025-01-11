@@ -19,13 +19,12 @@ from typing import (
 
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
-
-from .filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
+from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, attach_filter_chain
+from schemathesis.generation.case import Case
 
 if TYPE_CHECKING:
     import requests.auth
 
-    from schemathesis.generation.case import Case
     from schemathesis.schemas import APIOperation
 
 DEFAULT_REFRESH_INTERVAL = 300

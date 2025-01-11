@@ -4,6 +4,7 @@ import os
 from functools import lru_cache, wraps
 from typing import Any, Callable, TypeVar
 
+import hypothesis
 import pytest
 import requests
 import urllib3
@@ -15,9 +16,11 @@ from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
-from schemathesis.runner import Status, events, from_schema
-from schemathesis.runner.events import EngineEvent, EngineFinished, Initialized, NonFatalError, ScenarioFinished
-from schemathesis.runner.phases import PhaseName
+from schemathesis.engine import Status, events, from_schema
+from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.events import EngineEvent, EngineFinished, Initialized, NonFatalError, ScenarioFinished
+from schemathesis.engine.phases import PhaseName
+from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -133,7 +136,25 @@ E = TypeVar("E", bound=EngineEvent)
 class EventStream:
     def __init__(self, schema, **options):
         options.setdefault("checks", [not_a_server_error])
-        self.schema = from_schema(schema, **options)
+        config = EngineConfig(
+            execution=ExecutionConfig(
+                checks=options.get("checks", []),
+                targets=options.get("targets", []),
+                hypothesis_settings=options.get("hypothesis_settings")
+                or hypothesis.settings(deadline=DEFAULT_DEADLINE),
+                generation=schema.generation_config,
+                max_failures=options.get("max_failures"),
+                no_failfast=options.get("no_failfast", False),
+                unique_data=options.get("unique_data", False),
+                seed=options.get("seed"),
+                workers_num=options.get("workers_num", 1),
+            ),
+            network=options.get("network") or NetworkConfig(),
+            override=options.get("override"),
+            checks_config=options.get("checks_config", {}),
+        )
+
+        self.schema = from_schema(schema, config=config)
 
     def execute(self) -> EventStream:
         self.events = list(self.schema.execute())

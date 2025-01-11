@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from schemathesis import errors, graphql, openapi, pytest, python
+from schemathesis import auths, contrib, engine, errors, experimental, graphql, hooks, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.output import OutputConfig, sanitization
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
+from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.case import Case
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
-
-from . import auths, contrib, experimental, hooks, runner
-from .generation import GenerationConfig, GenerationMode, HeaderConfig
 
 __version__ = SCHEMATHESIS_VERSION
 
@@ -32,6 +30,7 @@ __all__ = [
     "auth",
     "check",
     "contrib",
+    "engine",
     "errors",
     "experimental",
     "graphql",
@@ -40,7 +39,6 @@ __all__ = [
     "openapi",
     "pytest",
     "python",
-    "runner",
     "sanitization",
     "target",
 ]

@@ -9,15 +9,13 @@ from typing import TYPE_CHECKING, Any, Callable, ClassVar, cast
 
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import Response
-
-from .filters import FilterSet, attach_filter_chain
+from schemathesis.filters import FilterSet, attach_filter_chain
 
 if TYPE_CHECKING:
     from hypothesis import strategies as st
 
     from schemathesis.generation.case import Case
-
-    from .schemas import APIOperation, BaseSchema
+    from schemathesis.schemas import APIOperation, BaseSchema
 
 HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 

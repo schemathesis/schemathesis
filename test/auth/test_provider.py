@@ -5,8 +5,8 @@ import pytest
 import schemathesis
 from schemathesis.auths import AuthContext, AuthStorage, CachingAuthProvider
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.engine import from_schema
 from schemathesis.generation.case import Case
-from schemathesis.runner import from_schema
 
 TOKEN = "EXAMPLE-TOKEN"
 
