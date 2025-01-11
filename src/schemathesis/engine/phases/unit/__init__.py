@@ -83,7 +83,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         status = Status.SKIP
     # NOTE: Right now there is just one suite, hence two events go one after another
     yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
-    yield events.PhaseFinished(phase=phase, status=status)
+    yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
 def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext, suite_id: uuid.UUID) -> None:

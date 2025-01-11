@@ -52,7 +52,6 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
             outcome=probes.ProbeOutcome.FAILURE,
-            config=config,
             request=ANY,
             response=ANY,
             error=None,
@@ -75,7 +74,6 @@ def test_detect_null_byte_error(openapi_30, config_factory):
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
             outcome=probes.ProbeOutcome.ERROR,
-            config=config,
             request=ANY,
             response=None,
             error=ANY,
@@ -90,7 +88,6 @@ def test_detect_null_byte_skipped(openapi_30, config_factory):
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
             outcome=probes.ProbeOutcome.SKIP,
-            config=config,
             request=None,
             response=None,
             error=None,

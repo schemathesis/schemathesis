@@ -13,6 +13,6 @@ class EventHandler:
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         raise NotImplementedError
 
-    def shutdown(self) -> None:
-        # Do nothing by default
-        ...
+    def start(self, ctx: ExecutionContext) -> None: ...
+
+    def shutdown(self) -> None: ...

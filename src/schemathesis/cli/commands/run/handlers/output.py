@@ -3,23 +3,31 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from types import GeneratorType
-from typing import Any, Generator, Iterable, cast
+from typing import TYPE_CHECKING, Any, Generator, Iterable
 
 import click
 
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
+from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteConfig
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
+from schemathesis.core.result import Err, Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
+from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
+from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.schemas import ApiOperationsCount
+
+if TYPE_CHECKING:
+    from rich.console import Console
+    from rich.progress import Progress, TaskID
 
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
@@ -147,6 +155,19 @@ def _print_lines(lines: list[str | Generator[str, None, None]]) -> None:
                 click.echo(line)
 
 
+def _default_console() -> Console:
+    from rich.console import Console
+
+    kwargs = {}
+    # For stdout recording in tests
+    if "PYTEST_VERSION" in os.environ:
+        kwargs["width"] = 240
+    return Console(**kwargs)
+
+
+BLOCK_PADDING = (0, 1, 0, 1)
+
+
 @dataclass
 class WarningData:
     missing_auth: dict[int, list[str]] = field(default_factory=dict)
@@ -157,6 +178,8 @@ class OutputHandler(EventHandler):
     workers_num: int
     rate_limit: str | None
     wait_for_schema: float | None
+    progress: Progress | None = None
+    progress_task_id: TaskID | None = None
     operations_processed: int = 0
     operations_count: ApiOperationsCount | None = None
     skip_reasons: list[str] = field(default_factory=list)
@@ -168,11 +191,10 @@ class OutputHandler(EventHandler):
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
         default_factory=lambda: {phase: (Status.SKIP, None) for phase in PhaseName}
     )
+    console: Console = field(default_factory=_default_console)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, events.Initialized):
-            self._on_initialized(ctx, event)
-        elif isinstance(event, events.PhaseStarted):
+        if isinstance(event, events.PhaseStarted):
             self._on_phase_started(event)
         elif isinstance(event, events.PhaseFinished):
             self._on_phase_finished(event)
@@ -188,39 +210,179 @@ class OutputHandler(EventHandler):
             self._on_fatal_error(event)
         elif isinstance(event, events.NonFatalError):
             self.errors.append(event)
+        elif isinstance(event, LoadingStarted):
+            self._on_loading_started(event)
+        elif isinstance(event, LoadingFinished):
+            self._on_loading_finished(ctx, event)
 
-    def _on_initialized(self, ctx: ExecutionContext, event: events.Initialized) -> None:
-        """Display initialization info, including any lines added by other handlers."""
-        self.operations_count = event.operations_count
+    def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
-        if event.location is not None:
-            click.secho(f"Schema location: {event.location}", bold=True)
-        click.secho(f"Base URL: {event.base_url}", bold=True)
-        click.secho(f"Specification version: {event.specification.name}", bold=True)
-        if event.seed is not None:
-            click.secho(f"Random seed: {event.seed}", bold=True)
-        click.secho(f"Workers: {self.workers_num}", bold=True)
-        if self.rate_limit is not None:
-            click.secho(f"Rate limit: {self.rate_limit}", bold=True)
-        click.secho(f"Collected API operations: {self.operations_count.selected}", bold=True)
-        links_count = cast(int, event.links_count)
-        click.secho(f"Collected API links: {links_count}", bold=True)
+
+    def shutdown(self) -> None:
+        if self.progress is not None and self.progress_task_id is not None:
+            self.progress.stop_task(self.progress_task_id)
+            self.progress.stop()
+
+    def _start_progress(self, name: str) -> None:
+        assert self.progress is not None
+        self.progress_task_id = self.progress.add_task(name, total=None)
+        self.progress.start()
+
+    def _stop_progress(self) -> None:
+        assert self.progress is not None
+        assert self.progress_task_id is not None
+        self.progress.stop_task(self.progress_task_id)
+        self.progress.stop()
+        self.progress = None
+        self.progress_task_id = None
+
+    def _on_loading_started(self, event: LoadingStarted) -> None:
+        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
+        from rich.style import Style
+        from rich.text import Text
+
+        progress_message = Text.assemble(
+            ("Loading specification from ", Style(color="white")),
+            (event.location, Style(color="cyan")),
+        )
+        self.progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            RenderableColumn(progress_message),
+            console=self.console,
+            transient=True,
+        )
+        self._start_progress("Loading")
+
+    def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
+        from rich.padding import Padding
+        from rich.style import Style
+        from rich.table import Table
+        from rich.text import Text
+
+        self._stop_progress()
+        self.operations_count = event.operations_count
+
+        duration_ms = int(event.duration * 1000)
+        message = Padding(
+            Text.assemble(
+                ("✅  ", Style(color="green")),
+                ("Loaded specification from ", Style(color="white")),
+                (event.location, Style(color="cyan")),
+                (f" (in {duration_ms} ms)", Style(color="white")),
+            ),
+            BLOCK_PADDING,
+        )
+        self.console.print(message)
+        self.console.print()
+
+        table = Table(
+            show_header=False,
+            box=None,
+            padding=(0, 4),
+            collapse_padding=True,
+        )
+        table.add_column("Field", style=Style(color="bright_white", bold=True))
+        table.add_column("Value", style="cyan")
+
+        table.add_row("Base URL:", event.base_url)
+        table.add_row("Specification:", event.specification.name)
+        table.add_row("Operations:", str(event.operations_count.total))
+
+        message = Padding(table, BLOCK_PADDING)
+        self.console.print(message)
+        self.console.print()
+
         if ctx.initialization_lines:
             _print_lines(ctx.initialization_lines)
 
     def _on_phase_started(self, event: events.PhaseStarted) -> None:
         phase = event.phase
         if phase.name == PhaseName.PROBING:
-            click.secho("API probing: ...\r", bold=True, nl=False)
+            self._start_probing()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             click.secho("Stateful tests\n", bold=True)
 
+    def _start_probing(self) -> None:
+        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
+        from rich.text import Text
+
+        progress_message = Text("Probing API capabilities")
+        self.progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            RenderableColumn(progress_message),
+            transient=True,
+            console=self.console,
+        )
+        self._start_progress("Probing")
+
     def _on_phase_finished(self, event: events.PhaseFinished) -> None:
+        from rich.padding import Padding
+        from rich.style import Style
+        from rich.table import Table
+        from rich.text import Text
+
         phase = event.phase
         self.phases[phase.name] = (event.status, phase.skip_reason)
+
         if phase.name == PhaseName.PROBING:
-            click.secho(f"API probing: {event.status.name}", bold=True, nl=False)
-            click.echo("\n")
+            self._stop_progress()
+
+            if event.status == Status.SUCCESS:
+                assert isinstance(event.payload, Ok)
+                payload = event.payload.ok()
+                self.console.print(
+                    Padding(
+                        Text.assemble(
+                            ("✅  ", Style(color="green")),
+                            ("API capabilities:", Style(color="white", bold=True)),
+                        ),
+                        BLOCK_PADDING,
+                    )
+                )
+                self.console.print()
+
+                table = Table(
+                    show_header=False,
+                    box=None,
+                    padding=(0, 4),
+                    collapse_padding=True,
+                )
+                table.add_column("Capability", style=Style(color="bright_white", bold=True))
+                table.add_column("Status", style="cyan")
+                for probe_run in payload.probes:
+                    icon, style = {
+                        ProbeOutcome.SUCCESS: ("✓", Style(color="green")),
+                        ProbeOutcome.FAILURE: ("✘", Style(color="red")),
+                        ProbeOutcome.SKIP: ("⊘", Style(color="yellow")),
+                        ProbeOutcome.ERROR: ("⚠", Style(color="yellow")),
+                    }[probe_run.outcome]
+
+                    table.add_row(f"{probe_run.probe.name}:", Text(icon, style=style))
+
+                message = Padding(table, BLOCK_PADDING)
+            elif event.status == Status.SKIP:
+                message = Padding(
+                    Text.assemble(
+                        ("⏭️  ", ""),
+                        ("API probing skipped", Style(color="yellow")),
+                    ),
+                    BLOCK_PADDING,
+                )
+            else:
+                assert event.status == Status.ERROR
+                assert isinstance(event.payload, Err)
+                error = EngineErrorInfo(event.payload.err())
+                message = Padding(
+                    Text.assemble(
+                        ("🚫  ", ""),
+                        (f"API probing failed: {error.message}", Style(color="red")),
+                    ),
+                    BLOCK_PADDING,
+                )
+            self.console.print(message)
+            self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             if event.status != Status.INTERRUPTED:
                 click.echo("\n")
@@ -483,7 +645,7 @@ class OutputHandler(EventHandler):
             parts.append(f"{total_warnings} warnings")
 
         if parts:
-            message = f'{", ".join(parts)} in {event.running_time:.2f}s'
+            message = f"{', '.join(parts)} in {event.running_time:.2f}s"
             color = "red" if (unique_failures or self.errors) else "yellow"
         elif ctx.statistic.total_cases == 0:
             message = "Empty test suite"

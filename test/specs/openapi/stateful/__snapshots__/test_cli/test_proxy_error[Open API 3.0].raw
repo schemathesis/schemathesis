@@ -4,26 +4,21 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema location: http://127.0.0.1/schema.yaml
-Base URL: http://127.0.0.1/api
-Specification version: Open API 3.0.2
-Random seed: 42
-Workers: 1
-Collected API operations: 4
-Collected API links: 3
-API probing: ERROR
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       4
+
+
+ 🚫  API probing failed: Connection failed
 
 Stateful tests
 
 ...
 
 ==================================== ERRORS ====================================
-_______________________________ API Probe errors _______________________________
-Network Error
-
-Connection failed
-
-    Unable to connect to proxy
 ________________________________ Stateful tests ________________________________
 Network Error
 
@@ -53,9 +48,9 @@ Test Phases:
   🚫 Stateful testing
 
 Errors:
-  🚫 Network Error: 2
+  🚫 Network Error: 1
 
 Test cases:
   N generated, N skipped
 
-============================== 2 errors in 1.00s ===============================
+============================== 1 errors in 1.00s ===============================

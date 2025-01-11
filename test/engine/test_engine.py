@@ -863,7 +863,7 @@ def test_connection_error(ctx):
     stream.assert_errors()
     expected = "Max retries exceeded with url"
     errors = stream.find_all(events.NonFatalError)
-    assert len(errors) == 2
+    assert len(errors) == 1
     assert expected in str(errors[0].info)
 
 
@@ -966,7 +966,6 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
 def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
     stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
-    assert stream.started.operations_count.total == 4
     for event, expected in zip(stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"]):
         assert event.recorder.label == expected
         for case in event.recorder.cases.values():
@@ -1016,7 +1015,6 @@ def event_stream(engine):
 
 def test_stop_event_stream(event_stream):
     assert isinstance(next(event_stream), events.EngineStarted)
-    assert isinstance(next(event_stream), events.Initialized)
     event_stream.stop()
     assert isinstance(next(event_stream), events.EngineFinished)
     assert next(event_stream, None) is None
@@ -1045,7 +1043,6 @@ def test_stop_event_stream_after_second_event(event_stream):
 
 def test_finish(event_stream):
     assert isinstance(next(event_stream), events.EngineStarted)
-    assert isinstance(next(event_stream), events.Initialized)
     event = event_stream.finish()
     assert isinstance(event, events.EngineFinished)
     assert next(event_stream, None) is None

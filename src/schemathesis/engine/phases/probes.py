@@ -13,6 +13,7 @@ import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from schemathesis.core.result import Err, Ok, Result
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events
 
@@ -26,10 +27,18 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
+@dataclass
+class ProbePayload:
+    probes: list[ProbeRun]
+
+    __slots__ = ("probes",)
+
+
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
     probes = run(ctx.schema, ctx.session, ctx.config.network)
     status = Status.SUCCESS
+    payload: Result[ProbePayload, Exception] | None = None
     for result in probes:
         if isinstance(result.probe, NullByteInHeader) and result.is_failure:
             from ...specs.openapi import formats
@@ -37,13 +46,12 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
 
             formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
         if result.error is not None:
-            yield events.NonFatalError(
-                error=result.error, phase=phase.name, label="API Probe errors", related_to_operation=False
-            )
             status = Status.ERROR
+            payload = Err(result.error)
         else:
             status = Status.SUCCESS
-    yield events.PhaseFinished(phase=phase, status=status)
+            payload = Ok(ProbePayload(probes=probes))
+    yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 
 
 def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:
@@ -61,7 +69,7 @@ class Probe:
     name: str
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: NetworkConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema
     ) -> requests.PreparedRequest:
         raise NotImplementedError
 
@@ -84,10 +92,9 @@ class ProbeOutcome(str, enum.Enum):
 class ProbeRun:
     probe: Probe
     outcome: ProbeOutcome
-    config: NetworkConfig
     request: requests.PreparedRequest | None = None
     response: requests.Response | None = None
-    error: requests.RequestException | None = None
+    error: Exception | None = None
 
     @property
     def is_failure(self) -> bool:
@@ -98,10 +105,10 @@ class ProbeRun:
 class NullByteInHeader(Probe):
     """Support NULL bytes in headers."""
 
-    name: str = "NULL_BYTE_IN_HEADER"
+    name: str = "Supports NULL byte in headers"
 
     def prepare_request(
-        self, session: requests.Session, request: requests.Request, schema: BaseSchema, config: NetworkConfig
+        self, session: requests.Session, request: requests.Request, schema: BaseSchema
     ) -> requests.PreparedRequest:
         request.method = "GET"
         request.url = schema.get_base_url()
@@ -124,7 +131,7 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
     from urllib3.exceptions import InsecureRequestWarning
 
     try:
-        request = probe.prepare_request(session, Request(), schema, config)
+        request = probe.prepare_request(session, Request(), schema)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
         with warnings.catch_warnings():
@@ -133,9 +140,9 @@ def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: Ne
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented
-        return ProbeRun(probe, ProbeOutcome.SKIP, config, None, None, None)
+        return ProbeRun(probe, ProbeOutcome.SKIP, None, None, None)
     except RequestException as exc:
         req = exc.request if isinstance(exc.request, PreparedRequest) else None
-        return ProbeRun(probe, ProbeOutcome.ERROR, config, req, None, exc)
+        return ProbeRun(probe, ProbeOutcome.ERROR, req, None, exc)
     result_type = probe.analyze_response(response)
-    return ProbeRun(probe, result_type, config, request, response)
+    return ProbeRun(probe, result_type, request, response)

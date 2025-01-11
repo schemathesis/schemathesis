@@ -62,4 +62,4 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         status = Status.SKIP
     elif status is None:
         status = Status.SKIP
-    yield events.PhaseFinished(phase=phase, status=status)
+    yield events.PhaseFinished(phase=phase, status=status, payload=None)

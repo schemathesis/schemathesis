@@ -4,25 +4,20 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema location: http://127.0.0.1/schema.yaml
-Base URL: http://127.0.0.1:1/api
-Specification version: Open API 3.0.2
-Random seed: 42
-Workers: 1
-Collected API operations: 2
-Collected API links: 0
-API probing: ERROR
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
+
+     Base URL:         http://127.0.0.1:1/api
+     Specification:    Open API 3.0.2
+     Operations:       2
+
+
+ 🚫  API probing failed: Connection failed
 
 GET /api/failure E                                                        [ 50%]
 GET /api/success E                                                        [100%]
 
 ==================================== ERRORS ====================================
-_______________________________ API Probe errors _______________________________
-Network Error
-
-Connection failed
-
-    Failed to establish a new connection: [Error NUM] Connection refused
 _______________________________ GET /api/failure _______________________________
 Network Error
 
@@ -51,9 +46,9 @@ Test Phases:
   ⏭️ Stateful testing (not applicable)
 
 Errors:
-  🚫 Network Error: 3
+  🚫 Network Error: 2
 
 Test cases:
   N generated, N skipped
 
-============================== 3 errors in 1.00s ===============================
+============================== 2 errors in 1.00s ===============================

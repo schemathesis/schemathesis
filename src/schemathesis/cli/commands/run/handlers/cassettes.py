@@ -71,11 +71,11 @@ class CassetteWriter(EventHandler):
         self.worker = threading.Thread(name="SchemathesisCassetteWriter", target=writer, kwargs=kwargs)
         self.worker.start()
 
+    def start(self, ctx: ExecutionContext) -> None:
+        self.queue.put(Initialize(seed=ctx.seed))
+
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
-        if isinstance(event, events.Initialized):
-            # In the beginning we write metadata and start `http_interactions` list
-            self.queue.put(Initialize(seed=event.seed))
-        elif isinstance(event, events.ScenarioFinished):
+        if isinstance(event, events.ScenarioFinished):
             self.queue.put(Process(recorder=event.recorder))
         elif isinstance(event, events.EngineFinished):
             self.shutdown()
@@ -94,6 +94,8 @@ class Initialize:
 
     seed: int | None
 
+    __slots__ = ("seed",)
+
 
 @dataclass
 class Process:
@@ -101,10 +103,14 @@ class Process:
 
     recorder: ScenarioRecorder
 
+    __slots__ = ("recorder",)
+
 
 @dataclass
 class Finalize:
     """The work is done and there will be no more messages to process."""
+
+    __slots__ = ()
 
 
 def get_command_representation() -> str:
@@ -214,12 +220,18 @@ http_interactions:"""
             for case_id, interaction in item.recorder.interactions.items():
                 case = item.recorder.cases[case_id]
                 if interaction.response is not None:
-                    checks = item.recorder.checks[case_id]
-                    status = Status.SUCCESS
-                    for check in checks:
-                        if check.status == Status.FAILURE:
-                            status = check.status
-                            break
+                    if case_id in item.recorder.checks:
+                        checks = item.recorder.checks[case_id]
+                        status = Status.SUCCESS
+                        for check in checks:
+                            if check.status == Status.FAILURE:
+                                status = check.status
+                                break
+                    else:
+                        # NOTE: Checks recording could be skipped if Schemathesis start skipping just
+                        # discovered failures in order to get past them and potentially discover more failures
+                        checks = []
+                        status = Status.SKIP
                 else:
                     checks = []
                     status = Status.ERROR

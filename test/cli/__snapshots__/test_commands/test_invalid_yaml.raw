@@ -1,6 +1,9 @@
 Exit code: 1
 ---
 Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
 Schema Loading Error
 
 API schema does not appear syntactically valid

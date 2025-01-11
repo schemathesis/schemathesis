@@ -38,6 +38,9 @@ from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationConfig, G
 from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
 
+# NOTE: Need to explicitly import all registered checks
+from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
+
 if TYPE_CHECKING:
     import hypothesis
 
@@ -615,6 +618,7 @@ def run(
         seed = Random().getrandbits(128)
     else:
         seed = hypothesis_seed
+
     config = executor.RunConfig(
         location=schema,
         base_url=base_url,

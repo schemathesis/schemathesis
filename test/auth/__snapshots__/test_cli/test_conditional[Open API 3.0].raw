@@ -4,14 +4,17 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema location: http://127.0.0.1/schema.yaml
-Base URL: http://127.0.0.1/api
-Specification version: Open API 3.0.2
-Random seed: 42
-Workers: 1
-Collected API operations: 2
-Collected API links: 0
-API probing: SUCCESS
+
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
+
+     Base URL:         http://127.0.0.1/api
+     Specification:    Open API 3.0.2
+     Operations:       2
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✘
 
 GET /api/success .                                                        [ 50%]
 GET /api/text .                                                           [100%]
