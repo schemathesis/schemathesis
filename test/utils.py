@@ -18,7 +18,7 @@ from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.engine.events import EngineEvent, EngineFinished, Initialized, NonFatalError, ScenarioFinished
+from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.schemas import BaseSchema
@@ -190,10 +190,6 @@ class EventStream:
 
     def assert_after_execution_status(self, status: Status) -> None:
         assert self.find(ScenarioFinished).status == status
-
-    @property
-    def started(self) -> Initialized | None:
-        return self.find(Initialized)
 
     @property
     def failures_count(self) -> int:
