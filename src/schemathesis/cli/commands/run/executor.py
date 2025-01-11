@@ -7,6 +7,7 @@ from typing import Any, Callable
 import click
 
 from schemathesis.cli.commands.run.context import ExecutionContext
+from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers import display_handler_error
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteConfig, CassetteWriter
@@ -63,12 +64,23 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
         output=config.output,
         generation=config.engine.execution.generation,
     )
+    loading_started = LoadingStarted(location=config.location)
+    yield loading_started
+
     try:
         schema = load_schema(loader_config)
         schema.filter_set = config.filter_set
     except LoaderError as exc:
         yield FatalError(exception=exc)
         return
+
+    yield LoadingFinished(
+        location=config.location,
+        start_time=loading_started.timestamp,
+        base_url=schema.get_base_url(),
+        specification=schema.specification,
+        operations_count=schema.count_operations(),
+    )
 
     try:
         yield from from_schema(schema, config=config.engine).execute()
@@ -95,11 +107,15 @@ def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
             junit_xml_file=config.junit_xml.name if config.junit_xml is not None else None,
         )
     )
-    ctx = ExecutionContext(output_config=config.output)
+
+    ctx = ExecutionContext(output_config=config.output, seed=config.engine.execution.seed)
 
     def shutdown() -> None:
         for _handler in handlers:
             _handler.shutdown()
+
+    for handler in handlers:
+        handler.start(ctx)
 
     try:
         for event in event_stream:

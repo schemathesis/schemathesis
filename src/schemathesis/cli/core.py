@@ -14,3 +14,4 @@ def ensure_color(ctx: click.Context, no_color: bool, force_color: bool) -> None:
         ctx.color = True
     elif no_color or "NO_COLOR" in os.environ:
         ctx.color = False
+        os.environ["NO_COLOR"] = "1"

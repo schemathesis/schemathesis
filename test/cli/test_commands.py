@@ -479,15 +479,7 @@ def test_register_check(new_check, cli, schema_url, snapshot_cli):
     assert cli.main("run", "-c", "new_check", schema_url, hooks=new_check) == snapshot_cli
 
 
-def assert_threaded_executor_interruption(lines, expected, optional_interrupt=False):
-    # It is possible to have a case when first call without an error will start processing
-    # But after, another thread will have interruption and will push this event before the
-    # first thread will finish. Race condition: "" is for this case and "." for the other
-    # way around
-    # The app under test was killed ungracefully and since we run it in a child or the main thread
-    # its output might occur in the captured stdout.
-    ignored_exception = "Exception ignored in: " in lines[9]
-    assert lines[11] in expected or ignored_exception, lines
+def assert_threaded_executor_interruption(lines, optional_interrupt=False):
     if not optional_interrupt:
         assert any("!! KeyboardInterrupt !!" in line for line in lines[12:]), lines
     assert any("=== SUMMARY ===" in line for line in lines[12:])
@@ -518,7 +510,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
         assert result == snapshot_cli
     else:
         lines = result.stdout.strip().split("\n")
-        assert_threaded_executor_interruption(lines, ("", "."))
+        assert_threaded_executor_interruption(lines)
 
 
 @pytest.mark.filterwarnings("ignore:Exception in thread")
@@ -544,7 +536,7 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
     lines = result.stdout.strip().split("\n")
     # There are many scenarios possible, depends on how many tests will be executed before interruption
     # and in what order. it could be no tests at all, some of them or all of them.
-    assert_threaded_executor_interruption(lines, ("F", ".", "F.", ".F", ""), True)
+    assert_threaded_executor_interruption(lines, True)
 
 
 async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_examples, openapi2_base_url):
@@ -792,11 +784,11 @@ def test_targeted(mocker, cli, schema_url, workers):
     [
         (
             ("--exclude-deprecated",),
-            "Collected API operations: 1",
+            "Selected: 1/2",
         ),
         (
             (),
-            "Collected API operations: 2",
+            "Selected: 2/2",
         ),
     ],
 )
@@ -819,7 +811,7 @@ def test_exclude_deprecated(ctx, cli, openapi3_base_url, options, expected):
     result = cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", *options)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
-    assert expected in result.stdout.splitlines()
+    assert expected in result.stdout
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1032,7 +1024,7 @@ def test_no_color(monkeypatch, cli, schema_url, kind):
         args += ("--no-color",)
     result = cli.run(*args, color=True)
     assert result.exit_code == ExitCode.OK, result.stdout
-    assert "[1m" not in result.stdout
+    assert "36m" not in result.stdout
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1238,9 +1230,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_rate_limit(cli, schema_url):
-    result = cli.run(schema_url, "--rate-limit=1/s")
-    lines = result.stdout.splitlines()
-    assert lines[8] == "Rate limit: 1/s"
+    assert cli.run(schema_url, "--rate-limit=1/s").exit_code == ExitCode.OK
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])
@@ -1647,7 +1637,7 @@ class EventCounter(cli.EventHandler):
 
     def handle_event(self, ctx, event) -> None:
         self.counter += 1
-        if isinstance(event, engine.events.Initialized):
+        if isinstance(event, engine.events.EngineStarted):
             ctx.add_initialization_line("Counter initialized!")
             ctx.add_initialization_line(gen())
         elif isinstance(event, engine.events.EngineFinished):

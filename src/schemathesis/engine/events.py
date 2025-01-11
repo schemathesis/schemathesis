@@ -3,18 +3,17 @@ from __future__ import annotations
 import time
 import uuid
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Generator
+from typing import TYPE_CHECKING, Generator
 
+from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import Phase, PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.schemas import ApiOperationsCount
 
 if TYPE_CHECKING:
-    from schemathesis.core import Specification
     from schemathesis.engine import Status
-    from schemathesis.schemas import BaseSchema
+    from schemathesis.engine.phases.probes import ProbePayload
 
 EventGenerator = Generator["EngineEvent", None, None]
 
@@ -64,14 +63,16 @@ class PhaseFinished(PhaseEvent):
     """End of an execution phase."""
 
     status: Status
+    payload: Result[ProbePayload, Exception] | None
 
-    __slots__ = ("id", "timestamp", "phase", "status")
+    __slots__ = ("id", "timestamp", "phase", "status", "payload")
 
-    def __init__(self, *, phase: Phase, status: Status) -> None:
+    def __init__(self, *, phase: Phase, status: Status, payload: Result[ProbePayload, Exception] | None) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
         self.phase = phase
         self.status = status
+        self.payload = payload
 
 
 @dataclass
@@ -265,38 +266,6 @@ class StepFinished(StepEvent):
         self.transition_id = transition_id
         self.target = target
         self.response = response
-
-
-@dataclass
-class Initialized(EngineEvent):
-    schema: dict[str, Any]
-    specification: Specification
-    operations_count: ApiOperationsCount
-    # Total number of links in the schema
-    links_count: int | None
-    # The place, where the API schema is located
-    location: str | None
-    seed: int | None
-    # The base URL against which the tests are running
-    base_url: str
-    # The base path part of every operation
-    base_path: str
-
-    @classmethod
-    def from_schema(cls, *, schema: BaseSchema, seed: int | None) -> Initialized:
-        """Computes all needed data from a schema instance."""
-        return cls(
-            id=uuid.uuid4(),
-            timestamp=time.time(),
-            schema=schema.raw_schema,
-            specification=schema.specification,
-            operations_count=schema.count_operations(),
-            links_count=schema.links_count,
-            location=schema.location,
-            base_url=schema.get_base_url(),
-            base_path=schema.base_path,
-            seed=seed,
-        )
 
 
 @dataclass

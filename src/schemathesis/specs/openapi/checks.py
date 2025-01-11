@@ -275,7 +275,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
             config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
             allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
-            allowed = f"Allowed statuses: {', '.join(map(str,allowed_statuses))}"
+            allowed = f"Allowed statuses: {', '.join(map(str, allowed_statuses))}"
             raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
     return None
 

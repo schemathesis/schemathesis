@@ -19,14 +19,14 @@ Experimental options:
                                             only]
   --experimental-no-failfast                Continue testing an API operation
                                             after a failure is found
-  --experimental-missing-required-header-allowed-statuses 
+  --experimental-missing-required-header-allowed-statuses
                                             Comma-separated list of status codes
                                             expected for test cases with a
                                             missing required header
-  --experimental-positive-data-acceptance-allowed-statuses 
+  --experimental-positive-data-acceptance-allowed-statuses
                                             Comma-separated list of status codes
                                             considered as successful responses
-  --experimental-negative-data-rejection-allowed-statuses 
+  --experimental-negative-data-rejection-allowed-statuses
                                             Comma-separated list of status codes
                                             expected for rejected negative data
 

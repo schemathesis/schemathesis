@@ -100,7 +100,6 @@ class ExecutionPlan:
             if engine.is_interrupted:
                 yield from self._finish(engine)
                 return
-            yield events.Initialized.from_schema(schema=engine.schema, seed=engine.config.execution.seed)
             if engine.is_interrupted:
                 yield from self._finish(engine)  # type: ignore[unreachable]
                 return
@@ -115,7 +114,7 @@ class ExecutionPlan:
                 else:
                     if engine.has_reached_the_failure_limit:
                         phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
-                    yield events.PhaseFinished(phase=phase, status=Status.SKIP)
+                    yield events.PhaseFinished(phase=phase, status=Status.SKIP, payload=None)
                 if engine.is_interrupted:
                     break  # type: ignore[unreachable]
 

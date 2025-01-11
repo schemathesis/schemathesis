@@ -14,6 +14,7 @@ from textwrap import dedent
 from types import SimpleNamespace
 from typing import TYPE_CHECKING, Any
 
+import click
 import httpx
 import pytest
 import requests
@@ -274,7 +275,7 @@ def keep_cwd():
 FLASK_MARKERS = ("* Serving Flask app", "* Debug mode")
 PACKAGE_ROOT = Path(schemathesis.__file__).parent
 SITE_PACKAGES = requests.__file__.split("requests")[0]
-TRANSITIONS_PATTERN = re.compile(r"(\d+)(?:\s+(\d+)\s+(\d+)\s+(\d+))$")
+IS_WINDOWS = platform.system() == "Windows"
 
 
 @dataclass
@@ -306,11 +307,6 @@ class CliSnapshotConfig:
         return self.request.getfixturevalue("testdir")
 
     def serialize(self, data: str) -> str:
-        lines = data.splitlines()
-        lines = [
-            line for line in lines if not any(marker in line for marker in FLASK_MARKERS) and line != "API probing: ..."
-        ]
-        data = "\n".join(lines)
         if self.replace_test_cases:
             data = re.sub(r"Test cases:\n  (\d+) generated, \1 skipped", "Test cases:\n  N generated, N skipped", data)
             # Cases with failures and skips
@@ -388,6 +384,7 @@ class CliSnapshotConfig:
             )
         if self.replace_duration:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
+            data = re.sub(r"in [0-9]+? ms", "in N ms", data)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
@@ -423,15 +420,22 @@ class CliSnapshotConfig:
                 elif line:
                     replace_next_non_empty = False
             data = "\n".join(lines) + "\n"
-        lines = data.splitlines()
-        output = []
-        if any(line.startswith("Links ") for line in lines):
-            for line in lines:
-                if TRANSITIONS_PATTERN.search(line):
-                    line = TRANSITIONS_PATTERN.sub("", line).rstrip()
-                output.append(line)
-            data = "\n".join(output) + "\n"
-        return data
+        lines = []
+        for line in data.splitlines():
+            line = click.unstyle(line)
+            if line.endswith("Schema Loading Error"):
+                # It is written at the end of the current line and does not properly rewrite the current line
+                # on all terminals
+                lines.append("Schema Loading Error")
+                continue
+            if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
+                line = line.replace("\\", "/")
+            if any(marker in line for marker in FLASK_MARKERS) or line.lstrip().startswith(
+                ("🕛 ", "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 ")
+            ):
+                continue
+            lines.append(line.rstrip())
+        return "\n".join(lines).strip() + "\n"
 
 
 EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
