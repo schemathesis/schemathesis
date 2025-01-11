@@ -15,7 +15,7 @@ from schemathesis.core.result import Ok
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.runner import Status, events
-from schemathesis.runner.phases import PhaseName
+from schemathesis.runner.phases import PhaseName, PhaseSkipReason
 from schemathesis.runner.recorder import ScenarioRecorder
 
 from ._pool import TaskProducer, WorkerPool
@@ -42,7 +42,8 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     yield suite_started
 
-    status = Status.SUCCESS
+    status = None
+    is_executed = False
 
     with WorkerPool(
         workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine, suite_id=suite_started.id
@@ -51,17 +52,14 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
             while True:
                 try:
                     event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
+                    is_executed = True
                     if engine.is_interrupted:
                         raise KeyboardInterrupt
                     yield event
                     if isinstance(event, events.NonFatalError):
                         status = Status.ERROR
                     if isinstance(event, events.ScenarioFinished):
-                        if status not in (Status.ERROR, Status.INTERRUPTED) and event.status in (
-                            Status.FAILURE,
-                            Status.ERROR,
-                            Status.INTERRUPTED,
-                        ):
+                        if event.status != Status.SKIP and (status is None or status < event.status):
                             status = event.status
                         if event.status in (Status.ERROR, Status.FAILURE):
                             engine.control.count_failure()
@@ -79,6 +77,11 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
             status = Status.INTERRUPTED
             yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
 
+    if not is_executed:
+        phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
+        status = Status.SKIP
+    elif status is None:
+        status = Status.SKIP
     # NOTE: Right now there is just one suite, hence two events go one after another
     yield events.SuiteFinished(id=suite_started.id, phase=phase.name, status=status)
     yield events.PhaseFinished(phase=phase, status=status)

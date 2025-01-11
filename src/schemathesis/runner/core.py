@@ -106,6 +106,8 @@ class ExecutionPlan:
 
             # Run main phases
             for phase in self.phases:
+                if engine.has_reached_the_failure_limit:
+                    phase.skip_reason = PhaseSkipReason.FAILURE_LIMIT_REACHED
                 yield events.PhaseStarted(phase=phase)
                 if phase.should_execute(engine):
                     yield from phases.execute(engine, phase)

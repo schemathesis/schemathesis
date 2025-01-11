@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import queue
 import time
+import unittest
 from dataclasses import replace
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
@@ -236,6 +237,10 @@ def execute_state_machine_loop(
             engine.stop()
             suite_status = Status.INTERRUPTED
             event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
+            break
+        except unittest.case.SkipTest:
+            # If `explicit` phase is used and there are not examples
+            suite_status = Status.SKIP
             break
         except FailureGroup as exc:
             # When a check fails, the state machine is stopped
