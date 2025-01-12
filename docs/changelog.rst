@@ -1,8 +1,17 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.5...HEAD>` - TBD
+:version:`Unreleased <v3.39.6...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.39.6:
+
+:version:`3.39.6 <v3.39.5...v3.39.6>` - 2025-01-12
+--------------------------------------------------
+
+**Changed**
+
+- Add HTTP 428 status to the allowed status list of the ``negative_data_rejection`` check. :issue:`2669`
 
 .. _v3.39.5:
 
