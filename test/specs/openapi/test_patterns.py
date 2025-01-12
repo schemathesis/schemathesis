@@ -116,16 +116,16 @@ def test_update_quantifier_random(data):
 
     # Assert that the generated string meets the length constraints
     if min_length is not None:
-        assert (
-            len(generated) >= min_length
-        ), f"Generated string '{generated}' is shorter than min_length {min_length}\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+        assert len(generated) >= min_length, (
+            f"Generated string '{generated}' is shorter than min_length {min_length}\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+        )
     if max_length is not None:
-        assert (
-            len(generated) <= max_length
-        ), f"Generated string '{generated}' is longer than max_length {max_length}.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
-    assert re.search(
-        pattern, generated
-    ), f"Generated string '{generated}' does not match the pattern.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+        assert len(generated) <= max_length, (
+            f"Generated string '{generated}' is longer than max_length {max_length}.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+        )
+    assert re.search(pattern, generated), (
+        f"Generated string '{generated}' does not match the pattern.\nOriginal pattern: {pattern}\nModified pattern: {modified_pattern}"
+    )
 
 
 def is_valid_regex(pattern: str) -> bool:

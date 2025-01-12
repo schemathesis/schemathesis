@@ -361,7 +361,7 @@ MISSING_SCHEMA_OR_CONTENT_MESSAGE = (
 )
 
 INVALID_SCHEMA_MESSAGE = (
-    'Can not generate data for {location} parameter "{name}"! ' "Its schema should be an object, got {schema}"
+    'Can not generate data for {location} parameter "{name}"! Its schema should be an object, got {schema}'
 )
 
 
