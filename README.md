@@ -21,6 +21,14 @@
 
 ## Schemathesis
 
+> ⚠️ You are viewing the Schemathesis V4 README (Work in Progress) ⚠️
+
+> This branch is under active development, with substantial changes expected before stabilization. While V4 is fully functional and passing tests, some features are missing, and the documentation may be outdated.
+
+> For the stable release, see the [V3 branch](https://github.com/schemathesis/schemathesis/tree/v3).
+
+> 💡 Have feedback? Share your thoughts in [this discussion](https://github.com/schemathesis/schemathesis/discussions/2677)!
+
 Schemathesis is an API testing tool that automatically finds crashes and validates spec compliance.
 
 <p align="center">
