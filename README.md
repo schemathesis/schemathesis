@@ -111,19 +111,9 @@ api-tests:
     - uses: schemathesis/action@v1
       with:
         schema: "https://example.schemathesis.io/openapi.json"
-        # OPTIONAL. Add Schemathesis.io token for pull request reports
-        token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 ```
 
 For more details, check out our [GitHub Action](https://github.com/schemathesis/action) repository or see our [GitHub Tutorial](https://docs.schemathesis.io/tutorials/github).
-
-For test reports in your pull requests, install the [GitHub app](https://github.com/apps/schemathesis):
-
-![image](https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png)
-
-### Schemathesis.io
-
-Schemathesis CLI integrates with Schemathesis.io to enhance bug detection by optimizing test case generation. It also provides a user-friendly UI for viewing and analyzing test results. For a quick setup all-in-one solution, we offer a [free tier](https://schemathesis.io/#pricing).
 
 ## Who's Using Schemathesis?
 
@@ -190,15 +180,9 @@ We welcome contributions in code and are especially interested in learning about
 
 Thank you for contributing to making Schemathesis better! 👍
 
-## Commercial support
+## Get in Touch
 
-If you're a large enterprise or startup seeking specialized assistance, we offer commercial support to help you integrate Schemathesis effectively into your workflows.
-This includes:
-
-- Quicker response time for your queries.
-- Direct consultation to work closely with your API specification, optimizing the Schemathesis setup for your specific needs.
-
-To discuss a custom support arrangement that best suits your organization, please contact our support team at <a href="mailto:support@schemathesis.io">support@schemathesis.io</a>.
+If you need assistance with integrating Schemathesis into your workflows or have specific questions, feel free to reach out at <a href="mailto:support@schemathesis.io">support@schemathesis.io</a>.
 
 ## Acknowledgements
 
