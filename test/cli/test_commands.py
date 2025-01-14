@@ -63,8 +63,6 @@ def test_run_as_module(testdir):
         ("http://127.0.0.1", "--header=тест:test"),
         ("http://127.0.0.1", "--header=test:тест"),
         ("http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
-        ("http://127.0.0.1", "--hypothesis-deadline=wrong"),
-        ("http://127.0.0.1", "--hypothesis-deadline=0"),
         ("//test",),
         ("http://127.0.0.1", "--max-response-time=0"),
         ("unknown.json",),
@@ -178,18 +176,16 @@ def test_hypothesis_database_with_derandomize(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize") == snapshot_cli
 
 
+@pytest.mark.openapi_version("3.0")
 @pytest.mark.operations
 def test_hypothesis_parameters(cli, schema_url):
     # When Hypothesis options are passed via command line
     result = cli.run(
         schema_url,
-        "--hypothesis-deadline=1000",
         "--hypothesis-derandomize",
         "--hypothesis-max-examples=1000",
         "--hypothesis-phases=explicit,generate",
-        "--hypothesis-report-multiple-bugs=0",
         "--hypothesis-suppress-health-check=all",
-        "--hypothesis-verbosity=normal",
     )
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
     # Parameters are validated in `hypothesis.settings`
@@ -246,17 +242,6 @@ def test_execute_missing_schema(cli, openapi3_base_url, url, message, workers):
     result = cli.run(f"{openapi3_base_url}{url}", f"--workers={workers}")
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert message in result.stdout
-
-
-@flaky(max_runs=3, min_passes=1)
-@pytest.mark.operations("success", "slow")
-@pytest.mark.parametrize("workers", [1, 2])
-@pytest.mark.snapshot(replace_multi_worker_progress="??")
-def test_hypothesis_failed_event(cli, schema_url, workers, snapshot_cli):
-    # When the Hypothesis deadline option is set manually, and it is smaller than the response time
-    # Then the whole Schemathesis run should fail
-    # And the proper error message should be displayed
-    assert cli.run(schema_url, "--hypothesis-deadline=20", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("success", "slow")
@@ -774,7 +759,7 @@ def test_urlencoded_form(cli, schema_url):
 @pytest.mark.operations("success")
 def test_targeted(mocker, cli, schema_url, workers):
     target = mocker.spy(hypothesis, "target")
-    result = cli.run(schema_url, f"--workers={workers}", "--target=response_time")
+    result = cli.run(schema_url, f"--workers={workers}", "--generation-optimize-for=response_time")
     assert result.exit_code == ExitCode.OK, result.stdout
     target.assert_called_with(mocker.ANY, label="response_time")
 
@@ -1604,7 +1589,7 @@ def buggy(ctx):
         cli.main(
             "run",
             schema_url,
-            "--target=buggy",
+            "--generation-optimize-for=buggy",
             hooks=module,
         )
         == snapshot_cli

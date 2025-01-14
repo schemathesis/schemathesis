@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid SCHEMA, must be a valid URL or file path.
+Error: The specified file does not exist. Please provide a valid path to an existing file.

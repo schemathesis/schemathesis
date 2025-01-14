@@ -110,10 +110,7 @@ class EngineErrorInfo:
         if isinstance(self._error, requests.RequestException):
             return get_request_error_message(self._error)
 
-        if self._kind in (
-            RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED,
-            RuntimeErrorKind.SCHEMA_UNSUPPORTED,
-        ):
+        if self._kind == RuntimeErrorKind.SCHEMA_UNSUPPORTED:
             return str(self._error).strip()
 
         if self._kind == RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR and isinstance(
@@ -170,7 +167,6 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_UNSUPPORTED,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
-            RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED,
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
             RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
@@ -249,10 +245,6 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
 
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}.",
-        RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED: (
-            f"Adjust the deadline using {bold('`--hypothesis-deadline=MILLIS`')} or "
-            f"disable with {bold('`--hypothesis-deadline=None`')}."
-        ),
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax.\n"
         "For guidance, visit: https://docs.python.org/3/library/re.html",
@@ -299,7 +291,6 @@ class RuntimeErrorKind(str, enum.Enum):
     NETWORK_OTHER = "network_other"
 
     # Hypothesis issues
-    HYPOTHESIS_DEADLINE_EXCEEDED = "hypothesis_deadline_exceeded"
     HYPOTHESIS_UNSATISFIABLE = "hypothesis_unsatisfiable"
     HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR = "hypothesis_unsupported_graphql_scalar"
     HYPOTHESIS_HEALTH_CHECK_DATA_TOO_LARGE = "hypothesis_health_check_data_too_large"
@@ -350,8 +341,6 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
                 HealthCheck.large_base_example: RuntimeErrorKind.HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE,
             }[health_check]
         return RuntimeErrorKind.UNCLASSIFIED
-    if isinstance(error, DeadlineExceeded):
-        return RuntimeErrorKind.HYPOTHESIS_DEADLINE_EXCEEDED
     if isinstance(error, hypothesis.errors.InvalidArgument) and str(error).startswith("Scalar "):
         # Comes from `hypothesis-graphql`
         return RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR

@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckFunction, not_a_server_error
 from schemathesis.generation import GenerationConfig
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
@@ -18,7 +17,7 @@ if TYPE_CHECKING:
 def _default_hypothesis_settings() -> hypothesis.settings:
     import hypothesis
 
-    return hypothesis.settings(deadline=DEFAULT_DEADLINE)
+    return hypothesis.settings(deadline=None)
 
 
 @dataclass
