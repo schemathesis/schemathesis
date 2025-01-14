@@ -7,7 +7,7 @@ import pathlib
 import re
 from contextlib import contextmanager
 from functools import partial, reduce
-from typing import TYPE_CHECKING, Callable, Generator, Sequence
+from typing import Callable, Generator, Sequence
 from urllib.parse import urlparse
 
 import click
@@ -20,10 +20,6 @@ from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.overrides import Override
-
-if TYPE_CHECKING:
-    import hypothesis
-
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
@@ -248,16 +244,6 @@ def validate_preserve_exact_body_bytes(ctx: click.core.Context, param: click.cor
     if raw_value and ctx.params["cassette_path"] is None:
         raise click.UsageError(MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE)
     return raw_value
-
-
-def convert_verbosity(
-    ctx: click.core.Context, param: click.core.Parameter, value: str | None
-) -> hypothesis.Verbosity | None:
-    import hypothesis
-
-    if value is None:
-        return value
-    return hypothesis.Verbosity[value]
 
 
 def convert_experimental(

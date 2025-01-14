@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 import click
 
 from schemathesis.core import NotSet
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 
 if TYPE_CHECKING:
     import hypothesis
@@ -57,14 +56,6 @@ class HealthCheck(IntEnum):
         return [HealthCheck[self.name]]
 
 
-@unique
-class Verbosity(IntEnum):
-    quiet = 0
-    normal = 1
-    verbose = 2
-    debug = 3
-
-
 def prepare_health_checks(
     hypothesis_suppress_health_check: list[HealthCheck] | None,
 ) -> list[hypothesis.HealthCheck] | None:
@@ -92,9 +83,7 @@ def prepare_settings(
     derandomize: bool | None = None,
     max_examples: int | None = None,
     phases: list[hypothesis.Phase] | None = None,
-    report_multiple_bugs: bool | None = None,
     suppress_health_check: list[hypothesis.HealthCheck] | None = None,
-    verbosity: hypothesis.Verbosity | None = None,
 ) -> hypothesis.settings:
     import hypothesis
     from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
@@ -105,18 +94,10 @@ def prepare_settings(
             ("derandomize", derandomize),
             ("max_examples", max_examples),
             ("phases", phases),
-            ("report_multiple_bugs", report_multiple_bugs),
             ("suppress_health_check", suppress_health_check),
-            ("verbosity", verbosity),
         )
         if value is not None
     }
-    # `deadline` is special, since Hypothesis allows passing `None`
-    if deadline is not None:
-        if isinstance(deadline, NotSet):
-            kwargs["deadline"] = None
-        else:
-            kwargs["deadline"] = deadline
     if database is not None:
         if database.lower() == "none":
             kwargs["database"] = None
@@ -124,5 +105,4 @@ def prepare_settings(
             kwargs["database"] = InMemoryExampleDatabase()
         else:
             kwargs["database"] = DirectoryBasedExampleDatabase(database)
-    kwargs.setdefault("deadline", DEFAULT_DEADLINE)
-    return hypothesis.settings(print_blob=False, **kwargs)
+    return hypothesis.settings(print_blob=False, deadline=None, verbosity=hypothesis.Verbosity.quiet, **kwargs)
