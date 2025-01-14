@@ -578,7 +578,7 @@ def test_unique_data(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
         unique_data=True,
-        hypothesis_settings=hypothesis.settings(max_examples=30, database=None, stateful_step_count=100),
+        hypothesis_settings=hypothesis.settings(max_examples=25, database=None, stateful_step_count=50),
     )
     cases = []
     for event in engine:

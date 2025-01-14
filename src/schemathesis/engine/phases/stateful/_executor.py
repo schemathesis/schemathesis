@@ -4,7 +4,6 @@ import queue
 import time
 import unittest
 from dataclasses import replace
-from datetime import timedelta
 from typing import Any
 
 import hypothesis
@@ -22,7 +21,6 @@ from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
@@ -41,7 +39,7 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
         kwargs["phases"] = DEFAULT_STATE_MACHINE_SETTINGS.phases
     if settings.stateful_step_count == hypothesis_default.stateful_step_count:
         kwargs["stateful_step_count"] = DEFAULT_STATE_MACHINE_SETTINGS.stateful_step_count
-    if settings.deadline in (hypothesis_default.deadline, timedelta(milliseconds=DEFAULT_DEADLINE)):
+    if settings.deadline == hypothesis_default.deadline:
         kwargs["deadline"] = DEFAULT_STATE_MACHINE_SETTINGS.deadline
     if settings.suppress_health_check == hypothesis_default.suppress_health_check:
         kwargs["suppress_health_check"] = DEFAULT_STATE_MACHINE_SETTINGS.suppress_health_check

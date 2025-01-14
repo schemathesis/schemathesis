@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-deadline': wrong is not a valid integer or None.
+Error: Invalid SCHEMA, must be a valid URL or file path.
