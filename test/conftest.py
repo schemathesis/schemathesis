@@ -405,7 +405,7 @@ class CliSnapshotConfig:
         if self.replace_response_time:
             data = re.sub(r"Actual: \d+\.\d+ms", "Actual: 105.00ms", data)
         if self.replace_seed:
-            data = re.sub(r"--hypothesis-seed=\d+", "--hypothesis-seed=42", data)
+            data = re.sub(r"--generation-seed=\d+", "--generation-seed=42", data)
             data = re.sub(r"Random seed: \d+", "Random seed: 42", data)
         if self.replace_reproduce_with:
             lines = []

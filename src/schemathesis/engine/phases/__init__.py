@@ -17,6 +17,14 @@ class PhaseName(enum.Enum):
     UNIT_TESTING = "Unit testing"
     STATEFUL_TESTING = "Stateful testing"
 
+    @classmethod
+    def from_str(cls, value: str) -> PhaseName:
+        return {
+            "probing": cls.PROBING,
+            "unit": cls.UNIT_TESTING,
+            "stateful": cls.STATEFUL_TESTING,
+        }[value.lower()]
+
 
 class PhaseSkipReason(str, enum.Enum):
     """Reasons why a phase might not be executed."""

@@ -235,7 +235,7 @@ def cached_test_func(f: Callable) -> Callable:
         try:
             if ctx.has_to_stop:
                 raise KeyboardInterrupt
-            if ctx.config.execution.unique_data:
+            if ctx.config.execution.unique_inputs:
                 cached = ctx.get_cached_outcome(case)
                 if isinstance(cached, BaseException):
                     raise cached

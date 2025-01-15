@@ -298,7 +298,7 @@ class OutputHandler(EventHandler):
 
     def _on_phase_started(self, event: events.PhaseStarted) -> None:
         phase = event.phase
-        if phase.name == PhaseName.PROBING:
+        if phase.name == PhaseName.PROBING and phase.is_enabled:
             self._start_probing()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             click.secho("Stateful tests\n", bold=True)
@@ -383,10 +383,10 @@ class OutputHandler(EventHandler):
                 )
             self.console.print(message)
             self.console.print()
-        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled:
             if event.status != Status.INTERRUPTED:
                 click.echo("\n")
-        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled and phase.skip_reason is None:
+        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
             if event.status != Status.INTERRUPTED:
                 click.echo()
             if self.workers_num > 1:

@@ -127,7 +127,7 @@ def csv_strategy(enum, exclude=()):
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
 )
 @example(params=[], flags=[], multiple_params=["--header=0:0\r"], csv_params=[])
-@example(params=["--hypothesis-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--generation-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(

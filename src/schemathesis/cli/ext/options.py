@@ -33,6 +33,16 @@ class BaseCsvChoice(click.Choice):
         self.fail(f"invalid choice(s): {sorted_options}. Choose from {available_options}.")
 
 
+class CsvChoice(BaseCsvChoice):
+    def convert(  # type: ignore[return]
+        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
+    ) -> list[str]:
+        selected, invalid_options = self.parse_value(value)
+        if not invalid_options and selected:
+            return selected
+        self.fail_on_invalid_options(invalid_options, selected)
+
+
 class CsvEnumChoice(BaseCsvChoice):
     def __init__(self, choices: type[Enum]):
         self.enum = choices

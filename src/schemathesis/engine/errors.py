@@ -241,7 +241,7 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
     """Get a user-friendly suggestion for handling the error."""
 
     def _format_health_check_suggestion(label: str) -> str:
-        return f"Bypass this health check using {bold(f'`--hypothesis-suppress-health-check={label}`')}."
+        return f"Bypass this health check using {bold(f'`--suppress-health-check={label}`')}."
 
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}.",

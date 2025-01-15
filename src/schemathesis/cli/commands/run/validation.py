@@ -22,7 +22,7 @@ from schemathesis.generation import GenerationMode
 from schemathesis.generation.overrides import Override
 
 INVALID_DERANDOMIZE_MESSAGE = (
-    "`--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid."
+    "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
 )
 MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
     "Missing argument, `--cassette-path` should be specified as well if you use `--cassette-preserve-exact-body-bytes`."
@@ -99,7 +99,7 @@ def validate_hypothesis_database(
 ) -> str | None:
     if raw_value is None:
         return raw_value
-    if ctx.params.get("hypothesis_derandomize"):
+    if ctx.params.get("generation_deterministic"):
         raise click.UsageError(INVALID_DERANDOMIZE_MESSAGE)
     return raw_value
 
