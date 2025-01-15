@@ -4,7 +4,6 @@ import threading
 from dataclasses import dataclass
 from typing import Sequence
 
-from schemathesis import experimental
 from schemathesis.auths import unregister as unregister_auth
 from schemathesis.core import SpecificationFeature
 from schemathesis.engine import Status, events, phases
@@ -61,8 +60,7 @@ class Engine:
                 skip_reason=PhaseSkipReason.NOT_SUPPORTED,
             )
 
-        # Check if stateful-only mode is enabled (only affects unit testing)
-        if experimental.STATEFUL_ONLY.is_enabled and phase_name == PhaseName.UNIT_TESTING:
+        if phase_name not in self.config.execution.phases:
             return Phase(
                 name=phase_name,
                 is_supported=True,

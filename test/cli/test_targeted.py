@@ -29,7 +29,7 @@ def new_target(context) -> float:
 def test_custom_target(cli, new_target, openapi3_schema_url):
     # When hooks are passed to the CLI call
     # And it contains registering a new target
-    result = cli.main("run", "--generation-optimize-for", "new_target", openapi3_schema_url, hooks=new_target)
+    result = cli.main("run", "--generation-optimize", "new_target", openapi3_schema_url, hooks=new_target)
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
     # And the specified target is called
@@ -43,11 +43,11 @@ def test_custom_target_graphql(cli, new_target, graphql_url):
     # And it contains registering a new target
     result = cli.main(
         "run",
-        "--generation-optimize-for",
+        "--generation-optimize",
         "new_target",
         graphql_url,
-        "--hypothesis-suppress-health-check=too_slow,filter_too_much",
-        "--hypothesis-max-examples=1",
+        "--suppress-health-check=too_slow,filter_too_much",
+        "--generation-max-examples=1",
         hooks=new_target,
     )
     # Then the test run should be successful

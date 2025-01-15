@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckFunction, not_a_server_error
+from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationConfig
 from schemathesis.generation.overrides import Override
 
@@ -24,12 +25,13 @@ def _default_hypothesis_settings() -> hypothesis.settings:
 class ExecutionConfig:
     """Configuration for test execution."""
 
+    phases: list[PhaseName] = field(default_factory=lambda: [PhaseName.UNIT_TESTING, PhaseName.STATEFUL_TESTING])
     checks: list[CheckFunction] = field(default_factory=lambda: [not_a_server_error])
     targets: list[TargetFunction] = field(default_factory=list)
     hypothesis_settings: hypothesis.settings = field(default_factory=_default_hypothesis_settings)
     generation: GenerationConfig = field(default_factory=GenerationConfig)
     max_failures: int | None = None
-    unique_data: bool = False
+    unique_inputs: bool = False
     no_failfast: bool = False
     seed: int | None = None
     workers_num: int = 1

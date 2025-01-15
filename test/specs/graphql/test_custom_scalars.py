@@ -73,7 +73,7 @@ type Query {
   getByUUID(value: UUID!): Int!
 }""",
     )
-    result = cli.run(str(schema_file), "--hypothesis-max-examples=5", f"--base-url={graphql_url}")
+    result = cli.run(str(schema_file), "--generation-max-examples=5", f"--base-url={graphql_url}")
     # Queries can be constructed, but the backend does not implement the fields
     assert result.stdout.count("Cannot query field") == 18
 

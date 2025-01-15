@@ -15,7 +15,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
     assert (
         cli.run(
             schema_url,
-            "--hypothesis-max-examples=80",
+            "--generation-max-examples=80",
             "--exitfirst",
             f"--workers={workers}",
         )
@@ -31,8 +31,8 @@ def test_sanitization(cli, schema_url, tmp_path):
     token = "secret"
     result = cli.run(
         schema_url,
-        "--experimental=stateful-only",
-        "--hypothesis-max-examples=80",
+        "--phases=stateful",
+        "--generation-max-examples=80",
         f"--header=Authorization: Bearer {token}",
         f"--cassette-path={cassette_path}",
         "--exitfirst",
@@ -48,7 +48,7 @@ def test_max_failures(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--hypothesis-max-examples=80",
+            "--generation-max-examples=80",
             "--max-failures=2",
         )
         == snapshot_cli
@@ -61,7 +61,7 @@ def test_with_cassette(tmp_path, cli, schema_url):
     cassette_path = tmp_path / "output.yaml"
     cli.run(
         schema_url,
-        "--hypothesis-max-examples=40",
+        "--generation-max-examples=40",
         "--exitfirst",
         f"--cassette-path={cassette_path}",
     )
@@ -78,8 +78,8 @@ def test_junit(tmp_path, cli, schema_url):
     junit_path = tmp_path / "junit.xml"
     result = cli.run(
         schema_url,
-        "--experimental=stateful-only",
-        "--hypothesis-max-examples=80",
+        "--phases=stateful",
+        "--generation-max-examples=80",
         "--exitfirst",
         f"--junit-xml={junit_path}",
     )
@@ -102,8 +102,8 @@ def test_stateful_only(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--experimental=stateful-only",
-            "--hypothesis-max-examples=80",
+            "--phases=stateful",
+            "--generation-max-examples=80",
             "--exitfirst",
         )
         == snapshot_cli
@@ -118,7 +118,7 @@ def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--base-url=http://127.0.0.1:1/api",
-            "--experimental=stateful-only",
+            "--phases=stateful",
         )
         == snapshot_cli
     )
@@ -131,7 +131,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--hypothesis-max-examples=40",
+            "--generation-max-examples=40",
             "--include-path=/api/success",
             "--exitfirst",
         )
@@ -148,7 +148,7 @@ def test_proxy_error(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--request-proxy=http://127.0.0.1",
-            "--experimental=stateful-only",
+            "--phases=stateful",
         )
         == snapshot_cli
     )
@@ -164,8 +164,8 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--experimental=stateful-only",
-            "--hypothesis-max-examples=1",
+            "--phases=stateful",
+            "--generation-max-examples=1",
             "--generation-allow-x00=false",
             "--generation-codec=ascii",
             "--generation-with-security-parameters=false",
@@ -185,4 +185,4 @@ def test_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
         raise KeyboardInterrupt
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    assert cli.run(schema_url, "--experimental=stateful-only") == snapshot_cli
+    assert cli.run(schema_url, "--phases=stateful") == snapshot_cli

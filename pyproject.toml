@@ -96,10 +96,10 @@ norecursedirs = ".hypothesis .idea .git src docs .pytest_cache .mypy_cache .tox"
 [tool.coverage.run]
 parallel = true
 branch = true
-source_pkgs = ["schemathesis", "test"]
+source_pkgs = ["schemathesis"]
 
 [tool.coverage.paths]
-source = ["src", ".tox/*/site-packages", "test"]
+source = ["src", ".tox/*/site-packages"]
 
 [tool.coverage.report]
 show_missing = true

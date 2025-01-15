@@ -1188,7 +1188,7 @@ def failed(ctx, response, case):
             "--include-method=POST",
             f"--base-url={openapi3_base_url}",
             "--generation-mode=negative",
-            "--hypothesis-max-examples=10",
+            "--generation-max-examples=10",
             "--experimental=coverage-phase",
             "--experimental-no-failfast",
             hooks=module,

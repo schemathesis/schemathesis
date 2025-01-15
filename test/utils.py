@@ -138,6 +138,7 @@ class EventStream:
         options.setdefault("checks", [not_a_server_error])
         config = EngineConfig(
             execution=ExecutionConfig(
+                phases=options.get("phases", [PhaseName.PROBING, PhaseName.UNIT_TESTING, PhaseName.STATEFUL_TESTING]),
                 checks=options.get("checks", []),
                 targets=options.get("targets", []),
                 hypothesis_settings=options.get("hypothesis_settings")
@@ -145,7 +146,7 @@ class EventStream:
                 generation=schema.generation_config,
                 max_failures=options.get("max_failures"),
                 no_failfast=options.get("no_failfast", False),
-                unique_data=options.get("unique_data", False),
+                unique_inputs=options.get("unique_data", False),
                 seed=options.get("seed"),
                 workers_num=options.get("workers_num", 1),
             ),

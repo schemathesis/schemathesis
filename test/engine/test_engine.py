@@ -13,13 +13,13 @@ from hypothesis import Phase, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis import experimental
 from schemathesis.checks import not_a_server_error
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Request
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
@@ -1131,9 +1131,11 @@ STATEFUL_KWARGS = {
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_auth(real_app_schema):
-    experimental.STATEFUL_ONLY.enable()
     stream = EventStream(
-        real_app_schema, network=NetworkConfig(auth=("admin", "password")), **STATEFUL_KWARGS
+        real_app_schema,
+        phases=[PhaseName.STATEFUL_TESTING],
+        network=NetworkConfig(auth=("admin", "password")),
+        **STATEFUL_KWARGS,
     ).execute()
     interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
     assert len(interactions) > 0
@@ -1144,10 +1146,9 @@ def test_stateful_auth(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_all_generation_modes(real_app_schema):
-    experimental.STATEFUL_ONLY.enable()
     method = GenerationMode.NEGATIVE
     real_app_schema.generation_config.modes = [method]
-    stream = EventStream(real_app_schema, **STATEFUL_KWARGS).execute()
+    stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
     cases = list(stream.find(events.ScenarioFinished).recorder.cases.values())
     assert len(cases) > 0
     for case in cases:
@@ -1157,10 +1158,9 @@ def test_stateful_all_generation_modes(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_seed(real_app_schema):
-    experimental.STATEFUL_ONLY.enable()
     requests = []
     for _ in range(3):
-        stream = EventStream(real_app_schema, seed=42, **STATEFUL_KWARGS).execute()
+        stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], seed=42, **STATEFUL_KWARGS).execute()
         current = []
         interactions = stream.find(events.ScenarioFinished).recorder.interactions
         for interaction in interactions.values():
@@ -1174,9 +1174,9 @@ def test_stateful_seed(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_override(real_app_schema):
-    experimental.STATEFUL_ONLY.enable()
     stream = EventStream(
         real_app_schema,
+        phases=[PhaseName.STATEFUL_TESTING],
         override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
