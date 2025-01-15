@@ -1,8 +1,75 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.6...HEAD>` - TBD
---------------------------------------------
+:version:`Unreleased <v4.0.0a1...HEAD>` - TBD
+---------------------------------------------
+
+.. _v4.0.0a1:
+
+:version:`4.0.0a1 <v3.39.6...v4.0.0a1>` - 2025-01-15
+----------------------------------------------------
+
+I'm releasing Schemathesis 4.0.0a1 - the biggest change in the project's history. I've rewritten major parts of the core engine, Python API, and pytest integration from scratch to enable features that were impossible to implement before. 
+While this means removing some functionality temporarily, it was necessary to clean up four years of accumulated hacks and create a more solid foundation.
+
+This is an alpha release - expect breaking changes and missing features. 
+If you're using Schemathesis in production, stick with 3.x for now. 
+The documentation is outdated, and I'll update it as the new architecture stabilizes.
+
+I'd really appreciate your feedback at `this GitHub Discussion <https://github.com/schemathesis/schemathesis/discussions/2677>`_ - it will help shape the path to stable 4.0.
+A detailed migration guide and complete changelog will follow.
+
+**Added**
+
+- New test phases system with `--phases` CLI option to control unit & stateful testing.
+
+**Performance**
+
+- Up to 3x faster test execution.
+- Up to 15x lower memory usage.
+
+**Changed**
+
+- Schema loaders reorganized with namespaces:
+  - ``schemathesis.from_uri`` → ``schemathesis.openapi.from_url``
+  - ``schemathesis.from_pytest_fixture`` → ``schemathesis.pytest.from_fixture``
+- Response handling: Custom checks now receive Schemathesis' ``Response`` class instead of ``requests.Response``.
+- Payload serialization: Decorators per transport replace single class implementation.
+- CLI: Updated header & summary style.
+- Sanitization: Direct arguments in ``schemathesis.sanitization.configure`` instead of ``Config`` instance.
+
+**Renamed CLI Options**
+
+- `--data-generation-methods` → `--generation-mode`
+- `--targets` → `--generation-optimize`
+- `--hypothesis-derandomize` → `--generation-deterministic`
+- `--hypothesis-database` → `--generation-database`
+- `--hypothesis-seed` → `--generation-seed`
+- `--contrib-unique-data` → `--generation-unique-inputs`
+- `--hypothesis-max-examples` → `--generation-max-examples`
+- `--sanitize-output` → `--output-sanitize`
+- `--hypothesis-suppress-health-check` → `--suppress-health-check`
+
+**Removed**
+
+- `aiohttp` integration.
+- Old-style stateful runner (new one is now default).
+- Schemathesis.io integration & ``--report`` option (local HTML reports coming later).
+- FastAPI fixups.
+- Python code samples (only cURL now).
+- Python 3.8 support.
+- Support for ``pytest<7.0``.
+- CLI Options: ``--endpoint``, ``--method``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations``,
+  ``--show-trace``, ``--debug-output-file``, ``--hypothesis-deadline``, ``--hypothesis-report-multiple-bugs``,
+  ``--hypothesis-verbosity``, ``--store-network-log``, ``--pre-run``, ``--dry-run``.
+- Most loader configuration moved to ``schema.configure`` method.
+- ``add_case`` hook.
+- ``schemathesis.contrib.unique_data``.
+- Single argument ``AuthProvider.get``.
+- ``schemathesis.runner.prepare`` (use ``schemathesis.engine.from_schema``).
+- ``schemathesis replay`` command.
+- Stateful testing summary (coming later).
+- ``SCHEMA_ANALYSIS`` experimental feature.
 
 .. _v3.39.6:
 
