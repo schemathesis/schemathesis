@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: `--hypothesis-derandomize` implies no database, so passing `--hypothesis-database` too is invalid.
+Error: `--generation-deterministic` implies no database, so passing `--generation-database` too is invalid.

@@ -393,7 +393,7 @@ def engine_factory(app_factory, app_runner, stop_event):
                 targets=targets or [],
                 generation=GenerationConfig(),
                 hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
-                unique_data=unique_data,
+                unique_inputs=unique_data,
                 max_failures=max_failures,
             ),
             network=network or NetworkConfig(),

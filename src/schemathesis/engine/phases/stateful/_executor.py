@@ -111,7 +111,7 @@ def execute_state_machine_loop(
             )
             event_queue.put(step_started)
             try:
-                if config.execution.unique_data:
+                if config.execution.unique_inputs:
                     cached = ctx.get_step_outcome(case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -120,13 +120,13 @@ def execute_state_machine_loop(
                 result = super().step(case, previous)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if config.execution.unique_data:
+                if config.execution.unique_inputs:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if config.execution.unique_data:
+                if config.execution.unique_inputs:
                     ctx.store_step_outcome(case, exc)
                 ctx.step_errored()
                 raise
@@ -134,11 +134,11 @@ def execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if config.execution.unique_data:
+                if config.execution.unique_inputs:
                     ctx.store_step_outcome(case, exc)
                 raise exc
             else:
-                if config.execution.unique_data:
+                if config.execution.unique_inputs:
                     ctx.store_step_outcome(case, None)
             finally:
                 transition_id: events.TransitionId | None

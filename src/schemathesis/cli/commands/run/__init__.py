@@ -22,10 +22,17 @@ from schemathesis.cli.commands.run.hypothesis import (
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
-from schemathesis.cli.ext.options import CsvEnumChoice, CsvListChoice, CustomHelpMessageChoice, RegistryChoice
+from schemathesis.cli.ext.options import (
+    CsvChoice,
+    CsvEnumChoice,
+    CsvListChoice,
+    CustomHelpMessageChoice,
+    RegistryChoice,
+)
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationConfig, GenerationMode
 from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
@@ -35,9 +42,32 @@ from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
+DEFAULT_PHASES = ("unit", "stateful")
+
 
 @click.argument("schema", type=str)  # type: ignore[misc]
 @group("Options")
+@grouped_option(
+    "--phases",
+    help="A comma-separated list of test phases to run",
+    type=CsvChoice(["unit", "stateful"]),
+    default=",".join(DEFAULT_PHASES),
+    metavar="",
+)
+@grouped_option(
+    "--base-url",
+    "-b",
+    help="Base URL of the API, required when schema is provided as a file",
+    type=str,
+    callback=validation.validate_base_url,
+    envvar="SCHEMATHESIS_BASE_URL",
+)
+@grouped_option(
+    "--suppress-health-check",
+    help="A comma-separated list of Schemathesis health checks to disable",
+    type=CsvEnumChoice(HealthCheck),
+    metavar="",
+)
 @grouped_option(
     "--workers",
     "-w",
@@ -51,52 +81,6 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     show_default=True,
     callback=validation.convert_workers,
     metavar="",
-)
-@group("Experimental options")
-@grouped_option(
-    "--experimental",
-    "experiments",
-    help="Enable experimental features",
-    type=click.Choice(sorted([experiment.label for experiment in experimental.GLOBAL_EXPERIMENTS.available])),
-    callback=validation.convert_experimental,
-    multiple=True,
-    metavar="",
-)
-@grouped_option(
-    "--experimental-no-failfast",
-    "no_failfast",
-    help="Continue testing an API operation after a failure is found",
-    is_flag=True,
-    default=False,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_NO_FAILFAST",
-)
-@grouped_option(
-    "--experimental-missing-required-header-allowed-statuses",
-    "missing_required_header_allowed_statuses",
-    help="Comma-separated list of status codes expected for test cases with a missing required header",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-positive-data-acceptance-allowed-statuses",
-    "positive_data_acceptance_allowed_statuses",
-    help="Comma-separated list of status codes considered as successful responses",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-negative-data-rejection-allowed-statuses",
-    "negative_data_rejection_allowed_statuses",
-    help="Comma-separated list of status codes expected for rejected negative data",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
 )
 @group("API validation options")
 @grouped_option(
@@ -143,6 +127,28 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     help="Terminate the test suite after reaching a specified number of failures or errors",
     show_default=True,
 )
+@group("Filtering options")
+@with_filters
+@grouped_option(
+    "--include-by",
+    "include_by",
+    type=str,
+    help="Include API operations by expression",
+)
+@grouped_option(
+    "--exclude-by",
+    "exclude_by",
+    type=str,
+    help="Exclude API operations by expression",
+)
+@grouped_option(
+    "--exclude-deprecated",
+    help="Exclude deprecated API operations from testing",
+    is_flag=True,
+    is_eager=True,
+    default=False,
+    show_default=True,
+)
 @group("Loader options")
 @grouped_option(
     "--wait-for-schema",
@@ -153,12 +159,20 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
 )
 @group("Network requests options")
 @grouped_option(
-    "--base-url",
-    "-b",
-    help="Base URL of the API, required when schema is provided as a file",
+    "--header",
+    "-H",
+    "headers",
+    help=r"Add a custom HTTP header to all API requests. Format: 'Header-Name: Value'",
+    multiple=True,
     type=str,
-    callback=validation.validate_base_url,
-    envvar="SCHEMATHESIS_BASE_URL",
+    callback=validation.validate_headers,
+)
+@grouped_option(
+    "--auth",
+    "-a",
+    help="Provide the server authentication details in the 'USER:PASSWORD' format",
+    type=str,
+    callback=validation.validate_auth,
 )
 @grouped_option(
     "--request-timeout",
@@ -203,44 +217,6 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     type=str,
     callback=validation.validate_rate_limit,
 )
-@grouped_option(
-    "--header",
-    "-H",
-    "headers",
-    help=r"Add a custom HTTP header to all API requests. Format: 'Header-Name: Value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_headers,
-)
-@grouped_option(
-    "--auth",
-    "-a",
-    help="Provide the server authentication details in the 'USER:PASSWORD' format",
-    type=str,
-    callback=validation.validate_auth,
-)
-@group("Filtering options")
-@with_filters
-@grouped_option(
-    "--include-by",
-    "include_by",
-    type=str,
-    help="Include API operations by expression",
-)
-@grouped_option(
-    "--exclude-by",
-    "exclude_by",
-    type=str,
-    help="Exclude API operations by expression",
-)
-@grouped_option(
-    "--exclude-deprecated",
-    help="Exclude deprecated API operations from testing",
-    is_flag=True,
-    is_eager=True,
-    default=False,
-    show_default=True,
-)
 @group("Output options")
 @grouped_option(
     "--junit-xml",
@@ -268,7 +244,7 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     callback=validation.validate_preserve_exact_body_bytes,
 )
 @grouped_option(
-    "--sanitize-output",
+    "--output-sanitize",
     type=bool,
     default=True,
     show_default=True,
@@ -282,6 +258,52 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     show_default=True,
     callback=validation.convert_boolean_string,
 )
+@group("Experimental options")
+@grouped_option(
+    "--experimental",
+    "experiments",
+    help="Enable experimental features",
+    type=click.Choice(sorted([experiment.label for experiment in experimental.GLOBAL_EXPERIMENTS.available])),
+    callback=validation.convert_experimental,
+    multiple=True,
+    metavar="FEATURES",
+)
+@grouped_option(
+    "--experimental-no-failfast",
+    "no_failfast",
+    help="Continue testing an API operation after a failure is found",
+    is_flag=True,
+    default=False,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_NO_FAILFAST",
+)
+@grouped_option(
+    "--experimental-missing-required-header-allowed-statuses",
+    "missing_required_header_allowed_statuses",
+    help="Comma-separated list of status codes expected for test cases with a missing required header",
+    type=CsvListChoice(),
+    callback=validation.convert_status_codes,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
+)
+@grouped_option(
+    "--experimental-positive-data-acceptance-allowed-statuses",
+    "positive_data_acceptance_allowed_statuses",
+    help="Comma-separated list of status codes considered as successful responses",
+    type=CsvListChoice(),
+    callback=validation.convert_status_codes,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
+)
+@grouped_option(
+    "--experimental-negative-data-rejection-allowed-statuses",
+    "negative_data_rejection_allowed_statuses",
+    help="Comma-separated list of status codes expected for rejected negative data",
+    type=CsvListChoice(),
+    callback=validation.convert_status_codes,
+    metavar="",
+    envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
+)
 @group("Data generation options")
 @grouped_option(
     "--generation-mode",
@@ -293,6 +315,24 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     callback=validation.convert_generation_mode,
     show_default=True,
     metavar="",
+)
+@grouped_option(
+    "--generation-seed",
+    help="Seed value for Schemathesis, ensuring reproducibility across test runs",
+    type=int,
+)
+@grouped_option(
+    "--generation-max-examples",
+    help="The cap on the number of examples generated by Schemathesis for each API operation",
+    type=click.IntRange(1),
+)
+@grouped_option(
+    "--generation-deterministic",
+    help="Enables deterministic mode, which eliminates random variation between tests",
+    is_flag=True,
+    is_eager=True,
+    default=None,
+    show_default=True,
 )
 @grouped_option(
     "--generation-allow-x00",
@@ -310,15 +350,15 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     callback=validation.validate_generation_codec,
 )
 @grouped_option(
-    "--generation-optimize-for",
-    "included_target_names",
+    "--generation-optimize",
+    "generation_optimize",
     multiple=True,
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
     default=None,
     callback=validation.convert_checks,
     show_default=True,
-    metavar="",
+    metavar="TARGET",
 )
 @grouped_option(
     "--generation-with-security-parameters",
@@ -327,6 +367,7 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     default="true",
     show_default=True,
     callback=validation.convert_boolean_string,
+    metavar="BOOLEAN",
 )
 @grouped_option(
     "--generation-graphql-allow-null",
@@ -335,14 +376,24 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     default="true",
     show_default=True,
     callback=validation.convert_boolean_string,
+    metavar="BOOLEAN",
 )
 @grouped_option(
-    "--contrib-unique-data",
-    "contrib_unique_data",
+    "--generation-database",
+    help="Storage for examples discovered by Schemathesis. "
+    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
+    f"or specify a file path for persistent storage",
+    type=str,
+    callback=validation.validate_hypothesis_database,
+)
+@grouped_option(
+    "--generation-unique-inputs",
+    "generation_unique_inputs",
     help="Force the generation of unique test cases",
     is_flag=True,
     default=False,
     show_default=True,
+    metavar="BOOLEAN",
 )
 @grouped_option(
     "--contrib-openapi-fill-missing-examples",
@@ -351,6 +402,7 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     is_flag=True,
     default=False,
     show_default=True,
+    metavar="BOOLEAN",
 )
 @group("Open API options")
 @grouped_option(
@@ -387,27 +439,6 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
 )
 @group("Hypothesis engine options")
 @grouped_option(
-    "--hypothesis-database",
-    help="Storage for examples discovered by Hypothesis. "
-    f"Use 'none' to disable, '{HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER}' for temporary storage, "
-    f"or specify a file path for persistent storage",
-    type=str,
-    callback=validation.validate_hypothesis_database,
-)
-@grouped_option(
-    "--hypothesis-derandomize",
-    help="Enables deterministic mode in Hypothesis, which eliminates random variation between tests",
-    is_flag=True,
-    is_eager=True,
-    default=None,
-    show_default=True,
-)
-@grouped_option(
-    "--hypothesis-max-examples",
-    help="The cap on the number of examples generated by Hypothesis for each API operation",
-    type=click.IntRange(1),
-)
-@grouped_option(
     "--hypothesis-phases",
     help="Testing phases to execute",
     type=CsvEnumChoice(Phase),
@@ -417,17 +448,6 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
     "--hypothesis-no-phases",
     help="Testing phases to exclude from execution",
     type=CsvEnumChoice(Phase),
-    metavar="",
-)
-@grouped_option(
-    "--hypothesis-seed",
-    help="Seed value for Hypothesis, ensuring reproducibility across test runs",
-    type=int,
-)
-@grouped_option(
-    "--hypothesis-suppress-health-check",
-    help="A comma-separated list of Hypothesis health checks to disable",
-    type=CsvEnumChoice(HealthCheck),
     metavar="",
 )
 @group("Global options")
@@ -450,9 +470,8 @@ def run(
     negative_data_rejection_allowed_statuses: list[str],
     included_check_names: Sequence[str],
     excluded_check_names: Sequence[str],
-    generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
+    phases: Sequence[str] = DEFAULT_PHASES,
     max_response_time: float | None = None,
-    included_target_names: Sequence[str] | None = None,
     exit_first: bool = False,
     max_failures: int | None = None,
     include_path: Sequence[str] = (),
@@ -480,6 +499,7 @@ def run(
     exclude_deprecated: bool = False,
     workers_num: int = DEFAULT_WORKERS,
     base_url: str | None = None,
+    suppress_health_check: list[HealthCheck] | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
@@ -491,23 +511,24 @@ def run(
     cassette_preserve_exact_body_bytes: bool = False,
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
-    sanitize_output: bool = True,
+    output_sanitize: bool = True,
     output_truncate: bool = True,
-    contrib_unique_data: bool = False,
     contrib_openapi_fill_missing_examples: bool = False,
-    hypothesis_database: str | None = None,
-    hypothesis_derandomize: bool | None = None,
-    hypothesis_max_examples: int | None = None,
     hypothesis_phases: list[Phase] | None = None,
     hypothesis_no_phases: list[Phase] | None = None,
-    hypothesis_suppress_health_check: list[HealthCheck] | None = None,
-    hypothesis_seed: int | None = None,
-    no_color: bool = False,
+    generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
+    generation_seed: int | None = None,
+    generation_max_examples: int | None = None,
+    generation_optimize: Sequence[str] | None = None,
+    generation_deterministic: bool | None = None,
+    generation_database: str | None = None,
+    generation_unique_inputs: bool = False,
     generation_allow_x00: bool = True,
     generation_graphql_allow_null: bool = True,
     generation_with_security_parameters: bool = True,
     generation_codec: str = "utf-8",
     force_color: bool = False,
+    no_color: bool = False,
     **__kwargs: Any,
 ) -> None:
     """Run tests against an API using a specified SCHEMA.
@@ -521,7 +542,7 @@ def run(
     validation.validate_schema(schema, base_url)
 
     _hypothesis_phases = prepare_phases(hypothesis_phases, hypothesis_no_phases)
-    _hypothesis_suppress_health_check = prepare_health_checks(hypothesis_suppress_health_check)
+    _hypothesis_suppress_health_check = prepare_health_checks(suppress_health_check)
 
     for experiment in experiments:
         experiment.enable()
@@ -575,28 +596,31 @@ def run(
         cassette_config = CassetteConfig(
             path=cassette_path,
             format=cassette_format,
-            sanitize_output=sanitize_output,
+            sanitize_output=output_sanitize,
             preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
         )
 
     # Use the same seed for all tests unless `derandomize=True` is used
     seed: int | None
-    if hypothesis_seed is None and not hypothesis_derandomize:
+    if generation_seed is None and not generation_deterministic:
         seed = Random().getrandbits(128)
     else:
-        seed = hypothesis_seed
+        seed = generation_seed
+
+    phases_ = [PhaseName.PROBING] + [PhaseName.from_str(phase) for phase in phases]
 
     config = executor.RunConfig(
         location=schema,
         base_url=base_url,
         engine=EngineConfig(
             execution=ExecutionConfig(
+                phases=phases_,
                 checks=selected_checks,
-                targets=TARGETS.get_by_names(included_target_names or []),
+                targets=TARGETS.get_by_names(generation_optimize or []),
                 hypothesis_settings=prepare_settings(
-                    database=hypothesis_database,
-                    derandomize=hypothesis_derandomize,
-                    max_examples=hypothesis_max_examples,
+                    database=generation_database,
+                    derandomize=generation_deterministic,
+                    max_examples=generation_max_examples,
                     phases=_hypothesis_phases,
                     suppress_health_check=_hypothesis_suppress_health_check,
                 ),
@@ -609,7 +633,7 @@ def run(
                 ),
                 max_failures=max_failures,
                 no_failfast=no_failfast,
-                unique_data=contrib_unique_data,
+                unique_inputs=generation_unique_inputs,
                 seed=seed,
                 workers_num=workers_num,
             ),
@@ -629,7 +653,7 @@ def run(
         filter_set=filter_set,
         wait_for_schema=wait_for_schema,
         rate_limit=rate_limit,
-        output=OutputConfig(sanitize=sanitize_output, truncate=output_truncate),
+        output=OutputConfig(sanitize=output_sanitize, truncate=output_truncate),
         cassette=cassette_config,
         junit_xml=junit_xml,
         args=ctx.args,

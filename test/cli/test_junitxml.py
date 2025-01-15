@@ -14,9 +14,9 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     result = cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        f"--generation-max-examples={hypothesis_max_examples or 2}",
         "--checks=not_a_server_error",
-        "--hypothesis-seed=1",
+        "--generation-seed=1",
     )
     # Command executed successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -33,8 +33,8 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     result = cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
+        "--generation-seed=1",
         "--checks=all",
         "--exclude-checks=positive_data_acceptance",
     )
@@ -164,8 +164,8 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
+        "--generation-seed=1",
         "--request-timeout=0.01",
         "--checks=all",
     )
@@ -186,7 +186,7 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
     cli.run(
         schema_url,
         f"--junit-xml={xml_path}",
-        "--hypothesis-seed=1",
+        "--generation-seed=1",
         "--hypothesis-phases=explicit",
         "--checks=all",
     )

@@ -367,7 +367,7 @@ def before_generate_case(context, strategy):
             "run",
             str(schema_file),
             "--base-url=http://127.0.0.1:1",
-            "--hypothesis-seed=23",
+            "--generation-seed=23",
             "--hypothesis-phases=generate",
             hooks=module,
         )
@@ -416,7 +416,7 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
         cli.main(
             "run",
             str(schema_file),
-            "--hypothesis-seed=23",
+            "--generation-seed=23",
             "--hypothesis-phases=explicit",
             f"--base-url={openapi3_base_url}",
             "--checks=explicit_header",

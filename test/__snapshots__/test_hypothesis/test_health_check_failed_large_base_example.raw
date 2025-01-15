@@ -31,7 +31,7 @@ default, such as an array with an extensive number of elements.
 Consider revising the schema to more accurately represent typical use cases
 or applying constraints to reduce the data size.
 
-Tip: Bypass this health check using `--hypothesis-suppress-health-check=large_base_example`.
+Tip: Bypass this health check using `--suppress-health-check=large_base_example`.
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

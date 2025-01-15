@@ -173,7 +173,7 @@ def test_certificates(cli, schema_url, mocker):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
 def test_hypothesis_database_with_derandomize(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--hypothesis-database=:memory:", "--hypothesis-derandomize") == snapshot_cli
+    assert cli.run(schema_url, "--generation-database=:memory:", "--generation-deterministic") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -182,10 +182,10 @@ def test_hypothesis_parameters(cli, schema_url):
     # When Hypothesis options are passed via command line
     result = cli.run(
         schema_url,
-        "--hypothesis-derandomize",
-        "--hypothesis-max-examples=1000",
+        "--generation-deterministic",
+        "--generation-max-examples=1000",
         "--hypothesis-phases=explicit,generate",
-        "--hypothesis-suppress-health-check=all",
+        "--suppress-health-check=all",
     )
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
     # Parameters are validated in `hypothesis.settings`
@@ -202,8 +202,8 @@ def test_cli_run_only_failure(cli, schema_url, workers, snapshot_cli):
 def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
     result = cli.run(
         schema_url,
-        "--hypothesis-suppress-health-check=filter_too_much",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        "--suppress-health-check=filter_too_much",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     assert " HYPOTHESIS OUTPUT " not in result.stdout
@@ -310,7 +310,7 @@ def test_headers_conformance_valid(cli, schema_url):
 
 @pytest.mark.operations("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--hypothesis-seed=1", "--hypothesis-derandomize") == snapshot_cli
+    assert cli.run(schema_url, "--generation-seed=1", "--generation-deterministic") == snapshot_cli
 
 
 @pytest.mark.operations("multiple_failures")
@@ -330,8 +330,8 @@ def test_multiple_failures_different_check(cli, schema_url, snapshot_cli):
             "status_code_conformance",
             "-c",
             "not_a_server_error",
-            "--hypothesis-derandomize",
-            "--hypothesis-seed=1",
+            "--generation-deterministic",
+            "--generation-seed=1",
         )
         == snapshot_cli
     )
@@ -404,7 +404,7 @@ def digits_format(ctx):
 @pytest.mark.operations("custom_format")
 def test_hooks_valid(cli, schema_url, app, digits_format):
     # When a hook is passed to the CLI call
-    result = cli.main("run", "--hypothesis-suppress-health-check=filter_too_much", schema_url, hooks=digits_format)
+    result = cli.main("run", "--suppress-health-check=filter_too_much", schema_url, hooks=digits_format)
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all registered new string format should produce digits as expected
@@ -428,7 +428,7 @@ def test_conditional_checks(cli, hypothesis_max_examples, schema_url, conditiona
         "-c",
         "conditional_check",
         schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
         hooks=conditional_check,
     )
 
@@ -514,7 +514,7 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.engine.phases.unit.TaskProducer.next_operation", wraps=mocked)
-    result = cli.run(schema_url, "--workers=2", "--hypothesis-derandomize")
+    result = cli.run(schema_url, "--workers=2", "--generation-deterministic")
     # the exit status depends on what thread finished first
     assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
     # Then execution stops, and a message about interruption is displayed
@@ -553,8 +553,8 @@ async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_exa
     result = cli.run(
         str(schema_path),
         f"--base-url={openapi2_base_url}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--hypothesis-derandomize",
+        f"--generation-max-examples={hypothesis_max_examples or 5}",
+        "--generation-deterministic",
     )
     # Then Schemathesis should resolve it and run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -675,8 +675,8 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
     result = cli.run(
         str(schema_path),
         f"--base-url={openapi3_base_url}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--hypothesis-derandomize",
+        f"--generation-max-examples={hypothesis_max_examples or 5}",
+        "--generation-deterministic",
         f"--cassette-path={cassette_path}",
     )
     # Then it should be correctly sent to the server
@@ -717,7 +717,7 @@ def test_no_schema_in_media_type(ctx, cli, base_url, snapshot_cli):
             },
         }
     )
-    assert cli.run(str(schema_path), f"--base-url={base_url}", "--hypothesis-max-examples=1") == snapshot_cli
+    assert cli.run(str(schema_path), f"--base-url={base_url}", "--generation-max-examples=1") == snapshot_cli
 
 
 def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
@@ -744,7 +744,7 @@ def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
             },
         }
     )
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=10") == snapshot_cli
+    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--generation-max-examples=10") == snapshot_cli
 
 
 @pytest.mark.operations("form")
@@ -759,7 +759,7 @@ def test_urlencoded_form(cli, schema_url):
 @pytest.mark.operations("success")
 def test_targeted(mocker, cli, schema_url, workers):
     target = mocker.spy(hypothesis, "target")
-    result = cli.run(schema_url, f"--workers={workers}", "--generation-optimize-for=response_time")
+    result = cli.run(schema_url, f"--workers={workers}", "--generation-optimize=response_time")
     assert result.exit_code == ExitCode.OK, result.stdout
     target.assert_called_with(mocker.ANY, label="response_time")
 
@@ -793,7 +793,7 @@ def test_exclude_deprecated(ctx, cli, openapi3_base_url, options, expected):
             }
         }
     )
-    result = cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--hypothesis-max-examples=1", *options)
+    result = cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--generation-max-examples=1", *options)
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout
@@ -813,7 +813,7 @@ def test_invalid_filter(cli, schema_url, snapshot_cli):
 @pytest.mark.operations("upload_file", "custom_format")
 @pytest.mark.openapi_version("3.0")
 def test_filter_by(cli, schema_url, snapshot_cli, value):
-    assert cli.run(schema_url, "--hypothesis-max-examples=1", value) == snapshot_cli
+    assert cli.run(schema_url, "--generation-max-examples=1", value) == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -947,7 +947,7 @@ def test_unsupported_regex(ctx, cli, snapshot_cli, openapi3_base_url):
     )
     # Then if it is possible it should generate at least something
     # And if it is not then there should be an error with a descriptive error message
-    assert cli.run(str(schema_path), "--hypothesis-max-examples=1", f"--base-url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), "--generation-max-examples=1", f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.mark.parametrize("extra", ["--auth='test:wrong'", "-H Authorization: Basic J3Rlc3Q6d3Jvbmcn"])
@@ -958,7 +958,7 @@ def test_auth_override_on_protected_operation(cli, schema_url, extra, snapshot_c
     # And the auth is overridden (directly or via headers)
     # And there is an error during testing
     # Then the code sample representation in the output should have the overridden value
-    assert cli.run(schema_url, "--checks=all", "--sanitize-output=false", extra) == snapshot_cli
+    assert cli.run(schema_url, "--checks=all", "--output-sanitize=false", extra) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -968,7 +968,7 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
     # Then the code sample should have the overridden value
-    assert cli.run(schema_url, "--checks=all", "--sanitize-output=false", f"-H Authorization: {auth}") == snapshot_cli
+    assert cli.run(schema_url, "--checks=all", "--output-sanitize=false", f"-H Authorization: {auth}") == snapshot_cli
 
 
 @pytest.mark.operations("cp866")
@@ -1032,7 +1032,7 @@ def test_force_color(cli, schema_url):
 @pytest.mark.parametrize("graphql_path", ["/graphql", "/foo"])
 def test_graphql_url(cli, graphql_url, graphql_path, args, snapshot_cli):
     # When the target API is GraphQL
-    assert cli.run(graphql_url, "--hypothesis-max-examples=5", *args) == snapshot_cli
+    assert cli.run(graphql_url, "--generation-max-examples=5", *args) == snapshot_cli
 
 
 @pytest.mark.parametrize("location", ["path", "query", "header", "cookie"])
@@ -1043,7 +1043,7 @@ def test_missing_content_and_schema(ctx, cli, location, snapshot_cli, openapi3_b
     )
     # Then CLI should show that this API operation errored
     # And show the proper message under its "ERRORS" section
-    assert cli.run(str(schema_path), "--hypothesis-max-examples=1", f"--base-url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), "--generation-max-examples=1", f"--base-url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1102,7 +1102,7 @@ def test_explicit_example_failure_output(ctx, cli, openapi3_base_url, snapshot_c
             },
         }
     )
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--sanitize-output=false") == snapshot_cli
+    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}", "--output-sanitize=false") == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -1144,8 +1144,8 @@ def test_multiple_generation_modes(cli, openapi3_schema_url, data_generation_che
         "-c",
         "not_a_server_error",
         openapi3_schema_url,
-        "--hypothesis-max-examples=25",
-        "--hypothesis-suppress-health-check=all",
+        "--generation-max-examples=25",
+        "--suppress-health-check=all",
         "--generation-mode",
         "all",
         hooks=data_generation_check,
@@ -1191,7 +1191,7 @@ def test_wait_for_schema(cli, schema_path, app_factory, app_runner):
     port = unused_port()
     schema_url = f"http://127.0.0.1:{port}/{schema_path}"
     app_runner.run_flask_app(app, port=port)
-    result = cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1")
+    result = cli.run(schema_url, "--wait-for-schema=1", "--generation-max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
 
 
@@ -1209,7 +1209,7 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
     schema_url = f"http://127.0.0.1:{port}/schema.yaml"
     app_runner.run_flask_app(app, port=port)
 
-    assert cli.run(schema_url, "--wait-for-schema=1", "--hypothesis-max-examples=1") == snapshot_cli
+    assert cli.run(schema_url, "--wait-for-schema=1", "--generation-max-examples=1") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1246,10 +1246,10 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     auth = "secret-auth"
     result = cli.run(
         openapi2_schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 5}",
+        "--generation-seed=1",
         f"-H Authorization: {auth}",
-        f"--sanitize-output={value}",
+        f"--output-sanitize={value}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if value == "false":
@@ -1490,7 +1490,7 @@ def test_custom_strings(cli, hypothesis_max_examples, schema_url, custom_strings
         "--generation-allow-x00=false",
         "--generation-codec=ascii",
         schema_url,
-        f"--hypothesis-max-examples={hypothesis_max_examples or 100}",
+        f"--generation-max-examples={hypothesis_max_examples or 100}",
         hooks=custom_strings,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -1560,7 +1560,7 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url, no
             "-c",
             "no_null_bytes",
             f"--base-url={openapi3_base_url}",
-            "--hypothesis-max-examples=1",
+            "--generation-max-examples=1",
             hooks=no_null_bytes,
         )
         == snapshot_cli
@@ -1589,7 +1589,7 @@ def buggy(ctx):
         cli.main(
             "run",
             schema_url,
-            "--generation-optimize-for=buggy",
+            "--generation-optimize=buggy",
             hooks=module,
         )
         == snapshot_cli
@@ -1635,7 +1635,7 @@ class EventCounter(cli.EventHandler):
             "run",
             schema_url,
             "--custom-counter=42",
-            "--hypothesis-max-examples=1",
+            "--generation-max-examples=1",
             hooks=module,
         )
         == snapshot_cli

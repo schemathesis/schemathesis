@@ -137,7 +137,7 @@ def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
             schema_url,
             "--workers",
             "2",
-            "--hypothesis-max-examples=1",
+            "--generation-max-examples=1",
             hooks=module,
         )
         == snapshot_cli

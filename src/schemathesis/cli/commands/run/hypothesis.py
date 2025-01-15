@@ -5,8 +5,6 @@ from typing import TYPE_CHECKING, Any
 
 import click
 
-from schemathesis.core import NotSet
-
 if TYPE_CHECKING:
     import hypothesis
 
@@ -79,7 +77,6 @@ def prepare_phases(
 
 def prepare_settings(
     database: str | None = None,
-    deadline: int | NotSet | None = None,
     derandomize: bool | None = None,
     max_examples: int | None = None,
     phases: list[hypothesis.Phase] | None = None,

@@ -64,13 +64,6 @@ class ExperimentSet:
 
 ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
-
-STATEFUL_ONLY = GLOBAL_EXPERIMENTS.create_experiment(
-    name="Stateful Only",
-    env_var="STATEFUL_ONLY",
-    description="Run only stateful tests",
-    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2262",
-)
 COVERAGE_PHASE = GLOBAL_EXPERIMENTS.create_experiment(
     name="Coverage phase",
     env_var="COVERAGE_PHASE",

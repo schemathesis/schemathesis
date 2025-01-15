@@ -40,10 +40,10 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     result = cli.run(
         schema_url,
         f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples}",
+        f"--generation-max-examples={hypothesis_max_examples}",
         f"--generation-mode={mode}",
         "--experimental=coverage-phase",
-        "--hypothesis-seed=1",
+        "--generation-seed=1",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -85,9 +85,9 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
         schema_url,
         f"--cassette-path={cassette_path}",
         f"--cassette-format={format}",
-        "--hypothesis-max-examples=1",
+        "--generation-max-examples=1",
         "--request-timeout=0.001",
-        "--hypothesis-seed=1",
+        "--generation-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if format == "vcr":
@@ -109,8 +109,8 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     result = cli.run(
         openapi3_schema_url,
         f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 5}",
+        "--generation-seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
@@ -151,7 +151,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
     result = cli.run(
         str(schema_path),
         f"--base-url={openapi3_base_url}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
         f"--cassette-path={cassette_path}",
     )
     # Then the test run should be successful
@@ -171,14 +171,14 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
         "schemathesis",
         "run",
         f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 2}",
+        f"--generation-max-examples={hypothesis_max_examples or 2}",
         schema_url,
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
-        f"st run --cassette-path={cassette_path} --hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
+        f"st run --cassette-path={cassette_path} --generation-max-examples={hypothesis_max_examples or 2} {schema_url}"
     )
     assert cassette["command"] == command
 
@@ -193,11 +193,11 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
         schema_url,
         f"--cassette-path={cassette_path}",
         "--cassette-format=har",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 1}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 1}",
+        "--generation-seed=1",
         "--checks=all",
         f"-H Authorization: {auth}",
-        f"--sanitize-output={value}",
+        f"--output-sanitize={value}",
         *args,
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -278,10 +278,10 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     result = cli.run(
         openapi2_schema_url,
         f"--cassette-path={cassette_path}",
-        f"--hypothesis-max-examples={hypothesis_max_examples or 5}",
-        "--hypothesis-seed=1",
+        f"--generation-max-examples={hypothesis_max_examples or 5}",
+        "--generation-seed=1",
         f"-H Authorization: {auth}",
-        f"--sanitize-output={value}",
+        f"--output-sanitize={value}",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
