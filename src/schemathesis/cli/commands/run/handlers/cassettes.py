@@ -77,10 +77,8 @@ class CassetteWriter(EventHandler):
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
             self.queue.put(Process(recorder=event.recorder))
-        elif isinstance(event, events.EngineFinished):
-            self.shutdown()
 
-    def shutdown(self) -> None:
+    def shutdown(self, ctx: ExecutionContext) -> None:
         self.queue.put(Finalize())
         self._stop_worker()
 
