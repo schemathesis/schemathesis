@@ -1,8 +1,17 @@
 Changelog
 =========
 
-:version:`Unreleased <v3.39.6...HEAD>` - TBD
+:version:`Unreleased <v3.39.7...HEAD>` - TBD
 --------------------------------------------
+
+.. _v3.39.7:
+
+:version:`3.39.7 <v3.39.6...v3.39.7>` - 2025-01-16
+--------------------------------------------------
+
+**Changed**
+
+- Rebuild Docker ``stable`` with the v3 branch.
 
 .. _v3.39.6:
 
