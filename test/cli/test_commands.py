@@ -524,6 +524,11 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
     assert_threaded_executor_interruption(lines, True)
 
 
+def test_keyboard_interrupt_during_schema_loading(cli, openapi3_schema_url, mocker, snapshot_cli):
+    mocker.patch("schemathesis.core.loaders.make_request", side_effect=KeyboardInterrupt)
+    assert cli.run(openapi3_schema_url) == snapshot_cli
+
+
 async def test_multiple_files_schema(ctx, openapi_2_app, cli, hypothesis_max_examples, openapi2_base_url):
     # When the schema contains references to other files
     uri = pathlib.Path(HERE).as_uri() + "/"

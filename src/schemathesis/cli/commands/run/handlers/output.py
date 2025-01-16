@@ -218,7 +218,7 @@ class OutputHandler(EventHandler):
     def start(self, ctx: ExecutionContext) -> None:
         display_header(SCHEMATHESIS_VERSION)
 
-    def shutdown(self) -> None:
+    def shutdown(self, ctx: ExecutionContext) -> None:
         if self.progress is not None and self.progress_task_id is not None:
             self.progress.stop_task(self.progress_task_id)
             self.progress.stop()

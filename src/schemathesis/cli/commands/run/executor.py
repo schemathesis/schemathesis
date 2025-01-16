@@ -19,7 +19,7 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.output import OutputConfig
 from schemathesis.engine import from_schema
 from schemathesis.engine.config import EngineConfig
-from schemathesis.engine.events import EventGenerator, FatalError
+from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 from schemathesis.filters import FilterSet
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
@@ -70,6 +70,9 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
     try:
         schema = load_schema(loader_config)
         schema.filter_set = config.filter_set
+    except KeyboardInterrupt:
+        yield Interrupted(phase=None)
+        return
     except LoaderError as exc:
         yield FatalError(exception=exc)
         return
@@ -112,7 +115,7 @@ def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
 
     def shutdown() -> None:
         for _handler in handlers:
-            _handler.shutdown()
+            _handler.shutdown(ctx)
 
     for handler in handlers:
         handler.start(ctx)
