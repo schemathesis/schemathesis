@@ -51,7 +51,7 @@ logging.getLogger("pyrate_limiter").setLevel(logging.CRITICAL)
 
 # Register Hypothesis profile. Could be used as
 # `pytest test -m hypothesis --hypothesis-profile <profile-name>`
-settings.register_profile("CI", max_examples=1000)
+settings.register_profile("CI", max_examples=2000)
 
 
 @pytest.fixture(autouse=True)
@@ -388,7 +388,7 @@ class CliSnapshotConfig:
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
-                lines[-1] = lines[-1].ljust(80, "=")
+                lines[-1] = lines[-1].rjust(80, "=")
             data = "\n".join(lines) + "\n"
         if self.remove_last_line:
             lines = data.splitlines()
