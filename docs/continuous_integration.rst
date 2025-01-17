@@ -20,13 +20,6 @@ For initial setup in a GitHub Actions workflow:
       - uses: schemathesis/action@v1
         with:
           schema: 'http://127.0.0.1:5000/api/openapi.json'
-          # Optional, for PR comments
-          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
-
-To get test results as comments in your GitHub pull requests, both the ``token`` and the `GitHub app`_ are required.
-Obtain the token by signing up on `Schemathesis.io <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=ci>`_.
-
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
 
 To add headers like ``Authorization``:
 
