@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v4.0.0a1...HEAD>` - TBD
 ---------------------------------------------
 
+**Changed**
+
+- A way to display the test progress for the unit test phase. It unifies single and multi-worker 
+  execution output bu using multiple spinners and a single progress bar. :issue:`2372`
+
 .. _v4.0.0a1:
 
 :version:`4.0.0a1 <v3.39.6...v4.0.0a1>` - 2025-01-15

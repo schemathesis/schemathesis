@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Iterable
@@ -27,7 +28,9 @@ from schemathesis.schemas import ApiOperationsCount
 
 if TYPE_CHECKING:
     from rich.console import Console
+    from rich.live import Live
     from rich.progress import Progress, TaskID
+    from rich.text import Text
 
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
@@ -38,12 +41,6 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
     click.secho(message, **kwargs)
-
-
-def get_percentage(position: int, length: int) -> str:
-    """Format completion percentage in square brackets."""
-    percentage_message = f"{position * 100 // length}%".rjust(4)
-    return f"[{percentage_message}]"
 
 
 def bold(option: str) -> str:
@@ -169,8 +166,396 @@ BLOCK_PADDING = (0, 1, 0, 1)
 
 
 @dataclass
+class LoadingProgressManager:
+    console: Console
+    location: str
+    start_time: float
+    progress: Progress
+    progress_task_id: TaskID | None
+    is_interrupted: bool
+
+    __slots__ = ("console", "location", "start_time", "progress", "progress_task_id", "is_interrupted")
+
+    def __init__(self, console: Console, location: str) -> None:
+        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
+        from rich.style import Style
+        from rich.text import Text
+
+        self.console = console
+        self.location = location
+        self.start_time = time.monotonic()
+        progress_message = Text.assemble(
+            ("Loading specification from ", Style(color="white")),
+            (location, Style(color="cyan")),
+        )
+        self.progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            RenderableColumn(progress_message),
+            console=console,
+            transient=True,
+        )
+        self.progress_task_id = None
+        self.is_interrupted = False
+
+    def start(self) -> None:
+        """Start loading progress display."""
+        self.progress_task_id = self.progress.add_task("Loading", total=None)
+        self.progress.start()
+
+    def stop(self) -> None:
+        """Stop loading progress display."""
+        assert self.progress_task_id is not None
+        self.progress.stop_task(self.progress_task_id)
+        self.progress.stop()
+
+    def interrupt(self) -> None:
+        """Handle interruption during loading."""
+        self.is_interrupted = True
+        self.stop()
+
+    def get_completion_message(self) -> Text:
+        """Generate completion message including duration."""
+        from rich.style import Style
+        from rich.text import Text
+
+        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        if self.is_interrupted:
+            return Text.assemble(
+                ("⚡  ", Style(color="yellow")),
+                (f"Loading interrupted after {duration} while loading from ", Style(color="white")),
+                (self.location, Style(color="cyan")),
+            )
+        return Text.assemble(
+            ("✅  ", Style(color="green")),
+            ("Loaded specification from ", Style(color="white")),
+            (self.location, Style(color="cyan")),
+            (f" (in {duration})", Style(color="white")),
+        )
+
+
+@dataclass
+class ProbingProgressManager:
+    console: Console
+    start_time: float
+    progress: Progress
+    progress_task_id: TaskID | None
+    is_interrupted: bool
+
+    __slots__ = ("console", "start_time", "progress", "progress_task_id", "is_interrupted")
+
+    def __init__(self, console: Console) -> None:
+        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
+        from rich.text import Text
+
+        self.console = console
+        self.start_time = time.monotonic()
+        self.progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            RenderableColumn(Text("Probing API capabilities")),
+            transient=True,
+            console=console,
+        )
+        self.progress_task_id = None
+        self.is_interrupted = False
+
+    def start(self) -> None:
+        """Start probing progress display."""
+        self.progress_task_id = self.progress.add_task("Probing", total=None)
+        self.progress.start()
+
+    def stop(self) -> None:
+        """Stop probing progress display."""
+        assert self.progress_task_id is not None
+        self.progress.stop_task(self.progress_task_id)
+        self.progress.stop()
+
+    def interrupt(self) -> None:
+        """Handle interruption during probing."""
+        self.is_interrupted = True
+        self.stop()
+
+    def get_completion_message(self) -> Text:
+        """Generate completion message including duration."""
+        from rich.style import Style
+        from rich.text import Text
+
+        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        if self.is_interrupted:
+            return Text.assemble(
+                ("⚡  ", Style(color="yellow")),
+                (f"API probing interrupted after {duration}", Style(color="white")),
+            )
+        return Text.assemble(
+            ("✅  ", Style(color="green")),
+            ("API capabilities:", Style(color="white")),
+        )
+
+
+@dataclass
 class WarningData:
     missing_auth: dict[int, list[str]] = field(default_factory=dict)
+
+
+@dataclass
+class OperationProgress:
+    """Tracks individual operation progress."""
+
+    label: str
+    start_time: float
+    task_id: TaskID
+
+    __slots__ = ("label", "start_time", "task_id")
+
+
+@dataclass
+class TestProgressManager:
+    """Manages progress display for test phases (unit tests, stateful tests, etc.)."""
+
+    console: Console
+    title: str
+    current: int
+    total: int
+    start_time: float
+
+    # Progress components
+    title_progress: Progress
+    progress_bar: Progress
+    operations_progress: Progress
+    current_operations: dict[str, OperationProgress]
+    stats: dict[Status, int]
+    stats_progress: Progress
+    live: Live | None
+
+    # Task IDs
+    title_task_id: TaskID | None
+    progress_task_id: TaskID | None
+    stats_task_id: TaskID
+
+    is_interrupted: bool
+
+    __slots__ = (
+        "console",
+        "title",
+        "current",
+        "total",
+        "start_time",
+        "title_progress",
+        "progress_bar",
+        "operations_progress",
+        "current_operations",
+        "stats",
+        "stats_progress",
+        "live",
+        "title_task_id",
+        "progress_task_id",
+        "stats_task_id",
+        "is_interrupted",
+    )
+
+    def __init__(
+        self,
+        console: Console,
+        title: str,
+        total: int,
+    ) -> None:
+        from rich.progress import (
+            BarColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+        from rich.style import Style
+
+        self.console = console
+        self.title = title
+        self.current = 0
+        self.total = total
+        self.start_time = time.monotonic()
+
+        # Initialize progress displays
+        self.title_progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            TextColumn("{task.description}", style=Style(color="white")),
+            console=self.console,
+        )
+        self.title_task_id = None
+
+        self.progress_bar = Progress(
+            TextColumn("    "),
+            TimeElapsedColumn(),
+            BarColumn(bar_width=None),
+            TextColumn("{task.percentage:.0f}% ({task.completed}/{task.total})"),
+            console=self.console,
+        )
+        self.progress_task_id = None
+
+        self.operations_progress = Progress(
+            TextColumn("  "),
+            SpinnerColumn("dots"),
+            TimeElapsedColumn(),
+            TextColumn(" {task.fields[label]}"),
+            console=self.console,
+        )
+
+        self.current_operations = {}
+
+        self.stats_progress = Progress(
+            TextColumn("    "),
+            TextColumn("{task.description}"),
+            console=self.console,
+        )
+        self.stats_task_id = self.stats_progress.add_task("")
+        self.stats = {
+            Status.SUCCESS: 0,
+            Status.FAILURE: 0,
+            Status.SKIP: 0,
+            Status.ERROR: 0,
+        }
+        self._update_stats_display()
+
+        self.live = None
+        self.is_interrupted = False
+
+    def _get_stats_message(self) -> str:
+        width = len(str(self.total))
+
+        parts = []
+        if self.stats[Status.SUCCESS]:
+            parts.append(f"✅ {self.stats[Status.SUCCESS]:{width}d} passed")
+        if self.stats[Status.FAILURE]:
+            parts.append(f"❌ {self.stats[Status.FAILURE]:{width}d} failed")
+        if self.stats[Status.ERROR]:
+            parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} errors")
+        if self.stats[Status.SKIP]:
+            parts.append(f"⏭️ {self.stats[Status.SKIP]:{width}d} skipped")
+        return "  ".join(parts)
+
+    def _update_stats_display(self) -> None:
+        """Update the statistics display."""
+        self.stats_progress.update(self.stats_task_id, description=self._get_stats_message())
+
+    def start(self) -> None:
+        """Start progress display."""
+        from rich.console import Group
+        from rich.live import Live
+        from rich.text import Text
+
+        group = Group(
+            self.title_progress,
+            Text(),
+            self.progress_bar,
+            Text(),
+            self.operations_progress,
+            Text(),
+            self.stats_progress,
+        )
+
+        self.live = Live(group, refresh_per_second=10, console=self.console, transient=True)
+        self.live.start()
+
+        # Initialize both progress displays
+        self.title_task_id = self.title_progress.add_task(self.title, total=self.total)
+        self.progress_task_id = self.progress_bar.add_task(
+            "",  # Empty description as it's shown in title
+            total=self.total,
+        )
+
+    def update_progress(self) -> None:
+        """Update progress in both displays."""
+        assert self.title_task_id is not None
+        assert self.progress_task_id is not None
+
+        self.current += 1
+        self.title_progress.update(self.title_task_id, completed=self.current)
+        self.progress_bar.update(self.progress_task_id, completed=self.current)
+
+    def start_operation(self, label: str) -> None:
+        """Start tracking new operation."""
+        task_id = self.operations_progress.add_task("", label=label, start_time=time.monotonic())
+        self.current_operations[label] = OperationProgress(label=label, start_time=time.monotonic(), task_id=task_id)
+
+    def finish_operation(self, label: str) -> None:
+        """Finish tracking operation."""
+        if operation := self.current_operations.pop(label, None):
+            if not self.current_operations:
+                assert self.title_task_id is not None
+                self.title_progress.update(self.title_task_id, description=f"  {self.title}")
+            self.operations_progress.update(operation.task_id, visible=False)
+
+    def update_stats(self, status: Status) -> None:
+        """Update statistics for a finished scenario."""
+        self.stats[status] += 1
+        self._update_stats_display()
+
+    def interrupt(self) -> None:
+        self.is_interrupted = True
+        self.stats[Status.SKIP] += self.total - self.current
+        if self.live:
+            self.stop()
+
+    def stop(self) -> None:
+        """Stop all progress displays."""
+        if self.live:
+            self.live.stop()
+
+    def _get_status_icon(self, default_icon: str = "🕛") -> str:
+        if self.is_interrupted:
+            icon = "⚡"
+        elif self.stats[Status.ERROR] > 0:
+            icon = "🚫"
+        elif self.stats[Status.FAILURE] > 0:
+            icon = "❌"
+        elif self.stats[Status.SUCCESS] > 0:
+            icon = "✅"
+        elif self.stats[Status.SKIP] > 0:
+            icon = "⏭️"
+        else:
+            icon = default_icon
+        return icon
+
+    def get_completion_message(self, default_icon: str = "🕛") -> str:
+        """Complete the phase and return status message."""
+        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        icon = self._get_status_icon(default_icon)
+
+        message = self._get_stats_message() or "No tests were run"
+        if self.is_interrupted:
+            duration_message = f"interrupted after {duration}"
+        else:
+            duration_message = f"in {duration}"
+
+        return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
+
+
+def format_duration(duration_ms: int) -> str:
+    """Format duration in milliseconds to human readable string."""
+    parts = []
+
+    # Convert to components
+    ms = duration_ms % 1000
+    seconds = (duration_ms // 1000) % 60
+    minutes = (duration_ms // (1000 * 60)) % 60
+    hours = duration_ms // (1000 * 60 * 60)
+
+    # Add non-empty components
+    if hours > 0:
+        parts.append(f"{hours} h")
+    if minutes > 0:
+        parts.append(f"{minutes} m")
+    if seconds > 0:
+        parts.append(f"{seconds} s")
+    if ms > 0:
+        parts.append(f"{ms} ms")
+
+    # Handle zero duration
+    if not parts:
+        return "0 ms"
+
+    return " ".join(parts)
 
 
 @dataclass
@@ -178,9 +563,11 @@ class OutputHandler(EventHandler):
     workers_num: int
     rate_limit: str | None
     wait_for_schema: float | None
-    progress: Progress | None = None
-    progress_task_id: TaskID | None = None
-    operations_processed: int = 0
+
+    loading_manager: LoadingProgressManager | None = None
+    probing_manager: ProbingProgressManager | None = None
+    progress_manager: TestProgressManager | None = None
+
     operations_count: ApiOperationsCount | None = None
     skip_reasons: list[str] = field(default_factory=list)
     current_line_length: int = 0
@@ -205,7 +592,7 @@ class OutputHandler(EventHandler):
         if isinstance(event, events.EngineFinished):
             self._on_engine_finished(ctx, event)
         elif isinstance(event, events.Interrupted):
-            self._on_interrupted()
+            self._on_interrupted(event)
         elif isinstance(event, events.FatalError):
             self._on_fatal_error(event)
         elif isinstance(event, events.NonFatalError):
@@ -219,62 +606,33 @@ class OutputHandler(EventHandler):
         display_header(SCHEMATHESIS_VERSION)
 
     def shutdown(self, ctx: ExecutionContext) -> None:
-        if self.progress is not None and self.progress_task_id is not None:
-            self.progress.stop_task(self.progress_task_id)
-            self.progress.stop()
-
-    def _start_progress(self, name: str) -> None:
-        assert self.progress is not None
-        self.progress_task_id = self.progress.add_task(name, total=None)
-        self.progress.start()
-
-    def _stop_progress(self) -> None:
-        assert self.progress is not None
-        assert self.progress_task_id is not None
-        self.progress.stop_task(self.progress_task_id)
-        self.progress.stop()
-        self.progress = None
-        self.progress_task_id = None
+        if self.progress_manager is not None:
+            self.progress_manager.stop()
+        if self.loading_manager is not None:
+            self.loading_manager.stop()
+        if self.probing_manager is not None:
+            self.probing_manager.stop()
 
     def _on_loading_started(self, event: LoadingStarted) -> None:
-        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
-        from rich.style import Style
-        from rich.text import Text
-
-        progress_message = Text.assemble(
-            ("Loading specification from ", Style(color="white")),
-            (event.location, Style(color="cyan")),
-        )
-        self.progress = Progress(
-            TextColumn(""),
-            SpinnerColumn("clock"),
-            RenderableColumn(progress_message),
-            console=self.console,
-            transient=True,
-        )
-        self._start_progress("Loading")
+        self.loading_manager = LoadingProgressManager(console=self.console, location=event.location)
+        self.loading_manager.start()
 
     def _on_loading_finished(self, ctx: ExecutionContext, event: LoadingFinished) -> None:
         from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
-        from rich.text import Text
 
-        self._stop_progress()
-        self.operations_count = event.operations_count
+        assert self.loading_manager is not None
+        self.loading_manager.stop()
 
-        duration_ms = int(event.duration * 1000)
         message = Padding(
-            Text.assemble(
-                ("✅  ", Style(color="green")),
-                ("Loaded specification from ", Style(color="white")),
-                (event.location, Style(color="cyan")),
-                (f" (in {duration_ms} ms)", Style(color="white")),
-            ),
+            self.loading_manager.get_completion_message(),
             BLOCK_PADDING,
         )
         self.console.print(message)
         self.console.print()
+        self.loading_manager = None
+        self.operations_count = event.operations_count
 
         table = Table(
             show_header=False,
@@ -300,22 +658,21 @@ class OutputHandler(EventHandler):
         phase = event.phase
         if phase.name == PhaseName.PROBING and phase.is_enabled:
             self._start_probing()
+        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
+            assert self.operations_count is not None
+            manager = TestProgressManager(
+                console=self.console,
+                title="Unit tests",
+                total=self.operations_count.total,
+            )
+            manager.start()
+            self.progress_manager = manager
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             click.secho("Stateful tests\n", bold=True)
 
     def _start_probing(self) -> None:
-        from rich.progress import Progress, RenderableColumn, SpinnerColumn, TextColumn
-        from rich.text import Text
-
-        progress_message = Text("Probing API capabilities")
-        self.progress = Progress(
-            TextColumn(""),
-            SpinnerColumn("clock"),
-            RenderableColumn(progress_message),
-            transient=True,
-            console=self.console,
-        )
-        self._start_progress("Probing")
+        self.probing_manager = ProbingProgressManager(console=self.console)
+        self.probing_manager.start()
 
     def _on_phase_finished(self, event: events.PhaseFinished) -> None:
         from rich.padding import Padding
@@ -327,7 +684,9 @@ class OutputHandler(EventHandler):
         self.phases[phase.name] = (event.status, phase.skip_reason)
 
         if phase.name == PhaseName.PROBING:
-            self._stop_progress()
+            assert self.probing_manager is not None
+            self.probing_manager.stop()
+            self.probing_manager = None
 
             if event.status == Status.SUCCESS:
                 assert isinstance(event.payload, Ok)
@@ -336,7 +695,7 @@ class OutputHandler(EventHandler):
                     Padding(
                         Text.assemble(
                             ("✅  ", Style(color="green")),
-                            ("API capabilities:", Style(color="white", bold=True)),
+                            ("API capabilities:", Style(color="white")),
                         ),
                         BLOCK_PADDING,
                     )
@@ -387,30 +746,33 @@ class OutputHandler(EventHandler):
             if event.status != Status.INTERRUPTED:
                 click.echo("\n")
         elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
+            assert self.progress_manager is not None
+            self.progress_manager.stop()
+            if event.status == Status.ERROR:
+                message = self.progress_manager.get_completion_message("🚫")
+            else:
+                message = self.progress_manager.get_completion_message()
+            self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
             if event.status != Status.INTERRUPTED:
-                click.echo()
-            if self.workers_num > 1:
-                click.echo()
+                self.console.print()
 
     def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
-        if event.phase == PhaseName.UNIT_TESTING and self.workers_num == 1:
+        if event.phase == PhaseName.UNIT_TESTING:
             # We should display execution result + percentage in the end. For example:
             assert event.label is not None
-            max_length = get_terminal_width() - len(" . [XXX%]") - len(TRUNCATION_PLACEHOLDER)
-            message = event.label
-            message = message[:max_length] + (message[max_length:] and "[...]") + " "
-            self.current_line_length = len(message)
-            click.echo(message, nl=False)
+            assert self.progress_manager is not None
+            self.progress_manager.start_operation(event.label)
 
     def _on_scenario_finished(self, event: events.ScenarioFinished) -> None:
-        self.operations_processed += 1
         if event.phase == PhaseName.UNIT_TESTING:
+            assert self.progress_manager is not None
+            if event.label:
+                self.progress_manager.finish_operation(event.label)
+            self.progress_manager.update_progress()
+            self.progress_manager.update_stats(event.status)
             if event.status == Status.SKIP and event.skip_reason is not None:
                 self.skip_reasons.append(event.skip_reason)
-            self._display_execution_result(event.status)
             self._check_warnings(event)
-            if self.workers_num == 1:
-                self.display_percentage()
         elif (
             event.phase == PhaseName.STATEFUL_TESTING
             and not event.is_final
@@ -436,10 +798,34 @@ class OutputHandler(EventHandler):
         self.current_line_length += len(symbol)
         click.secho(symbol, nl=False, fg=color)
 
-    def _on_interrupted(self) -> None:
-        click.echo()
-        display_section_name("KeyboardInterrupt", "!", bold=False)
-        click.echo()
+    def _on_interrupted(self, event: events.Interrupted) -> None:
+        from rich.padding import Padding
+
+        if self.progress_manager is not None:
+            self.progress_manager.interrupt()
+            return
+        if self.loading_manager is not None:
+            self.loading_manager.interrupt()
+            message = Padding(
+                self.loading_manager.get_completion_message(),
+                BLOCK_PADDING,
+            )
+            self.console.print(message)
+            self.console.print()
+            return
+        if self.probing_manager is not None:
+            self.probing_manager.interrupt()
+            message = Padding(
+                self.probing_manager.get_completion_message(),
+                BLOCK_PADDING,
+            )
+            self.console.print(message)
+            self.console.print()
+            return
+        if event.phase == PhaseName.STATEFUL_TESTING:
+            self.console.print()
+            display_section_name("KeyboardInterrupt", "!", bold=False)
+            self.console.print()
 
     def _on_fatal_error(self, event: events.FatalError) -> None:
         if isinstance(event.exception, LoaderError):
@@ -713,18 +1099,6 @@ class OutputHandler(EventHandler):
         self.display_test_cases(ctx)
         self.display_reports()
         self.display_final_line(ctx, event)
-
-    def display_percentage(self) -> None:
-        """Add the current progress in % to the right side of the current line."""
-        assert self.operations_count is not None
-        selected = self.operations_count.selected
-        current_percentage = get_percentage(self.operations_processed, selected)
-        styled = click.style(current_percentage, fg="cyan")
-        # Total length of the message, so it will fill to the right border of the terminal.
-        # Padding is already taken into account in `ctx.current_line_length`
-        length = max(get_terminal_width() - self.current_line_length + len(styled) - len(current_percentage), 1)
-        template = f"{{:>{length}}}"
-        click.echo(template.format(styled))
 
 
 TOO_MANY_RESPONSES_WARNING_TEMPLATE = (

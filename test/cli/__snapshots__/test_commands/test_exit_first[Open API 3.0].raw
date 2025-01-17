@@ -16,7 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
-GET /api/failure F                                                        [ 50%]
+ ❌  Unit tests (in N ms)
+
+     ❌ 1 failed
 
 =================================== FAILURES ===================================
 _______________________________ GET /api/failure _______________________________

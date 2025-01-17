@@ -1,5 +1,3 @@
-from datetime import timedelta
-
 from hypothesis import strategies as st
 
 import schemathesis
@@ -25,7 +23,7 @@ def filter_body(ctx, body):
 @schemathesis.check
 def not_so_slow(ctx, response, case):
     """Custom response check."""
-    assert response.elapsed < timedelta(milliseconds=100), "Response is slow!"
+    assert response.elapsed < 100, "Response is slow!"
 
 
 @schemathesis.target

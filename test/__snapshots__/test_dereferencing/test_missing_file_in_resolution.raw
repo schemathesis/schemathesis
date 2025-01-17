@@ -16,6 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
+ 🚫  Unit tests (in N ms)
+
+     No tests were run
 
 ==================================== ERRORS ====================================
 __________________________________ /api/test ___________________________________

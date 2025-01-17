@@ -6,8 +6,6 @@ import schemathesis
 
 TOKEN = "{TOKEN}"
 
-note = print
-
 @schemathesis.auth()
 class TokenAuth:
     def get(self, case, context):
@@ -30,8 +28,6 @@ def after_call(context, case, response):
     assert case.headers["Authorization"] ==  f"Bearer {TOKEN}", case.headers["Authorization"]
     request_authorization = response.request.headers["Authorization"]
     assert request_authorization == f"Bearer {TOKEN}", request_authorization
-    note()
-    note(request_authorization)
 """
     )
     # Then CLI should run successfully
@@ -57,8 +53,6 @@ def test_explicit_auth_precedence(ctx, cli, schema_url, args, expected, snapshot
 def after_call(context, case, response):
     request_authorization = response.request.headers["Authorization"]
     assert request_authorization == "{expected}", request_authorization
-    note()
-    note(request_authorization)
 """
     )
     # Then it overrides the one from the auth provider
@@ -155,15 +149,11 @@ from requests.auth import HTTPBasicAuth
 
 schemathesis.auth.set_from_requests(HTTPBasicAuth("user", "pass")).apply_to(method="GET", path="/success")
 
-note = print
-
 @schemathesis.hook
 def after_call(context, case, response):
     request_authorization = response.request.headers.get("Authorization")
     if case.operation.path == "/success":
         assert request_authorization == "{expected}", request_authorization
-        note()
-        note(request_authorization)
     if case.operation.path == "/text":
         assert request_authorization is None, request_authorization
 """

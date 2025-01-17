@@ -201,6 +201,7 @@ def run_test(
         id=scenario_started.id,
         suite_id=suite_id,
         phase=PhaseName.UNIT_TESTING,
+        label=operation.label,
         recorder=recorder,
         status=status,
         elapsed_time=test_elapsed_time,

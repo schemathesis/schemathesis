@@ -14,7 +14,9 @@ Schemathesis dev
 
  🚫  API probing failed: Connection failed
 
-POST /test E                                                              [100%]
+ 🚫  Unit tests (in N ms)
+
+     🚫 1 errors
 
 ==================================== ERRORS ====================================
 __________________________________ POST /test __________________________________

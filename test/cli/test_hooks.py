@@ -10,14 +10,13 @@ def test_before_call(ctx, cli, schema_url):
         """
 @schemathesis.hook
 def before_call(context, case, **kwargs):
-    note("\\nBefore!")
-    case.query = {"q": "42"}
+    1 / 0
         """
     )
     result = cli.main("run", schema_url, hooks=module)
-    assert result.exit_code == ExitCode.OK, result.stdout
+    assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     # Then it should be called before each `case.call`
-    assert "Before!" in result.stdout.splitlines()
+    assert "division by zero" in result.stdout
 
 
 @pytest.mark.openapi_version("3.0")
