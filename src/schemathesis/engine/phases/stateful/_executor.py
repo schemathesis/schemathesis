@@ -189,6 +189,7 @@ def execute_state_machine_loop(
                     id=self._scenario_id,
                     suite_id=suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
+                    label=None,
                     # With dry run there will be no status
                     status=ctx.current_scenario_status or Status.SKIP,
                     recorder=self.recorder,

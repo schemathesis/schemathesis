@@ -140,6 +140,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                                 id=scenario_started.id,
                                 suite_id=suite_id,
                                 phase=PhaseName.UNIT_TESTING,
+                                label=label,
                                 status=Status.ERROR,
                                 recorder=ScenarioRecorder(label="Error"),
                                 elapsed_time=0.0,

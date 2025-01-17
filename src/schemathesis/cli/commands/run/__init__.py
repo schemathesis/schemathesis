@@ -588,7 +588,7 @@ def run(
         max_response_time=max_response_time,
     ).into()
 
-    if exit_first:
+    if exit_first and max_failures is None:
         max_failures = 1
 
     cassette_config = None

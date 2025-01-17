@@ -142,6 +142,7 @@ class ScenarioFinished(ScenarioEvent):
         "timestamp",
         "phase",
         "suite_id",
+        "label",
         "status",
         "recorder",
         "elapsed_time",
@@ -155,6 +156,7 @@ class ScenarioFinished(ScenarioEvent):
         id: uuid.UUID,
         phase: PhaseName,
         suite_id: uuid.UUID,
+        label: str | None,
         status: Status,
         recorder: ScenarioRecorder,
         elapsed_time: float,
@@ -165,6 +167,7 @@ class ScenarioFinished(ScenarioEvent):
         self.timestamp = time.time()
         self.phase = phase
         self.suite_id = suite_id
+        self.label = label
         self.status = status
         self.recorder = recorder
         self.elapsed_time = elapsed_time

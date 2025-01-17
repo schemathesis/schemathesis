@@ -5,33 +5,33 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/root/openapi.json (in N ms)
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
-     Operations:       1
+     Operations:       2
 
 
  ✅  API capabilities:
 
      Supports NULL byte in headers:    ✘
 
- ✅  Unit tests (in N ms)
+ ⚡  Unit tests (interrupted after N ms)
 
-     ✅ 1 passed
-
+     ⏭️ 2 skipped
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 1/1
-  Tested: 1
+  Selected: 2/2
+  Tested: 0
+  Skipped: 2
 
 Test Phases:
   ✅ API probing
-  ✅ Unit testing
-  ⏭️ Stateful testing (not applicable)
+  ⚡ Unit testing
+  ⏭️ Stateful testing
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
-=========================== No issues found in 1.00s ===========================
+=============================== Empty test suite ===============================

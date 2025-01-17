@@ -16,7 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
-POST /api/payload E                                                       [100%]
+ 🚫  Unit tests (in N ms)
+
+     🚫 1 errors
 
 ==================================== ERRORS ====================================
 ______________________________ POST /api/payload _______________________________

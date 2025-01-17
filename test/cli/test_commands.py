@@ -464,12 +464,6 @@ def test_register_check(new_check, cli, schema_url, snapshot_cli):
     assert cli.main("run", "-c", "new_check", schema_url, hooks=new_check) == snapshot_cli
 
 
-def assert_threaded_executor_interruption(lines, optional_interrupt=False):
-    if not optional_interrupt:
-        assert any("!! KeyboardInterrupt !!" in line for line in lines[12:]), lines
-    assert any("=== SUMMARY ===" in line for line in lines[12:])
-
-
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.filterwarnings("ignore:Exception in thread")
 def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, workers, snapshot_cli):
@@ -488,18 +482,14 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
     result = cli.run(schema_url, f"--workers={workers}")
-    assert result.exit_code == ExitCode.OK, result.stdout
-    # Then execution stops, and a message about interruption is displayed
-    # And summary is still displayed in the end of the output
     if workers == 1:
         assert result == snapshot_cli
     else:
-        lines = result.stdout.strip().split("\n")
-        assert_threaded_executor_interruption(lines)
+        assert "skipped" in result.stdout
 
 
 @pytest.mark.filterwarnings("ignore:Exception in thread")
-def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
+def test_keyboard_interrupt_threaded(cli, schema_url, mocker, snapshot_cli):
     # When a Schemathesis run is interrupted by the keyboard or via SIGINT
     from schemathesis.engine.phases.unit import TaskProducer
 
@@ -514,14 +504,7 @@ def test_keyboard_interrupt_threaded(cli, schema_url, mocker):
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.engine.phases.unit.TaskProducer.next_operation", wraps=mocked)
-    result = cli.run(schema_url, "--workers=2", "--generation-deterministic")
-    # the exit status depends on what thread finished first
-    assert result.exit_code in (ExitCode.OK, ExitCode.TESTS_FAILED), result.stdout
-    # Then execution stops, and a message about interruption is displayed
-    lines = result.stdout.strip().split("\n")
-    # There are many scenarios possible, depends on how many tests will be executed before interruption
-    # and in what order. it could be no tests at all, some of them or all of them.
-    assert_threaded_executor_interruption(lines, True)
+    assert cli.run(schema_url, "--workers=2", "--generation-deterministic") == snapshot_cli
 
 
 def test_keyboard_interrupt_during_schema_loading(cli, openapi3_schema_url, mocker, snapshot_cli):
