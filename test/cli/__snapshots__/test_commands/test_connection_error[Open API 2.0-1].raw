@@ -14,8 +14,9 @@ Schemathesis dev
 
  🚫  API probing failed: Connection failed
 
-GET /api/failure E                                                        [ 50%]
-GET /api/success E                                                        [100%]
+ 🚫  Unit tests (in N ms)
+
+     🚫 2 errors
 
 ==================================== ERRORS ====================================
 _______________________________ GET /api/failure _______________________________

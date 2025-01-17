@@ -284,7 +284,6 @@ class CliSnapshotConfig:
     replace_server_host: bool = True
     replace_tmp_dir: bool = True
     replace_duration: bool = True
-    replace_multi_worker_progress: bool | str = True
     replace_error_codes: bool = True
     replace_test_case_id: bool = True
     replace_uuid: bool = True
@@ -361,15 +360,6 @@ class CliSnapshotConfig:
                     if line.strip().startswith("File") and "line" in line:
                         lines[idx] = line.replace("\\", "/")
             data = "\n".join(lines)
-        if self.replace_multi_worker_progress:
-            lines = data.splitlines()
-            for idx, line in enumerate(lines):
-                if re.match(r"^[.FSE]+$", line):
-                    if isinstance(self.replace_multi_worker_progress, str):
-                        lines[idx] = self.replace_multi_worker_progress
-                    else:
-                        lines[idx] = "".join(sorted(line))
-            data = "\n".join(lines) + "\n"
         if self.replace_stateful_progress:
             data = re.sub(r"(?<=Stateful tests\n\n)([.FES]+)", "...", data)
         if self.replace_error_codes:
@@ -384,7 +374,9 @@ class CliSnapshotConfig:
             )
         if self.replace_duration:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
-            data = re.sub(r"in [0-9]+? ms", "in N ms", data)
+            data = re.sub(r"in (?:[0-9]+? s )?[0-9]+? ms", "in N ms", data)
+            data = re.sub(r"in [0-9]+? s", "in N ms", data)
+            data = re.sub(r"after [0-9]+? ms", "after N ms", data).strip()
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
@@ -431,11 +423,57 @@ class CliSnapshotConfig:
             if IS_WINDOWS and ("Loading specification" in line or "Loaded specification" in line):
                 line = line.replace("\\", "/")
             if any(marker in line for marker in FLASK_MARKERS) or line.lstrip().startswith(
-                ("🕛 ", "🕐 ", "🕑 ", "🕒 ", "🕓 ", "🕔 ", "🕕 ", "🕖 ", "🕗 ", "🕘 ", "🕙 ", "🕚 ")
+                (
+                    "🕛 ",
+                    "🕐 ",
+                    "🕑 ",
+                    "🕒 ",
+                    "🕓 ",
+                    "🕔 ",
+                    "🕕 ",
+                    "🕖 ",
+                    "🕗 ",
+                    "🕘 ",
+                    "🕙 ",
+                    "🕚 ",
+                    "⠋",
+                    "⠙",
+                    "⠹",
+                    "⠸",
+                    "⠼",
+                    "⠴",
+                    "⠦",
+                    "⠧",
+                    "⠇",
+                    "⠏",
+                    "0:0",
+                )
             ):
                 continue
             lines.append(line.rstrip())
+        lines = clean_unit_tests(lines)
         return "\n".join(lines).strip() + "\n"
+
+
+def clean_unit_tests(lines):
+    for idx, line in enumerate(lines):
+        if "API capabilities" in line:
+            probing_idx = idx + 4
+            break
+        if "API probing" in line:
+            probing_idx = idx + 2
+            break
+    else:
+        return lines
+
+    unit_tests_indexes = [i for i, line in enumerate(lines) if "Unit tests" in line]
+
+    if not unit_tests_indexes:
+        return lines
+
+    last_idx = unit_tests_indexes[-1]
+
+    return lines[:probing_idx] + lines[last_idx:]
 
 
 EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"

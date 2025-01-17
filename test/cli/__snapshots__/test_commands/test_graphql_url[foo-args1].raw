@@ -16,10 +16,9 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✓
 
-Query.getBooks .                                                          [ 25%]
-Query.getAuthors .                                                        [ 50%]
-Mutation.addBook .                                                        [ 75%]
-Mutation.addAuthor .                                                      [100%]
+ ✅  Unit tests (in N ms)
+
+     ✅ 4 passed
 
 =================================== SUMMARY ====================================
 
