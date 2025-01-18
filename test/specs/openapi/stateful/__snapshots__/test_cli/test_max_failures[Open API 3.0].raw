@@ -20,9 +20,12 @@ Schemathesis dev
 
      ✅ 3 passed  ❌ 1 failed
 
-Stateful tests
+ ❌  Stateful tests (in N ms)
 
-...
+     Scenarios:    N
+     API Links:    3/3
+
+     ✅ N passed  ❌ 1 failed
 
 =================================== FAILURES ===================================
 _______________________________ GET /api/failure _______________________________

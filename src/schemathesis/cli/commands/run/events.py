@@ -3,7 +3,7 @@ import uuid
 
 from schemathesis.core import Specification
 from schemathesis.engine import events
-from schemathesis.schemas import ApiOperationsCount
+from schemathesis.schemas import ApiStatistic
 
 
 class LoadingStarted(events.EngineEvent):
@@ -16,15 +16,10 @@ class LoadingStarted(events.EngineEvent):
 
 
 class LoadingFinished(events.EngineEvent):
-    __slots__ = ("id", "timestamp", "location", "duration", "base_url", "specification", "operations_count")
+    __slots__ = ("id", "timestamp", "location", "duration", "base_url", "specification", "statistic")
 
     def __init__(
-        self,
-        location: str,
-        start_time: float,
-        base_url: str,
-        specification: Specification,
-        operations_count: ApiOperationsCount,
+        self, location: str, start_time: float, base_url: str, specification: Specification, statistic: ApiStatistic
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -32,4 +27,4 @@ class LoadingFinished(events.EngineEvent):
         self.duration = self.timestamp - start_time
         self.base_url = base_url
         self.specification = specification
-        self.operations_count = operations_count
+        self.statistic = statistic

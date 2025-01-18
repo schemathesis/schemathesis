@@ -24,7 +24,7 @@ from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
-from schemathesis.schemas import ApiOperationsCount
+from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -228,9 +228,9 @@ class LoadingProgressManager:
             )
         return Text.assemble(
             ("✅  ", Style(color="green")),
-            ("Loaded specification from ", Style(color="white")),
+            ("Loaded specification from ", Style(color="bright_white")),
             (self.location, Style(color="cyan")),
-            (f" (in {duration})", Style(color="white")),
+            (f" (in {duration})", Style(color="bright_white")),
         )
 
 
@@ -253,7 +253,7 @@ class ProbingProgressManager:
         self.progress = Progress(
             TextColumn(""),
             SpinnerColumn("clock"),
-            RenderableColumn(Text("Probing API capabilities")),
+            RenderableColumn(Text("Probing API capabilities", style="bright_white")),
             transient=True,
             console=console,
         )
@@ -310,8 +310,8 @@ class OperationProgress:
 
 
 @dataclass
-class TestProgressManager:
-    """Manages progress display for test phases (unit tests, stateful tests, etc.)."""
+class UnitTestProgressManager:
+    """Manages progress display for unit tests."""
 
     console: Console
     title: str
@@ -483,7 +483,7 @@ class TestProgressManager:
         if operation := self.current_operations.pop(label, None):
             if not self.current_operations:
                 assert self.title_task_id is not None
-                self.title_progress.update(self.title_task_id, description=f"  {self.title}")
+                self.title_progress.update(self.title_task_id)
             self.operations_progress.update(operation.task_id, visible=False)
 
     def update_stats(self, status: Status) -> None:
@@ -531,6 +531,194 @@ class TestProgressManager:
         return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
 
 
+@dataclass
+class StatefulProgressManager:
+    """Manages progress display for stateful testing."""
+
+    console: Console
+    title: str
+    links_total: int
+    start_time: float
+
+    # Progress components
+    title_progress: Progress
+    progress_bar: Progress
+    stats_progress: Progress
+    live: Live | None
+
+    # Task IDs
+    title_task_id: TaskID | None
+    progress_task_id: TaskID | None
+    stats_task_id: TaskID
+
+    # State
+    scenarios: int
+    links_seen: set[str]
+    stats: dict[Status, int]
+    is_interrupted: bool
+
+    __slots__ = (
+        "console",
+        "title",
+        "links_total",
+        "start_time",
+        "title_progress",
+        "progress_bar",
+        "stats_progress",
+        "live",
+        "title_task_id",
+        "progress_task_id",
+        "stats_task_id",
+        "scenarios",
+        "links_seen",
+        "stats",
+        "is_interrupted",
+    )
+
+    def __init__(self, console: Console, title: str, links_total: int) -> None:
+        from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+        from rich.style import Style
+
+        self.console = console
+        self.title = title
+        self.links_total = links_total
+        self.start_time = time.monotonic()
+
+        self.title_progress = Progress(
+            TextColumn(""),
+            SpinnerColumn("clock"),
+            TextColumn("{task.description}", style=Style(color="bright_white")),
+            console=self.console,
+        )
+        self.title_task_id = None
+
+        self.progress_bar = Progress(
+            TextColumn("    "),
+            TimeElapsedColumn(),
+            TextColumn("{task.fields[scenarios]:3d} scenarios  •  {task.fields[links]}"),
+            console=self.console,
+        )
+        self.progress_task_id = None
+
+        # Initialize stats progress
+        self.stats_progress = Progress(
+            TextColumn("    "),
+            TextColumn("{task.description}"),
+            console=self.console,
+        )
+        self.stats_task_id = self.stats_progress.add_task("")
+
+        self.live = None
+
+        # Initialize state
+        self.scenarios = 0
+        self.links_seen = set()
+        self.stats = {
+            Status.SUCCESS: 0,
+            Status.FAILURE: 0,
+            Status.ERROR: 0,
+            Status.SKIP: 0,
+        }
+        self.is_interrupted = False
+
+    def start(self) -> None:
+        """Start progress display."""
+        from rich.console import Group
+        from rich.live import Live
+        from rich.text import Text
+
+        # Initialize progress displays
+        self.title_task_id = self.title_progress.add_task("Stateful tests")
+        self.progress_task_id = self.progress_bar.add_task("", scenarios=0, links=f"0/{self.links_total} links")
+
+        # Create live display
+        group = Group(
+            self.title_progress,
+            Text(),
+            self.progress_bar,
+            Text(),
+            self.stats_progress,
+        )
+        self.live = Live(group, refresh_per_second=10, console=self.console, transient=True)
+        self.live.start()
+
+    def stop(self) -> None:
+        """Stop progress display."""
+        if self.live:
+            self.live.stop()
+
+    def update(self, links_seen: set[str], status: Status | None = None) -> None:
+        """Update progress and stats."""
+        self.scenarios += 1
+        self.links_seen.update(links_seen)
+
+        if status is not None:
+            self.stats[status] += 1
+
+        self._update_progress_display()
+        self._update_stats_display()
+
+    def _update_progress_display(self) -> None:
+        """Update the progress display."""
+        assert self.progress_task_id is not None
+        self.progress_bar.update(
+            self.progress_task_id,
+            scenarios=self.scenarios,
+            links=f"{len(self.links_seen)}/{self.links_total} links",
+        )
+
+    def _get_stats_message(self) -> str:
+        """Get formatted stats message."""
+        parts = []
+        if self.stats[Status.SUCCESS]:
+            parts.append(f"✅ {self.stats[Status.SUCCESS]} passed")
+        if self.stats[Status.FAILURE]:
+            parts.append(f"❌ {self.stats[Status.FAILURE]} failed")
+        if self.stats[Status.ERROR]:
+            parts.append(f"🚫 {self.stats[Status.ERROR]} errors")
+        if self.stats[Status.SKIP]:
+            parts.append(f"⏭️ {self.stats[Status.SKIP]} skipped")
+        return "  ".join(parts)
+
+    def _update_stats_display(self) -> None:
+        """Update the statistics display."""
+        self.stats_progress.update(self.stats_task_id, description=self._get_stats_message())
+
+    def _get_status_icon(self, default_icon: str = "🕛") -> str:
+        if self.is_interrupted:
+            icon = "⚡"
+        elif self.stats[Status.ERROR] > 0:
+            icon = "🚫"
+        elif self.stats[Status.FAILURE] > 0:
+            icon = "❌"
+        elif self.stats[Status.SUCCESS] > 0:
+            icon = "✅"
+        elif self.stats[Status.SKIP] > 0:
+            icon = "⏭️"
+        else:
+            icon = default_icon
+        return icon
+
+    def interrupt(self) -> None:
+        """Handle interruption."""
+        self.is_interrupted = True
+        if self.live:
+            self.stop()
+
+    def get_completion_message(self, icon: str | None = None) -> tuple[str, str]:
+        """Complete the phase and return status message."""
+        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+        icon = icon or self._get_status_icon()
+
+        message = self._get_stats_message() or "No tests were run"
+        if self.is_interrupted:
+            duration_message = f"interrupted after {duration}"
+        else:
+            duration_message = f"in {duration}"
+
+        return f"{icon}  {self.title} ({duration_message})", message
+
+
 def format_duration(duration_ms: int) -> str:
     """Format duration in milliseconds to human readable string."""
     parts = []
@@ -566,11 +754,11 @@ class OutputHandler(EventHandler):
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
-    progress_manager: TestProgressManager | None = None
+    unit_tests_manager: UnitTestProgressManager | None = None
+    stateful_tests_manager: StatefulProgressManager | None = None
 
-    operations_count: ApiOperationsCount | None = None
+    statistic: ApiStatistic | None = None
     skip_reasons: list[str] = field(default_factory=list)
-    current_line_length: int = 0
     cassette_config: CassetteConfig | None = None
     junit_xml_file: str | None = None
     warnings: WarningData = field(default_factory=WarningData)
@@ -606,8 +794,10 @@ class OutputHandler(EventHandler):
         display_header(SCHEMATHESIS_VERSION)
 
     def shutdown(self, ctx: ExecutionContext) -> None:
-        if self.progress_manager is not None:
-            self.progress_manager.stop()
+        if self.unit_tests_manager is not None:
+            self.unit_tests_manager.stop()
+        if self.stateful_tests_manager is not None:
+            self.stateful_tests_manager.stop()
         if self.loading_manager is not None:
             self.loading_manager.stop()
         if self.probing_manager is not None:
@@ -632,7 +822,7 @@ class OutputHandler(EventHandler):
         self.console.print(message)
         self.console.print()
         self.loading_manager = None
-        self.operations_count = event.operations_count
+        self.statistic = event.statistic
 
         table = Table(
             show_header=False,
@@ -645,7 +835,7 @@ class OutputHandler(EventHandler):
 
         table.add_row("Base URL:", event.base_url)
         table.add_row("Specification:", event.specification.name)
-        table.add_row("Operations:", str(event.operations_count.total))
+        table.add_row("Operations:", str(event.statistic.operations.total))
 
         message = Padding(table, BLOCK_PADDING)
         self.console.print(message)
@@ -659,20 +849,31 @@ class OutputHandler(EventHandler):
         if phase.name == PhaseName.PROBING and phase.is_enabled:
             self._start_probing()
         elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
-            assert self.operations_count is not None
-            manager = TestProgressManager(
-                console=self.console,
-                title="Unit tests",
-                total=self.operations_count.total,
-            )
-            manager.start()
-            self.progress_manager = manager
+            self._start_unit_tests()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
-            click.secho("Stateful tests\n", bold=True)
+            self._start_stateful_tests()
 
     def _start_probing(self) -> None:
         self.probing_manager = ProbingProgressManager(console=self.console)
         self.probing_manager.start()
+
+    def _start_unit_tests(self) -> None:
+        assert self.statistic is not None
+        self.unit_tests_manager = UnitTestProgressManager(
+            console=self.console,
+            title="Unit tests",
+            total=self.statistic.operations.total,
+        )
+        self.unit_tests_manager.start()
+
+    def _start_stateful_tests(self) -> None:
+        assert self.statistic is not None
+        self.stateful_tests_manager = StatefulProgressManager(
+            console=self.console,
+            title="Stateful tests",
+            links_total=self.statistic.links.total,
+        )
+        self.stateful_tests_manager.start()
 
     def _on_phase_finished(self, event: events.PhaseFinished) -> None:
         from rich.padding import Padding
@@ -695,7 +896,7 @@ class OutputHandler(EventHandler):
                     Padding(
                         Text.assemble(
                             ("✅  ", Style(color="green")),
-                            ("API capabilities:", Style(color="white")),
+                            ("API capabilities:", Style(color="bright_white")),
                         ),
                         BLOCK_PADDING,
                     )
@@ -743,68 +944,85 @@ class OutputHandler(EventHandler):
             self.console.print(message)
             self.console.print()
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled:
-            if event.status != Status.INTERRUPTED:
-                click.echo("\n")
-        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
-            assert self.progress_manager is not None
-            self.progress_manager.stop()
+            assert self.stateful_tests_manager is not None
+            self.stateful_tests_manager.stop()
             if event.status == Status.ERROR:
-                message = self.progress_manager.get_completion_message("🚫")
+                title, summary = self.stateful_tests_manager.get_completion_message("🚫")
             else:
-                message = self.progress_manager.get_completion_message()
+                title, summary = self.stateful_tests_manager.get_completion_message()
+
+            self.console.print(Padding(Text(title, style="bright_white"), BLOCK_PADDING))
+
+            table = Table(
+                show_header=False,
+                box=None,
+                padding=(0, 4),
+                collapse_padding=True,
+            )
+            table.add_column("Field", style=Style(color="bright_white", bold=True))
+            table.add_column("Value", style="cyan")
+            table.add_row("Scenarios:", f"{self.stateful_tests_manager.scenarios}")
+            table.add_row(
+                "API Links:", f"{len(self.stateful_tests_manager.links_seen)}/{self.stateful_tests_manager.links_total}"
+            )
+
+            self.console.print()
+            self.console.print(Padding(table, BLOCK_PADDING))
+            self.console.print()
+            self.console.print(Padding(Text(summary, style="bright_white"), (0, 0, 0, 5)))
+            self.console.print()
+            self.stateful_tests_manager = None
+        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
+            assert self.unit_tests_manager is not None
+            self.unit_tests_manager.stop()
+            if event.status == Status.ERROR:
+                message = self.unit_tests_manager.get_completion_message("🚫")
+            else:
+                message = self.unit_tests_manager.get_completion_message()
             self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
             if event.status != Status.INTERRUPTED:
                 self.console.print()
+            self.unit_tests_manager = None
 
     def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
         if event.phase == PhaseName.UNIT_TESTING:
             # We should display execution result + percentage in the end. For example:
             assert event.label is not None
-            assert self.progress_manager is not None
-            self.progress_manager.start_operation(event.label)
+            assert self.unit_tests_manager is not None
+            self.unit_tests_manager.start_operation(event.label)
 
     def _on_scenario_finished(self, event: events.ScenarioFinished) -> None:
         if event.phase == PhaseName.UNIT_TESTING:
-            assert self.progress_manager is not None
+            assert self.unit_tests_manager is not None
             if event.label:
-                self.progress_manager.finish_operation(event.label)
-            self.progress_manager.update_progress()
-            self.progress_manager.update_stats(event.status)
+                self.unit_tests_manager.finish_operation(event.label)
+            self.unit_tests_manager.update_progress()
+            self.unit_tests_manager.update_stats(event.status)
             if event.status == Status.SKIP and event.skip_reason is not None:
                 self.skip_reasons.append(event.skip_reason)
             self._check_warnings(event)
         elif (
             event.phase == PhaseName.STATEFUL_TESTING
             and not event.is_final
-            and event.status != Status.INTERRUPTED
-            and event.status is not None
+            and event.status not in (Status.INTERRUPTED, Status.SKIP, None)
         ):
-            self._display_execution_result(event.status)
+            assert self.stateful_tests_manager is not None
+            links_seen = {case.transition.id for case in event.recorder.cases.values() if case.transition is not None}
+            self.stateful_tests_manager.update(links_seen, event.status)
 
     def _check_warnings(self, event: events.ScenarioFinished) -> None:
         for status_code in (401, 403):
             if has_too_many_responses_with_status(event.recorder.interactions.values(), status_code):
                 self.warnings.missing_auth.setdefault(status_code, []).append(event.recorder.label)
 
-    def _display_execution_result(self, status: Status) -> None:
-        """Display an appropriate symbol for the given event's execution result."""
-        symbol, color = {
-            Status.SUCCESS: (".", "green"),
-            Status.FAILURE: ("F", "red"),
-            Status.ERROR: ("E", "red"),
-            Status.SKIP: ("S", "yellow"),
-            Status.INTERRUPTED: ("S", "yellow"),
-        }[status]
-        self.current_line_length += len(symbol)
-        click.secho(symbol, nl=False, fg=color)
-
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
 
-        if self.progress_manager is not None:
-            self.progress_manager.interrupt()
-            return
-        if self.loading_manager is not None:
+        if self.unit_tests_manager is not None:
+            self.unit_tests_manager.interrupt()
+        elif self.stateful_tests_manager is not None:
+            self.stateful_tests_manager.interrupt()
+        elif self.loading_manager is not None:
             self.loading_manager.interrupt()
             message = Padding(
                 self.loading_manager.get_completion_message(),
@@ -812,19 +1030,13 @@ class OutputHandler(EventHandler):
             )
             self.console.print(message)
             self.console.print()
-            return
-        if self.probing_manager is not None:
+        elif self.probing_manager is not None:
             self.probing_manager.interrupt()
             message = Padding(
                 self.probing_manager.get_completion_message(),
                 BLOCK_PADDING,
             )
             self.console.print(message)
-            self.console.print()
-            return
-        if event.phase == PhaseName.STATEFUL_TESTING:
-            self.console.print()
-            display_section_name("KeyboardInterrupt", "!", bold=False)
             self.console.print()
 
     def _on_fatal_error(self, event: events.FatalError) -> None:
@@ -901,11 +1113,11 @@ class OutputHandler(EventHandler):
         click.echo()
 
     def display_api_operations(self, ctx: ExecutionContext) -> None:
-        assert self.operations_count is not None
+        assert self.statistic is not None
         click.secho("API Operations:", bold=True)
         click.secho(
-            f"  Selected: {click.style(str(self.operations_count.selected), bold=True)}/"
-            f"{click.style(str(self.operations_count.total), bold=True)}"
+            f"  Selected: {click.style(str(self.statistic.operations.selected), bold=True)}/"
+            f"{click.style(str(self.statistic.operations.total), bold=True)}"
         )
         click.secho(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}")
         errors = len(
@@ -922,7 +1134,7 @@ class OutputHandler(EventHandler):
             click.secho(f"  Errored: {click.style(str(errors), bold=True)}")
 
         # API operations that are skipped due to fail-fast are counted here as well
-        total_skips = self.operations_count.selected - len(ctx.statistic.tested_operations) - errors
+        total_skips = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errors
         if total_skips:
             click.secho(f"  Skipped: {click.style(str(total_skips), bold=True)}")
             for reason in sorted(set(self.skip_reasons)):
@@ -1075,7 +1287,7 @@ class OutputHandler(EventHandler):
         display_section_name("SUMMARY")
         click.echo()
 
-        if self.operations_count:
+        if self.statistic:
             self.display_api_operations(ctx)
 
         self.display_phases()

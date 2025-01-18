@@ -16,10 +16,12 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
-Stateful tests
+ ⚡  Stateful tests (interrupted after N ms)
 
+     Scenarios:    N
+     API Links:    0/3
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! KeyboardInterrupt !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+     No tests were run
 
 =================================== SUMMARY ====================================
 

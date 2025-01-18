@@ -100,7 +100,7 @@ class OpenApiLink:
     def _extract_impl(self, wrapper: StepOutputWrapper) -> Transition:
         output = wrapper.output
         return Transition(
-            id=self.name,
+            id=f"{self.source.label} - {self.status_code} - {self.name}",
             parent_id=output.case.id,
             parameters=self.extract_parameters(output),
             request_body=self.extract_body(output),

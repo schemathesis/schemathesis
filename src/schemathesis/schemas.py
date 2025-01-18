@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from functools import lru_cache, partial
+from functools import cached_property, lru_cache, partial
 from itertools import chain
 from typing import (
     TYPE_CHECKING,
@@ -58,6 +58,34 @@ def get_full_path(base_path: str, path: str) -> str:
 
 
 @dataclass
+class FilteredCount:
+    """Count of total items and those passing filters."""
+
+    total: int
+    selected: int
+
+    __slots__ = ("total", "selected")
+
+    def __init__(self) -> None:
+        self.total = 0
+        self.selected = 0
+
+
+@dataclass
+class ApiStatistic:
+    """Statistics about API operations and links."""
+
+    operations: FilteredCount
+    links: FilteredCount
+
+    __slots__ = ("operations", "links")
+
+    def __init__(self) -> None:
+        self.operations = FilteredCount()
+        self.links = FilteredCount()
+
+
+@dataclass
 class ApiOperationsCount:
     """Statistics about API operations."""
 
@@ -84,7 +112,6 @@ class BaseSchema(Mapping):
     generation_config: GenerationConfig = field(default_factory=GenerationConfig)
     output_config: OutputConfig = field(default_factory=OutputConfig)
     rate_limiter: Limiter | None = None
-    _operations_count: ApiOperationsCount | None = None
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -186,7 +213,7 @@ class BaseSchema(Mapping):
         raise NotImplementedError
 
     def __len__(self) -> int:
-        return self.count_operations().total
+        return self.statistic.operations.total
 
     def hook(self, hook: str | Callable) -> Callable:
         return self.hooks.register(hook)
@@ -225,18 +252,11 @@ class BaseSchema(Mapping):
     def validate(self) -> None:
         raise NotImplementedError
 
-    def count_operations(self) -> ApiOperationsCount:
-        """Count total and selected operations."""
-        if self._operations_count is None:
-            self._operations_count = self._do_count_operations()
-        return self._operations_count
+    @cached_property
+    def statistic(self) -> ApiStatistic:
+        return self._measure_statistic()
 
-    def _do_count_operations(self) -> ApiOperationsCount:
-        """Implementation-specific counting logic."""
-        raise NotImplementedError
-
-    @property
-    def links_count(self) -> int:
+    def _measure_statistic(self) -> ApiStatistic:
         raise NotImplementedError
 
     def get_all_operations(
