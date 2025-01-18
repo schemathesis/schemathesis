@@ -225,7 +225,7 @@ def test_rewritten_components(raw_schema):
 def test_links_count(raw_schema):
     schema = schemathesis.openapi.from_dict(raw_schema)
 
-    _ = schema.links_count
+    _ = schema.statistic.links.total
 
 
 @pytest.mark.benchmark

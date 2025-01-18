@@ -348,6 +348,12 @@ class CliSnapshotConfig:
         data = data.replace(str(PACKAGE_ROOT), package_root)
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
+        data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
+        if "Stateful tests" in data:
+            before, after = data.split("Stateful tests", 1)
+            after = re.sub(r"\d+ passed", "N passed", after)
+            data = before + "Stateful tests" + after
+
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
             comprehension_ids = [idx for idx, line in enumerate(lines) if line.strip().endswith("comp>")]
@@ -452,6 +458,7 @@ class CliSnapshotConfig:
                 continue
             lines.append(line.rstrip())
         lines = clean_unit_tests(lines)
+        lines = clean_stateful_tests(lines)
         return "\n".join(lines).strip() + "\n"
 
 
@@ -466,14 +473,40 @@ def clean_unit_tests(lines):
     else:
         return lines
 
-    unit_tests_indexes = [i for i, line in enumerate(lines) if "Unit tests" in line]
+    indexes = [i for i, line in enumerate(lines) if "Unit tests" in line]
 
-    if not unit_tests_indexes:
+    if not indexes:
         return lines
 
-    last_idx = unit_tests_indexes[-1]
+    last_idx = indexes[-1]
 
     return lines[:probing_idx] + lines[last_idx:]
+
+
+def clean_stateful_tests(lines):
+    start_idx = None
+    for i, line in enumerate(lines):
+        if "Unit tests (in" in line:
+            start_idx = i + 3
+            break
+    if start_idx is None:
+        for i, line in enumerate(lines):
+            if "API probing failed" in line:
+                start_idx = i + 1
+                break
+            if "API capabilities" in line:
+                start_idx = i + 3
+                break
+
+    end_idx = None
+    for i, line in enumerate(lines):
+        if "Stateful tests (in" in line:
+            end_idx = i
+            break
+
+    if start_idx is not None and end_idx is not None:
+        return lines[: start_idx + 1] + lines[end_idx:]
+    return lines
 
 
 EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"

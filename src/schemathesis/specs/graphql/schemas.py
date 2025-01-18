@@ -24,9 +24,11 @@ from hypothesis import strategies as st
 from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
+from schemathesis import auths
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
+from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -38,12 +40,16 @@ from schemathesis.generation.meta import (
     PhaseInfo,
     TestPhase,
 )
+from schemathesis.hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
+from schemathesis.schemas import (
+    APIOperation,
+    APIOperationMap,
+    ApiStatistic,
+    BaseSchema,
+    OperationDefinition,
+)
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
-from ... import auths
-from ...generation import GenerationConfig, GenerationMode
-from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
-from ...schemas import APIOperation, APIOperationMap, ApiOperationsCount, BaseSchema, OperationDefinition
-from ..openapi.constants import LOCATION_TO_CONTAINER
 from ._cache import OperationCache
 from .scalars import CUSTOM_SCALARS, get_extra_scalar_strategies
 
@@ -140,8 +146,8 @@ class GraphQLSchema(BaseSchema):
     def _get_base_path(self) -> str:
         return cast(str, urlsplit(self.location).path)
 
-    def _do_count_operations(self) -> ApiOperationsCount:
-        counter = ApiOperationsCount()
+    def _measure_statistic(self) -> ApiStatistic:
+        statistic = ApiStatistic()
         raw_schema = self.raw_schema["__schema"]
         dummy_operation = APIOperation(
             base_url=self.get_base_url(),
@@ -159,16 +165,11 @@ class GraphQLSchema(BaseSchema):
                 for type_def in raw_schema.get("types", []):
                     if type_def["name"] == query_type_name:
                         for field in type_def["fields"]:
-                            counter.total += 1
+                            statistic.operations.total += 1
                             dummy_operation.label = f"{query_type_name}.{field['name']}"
                             if not self._should_skip(dummy_operation):
-                                counter.selected += 1
-        return counter
-
-    @property
-    def links_count(self) -> int:
-        # Links are not supported for GraphQL
-        return 0
+                                statistic.operations.selected += 1
+        return statistic
 
     def get_all_operations(
         self, generation_config: GenerationConfig | None = None

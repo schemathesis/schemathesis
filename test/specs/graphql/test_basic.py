@@ -150,7 +150,7 @@ def test_no_query(graphql_url):
     schema = schemathesis.graphql.from_dict(raw_schema)
     # Then no operations should be collected
     assert list(schema.get_all_operations()) == []
-    assert schema.count_operations().total == 0
+    assert schema.statistic.operations.total == 0
 
 
 @pytest.mark.parametrize("with_data_key", [True, False])
@@ -160,7 +160,7 @@ def test_data_key(graphql_url, with_data_key):
     if not with_data_key:
         decoded = decoded["data"]
     schema = schemathesis.graphql.from_dict(decoded)
-    assert schema.count_operations().total == 4
+    assert schema.statistic.operations.total == 4
 
 
 def test_malformed_response(graphql_url):
@@ -175,7 +175,7 @@ def test_operations_count(graphql_url):
     decoded = response.json()
     raw_schema = decoded["data"]
     schema = schemathesis.graphql.from_dict(raw_schema)
-    assert schema.count_operations().total == 4
+    assert schema.statistic.operations.total == 4
 
 
 CUSTOM_QUERY_NAME = "MyQuery"

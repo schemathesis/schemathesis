@@ -82,7 +82,7 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
         start_time=loading_started.timestamp,
         base_url=schema.get_base_url(),
         specification=schema.specification,
-        operations_count=schema.count_operations(),
+        statistic=schema.statistic,
     )
 
     try:
