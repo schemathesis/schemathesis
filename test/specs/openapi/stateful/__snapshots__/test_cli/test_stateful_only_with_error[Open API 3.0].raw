@@ -14,9 +14,12 @@ Schemathesis dev
 
  🚫  API probing failed: Connection failed
 
-Stateful tests
+ 🚫  Stateful tests (in N ms)
 
-...
+     Scenarios:    N
+     API Links:    0/3
+
+     🚫 1 errors
 
 ==================================== ERRORS ====================================
 ________________________________ Stateful tests ________________________________

@@ -44,7 +44,7 @@ from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
-from ...schemas import APIOperation, APIOperationMap, ApiOperationsCount, BaseSchema, OperationDefinition
+from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import links, serialization
 from ._cache import OperationCache
 from ._hypothesis import openapi_cases
@@ -166,15 +166,16 @@ class BaseOpenAPISchema(BaseSchema):
         operation.schema = self
         return not self.filter_set.match(_ctx_cache)
 
-    def _do_count_operations(self) -> ApiOperationsCount:
-        counter = ApiOperationsCount()
+    def _measure_statistic(self) -> ApiStatistic:
+        statistic = ApiStatistic()
         try:
             paths = self.raw_schema["paths"]
         except KeyError:
-            return counter
+            return statistic
 
         resolve = self.resolver.resolve
         should_skip = self._should_skip
+        links_field = self.links_field
 
         for path, path_item in paths.items():
             try:
@@ -183,12 +184,21 @@ class BaseOpenAPISchema(BaseSchema):
                 for method, definition in path_item.items():
                     if method not in HTTP_METHODS:
                         continue
-                    counter.total += 1
-                    if not should_skip(path, method, definition):
-                        counter.selected += 1
+                    statistic.operations.total += 1
+                    is_selected = not should_skip(path, method, definition)
+                    if is_selected:
+                        statistic.operations.selected += 1
+                    for response in definition.get("responses", {}).values():
+                        if "$ref" in response:
+                            _, response = resolve(response["$ref"])
+                        defined_links = response.get(links_field)
+                        if defined_links is not None:
+                            statistic.links.total += len(defined_links)
+                            if is_selected:
+                                statistic.links.selected = len(defined_links)
             except SCHEMA_PARSING_ERRORS:
                 continue
-        return counter
+        return statistic
 
     def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
         try:
@@ -209,20 +219,6 @@ class BaseOpenAPISchema(BaseSchema):
             except SCHEMA_PARSING_ERRORS:
                 # Ignore errors
                 continue
-
-    @property
-    def links_count(self) -> int:
-        total = 0
-        resolve = self.resolver.resolve
-        links_field = self.links_field
-        for definition in self._operation_iter():
-            for response in definition.get("responses", {}).values():
-                if "$ref" in response:
-                    _, response = resolve(response["$ref"])
-                defined_links = response.get(links_field)
-                if defined_links is not None:
-                    total += len(defined_links)
-        return total
 
     def override(
         self,

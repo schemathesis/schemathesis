@@ -208,7 +208,7 @@ def execute_state_machine_loop(
             event_queue.put(events.Interrupted(phase=PhaseName.STATEFUL_TESTING))
             break
         except unittest.case.SkipTest:
-            # If `explicit` phase is used and there are not examples
+            # If `explicit` phase is used and there are no examples
             suite_status = Status.SKIP
             break
         except FailureGroup as exc:
