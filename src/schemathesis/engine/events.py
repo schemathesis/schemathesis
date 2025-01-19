@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Generator
 
 from schemathesis.core.result import Result
-from schemathesis.core.transport import Response
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import Phase, PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -173,102 +172,6 @@ class ScenarioFinished(ScenarioEvent):
         self.elapsed_time = elapsed_time
         self.skip_reason = skip_reason
         self.is_final = is_final
-
-
-@dataclass
-class StepEvent(ScenarioEvent):
-    scenario_id: uuid.UUID
-
-
-@dataclass
-class StepStarted(StepEvent):
-    """Before executing a test case."""
-
-    __slots__ = (
-        "id",
-        "timestamp",
-        "phase",
-        "suite_id",
-        "scenario_id",
-    )
-
-    def __init__(
-        self,
-        *,
-        phase: PhaseName,
-        suite_id: uuid.UUID,
-        scenario_id: uuid.UUID,
-    ) -> None:
-        self.id = uuid.uuid4()
-        self.timestamp = time.time()
-        self.phase = phase
-        self.suite_id = suite_id
-        self.scenario_id = scenario_id
-
-
-@dataclass
-class TransitionId:
-    """Id of the the that was hit."""
-
-    name: str
-    # Status code as defined in the transition, i.e. may be `default`
-    status_code: str
-    source: str
-
-    __slots__ = ("name", "status_code", "source")
-
-
-@dataclass
-class ResponseData:
-    """Common data for responses."""
-
-    status_code: int
-    elapsed: float
-    __slots__ = ("status_code", "elapsed")
-
-
-@dataclass
-class StepFinished(StepEvent):
-    """After executing a test case."""
-
-    status: Status | None
-    transition_id: TransitionId | None
-    target: str
-    response: Response | None
-
-    __slots__ = (
-        "id",
-        "timestamp",
-        "phase",
-        "status",
-        "suite_id",
-        "scenario_id",
-        "transition_id",
-        "target",
-        "response",
-    )
-
-    def __init__(
-        self,
-        *,
-        phase: PhaseName,
-        id: uuid.UUID,
-        suite_id: uuid.UUID,
-        scenario_id: uuid.UUID,
-        status: Status | None,
-        transition_id: TransitionId | None,
-        target: str,
-        response: Response | None,
-    ) -> None:
-        self.id = id
-        self.timestamp = time.time()
-        self.phase = phase
-        self.status = status
-        self.suite_id = suite_id
-        self.scenario_id = scenario_id
-        self.transition_id = transition_id
-        self.target = target
-        self.response = response
 
 
 @dataclass

@@ -4,6 +4,7 @@ import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
 from schemathesis.core.failures import (
+    CustomFailure,
     Failure,
     FailureGroup,
     MalformedJson,
@@ -72,7 +73,7 @@ class CheckContext:
 
     def record_case(self, *, parent_id: str, case: Case) -> None:
         if self.recorder is not None:
-            self.recorder.record_case(parent_id=parent_id, case=case)
+            self.recorder.record_case(parent_id=parent_id, transition=None, case=case)
 
     def record_response(self, *, case_id: str, response: Response) -> None:
         if self.recorder is not None:
@@ -135,10 +136,11 @@ def run_checks(
         except Failure as failure:
             on_failure(name, collected, failure.with_traceback(None))
         except AssertionError as exc:
-            custom_failure = Failure.from_assertion(
-                name=name,
+            custom_failure = CustomFailure(
                 operation=case.operation.label,
-                exc=exc,
+                title=f"Custom check failed: `{name}`",
+                message=str(exc),
+                exception=exc,
             )
             on_failure(name, collected, custom_failure)
         except FailureGroup as group:

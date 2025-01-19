@@ -25,8 +25,8 @@ from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_outpu
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
     APIStateMachine,
-    Direction,
-    StepResult,
+    StepInput,
+    StepOutput,
 )
 from schemathesis.generation.targets import TargetMetricCollector
 
@@ -83,7 +83,7 @@ def execute_state_machine_loop(
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return transport_kwargs
 
-        def _repr_step(self, rule: Rule, data: dict, result: StepResult) -> str:
+        def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
             return ""
 
         if config.override is not None:
@@ -96,38 +96,35 @@ def execute_state_machine_loop(
                         setattr(case, location, container)
                 return super().before_call(case)
 
-        def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult | None:
+        def step(self, input: StepInput) -> StepOutput | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
-            if previous is not None:
-                step_result, _ = previous
-                self.recorder.record_case(parent_id=step_result.case.id, case=case)
+            if input.transition is not None:
+                self.recorder.record_case(
+                    parent_id=input.transition.parent_id, transition=input.transition, case=input.case
+                )
             else:
-                self.recorder.record_case(parent_id=None, case=case)
+                self.recorder.record_case(parent_id=None, transition=None, case=input.case)
             if engine.has_to_stop:
                 raise KeyboardInterrupt
-            step_started = events.StepStarted(
-                phase=PhaseName.STATEFUL_TESTING, suite_id=suite_id, scenario_id=self._scenario_id
-            )
-            event_queue.put(step_started)
             try:
                 if config.execution.unique_inputs:
-                    cached = ctx.get_step_outcome(case)
+                    cached = ctx.get_step_outcome(input.case)
                     if isinstance(cached, BaseException):
                         raise cached
                     elif cached is None:
                         return None
-                result = super().step(case, previous)
+                result = super().step(input)
                 ctx.step_succeeded()
             except FailureGroup as exc:
                 if config.execution.unique_inputs:
                     for failure in exc.exceptions:
-                        ctx.store_step_outcome(case, failure)
+                        ctx.store_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
                 if config.execution.unique_inputs:
-                    ctx.store_step_outcome(case, exc)
+                    ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
             except KeyboardInterrupt:
@@ -135,34 +132,11 @@ def execute_state_machine_loop(
                 raise
             except BaseException as exc:
                 if config.execution.unique_inputs:
-                    ctx.store_step_outcome(case, exc)
+                    ctx.store_step_outcome(input.case, exc)
                 raise exc
             else:
                 if config.execution.unique_inputs:
-                    ctx.store_step_outcome(case, None)
-            finally:
-                transition_id: events.TransitionId | None
-                if previous is not None:
-                    transition = previous[1]
-                    transition_id = events.TransitionId(
-                        name=transition.name,
-                        status_code=transition.status_code,
-                        source=transition.operation.label,
-                    )
-                else:
-                    transition_id = None
-                event_queue.put(
-                    events.StepFinished(
-                        id=step_started.id,
-                        suite_id=suite_id,
-                        scenario_id=self._scenario_id,
-                        phase=PhaseName.STATEFUL_TESTING,
-                        status=ctx.current_step_status,
-                        transition_id=transition_id,
-                        target=case.operation.label,
-                        response=ctx.current_response,
-                    )
-                )
+                    ctx.store_step_outcome(input.case, None)
             return result
 
         def validate_response(
@@ -190,7 +164,6 @@ def execute_state_machine_loop(
                     suite_id=suite_id,
                     phase=PhaseName.STATEFUL_TESTING,
                     label=None,
-                    # With dry run there will be no status
                     status=ctx.current_scenario_status or Status.SKIP,
                     recorder=self.recorder,
                     elapsed_time=time.monotonic() - self._start_time,

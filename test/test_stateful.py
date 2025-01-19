@@ -4,7 +4,6 @@ import pytest
 
 import schemathesis
 from schemathesis.core.errors import LoaderError
-from schemathesis.specs.openapi import expressions
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 
@@ -164,29 +163,6 @@ def test_links_access(schema_url):
     links = schema["/users/"]["POST"].links["201"]
     assert len(links) == 2
     assert links["GetUserByUserId"].name == "GetUserByUserId"
-
-
-@pytest.mark.parametrize(
-    ("parameter", "message"),
-    [
-        ("userId", "No such parameter in `GET /users/{user_id}`: `userId`. Did you mean `user_id`?"),
-        ("what?", "No such parameter in `GET /users/{user_id}`: `what?`."),
-    ],
-)
-@pytest.mark.operations("create_user", "get_user", "update_user")
-def test_misspelled_parameter(schema_url, parameter, message):
-    schema = schemathesis.openapi.from_url(schema_url)
-    # When the user supplies a parameter definition, that points to location which has no parameters defined in the
-    # schema
-    add_link(schema, "#/paths/~1users~1{user_id}/get", parameters={f"header.{parameter}": "$response.body#/id"})
-    case = schema["/users/{user_id}"]["GET"].Case()
-    link = schema["/users/"]["POST"].links["201"]["#/paths/~1users~1{user_id}/get"]
-    with pytest.raises(ValueError, match=re.escape(message)):
-        link.set_data(
-            case,
-            elapsed=1.0,
-            context=expressions.ExpressionContext(case=case, response=None),
-        )
 
 
 @pytest.mark.parametrize(
