@@ -3,11 +3,12 @@ from unittest.mock import Mock
 
 import pytest
 import requests
-from hypothesis import given, settings
+from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
 from schemathesis.core.transforms import UNRESOLVABLE, resolve_pointer
 from schemathesis.core.transport import Response
+from schemathesis.generation.stateful.state_machine import StepOutput
 from schemathesis.schemas import APIOperation, OperationDefinition
 from schemathesis.specs.openapi import expressions
 from schemathesis.specs.openapi.expressions.errors import RuntimeExpressionError
@@ -73,8 +74,8 @@ def response():
 
 
 @pytest.fixture
-def context(case, response):
-    return expressions.ExpressionContext(response=response, case=case)
+def output(case, response):
+    return StepOutput(response=response, case=case)
 
 
 @pytest.mark.parametrize(
@@ -116,8 +117,8 @@ def context(case, response):
         ("eq.{$request.query.unknown}", "eq."),
     ],
 )
-def test_evaluate(context, expr, expected):
-    assert expressions.evaluate(expr, context) == expected
+def test_evaluate(output, expr, expected):
+    assert expressions.evaluate(expr, output) == expected
 
 
 @pytest.mark.parametrize(
@@ -136,8 +137,8 @@ def test_evaluate(context, expr, expected):
         ),
     ],
 )
-def test_dynamic_body(context, expr, expected):
-    assert expressions.evaluate(expr, context, evaluate_nested=True) == expected
+def test_dynamic_body(output, expr, expected):
+    assert expressions.evaluate(expr, output, evaluate_nested=True) == expected
 
 
 @pytest.mark.parametrize(
@@ -161,16 +162,16 @@ def test_dynamic_body(context, expr, expected):
         "$response}",
     ],
 )
-def test_invalid_expression(context, expr):
+def test_invalid_expression(output, expr):
     with pytest.raises(RuntimeExpressionError):
-        expressions.evaluate(expr, context)
+        expressions.evaluate(expr, output)
 
 
 @given(expr=(st.text() | (st.lists(st.sampled_from([".", "}", "{", "$"]) | st.text()).map("".join))))
-@settings(deadline=None)
-def test_random_expression(expr):
+@settings(deadline=None, suppress_health_check=[HealthCheck.function_scoped_fixture])
+def test_random_expression(expr, output):
     try:
-        expressions.evaluate(expr, context)
+        expressions.evaluate(expr, output)
     except RuntimeExpressionError:
         pass
 

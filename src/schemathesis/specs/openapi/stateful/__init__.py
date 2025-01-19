@@ -7,38 +7,32 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.result import Ok
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
-from schemathesis.generation.stateful.state_machine import APIStateMachine, Direction, StepResult, _normalize_name
+from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
+from schemathesis.schemas import APIOperation
 
 from ....generation import GenerationMode
-from .. import expressions
-from ..links import get_all_links
+from ..links import OpenApiLink, get_all_links
 from ..utils import expand_status_code
 
 if TYPE_CHECKING:
-    from schemathesis.generation.stateful.state_machine import StepResult
+    from schemathesis.generation.stateful.state_machine import StepOutput
 
     from ..schemas import BaseOpenAPISchema
 
-FilterFunction = Callable[["StepResult"], bool]
+FilterFunction = Callable[["StepOutput"], bool]
 
 
 class OpenAPIStateMachine(APIStateMachine):
-    _response_matchers: dict[str, Callable[[StepResult], str | None]]
+    _response_matchers: dict[str, Callable[[StepOutput], str | None]]
 
-    def _get_target_for_result(self, result: StepResult) -> str | None:
+    def _get_target_for_result(self, result: StepOutput) -> str | None:
         matcher = self._response_matchers.get(result.case.operation.label)
         if matcher is None:
             return None
         return matcher(result)
-
-    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
-        context = expressions.ExpressionContext(case=result.case, response=result.response)
-        direction.set_data(case, context=context)
-        return case
 
 
 # The proportion of negative tests generated for "root" transitions
@@ -57,7 +51,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     operations = [result.ok() for result in schema.get_all_operations() if isinstance(result, Ok)]
     bundles = {}
     incoming_transitions = defaultdict(list)
-    _response_matchers: dict[str, Callable[[StepResult], str | None]] = {}
+    _response_matchers: dict[str, Callable[[StepOutput], str | None]] = {}
     # Statistic structure follows the links and count for each response status code
     for operation in operations:
         all_status_codes = tuple(operation.definition.raw["responses"])
@@ -65,8 +59,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
         for _, link in get_all_links(operation):
             bundle_name = f"{operation.label} -> {link.status_code}"
             bundles[bundle_name] = Bundle(bundle_name)
-            target_operation = link.get_target_operation()
-            incoming_transitions[target_operation.label].append(link)
+            incoming_transitions[link.target.label].append(link)
             bundle_matchers.append((bundle_name, make_response_filter(link.status_code, all_status_codes)))
         if bundle_matchers:
             _response_matchers[operation.label] = make_response_matcher(bundle_matchers)
@@ -77,22 +70,19 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
         incoming = incoming_transitions.get(target.label)
         if incoming is not None:
             for link in incoming:
-                source = link.operation
-                bundle_name = f"{source.label} -> {link.status_code}"
-                name = _normalize_name(f"{target.label} -> {link.status_code}")
-                case_strategy = strategies.combine(
-                    [target.as_strategy(generation_mode=mode) for mode in schema.generation_config.modes]
-                )
-                bundle = bundles[bundle_name]
-                rules[name] = transition(
-                    name=name,
-                    target=catch_all,
-                    previous=bundle,
-                    case=case_strategy,
-                    link=st.just(link),
+                bundle_name = f"{link.source.label} -> {link.status_code}"
+                name = _normalize_name(f"{link.status_code} -> {target.label}")
+                rules[name] = precondition(ensure_non_empty_bundle(bundle_name))(
+                    transition(
+                        name=name,
+                        target=catch_all,
+                        input=bundles[bundle_name].flatmap(
+                            into_step_input(target=target, link=link, modes=schema.generation_config.modes)
+                        ),
+                    )
                 )
         elif any(
-            incoming.operation.label == target.label
+            incoming.source.label == target.label
             for transitions in incoming_transitions.values()
             for incoming in transitions
         ):
@@ -119,12 +109,7 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 case_strategy = case_strategy_factory()
 
             rules[name] = precondition(ensure_links_followed)(
-                transition(
-                    name=name,
-                    target=catch_all,
-                    previous=st.none(),
-                    case=case_strategy,
-                )
+                transition(name=name, target=catch_all, input=case_strategy.map(StepInput.initial))
             )
 
     return type(
@@ -139,6 +124,54 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     )
 
 
+def into_step_input(
+    target: APIOperation, link: OpenApiLink, modes: list[GenerationMode]
+) -> Callable[[StepOutput], st.SearchStrategy[StepInput]]:
+    def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
+        @st.composite  # type: ignore[misc]
+        def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
+            transition_data = link.extract(output)
+
+            kwargs: dict[str, Any] = {
+                container: {
+                    name: extracted.value.ok()
+                    for name, extracted in data.items()
+                    if isinstance(extracted.value, Ok) and extracted.value.ok() is not None
+                }
+                for container, data in transition_data.parameters.items()
+            }
+            if (
+                transition_data.request_body is not None
+                and isinstance(transition_data.request_body.value, Ok)
+                and not link.merge_body
+            ):
+                kwargs["body"] = transition_data.request_body.value.ok()
+            cases = strategies.combine([target.as_strategy(generation_mode=mode, **kwargs) for mode in modes])
+            case = draw(cases)
+            if (
+                transition_data.request_body is not None
+                and isinstance(transition_data.request_body.value, Ok)
+                and link.merge_body
+            ):
+                new = transition_data.request_body.value.ok()
+                if isinstance(case.body, dict) and isinstance(new, dict):
+                    case.body = {**case.body, **new}
+                else:
+                    case.body = new
+            return StepInput(case=case, transition=transition_data)
+
+        return inner(output=_output)
+
+    return builder
+
+
+def ensure_non_empty_bundle(bundle_name: str) -> Callable[[APIStateMachine], bool]:
+    def inner(machine: APIStateMachine) -> bool:
+        return bool(machine.bundles.get(bundle_name))
+
+    return inner
+
+
 def ensure_links_followed(machine: APIStateMachine) -> bool:
     # If there are responses that have links to follow, reject any rule without incoming transitions
     for bundle in machine.bundles.values():
@@ -147,28 +180,17 @@ def ensure_links_followed(machine: APIStateMachine) -> bool:
     return True
 
 
-def transition(
-    *,
-    name: str,
-    target: Bundle,
-    previous: Bundle | st.SearchStrategy,
-    case: st.SearchStrategy,
-    link: st.SearchStrategy | NotSet = NOT_SET,
-) -> Callable[[Callable], Rule]:
-    def step_function(*args_: Any, **kwargs_: Any) -> StepResult | None:
-        return APIStateMachine._step(*args_, **kwargs_)
+def transition(*, name: str, target: Bundle, input: st.SearchStrategy[StepInput]) -> Callable[[Callable], Rule]:
+    def step_function(self: APIStateMachine, input: StepInput) -> StepOutput | None:
+        return APIStateMachine._step(self, input=input)
 
     step_function.__name__ = name
 
-    kwargs = {"target": target, "previous": previous, "case": case}
-    if not isinstance(link, NotSet):
-        kwargs["link"] = link
-
-    return rule(**kwargs)(step_function)
+    return rule(target=target, input=input)(step_function)
 
 
-def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepResult], str | None]:
-    def compare(result: StepResult) -> str | None:
+def make_response_matcher(matchers: list[tuple[str, FilterFunction]]) -> Callable[[StepOutput], str | None]:
+    def compare(result: StepOutput) -> str | None:
         for bundle_name, response_filter in matchers:
             if response_filter(result):
                 return bundle_name
@@ -196,7 +218,7 @@ def match_status_code(status_code: str) -> FilterFunction:
     """
     status_codes = set(expand_status_code(status_code))
 
-    def compare(result: StepResult) -> bool:
+    def compare(result: StepOutput) -> bool:
         return result.response.status_code in status_codes
 
     compare.__name__ = f"match_{status_code}_response"
@@ -214,7 +236,7 @@ def default_status_code(status_codes: Iterator[str]) -> FilterFunction:
         status_code for value in status_codes if value != "default" for status_code in expand_status_code(value)
     }
 
-    def match_default_response(result: StepResult) -> bool:
+    def match_default_response(result: StepOutput) -> bool:
         return result.response.status_code not in expanded_status_codes
 
     return match_default_response

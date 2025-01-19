@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import http.client
 import textwrap
+import traceback
 from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum, auto
 from json import JSONDecodeError
-from typing import Callable
+from typing import Any, Callable
 
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.output import OutputConfig, prepare_response_payload
@@ -32,7 +33,7 @@ class Severity(Enum):
 class Failure(AssertionError):
     """API check failure."""
 
-    __slots__ = ("operation", "title", "message", "code", "case_id", "severity")
+    __slots__ = ("operation", "title", "message", "case_id", "severity")
 
     def __init__(
         self,
@@ -40,14 +41,12 @@ class Failure(AssertionError):
         operation: str,
         title: str,
         message: str,
-        code: str,
         case_id: str | None = None,
         severity: Severity = Severity.MEDIUM,
     ) -> None:
         self.operation = operation
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self.severity = severity
 
@@ -72,18 +71,56 @@ class Failure(AssertionError):
             return NotImplemented
         return type(self) is type(other) and self.operation == other.operation and self._unique_key == other._unique_key
 
-    @classmethod
-    def from_assertion(cls, *, name: str, operation: str, exc: AssertionError) -> Failure:
-        return Failure(
-            operation=operation,
-            title=f"Custom check failed: `{name}`",
-            message=str(exc),
-            code="custom",
-        )
+    @property
+    def _unique_key(self) -> Any:
+        return self.message
+
+
+def get_origin(exception: BaseException, seen: tuple[BaseException, ...] = ()) -> tuple:
+    filename, lineno = None, None
+    if tb := exception.__traceback__:
+        filename, lineno, *_ = traceback.extract_tb(tb)[-1]
+    seen = (*seen, exception)
+    context = ()
+    if exception.__context__ is not None and exception.__context__ not in seen:
+        context = get_origin(exception.__context__, seen=seen)
+    return (
+        type(exception),
+        filename,
+        lineno,
+        context,
+        (
+            tuple(get_origin(exc, seen=seen) for exc in exception.exceptions if exc not in seen)
+            if isinstance(exception, BaseExceptionGroup)
+            else ()
+        ),
+    )
+
+
+class CustomFailure(Failure):
+    __slots__ = ("operation", "title", "message", "exception", "case_id", "severity", "origin")
+
+    def __init__(
+        self,
+        *,
+        operation: str,
+        title: str,
+        message: str,
+        exception: AssertionError,
+        case_id: str | None = None,
+        severity: Severity = Severity.MEDIUM,
+    ) -> None:
+        self.operation = operation
+        self.title = title
+        self.message = message
+        self.exception = exception
+        self.case_id = case_id
+        self.severity = severity
+        self.origin = get_origin(exception)
 
     @property
-    def _unique_key(self) -> str:
-        return self.message
+    def _unique_key(self) -> Any:
+        return self.origin
 
 
 @dataclass
@@ -94,7 +131,7 @@ class MaxResponseTimeConfig:
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
 
-    __slots__ = ("operation", "elapsed", "deadline", "title", "message", "code", "case_id", "severity")
+    __slots__ = ("operation", "elapsed", "deadline", "title", "message", "case_id", "severity")
 
     def __init__(
         self,
@@ -104,7 +141,6 @@ class ResponseTimeExceeded(Failure):
         deadline: int,
         message: str,
         title: str = "Response time limit exceeded",
-        code: str = "response_time_exceeded",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -112,7 +148,6 @@ class ResponseTimeExceeded(Failure):
         self.deadline = deadline
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.LOW
 
@@ -124,7 +159,7 @@ class ResponseTimeExceeded(Failure):
 class ServerError(Failure):
     """Server responded with an error."""
 
-    __slots__ = ("operation", "status_code", "title", "message", "code", "case_id", "severity")
+    __slots__ = ("operation", "status_code", "title", "message", "case_id", "severity")
 
     def __init__(
         self,
@@ -133,14 +168,12 @@ class ServerError(Failure):
         status_code: int,
         title: str = "Server error",
         message: str = "",
-        code: str = "server_error",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.status_code = status_code
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.CRITICAL
 
@@ -161,7 +194,6 @@ class MalformedJson(Failure):
         "colno",
         "message",
         "title",
-        "code",
         "case_id",
         "severity",
     )
@@ -177,7 +209,6 @@ class MalformedJson(Failure):
         colno: int,
         message: str,
         title: str = "JSON deserialization error",
-        code: str = "malformed_json",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -188,12 +219,11 @@ class MalformedJson(Failure):
         self.colno = colno
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
     @property
-    def _unique_key(self) -> str:
+    def _unique_key(self) -> Any:
         return self.title
 
     @classmethod

@@ -14,6 +14,8 @@ from schemathesis.generation.case import Case
 if TYPE_CHECKING:
     import requests
 
+    from schemathesis.generation.stateful.state_machine import Transition
+
 
 @dataclass
 class ScenarioRecorder:
@@ -42,9 +44,9 @@ class ScenarioRecorder:
         self.checks = {}
         self.interactions = {}
 
-    def record_case(self, *, parent_id: str | None, case: Case) -> None:
+    def record_case(self, *, parent_id: str | None, transition: Transition | None, case: Case) -> None:
         """Record a test case and its relationship to a parent, if applicable."""
-        self.cases[case.id] = CaseNode(value=case, parent_id=parent_id)
+        self.cases[case.id] = CaseNode(value=case, parent_id=parent_id, transition=transition)
 
     def record_response(self, *, case_id: str, response: Response) -> None:
         """Record the API response for a given test case."""
@@ -133,8 +135,11 @@ class CaseNode:
 
     value: Case
     parent_id: str | None
+    # Transition may be absent if `parent_id` is present for cases when a case is derived inside a check
+    # and outside of the implemented transition logic (e.g. Open API links)
+    transition: Transition | None
 
-    __slots__ = ("value", "parent_id")
+    __slots__ = ("value", "parent_id", "transition")
 
 
 @dataclass

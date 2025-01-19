@@ -11,6 +11,7 @@ from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
 from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
 
@@ -18,7 +19,7 @@ if TYPE_CHECKING:
     import hypothesis
     from requests.structures import CaseInsensitiveDict
 
-    from schemathesis.schemas import APIOperation, BaseSchema
+    from schemathesis.schemas import BaseSchema
 
 
 NO_LINKS_ERROR_MESSAGE = (
@@ -36,11 +37,50 @@ DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
 
 
 @dataclass
-class StepResult:
+class StepInput:
+    """Input for a single state machine step."""
+
+    case: Case
+    transition: Transition | None  # None for initial steps
+
+    __slots__ = ("case", "transition")
+
+    @classmethod
+    def initial(cls, case: Case) -> StepInput:
+        return cls(case=case, transition=None)
+
+
+@dataclass
+class Transition:
+    """Data about transition execution."""
+
+    # ID of the transition (e.g. link name)
+    id: str
+    parent_id: str
+    parameters: dict[str, dict[str, ExtractedParam]]
+    request_body: ExtractedParam | None
+
+    __slots__ = ("id", "parent_id", "parameters", "request_body")
+
+
+@dataclass
+class ExtractedParam:
+    """Result of parameter extraction."""
+
+    definition: Any
+    value: Result[Any, Exception]
+
+    __slots__ = ("definition", "value")
+
+
+@dataclass
+class StepOutput:
     """Output from a single transition of a state machine."""
 
     response: Response
     case: Case
+
+    __slots__ = ("response", "case")
 
 
 def _normalize_name(name: str) -> str:
@@ -89,10 +129,10 @@ class APIStateMachine(RuleBasedStateMachine):
         target = _normalize_name(target)
         return super()._new_name(target)  # type: ignore
 
-    def _get_target_for_result(self, result: StepResult) -> str | None:
+    def _get_target_for_result(self, result: StepOutput) -> str | None:
         raise NotImplementedError
 
-    def _add_result_to_targets(self, targets: tuple[str, ...], result: StepResult | None) -> None:
+    def _add_result_to_targets(self, targets: tuple[str, ...], result: StepOutput | None) -> None:
         if result is None:
             return
         target = self._get_target_for_result(result)
@@ -115,19 +155,11 @@ class APIStateMachine(RuleBasedStateMachine):
     # To provide the return type in the rendered documentation
     teardown.__doc__ = RuleBasedStateMachine.teardown.__doc__
 
-    def transform(self, result: StepResult, direction: Direction, case: Case) -> Case:
-        raise NotImplementedError
-
-    def _step(self, case: Case, previous: StepResult | None = None, link: Direction | None = None) -> StepResult | None:
-        # This method is a proxy that is used under the hood during the state machine initialization.
-        # The whole point of having it is to make it possible to override `step`; otherwise, custom "step" is ignored.
-        # It happens because, at the point of initialization, the final class is not yet created.
+    def _step(self, input: StepInput) -> StepOutput | None:
         __tracebackhide__ = True
-        if previous is not None and link is not None:
-            return self.step(case, (previous, link))
-        return self.step(case, None)
+        return self.step(input)
 
-    def step(self, case: Case, previous: tuple[StepResult, Direction] | None = None) -> StepResult:
+    def step(self, input: StepInput) -> StepOutput:
         """A single state machine step.
 
         :param Case case: Generated test case data that should be sent in an API call to the tested API operation.
@@ -137,15 +169,12 @@ class APIStateMachine(RuleBasedStateMachine):
         It is the most high-level point to extend the testing process. You probably don't need it in most cases.
         """
         __tracebackhide__ = True
-        if previous is not None:
-            result, direction = previous
-            case = self.transform(result, direction, case)
-        self.before_call(case)
-        kwargs = self.get_call_kwargs(case)
-        response = self.call(case, **kwargs)
-        self.after_call(response, case)
-        self.validate_response(response, case)
-        return self.store_result(response, case)
+        self.before_call(input.case)
+        kwargs = self.get_call_kwargs(input.case)
+        response = self.call(input.case, **kwargs)
+        self.after_call(response, input.case)
+        self.validate_response(response, input.case)
+        return StepOutput(response, input.case)
 
     def before_call(self, case: Case) -> None:
         """Hook method for modifying the case data before making a request.
@@ -271,15 +300,3 @@ class APIStateMachine(RuleBasedStateMachine):
         """
         __tracebackhide__ = True
         case.validate_response(response, additional_checks=additional_checks)
-
-    def store_result(self, response: Response, case: Case) -> StepResult:
-        return StepResult(response, case)
-
-
-class Direction:
-    name: str
-    status_code: str
-    operation: APIOperation
-
-    def set_data(self, case: Case, **kwargs: Any) -> None:
-        raise NotImplementedError

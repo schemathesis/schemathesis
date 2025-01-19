@@ -37,7 +37,6 @@ class UndefinedStatusCode(Failure):
         "allowed_status_codes",
         "message",
         "title",
-        "code",
         "case_id",
         "severity",
     )
@@ -51,7 +50,6 @@ class UndefinedStatusCode(Failure):
         allowed_status_codes: list[int],
         message: str,
         title: str = "Undocumented HTTP status code",
-        code: str = "undefined_status_code",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -60,7 +58,6 @@ class UndefinedStatusCode(Failure):
         self.allowed_status_codes = allowed_status_codes
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -72,7 +69,7 @@ class UndefinedStatusCode(Failure):
 class MissingHeaders(Failure):
     """Some required headers are missing."""
 
-    __slots__ = ("operation", "missing_headers", "message", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "missing_headers", "message", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -81,14 +78,12 @@ class MissingHeaders(Failure):
         missing_headers: list[str],
         message: str,
         title: str = "Missing required headers",
-        code: str = "missing_headers",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.missing_headers = missing_headers
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -105,7 +100,6 @@ class JsonSchemaError(Failure):
         "instance",
         "message",
         "title",
-        "code",
         "case_id",
         "severity",
     )
@@ -121,7 +115,6 @@ class JsonSchemaError(Failure):
         instance: None | bool | float | str | list | dict[str, Any],
         message: str,
         title: str = "Response violates schema",
-        code: str = "json_schema",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -132,7 +125,6 @@ class JsonSchemaError(Failure):
         self.instance = instance
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.HIGH
 
@@ -176,7 +168,7 @@ class JsonSchemaError(Failure):
 class MissingContentType(Failure):
     """Content type header is missing."""
 
-    __slots__ = ("operation", "media_types", "message", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "media_types", "message", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -185,14 +177,12 @@ class MissingContentType(Failure):
         media_types: list[str],
         message: str,
         title: str = "Missing Content-Type header",
-        code: str = "missing_content_type",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.media_types = media_types
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -204,7 +194,7 @@ class MissingContentType(Failure):
 class MalformedMediaType(Failure):
     """Media type name is malformed."""
 
-    __slots__ = ("operation", "actual", "defined", "message", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "actual", "defined", "message", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -214,7 +204,6 @@ class MalformedMediaType(Failure):
         defined: str,
         message: str,
         title: str = "Malformed media type",
-        code: str = "malformed_media_type",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -222,7 +211,6 @@ class MalformedMediaType(Failure):
         self.defined = defined
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -236,7 +224,6 @@ class UndefinedContentType(Failure):
         "defined_content_types",
         "message",
         "title",
-        "code",
         "case_id",
         "severity",
     )
@@ -249,7 +236,6 @@ class UndefinedContentType(Failure):
         defined_content_types: list[str],
         message: str,
         title: str = "Undocumented Content-Type",
-        code: str = "undefined_content_type",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -257,7 +243,6 @@ class UndefinedContentType(Failure):
         self.defined_content_types = defined_content_types
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -269,7 +254,7 @@ class UndefinedContentType(Failure):
 class UseAfterFree(Failure):
     """Resource was used after a successful DELETE operation on it."""
 
-    __slots__ = ("operation", "message", "free", "usage", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "message", "free", "usage", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -279,7 +264,6 @@ class UseAfterFree(Failure):
         free: str,
         usage: str,
         title: str = "Use after free",
-        code: str = "use_after_free",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -287,7 +271,6 @@ class UseAfterFree(Failure):
         self.free = free
         self.usage = usage
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.CRITICAL
 
@@ -299,7 +282,7 @@ class UseAfterFree(Failure):
 class EnsureResourceAvailability(Failure):
     """Resource is not available immediately after creation."""
 
-    __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "message", "created_with", "not_available_with", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -309,7 +292,6 @@ class EnsureResourceAvailability(Failure):
         created_with: str,
         not_available_with: str,
         title: str = "Resource is not available after creation",
-        code: str = "ensure_resource_availability",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -317,7 +299,6 @@ class EnsureResourceAvailability(Failure):
         self.created_with = created_with
         self.not_available_with = not_available_with
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -329,7 +310,7 @@ class EnsureResourceAvailability(Failure):
 class IgnoredAuth(Failure):
     """The API operation does not check the specified authentication."""
 
-    __slots__ = ("operation", "message", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "message", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -337,13 +318,11 @@ class IgnoredAuth(Failure):
         operation: str,
         message: str,
         title: str = "Authentication declared but not enforced",
-        code: str = "ignored_auth",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.CRITICAL
 
@@ -355,7 +334,7 @@ class IgnoredAuth(Failure):
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
 
-    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -365,7 +344,6 @@ class AcceptedNegativeData(Failure):
         status_code: int,
         allowed_statuses: list[str],
         title: str = "Accepted negative data",
-        code: str = "accepted_negative_data",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -373,7 +351,6 @@ class AcceptedNegativeData(Failure):
         self.status_code = status_code
         self.allowed_statuses = allowed_statuses
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -385,7 +362,7 @@ class AcceptedNegativeData(Failure):
 class RejectedPositiveData(Failure):
     """Response with positive data was rejected."""
 
-    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "code", "case_id", "severity")
+    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -395,7 +372,6 @@ class RejectedPositiveData(Failure):
         status_code: int,
         allowed_statuses: list[str],
         title: str = "Rejected positive data",
-        code: str = "rejected_positive_data",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
@@ -403,7 +379,6 @@ class RejectedPositiveData(Failure):
         self.status_code = status_code
         self.allowed_statuses = allowed_statuses
         self.title = title
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 

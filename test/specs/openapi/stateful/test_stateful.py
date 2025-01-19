@@ -8,7 +8,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.generation.stateful.state_machine import (
     DEFAULT_STATE_MACHINE_SETTINGS,
     NO_LINKS_ERROR_MESSAGE,
-    StepResult,
+    StepOutput,
 )
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 
@@ -28,7 +28,7 @@ def test_match_status_code(response_status, filter_value, matching, response_fac
     filter_function = match_status_code(filter_value)
     assert filter_function.__name__ == f"match_{filter_value}_response"
     # Then that response should match or not depending on the `matching` value
-    assert filter_function(StepResult(response, None)) is matching
+    assert filter_function(StepOutput(response, None)) is matching
 
 
 @pytest.mark.parametrize(
@@ -43,7 +43,7 @@ def test_match_status_code(response_status, filter_value, matching, response_fac
 def test_default_status_code(response_status, status_codes, matching, response_factory):
     response = response_factory.requests(status_code=response_status)
     filter_function = make_response_filter("default", status_codes)
-    assert filter_function(StepResult(response, None)) is matching
+    assert filter_function(StepOutput(response, None)) is matching
 
 
 def test_custom_rule(testdir, openapi3_base_url):

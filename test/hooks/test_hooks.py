@@ -426,41 +426,6 @@ def test_a(case):
     result.assert_outcomes(passed=1)
 
 
-def test_after_load_schema(testdir, simple_openapi):
-    testdir.make_test(
-        """
-LINK_STATUS = "200"
-# Totally not working link, but it is for testing only
-KEY = "userId"
-EXPRESSION = "$response.body#/id"
-PARAMETERS = {KEY: EXPRESSION}
-
-@schemathesis.hook
-def after_load_schema(
-    context: schemathesis.hooks.HookContext,
-    schema: schemathesis.schemas.BaseSchema,
-) -> None:
-    schema.add_link(
-        source=schema["/query"]["get"],
-        target=schema["/query"]["get"],
-        status_code=LINK_STATUS,
-        parameters=PARAMETERS,
-    )
-
-schema = schemathesis.openapi.from_dict(raw_schema)
-
-@schema.parametrize()
-def test_a(case):
-    link = schema.get_links(case.operation)[LINK_STATUS][case.operation.label]
-    assert link.operation == case.operation
-    assert link.parameters == [(None, KEY, EXPRESSION)]
-    """,
-        schema=simple_openapi,
-    )
-    result = testdir.runpytest()
-    result.assert_outcomes(passed=1)
-
-
 def test_graphql_body(graphql_schema):
     @graphql_schema.hook
     def map_body(context, body):

@@ -1,17 +1,12 @@
-"""Open API links support.
-
-Based on https://swagger.io/docs/specification/links/
-"""
-
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from difflib import get_close_matches
-from typing import TYPE_CHECKING, Any, Generator, Literal, TypedDict, Union, cast
+from dataclasses import dataclass
+from functools import lru_cache
+from typing import TYPE_CHECKING, Any, Generator, Literal, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.generation.case import Case
-from schemathesis.generation.stateful.state_machine import Direction
+from schemathesis.core.result import Err, Ok, Result
+from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
 
 from . import expressions
@@ -23,129 +18,141 @@ if TYPE_CHECKING:
 
 
 SCHEMATHESIS_LINK_EXTENSION = "x-schemathesis"
+ParameterLocation = Literal["path", "query", "header", "cookie", "body"]
 
 
-class SchemathesisLink(TypedDict):
-    merge_body: bool
+@dataclass
+class NormalizedParameter:
+    """Processed link parameter with resolved container information."""
+
+    location: ParameterLocation | None
+    name: str
+    expression: str
+    container_name: str
+
+    __slots__ = ("location", "name", "expression", "container_name")
 
 
 @dataclass(repr=False)
-class OpenAPILink(Direction):
-    """Alternative approach to link processing.
-
-    NOTE. This class will replace `Link` in the future.
-    """
+class OpenApiLink:
+    """Represents an OpenAPI link between operations."""
 
     name: str
     status_code: str
-    definition: dict[str, Any]
-    operation: APIOperation
-    parameters: list[tuple[Literal["path", "query", "header", "cookie", "body"] | None, str, str]] = field(init=False)
-    body: dict[str, Any] | NotSet = field(init=False)
-    merge_body: bool = True
+    source: APIOperation
+    target: APIOperation
+    parameters: list[NormalizedParameter]
+    body: dict[str, Any] | NotSet
+    merge_body: bool
 
-    def __repr__(self) -> str:
-        path = self.operation.path
-        method = self.operation.method
-        return f"state.schema['{path}']['{method}'].links['{self.status_code}']['{self.name}']"
+    __slots__ = ("name", "status_code", "source", "target", "parameters", "body", "merge_body", "_cached_extract")
 
-    def __post_init__(self) -> None:
-        extension = self.definition.get(SCHEMATHESIS_LINK_EXTENSION)
-        self.parameters = [
-            normalize_parameter(parameter, expression)
-            for parameter, expression in self.definition.get("parameters", {}).items()
-        ]
-        self.body = self.definition.get("requestBody", NOT_SET)
-        if extension is not None:
-            self.merge_body = extension.get("merge_body", True)
+    def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
+        self.name = name
+        self.status_code = status_code
+        self.source = source
 
-    def set_data(self, case: Case, **kwargs: Any) -> None:
-        """Assign all linked definitions to the new case instance."""
-        context = kwargs["context"]
-        self.set_parameters(case, context)
-        self.set_body(case, context)
-
-    def set_parameters(self, case: Case, context: expressions.ExpressionContext) -> None:
-        for location, name, expression in self.parameters:
-            location, container = get_container(case, location, name)
-            # Might happen if there is directly specified container,
-            # but the schema has no parameters of such type at all.
-            # Therefore the container is empty, otherwise it will be at least an empty object
-            if container is None:
-                message = f"No such parameter in `{case.operation.method.upper()} {case.operation.path}`: `{name}`."
-                possibilities = [param.name for param in case.operation.iter_parameters()]
-                matches = get_close_matches(name, possibilities)
-                if matches:
-                    message += f" Did you mean `{matches[0]}`?"
-                raise ValueError(message)
-            value = expressions.evaluate(expression, context)
-            if value is not None:
-                container[name] = value
-
-    def set_body(
-        self,
-        case: Case,
-        context: expressions.ExpressionContext,
-    ) -> None:
-        if self.body is not NOT_SET:
-            evaluated = expressions.evaluate(self.body, context, evaluate_nested=True)
-            if self.merge_body:
-                case.body = merge_body(case.body, evaluated)
-            else:
-                case.body = evaluated
-
-    def get_target_operation(self) -> APIOperation:
-        if "operationId" in self.definition:
-            return self.operation.schema.get_operation_by_id(self.definition["operationId"])  # type: ignore
-        return self.operation.schema.get_operation_by_reference(self.definition["operationRef"])  # type: ignore
-
-
-def merge_body(old: Any, new: Any) -> Any:
-    if isinstance(old, dict) and isinstance(new, dict):
-        return {**old, **new}
-    return new
-
-
-def get_container(
-    case: Case, location: Literal["path", "query", "header", "cookie", "body"] | None, name: str
-) -> tuple[Literal["path", "query", "header", "cookie", "body"], dict[str, Any] | None]:
-    """Get a container that suppose to store the given parameter."""
-    if location:
-        container_name = LOCATION_TO_CONTAINER[location]
-    else:
-        for param in case.operation.iter_parameters():
-            if param.name == name:
-                location = param.location
-                container_name = LOCATION_TO_CONTAINER[param.location]
-                break
+        if "operationId" in definition:
+            self.target = source.schema.get_operation_by_id(definition["operationId"])  # type: ignore
         else:
-            raise ValueError(f"Parameter `{name}` is not defined in API operation `{case.operation.label}`")
-    return location, getattr(case, container_name)
+            self.target = source.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
+
+        extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
+        self.parameters = self._normalize_parameters(definition.get("parameters", {}))
+        self.body = definition.get("requestBody", NOT_SET)
+        self.merge_body = extension.get("merge_body", True) if extension else True
+
+        self._cached_extract = lru_cache(8)(self._extract_impl)
+
+    def _normalize_parameters(self, parameters: dict[str, str]) -> list[NormalizedParameter]:
+        """Process link parameters and resolve their container locations.
+
+        Handles both explicit locations (e.g., "path.id") and implicit ones resolved from target operation.
+        """
+        result = []
+        for parameter, expression in parameters.items():
+            location: ParameterLocation | None
+            try:
+                # The parameter name is prefixed with its location. Example: `path.id`
+                _location, name = tuple(parameter.split("."))
+                location = cast(ParameterLocation, _location)
+            except ValueError:
+                location = None
+                name = parameter
+
+            container_name = self._get_parameter_container(location, name)
+            result.append(NormalizedParameter(location, name, expression, container_name))
+        return result
+
+    def _get_parameter_container(self, location: ParameterLocation | None, name: str) -> str:
+        """Resolve parameter container either from explicit location or by looking up in target operation."""
+        if location:
+            return LOCATION_TO_CONTAINER[location]
+
+        for param in self.target.iter_parameters():
+            if param.name == name:
+                return LOCATION_TO_CONTAINER[param.location]
+        raise ValueError(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
+
+    def extract(self, output: StepOutput) -> Transition:
+        return self._cached_extract(StepOutputWrapper(output))
+
+    def _extract_impl(self, wrapper: StepOutputWrapper) -> Transition:
+        output = wrapper.output
+        return Transition(
+            id=self.name,
+            parent_id=output.case.id,
+            parameters=self.extract_parameters(output),
+            request_body=self.extract_body(output),
+        )
+
+    def extract_parameters(self, output: StepOutput) -> dict[str, dict[str, ExtractedParam]]:
+        """Extract parameters using runtime expressions.
+
+        Returns a two-level dictionary: container -> parameter name -> extracted value
+        """
+        extracted: dict[str, dict[str, ExtractedParam]] = {}
+        for parameter in self.parameters:
+            container = extracted.setdefault(parameter.container_name, {})
+            value: Result[Any, Exception]
+            try:
+                value = Ok(expressions.evaluate(parameter.expression, output))
+            except Exception as exc:
+                value = Err(exc)
+            container[parameter.name] = ExtractedParam(definition=parameter.expression, value=value)
+        return extracted
+
+    def extract_body(self, output: StepOutput) -> ExtractedParam | None:
+        if not isinstance(self.body, NotSet):
+            value: Result[Any, Exception]
+            try:
+                value = Ok(expressions.evaluate(self.body, output, evaluate_nested=True))
+            except Exception as exc:
+                value = Err(exc)
+            return ExtractedParam(definition=self.body, value=value)
+        return None
 
 
-def normalize_parameter(
-    parameter: str, expression: str
-) -> tuple[Literal["path", "query", "header", "cookie", "body"] | None, str, str]:
-    """Normalize runtime expressions.
+@dataclass
+class StepOutputWrapper:
+    """Wrapper for StepOutput that uses only case_id for hash-based caching."""
 
-    Runtime expressions may have parameter names prefixed with their location - `path.id`.
-    At the same time, parameters could be defined without a prefix - `id`.
-    We need to normalize all parameters to the same form to simplify working with them.
-    """
-    try:
-        # The parameter name is prefixed with its location. Example: `path.id`
-        location, name = tuple(parameter.split("."))
-        _location = cast(Literal["path", "query", "header", "cookie", "body"], location)
-        return _location, name, expression
-    except ValueError:
-        return None, parameter, expression
+    output: StepOutput
+    __slots__ = ("output",)
+
+    def __hash__(self) -> int:
+        return hash(self.output.case.id)
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, StepOutputWrapper)
+        return self.output.case.id == other.output.case.id
 
 
-def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenAPILink], None, None]:
+def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenApiLink], None, None]:
     for status_code, definition in operation.definition.raw["responses"].items():
         definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
-            yield status_code, OpenAPILink(name, status_code, link_definition, operation)
+            yield status_code, OpenApiLink(name, status_code, link_definition, operation)
 
 
 StatusCode = Union[str, int]

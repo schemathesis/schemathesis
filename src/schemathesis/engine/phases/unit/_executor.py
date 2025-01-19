@@ -264,7 +264,7 @@ def cached_test_func(f: Callable) -> Callable:
 
 @cached_test_func
 def test_func(*, ctx: EngineContext, case: Case, recorder: ScenarioRecorder) -> None:
-    recorder.record_case(parent_id=None, case=case)
+    recorder.record_case(parent_id=None, transition=None, case=case)
     try:
         response = case.call(**ctx.transport_kwargs)
     except (requests.Timeout, requests.ConnectionError) as error:
