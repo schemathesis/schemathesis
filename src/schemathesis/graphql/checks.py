@@ -11,7 +11,7 @@ if TYPE_CHECKING:
 class UnexpectedGraphQLResponse(Failure):
     """GraphQL response is not a JSON object."""
 
-    __slots__ = ("operation", "type_name", "title", "message", "code", "case_id", "severity")
+    __slots__ = ("operation", "type_name", "title", "message", "case_id", "severity")
 
     def __init__(
         self,
@@ -20,14 +20,12 @@ class UnexpectedGraphQLResponse(Failure):
         type_name: str,
         title: str = "Unexpected GraphQL Response",
         message: str,
-        code: str = "graphql_unexpected_response",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.type_name = type_name
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self.severity = Severity.MEDIUM
 
@@ -39,7 +37,7 @@ class UnexpectedGraphQLResponse(Failure):
 class GraphQLClientError(Failure):
     """GraphQL query has not been executed."""
 
-    __slots__ = ("operation", "errors", "title", "message", "code", "case_id", "_unique_key_cache", "severity")
+    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
     def __init__(
         self,
@@ -48,14 +46,12 @@ class GraphQLClientError(Failure):
         message: str,
         errors: list[GraphQLFormattedError],
         title: str = "GraphQL client error",
-        code: str = "graphql_client_error",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self._unique_key_cache: str | None = None
         self.severity = Severity.MEDIUM
@@ -70,7 +66,7 @@ class GraphQLClientError(Failure):
 class GraphQLServerError(Failure):
     """GraphQL response indicates at least one server error."""
 
-    __slots__ = ("operation", "errors", "title", "message", "code", "case_id", "_unique_key_cache", "severity")
+    __slots__ = ("operation", "errors", "title", "message", "case_id", "_unique_key_cache", "severity")
 
     def __init__(
         self,
@@ -79,14 +75,12 @@ class GraphQLServerError(Failure):
         message: str,
         errors: list[GraphQLFormattedError],
         title: str = "GraphQL server error",
-        code: str = "graphql_server_error",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.errors = errors
         self.title = title
         self.message = message
-        self.code = code
         self.case_id = case_id
         self._unique_key_cache: str | None = None
         self.severity = Severity.CRITICAL

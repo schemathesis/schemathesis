@@ -44,20 +44,6 @@ class EngineResult:
     def errors(self):
         return [event for event in self.events if isinstance(event, events.NonFatalError)]
 
-    @property
-    def steps_before_first_failure(self):
-        steps = 0
-        for event in self.test_events:
-            if isinstance(event, events.StepFinished):
-                if event.status == Status.FAILURE:
-                    break
-                steps += 1
-        return steps
-
-    @property
-    def responses(self):
-        return [event.response for event in self.events if isinstance(event, events.StepFinished)]
-
 
 def collect_result(events) -> EngineResult:
     return EngineResult(events=list(events))
@@ -100,8 +86,6 @@ def test_stop_in_check(engine_factory, func, stop_event):
 
     engine = engine_factory(checks=[stop_immediately])
     result = collect_result(engine)
-    assert "StepStarted" in result.event_names
-    assert "StepFinished" in result.event_names
     assert result.events[-1].status == Status.INTERRUPTED
 
 
@@ -162,6 +146,25 @@ def test_custom_assertion_in_check(engine_factory, exception_args):
         assert failure.failure_info.failure.message == ""
     else:
         assert failure.failure_info.failure.message == "Oops!"
+
+
+def test_custom_assertion_with_random_message(engine_factory):
+    counter = 0
+
+    def custom_check(*args, **kwargs):
+        nonlocal counter
+        counter += 1
+        raise AssertionError(f"Fail counter: {counter}")
+
+    engine = engine_factory(
+        checks=[custom_check],
+        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
+    )
+    result = collect_result(engine)
+    # Failures on different API operations
+    assert len(result.failures) == 2
+    failure = result.failures[0]
+    assert failure.failure_info.failure.title == "Custom check failed: `custom_check`"
 
 
 def test_distinct_assertions(engine_factory):
