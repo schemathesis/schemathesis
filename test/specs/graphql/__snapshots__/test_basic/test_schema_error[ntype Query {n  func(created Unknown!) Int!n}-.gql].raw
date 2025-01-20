@@ -4,8 +4,11 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema Loading Error
 
-The provided API schema does not appear to be a valid GraphQL schema
+ ❌  Failed to load specification from /tmp/schema.gql after N ms
 
-    Unknown type 'Unknown'.
+ Schema Loading Error
+
+ The provided API schema does not appear to be a valid GraphQL schema
+
+     Unknown type 'Unknown'.

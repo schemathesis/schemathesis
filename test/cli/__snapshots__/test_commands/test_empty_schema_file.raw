@@ -4,8 +4,11 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema Loading Error
 
-API schema does not appear syntactically valid
+ ❌  Failed to load specification from /tmp/schema.json after N ms
 
-    Expecting value: line 1 column 1 (char 0)
+ Schema Loading Error
+
+ API schema does not appear syntactically valid
+
+     Expecting value: line 1 column 1 (char 0)

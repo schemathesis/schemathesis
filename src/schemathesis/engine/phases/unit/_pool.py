@@ -55,7 +55,7 @@ class WorkerPool:
                     "producer": self.producer,
                     "suite_id": self.suite_id,
                 },
-                name=f"schemathesis_{i}",
+                name=f"schemathesis_unit_tests_{i}",
                 daemon=True,
             )
             self.workers.append(worker)

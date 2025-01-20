@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Callable, Literal, Sequence
+from typing import Any, Callable, Literal, Sequence
 
 import click
 
 from schemathesis.cli.ext.groups import grouped_option
+from schemathesis.core.errors import IncorrectUsage
 from schemathesis.filters import FilterSet, expression_to_filter_function, is_deprecated
 
 
@@ -148,35 +149,42 @@ class FilterArguments:
         if exclude_by_function:
             filter_set.exclude(exclude_by_function)
         for name_ in self.exclude_name:
-            filter_set.exclude(name=name_)
+            apply_exclude_filter(filter_set, "name", name=name_)
         for method in self.exclude_method:
-            filter_set.exclude(method=method)
+            apply_exclude_filter(filter_set, "method", method=method)
         for path in self.exclude_path:
-            filter_set.exclude(path=path)
+            apply_exclude_filter(filter_set, "path", path=path)
         for tag in self.exclude_tag:
-            filter_set.exclude(tag=tag)
+            apply_exclude_filter(filter_set, "tag", tag=tag)
         for operation_id in self.exclude_operation_id:
-            filter_set.exclude(operation_id=operation_id)
-        if (
-            self.exclude_name_regex
-            or self.exclude_method_regex
-            or self.exclude_path_regex
-            or self.exclude_tag_regex
-            or self.exclude_operation_id_regex
+            apply_exclude_filter(filter_set, "operation-id", operation_id=operation_id)
+        for key, value, name in (
+            ("name_regex", self.exclude_name_regex, "name-regex"),
+            ("method_regex", self.exclude_method_regex, "method-regex"),
+            ("path_regex", self.exclude_path_regex, "path-regex"),
+            ("tag_regex", self.exclude_tag_regex, "tag-regex"),
+            ("operation_id_regex", self.exclude_operation_id_regex, "operation-id-regex"),
         ):
-            filter_set.exclude(
-                name_regex=self.exclude_name_regex,
-                method_regex=self.exclude_method_regex,
-                path_regex=self.exclude_path_regex,
-                tag_regex=self.exclude_tag_regex,
-                operation_id_regex=self.exclude_operation_id_regex,
-            )
+            if value:
+                apply_exclude_filter(filter_set, name, **{key: value})
 
         # Exclude deprecated operations
         if self.exclude_deprecated:
             filter_set.exclude(is_deprecated)
 
         return filter_set
+
+
+def apply_exclude_filter(filter_set: FilterSet, option_name: str, **kwargs: Any) -> None:
+    """Apply an exclude filter with proper error handling."""
+    try:
+        filter_set.exclude(**kwargs)
+    except IncorrectUsage as e:
+        if str(e) == "Filter already exists":
+            raise click.UsageError(
+                f"Filter for {option_name} already exists. You can't simultaneously include and exclude the same thing."
+            ) from None
+        raise click.UsageError(str(e)) from None
 
 
 def validate_unique_filter(values: Sequence[str], arg_name: str) -> None:

@@ -27,7 +27,7 @@ from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
-    from rich.console import Console
+    from rich.console import Console, Group
     from rich.live import Live
     from rich.progress import Progress, TaskID
     from rich.text import Text
@@ -97,7 +97,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
         click.echo()
 
 
-VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema"
+VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema or GraphQL endpoint"
 DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
 LOADER_ERROR_SUGGESTIONS = {
     # SSL-specific connection issue
@@ -123,12 +123,6 @@ def _display_extras(extras: list[str]) -> None:
         click.echo()
     for extra in extras:
         click.secho(f"    {extra}")
-
-
-def _maybe_display_tip(suggestion: str | None) -> None:
-    # Display suggestion if any
-    if suggestion is not None:
-        click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
 
 
 def display_header(version: str) -> None:
@@ -231,6 +225,33 @@ class LoadingProgressManager:
             ("Loaded specification from ", Style(color="bright_white")),
             (self.location, Style(color="cyan")),
             (f" (in {duration})", Style(color="bright_white")),
+        )
+
+    def get_error_message(self, error: LoaderError) -> Group:
+        from rich.console import Group
+        from rich.style import Style
+        from rich.text import Text
+
+        duration = format_duration(int((time.monotonic() - self.start_time) * 1000))
+
+        # Show what was attempted
+        attempted = Text.assemble(
+            ("❌  ", Style(color="red")),
+            ("Failed to load specification from ", Style(color="white")),
+            (self.location, Style(color="cyan")),
+            (f" after {duration}", Style(color="white")),
+        )
+
+        # Show error details
+        error_title = Text("Schema Loading Error", style=Style(color="red", bold=True))
+        error_message = Text(error.message)
+
+        return Group(
+            attempted,
+            Text(),
+            error_title,
+            Text(),
+            error_message,
         )
 
 
@@ -782,7 +803,7 @@ class OutputHandler(EventHandler):
         elif isinstance(event, events.Interrupted):
             self._on_interrupted(event)
         elif isinstance(event, events.FatalError):
-            self._on_fatal_error(event)
+            self._on_fatal_error(ctx, event)
         elif isinstance(event, events.NonFatalError):
             self.errors.append(event)
         elif isinstance(event, LoadingStarted):
@@ -1039,20 +1060,35 @@ class OutputHandler(EventHandler):
             self.console.print(message)
             self.console.print()
 
-    def _on_fatal_error(self, event: events.FatalError) -> None:
+    def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
+        from rich.padding import Padding
+        from rich.text import Text
+
+        self.shutdown(ctx)
+
         if isinstance(event.exception, LoaderError):
-            title = "Schema Loading Error"
-            message = event.exception.message
-            extras = event.exception.extras
-            suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
-        else:
-            title = "Test Execution Error"
-            message = DEFAULT_INTERNAL_ERROR_MESSAGE
-            traceback = format_exception(event.exception, with_traceback=True)
-            extras = split_traceback(traceback)
-            suggestion = (
-                f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-            )
+            assert self.loading_manager is not None
+            message = Padding(self.loading_manager.get_error_message(event.exception), BLOCK_PADDING)
+            self.console.print(message)
+            self.console.print()
+            self.loading_manager = None
+
+            if event.exception.extras:
+                for extra in event.exception.extras:
+                    self.console.print(Padding(Text(extra), (0, 0, 0, 5)))
+                self.console.print()
+
+            if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.wait_for_schema is not None):
+                suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
+                if suggestion is not None:
+                    click.secho(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+
+            raise click.Abort
+        title = "Test Execution Error"
+        message = DEFAULT_INTERNAL_ERROR_MESSAGE
+        traceback = format_exception(event.exception, with_traceback=True)
+        extras = split_traceback(traceback)
+        suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
         click.secho(title, fg="red", bold=True)
         click.echo()
         click.secho(message)
@@ -1062,7 +1098,7 @@ class OutputHandler(EventHandler):
             and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
             and self.wait_for_schema is not None
         ):
-            _maybe_display_tip(suggestion)
+            click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
 
         raise click.Abort
 
