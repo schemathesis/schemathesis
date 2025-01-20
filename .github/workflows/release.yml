@@ -24,10 +24,13 @@ jobs:
       - name: Detect pre-release
         id: detect-prerelease
         run: |
-          if [ "${{ github.event.release.prerelease }}" == "true" ]; then
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event.release.prerelease }}" == "true" ] || [[ "$TAG_NAME" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
             echo "is_prerelease=true" >> $GITHUB_ENV
           else
             echo "is_prerelease=false" >> $GITHUB_ENV
+          fi
+        shell: bash
 
       - name: Docker meta
         id: meta
