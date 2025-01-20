@@ -21,6 +21,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4.2.1
 
+      - name: Detect pre-release
+        id: detect-prerelease
+        run: |
+          TAG_NAME="${{ github.event.release.tag_name }}"
+          if [ "${{ github.event.release.prerelease }}" == "true" ] || [[ "$TAG_NAME" =~ -(alpha|beta|rc)[0-9]*$ ]]; then
+            echo "is_prerelease=true" >> $GITHUB_ENV
+          else
+            echo "is_prerelease=false" >> $GITHUB_ENV
+
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -33,7 +42,7 @@ jobs:
           tags: |
             type=semver,pattern={{raw}}${{ matrix.tag-suffix }}
             type=semver,pattern={{version}}${{ matrix.tag-suffix }}
-            type=raw,value=stable${{ matrix.tag-suffix }}
+            ${{ env.is_prerelease == 'false' && 'type=raw,value=stable${{ matrix.tag-suffix }}' || '' }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
