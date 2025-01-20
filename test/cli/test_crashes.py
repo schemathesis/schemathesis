@@ -186,6 +186,7 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
 )
 @example(params=["--checks=0"], flags=[], multiple_params=[], csv_params=[])
 @example(params=["--generation-optimize=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--exclude-operation-id=0", "--include-operation-id=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_random_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(
