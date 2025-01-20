@@ -9,3 +9,6 @@ python:
     - method: pip
       path: .
     - requirements: docs/requirements.txt
+
+sphinx:
+  configuration: docs/conf.py
