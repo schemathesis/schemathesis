@@ -4,9 +4,12 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema Loading Error
 
-API schema does not appear syntactically valid
+ ❌  Failed to load specification from /tmp/schema.yaml after N ms
 
-    unacceptable character #x0000: control characters are not allowed
-      in "<unicode string>", position 395
+ Schema Loading Error
+
+ API schema does not appear syntactically valid
+
+     unacceptable character #x0000: control characters are not allowed
+       in "<unicode string>", position 395

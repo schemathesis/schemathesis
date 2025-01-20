@@ -339,6 +339,7 @@ class CliSnapshotConfig:
                         pass
             with keep_cwd():
                 data = data.replace(Path(self.testdir.tmpdir).as_uri(), "file:///tmp")
+        data = re.sub(r"http://127\.0\.0\.1:[0-9]{3,}/", "http://127.0.0.1/", data)
         if self.replace_tmp_dir:
             with keep_cwd():
                 data = data.replace(str(self.testdir.tmpdir) + os.path.sep, "/tmp/")
@@ -383,6 +384,7 @@ class CliSnapshotConfig:
             data = re.sub(r"in (?:[0-9]+? s )?[0-9]+? ms", "in N ms", data)
             data = re.sub(r"in [0-9]+? s", "in N ms", data)
             data = re.sub(r"after [0-9]+? ms", "after N ms", data).strip()
+            data = re.sub(r"after (?:[0-9]+? s )?[0-9]+? ms", "after N ms", data)
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:

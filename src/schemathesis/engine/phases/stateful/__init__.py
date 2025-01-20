@@ -27,6 +27,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     thread = threading.Thread(
         target=execute_state_machine_loop,
         kwargs={"state_machine": state_machine, "event_queue": event_queue, "engine": engine},
+        name="schemathesis_stateful_tests",
     )
     status: Status | None = None
     is_executed = False

@@ -5,6 +5,7 @@ import time
 import unittest
 from dataclasses import replace
 from typing import Any
+from warnings import catch_warnings
 
 import hypothesis
 from hypothesis.control import current_build_context
@@ -197,7 +198,7 @@ def execute_state_machine_loop(
             break
         suite_status = Status.SUCCESS
         try:
-            with ignore_hypothesis_output():  # type: ignore
+            with catch_warnings(), ignore_hypothesis_output():  # type: ignore
                 InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code

@@ -4,10 +4,13 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-Schema Loading Error
 
-Connection failed
+ ❌  Failed to load specification from http://127.0.0.1:1/schema.yaml after N ms
 
-    Failed to establish a new connection: [Error NUM] Connection refused
+ Schema Loading Error
+
+ Connection failed
+
+     Failed to establish a new connection: [Error NUM] Connection refused
 
 Tip: Use `--wait-for-schema=NUM` to wait up to NUM seconds for schema availability.

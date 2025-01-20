@@ -5,14 +5,19 @@ Changelog
 ---------------------------------------------
 
 **Added**
+
 - Improved visibility into Open API link extraction success/failure status :issue:`823`
 
 **Changed**
+
 - Unified test progress display with multi-spinner interface and single progress bar :issue:`2372`
 - Optimized stateful testing by generating only required test data for Open API links.
+- Cleaner display of schema loading errors.
 
 **Fixed**
+
 - More accurate exception deduplication based on source location instead of messages.
+- Stricter validation of ``--include-*`` and ``--exclude-*`` CLI options.
 
 .. _v4.0.0a1:
 
