@@ -256,7 +256,7 @@ def convert_experimental(
     ]
 
 
-def convert_checks(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str]:
+def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str]:
     return reduce(operator.iadd, value, [])
 
 
