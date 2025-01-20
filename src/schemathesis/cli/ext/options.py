@@ -80,7 +80,10 @@ class RegistryChoice(BaseCsvChoice):
     def convert(  # type: ignore[return]
         self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
     ) -> list[str]:
-        return [item for item in value.split(",") if item]
+        selected, invalid_options = self.parse_value(value)
+        if not invalid_options and selected:
+            return selected
+        self.fail_on_invalid_options(invalid_options, selected)
 
 
 class OptionalInt(click.types.IntRange):

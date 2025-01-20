@@ -91,7 +91,7 @@ DEFAULT_PHASES = ("unit", "stateful")
     help="Comma-separated list of checks to run against API responses",
     type=RegistryChoice(CHECKS, with_all=True),
     default=("not_a_server_error",),
-    callback=validation.convert_checks,
+    callback=validation.reduce_list,
     show_default=True,
     metavar="",
 )
@@ -102,7 +102,7 @@ DEFAULT_PHASES = ("unit", "stateful")
     help="Comma-separated list of checks to skip during testing",
     type=RegistryChoice(CHECKS, with_all=True),
     default=(),
-    callback=validation.convert_checks,
+    callback=validation.reduce_list,
     show_default=True,
     metavar="",
 )
@@ -356,7 +356,7 @@ DEFAULT_PHASES = ("unit", "stateful")
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
     default=None,
-    callback=validation.convert_checks,
+    callback=validation.reduce_list,
     show_default=True,
     metavar="TARGET",
 )

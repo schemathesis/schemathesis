@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from hypothesis import HealthCheck, Phase, Verbosity, example, given, settings
+from hypothesis import HealthCheck, Phase, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from requests import Response
@@ -47,8 +47,8 @@ def schema_url(server):
 
 @st.composite
 def delimited(draw):
-    key = draw(st.text(min_size=1))
-    value = draw(st.text(min_size=1))
+    key = draw(st.text(min_size=1, alphabet=st.characters(min_codepoint=1, max_codepoint=127))).strip() or "a"
+    value = draw(st.text(min_size=1, alphabet=st.characters(min_codepoint=1, max_codepoint=127))).strip() or "b"
     return f"{key}:{value}"
 
 
@@ -72,23 +72,18 @@ def csv_strategy(enum, exclude=()):
         {},
         optional={
             "auth": delimited(),
-            "auth-type": st.sampled_from(["basic", "digest", "BASIC", "DIGEST"]),
-            "data-generation-method": st.sampled_from([item.name for item in GenerationMode]),
-            "target": st.sampled_from(TARGETS.get_all_names()),
-            "force-schema-version": st.sampled_from(["20", "30"]),
+            "generation-mode": st.sampled_from([item.name.lower() for item in GenerationMode] + ["all"]),
+            "generation-optimize": st.sampled_from(TARGETS.get_all_names()),
             "workers": st.integers(min_value=1, max_value=64),
             "request-timeout": st.integers(min_value=1),
             "max-response-time": st.integers(min_value=1),
-            "validate-schema": st.booleans(),
             "generation-with-security-parameters": st.booleans(),
-            "experimental-no-failfast": st.booleans(),
-            "hypothesis-database": st.text(),
-            "hypothesis-deadline": st.integers(min_value=1, max_value=300000) | st.none(),
-            "hypothesis-max-examples": st.integers(min_value=1),
-            "hypothesis-report-multiple-bugs": st.booleans(),
-            "hypothesis-seed": st.integers(),
-            "hypothesis-verbosity": st.sampled_from([item.name for item in Verbosity]),
-            "experimental": st.sampled_from([experiment.name for experiment in GLOBAL_EXPERIMENTS.available]),
+            "generation-database": st.text(),
+            "generation-max-examples": st.integers(min_value=1),
+            "generation-seed": st.integers(),
+            "experimental": st.sampled_from(
+                [experiment.name.lower().replace(" ", "-") for experiment in GLOBAL_EXPERIMENTS.available]
+            ),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -96,11 +91,10 @@ def csv_strategy(enum, exclude=()):
         optional={
             key: st.booleans()
             for key in (
-                "show-trace",
                 "exitfirst",
-                "hypothesis-derandomize",
-                "dry-run",
-                "contrib-unique-data",
+                "generation-deterministic",
+                "experimental-no-failfast",
+                "generation-unique-inputs",
                 "no-color",
             )
         },
@@ -110,16 +104,20 @@ def csv_strategy(enum, exclude=()):
         optional={
             "checks": st.lists(st.sampled_from(CHECKS.get_all_names() + ["all"]), min_size=1),
             "header": st.lists(delimited(), min_size=1),
-            "endpoint": st.lists(st.text(min_size=1)),
-            "method": st.lists(st.text(min_size=1)),
-            "tag": st.lists(st.text(min_size=1)),
-            "operation-id": st.lists(st.text(min_size=1)),
+            "include-name": st.lists(st.text(min_size=1)),
+            "exclude-name": st.lists(st.text(min_size=1)),
+            "include-method": st.lists(st.text(min_size=1)),
+            "exclude-method": st.lists(st.text(min_size=1)),
+            "include-tag": st.lists(st.text(min_size=1)),
+            "exclude-tag": st.lists(st.text(min_size=1)),
+            "include-operation-id": st.lists(st.text(min_size=1)),
+            "exclude-operation-id": st.lists(st.text(min_size=1)),
         },
     ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
     csv_params=st.fixed_dictionaries(
         {},
         optional={
-            "hypothesis-suppress-health-check": csv_strategy(
+            "suppress-health-check": csv_strategy(
                 HealthCheck, exclude=("function_scoped_fixture", "differing_executors")
             ),
             "hypothesis-phases": csv_strategy(Phase, exclude=("explain",)),
@@ -130,6 +128,66 @@ def csv_strategy(enum, exclude=()):
 @example(params=["--generation-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
+    result = cli.run(
+        schema_url,
+        *params,
+        *multiple_params,
+        *flags,
+        *csv_params,
+    )
+    check_result(result)
+
+
+@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture], deadline=None)
+@given(
+    params=st.fixed_dictionaries(
+        {},
+        optional={
+            "auth": st.text(),
+            "generation-mode": st.text(),
+            "generation-optimize": st.text(),
+            "workers": st.text(),
+            "request-timeout": st.text(),
+            "max-response-time": st.text(),
+            "generation-with-security-parameters": st.booleans(),
+            "generation-database": st.text(),
+            "generation-max-examples": st.text(),
+            "generation-seed": st.text(),
+            "experimental": st.text(),
+        },
+    ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
+    flags=st.fixed_dictionaries(
+        {},
+        optional={
+            key: st.booleans()
+            for key in (
+                "exitfirst",
+                "generation-deterministic",
+                "experimental-no-failfast",
+                "generation-unique-inputs",
+                "no-color",
+            )
+        },
+    ).map(lambda flags: [f"--{flag}" for flag in flags]),
+    multiple_params=st.fixed_dictionaries(
+        {},
+        optional={
+            "checks": st.lists(st.text(), min_size=1),
+            "header": st.lists(st.text(), min_size=1),
+        },
+    ).map(lambda params: [f"--{key}={value}" for key, values in params.items() for value in values]),
+    csv_params=st.fixed_dictionaries(
+        {},
+        optional={
+            "suppress-health-check": st.lists(st.text()).map(",".join),
+            "hypothesis-phases": st.lists(st.text()).map(",".join),
+        },
+    ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
+)
+@example(params=["--checks=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--generation-optimize=0"], flags=[], multiple_params=[], csv_params=[])
+@pytest.mark.usefixtures("mocked_schema")
+def test_random_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(
         schema_url,
         *params,
