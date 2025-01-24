@@ -13,7 +13,13 @@ from hypothesis import HealthCheck, Phase, Verbosity
 import schemathesis
 from schemathesis.checks import CHECKS
 from schemathesis.core.compat import RefResolutionError
-from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE, IncorrectUsage, LoaderError, format_exception
+from schemathesis.core.errors import (
+    RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    IncorrectUsage,
+    InvalidSchema,
+    LoaderError,
+    format_exception,
+)
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events, from_schema
@@ -130,7 +136,7 @@ def test_default(corpus, filename, app_port):
     schema = _load_schema(corpus, filename, app_port)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, IncorrectUsage, LoaderError):
+    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema):
         pass
 
     engine = from_schema(
@@ -237,6 +243,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
     if "Ensure that the definition complies with the OpenAPI specification" in formatted:
         return True
     if "Invalid Open API link definition" in formatted:
+        return True
+    if "is not defined in API operation" in formatted:
         return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in formatted:
         return True
