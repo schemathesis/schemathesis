@@ -66,7 +66,156 @@ def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, m
             )
             + trailing_anchor
         )
+    elif (
+        len(parsed) > 3
+        and parsed[0][0] == ANCHOR
+        and parsed[-1][0] == ANCHOR
+        and all(op == LITERAL or op in REPEATS for op, _ in parsed[1:-1])
+    ):
+        return _handle_anchored_pattern(parsed, pattern, min_length, max_length)
     return pattern
+
+
+def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None, max_length: int | None) -> str:
+    """Update regex pattern with multiple quantified patterns to satisfy length constraints."""
+    # Extract anchors
+    leading_anchor_length = _get_anchor_length(parsed[0][1])
+    trailing_anchor_length = _get_anchor_length(parsed[-1][1])
+    leading_anchor = pattern[:leading_anchor_length]
+    trailing_anchor = pattern[-trailing_anchor_length:]
+
+    pattern_parts = parsed[1:-1]
+
+    # Adjust length constraints by subtracting fixed literals length
+    fixed_length = sum(1 for op, _ in pattern_parts if op == LITERAL)
+    if min_length is not None:
+        min_length -= fixed_length
+        if min_length < 0:
+            return pattern
+    if max_length is not None:
+        max_length -= fixed_length
+        if max_length < 0:
+            return pattern
+
+    # Extract only min/max bounds from quantified parts
+    quantifier_bounds = [value[:2] for op, value in pattern_parts if op in REPEATS]
+
+    if not quantifier_bounds:
+        return pattern
+
+    length_distribution = _distribute_length_constraints(quantifier_bounds, min_length, max_length)
+    if not length_distribution:
+        return pattern
+
+    # Rebuild pattern with updated quantifiers
+    result = leading_anchor
+    current_idx = leading_anchor_length
+    distribution_idx = 0
+
+    for op, value in pattern_parts:
+        if op == LITERAL:
+            result += chr(value)
+            current_idx += 1
+        else:
+            new_min, new_max = length_distribution[distribution_idx]
+            next_position = _find_quantified_end(pattern, current_idx)
+            quantified_segment = pattern[current_idx:next_position]
+            _, _, subpattern = value
+            new_value = (new_min, new_max, subpattern)
+            result += _update_quantifier(op, new_value, quantified_segment, new_min, new_max)
+            current_idx = next_position
+            distribution_idx += 1
+
+    return result + trailing_anchor
+
+
+def _find_quantified_end(pattern: str, start: int) -> int:
+    """Find the end position of current quantified part."""
+    level = 0
+    for i in range(start, len(pattern)):
+        # Track nested character class level
+        if pattern[i] == "[":
+            level += 1
+        elif pattern[i] == "]":
+            level -= 1
+        # Handle simple and complex quantifiers outside character classes
+        elif level == 0 and pattern[i] in "*+?":
+            return i + 1
+        elif level == 0 and pattern[i] == "{":
+            # Find matching }
+            while i < len(pattern) and pattern[i] != "}":
+                i += 1
+            return i + 1
+    return len(pattern)
+
+
+def _distribute_length_constraints(
+    bounds: list[tuple[int, int]], min_length: int | None, max_length: int | None
+) -> list[tuple[int, int]] | None:
+    """Distribute length constraints among quantified pattern parts."""
+    # Handle exact length case with dynamic programming
+    if min_length == max_length:
+        assert min_length is not None
+        target = min_length
+        dp: dict[tuple[int, int], list[tuple[int, ...]] | None] = {}
+
+        def find_valid_combination(pos: int, remaining: int) -> list[tuple[int, ...]] | None:
+            if (pos, remaining) in dp:
+                return dp[(pos, remaining)]
+
+            if pos == len(bounds):
+                return [()] if remaining == 0 else None
+
+            max_len: int
+            min_len, max_len = bounds[pos]
+            if max_len == MAXREPEAT:
+                max_len = remaining + 1
+            else:
+                max_len += 1
+
+            # Try each possible length for current quantifier
+            for length in range(min_len, max_len):
+                rest = find_valid_combination(pos + 1, remaining - length)
+                if rest is not None:
+                    dp[(pos, remaining)] = [(length,) + r for r in rest]
+                    return dp[(pos, remaining)]
+
+            dp[(pos, remaining)] = None
+            return None
+
+        distribution = find_valid_combination(0, target)
+        if distribution:
+            return [(length, length) for length in distribution[0]]
+        return None
+
+    # Handle range case by distributing min/max bounds
+    result = []
+    remaining_min = min_length or 0
+    remaining_max = max_length or MAXREPEAT
+
+    for min_repeat, max_repeat in bounds:
+        if remaining_min > 0:
+            part_min = min(max_repeat, max(min_repeat, remaining_min))
+        else:
+            part_min = min_repeat
+
+        if remaining_max < MAXREPEAT:
+            part_max = min(max_repeat, remaining_max)
+        else:
+            part_max = max_repeat
+
+        if part_min > part_max:
+            return None
+
+        result.append((part_min, part_max))
+
+        remaining_min = max(0, remaining_min - part_min)
+        remaining_max -= part_max if part_max != MAXREPEAT else 0
+
+    if remaining_min > 0 or remaining_max < 0:
+        return None
+
+    return result
 
 
 def _get_anchor_length(node_type: int) -> int:
