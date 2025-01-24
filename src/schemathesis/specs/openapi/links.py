@@ -5,6 +5,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Generator, Literal, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
@@ -92,7 +93,7 @@ class OpenApiLink:
         for param in self.target.iter_parameters():
             if param.name == name:
                 return LOCATION_TO_CONTAINER[param.location]
-        raise ValueError(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
+        raise InvalidSchema(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
 
     def extract(self, output: StepOutput) -> Transition:
         return self._cached_extract(StepOutputWrapper(output))
