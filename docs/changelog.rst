@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.2...HEAD>` - TBD
 ---------------------------------------------------
 
+**Fixed**
+
+- Handling of complex regex patterns with multiple quantifiers to respect length constraints during test generation.
+
 .. _v4.0.0-alpha.2:
 
 :version:`4.0.0-alpha.2 <v4.0.0a1...v4.0.0-alpha.2>` - 2025-01-20

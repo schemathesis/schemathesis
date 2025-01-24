@@ -75,6 +75,33 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("b$", None, None, "b$"),
         ("b$", 0, None, "b$"),
         ("}?", 0, None, "}?"),
+        # More complex patterns
+        # Fixed parts with single quantifier
+        ("^abc[0-9]*$", None, 5, "^abc([0-9]){0,2}$"),
+        ("^-[a-z]{1,10}-$", None, 4, "^-([a-z]){1,2}-$"),
+        # Multiple quantifiers
+        (r"^[a-z]{2,4}-\d{4,15}$", 7, 7, r"^([a-z]){2}-(\d){4}$"),
+        (r"^[a-z]{2,4}-\d{4,15}$", 20, 20, r"^([a-z]){4}-(\d){15}$"),
+        # Complex patterns with multiple parts
+        ("^[A-Z]{1,3}-[0-9]{2,4}-[a-z]{1,5}$", 8, 8, "^([A-Z]){1}-([0-9]){2}-([a-z]){3}$"),
+        (r"^\w{2,4}:\d{3,5}:[A-F]{1,2}$", 10, 10, r"^(\w){2}:(\d){4}:([A-F]){2}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 7, 7, r"^([a-zA-Z0-9]){2}-(\d){4}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 8, 8, r"^([a-zA-Z0-9]){2}-(\d){5}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 19, 19, r"^([a-zA-Z0-9]){3}-(\d){15}$"),
+        (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 50, 50, r"^[a-zA-Z0-9]{2,4}-\d{4,15}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 1, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 1, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", None, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 0, None, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd([a-zA-Z0-9]){2,4}$"),
+        (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd([a-zA-Z0-9]){2,4}$"),
+        (r"^abcd$", 50, 50, r"^abcd$"),
+        # Edge cases
+        ("^[a-z]*-[0-9]*$", 3, 3, "^([a-z]){0}-([0-9]){2}$"),
+        # Multiple fixed parts
+        ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc([0-9]){1}def([a-z]){2}ghi$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
