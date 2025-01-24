@@ -4,7 +4,9 @@ Changelog
 :version:`Unreleased <v3.39.7...HEAD>` - TBD
 --------------------------------------------
 
-.. _v3.39.7:
+**Fixed**
+
+- Handling of complex regex patterns with multiple quantifiers to respect length constraints during test generation.
 
 :version:`3.39.7 <v3.39.6...v3.39.7>` - 2025-01-16
 --------------------------------------------------

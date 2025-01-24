@@ -194,6 +194,10 @@ class CoverageContext:
                 re.compile(pattern)
             except re.error:
                 raise Unsatisfiable from None
+            if "minLength" in schema or "maxLength" in schema:
+                min_length = schema.get("minLength")
+                max_length = schema.get("maxLength")
+                pattern = update_quantifier(schema["pattern"], min_length, max_length)
             return cached_draw(st.from_regex(pattern))
         if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
             items = schema["items"]
@@ -514,11 +518,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         # Default positive value
         yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
     elif "pattern" in schema:
-        # Without merging `maxLength` & `minLength` into a regex it is problematic
-        # to generate a valid value as the unredlying machinery will resort to filtering
-        # and it is unlikely that it will generate a string of that length
         yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
-        return
 
     seen = set()
 

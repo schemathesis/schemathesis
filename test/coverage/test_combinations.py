@@ -153,7 +153,7 @@ def test_negative_primitive_schemas(nctx, schema, expected):
         ({"type": "string", "minLength": 5, "maxLength": 10}, {5, 6, 9, 10}),
         ({"type": "string", "minLength": 5, "maxLength": 6}, {5, 6}),
         ({"type": "string", "minLength": 5, "maxLength": 5}, {5}),
-        ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": "^[\\w\\W]+$"}, {1}),
+        ({"type": "string", "minLength": 0, "maxLength": 512, "pattern": r"^[\w\W]+$"}, {1}),
     ],
 )
 def test_positive_string(ctx, schema, lengths):
@@ -925,6 +925,14 @@ SCHEMA_WITH_PATTERN = {"minLength": 2, "pattern": "^A{2}$"}
 def test_negative_pattern(nctx, schema, expected):
     covered = cover_schema(nctx, schema)
     assert covered == expected
+    assert_unique(covered)
+    assert_not_conform(covered, schema)
+
+
+def test_positive_pattern(pctx):
+    schema = {"pattern": r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", "minLength": 7, "maxLength": 20, "type": "string"}
+    covered = cover_schema(pctx, schema)
+    assert covered == ["0000-0000", "00-0000", "00-00000", "0000-000000000000000", "000-000000000000000"]
     assert_unique(covered)
     assert_not_conform(covered, schema)
 
