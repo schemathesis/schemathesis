@@ -197,7 +197,7 @@ class CoverageContext:
             if "minLength" in schema or "maxLength" in schema:
                 min_length = schema.get("minLength")
                 max_length = schema.get("maxLength")
-                pattern = update_quantifier(schema["pattern"], min_length, max_length)
+                pattern = update_quantifier(pattern, min_length, max_length)
             return cached_draw(st.from_regex(pattern))
         if (keys == ["items", "type"] or keys == ["items", "minItems", "type"]) and isinstance(schema["items"], dict):
             items = schema["items"]
