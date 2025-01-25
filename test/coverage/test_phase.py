@@ -1029,6 +1029,106 @@ def test_incorrect_headers(ctx):
     )
 
 
+def test_optional_parameter_without_type(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "query",
+                            "required": True,
+                            "schema": {"title": "Query", "type": "string"},
+                        },
+                        {
+                            "in": "query",
+                            "name": "locking_period",
+                            "required": False,
+                            "schema": {"default": 24, "title": "Locking Period"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {
+                "query": {
+                    "query": "",
+                    "x-schemathesis-unknown-property": "42",
+                },
+            },
+            {
+                "query": {
+                    "query": "{}",
+                },
+            },
+            {
+                "query": {
+                    "query": [
+                        "null",
+                        "null",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "query": "null",
+                },
+            },
+            {
+                "query": {
+                    "query": "false",
+                },
+            },
+            {
+                "query": {
+                    "query": "0",
+                },
+            },
+            {
+                "query": {},
+            },
+            {
+                "query": {
+                    "query": [
+                        "0",
+                        "0",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "query": "{}",
+                },
+            },
+            {
+                "query": {
+                    "query": [
+                        "null",
+                        "null",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "query": "null",
+                },
+            },
+            {
+                "query": {
+                    "query": "false",
+                },
+            },
+        ],
+    )
+
+
 def test_incorrect_headers_with_enum(ctx):
     schema = ctx.openapi.build_schema(
         {

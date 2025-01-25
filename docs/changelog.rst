@@ -11,6 +11,7 @@ Changelog
 **Fixed**
 
 - Handling of complex regex patterns with multiple quantifiers to respect length constraints during test generation.
+- Internal error during the coverage phase if negated parameter has no ``type``.
 
 .. _v4.0.0-alpha.2:
 
