@@ -40,7 +40,7 @@ def display_section_name(title: str, separator: str = "=", **kwargs: Any) -> Non
     """Print section name with separators in terminal with the given title nicely centered."""
     message = f" {title} ".center(get_terminal_width(), separator)
     kwargs.setdefault("bold", True)
-    click.secho(message, **kwargs)
+    click.echo(_style(message, **kwargs))
 
 
 def bold(option: str) -> str:
@@ -58,12 +58,14 @@ def display_failures(ctx: ExecutionContext) -> None:
 
 
 if IO_ENCODING != "utf-8":
+    HEADER_SEPARATOR = "-"
 
     def _style(text: str, **kwargs: Any) -> str:
         text = text.encode(IO_ENCODING, errors="replace").decode("utf-8")
         return click.style(text, **kwargs)
 
 else:
+    HEADER_SEPARATOR = "━"
 
     def _style(text: str, **kwargs: Any) -> str:
         return click.style(text, **kwargs)
@@ -122,14 +124,14 @@ def _display_extras(extras: list[str]) -> None:
     if extras:
         click.echo()
     for extra in extras:
-        click.secho(f"    {extra}")
+        click.echo(_style(f"    {extra}"))
 
 
 def display_header(version: str) -> None:
     prefix = "v" if version != "dev" else ""
     header = f"Schemathesis {prefix}{version}"
-    click.secho(header, bold=True)
-    click.secho("━" * len(header), bold=True)
+    click.echo(_style(header, bold=True))
+    click.echo(_style(HEADER_SEPARATOR * len(header), bold=True))
     click.echo()
 
 
@@ -1081,7 +1083,7 @@ class OutputHandler(EventHandler):
             if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.wait_for_schema is not None):
                 suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
                 if suggestion is not None:
-                    click.secho(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+                    click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
             raise click.Abort
         title = "Test Execution Error"
@@ -1089,16 +1091,16 @@ class OutputHandler(EventHandler):
         traceback = format_exception(event.exception, with_traceback=True)
         extras = split_traceback(traceback)
         suggestion = f"Please consider reporting the traceback above to our issue tracker:\n\n  {ISSUE_TRACKER_URL}."
-        click.secho(title, fg="red", bold=True)
+        click.echo(_style(title, fg="red", bold=True))
         click.echo()
-        click.secho(message)
+        click.echo(message)
         _display_extras(extras)
         if not (
             isinstance(event.exception, LoaderError)
             and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
             and self.wait_for_schema is not None
         ):
-            click.secho(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}")
+            click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
         raise click.Abort
 
@@ -1106,29 +1108,33 @@ class OutputHandler(EventHandler):
         display_section_name("WARNINGS")
         total = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
         suffix = "" if total == 1 else "s"
-        click.secho(
-            f"\nMissing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
-            fg="yellow",
+        click.echo(
+            _style(
+                f"\nMissing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
+                fg="yellow",
+            )
         )
 
         for status_code, operations in self.warnings.missing_auth.items():
             status_text = "Unauthorized" if status_code == 401 else "Forbidden"
             count = len(operations)
             suffix = "" if count == 1 else "s"
-            click.secho(
-                f"{status_code} {status_text} ({count} operation{suffix}):",
-                fg="yellow",
+            click.echo(
+                _style(
+                    f"{status_code} {status_text} ({count} operation{suffix}):",
+                    fg="yellow",
+                )
             )
             # Show first few API operations
             for endpoint in operations[:3]:
-                click.secho(f"  • {endpoint}", fg="yellow")
+                click.echo(_style(f"  - {endpoint}", fg="yellow"))
             if len(operations) > 3:
-                click.secho(f"  + {len(operations) - 3} more", fg="yellow")
+                click.echo(_style(f"  + {len(operations) - 3} more", fg="yellow"))
             click.echo()
-        click.secho("Tip: ", bold=True, fg="yellow", nl=False)
-        click.secho(f"Use {bold('--auth')} ", fg="yellow", nl=False)
-        click.secho(f"or {bold('-H')} ", fg="yellow", nl=False)
-        click.secho("to provide authentication credentials", fg="yellow")
+        click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
+        click.echo(_style(f"Use {bold('--auth')} ", fg="yellow"), nl=False)
+        click.echo(_style(f"or {bold('-H')} ", fg="yellow"), nl=False)
+        click.echo(_style("to provide authentication credentials", fg="yellow"))
         click.echo()
 
     def display_experiments(self) -> None:
@@ -1136,26 +1142,30 @@ class OutputHandler(EventHandler):
 
         click.echo()
         for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
-            click.secho(f"🧪 {experiment.name}: ", bold=True, nl=False)
-            click.secho(experiment.description)
-            click.secho(f"   Feedback: {experiment.discussion_url}")
+            click.echo(_style(f"🧪 {experiment.name}: ", bold=True), nl=False)
+            click.echo(_style(experiment.description))
+            click.echo(_style(f"   Feedback: {experiment.discussion_url}"))
             click.echo()
 
-        click.secho(
-            "Your feedback is crucial for experimental features. "
-            "Please visit the provided URL(s) to share your thoughts.",
-            dim=True,
+        click.echo(
+            _style(
+                "Your feedback is crucial for experimental features. "
+                "Please visit the provided URL(s) to share your thoughts.",
+                dim=True,
+            )
         )
         click.echo()
 
     def display_api_operations(self, ctx: ExecutionContext) -> None:
         assert self.statistic is not None
-        click.secho("API Operations:", bold=True)
-        click.secho(
-            f"  Selected: {click.style(str(self.statistic.operations.selected), bold=True)}/"
-            f"{click.style(str(self.statistic.operations.total), bold=True)}"
+        click.echo(_style("API Operations:", bold=True))
+        click.echo(
+            _style(
+                f"  Selected: {click.style(str(self.statistic.operations.selected), bold=True)}/"
+                f"{click.style(str(self.statistic.operations.total), bold=True)}"
+            )
         )
-        click.secho(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}")
+        click.echo(_style(f"  Tested: {click.style(str(len(ctx.statistic.tested_operations)), bold=True)}"))
         errors = len(
             {
                 err.label
@@ -1167,48 +1177,48 @@ class OutputHandler(EventHandler):
             }
         )
         if errors:
-            click.secho(f"  Errored: {click.style(str(errors), bold=True)}")
+            click.echo(_style(f"  Errored: {click.style(str(errors), bold=True)}"))
 
         # API operations that are skipped due to fail-fast are counted here as well
         total_skips = self.statistic.operations.selected - len(ctx.statistic.tested_operations) - errors
         if total_skips:
-            click.secho(f"  Skipped: {click.style(str(total_skips), bold=True)}")
+            click.echo(_style(f"  Skipped: {click.style(str(total_skips), bold=True)}"))
             for reason in sorted(set(self.skip_reasons)):
-                click.secho(f"    - {reason.rstrip('.')}")
+                click.echo(_style(f"    - {reason.rstrip('.')}"))
         click.echo()
 
     def display_phases(self) -> None:
-        click.secho("Test Phases:", bold=True)
+        click.echo(_style("Test Phases:", bold=True))
 
         for phase in PhaseName:
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
-                click.secho(f"  ⏭️ {phase.value}", fg="yellow", nl=False)
+                click.echo(_style(f"  ⏭️ {phase.value}", fg="yellow"), nl=False)
                 if skip_reason:
-                    click.secho(f" ({skip_reason.value})", fg="yellow")
+                    click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
                 else:
                     click.echo()
             elif status == Status.SUCCESS:
-                click.secho(f"  ✅ {phase.value}", fg="green")
+                click.echo(_style(f"  ✅ {phase.value}", fg="green"))
             elif status == Status.FAILURE:
-                click.secho(f"  ❌ {phase.value}", fg="red")
+                click.echo(_style(f"  ❌ {phase.value}", fg="red"))
             elif status == Status.ERROR:
-                click.secho(f"  🚫 {phase.value}", fg="red")
+                click.echo(_style(f"  🚫 {phase.value}", fg="red"))
             elif status == Status.INTERRUPTED:
-                click.secho(f"  ⚡ {phase.value}", fg="yellow")
+                click.echo(_style(f"  ⚡ {phase.value}", fg="yellow"))
         click.echo()
 
     def display_test_cases(self, ctx: ExecutionContext) -> None:
         if ctx.statistic.total_cases == 0:
-            click.secho("Test cases:", bold=True)
-            click.secho("  No test cases were generated\n")
+            click.echo(_style("Test cases:", bold=True))
+            click.echo("  No test cases were generated\n")
             return
 
         unique_failures = sum(
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
         )
-        click.secho("Test cases:", bold=True)
+        click.echo(_style("Test cases:", bold=True))
 
         parts = [f"  {click.style(str(ctx.statistic.total_cases), bold=True)} generated"]
 
@@ -1227,7 +1237,7 @@ class OutputHandler(EventHandler):
             if ctx.statistic.cases_without_checks > 0:
                 parts.append(f"{click.style(str(ctx.statistic.cases_without_checks), bold=True)} skipped")
 
-        click.secho(", ".join(parts) + "\n")
+        click.echo(_style(", ".join(parts) + "\n"))
 
     def display_failures_summary(self, ctx: ExecutionContext) -> None:
         # Collect all unique failures and their counts by title
@@ -1238,14 +1248,14 @@ class OutputHandler(EventHandler):
                     data = failure_counts.get(failure.title, (failure.severity, 0))
                     failure_counts[failure.title] = (failure.severity, data[1] + 1)
 
-        click.secho("Failures:", bold=True)
+        click.echo(_style("Failures:", bold=True))
 
         # Sort by severity first, then by title
         sorted_failures = sorted(failure_counts.items(), key=lambda x: (x[1][0], x[0]))
 
         for title, (_, count) in sorted_failures:
-            click.secho(f"  ❌ {title}: ", nl=False)
-            click.secho(str(count), bold=True)
+            click.echo(_style(f"  ❌ {title}: "), nl=False)
+            click.echo(_style(str(count), bold=True))
         click.echo()
 
     def display_errors_summary(self) -> None:
@@ -1255,11 +1265,11 @@ class OutputHandler(EventHandler):
             title = error.info.title
             error_counts[title] = error_counts.get(title, 0) + 1
 
-        click.secho("Errors:", bold=True)
+        click.echo(_style("Errors:", bold=True))
 
         for title in sorted(error_counts):
-            click.secho(f"  🚫 {title}: ", nl=False)
-            click.secho(str(error_counts[title]), bold=True)
+            click.echo(_style(f"  🚫 {title}: "), nl=False)
+            click.echo(_style(str(error_counts[title]), bold=True))
         click.echo()
 
     def display_final_line(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
@@ -1299,9 +1309,9 @@ class OutputHandler(EventHandler):
             reports.append(("JUnit XML", self.junit_xml_file))
 
         if reports:
-            click.secho("Reports:", bold=True)
+            click.echo(_style("Reports:", bold=True))
             for report_type, path in reports:
-                click.secho(f"  • {report_type}: {path}")
+                click.echo(_style(f"  - {report_type}: {path}"))
             click.echo()
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
@@ -1311,9 +1321,11 @@ class OutputHandler(EventHandler):
             for error in errors:
                 display_section_name(error.label, "_", fg="red")
                 click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
-            click.secho(
-                f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
-                fg="red",
+            click.echo(
+                _style(
+                    f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
+                    fg="red",
+                )
             )
         display_failures(ctx)
         if self.warnings.missing_auth:
@@ -1336,8 +1348,8 @@ class OutputHandler(EventHandler):
 
         if self.warnings.missing_auth:
             affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
-            click.secho("Warnings:", bold=True)
-            click.secho(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow")
+            click.echo(_style("Warnings:", bold=True))
+            click.echo(_style(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow"))
             click.echo()
 
         if ctx.summary_lines:

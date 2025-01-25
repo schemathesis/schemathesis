@@ -35,6 +35,6 @@ Test cases:
   N generated, N passed
 
 Reports:
-  • VCR: /tmp/test_run_subprocess_Open_API_20/output.yaml
+  - VCR: /tmp/test_run_subprocess_Open_API_20/output.yaml
 
 =========================== No issues found in 1.00s ===========================
