@@ -25,7 +25,7 @@ Schemathesis dev
 Missing or invalid API credentials: 1 API operation returned authentication errors
 
 401 Unauthorized (1 operation):
-  • GET /api/basic
+  - GET /api/basic
 
 Tip: Use --auth or -H to provide authentication credentials
 
