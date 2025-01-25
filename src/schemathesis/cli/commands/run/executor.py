@@ -83,6 +83,8 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
         base_url=schema.get_base_url(),
         specification=schema.specification,
         statistic=schema.statistic,
+        schema=schema.raw_schema,
+        base_path=schema.base_path,
     )
 
     try:
