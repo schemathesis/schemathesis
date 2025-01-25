@@ -386,19 +386,22 @@ def _iter_coverage_cases(
             container = template["query"]
             for parameter in operation.query:
                 instant = Instant()
-                value = container[parameter.name]
-                yield operation.Case(
-                    **{**template, "query": {**container, parameter.name: [value, value]}},
-                    meta=CaseMetadata(
-                        generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                        components={},
-                        phase=PhaseInfo.coverage(
-                            description=f"Duplicate `{parameter.name}` query parameter",
-                            parameter=parameter.name,
-                            parameter_location="query",
+                # Could be absent if value schema can't be negated
+                # I.e. contains just `default` value without any other keywords
+                value = container.get(parameter.name, NOT_SET)
+                if value is not NOT_SET:
+                    yield operation.Case(
+                        **{**template, "query": {**container, parameter.name: [value, value]}},
+                        meta=CaseMetadata(
+                            generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
+                            components={},
+                            phase=PhaseInfo.coverage(
+                                description=f"Duplicate `{parameter.name}` query parameter",
+                                parameter=parameter.name,
+                                parameter_location="query",
+                            ),
                         ),
-                    ),
-                )
+                    )
         # Generate missing required parameters
         for parameter in operation.iter_parameters():
             if parameter.is_required and parameter.location != "path":
