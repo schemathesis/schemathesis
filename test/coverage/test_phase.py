@@ -1057,7 +1057,7 @@ def test_optional_parameter_without_type(ctx):
     )
     assert_coverage(
         schema,
-        [GenerationMode.NEGATIVE],
+        [DataGenerationMethod.negative],
         [
             {
                 "query": {
