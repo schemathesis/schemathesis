@@ -88,6 +88,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 7, 7, r"^([a-zA-Z0-9]){2}-(\d){4}$"),
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 8, 8, r"^([a-zA-Z0-9]){2}-(\d){5}$"),
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 19, 19, r"^([a-zA-Z0-9]){3}-(\d){15}$"),
+        (r"^([a-zA-Z0-9]){2,4}-(\d){4,15}$", 19, 19, r"^([a-zA-Z0-9]){3}-(\d){15}$"),
         (r"^[a-zA-Z0-9]{2,4}-\d{4,15}$", 50, 50, r"^[a-zA-Z0-9]{2,4}-\d{4,15}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 1, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 1, r"^abcd[a-zA-Z0-9]{2,4}$"),
@@ -97,6 +98,8 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         (r"^abcd[a-zA-Z0-9]{2,4}$", None, 5, r"^abcd[a-zA-Z0-9]{2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, None, r"^abcd([a-zA-Z0-9]){2,4}$"),
         (r"^abcd[a-zA-Z0-9]{2,4}$", 5, 10, r"^abcd([a-zA-Z0-9]){2,4}$"),
+        (r"^[a-zA-Z0-9]+([-a-zA-Z0-9]?[a-zA-Z0-9])*$", 5, 64, r"^([a-zA-Z0-9]){5,64}([-a-zA-Z0-9]?[a-zA-Z0-9]){0}$"),
+        (r"^\+[0-9]{5,}$", 6, 6, r"^\+([0-9]){5}$"),
         (r"^abcd$", 50, 50, r"^abcd$"),
         # Edge cases
         ("^[a-z]*-[0-9]*$", 3, 3, "^([a-z]){0}-([0-9]){2}$"),
@@ -106,6 +109,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
     assert update_quantifier(pattern, min_length, max_length) == expected
+    re.compile(expected)
 
 
 def test_update_quantifier_invalid_pattern():

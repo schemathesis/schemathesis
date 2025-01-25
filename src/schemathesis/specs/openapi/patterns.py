@@ -109,21 +109,27 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
 
     # Rebuild pattern with updated quantifiers
     result = leading_anchor
-    current_idx = leading_anchor_length
+    current_position = leading_anchor_length
     distribution_idx = 0
 
     for op, value in pattern_parts:
         if op == LITERAL:
+            if pattern[current_position] == "\\":
+                # Escaped value
+                current_position += 2
+                result += "\\"
+            else:
+                current_position += 1
             result += chr(value)
-            current_idx += 1
         else:
             new_min, new_max = length_distribution[distribution_idx]
-            next_position = _find_quantified_end(pattern, current_idx)
-            quantified_segment = pattern[current_idx:next_position]
+            next_position = _find_quantified_end(pattern, current_position)
+            quantified_segment = pattern[current_position:next_position]
             _, _, subpattern = value
             new_value = (new_min, new_max, subpattern)
+
             result += _update_quantifier(op, new_value, quantified_segment, new_min, new_max)
-            current_idx = next_position
+            current_position = next_position
             distribution_idx += 1
 
     return result + trailing_anchor
@@ -131,21 +137,34 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
 
 def _find_quantified_end(pattern: str, start: int) -> int:
     """Find the end position of current quantified part."""
-    level = 0
+    char_class_level = 0
+    group_level = 0
+
     for i in range(start, len(pattern)):
-        # Track nested character class level
-        if pattern[i] == "[":
-            level += 1
-        elif pattern[i] == "]":
-            level -= 1
-        # Handle simple and complex quantifiers outside character classes
-        elif level == 0 and pattern[i] in "*+?":
-            return i + 1
-        elif level == 0 and pattern[i] == "{":
-            # Find matching }
-            while i < len(pattern) and pattern[i] != "}":
-                i += 1
-            return i + 1
+        char = pattern[i]
+
+        # Handle character class nesting
+        if char == "[":
+            char_class_level += 1
+        elif char == "]":
+            char_class_level -= 1
+
+        # Handle group nesting
+        elif char == "(":
+            group_level += 1
+        elif char == ")":
+            group_level -= 1
+
+        # Only process quantifiers when we're not inside any nested structure
+        elif char_class_level == 0 and group_level == 0:
+            if char in "*+?":
+                return i + 1
+            elif char == "{":
+                # Find matching }
+                while i < len(pattern) and pattern[i] != "}":
+                    i += 1
+                return i + 1
+
     return len(pattern)
 
 
@@ -242,13 +261,13 @@ def _handle_repeat_quantifier(
     min_length, max_length = _build_size(min_repeat, max_repeat, min_length, max_length)
     if min_length > max_length:
         return pattern
-    return f"({_strip_quantifier(pattern)})" + _build_quantifier(min_length, max_length)
+    return f"({_strip_quantifier(pattern).strip(')(')})" + _build_quantifier(min_length, max_length)
 
 
 def _handle_literal_or_in_quantifier(pattern: str, min_length: int | None, max_length: int | None) -> str:
     """Handle literal or character class quantifiers."""
     min_length = 1 if min_length is None else max(min_length, 1)
-    return f"({pattern})" + _build_quantifier(min_length, max_length)
+    return f"({pattern.strip(')(')})" + _build_quantifier(min_length, max_length)
 
 
 def _build_quantifier(minimum: int | None, maximum: int | None) -> str:
