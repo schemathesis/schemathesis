@@ -560,6 +560,7 @@ class StatefulProgressManager:
 
     console: Console
     title: str
+    links_selected: int
     links_total: int
     start_time: float
 
@@ -576,13 +577,14 @@ class StatefulProgressManager:
 
     # State
     scenarios: int
-    links_seen: set[str]
+    links_covered: set[str]
     stats: dict[Status, int]
     is_interrupted: bool
 
     __slots__ = (
         "console",
         "title",
+        "links_selected",
         "links_total",
         "start_time",
         "title_progress",
@@ -593,17 +595,18 @@ class StatefulProgressManager:
         "progress_task_id",
         "stats_task_id",
         "scenarios",
-        "links_seen",
+        "links_covered",
         "stats",
         "is_interrupted",
     )
 
-    def __init__(self, console: Console, title: str, links_total: int) -> None:
+    def __init__(self, *, console: Console, title: str, links_selected: int, links_total: int) -> None:
         from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
         from rich.style import Style
 
         self.console = console
         self.title = title
+        self.links_selected = links_selected
         self.links_total = links_total
         self.start_time = time.monotonic()
 
@@ -635,7 +638,7 @@ class StatefulProgressManager:
 
         # Initialize state
         self.scenarios = 0
-        self.links_seen = set()
+        self.links_covered = set()
         self.stats = {
             Status.SUCCESS: 0,
             Status.FAILURE: 0,
@@ -652,7 +655,9 @@ class StatefulProgressManager:
 
         # Initialize progress displays
         self.title_task_id = self.title_progress.add_task("Stateful tests")
-        self.progress_task_id = self.progress_bar.add_task("", scenarios=0, links=f"0/{self.links_total} links")
+        self.progress_task_id = self.progress_bar.add_task(
+            "", scenarios=0, links=f"0 covered / {self.links_selected} selected / {self.links_total} total links"
+        )
 
         # Create live display
         group = Group(
@@ -670,10 +675,10 @@ class StatefulProgressManager:
         if self.live:
             self.live.stop()
 
-    def update(self, links_seen: set[str], status: Status | None = None) -> None:
+    def update(self, links_covered: set[str], status: Status | None = None) -> None:
         """Update progress and stats."""
         self.scenarios += 1
-        self.links_seen.update(links_seen)
+        self.links_covered.update(links_covered)
 
         if status is not None:
             self.stats[status] += 1
@@ -687,7 +692,7 @@ class StatefulProgressManager:
         self.progress_bar.update(
             self.progress_task_id,
             scenarios=self.scenarios,
-            links=f"{len(self.links_seen)}/{self.links_total} links",
+            links=f"{len(self.links_covered)} covered / {self.links_selected} selected / {self.links_total} total links",
         )
 
     def _get_stats_message(self) -> str:
@@ -894,6 +899,7 @@ class OutputHandler(EventHandler):
         self.stateful_tests_manager = StatefulProgressManager(
             console=self.console,
             title="Stateful tests",
+            links_selected=self.statistic.links.selected,
             links_total=self.statistic.links.total,
         )
         self.stateful_tests_manager.start()
@@ -986,7 +992,8 @@ class OutputHandler(EventHandler):
             table.add_column("Value", style="cyan")
             table.add_row("Scenarios:", f"{self.stateful_tests_manager.scenarios}")
             table.add_row(
-                "API Links:", f"{len(self.stateful_tests_manager.links_seen)}/{self.stateful_tests_manager.links_total}"
+                "API Links:",
+                f"{len(self.stateful_tests_manager.links_covered)} covered / {self.stateful_tests_manager.links_selected} selected / {self.stateful_tests_manager.links_total} total",
             )
 
             self.console.print()

@@ -68,7 +68,7 @@ class Engine:
                 skip_reason=PhaseSkipReason.DISABLED,
             )
 
-        if requires_links and self.schema.statistic.links.selected == 0:
+        if requires_links and self.schema.statistic.links.total == 0:
             return Phase(
                 name=phase_name,
                 is_supported=True,

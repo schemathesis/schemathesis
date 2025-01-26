@@ -19,7 +19,7 @@ Schemathesis dev
  ⚡  Stateful tests (interrupted after N ms)
 
      Scenarios:    N
-     API Links:    0/4
+     API Links:    0 covered / 4 selected / 4 total
 
      No tests were run
 
