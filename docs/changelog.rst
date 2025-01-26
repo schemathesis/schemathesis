@@ -19,6 +19,7 @@ Changelog
 - Internal error in CLI if run with ``PYTHONIOENCODING`` environment variable that is not ``utf8``.
 - Overriding of multiple incoming links defined for the same status code in OpenAPI specification.
 - Support for API links where operations can form a cycle (e.g., DELETE -> POST -> DELETE).
+- Incorrect Open API link selection when target operations are filtered out.
 - False positive in the ``ensure_resource_availability`` check.
 
 .. _v4.0.0-alpha.2:
