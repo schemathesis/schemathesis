@@ -1279,14 +1279,17 @@ class OutputHandler(EventHandler):
             len(group.failures) for grouped in ctx.statistic.failures.values() for group in grouped.values()
         )
         if unique_failures:
-            parts.append(f"{unique_failures} failures")
+            suffix = "s" if unique_failures > 1 else ""
+            parts.append(f"{unique_failures} failure{suffix}")
 
         if self.errors:
-            parts.append(f"{len(self.errors)} errors")
+            suffix = "s" if len(self.errors) > 1 else ""
+            parts.append(f"{len(self.errors)} error{suffix}")
 
         total_warnings = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
         if total_warnings:
-            parts.append(f"{total_warnings} warnings")
+            suffix = "s" if total_warnings > 1 else ""
+            parts.append(f"{total_warnings} warning{suffix}")
 
         if parts:
             message = f"{', '.join(parts)} in {event.running_time:.2f}s"
@@ -1315,6 +1318,10 @@ class OutputHandler(EventHandler):
             click.echo()
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
+        assert self.loading_manager is None
+        assert self.probing_manager is None
+        assert self.unit_tests_manager is None
+        assert self.stateful_tests_manager is None
         if self.errors:
             display_section_name("ERRORS")
             errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label))

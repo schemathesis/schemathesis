@@ -20,6 +20,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         state_machine = engine.schema.as_state_machine()
     except Exception as exc:
         yield events.NonFatalError(error=exc, phase=phase.name, label="Stateful tests", related_to_operation=False)
+        yield events.PhaseFinished(phase=phase, status=Status.ERROR, payload=None)
         return
 
     event_queue: queue.Queue = queue.Queue()

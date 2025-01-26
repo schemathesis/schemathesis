@@ -569,13 +569,7 @@ class BaseOpenAPISchema(BaseSchema):
         return scopes, definitions.get("headers")
 
     def as_state_machine(self) -> type[APIStateMachine]:
-        try:
-            return create_state_machine(self)
-        except OperationNotFound as exc:
-            raise LoaderError(
-                kind=LoaderErrorKind.OPEN_API_INVALID_SCHEMA,
-                message=f"Invalid Open API link definition: Operation `{exc.item}` not found",
-            ) from exc
+        return create_state_machine(self)
 
     def add_link(
         self,

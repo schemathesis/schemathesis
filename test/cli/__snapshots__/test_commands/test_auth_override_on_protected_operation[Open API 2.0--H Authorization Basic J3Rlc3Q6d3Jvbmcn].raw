@@ -66,4 +66,4 @@ Warnings:
 Test cases:
   N generated, N found N unique failures
 
-======================= 1 failures, 1 warnings in 1.00s ========================
+======================== 1 failure, 1 warning in 1.00s =========================
