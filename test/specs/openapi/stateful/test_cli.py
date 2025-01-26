@@ -186,3 +186,17 @@ def test_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
     assert cli.run(schema_url, "--phases=stateful") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_missing_link(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--phases=stateful") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_not_enough_links(cli, schema_url, snapshot_cli):
+    assert cli.run(schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli

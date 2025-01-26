@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import TYPE_CHECKING, Any, Generator, Literal, Union, cast
+from typing import TYPE_CHECKING, Any, Callable, Generator, Literal, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.core.errors import InvalidSchema
+from schemathesis.core.errors import InvalidLinkDefinition, InvalidSchema, OperationNotFound
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
@@ -49,14 +49,27 @@ class OpenApiLink:
     __slots__ = ("name", "status_code", "source", "target", "parameters", "body", "merge_body", "_cached_extract")
 
     def __init__(self, name: str, status_code: str, definition: dict[str, Any], source: APIOperation):
+        from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
+
         self.name = name
         self.status_code = status_code
         self.source = source
+        assert isinstance(source.schema, BaseOpenAPISchema)
 
+        get_operation: Callable[[str], APIOperation]
         if "operationId" in definition:
-            self.target = source.schema.get_operation_by_id(definition["operationId"])  # type: ignore
+            operation_reference = definition["operationId"]
+            get_operation = source.schema.get_operation_by_id
         else:
-            self.target = source.schema.get_operation_by_reference(definition["operationRef"])  # type: ignore
+            operation_reference = definition["operationRef"]
+            get_operation = source.schema.get_operation_by_reference
+
+        try:
+            self.target = get_operation(operation_reference)
+        except OperationNotFound as exc:
+            raise InvalidLinkDefinition(
+                f"Link '{name}' references non-existent operation '{operation_reference}' from {status_code} response of '{source.label}'"
+            ) from exc
 
         extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
         self.parameters = self._normalize_parameters(definition.get("parameters", {}))
