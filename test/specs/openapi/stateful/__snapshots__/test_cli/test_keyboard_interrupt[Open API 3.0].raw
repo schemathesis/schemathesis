@@ -38,4 +38,6 @@ Test Phases:
 Test cases:
   N generated, N skipped
 
+Seed: 42
+
 =========================== No issues found in 1.00s ===========================

@@ -53,4 +53,6 @@ Errors:
 Test cases:
   N generated, N skipped
 
+Seed: 42
+
 ============================== 2 errors in 1.00s ===============================

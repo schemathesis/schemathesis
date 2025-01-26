@@ -106,6 +106,7 @@ def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
     handlers.append(
         OutputHandler(
             workers_num=config.engine.execution.workers_num,
+            seed=config.engine.execution.seed,
             rate_limit=config.rate_limit,
             wait_for_schema=config.wait_for_schema,
             cassette_config=config.cassette,

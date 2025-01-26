@@ -7,6 +7,7 @@ Changelog
 **Added**
 
 - Add ``LoadingStarted`` & ``LoadingFinished`` to the public API.
+- Display the random generator seed in CLI output.
 
 **Changed**:
 
@@ -103,7 +104,8 @@ A detailed migration guide and complete changelog will follow.
 - Support for ``pytest<7.0``.
 - CLI Options: ``--endpoint``, ``--method``, ``--tag``, ``--operation-id``, ``--skip-deprecated-operations``,
   ``--show-trace``, ``--debug-output-file``, ``--hypothesis-deadline``, ``--hypothesis-report-multiple-bugs``,
-  ``--hypothesis-verbosity``, ``--store-network-log``, ``--pre-run``, ``--dry-run``.
+  ``--hypothesis-verbosity``, ``--store-network-log``, ``--pre-run``, ``--dry-run``, ``--contrib-openapi-formats-uuid``,
+  ``--validate-schema``.
 - Most loader configuration moved to ``schema.configure`` method.
 - ``add_case`` hook.
 - ``schemathesis.contrib.unique_data``.
