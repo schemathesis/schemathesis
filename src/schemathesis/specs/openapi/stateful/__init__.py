@@ -125,8 +125,9 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                             ),
                         )
                     )
-            elif transitions.operations[target.label].outgoing:
-                # No incoming transitions, but has at least one outgoing transition
+            if transitions.operations[target.label].outgoing and target.method == "post":
+                # Allow POST methods for operations with outgoing transitions.
+                # This approach also includes cases when there is an incoming transition back to POST
                 # For example, POST /users/ -> GET /users/{id}/
                 # The source operation has no prerequisite, but we need to allow this rule to be executed
                 # in order to reach other transitions
