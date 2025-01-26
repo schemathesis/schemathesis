@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation.stateful.state_machine import DEFAULT_STATEFUL_STEP_COUNT
 
 if TYPE_CHECKING:
     from requests.structures import CaseInsensitiveDict
@@ -13,21 +14,33 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.stateful import ApiTransitions
 
 
-# Maximum number of same operations per source instance
-MAX_OPERATIONS_PER_SOURCE = 2
+# It is enough to be able to catch double-click type of issues
+MAX_OPERATIONS_PER_SOURCE_CAP = 2
 # Maximum number of concurrent root sources (e.g., active users in the system)
 MAX_ROOT_SOURCES = 2
+
+
+def _get_max_operations_per_source(transitions: ApiTransitions) -> int:
+    """Calculate global limit based on number of sources to maximize diversity of used API calls."""
+    sources = len(transitions.operations)
+
+    if sources == 0:
+        return MAX_OPERATIONS_PER_SOURCE_CAP
+
+    # Total steps divided by number of sources, but never below the cap
+    return max(MAX_OPERATIONS_PER_SOURCE_CAP, DEFAULT_STATEFUL_STEP_COUNT // sources)
 
 
 @dataclass
 class TransitionController:
     """Controls which transitions can be executed in a state machine."""
 
-    __slots__ = ("transitions", "statistic")
+    __slots__ = ("transitions", "max_operations_per_source", "statistic")
 
     def __init__(self, transitions: ApiTransitions) -> None:
         # Incoming & outgoing transitions available in the state machine
         self.transitions = transitions
+        self.max_operations_per_source = _get_max_operations_per_source(transitions)
         # source -> derived API calls
         self.statistic: dict[str, dict[str, Counter[str]]] = {}
 
@@ -70,6 +83,5 @@ class TransitionController:
     def allow_transition(self, source: str, target: str) -> bool:
         """Decide if this transition should be allowed now."""
         existing = self.statistic.get(source, {})
-        # There should be no more than MAX_OPERATIONS_PER_SOURCE such transitions per scenario
         total = sum(metric.get(target, 0) for metric in existing.values())
-        return total < MAX_OPERATIONS_PER_SOURCE
+        return total < self.max_operations_per_source

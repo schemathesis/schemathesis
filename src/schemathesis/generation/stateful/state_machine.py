@@ -27,11 +27,11 @@ NO_LINKS_ERROR_MESSAGE = (
     "Please add OpenAPI links to enable stateful testing or use stateless tests instead. \n"
     "See https://schemathesis.readthedocs.io/en/stable/stateful.html#how-to-specify-connections for more information."
 )
-
+DEFAULT_STATEFUL_STEP_COUNT = 6
 DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     phases=[hypothesis.Phase.generate],
     deadline=None,
-    stateful_step_count=6,
+    stateful_step_count=DEFAULT_STATEFUL_STEP_COUNT,
     suppress_health_check=list(hypothesis.HealthCheck),
 )
 

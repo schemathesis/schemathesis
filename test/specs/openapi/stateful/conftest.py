@@ -399,12 +399,15 @@ def engine_factory(app_factory, app_runner, stop_event):
         max_failures=None,
         unique_data=False,
         configuration=None,
+        include=None,
     ):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
             **(configuration or {})
         )
+        if include is not None:
+            schema = schema.include(**include)
         config = EngineConfig(
             execution=ExecutionConfig(
                 checks=checks or CHECKS.get_all(),
