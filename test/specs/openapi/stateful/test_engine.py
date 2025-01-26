@@ -626,3 +626,9 @@ def test_multiple_incoming_link_without_override(app_factory):
         sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values())
         == schema.statistic.links.total
     )
+
+
+def test_circular_links(engine_factory):
+    engine = engine_factory(app_kwargs={"circular_links": True})
+    result = collect_result(engine)
+    assert result.events[-1].status != Status.ERROR
