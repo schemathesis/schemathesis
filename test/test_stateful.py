@@ -3,7 +3,7 @@ import re
 import pytest
 
 import schemathesis
-from schemathesis.core.errors import LoaderError
+from schemathesis.core.errors import InvalidLinkDefinition
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 
@@ -230,6 +230,6 @@ def test_missing_operation(ctx, operation_id, expected):
 
     schema = schemathesis.openapi.from_dict(schema)
 
-    with pytest.raises(LoaderError) as exc:
+    with pytest.raises(InvalidLinkDefinition) as exc:
         schema.as_state_machine()
     assert str(exc.value.__cause__) == expected

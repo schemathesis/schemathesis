@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 from schemathesis import errors
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
+    InvalidLinkDefinition,
     SerializationNotPossible,
     format_exception,
     get_request_error_extras,
@@ -76,6 +77,9 @@ class EngineErrorInfo:
         """A general error description."""
         import requests
 
+        if isinstance(self._error, InvalidLinkDefinition):
+            return "Invalid Link Definition"
+
         if isinstance(self._error, requests.RequestException):
             return "Network Error"
 
@@ -96,6 +100,7 @@ class EngineErrorInfo:
 
         return {
             RuntimeErrorKind.SCHEMA_UNSUPPORTED: "Unsupported Schema",
+            RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Missing Open API links",
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Unknown GraphQL Scalar",
             RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX: "XML serialization error",
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE: "Serialization not possible",
@@ -166,6 +171,7 @@ class EngineErrorInfo:
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
             RuntimeErrorKind.SCHEMA_UNSUPPORTED,
             RuntimeErrorKind.SCHEMA_GENERIC,
+            RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND,
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE,
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR,
             RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE,
@@ -184,11 +190,7 @@ class EngineErrorInfo:
         """Format error message with optional styling and traceback."""
         message = []
 
-        # Title
-        if self._kind == RuntimeErrorKind.SCHEMA_GENERIC:
-            title = "Schema Error"
-        else:
-            title = self.title
+        title = self.title
         if title:
             message.append(f"{title}\n")
 
@@ -246,6 +248,7 @@ def get_runtime_error_suggestion(error_type: RuntimeErrorKind, bold: Callable[[s
     return {
         RuntimeErrorKind.CONNECTION_SSL: f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}.",
         RuntimeErrorKind.HYPOTHESIS_UNSATISFIABLE: "Examine the schema for inconsistencies and consider simplifying it.",
+        RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Review your endpoint filters to include linked operations",
         RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION: "Ensure your regex is compatible with Python's syntax.\n"
         "For guidance, visit: https://docs.python.org/3/library/re.html",
         RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Define a custom strategy for it.\n"
@@ -299,6 +302,7 @@ class RuntimeErrorKind(str, enum.Enum):
     HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
 
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
+    SCHEMA_NO_LINKS_FOUND = "schema_no_links_found"
     SCHEMA_UNSUPPORTED = "schema_unsupported"
     SCHEMA_GENERIC = "schema_generic"
 
@@ -350,6 +354,8 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
         if isinstance(error, errors.InvalidRegexPattern):
             return RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION
         return RuntimeErrorKind.SCHEMA_GENERIC
+    if isinstance(error, errors.NoLinksFound):
+        return RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND
     if isinstance(error, UnsupportedRecursiveReference):
         # Recursive references are not supported right now
         return RuntimeErrorKind.SCHEMA_UNSUPPORTED

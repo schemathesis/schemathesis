@@ -10,7 +10,7 @@ from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
-from schemathesis.core.errors import IncorrectUsage
+from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
 from schemathesis.generation.case import Case
@@ -22,11 +22,6 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-NO_LINKS_ERROR_MESSAGE = (
-    "Stateful testing requires at least one OpenAPI link in the schema, but no links detected. "
-    "Please add OpenAPI links to enable stateful testing or use stateless tests instead. \n"
-    "See https://schemathesis.readthedocs.io/en/stable/stateful.html#how-to-specify-connections for more information."
-)
 DEFAULT_STATEFUL_STEP_COUNT = 6
 DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     phases=[hypothesis.Phase.generate],
@@ -104,7 +99,11 @@ class APIStateMachine(RuleBasedStateMachine):
             super().__init__()  # type: ignore
         except InvalidDefinition as exc:
             if "defines no rules" in str(exc):
-                raise IncorrectUsage(NO_LINKS_ERROR_MESSAGE) from None
+                if not self.schema.statistic.links.total:
+                    message = "Schema contains no link definitions required for stateful testing"
+                else:
+                    message = "All link definitions required for stateful testing are excluded by filters"
+                raise NoLinksFound(message) from None
             raise
         self.setup()
 

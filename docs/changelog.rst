@@ -11,6 +11,8 @@ Changelog
 **Changed**:
 
 - Improve control over API calls in stateful testing to make test scenarios more diverse.
+- Improve error message in CLI when the schema has no Open API links.
+- Improve error message in CLI when the schema contains incorrect Open API links.
 
 **Fixed**
 

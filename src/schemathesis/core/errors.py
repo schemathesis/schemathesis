@@ -102,6 +102,10 @@ class InvalidRegexType(InvalidSchema):
     """Raised when an invalid type is used where a regex pattern is expected."""
 
 
+class InvalidLinkDefinition(InvalidSchema):
+    """Raised when an Open API link references a non-existent operation."""
+
+
 class MalformedMediaType(ValueError):
     """Raised on parsing of incorrect media type."""
 
@@ -146,6 +150,10 @@ class InvalidHeadersExample(InvalidSchema):
 
 class IncorrectUsage(SchemathesisError):
     """Indicates incorrect usage of Schemathesis' public API."""
+
+
+class NoLinksFound(IncorrectUsage):
+    """Raised when no valid links are available for stateful testing."""
 
 
 class InvalidRateLimit(IncorrectUsage):

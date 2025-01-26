@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in N ms)
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,18 +16,18 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- 🚫  Unit tests (in N ms)
+ 🚫  Stateful tests (in N ms)
 
-     🚫 1 errors
+     Scenarios:    N
+     API Links:    0/2
+
+     No tests were run
 
 ==================================== ERRORS ====================================
-______________________________ POST /api/success _______________________________
-Schema Error
+________________________________ Stateful tests ________________________________
+Invalid Link Definition
 
-Failed to generate test cases for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`
-
-Tip: Ensure your regex is compatible with Python's syntax.
-For guidance, visit: https://docs.python.org/3/library/re.html
+Link 'GetUserByUserId' references non-existent operation 'getUser' from 201 response of 'POST /api/users/'
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -36,15 +36,15 @@ Need more help?
 API Operations:
   Selected: 1/1
   Tested: 0
-  Errored: 1
+  Skipped: 1
 
 Test Phases:
   ✅ API probing
-  🚫 Unit testing
-  ⏭️ Stateful testing (not applicable)
+  ⏭️ Unit testing (disabled)
+  🚫 Stateful testing
 
 Errors:
-  🚫 Schema Error: 1
+  🚫 Invalid Link Definition: 1
 
 Test cases:
   No test cases were generated
