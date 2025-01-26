@@ -18,6 +18,7 @@ Changelog
 - Internal error during the coverage phase if negated parameter has no ``type``.
 - Internal error in CLI if run with ``PYTHONIOENCODING`` environment variable that is not ``utf8``.
 - Overriding of multiple incoming links defined for the same status code in OpenAPI specification.
+- Support for API links where operations can form a cycle (e.g., DELETE -> POST -> DELETE).
 
 .. _v4.0.0-alpha.2:
 

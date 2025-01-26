@@ -31,6 +31,7 @@ class AppConfig:
     ignored_auth: bool = False
     slowdown: float | int | None = None
     multiple_incoming_links_with_same_status: bool = False
+    circular_links: bool = False
 
 
 @pytest.fixture
@@ -319,6 +320,7 @@ def app_factory(ctx):
         ignored_auth=False,
         slowdown=None,
         multiple_incoming_links_with_same_status=False,
+        circular_links: bool = False,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
@@ -367,6 +369,12 @@ def app_factory(ctx):
                     "operationId": "getUser",
                     "parameters": {"userId": "$request.path.userId"},
                 }
+            }
+        if circular_links:
+            # Add link from DELETE back to POST
+            delete_links["CreateNewUser"] = {
+                "operationId": "createUser",
+                "requestBody": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/NewUser"}}}},
             }
         return app
 
