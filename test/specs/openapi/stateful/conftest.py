@@ -30,6 +30,7 @@ class AppConfig:
     auth_token: str | None = None
     ignored_auth: bool = False
     slowdown: float | int | None = None
+    multiple_incoming_links_with_same_status: bool = False
 
 
 @pytest.fixture
@@ -181,6 +182,7 @@ def app_factory(ctx):
 
     app = Flask(__name__)
     config = AppConfig()
+    app.config["schema"] = schema
 
     users = {}
     next_user_id = 1
@@ -316,6 +318,7 @@ def app_factory(ctx):
         auth_token=None,
         ignored_auth=False,
         slowdown=None,
+        multiple_incoming_links_with_same_status=False,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
@@ -358,6 +361,13 @@ def app_factory(ctx):
             order_links.clear()
         if slowdown:
             config.slowdown = slowdown
+        if multiple_incoming_links_with_same_status:
+            schema["paths"]["/users/{userId}"]["patch"]["responses"]["200"]["links"] = {
+                "GetUser": {
+                    "operationId": "getUser",
+                    "parameters": {"userId": "$request.path.userId"},
+                }
+            }
         return app
 
     return _factory
