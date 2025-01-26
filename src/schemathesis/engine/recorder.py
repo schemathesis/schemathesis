@@ -93,30 +93,34 @@ class ScenarioRecorder:
         return None
 
     def find_related(self, *, case_id: str) -> Iterator[Case]:
-        """Iterate over all ancestors and their children for a given case."""
-        current_id = case_id
-        seen = {current_id}
+        """Iterate over all cases in the tree, starting from the root."""
+        seen = {case_id}
 
+        # First, find the root by going up
+        current_id = case_id
         while True:
             current_node = self.cases.get(current_id)
             if current_node is None or current_node.parent_id is None:
+                root_id = current_id
                 break
+            current_id = current_node.parent_id
 
-            # Get all children of the parent (siblings of the current case)
-            parent_id = current_node.parent_id
-            for case_id, maybe_child in self.cases.items():
-                # If this case has the same parent and we haven't seen it yet
-                if parent_id == maybe_child.parent_id and case_id not in seen:
+        # Then traverse the whole tree from root
+        def traverse(node_id: str) -> Iterator[Case]:
+            # Get all children
+            for case_id, node in self.cases.items():
+                if node.parent_id == node_id and case_id not in seen:
                     seen.add(case_id)
-                    yield maybe_child.value
+                    yield node.value
+                    # Recurse into children
+                    yield from traverse(case_id)
 
-            # Move up to the parent
-            current_id = parent_id
-            if current_id not in seen:
-                seen.add(current_id)
-                parent_node = self.cases.get(current_id)
-                if parent_node:
-                    yield parent_node.value
+        # Start traversal from root
+        root_node = self.cases.get(root_id)
+        if root_node and root_id not in seen:
+            seen.add(root_id)
+            yield root_node.value
+        yield from traverse(root_id)
 
     def find_response(self, *, case_id: str) -> Response | None:
         """Retrieve the API response for a given test case, if available."""
