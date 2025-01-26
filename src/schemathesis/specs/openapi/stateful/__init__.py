@@ -76,9 +76,11 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     """Collect all transitions between operations."""
     transitions = ApiTransitions()
 
+    selected_labels = {operation.label for operation in operations}
     for operation in operations:
         for _, link in get_all_links(operation):
-            transitions.add_outgoing(operation.label, link)
+            if link.target.label in selected_labels:
+                transitions.add_outgoing(operation.label, link)
 
     return transitions
 
