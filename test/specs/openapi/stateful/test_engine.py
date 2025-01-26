@@ -567,6 +567,16 @@ def test_new_resource_is_not_available(engine_factory):
     assert result.failures[0].failure_info.failure.title == "Resource is not available after creation"
 
 
+def test_resource_availability(engine_factory):
+    # By default it is available unless was explicitly deleted
+    # Ensure the check properly finds such DELETE calls
+    engine = engine_factory(
+        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
+    )
+    result = collect_result(engine)
+    assert result.events[-1].status == Status.SUCCESS
+
+
 def test_negative_tests(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
