@@ -139,7 +139,7 @@ def test_custom_assertion_in_check(engine_factory, exception_args):
     )
     result = collect_result(engine)
     # Failures on different API operations
-    assert len(result.failures) == 3
+    assert len(result.failures) == 4
     failure = result.failures[0]
     assert failure.failure_info.failure.title == "Custom check failed: `custom_check`"
     if not exception_args:
@@ -162,7 +162,7 @@ def test_custom_assertion_with_random_message(engine_factory):
     )
     result = collect_result(engine)
     # Failures on different API operations
-    assert len(result.failures) == 3
+    assert len(result.failures) == 4
     failure = result.failures[0]
     assert failure.failure_info.failure.title == "Custom check failed: `custom_check`"
 
@@ -229,15 +229,16 @@ def test_flaky_assertions(engine_factory, kwargs):
         assert len(result.failures) == 1
         assert {check.failure_info.failure.message for check in result.failures} == {"First"}
     else:
-        # Assertions happen on multiple API operations (3 + 1)
-        assert len(result.failures) == 5
+        # Assertions happen on multiple API operations (3 on the same)
+        assert len(result.failures) == 6
         assert {check.failure_info.failure.message for check in result.failures} == {
             "First",
             "Second",
             # Rewritten by pytest
             "assert None == 43\n +  where None = Case(body={'name': ''}).headers",
             "assert None == 43\n +  where None = Case(path_parameters={'orderId': 42}).headers",
-            "assert None == 43\n +  where None = Case(path_parameters={'userId': 7}).headers",
+            "assert None == 43\n +  where None = Case(path_parameters={'userId': 6}).headers",
+            "assert None == 43\n +  where None = Case(path_parameters={'userId': 5}).headers",
         }
 
 
@@ -615,3 +616,13 @@ def test_ignored_auth_invalid(engine_factory):
     # Then it should be reported
     assert result.events[-1].status == Status.FAILURE
     assert result.failures[0].failure_info.failure.title == "Authentication declared but not enforced"
+
+
+def test_multiple_incoming_link_without_override(app_factory):
+    app = app_factory(multiple_incoming_links_with_same_status=True)
+    schema = schemathesis.openapi.from_dict(app.config["schema"])
+    state_machine = schema.as_state_machine()
+    assert (
+        sum(len(operation.outgoing) for operation in state_machine._transitions.operations.values())
+        == schema.statistic.links.total
+    )
