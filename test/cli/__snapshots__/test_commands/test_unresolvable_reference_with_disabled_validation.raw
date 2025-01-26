@@ -62,4 +62,6 @@ Errors:
 Test cases:
   N generated, N passed
 
+Seed: 42
+
 ============================== 2 errors in 1.00s ===============================
