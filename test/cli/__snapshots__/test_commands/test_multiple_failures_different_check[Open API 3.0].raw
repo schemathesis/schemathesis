@@ -57,4 +57,6 @@ Failures:
 Test cases:
   N generated, N found N unique failures
 
+Seed: 42
+
 ============================= 2 failures in 1.00s ==============================

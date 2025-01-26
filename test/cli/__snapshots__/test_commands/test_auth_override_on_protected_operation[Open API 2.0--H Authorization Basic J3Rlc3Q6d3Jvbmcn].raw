@@ -66,4 +66,6 @@ Warnings:
 Test cases:
   N generated, N found N unique failures
 
+Seed: 42
+
 ======================== 1 failure, 1 warning in 1.00s =========================

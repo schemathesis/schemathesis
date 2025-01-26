@@ -777,6 +777,8 @@ def format_duration(duration_ms: int) -> str:
 @dataclass
 class OutputHandler(EventHandler):
     workers_num: int
+    # Seed can't be absent in the deterministic mode
+    seed: int | None
     rate_limit: str | None
     wait_for_schema: float | None
 
@@ -1324,6 +1326,14 @@ class OutputHandler(EventHandler):
                 click.echo(_style(f"  - {report_type}: {path}"))
             click.echo()
 
+    def display_seed(self) -> None:
+        click.echo(_style("Seed: ", bold=True), nl=False)
+        if self.seed is None:
+            click.echo("not used in the deterministic mode")
+        else:
+            click.echo(str(self.seed))
+        click.echo()
+
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
         assert self.loading_manager is None
         assert self.probing_manager is None
@@ -1372,6 +1382,7 @@ class OutputHandler(EventHandler):
 
         self.display_test_cases(ctx)
         self.display_reports()
+        self.display_seed()
         self.display_final_line(ctx, event)
 
 

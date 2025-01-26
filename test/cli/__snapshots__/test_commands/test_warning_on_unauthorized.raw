@@ -46,4 +46,6 @@ Warnings:
 Test cases:
   N generated, N passed
 
+Seed: 42
+
 ============================== 1 warning in 1.00s ==============================
