@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 Schemathesis dev
@@ -20,6 +20,23 @@ Schemathesis dev
 
      ✅ 1 passed
 
+ 🚫  Stateful tests (in N ms)
+
+     Scenarios:    N
+     API Links:    0 covered / 0 selected / 4 total
+
+     No tests were run
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Missing Open API links
+
+All link definitions required for stateful testing are excluded by filters
+
+Tip: Review your endpoint filters to include linked operations
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -29,9 +46,12 @@ API Operations:
 Test Phases:
   ✅ API probing
   ✅ Unit testing
-  ⏭️ Stateful testing (not applicable)
+  🚫 Stateful testing
+
+Errors:
+  🚫 Missing Open API links: 1
 
 Test cases:
   N generated, N passed
 
-=========================== No issues found in 1.00s ===========================
+=============================== 1 error in 1.00s ===============================
