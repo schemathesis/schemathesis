@@ -13,6 +13,7 @@ Changelog
 - Improve control over API calls in stateful testing to make test scenarios more diverse.
 - Improve error message in CLI when the schema has no Open API links.
 - Improve error message in CLI when the schema contains incorrect Open API links.
+- Display the number of covered, selected, and total Open API links in stateful testing output.
 
 **Fixed**
 
@@ -23,6 +24,7 @@ Changelog
 - Support for API links where operations can form a cycle (e.g., DELETE -> POST -> DELETE).
 - Incorrect Open API link selection when target operations are filtered out.
 - False positive in the ``ensure_resource_availability`` check.
+- Calculating the number of Open API links selected for testing.
 
 .. _v4.0.0-alpha.2:
 

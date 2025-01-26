@@ -66,8 +66,8 @@ from .stateful import create_state_machine
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
-    from ...auths import AuthStorage
-    from ...stateful.state_machine import APIStateMachine
+    from schemathesis.auths import AuthStorage
+    from schemathesis.generation.stateful import APIStateMachine
 
 HTTP_METHODS = frozenset({"get", "put", "post", "delete", "options", "head", "patch", "trace"})
 SCHEMA_ERROR_MESSAGE = "Ensure that the definition complies with the OpenAPI specification"
@@ -174,30 +174,64 @@ class BaseOpenAPISchema(BaseSchema):
             return statistic
 
         resolve = self.resolver.resolve
+        resolve_path_item = self._resolve_path_item
         should_skip = self._should_skip
         links_field = self.links_field
 
+        # For operationId lookup
+        selected_operations_by_id: set[str] = set()
+        # Tuples of (method, path)
+        selected_operations_by_path: set[tuple[str, str]] = set()
+        collected_links: list[dict] = []
+
         for path, path_item in paths.items():
             try:
-                if "$ref" in path_item:
-                    _, path_item = resolve(path_item["$ref"])
-                for method, definition in path_item.items():
-                    if method not in HTTP_METHODS:
-                        continue
-                    statistic.operations.total += 1
-                    is_selected = not should_skip(path, method, definition)
-                    if is_selected:
-                        statistic.operations.selected += 1
-                    for response in definition.get("responses", {}).values():
-                        if "$ref" in response:
-                            _, response = resolve(response["$ref"])
-                        defined_links = response.get(links_field)
-                        if defined_links is not None:
-                            statistic.links.total += len(defined_links)
-                            if is_selected:
-                                statistic.links.selected = len(defined_links)
+                scope, path_item = resolve_path_item(path_item)
+                self.resolver.push_scope(scope)
+                try:
+                    for method, definition in path_item.items():
+                        if method not in HTTP_METHODS:
+                            continue
+                        statistic.operations.total += 1
+                        is_selected = not should_skip(path, method, definition)
+                        if is_selected:
+                            statistic.operations.selected += 1
+                            # Store both identifiers
+                            if "operationId" in definition:
+                                selected_operations_by_id.add(definition["operationId"])
+                            selected_operations_by_path.add((method, path))
+                        for response in definition.get("responses", {}).values():
+                            if "$ref" in response:
+                                _, response = resolve(response["$ref"])
+                            defined_links = response.get(links_field)
+                            if defined_links is not None:
+                                statistic.links.total += len(defined_links)
+                                if is_selected:
+                                    collected_links.extend(defined_links.values())
+                finally:
+                    self.resolver.pop_scope()
             except SCHEMA_PARSING_ERRORS:
                 continue
+
+        def is_link_selected(link: dict) -> bool:
+            if "$ref" in link:
+                _, link = resolve(link["$ref"])
+
+            if "operationId" in link:
+                return link["operationId"] in selected_operations_by_id
+            else:
+                try:
+                    scope, _ = resolve(link["operationRef"])
+                    path, method = scope.rsplit("/", maxsplit=2)[-2:]
+                    path = path.replace("~1", "/").replace("~0", "~")
+                    return (method, path) in selected_operations_by_path
+                except Exception:
+                    return False
+
+        for link in collected_links:
+            if is_link_selected(link):
+                statistic.links.selected += 1
+
         return statistic
 
     def _operation_iter(self) -> Generator[dict[str, Any], None, None]:
