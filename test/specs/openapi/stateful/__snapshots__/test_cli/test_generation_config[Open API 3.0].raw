@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 1
 ---
 Stdout:
 Schemathesis dev
@@ -16,12 +16,28 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ✅  Stateful tests (in N ms)
+ ❌  Stateful tests (in N ms)
 
      Scenarios:    N
-     API Links:    2/3
+     API Links:    4/4
 
-     ✅ N passed
+     ✅ N passed  ❌ 1 failed
+
+=================================== FAILURES ===================================
+________________________________ Stateful tests ________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Server error
+
+[500] Internal Server Error:
+
+    `500 Internal Server Error
+
+    Server got itself in trouble`
+
+Reproduce with:
+
+    <PLACEHOLDER>
 
 =================================== SUMMARY ====================================
 
@@ -32,9 +48,12 @@ API Operations:
 Test Phases:
   ✅ API probing
   ⏭️ Unit testing (disabled)
-  ✅ Stateful testing
+  ❌ Stateful testing
+
+Failures:
+  ❌ Server error: 1
 
 Test cases:
-  N generated, N passed
+  N generated, N found N unique failures, N skipped
 
-=========================== No issues found in 1.00s ===========================
+============================= 1 failures in 1.00s ==============================

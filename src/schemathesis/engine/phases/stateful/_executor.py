@@ -78,7 +78,6 @@ def execute_state_machine_loop(
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
-            self.recorder = ScenarioRecorder(label="Stateful tests")
             self._check_ctx = engine.get_check_context(self.recorder)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
@@ -100,12 +99,6 @@ def execute_state_machine_loop(
         def step(self, input: StepInput) -> StepOutput | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
             # The idea is to stop the execution as soon as possible
-            if input.transition is not None:
-                self.recorder.record_case(
-                    parent_id=input.transition.parent_id, transition=input.transition, case=input.case
-                )
-            else:
-                self.recorder.record_case(parent_id=None, transition=None, case=input.case)
             if engine.has_to_stop:
                 raise KeyboardInterrupt
             try:

@@ -1180,7 +1180,9 @@ def test_stateful_override(real_app_schema):
         override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
-    interactions = stream.find(events.ScenarioFinished).recorder.interactions.values()
+    interactions = sum(
+        [list(event.recorder.interactions.values()) for event in stream.find_all(events.ScenarioFinished)], []
+    )
     assert len(interactions) > 0
     get_requests = [i.request for i in interactions if i.request.method == "GET"]
     assert len(get_requests) > 0

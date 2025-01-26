@@ -14,6 +14,10 @@ Changelog
 - Internal error during the coverage phase if negated parameter has no ``type``.
 - Internal error in CLI if run with ``PYTHONIOENCODING`` environment variable that is not ``utf8``.
 
+**Changed**:
+
+- Improve control over API calls in stateful testing to make test scenarios more diverse.
+
 .. _v4.0.0-alpha.2:
 
 :version:`4.0.0-alpha.2 <v4.0.0a1...v4.0.0-alpha.2>` - 2025-01-20

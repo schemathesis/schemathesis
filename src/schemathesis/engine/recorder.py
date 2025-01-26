@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import base64
 import time
-import uuid
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Iterator, cast
 
@@ -24,7 +23,6 @@ class ScenarioRecorder:
     Records test cases, their hierarchy, API interactions, and results of checks performed during execution.
     """
 
-    id: uuid.UUID
     # Human-readable label
     label: str
 
@@ -35,10 +33,9 @@ class ScenarioRecorder:
     # Network interactions by test case ID
     interactions: dict[str, Interaction]
 
-    __slots__ = ("id", "label", "status", "roots", "cases", "checks", "interactions")
+    __slots__ = ("label", "status", "roots", "cases", "checks", "interactions")
 
     def __init__(self, *, label: str) -> None:
-        self.id = uuid.uuid4()
         self.label = label
         self.cases = {}
         self.checks = {}

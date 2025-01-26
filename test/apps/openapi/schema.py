@@ -385,7 +385,18 @@ def _make_openapi_2_schema(operations: tuple[str, ...]) -> dict:
                         },
                     },
                 ],
-                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                "responses": {
+                    "200": {
+                        "x-links": {
+                            "GetUserById": {
+                                "operationId": "getUser",
+                                "parameters": {"path.user_id": "$request.path.user_id"},
+                            }
+                        },
+                        "description": "OK",
+                    },
+                    "404": {"description": "Not found"},
+                },
             }
         elif name == "csv_payload":
             schema = {
@@ -800,7 +811,18 @@ def _make_openapi_3_schema(operations: tuple[str, ...]) -> dict:
                     },
                     "required": True,
                 },
-                "responses": {"200": {"description": "OK"}, "404": {"description": "Not found"}},
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "links": {
+                            "GetUserById": {
+                                "operationId": "getUser",
+                                "parameters": {"path.user_id": "$request.path.user_id"},
+                            }
+                        },
+                    },
+                    "404": {"description": "Not found"},
+                },
             }
         elif name == "csv_payload":
             schema = {

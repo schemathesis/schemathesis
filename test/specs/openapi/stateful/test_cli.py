@@ -8,7 +8,7 @@ from _pytest.main import ExitCode
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.parametrize("workers", [1, 2])
 @pytest.mark.skipif(platform.system() == "Windows", reason="Simpler to setup on Linux")
 def test_default(cli, schema_url, snapshot_cli, workers):
@@ -25,7 +25,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_sanitization(cli, schema_url, tmp_path):
     cassette_path = tmp_path / "output.yaml"
     token = "secret"
@@ -43,7 +43,7 @@ def test_sanitization(cli, schema_url, tmp_path):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_max_failures(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -97,7 +97,7 @@ def test_junit(tmp_path, cli, schema_url):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_only(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -112,7 +112,7 @@ def test_stateful_only(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -126,7 +126,7 @@ def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_filtered_out(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -141,7 +141,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
 def test_proxy_error(cli, schema_url, snapshot_cli):
     assert (
@@ -156,7 +156,7 @@ def test_proxy_error(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_generation_config(cli, mocker, schema_url, snapshot_cli):
     from schemathesis.specs.openapi import _hypothesis
 
@@ -165,7 +165,7 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--phases=stateful",
-            "--generation-max-examples=1",
+            "--generation-max-examples=50",
             "--generation-allow-x00=false",
             "--generation-codec=ascii",
             "--generation-with-security-parameters=false",
@@ -179,7 +179,7 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
-@pytest.mark.snapshot(replace_reproduce_with=True, replace_stateful_progress=True)
+@pytest.mark.snapshot(replace_reproduce_with=True)
 def test_keyboard_interrupt(cli, mocker, schema_url, snapshot_cli):
     def mocked(*args, **kwargs):
         raise KeyboardInterrupt
