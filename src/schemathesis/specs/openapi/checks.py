@@ -376,6 +376,10 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if not isinstance(case.operation.schema, BaseOpenAPISchema):
         return True
 
+    # First, check if this is a 4XX response
+    if not (400 <= response.status_code < 500):
+        return None
+
     parent = ctx.find_parent(case_id=case.id)
     if parent is None:
         return None
@@ -383,6 +387,17 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
     if parent_response is None:
         return None
 
+    if not (
+        parent.operation.method.upper() == "POST"
+        and 200 <= parent_response.status_code < 400
+        and _is_prefix_operation(
+            ResourcePath(parent.path, parent.path_parameters or {}),
+            ResourcePath(case.path, case.path_parameters or {}),
+        )
+    ):
+        return None
+
+    # Check if all parameters come from links
     overrides = case._override
     overrides_all_parameters = True
     for parameter in case.operation.iter_parameters():
@@ -390,34 +405,42 @@ def ensure_resource_availability(ctx: CheckContext, response: Response, case: Ca
         if parameter.name not in getattr(overrides, container, {}):
             overrides_all_parameters = False
             break
+    if not overrides_all_parameters:
+        return None
 
-    if (
-        # Response indicates a client error, even though all available parameters were taken from links
-        # and comes from a POST request. This case likely means that the POST request actually did not
-        # save the resource and it is not available for subsequent operations
-        400 <= response.status_code < 500
-        and parent.operation.method.upper() == "POST"
-        and 200 <= parent_response.status_code < 400
-        and overrides_all_parameters
-        and _is_prefix_operation(
-            ResourcePath(parent.path, parent.path_parameters or {}),
-            ResourcePath(case.path, case.path_parameters or {}),
-        )
-    ):
-        created_with = parent.operation.label
-        not_available_with = case.operation.label
-        reason = http.client.responses.get(response.status_code, "Unknown")
-        raise EnsureResourceAvailability(
-            operation=created_with,
-            message=(
-                f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
-                f"Created with      : `{created_with}`\n"
-                f"Not available with: `{not_available_with}`"
-            ),
-            created_with=created_with,
-            not_available_with=not_available_with,
-        )
-    return None
+    # Look for any successful DELETE operations on this resource
+    for related_case in ctx.find_related(case_id=case.id):
+        related_response = ctx.find_response(case_id=related_case.id)
+        if (
+            related_case.operation.method.upper() == "DELETE"
+            and related_response is not None
+            and 200 <= related_response.status_code < 300
+            and _is_prefix_operation(
+                ResourcePath(related_case.path, related_case.path_parameters or {}),
+                ResourcePath(case.path, case.path_parameters or {}),
+            )
+        ):
+            # Resource was properly deleted, 404 is expected
+            return None
+
+    # If we got here:
+    # 1. Resource was created successfully
+    # 2. Current operation returned 4XX
+    # 3. All parameters come from links
+    # 4. No successful DELETE operations found
+    created_with = parent.operation.label
+    not_available_with = case.operation.label
+    reason = http.client.responses.get(response.status_code, "Unknown")
+    raise EnsureResourceAvailability(
+        operation=created_with,
+        message=(
+            f"The API returned `{response.status_code} {reason}` for a resource that was just created.\n\n"
+            f"Created with      : `{created_with}`\n"
+            f"Not available with: `{not_available_with}`"
+        ),
+        created_with=created_with,
+        not_available_with=not_available_with,
+    )
 
 
 class AuthKind(enum.Enum):
