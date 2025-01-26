@@ -290,7 +290,6 @@ class CliSnapshotConfig:
     replace_response_time: bool = True
     replace_seed: bool = True
     replace_reproduce_with: bool = False
-    replace_stateful_progress: bool = True
     replace_test_cases: bool = True
     remove_last_line: bool = False
 
@@ -367,8 +366,6 @@ class CliSnapshotConfig:
                     if line.strip().startswith("File") and "line" in line:
                         lines[idx] = line.replace("\\", "/")
             data = "\n".join(lines)
-        if self.replace_stateful_progress:
-            data = re.sub(r"(?<=Stateful tests\n\n)([.FES]+)", "...", data)
         if self.replace_error_codes:
             data = (
                 data.replace("Errno 111", "Error NUM")
