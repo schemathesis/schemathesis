@@ -648,3 +648,9 @@ def test_link_subset(engine_factory):
     engine = engine_factory(include={"method_regex": "POST|GET"})
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
+
+
+def test_duplicate_operation_links(engine_factory):
+    engine = engine_factory(app_kwargs={"duplicate_operation_links": True})
+    result = collect_result(engine)
+    assert result.events[-1].status != Status.ERROR

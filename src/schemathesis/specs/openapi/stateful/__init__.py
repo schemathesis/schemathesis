@@ -115,9 +115,10 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             if incoming:
                 for link in incoming:
                     bundle_name = f"{link.source.label} -> {link.status_code}"
-                    name = _normalize_name(f"{link.status_code} -> {target.label}")
-                    name = _normalize_name(f"{link.source.label} -> {link.status_code} -> {target.label}")
-                    assert name not in rules
+                    name = _normalize_name(
+                        f"{link.source.label} -> {link.status_code} -> {link.name} -> {target.label}"
+                    )
+                    assert name not in rules, name
                     rules[name] = precondition(is_transition_allowed(bundle_name, link.source.label, target.label))(
                         transition(
                             name=name,

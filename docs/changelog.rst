@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.3...HEAD>` - TBD
 ---------------------------------------------------
 
+**Fixed**
+
+- Handling of multiple API links pointing to the same operation with different parameters.
+
 .. _v4.0.0-alpha.3:
 
 :version:`4.0.0-alpha.3 <v4.0.0-alpha.2...v4.0.0-alpha.3>` - 2025-01-27
@@ -14,7 +18,7 @@ Changelog
 - Add ``LoadingStarted`` & ``LoadingFinished`` to the public API.
 - Display the random generator seed in CLI output.
 
-**Changed**:
+**Changed**
 
 - Improve control over API calls in stateful testing to make test scenarios more diverse.
 - Improve error message in CLI when the schema has no Open API links.
