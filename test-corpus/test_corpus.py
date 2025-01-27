@@ -242,7 +242,7 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Ensure that the definition complies with the OpenAPI specification" in formatted:
         return True
-    if "Invalid Open API link definition" in formatted:
+    if "references non-existent operation" in formatted:
         return True
     if "is not defined in API operation" in formatted:
         return True
