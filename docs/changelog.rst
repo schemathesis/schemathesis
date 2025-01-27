@@ -15,6 +15,7 @@ Changelog
 - Improve error message in CLI when the schema has no Open API links.
 - Improve error message in CLI when the schema contains incorrect Open API links.
 - Display the number of covered, selected, and total Open API links in stateful testing output.
+- Vary random seed in subsequent state machine re-runs to avoid repeating all previous sequences.
 
 **Fixed**
 
