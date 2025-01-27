@@ -169,10 +169,7 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    if config.execution.seed is not None:
-        InstrumentedStateMachine = hypothesis.seed(config.execution.seed)(_InstrumentedStateMachine)
-    else:
-        InstrumentedStateMachine = _InstrumentedStateMachine
+    seed = config.execution.seed
 
     while True:
         # This loop is running until no new failures are found in a single iteration
@@ -190,6 +187,13 @@ def execute_state_machine_loop(
             )
             break
         suite_status = Status.SUCCESS
+        if seed is not None:
+            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
+            # Predictably change the seed to avoid re-running the same sequences if tests fail
+            # yet have reproducible results
+            seed += 1
+        else:
+            InstrumentedStateMachine = _InstrumentedStateMachine
         try:
             with catch_warnings(), ignore_hypothesis_output():  # type: ignore
                 InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
