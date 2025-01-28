@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+from pathlib import Path
 from random import Random
 from typing import Any, Sequence
 
 import click
+from click.utils import LazyFile
 
 from schemathesis import contrib, experimental
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run import executor, validation
 from schemathesis.cli.commands.run.checks import CheckArguments
 from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteConfig, CassetteFormat
 from schemathesis.cli.commands.run.hypothesis import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     HealthCheck,
@@ -19,6 +20,7 @@ from schemathesis.cli.commands.run.hypothesis import (
     prepare_phases,
     prepare_settings,
 )
+from schemathesis.cli.commands.run.reports import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
@@ -48,25 +50,14 @@ DEFAULT_PHASES = ("unit", "stateful")
 @click.argument("schema", type=str)  # type: ignore[misc]
 @group("Options")
 @grouped_option(
-    "--phases",
-    help="A comma-separated list of test phases to run",
-    type=CsvChoice(["unit", "stateful"]),
-    default=",".join(DEFAULT_PHASES),
-    metavar="",
-)
-@grouped_option(
-    "--base-url",
-    "-b",
-    help="Base URL of the API, required when schema is provided as a file",
+    "--url",
+    "-u",
+    "base_url",
+    help="API base URL (required for file-based schemas)",
+    metavar="URL",
     type=str,
     callback=validation.validate_base_url,
     envvar="SCHEMATHESIS_BASE_URL",
-)
-@grouped_option(
-    "--suppress-health-check",
-    help="A comma-separated list of Schemathesis health checks to disable",
-    type=CsvEnumChoice(HealthCheck),
-    metavar="",
 )
 @grouped_option(
     "--workers",
@@ -81,6 +72,26 @@ DEFAULT_PHASES = ("unit", "stateful")
     show_default=True,
     callback=validation.convert_workers,
     metavar="",
+)
+@grouped_option(
+    "--phases",
+    help="A comma-separated list of test phases to run",
+    type=CsvChoice(["unit", "stateful"]),
+    default=",".join(DEFAULT_PHASES),
+    metavar="",
+)
+@grouped_option(
+    "--suppress-health-check",
+    help="A comma-separated list of Schemathesis health checks to disable",
+    type=CsvEnumChoice(HealthCheck),
+    metavar="",
+)
+@grouped_option(
+    "--wait-for-schema",
+    help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default",
+    type=click.FloatRange(1.0),
+    default=None,
+    envvar="SCHEMATHESIS_WAIT_FOR_SCHEMA",
 )
 @group("API validation options")
 @grouped_option(
@@ -107,11 +118,6 @@ DEFAULT_PHASES = ("unit", "stateful")
     metavar="",
 )
 @grouped_option(
-    "--max-response-time",
-    help="Time limit in seconds for API response times. The test will fail if a response time exceeds this limit",
-    type=click.FloatRange(min=0.0, min_open=True),
-)
-@grouped_option(
     "-x",
     "--exitfirst",
     "exit_first",
@@ -127,42 +133,52 @@ DEFAULT_PHASES = ("unit", "stateful")
     help="Terminate the test suite after reaching a specified number of failures or errors",
     show_default=True,
 )
-@group("Filtering options")
+@grouped_option(
+    "--max-response-time",
+    help="Maximum allowed API response time in seconds",
+    type=click.FloatRange(min=0.0, min_open=True),
+    metavar="SECONDS",
+)
+@group(
+    "Filtering options",
+    description=(
+        "Filter operations by path, method, name, tag, or operation-id using:\n\n"
+        "--include-TYPE VALUE          Match operations with exact VALUE\n"
+        "--include-TYPE-regex PATTERN  Match operations using regular expression\n"
+        "--exclude-TYPE VALUE          Exclude operations with exact VALUE\n"
+        "--exclude-TYPE-regex PATTERN  Exclude operations using regular expression"
+    ),
+)
 @with_filters
 @grouped_option(
     "--include-by",
     "include_by",
     type=str,
-    help="Include API operations by expression",
+    metavar="EXPR",
+    help="Include using custom expression",
 )
 @grouped_option(
     "--exclude-by",
     "exclude_by",
     type=str,
-    help="Exclude API operations by expression",
+    metavar="EXPR",
+    help="Exclude using custom expression",
 )
 @grouped_option(
     "--exclude-deprecated",
-    help="Exclude deprecated API operations from testing",
+    help="Skip deprecated operations",
     is_flag=True,
     is_eager=True,
     default=False,
     show_default=True,
-)
-@group("Loader options")
-@grouped_option(
-    "--wait-for-schema",
-    help="Maximum duration, in seconds, to wait for the API schema to become available. Disabled by default",
-    type=click.FloatRange(1.0),
-    default=None,
-    envvar="SCHEMATHESIS_WAIT_FOR_SCHEMA",
 )
 @group("Network requests options")
 @grouped_option(
     "--header",
     "-H",
     "headers",
-    help=r"Add a custom HTTP header to all API requests. Format: 'Header-Name: Value'",
+    help=r"Add a custom HTTP header to all API requests",
+    metavar="NAME:VALUE",
     multiple=True,
     type=str,
     callback=validation.validate_headers,
@@ -170,28 +186,39 @@ DEFAULT_PHASES = ("unit", "stateful")
 @grouped_option(
     "--auth",
     "-a",
-    help="Provide the server authentication details in the 'USER:PASSWORD' format",
+    help="Authenticate all API requests with basic authentication",
+    metavar="USER:PASS",
     type=str,
     callback=validation.validate_auth,
+)
+@grouped_option(
+    "--proxy",
+    "request_proxy",
+    help="Set the proxy for all network requests",
+    metavar="URL",
+    type=str,
+)
+@grouped_option(
+    "--tls-verify",
+    "request_tls_verify",
+    help="Path to CA bundle for TLS verification, or 'false' to disable",
+    type=str,
+    default="true",
+    show_default=True,
+    callback=validation.convert_boolean_string,
+)
+@grouped_option(
+    "--rate-limit",
+    help="Specify a rate limit for test requests in '<limit>/<duration>' format. "
+    "Example - `100/m` for 100 requests per minute",
+    type=str,
+    callback=validation.validate_rate_limit,
 )
 @grouped_option(
     "--request-timeout",
     help="Timeout limit, in seconds, for each network request during tests",
     type=click.FloatRange(min=0.0, min_open=True),
     default=DEFAULT_RESPONSE_TIMEOUT,
-)
-@grouped_option(
-    "--request-proxy",
-    help="Set the proxy for all network requests",
-    type=str,
-)
-@grouped_option(
-    "--request-tls-verify",
-    help="Configures TLS certificate verification for server requests. Can specify path to CA_BUNDLE for custom certs",
-    type=str,
-    default="true",
-    show_default=True,
-    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--request-cert",
@@ -210,45 +237,56 @@ DEFAULT_PHASES = ("unit", "stateful")
     show_default=False,
     callback=validation.validate_request_cert_key,
 )
-@grouped_option(
-    "--rate-limit",
-    help="Specify a rate limit for test requests in '<limit>/<duration>' format. "
-    "Example - `100/m` for 100 requests per minute",
-    type=str,
-    callback=validation.validate_rate_limit,
-)
 @group("Output options")
 @grouped_option(
-    "--junit-xml",
-    help="Output a JUnit-XML style report at the specified file path",
-    type=click.File("w", encoding="utf-8"),
+    "--report",
+    "report_formats",
+    help="Generate test reports in specified formats",
+    type=CsvEnumChoice(ReportFormat),
+    is_eager=True,
+    metavar="FORMAT",
 )
 @grouped_option(
-    "--cassette-path",
-    help="Save the test outcomes in a VCR-compatible format",
+    "--report-dir",
+    help="Directory to store all report files",
+    type=click.Path(file_okay=False, dir_okay=True),
+    default=DEFAULT_REPORT_DIRECTORY,
+    show_default=True,
+)
+@grouped_option(
+    "--report-junit-path",
+    help="Custom path for JUnit XML report",
     type=click.File("w", encoding="utf-8"),
     is_eager=True,
 )
 @grouped_option(
-    "--cassette-format",
-    help="Format of the saved cassettes",
-    type=click.Choice([item.name.lower() for item in CassetteFormat]),
-    default=CassetteFormat.VCR.name.lower(),
-    callback=validation.convert_cassette_format,
-    metavar="",
+    "--report-vcr-path",
+    help="Custom path for VCR cassette",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
 )
 @grouped_option(
-    "--cassette-preserve-exact-body-bytes",
+    "--report-har-path",
+    help="Custom path for HAR file",
+    type=click.File("w", encoding="utf-8"),
+    is_eager=True,
+)
+@grouped_option(
+    "--report-preserve-bytes",
     help="Retain exact byte sequence of payloads in cassettes, encoded as base64",
+    type=bool,
     is_flag=True,
-    callback=validation.validate_preserve_exact_body_bytes,
+    default=False,
+    callback=validation.validate_preserve_bytes,
 )
 @grouped_option(
     "--output-sanitize",
-    type=bool,
-    default=True,
+    type=str,
+    default="true",
     show_default=True,
     help="Enable or disable automatic output sanitization to obscure sensitive data",
+    metavar="BOOLEAN",
+    callback=validation.convert_boolean_string,
 )
 @grouped_option(
     "--output-truncate",
@@ -256,6 +294,7 @@ DEFAULT_PHASES = ("unit", "stateful")
     type=str,
     default="true",
     show_default=True,
+    metavar="BOOLEAN",
     callback=validation.convert_boolean_string,
 )
 @group("Experimental options")
@@ -306,10 +345,10 @@ DEFAULT_PHASES = ("unit", "stateful")
 )
 @group("Data generation options")
 @grouped_option(
-    "--generation-mode",
+    "--mode",
+    "-m",
     "generation_modes",
-    help="Specify the approach Schemathesis uses to generate test data. "
-    "Use 'positive' for valid data, 'negative' for invalid data, or 'all' for both",
+    help="Test data generation mode",
     type=click.Choice([item.value for item in GenerationMode] + ["all"]),
     default=GenerationMode.default().value,
     callback=validation.convert_generation_mode,
@@ -317,14 +356,23 @@ DEFAULT_PHASES = ("unit", "stateful")
     metavar="",
 )
 @grouped_option(
-    "--generation-seed",
-    help="Seed value for Schemathesis, ensuring reproducibility across test runs",
+    "--max-examples",
+    "-n",
+    "generation_max_examples",
+    help="Maximum number of test cases per API operation",
+    type=click.IntRange(1),
+)
+@grouped_option(
+    "--seed",
+    "generation_seed",
+    help="Random seed for reproducible test runs",
     type=int,
 )
 @grouped_option(
-    "--generation-max-examples",
-    help="The cap on the number of examples generated by Schemathesis for each API operation",
-    type=click.IntRange(1),
+    "--no-shrink",
+    "generation_no_shrink",
+    help="Disable test case shrinking. Makes test failures harder to debug but improves performance",
+    is_flag=True,
 )
 @grouped_option(
     "--generation-deterministic",
@@ -336,10 +384,11 @@ DEFAULT_PHASES = ("unit", "stateful")
 )
 @grouped_option(
     "--generation-allow-x00",
-    help="Whether to allow the generation of `\x00` bytes within strings",
+    help="Whether to allow the generation of 'NULL' bytes within strings",
     type=str,
     default="true",
     show_default=True,
+    metavar="BOOLEAN",
     callback=validation.convert_boolean_string,
 )
 @grouped_option(
@@ -350,8 +399,8 @@ DEFAULT_PHASES = ("unit", "stateful")
     callback=validation.validate_generation_codec,
 )
 @grouped_option(
-    "--generation-optimize",
-    "generation_optimize",
+    "--generation-maximize",
+    "generation_maximize",
     multiple=True,
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
@@ -470,8 +519,8 @@ def run(
     negative_data_rejection_allowed_statuses: list[str],
     included_check_names: Sequence[str],
     excluded_check_names: Sequence[str],
-    phases: Sequence[str] = DEFAULT_PHASES,
     max_response_time: float | None = None,
+    phases: Sequence[str] = DEFAULT_PHASES,
     exit_first: bool = False,
     max_failures: int | None = None,
     include_path: Sequence[str] = (),
@@ -499,18 +548,20 @@ def run(
     exclude_deprecated: bool = False,
     workers_num: int = DEFAULT_WORKERS,
     base_url: str | None = None,
+    wait_for_schema: float | None = None,
+    rate_limit: str | None = None,
     suppress_health_check: list[HealthCheck] | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
-    junit_xml: click.utils.LazyFile | None = None,
-    cassette_path: click.utils.LazyFile | None = None,
-    cassette_format: CassetteFormat = CassetteFormat.VCR,
-    cassette_preserve_exact_body_bytes: bool = False,
-    wait_for_schema: float | None = None,
-    rate_limit: str | None = None,
+    report_formats: list[ReportFormat] | None = None,
+    report_dir: Path = DEFAULT_REPORT_DIRECTORY,
+    report_junit_path: LazyFile | None = None,
+    report_vcr_path: LazyFile | None = None,
+    report_har_path: LazyFile | None = None,
+    report_preserve_bytes: bool = False,
     output_sanitize: bool = True,
     output_truncate: bool = True,
     contrib_openapi_fill_missing_examples: bool = False,
@@ -519,7 +570,7 @@ def run(
     generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
-    generation_optimize: Sequence[str] | None = None,
+    generation_maximize: Sequence[str] | None = None,
     generation_deterministic: bool | None = None,
     generation_database: str | None = None,
     generation_unique_inputs: bool = False,
@@ -527,6 +578,7 @@ def run(
     generation_graphql_allow_null: bool = True,
     generation_with_security_parameters: bool = True,
     generation_codec: str = "utf-8",
+    generation_no_shrink: bool = False,
     force_color: bool = False,
     no_color: bool = False,
     **__kwargs: Any,
@@ -541,7 +593,7 @@ def run(
 
     validation.validate_schema(schema, base_url)
 
-    _hypothesis_phases = prepare_phases(hypothesis_phases, hypothesis_no_phases)
+    _hypothesis_phases = prepare_phases(hypothesis_phases, hypothesis_no_phases, generation_no_shrink)
     _hypothesis_suppress_health_check = prepare_health_checks(suppress_health_check)
 
     for experiment in experiments:
@@ -591,13 +643,16 @@ def run(
     if exit_first and max_failures is None:
         max_failures = 1
 
-    cassette_config = None
-    if cassette_path is not None:
-        cassette_config = CassetteConfig(
-            path=cassette_path,
-            format=cassette_format,
+    report_config = None
+    if report_formats or report_junit_path or report_vcr_path or report_har_path:
+        report_config = ReportConfig(
+            formats=report_formats,
+            directory=Path(report_dir),
+            junit_path=report_junit_path if report_junit_path else None,
+            vcr_path=report_vcr_path if report_vcr_path else None,
+            har_path=report_har_path if report_har_path else None,
+            preserve_bytes=report_preserve_bytes,
             sanitize_output=output_sanitize,
-            preserve_exact_body_bytes=cassette_preserve_exact_body_bytes,
         )
 
     # Use the same seed for all tests unless `derandomize=True` is used
@@ -616,7 +671,7 @@ def run(
             execution=ExecutionConfig(
                 phases=phases_,
                 checks=selected_checks,
-                targets=TARGETS.get_by_names(generation_optimize or []),
+                targets=TARGETS.get_by_names(generation_maximize or []),
                 hypothesis_settings=prepare_settings(
                     database=generation_database,
                     derandomize=generation_deterministic,
@@ -654,8 +709,7 @@ def run(
         wait_for_schema=wait_for_schema,
         rate_limit=rate_limit,
         output=OutputConfig(sanitize=output_sanitize, truncate=output_truncate),
-        cassette=cassette_config,
-        junit_xml=junit_xml,
+        report=report_config,
         args=ctx.args,
         params=ctx.params,
     )

@@ -13,10 +13,10 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     xml_path = tmp_path / "junit.xml"
     result = cli.run(
         schema_url,
-        f"--junit-xml={xml_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 2}",
+        f"--report-junit-path={xml_path}",
+        f"--max-examples={hypothesis_max_examples or 2}",
         "--checks=not_a_server_error",
-        "--generation-seed=1",
+        "--seed=1",
     )
     # Command executed successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -32,9 +32,9 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     xml_path = tmp_path / path
     result = cli.run(
         schema_url,
-        f"--junit-xml={xml_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 1}",
-        "--generation-seed=1",
+        f"--report-junit-path={xml_path}",
+        f"--max-examples={hypothesis_max_examples or 1}",
+        "--seed=1",
         "--checks=all",
         "--exclude-checks=positive_data_acceptance",
     )
@@ -100,7 +100,7 @@ def test_error_with_traceback(with_error, cli, schema_url, tmp_path):
         schema_url,
         "-c",
         "with_error",
-        f"--junit-xml={xml_path}",
+        f"--report-junit-path={xml_path}",
         hooks=with_error,
     )
     tree = ElementTree.parse(xml_path)
@@ -139,9 +139,9 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
     )
     cli.run(
         str(schema_path),
-        f"--base-url={openapi3_base_url}",
+        f"--url={openapi3_base_url}",
         "--checks=all",
-        f"--junit-xml={xml_path}",
+        f"--report-junit-path={xml_path}",
         "--exclude-checks=positive_data_acceptance",
     )
     tree = ElementTree.parse(xml_path)
@@ -163,9 +163,9 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     xml_path = tmp_path / "junit.xml"
     cli.run(
         schema_url,
-        f"--junit-xml={xml_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 1}",
-        "--generation-seed=1",
+        f"--report-junit-path={xml_path}",
+        f"--max-examples={hypothesis_max_examples or 1}",
+        "--seed=1",
         "--request-timeout=0.01",
         "--checks=all",
     )
@@ -185,8 +185,8 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
     xml_path = tmp_path / "junit.xml"
     cli.run(
         schema_url,
-        f"--junit-xml={xml_path}",
-        "--generation-seed=1",
+        f"--report-junit-path={xml_path}",
+        "--seed=1",
         "--hypothesis-phases=explicit",
         "--checks=all",
     )
@@ -207,6 +207,6 @@ def test_permission_denied(cli, tmp_path, schema_url, path):
     dir_path = tmp_path / "output"
     dir_path.mkdir(mode=0o555)
     xml_path = dir_path / path
-    result = cli.run(schema_url, f"--junit-xml={xml_path}")
+    result = cli.run(schema_url, f"--report-junit-path={xml_path}")
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
     assert "Permission denied" in result.stdout

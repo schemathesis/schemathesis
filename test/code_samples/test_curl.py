@@ -77,7 +77,7 @@ def test_cli_output(cli, base_url, schema_url, curl):
 @pytest.mark.operations("failure")
 @pytest.mark.openapi_version("3.0")
 def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
-    result = cli.run(schema_url, "--request-tls-verify=false")
+    result = cli.run(schema_url, "--tls-verify=false")
     lines = result.stdout.splitlines()
     line = f"    curl -X GET --insecure {base_url}/failure"
     assert line in lines

@@ -1,7 +1,0 @@
-Exit code: 2
----
-Stdout:
-Usage: run [OPTIONS] SCHEMA
-Try 'run -h' for help.
-
-Error: Missing argument, `--cassette-path` should be specified as well if you use `--cassette-preserve-exact-body-bytes`.

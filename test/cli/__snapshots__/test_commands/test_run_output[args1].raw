@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: The `--base-url` option is required when specifying a schema via a file.
+Error: The `--url` option is required when specifying a schema via a file.

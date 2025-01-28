@@ -22,8 +22,13 @@ class CustomHelpMessageChoice(click.Choice):
 
 class BaseCsvChoice(click.Choice):
     def parse_value(self, value: str) -> tuple[list[str], set[str]]:
-        selected = [item for item in value.split(",") if item]
-        invalid_options = set(selected) - set(self.choices)
+        selected = [item.strip() for item in value.split(",") if item.strip()]
+        if not self.case_sensitive:
+            invalid_options = {
+                item for item in selected if item.upper() not in {choice.upper() for choice in self.choices}
+            }
+        else:
+            invalid_options = set(selected) - set(self.choices)
         return selected, invalid_options
 
     def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:  # type: ignore[misc]
@@ -44,16 +49,18 @@ class CsvChoice(BaseCsvChoice):
 
 
 class CsvEnumChoice(BaseCsvChoice):
-    def __init__(self, choices: type[Enum]):
+    def __init__(self, choices: type[Enum], case_sensitive: bool = False):
         self.enum = choices
-        super().__init__(tuple(el.name for el in choices))
+        super().__init__(tuple(el.name.lower() for el in choices), case_sensitive=case_sensitive)
 
-    def convert(  # type: ignore[return]
-        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
-    ) -> list[Enum]:
+    def convert(self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None) -> list[Enum]:
         selected, invalid_options = self.parse_value(value)
         if not invalid_options and selected:
-            return [self.enum[item] for item in selected]
+            # Match case-insensitively to find the correct enum
+            return [
+                next(enum_value for enum_value in self.enum if enum_value.value.upper() == item.upper())
+                for item in selected
+            ]
         self.fail_on_invalid_options(invalid_options, selected)
 
 

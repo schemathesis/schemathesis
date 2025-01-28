@@ -9,8 +9,8 @@ from schemathesis.cli.ext.options import CsvEnumChoice
 
 
 class Options(Enum):
-    FIRST = 1
-    SECOND = 2
+    FIRST = "first"
+    SECOND = "second"
 
 
 @given(value=st.text() | st.lists(st.text()).map(",".join))

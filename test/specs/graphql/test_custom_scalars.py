@@ -45,7 +45,7 @@ type Query {
 }
     """,
     )
-    assert cli.run(str(schema_file), f"--base-url={graphql_url}") == snapshot_cli
+    assert cli.run(str(schema_file), f"--url={graphql_url}") == snapshot_cli
 
 
 def test_built_in_scalars_in_cli(testdir, cli, graphql_url):
@@ -73,7 +73,7 @@ type Query {
   getByUUID(value: UUID!): Int!
 }""",
     )
-    result = cli.run(str(schema_file), "--generation-max-examples=5", f"--base-url={graphql_url}")
+    result = cli.run(str(schema_file), "--max-examples=5", f"--url={graphql_url}")
     # Queries can be constructed, but the backend does not implement the fields
     assert result.stdout.count("Cannot query field") == 18
 
