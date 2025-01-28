@@ -4,9 +4,28 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.3...HEAD>` - TBD
 ---------------------------------------------------
 
+Added
+
+- ``--report`` unified reporting system with multiple format support.
+- ``--report-dir`` for centralized report storage.
+
+**Changed**
+
+- Rename ``--generation-optimize`` -> ``--generation-maximize``.
+- Rename ``--generation-mode`` -> ``-m/--mode``.
+- Rename ``--generation-max-examples`` -> ``-n/--max-examples``.
+- Rename ``--junit-xml`` -> ``--report=junit``.
+- Rename ``--cassette-*`` options -> ``--report=vcr/har`` with format-specific paths.
+- Replace ``shrink`` in ``--hypothesis-phases`` with a separate ``--no-shrink`` option.
+- Simplified filtering options help message.
+
 **Fixed**
 
 - Handling of multiple API links pointing to the same operation with different parameters.
+
+**Removed**
+
+- ``--cassette-format`` (replaced by ``--report``).
 
 .. _v4.0.0-alpha.3:
 

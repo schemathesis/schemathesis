@@ -15,7 +15,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
     assert (
         cli.run(
             schema_url,
-            "--generation-max-examples=80",
+            "--max-examples=80",
             "--exitfirst",
             f"--workers={workers}",
         )
@@ -32,9 +32,9 @@ def test_sanitization(cli, schema_url, tmp_path):
     result = cli.run(
         schema_url,
         "--phases=stateful",
-        "--generation-max-examples=80",
+        "--max-examples=80",
         f"--header=Authorization: Bearer {token}",
-        f"--cassette-path={cassette_path}",
+        f"--report-vcr-path={cassette_path}",
         "--exitfirst",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -48,7 +48,7 @@ def test_max_failures(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--generation-max-examples=80",
+            "--max-examples=80",
             "--max-failures=2",
         )
         == snapshot_cli
@@ -61,9 +61,9 @@ def test_with_cassette(tmp_path, cli, schema_url):
     cassette_path = tmp_path / "output.yaml"
     cli.run(
         schema_url,
-        "--generation-max-examples=40",
+        "--max-examples=40",
         "--exitfirst",
-        f"--cassette-path={cassette_path}",
+        f"--report-vcr-path={cassette_path}",
     )
     assert cassette_path.exists()
     with cassette_path.open(encoding="utf-8") as fd:
@@ -79,9 +79,9 @@ def test_junit(tmp_path, cli, schema_url):
     result = cli.run(
         schema_url,
         "--phases=stateful",
-        "--generation-max-examples=80",
+        "--max-examples=80",
         "--exitfirst",
-        f"--junit-xml={junit_path}",
+        f"--report-junit-path={junit_path}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert junit_path.exists()
@@ -103,7 +103,7 @@ def test_stateful_only(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--phases=stateful",
-            "--generation-max-examples=80",
+            "--max-examples=80",
             "--exitfirst",
         )
         == snapshot_cli
@@ -117,7 +117,7 @@ def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--base-url=http://127.0.0.1:1/api",
+            "--url=http://127.0.0.1:1/api",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -131,7 +131,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--generation-max-examples=40",
+            "--max-examples=40",
             "--include-path=/api/success",
             "--exitfirst",
         )
@@ -147,7 +147,7 @@ def test_proxy_error(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
-            "--request-proxy=http://127.0.0.1",
+            "--proxy=http://127.0.0.1",
             "--phases=stateful",
         )
         == snapshot_cli
@@ -165,7 +165,7 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--phases=stateful",
-            "--generation-max-examples=50",
+            "--max-examples=50",
             "--generation-allow-x00=false",
             "--generation-codec=ascii",
             "--generation-with-security-parameters=false",

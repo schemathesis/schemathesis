@@ -11,7 +11,7 @@ import click
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteConfig
+from schemathesis.cli.commands.run.reports import ReportConfig, ReportFormat
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
@@ -100,7 +100,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
 
 
 VERIFY_URL_SUGGESTION = "Verify that the URL points directly to the Open API schema or GraphQL endpoint"
-DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--request-tls-verify=false`')}."
+DISABLE_SSL_SUGGESTION = f"Bypass SSL verification with {bold('`--tls-verify=false`')}."
 LOADER_ERROR_SUGGESTIONS = {
     # SSL-specific connection issue
     LoaderErrorKind.CONNECTION_SSL: DISABLE_SSL_SUGGESTION,
@@ -789,8 +789,7 @@ class OutputHandler(EventHandler):
 
     statistic: ApiStatistic | None = None
     skip_reasons: list[str] = field(default_factory=list)
-    cassette_config: CassetteConfig | None = None
-    junit_xml_file: str | None = None
+    report_config: ReportConfig | None = None
     warnings: WarningData = field(default_factory=WarningData)
     errors: list[events.NonFatalError] = field(default_factory=list)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
@@ -1313,14 +1312,13 @@ class OutputHandler(EventHandler):
         display_section_name(message, fg=color)
 
     def display_reports(self) -> None:
-        reports = []
-        if self.cassette_config is not None:
-            format_name = self.cassette_config.format.name.upper()
-            reports.append((format_name, self.cassette_config.path.name))
-        if self.junit_xml_file is not None:
-            reports.append(("JUnit XML", self.junit_xml_file))
+        if self.report_config is not None:
+            reports = [
+                (format.value.upper(), self.report_config.get_path(format).name)
+                for format in ReportFormat
+                if format in self.report_config.formats
+            ]
 
-        if reports:
             click.echo(_style("Reports:", bold=True))
             for report_type, path in reports:
                 click.echo(_style(f"  - {report_type}: {path}"))

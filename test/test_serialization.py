@@ -105,7 +105,7 @@ def test_no_serialization_possible(tsv_schema):
 @pytest.mark.operations("csv_payload")
 def test_in_cli(ctx, cli, tsv_schema, snapshot_cli, openapi3_base_url):
     schema_path = ctx.openapi.write_schema(tsv_schema.raw_schema["paths"])
-    assert cli.run(str(schema_path), f"--base-url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.mark.parametrize("transport", [RequestsTransport, WSGITransport])

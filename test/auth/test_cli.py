@@ -90,9 +90,7 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, ope
         security=[{"bearerAuth": []}, {"basicAuth": []}],
     )
     # Then it should be able to generate requests
-    assert (
-        cli.run(str(schema_path), "-H", "Authorization: Bearer foo", f"--base-url={openapi3_base_url}") == snapshot_cli
-    )
+    assert cli.run(str(schema_path), "-H", "Authorization: Bearer foo", f"--url={openapi3_base_url}") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -131,7 +129,7 @@ def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
             schema_url,
             "--workers",
             "2",
-            "--generation-max-examples=1",
+            "--max-examples=1",
             hooks=module,
         )
         == snapshot_cli

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from enum import IntEnum, unique
+from enum import Enum, unique
 from typing import TYPE_CHECKING, Any
 
 import click
@@ -16,12 +16,11 @@ HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 
 
 @unique
-class Phase(IntEnum):
-    explicit = 0  #: controls whether explicit examples are run.
-    reuse = 1  #: controls whether previous examples will be reused.
-    generate = 2  #: controls whether new examples will be generated.
-    target = 3  #: controls whether examples will be mutated for targeting.
-    shrink = 4  #: controls whether examples will be shrunk.
+class Phase(str, Enum):
+    explicit = "explicit"  #: controls whether explicit examples are run.
+    reuse = "reuse"  #: controls whether previous examples will be reused.
+    generate = "generate"  #: controls whether new examples will be generated.
+    target = "target"  #: controls whether examples will be mutated for targeting.
     # The `explain` phase is not supported
 
     def as_hypothesis(self) -> hypothesis.Phase:
@@ -30,20 +29,23 @@ class Phase(IntEnum):
         return Phase[self.name]
 
     @staticmethod
-    def filter_from_all(variants: list[Phase]) -> list[hypothesis.Phase]:
+    def filter_from_all(variants: list[Phase], no_shrink: bool) -> list[hypothesis.Phase]:
         from hypothesis import Phase
 
-        return list(set(Phase) - {Phase.explain} - set(variants))
+        phases = set(Phase) - {Phase.explain} - set(variants)
+        if no_shrink:
+            return list(phases - {Phase.shrink})
+        return list(phases)
 
 
 @unique
-class HealthCheck(IntEnum):
+class HealthCheck(str, Enum):
     # We remove not relevant checks
-    data_too_large = 1
-    filter_too_much = 2
-    too_slow = 3
-    large_base_example = 7
-    all = 8
+    data_too_large = "data_too_large"
+    filter_too_much = "filter_too_much"
+    too_slow = "too_slow"
+    large_base_example = "large_base_example"
+    all = "all"
 
     def as_hypothesis(self) -> list[hypothesis.HealthCheck]:
         from hypothesis import HealthCheck
@@ -64,14 +66,23 @@ def prepare_health_checks(
 
 
 def prepare_phases(
-    hypothesis_phases: list[Phase] | None, hypothesis_no_phases: list[Phase] | None
+    hypothesis_phases: list[Phase] | None,
+    hypothesis_no_phases: list[Phase] | None,
+    no_shrink: bool = False,
 ) -> list[hypothesis.Phase] | None:
+    from hypothesis import Phase as HypothesisPhase
+
     if hypothesis_phases is not None and hypothesis_no_phases is not None:
         raise click.UsageError(PHASES_INVALID_USAGE_MESSAGE)
     if hypothesis_phases:
-        return [phase.as_hypothesis() for phase in hypothesis_phases]
-    if hypothesis_no_phases:
-        return Phase.filter_from_all(hypothesis_no_phases)
+        phases = [phase.as_hypothesis() for phase in hypothesis_phases]
+        if not no_shrink:
+            phases.append(HypothesisPhase.shrink)
+        return phases
+    elif hypothesis_no_phases:
+        return Phase.filter_from_all(hypothesis_no_phases, no_shrink)
+    elif no_shrink:
+        return Phase.filter_from_all([], no_shrink)
     return None
 
 

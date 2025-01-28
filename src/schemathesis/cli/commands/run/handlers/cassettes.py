@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import datetime
-import enum
 import json
 import sys
 import threading
@@ -11,11 +10,12 @@ from queue import Queue
 from typing import IO, Callable, Iterator
 from urllib.parse import parse_qsl, urlparse
 
-import click
 import harfile
+from click.utils import LazyFile
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
+from schemathesis.cli.commands.run.reports import ReportFormat
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
@@ -28,43 +28,26 @@ from schemathesis.generation.meta import CoveragePhaseData
 WRITER_WORKER_JOIN_TIMEOUT = 1
 
 
-class CassetteFormat(str, enum.Enum):
-    """Type of the cassette."""
-
-    VCR = "vcr"
-    HAR = "har"
-
-    @classmethod
-    def from_str(cls, value: str) -> CassetteFormat:
-        try:
-            return cls[value.upper()]
-        except KeyError:
-            available_formats = ", ".join(cls)
-            raise ValueError(
-                f"Invalid value for cassette format: {value}. Available formats: {available_formats}"
-            ) from None
-
-
-@dataclass
-class CassetteConfig:
-    path: click.utils.LazyFile
-    format: CassetteFormat = CassetteFormat.VCR
-    preserve_exact_body_bytes: bool = False
-    sanitize_output: bool = True
-
-
 @dataclass
 class CassetteWriter(EventHandler):
     """Write network interactions to a cassette."""
 
-    config: CassetteConfig
+    format: ReportFormat
+    path: LazyFile
+    sanitize_output: bool = True
+    preserve_bytes: bool = False
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
     def __post_init__(self) -> None:
-        kwargs = {"config": self.config, "queue": self.queue}
+        kwargs = {
+            "path": self.path,
+            "sanitize_output": self.sanitize_output,
+            "preserve_bytes": self.preserve_bytes,
+            "queue": self.queue,
+        }
         writer: Callable
-        if self.config.format == CassetteFormat.HAR:
+        if self.format == ReportFormat.HAR:
             writer = har_writer
         else:
             writer = vcr_writer
@@ -120,7 +103,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
+def vcr_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -131,12 +114,12 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
         providing tags, anchors to have incremental writing, with primitive types it is much simpler.
     """
     current_id = 1
-    stream = config.path.open()
+    stream = path.open()
 
     def format_header_values(values: list[str]) -> str:
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
-    if config.sanitize_output:
+    if sanitize_output:
 
         def format_headers(headers: dict[str, list[str]]) -> str:
             headers = deepclone(headers)
@@ -162,7 +145,7 @@ def vcr_writer(config: CassetteConfig, queue: Queue) -> None:
   checks:
 {items}"""
 
-    if config.preserve_exact_body_bytes:
+    if preserve_bytes:
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.encoded_body is not None:
@@ -283,7 +266,7 @@ http_interactions:"""
                 else:
                     stream.write("null")
 
-                if config.sanitize_output:
+                if sanitize_output:
                     uri = sanitize_url(interaction.request.uri)
                 else:
                     uri = interaction.request.uri
@@ -321,7 +304,7 @@ http_interactions:"""
                 current_id += 1
         else:
             break
-    config.path.close()
+    path.close()
 
 
 def write_double_quoted(stream: IO, text: str | None) -> None:
@@ -367,13 +350,13 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
     stream.write('"')
 
 
-def har_writer(config: CassetteConfig, queue: Queue) -> None:
-    with harfile.open(config.path) as har:
+def har_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
+    with harfile.open(path) as har:
         while True:
             item = queue.get()
             if isinstance(item, Process):
                 for interaction in item.recorder.interactions.values():
-                    if config.sanitize_output:
+                    if sanitize_output:
                         uri = sanitize_url(interaction.request.uri)
                     else:
                         uri = interaction.request.uri
@@ -382,7 +365,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                         post_data = harfile.PostData(
                             mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                             text=interaction.request.encoded_body
-                            if config.preserve_exact_body_bytes
+                            if preserve_bytes
                             else interaction.request.body.decode("utf-8", "replace"),
                         )
                     else:
@@ -393,16 +376,14 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                             size=interaction.response.body_size or 0,
                             mimeType=content_type,
                             text=interaction.response.encoded_body
-                            if config.preserve_exact_body_bytes
+                            if preserve_bytes
                             else interaction.response.content.decode("utf-8", "replace")
                             if interaction.response.content is not None
                             else None,
-                            encoding="base64"
-                            if interaction.response.content is not None and config.preserve_exact_body_bytes
-                            else None,
+                            encoding="base64" if interaction.response.content is not None and preserve_bytes else None,
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"
-                        if config.sanitize_output:
+                        if sanitize_output:
                             headers = deepclone(interaction.response.headers)
                             sanitize_value(headers)
                         else:
@@ -424,7 +405,7 @@ def har_writer(config: CassetteConfig, queue: Queue) -> None:
                         time = 0
                         http_version = ""
 
-                    if config.sanitize_output:
+                    if sanitize_output:
                         headers = deepclone(interaction.request.headers)
                         sanitize_value(headers)
                     else:

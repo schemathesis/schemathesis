@@ -125,7 +125,7 @@ def csv_strategy(enum, exclude=()):
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
 )
 @example(params=[], flags=[], multiple_params=["--header=0:0\r"], csv_params=[])
-@example(params=["--generation-max-examples=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--max-examples=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
     result = cli.run(
@@ -185,7 +185,7 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
 )
 @example(params=["--checks=0"], flags=[], multiple_params=[], csv_params=[])
-@example(params=["--generation-optimize=0"], flags=[], multiple_params=[], csv_params=[])
+@example(params=["--generation-maximize=0"], flags=[], multiple_params=[], csv_params=[])
 @example(params=["--exclude-operation-id=0", "--include-operation-id=0"], flags=[], multiple_params=[], csv_params=[])
 @pytest.mark.usefixtures("mocked_schema")
 def test_random_parameters_combos(cli, schema_url, params, flags, multiple_params, csv_params):
@@ -212,7 +212,7 @@ def test_random_parameters_combos(cli, schema_url, params, flags, multiple_param
 def test_schema_validity(cli, schema, base_url):
     args = ()
     if base_url:
-        args = (f"--base-url={base_url}",)
+        args = (f"--url={base_url}",)
     result = cli.run(schema, *args)
     check_result(result)
 

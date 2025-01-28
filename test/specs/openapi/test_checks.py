@@ -285,9 +285,9 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
     assert (
         cli.run(
             str(schema_path),
-            f"--base-url={openapi3_base_url}",
+            f"--url={openapi3_base_url}",
             "--hypothesis-phases=explicit",
-            "--generation-mode=negative",
+            "--mode=negative",
             "--experimental=coverage-phase",
             f"--experimental-missing-required-header-allowed-statuses={expected_status}",
         )
@@ -310,9 +310,9 @@ def test_method_not_allowed(ctx, cli, openapi3_base_url, snapshot_cli, path, met
     assert (
         cli.run(
             str(schema_path),
-            f"--base-url={openapi3_base_url}",
+            f"--url={openapi3_base_url}",
             "--hypothesis-phases=explicit",
-            "--generation-mode=negative",
+            "--mode=negative",
             "--experimental=coverage-phase",
         )
         == snapshot_cli

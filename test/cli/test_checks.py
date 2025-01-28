@@ -36,12 +36,12 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     )
     result = cli.run(
         str(schema_path),
-        f"--base-url={openapi3_base_url}",
+        f"--url={openapi3_base_url}",
         "--checks",
         "negative_data_rejection",
-        "--generation-mode",
+        "--mode",
         "negative",
-        "--generation-max-examples=5",
+        "--max-examples=5",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED
 
@@ -85,8 +85,8 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
     assert (
         cli.run(
             str(schema_path),
-            f"--base-url={openapi3_base_url}",
-            "--generation-max-examples=5",
+            f"--url={openapi3_base_url}",
+            "--max-examples=5",
             "--experimental=positive-data-acceptance",
             *args,
         )
@@ -101,8 +101,8 @@ def test_positive_data_acceptance_with_env_vars(ctx, cli, snapshot_cli, schema, 
     assert (
         cli.run(
             str(schema_path),
-            f"--base-url={openapi3_base_url}",
-            "--generation-max-examples=5",
+            f"--url={openapi3_base_url}",
+            "--max-examples=5",
         )
         == snapshot_cli
     )
