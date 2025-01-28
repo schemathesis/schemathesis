@@ -27,6 +27,7 @@ def _with_filter(*, by: str, mode: Literal["include", "exclude"], modifier: Lite
         help=help_text,
         type=str,
         multiple=modifier is None,
+        hidden=True,
     )
 
 

@@ -11,7 +11,7 @@ from _pytest.main import ExitCode
 from hypothesis import example, given
 from hypothesis import strategies as st
 
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteFormat, _cookie_to_har, write_double_quoted
+from schemathesis.cli.commands.run.handlers.cassettes import _cookie_to_har, write_double_quoted
 from schemathesis.generation import GenerationMode
 
 
@@ -33,17 +33,17 @@ def load_response_body(cassette, idx):
 
 
 @pytest.mark.parametrize("mode", [m.value for m in GenerationMode.all()] + ["all"])
-@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
+@pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
     hypothesis_max_examples = hypothesis_max_examples or 2
     result = cli.run(
         schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--generation-max-examples={hypothesis_max_examples}",
-        f"--generation-mode={mode}",
+        f"--report-vcr-path={cassette_path}",
+        f"--max-examples={hypothesis_max_examples}",
+        f"--mode={mode}",
         "--experimental=coverage-phase",
-        "--generation-seed=1",
+        "--seed=1",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -83,11 +83,10 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
 def test_store_timeout(cli, schema_url, cassette_path, format):
     result = cli.run(
         schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--cassette-format={format}",
-        "--generation-max-examples=1",
+        f"--report-{format}-path={cassette_path}",
+        "--max-examples=1",
         "--request-timeout=0.001",
-        "--generation-seed=1",
+        "--seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if format == "vcr":
@@ -108,9 +107,9 @@ def test_interaction_status(cli, openapi3_schema_url, hypothesis_max_examples, c
     # When an API operation has responses with SUCCESS and FAILURE statuses
     result = cli.run(
         openapi3_schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 5}",
-        "--generation-seed=1",
+        f"--report-vcr-path={cassette_path}",
+        f"--max-examples={hypothesis_max_examples or 5}",
+        "--seed=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     cassette = load_cassette(cassette_path)
@@ -150,9 +149,9 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
     )
     result = cli.run(
         str(schema_path),
-        f"--base-url={openapi3_base_url}",
-        f"--generation-max-examples={hypothesis_max_examples or 1}",
-        f"--cassette-path={cassette_path}",
+        f"--url={openapi3_base_url}",
+        f"--max-examples={hypothesis_max_examples or 1}",
+        f"--report-vcr-path={cassette_path}",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -170,31 +169,28 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     result = testdir.run(
         "schemathesis",
         "run",
-        f"--cassette-path={cassette_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 2}",
+        f"--report-vcr-path={cassette_path}",
+        f"--max-examples={hypothesis_max_examples or 2}",
         schema_url,
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
-    command = (
-        f"st run --cassette-path={cassette_path} --generation-max-examples={hypothesis_max_examples or 2} {schema_url}"
-    )
+    command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {schema_url}"
     assert cassette["command"] == command
 
 
 @pytest.mark.operations("__all__")
 @pytest.mark.parametrize("value", ["true", "false"])
-@pytest.mark.parametrize("args", [(), ("--cassette-preserve-exact-body-bytes",)], ids=("plain", "base64"))
+@pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
 def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, args, value):
     cassette_path = cassette_path.with_suffix(".har")
     auth = "secret"
     result = cli.run(
         schema_url,
-        f"--cassette-path={cassette_path}",
-        "--cassette-format=har",
-        f"--generation-max-examples={hypothesis_max_examples or 1}",
-        "--generation-seed=1",
+        f"--report-har-path={cassette_path}",
+        f"--max-examples={hypothesis_max_examples or 1}",
+        "--seed=1",
         "--checks=all",
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
@@ -215,11 +211,6 @@ def test_har_format(cli, schema_url, cassette_path, hypothesis_max_examples, arg
                     assert header["value"] != auth
                 else:
                     assert header["value"] == auth
-
-
-def test_invalid_format():
-    with pytest.raises(ValueError, match="Invalid value for cassette format: invalid. Available formats: vcr, har"):
-        CassetteFormat.from_str("invalid")
 
 
 @pytest.mark.parametrize(
@@ -254,7 +245,7 @@ def test_cookie_to_har(value, expected):
 @pytest.fixture(params=["tls-verify", "cert", "cert-and-key", "proxies"])
 def request_args(request, tmp_path):
     if request.param == "tls-verify":
-        return ["--request-tls-verify=false"], "verify", False, ExitCode.OK
+        return ["--tls-verify=false"], "verify", False, ExitCode.OK
     cert = tmp_path / "cert.tmp"
     cert.touch()
     if request.param == "cert":
@@ -268,7 +259,7 @@ def request_args(request, tmp_path):
             exit_code = ExitCode.OK
         else:
             exit_code = ExitCode.TESTS_FAILED
-        return ["--request-proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
+        return ["--proxy=http://127.0.0.1"], "proxies", {"all": "http://127.0.0.1"}, exit_code
 
 
 @pytest.mark.parametrize("value", ["true", "false"])
@@ -277,9 +268,9 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     auth = "secret-auth"
     result = cli.run(
         openapi2_schema_url,
-        f"--cassette-path={cassette_path}",
-        f"--generation-max-examples={hypothesis_max_examples or 5}",
-        "--generation-seed=1",
+        f"--report-vcr-path={cassette_path}",
+        f"--max-examples={hypothesis_max_examples or 5}",
+        "--seed=1",
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
     )
@@ -302,10 +293,36 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
 
 
 @pytest.mark.openapi_version("3.0")
-def test_forbid_preserve_exact_bytes_without_cassette_path(cli, schema_url, snapshot_cli):
-    # When `--cassette-preserve-exact-body-bytes` is specified without `--cassette-path`
+def test_forbid_preserve_bytes_without_cassette_path(cli, schema_url, snapshot_cli):
+    # When `--report-preserve-bytes` is specified without `--report-vcr-path` or `--report=vcr`
     # Then it is an error
-    assert cli.run(schema_url, "--cassette-preserve-exact-body-bytes") == snapshot_cli
+    assert cli.run(schema_url, "--report-preserve-bytes") == snapshot_cli
+
+
+@pytest.mark.openapi_version("3.0")
+def test_report_dir(cli, schema_url, tmp_path):
+    # When report directory is specified with a report format
+    report_dir = tmp_path / "reports"
+    cli.run(
+        schema_url,
+        f"--report-dir={report_dir}",
+        "--report=junit",
+        "--max-examples=1",
+    )
+    # And the report should be created in the specified directory
+    assert report_dir.exists()
+    assert (report_dir / "junit.xml").exists()
+
+    # When multiple report formats are specified
+    cli.run(
+        schema_url,
+        f"--report-dir={report_dir}",
+        "--report=vcr,har",
+        "--max-examples=1",
+    )
+    # Then all reports should be created in the specified directory
+    assert (report_dir / "vcr.yaml").exists()
+    assert (report_dir / "har.json").exists()
 
 
 @given(text=st.text())

@@ -292,7 +292,7 @@ def test_accepts_any_auth_if_explicit_is_present(ignores_auth):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("basic")
 def test_explicit_auth_cli(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "-c", "ignored_auth", "--auth=test:test", "--generation-max-examples=1") == snapshot_cli
+    assert cli.run(schema_url, "-c", "ignored_auth", "--auth=test:test", "--max-examples=1") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -354,11 +354,11 @@ def test_stateful_in_cli_no_error(ctx, cli, with_error, base_url, snapshot_cli):
     assert (
         cli.run(
             str(schema_path),
-            f"--base-url={base_url}",
+            f"--url={base_url}",
             "-c",
             "ignored_auth",
             "--header=Authorization: Basic dGVzdDp0ZXN0",
-            "--generation-max-examples=10",
+            "--max-examples=10",
             "--phases=stateful",
         )
         == snapshot_cli

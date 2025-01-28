@@ -13,7 +13,7 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis import errors, experimental
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteFormat
+from schemathesis.cli.commands.run.reports import ReportFormat
 from schemathesis.cli.constants import DEFAULT_WORKERS
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
@@ -24,8 +24,10 @@ from schemathesis.generation.overrides import Override
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
 )
-MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE = (
-    "Missing argument, `--cassette-path` should be specified as well if you use `--cassette-preserve-exact-body-bytes`."
+INVALID_REPORT_USAGE = (
+    "Can't use `--report-preserve-bytes` without enabling cassette formats. "
+    "Enable VCR or HAR format with `--report=vcr`, `--report-vcr-path`, "
+    "`--report=har`, or `--report-har-path`"
 )
 INVALID_SCHEMA_MESSAGE = "Invalid SCHEMA, must be a valid URL or file path."
 FILE_DOES_NOT_EXIST_MESSAGE = "The specified file does not exist. Please provide a valid path to an existing file."
@@ -33,7 +35,7 @@ INVALID_BASE_URL_MESSAGE = (
     "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
     "Make sure it is a properly formatted URL."
 )
-MISSING_BASE_URL_MESSAGE = "The `--base-url` option is required when specifying a schema via a file."
+MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 
@@ -240,10 +242,18 @@ def validate_request_cert_key(
     return raw_value
 
 
-def validate_preserve_exact_body_bytes(ctx: click.core.Context, param: click.core.Parameter, raw_value: bool) -> bool:
-    if raw_value and ctx.params["cassette_path"] is None:
-        raise click.UsageError(MISSING_CASSETTE_PATH_ARGUMENT_MESSAGE)
-    return raw_value
+def validate_preserve_bytes(ctx: click.core.Context, param: click.core.Parameter, raw_value: bool) -> bool:
+    if not raw_value:
+        return False
+
+    report_formats = ctx.params.get("report_formats", []) or []
+    vcr_enabled = ReportFormat.VCR in report_formats or ctx.params.get("report_vcr_path")
+    har_enabled = ReportFormat.HAR in report_formats or ctx.params.get("report_har_path")
+
+    if not (vcr_enabled or har_enabled):
+        raise click.UsageError(INVALID_REPORT_USAGE)
+
+    return True
 
 
 def convert_experimental(
@@ -300,10 +310,6 @@ def convert_status_codes(
             "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
         )
     return value
-
-
-def convert_cassette_format(ctx: click.core.Context, param: click.core.Parameter, value: str) -> CassetteFormat:
-    return CassetteFormat.from_str(value)
 
 
 def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:

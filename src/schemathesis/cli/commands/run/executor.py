@@ -10,10 +10,11 @@ from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers import display_handler_error
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.handlers.cassettes import CassetteConfig, CassetteWriter
+from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.loaders import AutodetectConfig, load_schema
+from schemathesis.cli.commands.run.reports import ReportConfig, ReportFormat
 from schemathesis.cli.ext.fs import open_file
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.output import OutputConfig
@@ -43,8 +44,7 @@ class RunConfig:
     wait_for_schema: float | None
     rate_limit: str | None
     output: OutputConfig
-    junit_xml: click.utils.LazyFile | None
-    cassette: CassetteConfig | None
+    report: ReportConfig | None
     args: list[str]
     params: dict[str, Any]
 
@@ -93,27 +93,47 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
         yield FatalError(exception=exc)
 
 
-def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
+def initialize_handlers(config: RunConfig) -> list[EventHandler]:
+    """Create event handlers based on run configuration."""
     handlers: list[EventHandler] = []
-    if config.junit_xml is not None:
-        open_file(config.junit_xml)
-        handlers.append(JunitXMLHandler(config.junit_xml))
-    if config.cassette is not None:
-        open_file(config.cassette.path)
-        handlers.append(CassetteWriter(config=config.cassette))
+
+    if config.report is not None:
+        if ReportFormat.JUNIT in config.report.formats:
+            path = config.report.get_path(ReportFormat.JUNIT)
+            open_file(path)
+            handlers.append(JunitXMLHandler(path))
+
+        for format in (ReportFormat.VCR, ReportFormat.HAR):
+            if format in config.report.formats:
+                path = config.report.get_path(format)
+                open_file(path)
+                handlers.append(
+                    CassetteWriter(
+                        format=format,
+                        path=path,
+                        sanitize_output=config.report.sanitize_output,
+                        preserve_bytes=config.report.preserve_bytes,
+                    )
+                )
+
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*config.args, **config.params))
+
     handlers.append(
         OutputHandler(
             workers_num=config.engine.execution.workers_num,
             seed=config.engine.execution.seed,
             rate_limit=config.rate_limit,
             wait_for_schema=config.wait_for_schema,
-            cassette_config=config.cassette,
-            junit_xml_file=config.junit_xml.name if config.junit_xml is not None else None,
+            report_config=config.report,
         )
     )
 
+    return handlers
+
+
+def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
+    handlers = initialize_handlers(config)
     ctx = ExecutionContext(output_config=config.output, seed=config.engine.execution.seed)
 
     def shutdown() -> None:
