@@ -46,7 +46,7 @@ def _parse_variable(tokens: lexer.TokenGenerator, token: lexer.Token, expr: str)
     elif token.value == nodes.NodeType.RESPONSE.value:
         yield _parse_response(tokens, expr)
     else:
-        raise UnknownToken(token.value)
+        raise UnknownToken(f"Invalid expression `{expr}`. Unknown token: `{token.value}`")
 
 
 def _parse_request(tokens: lexer.TokenGenerator, expr: str) -> nodes.BodyRequest | nodes.NonBodyRequest:

@@ -33,6 +33,7 @@ class AppConfig:
     multiple_incoming_links_with_same_status: bool = False
     duplicate_operation_links: bool = False
     circular_links: bool = False
+    invalid_parameter: bool = False
 
 
 @pytest.fixture
@@ -325,6 +326,7 @@ def app_factory(ctx):
         multiple_incoming_links_with_same_status=False,
         circular_links: bool = False,
         duplicate_operation_links: bool = False,
+        invalid_parameter: bool = False,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
@@ -388,6 +390,25 @@ def app_factory(ctx):
                 "operationId": "getUser",
                 "parameters": {"userId": "$response.body#/manager_id"},
                 "description": "Get user's manager",
+            }
+        if invalid_parameter:
+            # Add a link with reference to non-existent parameter
+            for name in ("InvalidUser", "InvalidUser-2"):
+                schema["paths"]["/users"]["post"]["responses"]["201"]["links"][name] = {
+                    "operationId": "getUser",
+                    "parameters": {
+                        "unknown": "$response.body#/id",  # `unknown` parameter doesn't exist in GET /users/{userId}
+                        "userId": "$request.query.wrong",  # `wrong` parameter doesn't exist in POST /users
+                    },
+                }
+            schema["paths"]["/users/{userId}"]["patch"]["responses"]["200"]["links"] = {
+                "GetUser": {
+                    "operationId": "getUser",
+                    "parameters": {
+                        "userId": "$request.path.whatever",
+                        "something": "$req.[",
+                    },
+                }
             }
         return app
 
