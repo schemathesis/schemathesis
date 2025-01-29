@@ -25,9 +25,18 @@ Schemathesis dev
 
 ==================================== ERRORS ====================================
 ________________________________ Stateful tests ________________________________
-Invalid Link Definition
+Invalid OpenAPI Links Definition
 
-Link 'GetUserByUserId' references non-existent operation 'getUser' from 201 response of 'POST /api/users/'
+The following API operations contain invalid link definitions:
+
+  POST /api/users/
+    -> [201] getUser
+       Link: GetUserByUserId
+         - Operation 'getUser' not found
+
+    -> [201] updateUser
+       Link: UpdateUserById
+         - Operation 'updateUser' not found
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -44,7 +53,7 @@ Test Phases:
   🚫 Stateful testing
 
 Errors:
-  🚫 Invalid Link Definition: 1
+  🚫 Invalid OpenAPI Links Definition: 1
 
 Test cases:
   No test cases were generated

@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 from schemathesis import errors
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
-    InvalidLinkDefinition,
+    InvalidTransition,
     SerializationNotPossible,
     format_exception,
     get_request_error_extras,
@@ -77,7 +77,7 @@ class EngineErrorInfo:
         """A general error description."""
         import requests
 
-        if isinstance(self._error, InvalidLinkDefinition):
+        if isinstance(self._error, InvalidTransition):
             return "Invalid Link Definition"
 
         if isinstance(self._error, requests.RequestException):
@@ -101,6 +101,7 @@ class EngineErrorInfo:
         return {
             RuntimeErrorKind.SCHEMA_UNSUPPORTED: "Unsupported Schema",
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND: "Missing Open API links",
+            RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE: "Invalid OpenAPI Links Definition",
             RuntimeErrorKind.HYPOTHESIS_UNSUPPORTED_GRAPHQL_SCALAR: "Unknown GraphQL Scalar",
             RuntimeErrorKind.SERIALIZATION_UNBOUNDED_PREFIX: "XML serialization error",
             RuntimeErrorKind.SERIALIZATION_NOT_POSSIBLE: "Serialization not possible",
@@ -169,6 +170,7 @@ class EngineErrorInfo:
     def has_useful_traceback(self) -> bool:
         return self._kind not in (
             RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION,
+            RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE,
             RuntimeErrorKind.SCHEMA_UNSUPPORTED,
             RuntimeErrorKind.SCHEMA_GENERIC,
             RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND,
@@ -302,6 +304,7 @@ class RuntimeErrorKind(str, enum.Enum):
     HYPOTHESIS_HEALTH_CHECK_LARGE_BASE_EXAMPLE = "hypothesis_health_check_large_base_example"
 
     SCHEMA_INVALID_REGULAR_EXPRESSION = "schema_invalid_regular_expression"
+    SCHEMA_INVALID_STATE_MACHINE = "schema_invalid_state_machine"
     SCHEMA_NO_LINKS_FOUND = "schema_no_links_found"
     SCHEMA_UNSUPPORTED = "schema_unsupported"
     SCHEMA_GENERIC = "schema_generic"
@@ -354,6 +357,8 @@ def _classify(*, error: Exception) -> RuntimeErrorKind:
         if isinstance(error, errors.InvalidRegexPattern):
             return RuntimeErrorKind.SCHEMA_INVALID_REGULAR_EXPRESSION
         return RuntimeErrorKind.SCHEMA_GENERIC
+    if isinstance(error, errors.InvalidStateMachine):
+        return RuntimeErrorKind.SCHEMA_INVALID_STATE_MACHINE
     if isinstance(error, errors.NoLinksFound):
         return RuntimeErrorKind.SCHEMA_NO_LINKS_FOUND
     if isinstance(error, UnsupportedRecursiveReference):

@@ -654,7 +654,12 @@ class BaseOpenAPISchema(BaseSchema):
     def get_links(self, operation: APIOperation) -> dict[str, dict[str, Any]]:
         result: dict[str, dict[str, Any]] = defaultdict(dict)
         for status_code, link in links.get_all_links(operation):
-            result[status_code][link.name] = link
+            if isinstance(link, Ok):
+                name = link.ok().name
+            else:
+                name = link.err().name
+            result[status_code][name] = link
+
         return result
 
     def get_tags(self, operation: APIOperation) -> list[str] | None:

@@ -5,7 +5,7 @@ from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Callable, Generator, Literal, Union, cast
 
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.core.errors import InvalidLinkDefinition, InvalidSchema, OperationNotFound
+from schemathesis.core.errors import InvalidTransition, OperationNotFound, TransitionValidationError
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
@@ -55,6 +55,7 @@ class OpenApiLink:
         self.status_code = status_code
         self.source = source
         assert isinstance(source.schema, BaseOpenAPISchema)
+        errors = []
 
         get_operation: Callable[[str], APIOperation]
         if "operationId" in definition:
@@ -66,19 +67,30 @@ class OpenApiLink:
 
         try:
             self.target = get_operation(operation_reference)
-        except OperationNotFound as exc:
-            raise InvalidLinkDefinition(
-                f"Link '{name}' references non-existent operation '{operation_reference}' from {status_code} response of '{source.label}'"
-            ) from exc
+            target = self.target.label
+        except OperationNotFound:
+            target = operation_reference
+            errors.append(TransitionValidationError(f"Operation '{operation_reference}' not found"))
 
         extension = definition.get(SCHEMATHESIS_LINK_EXTENSION)
-        self.parameters = self._normalize_parameters(definition.get("parameters", {}))
+        self.parameters = self._normalize_parameters(definition.get("parameters", {}), errors)
         self.body = definition.get("requestBody", NOT_SET)
         self.merge_body = extension.get("merge_body", True) if extension else True
 
+        if errors:
+            raise InvalidTransition(
+                name=self.name,
+                source=self.source.label,
+                target=target,
+                status_code=self.status_code,
+                errors=errors,
+            )
+
         self._cached_extract = lru_cache(8)(self._extract_impl)
 
-    def _normalize_parameters(self, parameters: dict[str, str]) -> list[NormalizedParameter]:
+    def _normalize_parameters(
+        self, parameters: dict[str, str], errors: list[TransitionValidationError]
+    ) -> list[NormalizedParameter]:
         """Process link parameters and resolve their container locations.
 
         Handles both explicit locations (e.g., "path.id") and implicit ones resolved from target operation.
@@ -94,7 +106,34 @@ class OpenApiLink:
                 location = None
                 name = parameter
 
-            container_name = self._get_parameter_container(location, name)
+            if isinstance(expression, str):
+                try:
+                    parsed = expressions.parser.parse(expression)
+                    # Find NonBodyRequest nodes that reference source parameters
+                    for node in parsed:
+                        if isinstance(node, expressions.nodes.NonBodyRequest):
+                            # Check if parameter exists in source operation
+                            if not any(
+                                p.name == node.parameter and p.location == node.location
+                                for p in self.source.iter_parameters()
+                            ):
+                                errors.append(
+                                    TransitionValidationError(
+                                        f"Expression `{expression}` references non-existent {node.location} parameter "
+                                        f"`{node.parameter}` in `{self.source.label}`"
+                                    )
+                                )
+                except Exception as exc:
+                    errors.append(TransitionValidationError(str(exc)))
+
+            if hasattr(self, "target"):
+                try:
+                    container_name = self._get_parameter_container(location, name)
+                except TransitionValidationError as exc:
+                    errors.append(exc)
+                    continue
+            else:
+                continue
             result.append(NormalizedParameter(location, name, expression, container_name))
         return result
 
@@ -106,7 +145,7 @@ class OpenApiLink:
         for param in self.target.iter_parameters():
             if param.name == name:
                 return LOCATION_TO_CONTAINER[param.location]
-        raise InvalidSchema(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
+        raise TransitionValidationError(f"Parameter `{name}` is not defined in API operation `{self.target.label}`")
 
     def extract(self, output: StepOutput) -> Transition:
         return self._cached_extract(StepOutputWrapper(output))
@@ -162,11 +201,17 @@ class StepOutputWrapper:
         return self.output.case.id == other.output.case.id
 
 
-def get_all_links(operation: APIOperation) -> Generator[tuple[str, OpenApiLink], None, None]:
+def get_all_links(
+    operation: APIOperation,
+) -> Generator[tuple[str, Result[OpenApiLink, InvalidTransition]], None, None]:
     for status_code, definition in operation.definition.raw["responses"].items():
         definition = operation.schema.resolver.resolve_all(definition, RECURSION_DEPTH_LIMIT - 8)  # type: ignore[attr-defined]
         for name, link_definition in definition.get(operation.schema.links_field, {}).items():  # type: ignore
-            yield status_code, OpenApiLink(name, status_code, link_definition, operation)
+            try:
+                link = OpenApiLink(name, status_code, link_definition, operation)
+                yield status_code, Ok(link)
+            except InvalidTransition as exc:
+                yield status_code, Err(exc)
 
 
 StatusCode = Union[str, int]
