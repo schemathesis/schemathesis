@@ -379,6 +379,7 @@ class UnitTestProgressManager:
 
     def __init__(
         self,
+        *,
         console: Console,
         title: str,
         total: int,
@@ -864,7 +865,8 @@ class OutputHandler(EventHandler):
 
         table.add_row("Base URL:", event.base_url)
         table.add_row("Specification:", event.specification.name)
-        table.add_row("Operations:", str(event.statistic.operations.total))
+        statistic = event.statistic.operations
+        table.add_row("Operations:", f"{statistic.selected} selected / {statistic.total} total")
 
         message = Padding(table, BLOCK_PADDING)
         self.console.print(message)
@@ -891,7 +893,7 @@ class OutputHandler(EventHandler):
         self.unit_tests_manager = UnitTestProgressManager(
             console=self.console,
             title="Unit tests",
-            total=self.statistic.operations.total,
+            total=self.statistic.operations.selected,
         )
         self.unit_tests_manager.start()
 
