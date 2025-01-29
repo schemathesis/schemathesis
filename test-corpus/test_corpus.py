@@ -246,6 +246,8 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "is not defined in API operation" in formatted:
         return True
+    if "contain invalid link definitions" in formatted:
+        return True
     if RECURSIVE_REFERENCE_ERROR_MESSAGE in formatted:
         return True
     if (schema_id, event.label) in KNOWN_ISSUES:

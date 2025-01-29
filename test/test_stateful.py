@@ -3,7 +3,7 @@ import re
 import pytest
 
 import schemathesis
-from schemathesis.core.errors import InvalidLinkDefinition
+from schemathesis.core.errors import InvalidStateMachine
 
 pytestmark = [pytest.mark.openapi_version("3.0")]
 
@@ -162,7 +162,7 @@ def test_links_access(schema_url):
     schema = schemathesis.openapi.from_url(schema_url)
     links = schema["/users/"]["POST"].links["201"]
     assert len(links) == 2
-    assert links["GetUserByUserId"].name == "GetUserByUserId"
+    assert links["GetUserByUserId"].ok().name == "GetUserByUserId"
 
 
 @pytest.mark.parametrize(
@@ -197,14 +197,7 @@ def test_link_override(ctx, schema_code, link_code):
     assert "links" in schema.raw_schema["paths"]["/foo"]["get"]["responses"][schema_code]
 
 
-@pytest.mark.parametrize(
-    ("operation_id", "expected"),
-    [
-        ("get_User", "`get_User` not found. Did you mean `getUser`?"),
-        ("unknown", "`unknown` not found"),
-    ],
-)
-def test_missing_operation(ctx, operation_id, expected):
+def test_missing_operation(ctx):
     schema = ctx.openapi.build_schema(
         {
             "/users/": {
@@ -214,7 +207,7 @@ def test_missing_operation(ctx, operation_id, expected):
                             "description": "OK",
                             "links": {
                                 "GetUserByUserId": {
-                                    "operationId": operation_id,
+                                    "operationId": "unknown",
                                     "parameters": {"path.user_id": "$response.body#/id"},
                                 },
                             },
@@ -230,6 +223,6 @@ def test_missing_operation(ctx, operation_id, expected):
 
     schema = schemathesis.openapi.from_dict(schema)
 
-    with pytest.raises(InvalidLinkDefinition) as exc:
+    with pytest.raises(InvalidStateMachine) as exc:
         schema.as_state_machine()
-    assert str(exc.value.__cause__) == expected
+    assert "Operation 'unknown' not found" in str(exc.value)

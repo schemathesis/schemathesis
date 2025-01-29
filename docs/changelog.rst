@@ -8,6 +8,7 @@ Added
 
 - ``--report`` unified reporting system with multiple format support.
 - ``--report-dir`` for centralized report storage.
+- Display Open API link definition errors in CLI output.
 
 **Changed**
 

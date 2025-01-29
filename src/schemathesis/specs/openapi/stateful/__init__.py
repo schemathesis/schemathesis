@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Iterator
 from hypothesis import strategies as st
 from hypothesis.stateful import Bundle, Rule, precondition, rule
 
+from schemathesis.core.errors import InvalidStateMachine
 from schemathesis.core.result import Ok
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
@@ -77,10 +78,17 @@ def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     transitions = ApiTransitions()
 
     selected_labels = {operation.label for operation in operations}
+    errors = []
     for operation in operations:
         for _, link in get_all_links(operation):
-            if link.target.label in selected_labels:
-                transitions.add_outgoing(operation.label, link)
+            if isinstance(link, Ok):
+                if link.ok().target.label in selected_labels:
+                    transitions.add_outgoing(operation.label, link.ok())
+            else:
+                errors.append(link.err())
+
+    if errors:
+        raise InvalidStateMachine(errors)
 
     return transitions
 

@@ -1,0 +1,73 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in N ms)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       5 selected / 5 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ✅  Unit tests (in N ms)
+
+     ✅ 5 passed
+
+ 🚫  Stateful tests (in N ms)
+
+     Scenarios:    N
+     API Links:    0 covered / 10 selected / 10 total
+
+     No tests were run
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Invalid OpenAPI Links Definition
+
+The following API operations contain invalid link definitions:
+
+  POST /users
+    -> [201] GET /users/{userId}
+       Link: InvalidUser
+         - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
+         - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
+       Link: InvalidUser-2
+         - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
+         - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
+
+  PATCH /users/{userId}
+    -> [200] GET /users/{userId}
+       Link: GetUser
+         - Invalid expression `$req.[`. Unknown token: `$req`
+         - Parameter `something` is not defined in API operation `GET /users/{userId}`
+         - Expression `$request.path.whatever` references non-existent path parameter `whatever` in `PATCH /users/{userId}`
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 5/5
+  Tested: 5
+
+Test Phases:
+  ✅ API probing
+  ✅ Unit testing
+  🚫 Stateful testing
+
+Errors:
+  🚫 Invalid OpenAPI Links Definition: 1
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

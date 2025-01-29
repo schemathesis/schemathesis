@@ -200,3 +200,10 @@ def test_missing_link(cli, schema_url, snapshot_cli):
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_not_enough_links(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--phases=stateful", "--include-method=POST") == snapshot_cli
+
+
+def test_invalid_parameter_reference(app_factory, app_runner, cli, snapshot_cli):
+    # When a link references a non-existent parameter
+    app = app_factory(invalid_parameter=True)
+    port = app_runner.run_flask_app(app)
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-n 1") == snapshot_cli

@@ -102,8 +102,85 @@ class InvalidRegexType(InvalidSchema):
     """Raised when an invalid type is used where a regex pattern is expected."""
 
 
-class InvalidLinkDefinition(InvalidSchema):
-    """Raised when an Open API link references a non-existent operation."""
+class InvalidStateMachine(SchemathesisError):
+    """Collection of validation errors found in API state machine transitions.
+
+    Raised during schema initialization when one or more transitions
+    contain invalid definitions, such as references to non-existent parameters
+    or operations.
+    """
+
+    errors: list[InvalidTransition]
+
+    __slots__ = ("errors",)
+
+    def __init__(self, errors: list[InvalidTransition]) -> None:
+        self.errors = errors
+
+    def __str__(self) -> str:
+        """Format state machine validation errors in a clear, hierarchical structure."""
+        result = "The following API operations contain invalid link definitions:"
+
+        # Group transitions by source operation, then by target and status
+        by_source: dict[str, dict[tuple[str, str], list[InvalidTransition]]] = {}
+        for transition in self.errors:
+            source_group = by_source.setdefault(transition.source, {})
+            target_key = (transition.target, transition.status_code)
+            source_group.setdefault(target_key, []).append(transition)
+
+        for source, target_groups in by_source.items():
+            result += f"\n\n  {source}"
+
+            for (target, status), transitions in target_groups.items():
+                result += f"\n    -> [{status}] {target}"
+
+                for transition in transitions:
+                    result += f"\n       Link: {transition.name}"
+                    for error in transition.errors:
+                        result += f"\n         - {error.message}"
+
+                # Add spacing between different target groups
+                if (target, status) != list(target_groups.keys())[-1]:
+                    result += "\n"
+
+        return result
+
+
+class InvalidTransition(SchemathesisError):
+    """Raised when a stateful transition contains one or more errors."""
+
+    name: str
+    source: str
+    target: str
+    status_code: str
+    errors: list[TransitionValidationError]
+
+    __slots__ = ("name", "source", "target", "status_code", "errors")
+
+    def __init__(
+        self,
+        name: str,
+        source: str,
+        target: str,
+        status_code: str,
+        errors: list[TransitionValidationError],
+    ) -> None:
+        self.name = name
+        self.source = source
+        self.target = target
+        self.status_code = status_code
+        self.errors = errors
+
+
+class TransitionValidationError(SchemathesisError):
+    """Single validation error found during stateful transition validation."""
+
+    message: str
+
+    __slots__ = ("message",)
+
+    def __init__(self, message: str) -> None:
+        self.message = message
 
 
 class MalformedMediaType(ValueError):
