@@ -22,6 +22,7 @@ Added
 **Fixed**
 
 - Handling of multiple API links pointing to the same operation with different parameters.
+- **CLI**: Make exact method filters case insensitive.
 
 **Removed**
 

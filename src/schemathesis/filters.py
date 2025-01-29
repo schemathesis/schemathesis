@@ -268,6 +268,8 @@ class FilterSet:
                 # To match anything the regex should match the expected value, hence passing them together is useless
                 raise IncorrectUsage(ERROR_EXPECTED_AND_REGEX)
             if expected is not None:
+                if attribute == "method":
+                    expected = _normalize_method(expected)
                 matchers.append(Matcher.for_value(attribute, expected))
             if regex is not None:
                 matchers.append(Matcher.for_regex(attribute, regex))
@@ -281,6 +283,12 @@ class FilterSet:
             self._includes.add(filter_)
         else:
             self._excludes.add(filter_)
+
+
+def _normalize_method(value: FilterValue) -> FilterValue:
+    if isinstance(value, list):
+        return [item.upper() for item in value]
+    return value.upper()
 
 
 def attach_filter_chain(
