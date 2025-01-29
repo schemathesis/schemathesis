@@ -1,12 +1,15 @@
+import pytest
+
 from .utils import integer
 
 
-def test_method_filter(testdir):
+@pytest.mark.parametrize("filter", ["method='GET'", "method='get'", "method_regex='GET'", "method_regex='get'"])
+def test_method_filter(testdir, filter):
     # When `method` is specified
     parameters = {"parameters": [integer(name="id", required=True)], "responses": {"200": {"description": "OK"}}}
     testdir.make_test(
-        """
-@schema.include(method_regex="GET").parametrize()
+        f"""
+@schema.include({filter}).parametrize()
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1

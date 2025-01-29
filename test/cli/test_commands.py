@@ -797,6 +797,12 @@ def test_invalid_filter(cli, schema_url, snapshot_cli):
     assert cli.run(schema_url, "--include-by=fooo") == snapshot_cli
 
 
+@pytest.mark.openapi_version("3.0")
+def test_filter_case_sensitivity(cli, schema_url, snapshot_cli):
+    # Method filter should be case insensitive
+    assert cli.run(schema_url, "--include-method=get") == snapshot_cli
+
+
 @pytest.mark.parametrize("value", ["--include-by=/x-property == 42", "--exclude-by=/x-property != 42"])
 @pytest.mark.operations("upload_file", "custom_format")
 @pytest.mark.openapi_version("3.0")
