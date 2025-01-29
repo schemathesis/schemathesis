@@ -17,6 +17,7 @@ from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
     IncorrectUsage,
     InvalidSchema,
+    InvalidStateMachine,
     LoaderError,
     format_exception,
 )
@@ -136,7 +137,7 @@ def test_default(corpus, filename, app_port):
     schema = _load_schema(corpus, filename, app_port)
     try:
         schema.as_state_machine()()
-    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema):
+    except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
         pass
 
     engine = from_schema(
