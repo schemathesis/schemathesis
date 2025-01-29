@@ -25,7 +25,7 @@ class JunitXMLHandler(EventHandler):
             test_case.elapsed_sec += event.elapsed_time
             if event.status == Status.FAILURE:
                 add_failure(test_case, ctx.statistic.failures[label].values(), ctx)
-            elif event.status == Status.SKIP:
+            elif event.status == Status.SKIP and event.skip_reason is not None:
                 test_case.add_skipped_info(output=event.skip_reason)
         elif isinstance(event, events.NonFatalError):
             test_case = self.get_or_create_test_case(event.label)
