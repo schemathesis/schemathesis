@@ -73,6 +73,19 @@ class ApiTransitions:
         self.operations.setdefault(link.target.label, OperationTransitions()).incoming.append(link)
 
 
+@dataclass
+class RootTransitions:
+    """Classification of API operations that can serve as entry points."""
+
+    __slots__ = ("reliable", "fallback")
+
+    def __init__(self) -> None:
+        # Operations likely to succeed and provide data for other transitions
+        self.reliable: set[str] = set()
+        # Operations that might work but are less reliable
+        self.fallback: set[str] = set()
+
+
 def collect_transitions(operations: list[APIOperation]) -> ApiTransitions:
     """Collect all transitions between operations."""
     transitions = ApiTransitions()
@@ -117,6 +130,27 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
     rules = {}
     catch_all = Bundle("catch_all")
 
+    # We want stateful testing to be effective and focus on meaningful transitions.
+    # An operation is considered as a "root" transition (entry point) if it satisfies certain criteria
+    # that indicate it's likely to succeed and provide data for other transitions.
+    # For example:
+    #   - POST operations that create resources
+    #   - GET operations without path parameters (e.g., GET /users/ to list all users)
+    #
+    # We avoid adding operations as roots if they:
+    #   1. Have incoming transitions that will provide proper data
+    #      Example: If POST /users/ -> GET /users/{id} exists, we don't need
+    #      to generate random user IDs for GET /users/{id}
+    #   2. Are unlikely to succeed with random data
+    #      Example: GET /users/{id} with random ID is likely to return 404
+    #
+    # This way we:
+    #   1. Maximize the chance of successful transitions
+    #   2. Don't waste the test budget (limited number of steps) on likely-to-fail operations
+    #   3. Focus on transitions that are designed to work together via links
+
+    roots = classify_root_transitions(operations, transitions)
+
     for target in operations:
         if target.label in transitions.operations:
             incoming = transitions.operations[target.label].incoming
@@ -136,13 +170,8 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                             ),
                         )
                     )
-            if transitions.operations[target.label].outgoing and target.method == "post":
-                # Allow POST methods for operations with outgoing transitions.
-                # This approach also includes cases when there is an incoming transition back to POST
-                # For example, POST /users/ -> GET /users/{id}/
-                # The source operation has no prerequisite, but we need to allow this rule to be executed
-                # in order to reach other transitions
-                name = _normalize_name(f"{target.label} -> X")
+            if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
+                name = _normalize_name(f"RANDOM -> {target.label}")
                 if len(schema.generation_config.modes) == 1:
                     case_strategy = target.as_strategy(generation_mode=schema.generation_config.modes[0])
                 else:
@@ -175,6 +204,37 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
             **rules,
         },
     )
+
+
+def classify_root_transitions(operations: list[APIOperation], transitions: ApiTransitions) -> RootTransitions:
+    """Find operations that can serve as root transitions."""
+    roots = RootTransitions()
+
+    for operation in operations:
+        # Skip if operation has no outgoing transitions
+        operation_transitions = transitions.operations.get(operation.label)
+        if not operation_transitions or not operation_transitions.outgoing:
+            continue
+
+        if is_likely_root_transition(operation, operation_transitions):
+            roots.reliable.add(operation.label)
+        else:
+            roots.fallback.add(operation.label)
+
+    return roots
+
+
+def is_likely_root_transition(operation: APIOperation, transitions: OperationTransitions) -> bool:
+    """Check if operation is likely to succeed as a root transition."""
+    # POST operations with request bodies are likely to create resources
+    if operation.method == "post" and operation.body:
+        return True
+
+    # GET operations without path parameters are likely to return lists
+    if operation.method == "get" and not operation.path_parameters:
+        return True
+
+    return False
 
 
 def into_step_input(

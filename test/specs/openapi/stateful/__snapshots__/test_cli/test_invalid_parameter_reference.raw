@@ -9,7 +9,7 @@ Schemathesis dev
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
-     Operations:       5 selected / 5 total
+     Operations:       6 selected / 6 total
 
 
  ✅  API capabilities:
@@ -18,7 +18,7 @@ Schemathesis dev
 
  ✅  Unit tests (in N ms)
 
-     ✅ 5 passed
+     ✅ 6 passed
 
  🚫  Stateful tests (in N ms)
 
@@ -54,8 +54,8 @@ Need more help?
 =================================== SUMMARY ====================================
 
 API Operations:
-  Selected: 5/5
-  Tested: 5
+  Selected: 6/6
+  Tested: 6
 
 Test Phases:
   ✅ API probing
