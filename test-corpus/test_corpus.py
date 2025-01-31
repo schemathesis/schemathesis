@@ -239,8 +239,6 @@ def should_ignore_error(schema_id: str, event: events.NonFatalError) -> bool:
         return True
     if "Unresolvable JSON pointer" in formatted:
         return True
-    if "No progress can be made from" in formatted:
-        return True
     if "Ensure that the definition complies with the OpenAPI specification" in formatted:
         return True
     if "references non-existent operation" in formatted:
