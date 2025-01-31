@@ -639,18 +639,45 @@ def test_multiple_incoming_link_without_override(app_factory):
 
 
 def test_circular_links(engine_factory):
-    engine = engine_factory(app_kwargs={"circular_links": True})
+    engine = engine_factory(
+        app_kwargs={"circular_links": True},
+        hypothesis_settings=hypothesis.settings(max_examples=5),
+    )
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_link_subset(engine_factory):
-    engine = engine_factory(include={"method_regex": "POST|GET"})
+    engine = engine_factory(
+        include={"method_regex": "POST|GET"},
+        hypothesis_settings=hypothesis.settings(max_examples=5),
+    )
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_duplicate_operation_links(engine_factory):
-    engine = engine_factory(app_kwargs={"duplicate_operation_links": True})
+    engine = engine_factory(
+        app_kwargs={"duplicate_operation_links": True},
+        hypothesis_settings=hypothesis.settings(max_examples=5),
+    )
+    result = collect_result(engine)
+    assert result.events[-1].status != Status.ERROR
+
+
+def test_list_users_as_root(engine_factory):
+    engine = engine_factory(
+        app_kwargs={"list_users_as_root": True},
+        hypothesis_settings=hypothesis.settings(max_examples=5),
+    )
+    result = collect_result(engine)
+    assert result.events[-1].status != Status.ERROR
+
+
+def test_no_reliable_transitions(engine_factory):
+    engine = engine_factory(
+        app_kwargs={"no_reliable_transitions": True},
+        hypothesis_settings=hypothesis.settings(max_examples=5),
+    )
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR

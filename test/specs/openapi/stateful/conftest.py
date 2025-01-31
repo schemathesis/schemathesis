@@ -34,6 +34,8 @@ class AppConfig:
     duplicate_operation_links: bool = False
     circular_links: bool = False
     invalid_parameter: bool = False
+    list_users_as_root: bool = False
+    no_reliable_transitions: bool = False
 
 
 @pytest.fixture
@@ -62,6 +64,12 @@ def app_factory(ctx):
             "parameters": {"userId": "$request.path.userId"},
         },
     }
+    get_collection_links = {
+        "GetUser": {
+            "operationId": "getUser",
+            "parameters": {"userId": "$response.body#/users/0/id"},
+        },
+    }
     delete_links = {
         "GetUser": {
             "operationId": "getUser",
@@ -77,6 +85,24 @@ def app_factory(ctx):
     schema = ctx.openapi.build_schema(
         {
             "/users": {
+                "get": {
+                    "operationId": "getUsers",
+                    "responses": {
+                        "200": {
+                            "description": "List of users",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "users": {"type": "array", "items": {"$ref": "#/components/schemas/User"}}
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                },
                 "post": {
                     "operationId": "createUser",
                     "requestBody": {
@@ -204,6 +230,10 @@ def app_factory(ctx):
             return jsonify(user)
         return jsonify({"error": "User not found"}), 404
 
+    @app.route("/users", methods=["GET"])
+    def list_users():
+        return jsonify(users)
+
     def expect_custom_headers():
         if config.custom_headers:
             for key, value in config.custom_headers.items():
@@ -327,6 +357,8 @@ def app_factory(ctx):
         circular_links: bool = False,
         duplicate_operation_links: bool = False,
         invalid_parameter: bool = False,
+        list_users_as_root: bool = False,
+        no_reliable_transitions: bool = False,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
@@ -410,6 +442,12 @@ def app_factory(ctx):
                     },
                 }
             }
+        if list_users_as_root:
+            schema["paths"]["/users"]["get"]["responses"]["200"]["links"] = get_collection_links
+            post_links.clear()
+        if no_reliable_transitions:
+            # Remove POST endpoint completely
+            del schema["paths"]["/users"]["post"]
         return app
 
     return _factory

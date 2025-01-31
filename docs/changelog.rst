@@ -20,6 +20,7 @@ Added
 - Replace ``shrink`` in ``--hypothesis-phases`` with a separate ``--no-shrink`` option.
 - Simplified filtering options help message.
 - Display the number of selected operations in CLI.
+- Improved state machine generation by prioritizing reliable API entry points over random operations.
 
 **Fixed**
 
