@@ -228,9 +228,10 @@ class MalformedJson(Failure):
 
     @classmethod
     def from_exception(cls, *, operation: str, exc: JSONDecodeError) -> MalformedJson:
+        message = f"Response must be valid JSON with 'Content-Type: application/json' header:\n\n  {exc}"
         return cls(
             operation=operation,
-            message=str(exc),
+            message=message,
             validation_message=exc.msg,
             document=exc.doc,
             position=exc.pos,
