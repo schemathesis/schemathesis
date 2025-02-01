@@ -172,7 +172,7 @@ class APIStateMachine(RuleBasedStateMachine):
         kwargs = self.get_call_kwargs(input.case)
         response = self.call(input.case, **kwargs)
         self.after_call(response, input.case)
-        self.validate_response(response, input.case)
+        self.validate_response(response, input.case, **kwargs)
         return StepOutput(response, input.case)
 
     def before_call(self, case: Case) -> None:
@@ -266,7 +266,7 @@ class APIStateMachine(RuleBasedStateMachine):
         return {}
 
     def validate_response(
-        self, response: Response, case: Case, additional_checks: list[CheckFunction] | None = None
+        self, response: Response, case: Case, additional_checks: list[CheckFunction] | None = None, **kwargs: Any
     ) -> None:
         """Validate an API response.
 
@@ -298,4 +298,4 @@ class APIStateMachine(RuleBasedStateMachine):
         all provided checks rather than only the first encountered exception.
         """
         __tracebackhide__ = True
-        case.validate_response(response, additional_checks=additional_checks)
+        case.validate_response(response, additional_checks=additional_checks, transport_kwargs=kwargs)

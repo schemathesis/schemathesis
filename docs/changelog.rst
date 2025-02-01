@@ -30,6 +30,7 @@ Added
 - **CLI**: Make exact method filters case insensitive.
 - Internal error in coverage phase when a parameter is mixing keywords for different types.
 - Do not run irrelevant checks on "Unspecified HTTP method" type of coverage scenarios.
+- Ignoring ``verify=False`` when specified via ``get_call_kwargs`` on a state machine. :issue:`2713`
 
 **Removed**
 
