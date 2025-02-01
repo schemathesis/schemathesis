@@ -437,7 +437,12 @@ def cover_schema_iter(
                 elif key == "required":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_required(ctx, template, value)
-                elif key == "additionalProperties" and not value and "pattern" not in schema:
+                elif (
+                    key == "additionalProperties"
+                    and not value
+                    and "pattern" not in schema
+                    and schema.get("type") in ["object", None]
+                ):
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield NegativeValue(
                         {**template, UNKNOWN_PROPERTY_KEY: UNKNOWN_PROPERTY_VALUE},

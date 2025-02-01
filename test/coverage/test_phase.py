@@ -650,6 +650,72 @@ def test_with_examples_openapi_2(ctx):
     )
 
 
+def test_mixed_type_keyword(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "key",
+                            "in": "query",
+                            "required": False,
+                            "schema": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string",
+                                    "enum": ["a", "b"],
+                                    "additionalProperties": False,
+                                },
+                            },
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {
+                "query": {"key": ["0", "0"]},
+            },
+            {
+                "query": {"key": [ANY]},
+            },
+            {
+                "query": {"key": ["{}"]},
+            },
+            {
+                "query": {"key": ["[null, null]"]},
+            },
+            {
+                "query": {"key": ["null"]},
+            },
+            {
+                "query": {"key": ["false"]},
+            },
+            {
+                "query": {"key": ["0"]},
+            },
+            {
+                "query": {"key": "{}"},
+            },
+            {
+                "query": {"key": ""},
+            },
+            {
+                "query": {"key": "null"},
+            },
+            {
+                "query": {"key": "false"},
+            },
+        ],
+    )
+
+
 def test_negative_patterns(ctx):
     schema = ctx.openapi.build_schema(
         {
