@@ -20,7 +20,9 @@ ___________________________ GET /api/malformed_json ____________________________
 
 - JSON deserialization error
 
-    Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+    Response must be valid JSON with 'Content-Type: application/json' header:
+
+      Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
 
 [200] OK:
 

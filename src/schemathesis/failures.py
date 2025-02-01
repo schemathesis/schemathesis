@@ -93,8 +93,9 @@ class JSONDecodeErrorContext(FailureContext):
 
     @classmethod
     def from_exception(cls, exc: JSONDecodeError) -> JSONDecodeErrorContext:
+        message = f"Response must be valid JSON with 'Content-Type: application/json' header:\n\n  {exc}"
         return cls(
-            message=str(exc),
+            message=message,
             validation_message=exc.msg,
             document=exc.doc,
             position=exc.pos,

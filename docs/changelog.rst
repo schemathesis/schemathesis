@@ -9,6 +9,10 @@ Changelog
 - Internal error in coverage phase when a parameter is mixing keywords for different types.
 - Do not run irrelevant checks on "Unspecified HTTP method" type of coverage scenarios.
 
+**Changed**
+
+- Slightly improve the error message on malformed JSON.
+
 .. _v3.39.8:
 
 :version:`3.39.8 <v3.39.7...v3.39.8>` - 2025-01-25
