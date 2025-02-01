@@ -37,28 +37,28 @@ def test_simple_filter(schema_url, is_include):
 
     if is_include:
 
-        @schema.hook.apply_to(name="POST /api/payload")
+        @schema.hook.apply_to(name="POST /payload")
         def map_body(context, body):
             return 42
 
-        @schema.hook.apply_to(name="POST /api/payload")
+        @schema.hook.apply_to(name="POST /payload")
         def filter_body(context, body):
             return True
     else:
 
-        @schema.hook.skip_for(name="POST /api/payload")
+        @schema.hook.skip_for(name="POST /payload")
         def map_body(context, body):
             return 42
 
-        @schema.hook.skip_for(name="POST /api/payload")
+        @schema.hook.skip_for(name="POST /payload")
         def filter_body(context, body):
             return True
 
-        @schema.hook.skip_for(name="POST /api/payload")
+        @schema.hook.skip_for(name="POST /payload")
         def flatmap_body(context, body):
             return True
 
-        @schema.hook.skip_for(name="POST /api/payload")
+        @schema.hook.skip_for(name="POST /payload")
         def before_generate_body(context, body):
             return True
 

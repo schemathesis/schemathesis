@@ -58,7 +58,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
     assert len(testcases) == 4
     # Inspected testcase with a failure
     assert testcases[1].tag == "testcase"
-    assert testcases[1].attrib["name"] == "GET /api/failure"
+    assert testcases[1].attrib["name"] == "GET /failure"
     assert testcases[1][0].tag == "failure"
     assert testcases[1][0].attrib["type"] == "failure"
     assert (
@@ -66,9 +66,9 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
         == "1. Test Case ID: <PLACEHOLDER>  - Server error  - Undocumented Content-Type      Received: text/plain; charset=utf-8     Documented: application/json  [500] Internal Server Error:      `500: Internal Server Error`  Reproduce with:       curl -X GET http://localhost/api/failure"
     )
     # Inspect passed testcase
-    assert testcases[2].attrib["name"] == "GET /api/success"
+    assert testcases[2].attrib["name"] == "GET /success"
     # Inspect testcase with an error
-    assert testcases[3].attrib["name"] == "POST /api/unsatisfiable"
+    assert testcases[3].attrib["name"] == "POST /unsatisfiable"
     assert testcases[3][0].tag == "error"
     assert testcases[3][0].attrib["type"] == "error"
     assert (
@@ -148,7 +148,7 @@ def test_binary_response(ctx, cli, openapi3_base_url, tmp_path, server_host):
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
-    assert testcases[0].attrib["name"] == "GET /api/binary"
+    assert testcases[0].attrib["name"] == "GET /binary"
     assert testcases[0][0].tag == "failure"
     assert testcases[0][0].attrib["type"] == "failure"
     assert (
@@ -173,7 +173,7 @@ def test_timeout(cli, tmp_path, schema_url, hypothesis_max_examples):
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
-    assert testcases[0].attrib["name"] == "GET /api/slow"
+    assert testcases[0].attrib["name"] == "GET /slow"
     assert testcases[0][0].tag == "error"
     assert testcases[0][0].attrib["type"] == "error"
     assert "Read timed out after 0.01 seconds" in testcases[0][0].text
@@ -194,7 +194,7 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
     testsuite = tree.getroot()[0]
     testcases = list(testsuite)
     assert testcases[0].tag == "testcase"
-    assert testcases[0].attrib["name"] == "GET /api/success"
+    assert testcases[0].attrib["name"] == "GET /success"
     assert testcases[0][0].tag == "skipped"
     assert testcases[0][0].attrib["type"] == "skipped"
     assert extract_message(testcases[0][0], server_host) == "No examples in schema"

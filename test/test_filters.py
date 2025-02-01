@@ -13,7 +13,7 @@ def test_method_filter(testdir, filter):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path in ("/v1/foo", "/v1/users")
+    assert case.operation.path in ("/foo", "/users")
     assert case.method == "GET"
 """,
         paths={"/foo": {"get": parameters}, "/bar": {"post": parameters}},
@@ -23,8 +23,8 @@ def test_(request, case):
     # Then only tests for this method should be generated
     result.stdout.re_match_lines(
         [
-            r"test_method_filter.py::test_[GET /v1/foo] PASSED",
-            r"test_method_filter.py::test_[GET /v1/users] PASSED",
+            r"test_method_filter.py::test_[GET /foo] PASSED",
+            r"test_method_filter.py::test_[GET /users] PASSED",
         ]
     )
 
@@ -38,7 +38,7 @@ def test_tag_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/bar"
+    assert case.operation.path == "/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -50,7 +50,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     # Then only tests for this tag should be generated
-    result.stdout.re_match_lines([r"test_tag_filter.py::test_[GET /v1/bar] PASSED"])
+    result.stdout.re_match_lines([r"test_tag_filter.py::test_[GET /bar] PASSED"])
 
 
 def test_loader_filter(testdir):
@@ -60,7 +60,7 @@ def test_loader_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/foo"
+    assert case.operation.path == "/foo"
     assert case.method == "POST"
 """,
         paths={
@@ -87,7 +87,7 @@ def test_operation_id_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/bar"
+    assert case.operation.path == "/bar"
     assert case.method == "GET"
 """,
         paths={
@@ -100,7 +100,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
 
-    result.stdout.re_match_lines([r"test_operation_id_filter.py::test_[GET /v1/bar] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_filter.py::test_[GET /bar] PASSED"])
 
 
 def test_operation_id_list_filter(testdir):
@@ -111,7 +111,7 @@ def test_operation_id_list_filter(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/foo"
+    assert case.operation.path == "/foo"
 """,
         paths={
             "/foo": {
@@ -126,8 +126,8 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
 
-    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /v1/foo] PASSED"])
-    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /v1/foo] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[GET /foo] PASSED"])
+    result.stdout.re_match_lines([r"test_operation_id_list_filter.py::test_[POST /foo] PASSED"])
 
 
 def test_error_on_no_matches(testdir):

@@ -29,7 +29,7 @@ ________________________________ Stateful tests ________________________________
 
 - Authentication declared but not enforced
 
-    The API returned `200 OK` for `GET /api/ignored_auth` that requires authentication.
+    The API returned `200 OK` for `GET /ignored_auth` that requires authentication.
 
 [200] OK:
 

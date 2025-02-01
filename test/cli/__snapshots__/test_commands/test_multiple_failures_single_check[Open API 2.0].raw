@@ -21,7 +21,7 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-__________________________ GET /api/multiple_failures __________________________
+____________________________ GET /multiple_failures ____________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Server error

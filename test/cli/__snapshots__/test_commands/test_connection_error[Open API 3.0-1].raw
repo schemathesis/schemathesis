@@ -19,13 +19,13 @@ Schemathesis dev
      🚫 2 errors
 
 ==================================== ERRORS ====================================
-_______________________________ GET /api/failure _______________________________
+_________________________________ GET /failure _________________________________
 Network Error
 
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
-_______________________________ GET /api/success _______________________________
+_________________________________ GET /success _________________________________
 Network Error
 
 Connection failed

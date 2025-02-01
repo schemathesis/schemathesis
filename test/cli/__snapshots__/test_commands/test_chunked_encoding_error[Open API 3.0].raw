@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-_______________________________ GET /api/success _______________________________
+_________________________________ GET /success _________________________________
 Network Error
 
 Connection broken. The server declared chunked encoding but sent an invalid chunk

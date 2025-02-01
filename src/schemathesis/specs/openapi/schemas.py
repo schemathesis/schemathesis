@@ -155,7 +155,6 @@ class BaseOpenAPISchema(BaseSchema):
             return True
         if self.filter_set.is_empty():
             return False
-        path = self.get_full_path(path)
         # Attribute assignment is way faster than creating a new namespace every time
         operation = _ctx_cache.operation
         operation.method = method
@@ -365,28 +364,24 @@ class BaseOpenAPISchema(BaseSchema):
     def _into_err(self, error: Exception, path: str | None, method: str | None) -> Err[InvalidSchema]:
         __tracebackhide__ = True
         try:
-            full_path = self.get_full_path(path) if isinstance(path, str) else None
-            self._raise_invalid_schema(error, full_path, path, method)
+            self._raise_invalid_schema(error, path, method)
         except InvalidSchema as exc:
             return Err(exc)
 
     def _raise_invalid_schema(
         self,
         error: Exception,
-        full_path: str | None = None,
         path: str | None = None,
         method: str | None = None,
     ) -> NoReturn:
         __tracebackhide__ = True
         if isinstance(error, RefResolutionError):
-            raise InvalidSchema.from_reference_resolution_error(
-                error, path=path, method=method, full_path=full_path
-            ) from None
+            raise InvalidSchema.from_reference_resolution_error(error, path=path, method=method) from None
         try:
             self.validate()
         except jsonschema.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(exc, path=path, method=method, full_path=full_path) from None
-        raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method, full_path=full_path) from error
+            raise InvalidSchema.from_jsonschema_error(exc, path=path, method=method) from None
+        raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method) from error
 
     def validate(self) -> None:
         with suppress(TypeError):
@@ -584,8 +579,7 @@ class BaseOpenAPISchema(BaseSchema):
             responses = operation.definition.raw["responses"]
         except KeyError as exc:
             path = operation.path
-            full_path = self.get_full_path(path) if isinstance(path, str) else None
-            self._raise_invalid_schema(exc, full_path, path, operation.method)
+            self._raise_invalid_schema(exc, path, operation.method)
         status_code = str(response.status_code)
         if status_code in responses:
             return self.resolver.resolve_in_scope(responses[status_code], operation.definition.scope)

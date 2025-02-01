@@ -21,7 +21,7 @@ Schemathesis dev
      ✅ 1 passed  🚫 1 errors
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/foo _________________________________
+__________________________________ POST /foo ___________________________________
 Schema Error
 
 Invalid regular expression. Pattern `\\p{Alpha}` is not recognized - `bad escape \p at position 0`

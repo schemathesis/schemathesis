@@ -35,20 +35,16 @@ class InvalidSchema(SchemathesisError):
 
     def __init__(
         self,
-        message: str | None = None,
+        message: str,
         path: str | None = None,
         method: str | None = None,
-        full_path: str | None = None,
     ) -> None:
         self.message = message
         self.path = path
         self.method = method
-        self.full_path = full_path
 
     @classmethod
-    def from_jsonschema_error(
-        cls, error: ValidationError, path: str | None, method: str | None, full_path: str | None
-    ) -> InvalidSchema:
+    def from_jsonschema_error(cls, error: ValidationError, path: str | None, method: str | None) -> InvalidSchema:
         if error.absolute_path:
             part = error.absolute_path[-1]
             if isinstance(part, int) and len(error.absolute_path) > 1:
@@ -69,11 +65,11 @@ class InvalidSchema(SchemathesisError):
         else:
             message += error.message
         message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
-        return cls(message, path=path, method=method, full_path=full_path)
+        return cls(message, path=path, method=method)
 
     @classmethod
     def from_reference_resolution_error(
-        cls, error: RefResolutionError, path: str | None, method: str | None, full_path: str | None
+        cls, error: RefResolutionError, path: str | None, method: str | None
     ) -> InvalidSchema:
         notes = getattr(error, "__notes__", [])
         # Some exceptions don't have the actual reference in them, hence we add it manually via notes
@@ -83,7 +79,7 @@ class InvalidSchema(SchemathesisError):
         message += f"\n\nError details:\n    JSON pointer: {pointer}"
         message += "\n    This typically means that the schema is referencing a component that doesn't exist."
         message += f"\n\n{SCHEMA_ERROR_SUGGESTION}"
-        return cls(message, path=path, method=method, full_path=full_path)
+        return cls(message, path=path, method=method)
 
     def as_failing_test_function(self) -> Callable:
         """Create a test function that will fail.

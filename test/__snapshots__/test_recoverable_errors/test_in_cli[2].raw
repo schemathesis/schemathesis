@@ -21,7 +21,7 @@ Schemathesis dev
      ✅ 1 passed  🚫 1 errors
 
 ==================================== ERRORS ====================================
-___________________________________ /api/foo ___________________________________
+_____________________________________ /foo _____________________________________
 Schema Error
 
 Unresolvable JSON pointer in the schema
@@ -31,7 +31,7 @@ Error details:
     This typically means that the schema is referencing a component that doesn't exist.
 
 Ensure that the definition complies with the OpenAPI specification
-________________________________ POST /api/bar _________________________________
+__________________________________ POST /bar ___________________________________
 Schema Error
 
 Unresolvable JSON pointer in the schema

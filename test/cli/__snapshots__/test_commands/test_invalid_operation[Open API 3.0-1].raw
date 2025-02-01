@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-______________________________ POST /api/invalid _______________________________
+________________________________ POST /invalid _________________________________
 Schema Error
 
 Invalid definition for element at index 0 in `parameters`

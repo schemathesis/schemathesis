@@ -24,7 +24,7 @@ def param(inner):
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/users"
+    assert case.operation.path == "/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -41,10 +41,10 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize_fixture.py::test_\[GET /v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[GET /v1/users\]\[B\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST /v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_fixture.py::test_\[POST /v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[GET /users\]\[A\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[GET /users\]\[B\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[A\] PASSED",
+            r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -88,7 +88,7 @@ class TestAPI:
     @settings(suppress_health_check=[HealthCheck.function_scoped_fixture])
     def test_(self, request, param, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.operation.full_path == "/v1/users"
+        assert case.operation.path == "/users"
         assert case.method in ("GET", "POST")
 """,
         paths={
@@ -105,10 +105,10 @@ class TestAPI:
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /v1/users\]\[B\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /users\]\[A\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /users\]\[B\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[A\] PASSED",
+            r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )

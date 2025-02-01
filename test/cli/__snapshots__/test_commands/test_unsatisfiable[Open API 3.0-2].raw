@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-___________________________ POST /api/unsatisfiable ____________________________
+_____________________________ POST /unsatisfiable ______________________________
 Schema Error
 
 Failed to generate test cases for this API operation. Possible reasons:

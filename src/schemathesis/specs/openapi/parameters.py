@@ -376,7 +376,6 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
                 ),
                 path=operation.path,
                 method=operation.method,
-                full_path=operation.full_path,
             )
         return data["schema"]
     # https://github.com/OAI/OpenAPI-Specification/blob/master/versions/3.0.3.md#fixed-fields-10
@@ -388,7 +387,6 @@ def get_parameter_schema(operation: APIOperation, data: dict[str, Any]) -> dict[
             MISSING_SCHEMA_OR_CONTENT_MESSAGE.format(location=data.get("in", ""), name=data.get("name", "<UNKNOWN>")),
             path=operation.path,
             method=operation.method,
-            full_path=operation.full_path,
         ) from exc
     options = iter(content.values())
     media_type_object = next(options)

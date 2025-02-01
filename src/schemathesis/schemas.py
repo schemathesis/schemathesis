@@ -619,7 +619,7 @@ class APIOperation(Generic[P]):
 
     def __post_init__(self) -> None:
         if self.label is None:
-            self.label = f"{self.method.upper()} {self.full_path}"  # type: ignore
+            self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
     @property
     def full_path(self) -> str:

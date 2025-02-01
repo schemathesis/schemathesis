@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/foo _________________________________
+__________________________________ POST /foo ___________________________________
 Unsupported Schema
 
 Currently, Schemathesis can't generate data for this operation due to recursive references in the operation definition. See more information in this issue - https://github.com/schemathesis/schemathesis/issues/947

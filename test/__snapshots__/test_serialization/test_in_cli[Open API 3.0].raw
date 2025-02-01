@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/csv _________________________________
+__________________________________ POST /csv ___________________________________
 Serialization not possible
 
 Schemathesis can't serialize data to any of the defined media types: text/tsv

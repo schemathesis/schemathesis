@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/csv _________________________________
+__________________________________ POST /csv ___________________________________
 Serialization not possible
 
 Failed to generate test cases from examples for this API operation because of unsupported payload media types: text/csv
