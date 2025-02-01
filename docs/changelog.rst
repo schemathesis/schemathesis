@@ -155,6 +155,38 @@ A detailed migration guide and complete changelog will follow.
 - Stateful testing summary (coming later).
 - ``SCHEMA_ANALYSIS`` experimental feature.
 
+.. _v3.39.9:
+
+:version:`3.39.9 <v3.39.8...v3.39.9>` - 2025-02-01
+--------------------------------------------------
+
+**Fixed**
+
+- Internal error in coverage phase when a parameter is mixing keywords for different types.
+- Do not run irrelevant checks on "Unspecified HTTP method" type of coverage scenarios.
+- Ignoring ``verify=False`` when specified via ``get_call_kwargs`` on a state machine. :issue:`2713`
+
+**Changed**
+
+- Slightly improve the error message on malformed JSON.
+
+.. _v3.39.8:
+
+:version:`3.39.8 <v3.39.7...v3.39.8>` - 2025-01-25
+--------------------------------------------------
+
+**Fixed**
+
+- Handling of complex regex patterns with multiple quantifiers to respect length constraints during test generation.
+- Internal error during the coverage phase if negated parameter has no ``type``.
+
+:version:`3.39.7 <v3.39.6...v3.39.7>` - 2025-01-16
+--------------------------------------------------
+
+**Changed**
+
+- Rebuild Docker ``stable`` with the v3 branch.
+
 .. _v3.39.6:
 
 :version:`3.39.6 <v3.39.5...v3.39.6>` - 2025-01-12
