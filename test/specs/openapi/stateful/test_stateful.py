@@ -418,3 +418,34 @@ GET /api/users/{user_id}
 def test_aggregate_responses():
     responses = {201: 2, 204: 3, 301: 1, 400: 1, 404: 1, 500: 1, 503: 1, None: 5}
     assert _aggregate_responses(responses) == {"2xx": 5, "4xx": 2, "5xx": 2, "Total": 9}
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+def test_passing_transport_kwargs(app_schema, openapi3_base_url, mocker):
+    schema = schemathesis.openapi.from_dict(app_schema, base_url=openapi3_base_url)
+
+    mocker.patch(
+        "schemathesis.specs.openapi.checks._get_security_parameters",
+        return_value=[{"name": "token", "required": True, "in": "query"}],
+    )
+    mocked = mocker.patch("schemathesis.specs.openapi.checks._contains_auth")
+
+    headers = {"Authorization": "Bearer SECRET!", "Content-Type": "application/json"}
+    kwargs = {"verify": False, "headers": headers}
+
+    # State machine should properly pass transport kwargs to `validate_response`
+    class APIWorkflow(schema.as_state_machine()):
+        def before_call(self, case) -> None:
+            case.body = {"first_name": "foo", "last_name": "bar"}
+            case.query = {}
+
+        def get_call_kwargs(self, case):
+            return kwargs
+
+    try:
+        APIWorkflow.run()
+    except Exception:
+        pass
+
+    assert mocked.call_args.args[0].transport_kwargs == kwargs

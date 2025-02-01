@@ -4,8 +4,7 @@ from typing import Any, Callable
 
 def _warn_deprecation(*, kind: str, thing: str, removed_in: str, replacement: str) -> None:
     warnings.warn(
-        f"{kind} `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. "
-        f"Use {replacement} instead.",
+        f"{kind} `{thing}` is deprecated and will be removed in Schemathesis {removed_in}. Use {replacement} instead.",
         DeprecationWarning,
         stacklevel=1,
     )

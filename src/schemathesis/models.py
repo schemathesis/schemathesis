@@ -560,7 +560,7 @@ class Case:
                 sanitize_response(response)
             code_message = self._get_code_message(code_sample_style, response.request, verify=verify)
             raise exception_cls(
-                f"{formatted}\n\n" f"{code_message}",
+                f"{formatted}\n\n{code_message}",
                 causes=tuple(failed_checks),
             )
 

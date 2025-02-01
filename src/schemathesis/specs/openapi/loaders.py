@@ -432,8 +432,7 @@ For more details, check the Open API documentation: {DOC_ENTRY}
 
 Please, stringify the following status codes:"""
 NON_STRING_OBJECT_KEY_MESSAGE = (
-    "The Open API specification requires all keys in the schema to be strings. "
-    "You have some keys that are not strings."
+    "The Open API specification requires all keys in the schema to be strings. You have some keys that are not strings."
 )
 
 

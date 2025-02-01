@@ -48,8 +48,7 @@ def run_app(port: int, operations: list[openapi.schema.Operation], spec: str, fr
             spec
         ]
         click.secho(
-            f"Schemathesis test server is running!\n\n"
-            f"API Schema is available at: http://0.0.0.0:{port}/schema.yaml\n",
+            f"Schemathesis test server is running!\n\nAPI Schema is available at: http://0.0.0.0:{port}/schema.yaml\n",
             bold=True,
         )
         if framework == "aiohttp":

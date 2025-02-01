@@ -125,7 +125,7 @@ def get_summary_output(event: events.Finished) -> tuple[str, str]:
         message = "Empty test suite"
         color = "yellow"
     else:
-        message = f'{", ".join(parts)} in {event.running_time:.2f}s'
+        message = f"{', '.join(parts)} in {event.running_time:.2f}s"
         if event.has_failures or event.has_errors:
             color = "red"
         elif event.skipped_count > 0:
@@ -176,7 +176,7 @@ def display_errors(context: ExecutionContext, event: events.Finished) -> None:
             fg="red",
         )
     click.secho(
-        f"\nNeed more help?\n" f"    Join our Discord server: {DISCORD_LINK}",
+        f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",
         fg="red",
     )
 

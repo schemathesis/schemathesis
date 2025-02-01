@@ -266,8 +266,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     cassette = load_cassette(cassette_path)
     assert len(cassette["http_interactions"]) == 1
     command = (
-        f"st run --cassette-path={cassette_path} "
-        f"--hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
+        f"st run --cassette-path={cassette_path} --hypothesis-max-examples={hypothesis_max_examples or 2} {schema_url}"
     )
     assert cassette["command"] == command
 

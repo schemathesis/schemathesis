@@ -169,6 +169,7 @@ class APIStateMachine(RuleBasedStateMachine):
         kwargs = self.get_call_kwargs(case)
         start = time.monotonic()
         response = self.call(case, **kwargs)
+        self._transport_kwargs = kwargs
         elapsed = time.monotonic() - start
         self.after_call(response, case)
         self.validate_response(response, case, additional_checks=(use_after_free,))
@@ -297,7 +298,7 @@ class APIStateMachine(RuleBasedStateMachine):
         all provided checks rather than only the first encountered exception.
         """
         __tracebackhide__ = True
-        case.validate_response(response, additional_checks=additional_checks)
+        case.validate_response(response, additional_checks=additional_checks, transport_kwargs=self._transport_kwargs)
 
     def store_result(self, response: GenericResponse, case: Case, elapsed: float) -> StepResult:
         return StepResult(response, case, elapsed)
