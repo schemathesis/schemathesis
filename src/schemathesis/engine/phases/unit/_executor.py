@@ -70,6 +70,19 @@ def run_test(
             error=error, phase=PhaseName.UNIT_TESTING, label=operation.label, related_to_operation=True
         )
 
+    def scenario_finished(status: Status) -> events.ScenarioFinished:
+        return events.ScenarioFinished(
+            id=scenario_started.id,
+            suite_id=suite_id,
+            phase=PhaseName.UNIT_TESTING,
+            label=operation.label,
+            recorder=recorder,
+            status=status,
+            elapsed_time=time.monotonic() - test_start_time,
+            skip_reason=skip_reason,
+            is_final=False,
+        )
+
     try:
         setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
@@ -111,6 +124,7 @@ def run_test(
         status = Status.ERROR
         yield non_fatal_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
+        yield scenario_finished(Status.INTERRUPTED)
         yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
         return
     except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
@@ -193,20 +207,10 @@ def run_test(
     if invalid_headers:
         status = Status.ERROR
         yield non_fatal_error(InvalidHeadersExample.from_headers(invalid_headers))
-    test_elapsed_time = time.monotonic() - test_start_time
     for error in deduplicate_errors(errors):
         yield non_fatal_error(error)
-    yield events.ScenarioFinished(
-        id=scenario_started.id,
-        suite_id=suite_id,
-        phase=PhaseName.UNIT_TESTING,
-        label=operation.label,
-        recorder=recorder,
-        status=status,
-        elapsed_time=test_elapsed_time,
-        skip_reason=skip_reason,
-        is_final=False,
-    )
+
+    yield scenario_finished(status)
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:

@@ -978,9 +978,14 @@ def test_interrupted_in_test(openapi3_schema):
     def check(ctx, response, case):
         raise KeyboardInterrupt
 
-    interrupted = EventStream(openapi3_schema, checks=(check,)).execute().find(events.Interrupted)
+    stream = EventStream(openapi3_schema, checks=(check,)).execute()
+    interrupted = stream.find(events.Interrupted)
     # Then the `Interrupted` event should be emitted
     assert interrupted is not None
+    scenario_finished = stream.find(events.ScenarioFinished)
+    assert scenario_finished is not None
+    assert scenario_finished.recorder.cases
+    assert scenario_finished.recorder.interactions
 
 
 @pytest.mark.operations("success")
