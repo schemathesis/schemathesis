@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.8...HEAD>` - TBD
 --------------------------------------------
 
+**Fixed**
+
+- Internal error in coverage phase when a parameter is mixing keywords for different types.
+
 .. _v3.39.8:
 
 :version:`3.39.8 <v3.39.7...v3.39.8>` - 2025-01-25
