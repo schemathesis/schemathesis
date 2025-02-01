@@ -23,6 +23,8 @@ Added
 - Improved state machine generation by prioritizing reliable API entry points over random operations.
 - Made operation filtering independent from API base path for more predictable behavior.
 - Slightly improve the error message on malformed JSON.
+- **BREAKING**: The `validate_response` method in state machines now accepts the same keyword arguments as `call`. 
+  If you've overridden this method, update its signature to include `**kwargs`.
 
 **Fixed**
 
