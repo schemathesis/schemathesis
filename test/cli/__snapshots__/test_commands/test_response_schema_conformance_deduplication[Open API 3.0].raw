@@ -21,7 +21,7 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-_____________________________ GET /api/conformance _____________________________
+_______________________________ GET /conformance _______________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Response violates schema

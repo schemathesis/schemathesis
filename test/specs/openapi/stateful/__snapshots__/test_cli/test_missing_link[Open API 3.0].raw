@@ -29,7 +29,7 @@ Invalid OpenAPI Links Definition
 
 The following API operations contain invalid link definitions:
 
-  POST /api/users/
+  POST /users/
     -> [201] getUser
        Link: GetUserByUserId
          - Operation 'getUser' not found

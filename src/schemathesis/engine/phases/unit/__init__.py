@@ -123,7 +123,7 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                 else:
                     error = result.err()
                     if error.method:
-                        label = f"{error.method.upper()} {error.full_path}"
+                        label = f"{error.method.upper()} {error.path}"
                         scenario_started = events.ScenarioStarted(
                             label=label, phase=PhaseName.UNIT_TESTING, suite_id=suite_id
                         )
@@ -149,12 +149,11 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                             )
                         )
                     else:
-                        assert error.full_path is not None
                         events_queue.put(
                             events.NonFatalError(
                                 error=error,
                                 phase=PhaseName.UNIT_TESTING,
-                                label=error.full_path,
+                                label=error.path,
                                 related_to_operation=False,
                             )
                         )

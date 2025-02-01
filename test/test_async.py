@@ -43,7 +43,7 @@ async def test_(request, case):
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=1)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"test_simple.py::test_\[GET /v1/users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"test_simple.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 1"])
 
 
 def test_settings_first(testdir, plugin):
@@ -89,7 +89,7 @@ def app():
         return web.Response()
 
     app = web.Application()
-    app.add_routes([web.get("/schema.yaml", schema), web.get("/v1/users", users)])
+    app.add_routes([web.get("/schema.yaml", schema), web.get("/users", users)])
     app["saved_requests"] = saved_requests
     return app
 
@@ -98,11 +98,11 @@ def app():
 async def test_(request, aiohttp_client, app, case):
     request.config.HYPOTHESIS_CASES += 1
     client = await aiohttp_client(app)
-    response = await client.request(case.method, "/v1/users", headers=case.headers)
+    response = await client.request(case.method, "/users", headers=case.headers)
     assert response.status < 500
     assert len(app["saved_requests"]) == 1
     assert app["saved_requests"][0].method == "GET"
-    assert app["saved_requests"][0].path == "/v1/users"
+    assert app["saved_requests"][0].path == "/users"
 """
     )
     result = testdir.runpytest("-v", "-s")

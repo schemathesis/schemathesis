@@ -132,7 +132,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
         cli.run(
             schema_url,
             "--max-examples=40",
-            "--include-path=/api/success",
+            "--include-path=/success",
             "--exitfirst",
         )
         == snapshot_cli
