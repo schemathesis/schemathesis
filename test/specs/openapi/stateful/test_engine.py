@@ -87,6 +87,10 @@ def test_stop_in_check(engine_factory, func, stop_event):
     engine = engine_factory(checks=[stop_immediately])
     result = collect_result(engine)
     assert result.events[-1].status == Status.INTERRUPTED
+    if func is keyboard_interrupt:
+        scenario_finished = [ev for ev in result.events if isinstance(ev, events.ScenarioFinished)]
+        assert len(scenario_finished) > 0
+        assert scenario_finished[0].recorder.cases
 
 
 @pytest.mark.parametrize("event_cls", [events.ScenarioStarted, events.ScenarioFinished])

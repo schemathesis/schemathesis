@@ -4,7 +4,7 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.3...HEAD>` - TBD
 ---------------------------------------------------
 
-Added
+**Added**
 
 - ``--report`` unified reporting system with multiple format support.
 - ``--report-dir`` for centralized report storage.
@@ -12,27 +12,28 @@ Added
 
 **Changed**
 
-- Rename ``--generation-optimize`` -> ``--generation-maximize``.
-- Rename ``--generation-mode`` -> ``-m/--mode``.
-- Rename ``--generation-max-examples`` -> ``-n/--max-examples``.
-- Rename ``--junit-xml`` -> ``--report=junit``.
-- Rename ``--cassette-*`` options -> ``--report=vcr/har`` with format-specific paths.
-- Replace ``shrink`` in ``--hypothesis-phases`` with a separate ``--no-shrink`` option.
-- Simplified filtering options help message.
-- Display the number of selected operations in CLI.
-- Improved state machine generation by prioritizing reliable API entry points over random operations.
-- Made operation filtering independent from API base path for more predictable behavior.
-- Slightly improve the error message on malformed JSON.
-- **BREAKING**: The `validate_response` method in state machines now accepts the same keyword arguments as `call`. 
-  If you've overridden this method, update its signature to include `**kwargs`.
+- Rename ``--generation-optimize`` to ``--generation-maximize``
+- Rename ``--generation-mode`` to ``-m/--mode``
+- Rename ``--generation-max-examples`` to ``-n/--max-examples``
+- Rename ``--junit-xml`` to ``--report=junit``
+- Rename ``--cassette-*`` options to ``--report=vcr/har`` with format-specific paths
+- Replace ``shrink`` in ``--hypothesis-phases`` with a separate ``--no-shrink`` option
+- Simplify help messages for filtering options.
+- Add display of selected operations count in CLI.
+- Improve state machine generation by prioritizing reliable API entry points over random operations.
+- Make operation filtering independent of API base path for more predictable behavior.
+- Improve error message for malformed JSON responses.
+- **BREAKING**: The ``validate_response`` method in state machines now accepts the same keyword arguments as ``call``. 
+  If you've overridden this method, update its signature to include ``**kwargs``.
 
 **Fixed**
 
 - Handling of multiple API links pointing to the same operation with different parameters.
-- **CLI**: Make exact method filters case insensitive.
-- Internal error in coverage phase when a parameter is mixing keywords for different types.
-- Do not run irrelevant checks on "Unspecified HTTP method" type of coverage scenarios.
-- Ignoring ``verify=False`` when specified via ``get_call_kwargs`` on a state machine. :issue:`2713`
+- **CLI**: Make exact method filters case-insensitive.
+- Internal error in coverage phase when a parameter mixes keywords for different types.
+- Skip irrelevant checks for "Unspecified HTTP method" coverage scenarios.
+- Handle ``verify=False`` properly when specified via ``get_call_kwargs`` on a state machine. :issue:`2713`
+- Preserve test data when unit tests are interrupted via CTRL-C.
 
 **Removed**
 
