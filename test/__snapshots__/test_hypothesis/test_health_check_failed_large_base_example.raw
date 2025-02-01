@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-________________________________ POST /api/data ________________________________
+__________________________________ POST /data __________________________________
 Failed Health Check
 
 A health check has identified that the smallest example derived from the schema

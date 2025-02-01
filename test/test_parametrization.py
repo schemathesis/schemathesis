@@ -14,7 +14,7 @@ def test_parametrization(testdir):
 @schema.parametrize()
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/users"
+    assert case.operation.path == "/users"
     assert case.method == "GET"
 """
     )
@@ -24,7 +24,7 @@ def test_(request, case):
     result.assert_outcomes(passed=1)
     # Then test name should contain method:path
     # And there should be only 1 hypothesis call
-    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /v1/users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 1"])
 
 
 def test_pytest_parametrize(testdir):
@@ -35,7 +35,7 @@ def test_pytest_parametrize(testdir):
 @schema.parametrize()
 def test_(request, param, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/users"
+    assert case.operation.path == "/users"
     assert case.method in ("GET", "POST")
 """,
         paths={
@@ -52,8 +52,8 @@ def test_(request, param, case):
     result.assert_outcomes(passed=4)
     result.stdout.re_match_lines(
         [
-            r"test_pytest_parametrize.py::test_\[GET /v1/users\]\[A\] PASSED",
-            r"test_pytest_parametrize.py::test_\[GET /v1/users\]\[B\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET /users\]\[A\] PASSED",
+            r"test_pytest_parametrize.py::test_\[GET /users\]\[B\] PASSED",
             r"Hypothesis calls: 4",
         ]
     )
@@ -67,7 +67,7 @@ class TestAPI:
     @schema.parametrize()
     def test_(self, request, case):
         request.config.HYPOTHESIS_CASES += 1
-        assert case.operation.full_path == "/v1/users"
+        assert case.operation.path == "/users"
         assert case.method in ("GET", "POST")
 """,
         paths={
@@ -82,8 +82,8 @@ class TestAPI:
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_method.py::TestAPI::test_\[GET /v1/users\] PASSED",
-            r"test_method.py::TestAPI::test_\[POST /v1/users\] PASSED",
+            r"test_method.py::TestAPI::test_\[GET /users\] PASSED",
+            r"test_method.py::TestAPI::test_\[POST /users\] PASSED",
             r"Hypothesis calls: 2",
         ]
     )
@@ -98,7 +98,7 @@ def test_max_examples(testdir):
 @settings(max_examples=5)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/users"
+    assert case.operation.path == "/users"
     assert case.method in ("GET", "POST")
 """,
         paths={"/users": {"get": parameters, "post": parameters}},
@@ -117,7 +117,7 @@ def test_direct_schema(testdir):
 @settings(max_examples=1)
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/users"
+    assert case.operation.path == "/users"
     assert case.method == "POST"
     assert_list(case.body)
     assert_str(case.body[0])
@@ -442,7 +442,7 @@ def test_b(request, case):
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
-    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /v1/pets\]", r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 2"])
 
 
 @pytest.mark.parametrize(
@@ -565,7 +565,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-rf")
     # Then the tests should fail with the relevant error message
     result.assert_outcomes(failed=1, passed=2)
-    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET /v1/invalid\] FAILED"])
+    result.stdout.re_match_lines([r".*test_invalid_operation.py::test_\[GET /invalid\] FAILED"])
 
 
 def test_no_base_path(testdir):
@@ -745,7 +745,7 @@ def test_(request, case):
     result = testdir.runpytest("-v")
     # Then it should not be propagated & collection should be continued
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r".*\[GET /v1/users\]"])
+    result.stdout.re_match_lines([r".*\[GET /users\]"])
 
 
 @pytest.mark.openapi_version("3.0")

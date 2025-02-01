@@ -131,7 +131,6 @@ def run_test(
                     exc,
                     path=operation.path,
                     method=operation.method,
-                    full_path=operation.schema.get_full_path(operation.path),
                 )
             )
     except HypothesisRefResolutionError:

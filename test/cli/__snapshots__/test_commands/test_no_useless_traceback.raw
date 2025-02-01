@@ -21,7 +21,7 @@ Schemathesis dev
      🚫 1 errors
 
 ==================================== ERRORS ====================================
-______________________________ POST /api/success _______________________________
+________________________________ POST /success _________________________________
 Schema Error
 
 Failed to generate test cases for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`

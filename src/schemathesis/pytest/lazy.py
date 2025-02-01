@@ -168,7 +168,7 @@ class LazySchema:
                 for result in tests:
                     if isinstance(result, Ok):
                         operation, sub_test = result.ok()
-                        subtests.item._nodeid = f"{node_id}[{operation.method.upper()} {operation.full_path}]"
+                        subtests.item._nodeid = f"{node_id}[{operation.method.upper()} {operation.path}]"
                         run_subtest(operation, fixtures, sub_test, subtests)
                     else:
                         _schema_error(subtests, result.err(), node_id)
@@ -236,8 +236,7 @@ SEPARATOR = "\n===================="
 def _schema_error(subtests: SubTests, error: InvalidSchema, node_id: str) -> None:
     """Run a failing test, that will show the underlying problem."""
     sub_test = error.as_failing_test_function()
-    # `full_path` is always available in this case
-    kwargs = {"path": error.full_path}
+    kwargs = {"path": error.path}
     if error.method:
         kwargs["method"] = error.method.upper()
     subtests.item._nodeid = _get_partial_node_name(node_id, **kwargs)

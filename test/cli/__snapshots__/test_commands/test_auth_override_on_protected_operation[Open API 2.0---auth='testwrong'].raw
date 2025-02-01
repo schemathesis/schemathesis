@@ -21,7 +21,7 @@ Schemathesis dev
      ❌ 1 failed
 
 =================================== FAILURES ===================================
-________________________________ GET /api/basic ________________________________
+__________________________________ GET /basic __________________________________
 1. Test Case ID: <PLACEHOLDER>
 
 - Undocumented HTTP status code
@@ -42,7 +42,7 @@ Reproduce with:
 Missing or invalid API credentials: 1 API operation returned authentication errors
 
 401 Unauthorized (1 operation):
-  - GET /api/basic
+  - GET /basic
 
 Tip: Use --auth or -H to provide authentication credentials
 

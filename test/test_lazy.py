@@ -68,9 +68,9 @@ def test_(request, case):
     result.assert_outcomes(passed=1, failed=1)
     result.stdout.re_match_lines(
         [
-            r"test_invalid_operation.py::test_\[GET /v1/valid\] \(label='GET /v1/valid'\) SUBPASS +\[ 25%\]",
-            r"test_invalid_operation.py::test_\[GET /v1/invalid\] \(label='GET /v1/invalid'\) SUBFAIL +\[ 50%\]",
-            r"test_invalid_operation.py::test_\[GET /v1/users\] \(label='GET /v1/users'\) SUBPASS +\[ 75%\]",
+            r"test_invalid_operation.py::test_\[GET /valid\] \(label='GET /valid'\) SUBPASS +\[ 25%\]",
+            r"test_invalid_operation.py::test_\[GET /invalid\] \(label='GET /invalid'\) SUBFAIL +\[ 50%\]",
+            r"test_invalid_operation.py::test_\[GET /users\] \(label='GET /users'\) SUBPASS +\[ 75%\]",
             r"test_invalid_operation.py::test_ PASSED +\[100%\]",
         ]
     )
@@ -111,7 +111,7 @@ lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 @lazy_schema.include(path_regex="/first").parametrize()
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/first"
+    assert case.operation.path == "/first"
 
 @lazy_schema.include(method="POST").parametrize()
 def test_b(request, case):
@@ -121,13 +121,13 @@ def test_b(request, case):
 @lazy_schema.include(tag="foo").parametrize()
 def test_c(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/second"
+    assert case.operation.path == "/second"
     assert case.method == "GET"
 
 @lazy_schema.include(operation_id="updateThird").parametrize()
 def test_d(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/third"
+    assert case.operation.path == "/third"
     assert case.method == "PUT"
 """,
         paths={
@@ -162,12 +162,12 @@ def test_with_schema_filters(testdir):
     # When the test uses method / endpoint filter
     testdir.make_test(
         """
-lazy_schema = schemathesis.pytest.from_fixture("simple_schema").include(path_regex="/v1/pets", method="POST")
+lazy_schema = schemathesis.pytest.from_fixture("simple_schema").include(path_regex="/pets", method="POST")
 
 @lazy_schema.parametrize()
 def test_a(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.operation.full_path == "/v1/pets"
+    assert case.operation.path == "/pets"
     assert case.method == "POST"
 """,
         paths={"/pets": {"post": {"responses": {"200": {"description": "OK"}}}}},
@@ -282,8 +282,8 @@ def test_(case):
     result.assert_outcomes(passed=2)
     result.stdout.re_match_lines(
         [
-            r"test_parametrized_fixture.py::test_\[a\]\[GET /api/users\] \(label='GET /api/users'\) SUBPASS +\[ 33%\]",
-            r"test_parametrized_fixture.py::test_\[b\]\[GET /api/users\] \(label='GET /api/users'\) SUBPASS +\[ 75%\]",
+            r"test_parametrized_fixture.py::test_\[a\]\[GET /users\] \(label='GET /users'\) SUBPASS +\[ 33%\]",
+            r"test_parametrized_fixture.py::test_\[b\]\[GET /users\] \(label='GET /users'\) SUBPASS +\[ 75%\]",
         ]
     )
 
@@ -339,9 +339,7 @@ def pytest_terminal_summary(terminalreporter) -> None:
     result = testdir.runpytest("-v")
     # And it should be the same test in the end
     # We do not assert the outcome here, because it is not reported.
-    result.stdout.re_match_lines(
-        [r"test_generation_modes.py::test_\[GET /v1/users\] \(label='GET /v1/users'\) SUBPASS"]
-    )
+    result.stdout.re_match_lines([r"test_generation_modes.py::test_\[GET /users\] \(label='GET /users'\) SUBPASS"])
 
 
 def test_error_on_no_matches(testdir):
