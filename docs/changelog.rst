@@ -27,6 +27,7 @@ Added
 
 - Handling of multiple API links pointing to the same operation with different parameters.
 - **CLI**: Make exact method filters case insensitive.
+- Internal error in coverage phase when a parameter is mixing keywords for different types.
 
 **Removed**
 
