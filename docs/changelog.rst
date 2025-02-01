@@ -22,6 +22,7 @@ Added
 - Display the number of selected operations in CLI.
 - Improved state machine generation by prioritizing reliable API entry points over random operations.
 - Made operation filtering independent from API base path for more predictable behavior.
+- Slightly improve the error message on malformed JSON.
 
 **Fixed**
 
