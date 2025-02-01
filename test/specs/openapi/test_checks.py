@@ -11,6 +11,7 @@ from schemathesis.specs.openapi.checks import (
     has_only_additional_properties_in_non_body_parameters,
     negative_data_rejection,
     positive_data_acceptance,
+    response_schema_conformance,
 )
 
 
@@ -172,6 +173,46 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         query={"key": 5, "unknown": 3},
     )
     assert negative_data_rejection(CheckContext(override=None, auth=None, headers=None), response, case) is None
+
+
+def test_response_schema_conformance_with_unspecified_method(response_factory, sample_schema):
+    response = response_factory.requests()
+    sample_schema["paths"]["/test"]["post"]["responses"] = {
+        "200": {
+            "description": "Successful response",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                        "required": ["id", "name"],
+                    }
+                }
+            },
+        }
+    }
+    schema = schemathesis.openapi.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    meta = build_metadata()
+    meta.description = "Unspecified HTTP method: PUT"
+    case = Case(
+        operation=operation,
+        generation_time=0.0,
+        meta=meta,
+        data_generation_method=DataGenerationMethod.negative,
+    )
+
+    result = response_schema_conformance(
+        CheckContext(
+            override=None,
+            auth=None,
+            headers=None,
+            transport_kwargs=None,
+        ),
+        response,
+        case,
+    )
+    assert result is True
 
 
 @pytest.mark.parametrize(

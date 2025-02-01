@@ -32,10 +32,15 @@ if TYPE_CHECKING:
     from ...transports.responses import GenericResponse
 
 
+def is_unexpected_http_status_case(case: Case) -> bool:
+    # Skip checks for requests using HTTP methods not defined in the API spec
+    return bool(case.meta and case.meta.description and case.meta.description.startswith("Unspecified HTTP method"))
+
+
 def status_code_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
     responses = case.operation.definition.raw.get("responses", {})
     # "default" can be used as the default response object for all HTTP codes that are not covered individually
@@ -66,7 +71,7 @@ def _expand_responses(responses: dict[str | int, Any]) -> Generator[int, None, N
 def content_type_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
     documented_content_types = case.operation.schema.get_content_types(case.operation, response)
     if not documented_content_types:
@@ -124,7 +129,7 @@ def response_headers_conformance(ctx: CheckContext, response: GenericResponse, c
     from .parameters import OpenAPI20Parameter, OpenAPI30Parameter
     from .schemas import BaseOpenAPISchema, OpenApi30, _maybe_raise_one_or_more
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
     resolved = case.operation.schema.get_headers(case.operation, response)
     if not resolved:
@@ -209,7 +214,7 @@ def _coerce_header_value(value: str, schema: dict[str, Any]) -> str | int | floa
 def response_schema_conformance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
     return case.operation.validate_response(response)
 
@@ -217,7 +222,7 @@ def response_schema_conformance(ctx: CheckContext, response: GenericResponse, ca
 def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
 
     config = ctx.config.negative_data_rejection
@@ -245,7 +250,7 @@ def negative_data_rejection(ctx: CheckContext, response: GenericResponse, case: 
 def positive_data_acceptance(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
 
     config = ctx.config.positive_data_acceptance
@@ -283,7 +288,7 @@ def missing_required_header(ctx: CheckContext, response: GenericResponse, case: 
             config = ctx.config.missing_required_header
             allowed_statuses = expand_status_codes(config.allowed_statuses or [])
         if response.status_code not in allowed_statuses:
-            allowed = f"Allowed statuses: {', '.join(map(str,allowed_statuses))}"
+            allowed = f"Allowed statuses: {', '.join(map(str, allowed_statuses))}"
             raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
     return None
 
@@ -333,7 +338,7 @@ def use_after_free(ctx: CheckContext, response: GenericResponse, original: Case)
     from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+    if not isinstance(original.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(original):
         return True
     if response.status_code == 404 or not original.source or response.status_code >= 500:
         return None
@@ -373,7 +378,7 @@ def ensure_resource_availability(ctx: CheckContext, response: GenericResponse, o
     from ...transports.responses import get_reason
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(original.operation.schema, BaseOpenAPISchema):
+    if not isinstance(original.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(original):
         return True
     if (
         # Response indicates a client error, even though all available parameters were taken from links
@@ -416,7 +421,7 @@ def ignored_auth(ctx: CheckContext, response: GenericResponse, case: Case) -> bo
     """Check if an operation declares authentication as a requirement but does not actually enforce it."""
     from .schemas import BaseOpenAPISchema
 
-    if not isinstance(case.operation.schema, BaseOpenAPISchema):
+    if not isinstance(case.operation.schema, BaseOpenAPISchema) or is_unexpected_http_status_case(case):
         return True
     security_parameters = _get_security_parameters(case.operation)
     # Authentication is required for this API operation and response is successful

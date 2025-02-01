@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error in coverage phase when a parameter is mixing keywords for different types.
+- Do not run irrelevant checks on "Unspecified HTTP method" type of coverage scenarios.
 
 .. _v3.39.8:
 
