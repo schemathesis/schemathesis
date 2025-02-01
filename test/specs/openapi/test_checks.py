@@ -3,6 +3,7 @@ import pytest
 import schemathesis
 from schemathesis.checks import CheckContext
 from schemathesis.core.failures import Failure
+from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -18,6 +19,7 @@ from schemathesis.specs.openapi.checks import (
     has_only_additional_properties_in_non_body_parameters,
     negative_data_rejection,
     positive_data_acceptance,
+    response_schema_conformance,
 )
 
 
@@ -200,6 +202,55 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
         )
         is None
     )
+
+
+def test_response_schema_conformance_with_unspecified_method(response_factory, sample_schema):
+    response = response_factory.requests()
+    response = Response.from_requests(response, True)
+    sample_schema["paths"]["/test"]["post"]["responses"] = {
+        "200": {
+            "description": "Successful response",
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "type": "object",
+                        "properties": {"id": {"type": "integer"}, "name": {"type": "string"}},
+                        "required": ["id", "name"],
+                    }
+                }
+            },
+        }
+    }
+    schema = schemathesis.openapi.from_dict(sample_schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(
+        meta=CaseMetadata(
+            generation=GenerationInfo(
+                time=0.1,
+                mode=GenerationMode.NEGATIVE,
+            ),
+            components={
+                ComponentKind.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
+            },
+            phase=PhaseInfo.coverage(
+                description="Unspecified HTTP method: PUT",
+            ),
+        ),
+        query={"key": 5, "unknown": 3},
+    )
+
+    result = response_schema_conformance(
+        CheckContext(
+            override=None,
+            auth=None,
+            headers=None,
+            config={},
+            transport_kwargs=None,
+        ),
+        response,
+        case,
+    )
+    assert result is True
 
 
 @pytest.mark.parametrize(
