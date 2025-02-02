@@ -393,7 +393,7 @@ class CliSnapshotConfig:
         if self.replace_test_case_id:
             lines = data.splitlines()
             for idx, line in enumerate(lines):
-                if re.match(r"\d+\. Test Case ID", line):
+                if re.match(r".*\d+\. Test Case ID", line):
                     sequential_id = lines[idx].split(".")[0]
                     lines[idx] = f"{sequential_id}. Test Case ID: <PLACEHOLDER>"
             data = "\n".join(lines) + "\n"

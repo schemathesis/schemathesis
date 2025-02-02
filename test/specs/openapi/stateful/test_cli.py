@@ -206,4 +206,17 @@ def test_invalid_parameter_reference(app_factory, app_runner, cli, snapshot_cli)
     # When a link references a non-existent parameter
     app = app_factory(invalid_parameter=True)
     port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-n 1") == snapshot_cli
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 1") == snapshot_cli
+
+
+def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
+    app = app_factory(omit_required_field=True)
+    port = app_runner.run_flask_app(app)
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 1") == snapshot_cli
+
+
+@pytest.mark.parametrize("content", ["", "User data as plain text"])
+def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
+    app = app_factory(return_plain_text=content)
+    port = app_runner.run_flask_app(app)
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 30") == snapshot_cli

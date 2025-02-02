@@ -1,0 +1,58 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in N ms)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       6 selected / 6 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ✅  Stateful tests (in N ms)
+
+     Scenarios:    N
+     API Links:    3 covered / 7 selected / 7 total
+
+     ✅ N passed
+
+================================ Stateful tests ================================
+
+Failed to extract data from response:
+
+    1. Test Case ID: <PLACEHOLDER>
+
+    POST /users -> [201] DeleteUser -> DELETE /users/{userId}
+
+        Could not resolve parameter `userId` via `$response.body#/id`
+        Path `#/id` not found in response
+
+        [201] curl -X POST -H 'Content-Type: application/json' -d '{"name": ""}' http://127.0.0.1/users
+
+        {"last_modified":"2021-01-01T00:00:00Z","name":""}
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 6/6
+  Tested: 4
+  Skipped: 2
+
+Test Phases:
+  ✅ API probing
+  ⏭️ Unit testing (disabled)
+  ✅ Stateful testing
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=========================== No issues found in 1.00s ===========================
