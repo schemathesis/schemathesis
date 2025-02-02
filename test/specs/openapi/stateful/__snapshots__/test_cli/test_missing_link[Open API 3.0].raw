@@ -29,14 +29,13 @@ Invalid OpenAPI Links Definition
 
 The following API operations contain invalid link definitions:
 
-  POST /users/
-    -> [201] getUser
-       Link: GetUserByUserId
-         - Operation 'getUser' not found
+  POST /users/ -> [201] GetUserByUserId -> getUser
 
-    -> [201] updateUser
-       Link: UpdateUserById
-         - Operation 'updateUser' not found
+     - Operation 'getUser' not found
+
+  POST /users/ -> [201] UpdateUserById -> updateUser
+
+     - Operation 'updateUser' not found
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA

@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
+from typing import Literal
 
 import hypothesis
 import pytest
@@ -36,6 +37,10 @@ class AppConfig:
     invalid_parameter: bool = False
     list_users_as_root: bool = False
     no_reliable_transitions: bool = False
+    # For non-JSON response test
+    return_plain_text: Literal[False] | str | bytes = False
+    # For missing body parameter test
+    omit_required_field: bool = False
 
 
 @pytest.fixture
@@ -61,7 +66,7 @@ def app_factory(ctx):
     get_links = {
         "DeleteUser": {
             "operationId": "deleteUser",
-            "parameters": {"userId": "$request.path.userId"},
+            "parameters": {"userId": "$response.body#/id"},
         },
     }
     get_collection_links = {
@@ -227,6 +232,11 @@ def app_factory(ctx):
             time.sleep(config.slowdown)
         user = users.get(user_id)
         if user:
+            if config.return_plain_text is not False:
+                return config.return_plain_text, 200, {"Content-Type": "text/plain"}
+            if config.omit_required_field:
+                # Return response without required 'id' field
+                return jsonify({"name": user["name"], "last_modified": user["last_modified"]})
             return jsonify(user)
         return jsonify({"error": "User not found"}), 404
 
@@ -265,11 +275,16 @@ def app_factory(ctx):
         new_user = {"id": next_user_id, "name": name, "last_modified": last_modified}
         if config.duplicate_operation_links:
             new_user["manager_id"] = 0
+        if config.return_plain_text is not False:
+            new_user["id"] = next_user_id = 192
         if not config.ensure_resource_availability:
             # Do not always save the user
             users[next_user_id] = new_user
         next_user_id += 1
 
+        if config.omit_required_field:
+            # Return response without required 'id' field
+            return jsonify({"name": new_user["name"], "last_modified": new_user["last_modified"]}), 201
         return jsonify(new_user), 201
 
     @app.route("/users/<int:user_id>", methods=["PATCH"])
@@ -359,11 +374,19 @@ def app_factory(ctx):
         invalid_parameter: bool = False,
         list_users_as_root: bool = False,
         no_reliable_transitions: bool = False,
+        return_plain_text: Literal[False] | str | bytes = False,
+        omit_required_field: bool = False,
     ):
         config.use_after_free = use_after_free
         config.ensure_resource_availability = ensure_resource_availability
         config.auth_token = auth_token
         config.ignored_auth = ignored_auth
+        config.return_plain_text = return_plain_text
+        if return_plain_text is not False:
+            # To simplify snapshots
+            schema["components"]["schemas"]["NewUser"]["properties"]["name"] = {"enum": ["fixed-name"]}
+
+        config.omit_required_field = omit_required_field
         if ignored_auth:
             schema["components"]["securitySchemes"] = {
                 "bearerAuth": {"type": "http", "scheme": "bearer", "bearerFormat": "JWT"}

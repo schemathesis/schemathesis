@@ -69,6 +69,52 @@ class ExtractedParam:
 
 
 @dataclass
+class ExtractionFailure:
+    """Represents a failure to extract data from a transition."""
+
+    # e.g., "GetUser"
+    id: str
+    case_id: str
+    # e.g., "POST /users"
+    source: str
+    # e.g., "GET /users/{userId}"
+    target: str
+    # e.g., "userId"
+    parameter_name: str
+    # e.g., "$response.body#/id"
+    expression: str
+    # Previous test cases in the chain, from newest to oldest
+    # Stored as a case + response pair
+    history: list[tuple[Case, Response]]
+    # The actual response that caused the failure
+    response: Response
+    error: Exception | None
+
+    __slots__ = ("id", "case_id", "source", "target", "parameter_name", "expression", "history", "response", "error")
+
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, ExtractionFailure)
+        return (
+            self.source == other.source
+            and self.target == other.target
+            and self.id == other.id
+            and self.parameter_name == other.parameter_name
+            and self.expression == other.expression
+        )
+
+    def __hash__(self) -> int:
+        return hash(
+            (
+                self.source,
+                self.target,
+                self.id,
+                self.parameter_name,
+                self.expression,
+            )
+        )
+
+
+@dataclass
 class StepOutput:
     """Output from a single transition of a state machine."""
 
