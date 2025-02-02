@@ -8,7 +8,7 @@ Changelog
 
 - ``--report`` unified reporting system with multiple format support.
 - ``--report-dir`` for centralized report storage.
-- Display Open API link definition errors in CLI output.
+- Display Open API link definition & extraction errors in CLI output.
 
 **Changed**
 
@@ -23,6 +23,7 @@ Changelog
 - Improve state machine generation by prioritizing reliable API entry points over random operations.
 - Make operation filtering independent of API base path for more predictable behavior.
 - Improve error message for malformed JSON responses.
+- Return ``UNRESOLVABLE`` sentinel instead of an empty string when Open API runtime expressions can't be evaluated (e.g., when ``$response.body#/id`` is not found)
 - **BREAKING**: The ``validate_response`` method in state machines now accepts the same keyword arguments as ``call``. 
   If you've overridden this method, update its signature to include ``**kwargs``.
 

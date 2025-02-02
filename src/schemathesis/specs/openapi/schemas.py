@@ -41,11 +41,12 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.meta import CaseMetadata
 from schemathesis.generation.overrides import Override, OverrideMark, check_no_override_mark
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
+from schemathesis.specs.openapi.stateful import links
 
 from ...generation import GenerationConfig, GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
-from . import links, serialization
+from . import serialization
 from ._cache import OperationCache
 from ._hypothesis import openapi_cases
 from .converter import to_json_schema, to_json_schema_recursive

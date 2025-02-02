@@ -9,14 +9,15 @@ from hypothesis.stateful import Bundle, Rule, precondition, rule
 
 from schemathesis.core.errors import InvalidStateMachine
 from schemathesis.core.result import Ok
+from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.stateful.state_machine import APIStateMachine, StepInput, StepOutput, _normalize_name
 from schemathesis.schemas import APIOperation
-from schemathesis.specs.openapi.links import OpenApiLink, get_all_links
 from schemathesis.specs.openapi.stateful.control import TransitionController
+from schemathesis.specs.openapi.stateful.links import OpenApiLink, get_all_links
 from schemathesis.specs.openapi.utils import expand_status_code
 
 if TYPE_CHECKING:
@@ -243,35 +244,38 @@ def into_step_input(
     def builder(_output: StepOutput) -> st.SearchStrategy[StepInput]:
         @st.composite  # type: ignore[misc]
         def inner(draw: st.DrawFn, output: StepOutput) -> StepInput:
-            transition_data = link.extract(output)
+            transition = link.extract(output)
 
             kwargs: dict[str, Any] = {
                 container: {
                     name: extracted.value.ok()
                     for name, extracted in data.items()
-                    if isinstance(extracted.value, Ok) and extracted.value.ok() is not None
+                    if isinstance(extracted.value, Ok) and extracted.value.ok() not in (None, UNRESOLVABLE)
                 }
-                for container, data in transition_data.parameters.items()
+                for container, data in transition.parameters.items()
             }
+
             if (
-                transition_data.request_body is not None
-                and isinstance(transition_data.request_body.value, Ok)
+                transition.request_body is not None
+                and isinstance(transition.request_body.value, Ok)
+                and transition.request_body.value.ok() is not UNRESOLVABLE
                 and not link.merge_body
             ):
-                kwargs["body"] = transition_data.request_body.value.ok()
+                kwargs["body"] = transition.request_body.value.ok()
             cases = strategies.combine([target.as_strategy(generation_mode=mode, **kwargs) for mode in modes])
             case = draw(cases)
             if (
-                transition_data.request_body is not None
-                and isinstance(transition_data.request_body.value, Ok)
+                transition.request_body is not None
+                and isinstance(transition.request_body.value, Ok)
+                and transition.request_body.value.ok() is not UNRESOLVABLE
                 and link.merge_body
             ):
-                new = transition_data.request_body.value.ok()
+                new = transition.request_body.value.ok()
                 if isinstance(case.body, dict) and isinstance(new, dict):
                     case.body = {**case.body, **new}
                 else:
                     case.body = new
-            return StepInput(case=case, transition=transition_data)
+            return StepInput(case=case, transition=transition)
 
         return inner(output=_output)
 

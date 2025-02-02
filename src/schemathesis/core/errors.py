@@ -125,21 +125,16 @@ class InvalidStateMachine(SchemathesisError):
             source_group.setdefault(target_key, []).append(transition)
 
         for source, target_groups in by_source.items():
-            result += f"\n\n  {source}"
-
             for (target, status), transitions in target_groups.items():
-                result += f"\n    -> [{status}] {target}"
-
                 for transition in transitions:
-                    result += f"\n       Link: {transition.name}"
+                    result += f"\n\n  {_format_transition(source, status, transition.name, target)}\n"
                     for error in transition.errors:
-                        result += f"\n         - {error.message}"
-
-                # Add spacing between different target groups
-                if (target, status) != list(target_groups.keys())[-1]:
-                    result += "\n"
-
+                        result += f"\n     - {error.message}"
         return result
+
+
+def _format_transition(source: str, status: str, transition: str, target: str) -> str:
+    return f"{source} -> [{status}] {transition} -> {target}"
 
 
 class InvalidTransition(SchemathesisError):

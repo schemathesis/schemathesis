@@ -106,7 +106,7 @@ def resolve_pointer(document: Any, pointer: str) -> dict | list | str | int | fl
         elif isinstance(target, list):
             try:
                 target = target[int(token)]
-            except IndexError:
+            except (IndexError, ValueError):
                 return UNRESOLVABLE
         else:
             return UNRESOLVABLE

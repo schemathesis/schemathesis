@@ -9,10 +9,9 @@ from schemathesis.core.errors import InvalidTransition, OperationNotFound, Trans
 from schemathesis.core.result import Err, Ok, Result
 from schemathesis.generation.stateful.state_machine import ExtractedParam, StepOutput, Transition
 from schemathesis.schemas import APIOperation
-
-from . import expressions
-from .constants import LOCATION_TO_CONTAINER
-from .references import RECURSION_DEPTH_LIMIT
+from schemathesis.specs.openapi import expressions
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+from schemathesis.specs.openapi.references import RECURSION_DEPTH_LIMIT
 
 if TYPE_CHECKING:
     from jsonschema import RefResolver
@@ -153,7 +152,7 @@ class OpenApiLink:
     def _extract_impl(self, wrapper: StepOutputWrapper) -> Transition:
         output = wrapper.output
         return Transition(
-            id=f"{self.source.label} - {self.status_code} - {self.name}",
+            id=f"{self.source.label} -> [{self.status_code}] {self.name} -> {self.target.label}",
             parent_id=output.case.id,
             parameters=self.extract_parameters(output),
             request_body=self.extract_body(output),

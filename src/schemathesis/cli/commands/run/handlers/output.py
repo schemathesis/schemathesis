@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import os
+import textwrap
 import time
 from dataclasses import dataclass, field
+from json.decoder import JSONDecodeError
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Iterable
 
@@ -16,6 +18,7 @@ from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
@@ -31,6 +34,8 @@ if TYPE_CHECKING:
     from rich.live import Live
     from rich.progress import Progress, TaskID
     from rich.text import Text
+
+    from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
 IO_ENCODING = os.getenv("PYTHONIOENCODING", "utf-8")
 DISCORD_LINK = "https://discord.gg/R9ASRAmHnA"
@@ -1167,6 +1172,54 @@ class OutputHandler(EventHandler):
         )
         click.echo()
 
+    def display_stateful_failures(self, ctx: ExecutionContext) -> None:
+        display_section_name("Stateful tests")
+
+        click.echo("\nFailed to extract data from response:")
+
+        grouped: dict[str, list[ExtractionFailure]] = {}
+        for failure in ctx.statistic.extraction_failures:
+            grouped.setdefault(failure.id, []).append(failure)
+
+        for idx, (transition_id, failures) in enumerate(grouped.items(), 1):
+            for failure in failures:
+                click.echo(f"\n    {idx}. Test Case ID: {failure.case_id}\n")
+                click.echo(f"    {transition_id}")
+
+                indent = "        "
+                if failure.error:
+                    if isinstance(failure.error, JSONDecodeError):
+                        click.echo(f"\n{indent}Failed to parse JSON from response")
+                    else:
+                        click.echo(f"\n{indent}{failure.error.__class__.__name__}: {failure.error}")
+                else:
+                    description = (
+                        f"\n{indent}Could not resolve parameter `{failure.parameter_name}` via `{failure.expression}`"
+                    )
+                    prefix = "$response.body"
+                    if failure.expression.startswith(prefix):
+                        description += f"\n{indent}Path `{failure.expression[len(prefix) :]}` not found in response"
+                    click.echo(description)
+
+                click.echo()
+
+                for case, response in reversed(failure.history):
+                    curl = case.as_curl_command(headers=dict(response.request.headers), verify=response.verify)
+                    click.echo(f"{indent}[{response.status_code}] {curl}")
+
+                response = failure.response
+
+                if response.content is None or not response.content:
+                    click.echo(f"\n{indent}<EMPTY>")
+                else:
+                    try:
+                        payload = prepare_response_payload(response.text, config=ctx.output_config)
+                        click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
+                    except UnicodeDecodeError:
+                        click.echo(f"\n{indent}<BINARY>")
+
+        click.echo()
+
     def display_api_operations(self, ctx: ExecutionContext) -> None:
         assert self.statistic is not None
         click.echo(_style("API Operations:", bold=True))
@@ -1357,6 +1410,8 @@ class OutputHandler(EventHandler):
             self.display_warnings()
         if GLOBAL_EXPERIMENTS.enabled:
             self.display_experiments()
+        if ctx.statistic.extraction_failures:
+            self.display_stateful_failures(ctx)
         display_section_name("SUMMARY")
         click.echo()
 

@@ -16,10 +16,6 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✓
 
- ✅  Unit tests (in N ms)
-
-     ✅ 6 passed
-
  🚫  Stateful tests (in N ms)
 
      Scenarios:    N
@@ -33,21 +29,21 @@ Invalid OpenAPI Links Definition
 
 The following API operations contain invalid link definitions:
 
-  POST /users
-    -> [201] GET /users/{userId}
-       Link: InvalidUser
-         - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
-         - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
-       Link: InvalidUser-2
-         - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
-         - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
+  POST /users -> [201] InvalidUser -> GET /users/{userId}
 
-  PATCH /users/{userId}
-    -> [200] GET /users/{userId}
-       Link: GetUser
-         - Invalid expression `$req.[`. Unknown token: `$req`
-         - Parameter `something` is not defined in API operation `GET /users/{userId}`
-         - Expression `$request.path.whatever` references non-existent path parameter `whatever` in `PATCH /users/{userId}`
+     - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
+     - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
+
+  POST /users -> [201] InvalidUser-2 -> GET /users/{userId}
+
+     - Parameter `unknown` is not defined in API operation `GET /users/{userId}`
+     - Expression `$request.query.wrong` references non-existent query parameter `wrong` in `POST /users`
+
+  PATCH /users/{userId} -> [200] GetUser -> GET /users/{userId}
+
+     - Invalid expression `$req.[`. Unknown token: `$req`
+     - Parameter `something` is not defined in API operation `GET /users/{userId}`
+     - Expression `$request.path.whatever` references non-existent path parameter `whatever` in `PATCH /users/{userId}`
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
@@ -55,18 +51,19 @@ Need more help?
 
 API Operations:
   Selected: 6/6
-  Tested: 6
+  Tested: 0
+  Skipped: 6
 
 Test Phases:
   ✅ API probing
-  ✅ Unit testing
+  ⏭️ Unit testing (disabled)
   🚫 Stateful testing
 
 Errors:
   🚫 Invalid OpenAPI Links Definition: 1
 
 Test cases:
-  N generated, N passed
+  No test cases were generated
 
 Seed: 42
 

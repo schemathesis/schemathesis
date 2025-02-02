@@ -1,0 +1,58 @@
+Exit code: 0
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in N ms)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.2
+     Operations:       6 selected / 6 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ✅  Stateful tests (in N ms)
+
+     Scenarios:    N
+     API Links:    7 covered / 7 selected / 7 total
+
+     ✅ N passed
+
+================================ Stateful tests ================================
+
+Failed to extract data from response:
+
+    1. Test Case ID: <PLACEHOLDER>
+
+    GET /users/{userId} -> [200] DeleteUser -> DELETE /users/{userId}
+
+        Failed to parse JSON from response
+
+        [201] curl -X POST -H 'Content-Type: application/json' -d '{"name": "fixed-name"}' http://127.0.0.1/users
+        [200] curl -X GET http://127.0.0.1/users/192
+
+        User data as plain text
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 6/6
+  Tested: 5
+  Skipped: 1
+
+Test Phases:
+  ✅ API probing
+  ⏭️ Unit testing (disabled)
+  ✅ Stateful testing
+
+Test cases:
+  N generated, N passed
+
+Seed: 42
+
+=========================== No issues found in 1.00s ===========================
