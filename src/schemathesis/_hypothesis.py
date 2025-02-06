@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import json
 import warnings
 from functools import wraps
@@ -223,6 +224,87 @@ def add_coverage(
     return test
 
 
+class Template:
+    __slots__ = ("_components", "_template")
+
+    def __init__(self) -> None:
+        self._components: dict[str, DataGenerationMethod] = {}
+        self._template: dict[str, Any] = {}
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._template
+
+    def __getitem__(self, key: str) -> dict:
+        return self._template[key]
+
+    def get(self, key: str, default: Any = None) -> dict:
+        return self._template.get(key, default)
+
+    def add_parameter(self, location: str, name: str, value: coverage.GeneratedValue) -> None:
+        from .specs.openapi.constants import LOCATION_TO_CONTAINER
+
+        component_name = LOCATION_TO_CONTAINER[location]
+        method = self._components.get(component_name)
+        if method is None:
+            self._components[component_name] = value.data_generation_method
+        elif value.data_generation_method == DataGenerationMethod.negative:
+            self._components[component_name] = DataGenerationMethod.negative
+
+        container = self._template.setdefault(component_name, {})
+        if _should_stringify(location, value):
+            container[name] = _stringify_value(value.value, location)
+        else:
+            container[name] = value.value
+
+    def set_body(self, body: coverage.GeneratedValue, media_type: str) -> None:
+        self._template["body"] = body.value
+        self._template["media_type"] = media_type
+        self._components["body"] = body.data_generation_method
+
+    def unmodified(self) -> TemplateValue:
+        return TemplateValue(kwargs=self._template.copy(), components=self._components.copy())
+
+    def with_body(self, *, media_type: str, value: coverage.GeneratedValue) -> TemplateValue:
+        kwargs = {**self._template, "media_type": media_type, "body": value.value}
+        components = {**self._components, "body": value.data_generation_method}
+        return TemplateValue(kwargs=kwargs, components=components)
+
+    def with_parameter(self, *, location: str, name: str, value: coverage.GeneratedValue) -> TemplateValue:
+        from .specs.openapi.constants import LOCATION_TO_CONTAINER
+
+        if _should_stringify(location, value):
+            generated = _stringify_value(value.value, location)
+        else:
+            generated = value.value
+
+        container_name = LOCATION_TO_CONTAINER[location]
+        container = self._template[container_name]
+        kwargs = {**self._template, container_name: {**container, name: generated}}
+        components = {**self._components, container_name: value.data_generation_method}
+        return TemplateValue(kwargs=kwargs, components=components)
+
+
+@dataclass
+class TemplateValue:
+    kwargs: dict[str, Any]
+    components: dict[str, DataGenerationMethod]
+    __slots__ = ("kwargs", "components")
+
+
+def _should_stringify(location: str, value: coverage.GeneratedValue) -> bool:
+    return location in ("header", "cookie", "path", "query") and not isinstance(value.value, str)
+
+
+def _stringify_value(val: Any, location: str) -> str | list[str]:
+    if isinstance(val, list):
+        if location == "query":
+            # Having a list here ensures there will be multiple query parameters wit the same name
+            return [json.dumps(item) for item in val]
+        # use comma-separated values style for arrays
+        return ",".join(json.dumps(sub) for sub in val)
+    return json.dumps(val)
+
+
 def _iter_coverage_cases(
     operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
 ) -> Generator[Case, None, None]:
@@ -239,7 +321,7 @@ def _iter_coverage_cases(
         return json.dumps(val)
 
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
-    template: dict[str, Any] = {}
+    template = Template()
     responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
         location = parameter.location
@@ -253,11 +335,7 @@ def _iter_coverage_cases(
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
             continue
-        container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
-            container[name] = _stringify_value(value.value, location)
-        else:
-            container[name] = value.value
+        template.add_parameter(location, name, value)
         generators[(location, name)] = gen
     if operation.body:
         for body in operation.body:
@@ -274,48 +352,48 @@ def _iter_coverage_cases(
             if isinstance(value, NotSet):
                 continue
             if "body" not in template:
-                template["body"] = value.value
-                template["media_type"] = body.media_type
-            case = operation.make_case(**{**template, "body": value.value, "media_type": body.media_type})
+                template.set_body(value, body.media_type)
+            data = template.with_body(value=value, media_type=body.media_type)
+            case = operation.make_case(**data.kwargs)
             case.data_generation_method = value.data_generation_method
             case.meta = _make_meta(
                 description=value.description,
                 location=value.location,
                 parameter=body.media_type,
                 parameter_location="body",
+                **data.components,
             )
             yield case
             for next_value in gen:
-                case = operation.make_case(**{**template, "body": next_value.value, "media_type": body.media_type})
+                data = template.with_body(value=next_value, media_type=body.media_type)
+                case = operation.make_case(**data.kwargs)
                 case.data_generation_method = next_value.data_generation_method
                 case.meta = _make_meta(
                     description=next_value.description,
                     location=next_value.location,
                     parameter=body.media_type,
                     parameter_location="body",
+                    **data.components,
                 )
                 yield case
     elif DataGenerationMethod.positive in data_generation_methods:
-        case = operation.make_case(**template)
+        data = template.unmodified()
+        case = operation.make_case(**data.kwargs)
         case.data_generation_method = DataGenerationMethod.positive
-        case.meta = _make_meta(description="Default positive test case")
+        case.meta = _make_meta(description="Default positive test case", **data.components)
         yield case
 
     for (location, name), gen in generators.items():
-        container_name = LOCATION_TO_CONTAINER[location]
-        container = template[container_name]
         for value in gen:
-            if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
-                generated = _stringify_value(value.value, location)
-            else:
-                generated = value.value
-            case = operation.make_case(**{**template, container_name: {**container, name: generated}})
+            data = template.with_parameter(location=location, name=name, value=value)
+            case = operation.make_case(**data.kwargs)
             case.data_generation_method = value.data_generation_method
             case.meta = _make_meta(
                 description=value.description,
                 location=value.location,
                 parameter=name,
                 parameter_location=location,
+                **data.components,
             )
             yield case
     if DataGenerationMethod.negative in data_generation_methods:
@@ -323,10 +401,11 @@ def _iter_coverage_cases(
         # NOTE: The HEAD method is excluded
         methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
         for method in sorted(methods):
-            case = operation.make_case(**template)
+            data = template.unmodified()
+            case = operation.make_case(**data.kwargs)
             case._explicit_method = method
             case.data_generation_method = DataGenerationMethod.negative
-            case.meta = _make_meta(description=f"Unspecified HTTP method: {method.upper()}")
+            case.meta = _make_meta(description=f"Unspecified HTTP method: {method.upper()}", **data.components)
             yield case
         # Generate duplicate query parameters
         if operation.query:
@@ -336,13 +415,17 @@ def _iter_coverage_cases(
                 # I.e. contains just `default` value without any other keywords
                 value = container.get(parameter.name, NOT_SET)
                 if value is not NOT_SET:
-                    case = operation.make_case(**{**template, "query": {**container, parameter.name: [value, value]}})
+                    data = template.unmodified()
+                    case = operation.make_case(
+                        **{**data.kwargs, "query": {**container, parameter.name: [value, value]}}
+                    )
                     case.data_generation_method = DataGenerationMethod.negative
                     case.meta = _make_meta(
                         description=f"Duplicate `{parameter.name}` query parameter",
                         location=None,
                         parameter=parameter.name,
                         parameter_location="query",
+                        **data.components,
                     )
                     yield case
         # Generate missing required parameters
@@ -352,8 +435,9 @@ def _iter_coverage_cases(
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]
                 container = template[container_name]
+                data = template.unmodified()
                 case = operation.make_case(
-                    **{**template, container_name: {k: v for k, v in container.items() if k != name}}
+                    **{**data.kwargs, container_name: {k: v for k, v in container.items() if k != name}}
                 )
                 case.data_generation_method = DataGenerationMethod.negative
                 case.meta = _make_meta(
@@ -361,6 +445,7 @@ def _iter_coverage_cases(
                     location=None,
                     parameter=name,
                     parameter_location=location,
+                    **{**data.components, container_name: DataGenerationMethod.negative},
                 )
                 yield case
     # Generate combinations for each location
@@ -397,13 +482,15 @@ def _iter_coverage_cases(
             else:
                 container = container_values
 
-            case = operation.make_case(**{**template, _container_name: container})
+            data = template.unmodified()
+            case = operation.make_case(**{**data.kwargs, _container_name: container})
             case.data_generation_method = _data_generation_method
             case.meta = _make_meta(
                 description=description,
                 location=None,
                 parameter=_parameter,
                 parameter_location=_location,
+                **{**data.components, _container_name: _data_generation_method},
             )
             return case
 
@@ -496,13 +583,18 @@ def _make_meta(
     location: str | None = None,
     parameter: str | None = None,
     parameter_location: str | None = None,
+    query: DataGenerationMethod | None = None,
+    path_parameters: DataGenerationMethod | None = None,
+    headers: DataGenerationMethod | None = None,
+    cookies: DataGenerationMethod | None = None,
+    body: DataGenerationMethod | None = None,
 ) -> GenerationMetadata:
     return GenerationMetadata(
-        query=None,
-        path_parameters=None,
-        headers=None,
-        cookies=None,
-        body=None,
+        query=query,
+        path_parameters=path_parameters,
+        headers=headers,
+        cookies=cookies,
+        body=body,
         phase=TestPhase.COVERAGE,
         description=description,
         location=location,
