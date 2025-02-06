@@ -1293,6 +1293,39 @@ def test_negative_query_parameter(ctx):
     ]
 
 
+def test_negative_data_rejection(ctx, cli, openapi3_base_url, snapshot_cli):
+    raw_schema = {
+        "/success": {
+            "get": {
+                "parameters": [
+                    {
+                        "in": "query",
+                        "name": "page_num",
+                        "required": False,
+                        "schema": {"type": "integer", "minimum": 1, "maximum": 999, "default": 1},
+                    }
+                ],
+                "responses": {"200": {"description": "OK"}},
+            },
+        }
+    }
+    schema_path = ctx.openapi.write_schema(raw_schema)
+    assert (
+        cli.main(
+            "run",
+            str(schema_path),
+            "-c",
+            "negative_data_rejection",
+            f"--url={openapi3_base_url}",
+            "--mode=all",
+            "--max-examples=10",
+            "--experimental=coverage-phase",
+            "--hypothesis-phases=explicit",
+        )
+        == snapshot_cli
+    )
+
+
 @pytest.mark.openapi_version("3.0")
 def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     raw_schema = {

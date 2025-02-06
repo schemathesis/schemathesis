@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.4...HEAD>` - TBD
 ---------------------------------------------------
 
+**Fixed**
+
+- Missing metadata for test case components generated during the coverage phase.
+  It lead to false negative results of the ``negative_data_rejection`` check.
+
 .. _v4.0.0-alpha.4:
 
 :version:`4.0.0-alpha.4 <v4.0.0-alpha.3...v4.0.0-alpha.4>` - 2025-02-03
