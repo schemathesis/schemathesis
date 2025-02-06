@@ -25,7 +25,14 @@ from schemathesis.generation import GenerationConfig, GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
-from schemathesis.generation.meta import CaseMetadata, CoveragePhaseData, GenerationInfo, PhaseInfo
+from schemathesis.generation.meta import (
+    CaseMetadata,
+    ComponentInfo,
+    ComponentKind,
+    CoveragePhaseData,
+    GenerationInfo,
+    PhaseInfo,
+)
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
 from schemathesis.schemas import APIOperation, BaseSchema, ParameterSet
 
@@ -229,23 +236,96 @@ class Instant:
         return perf_counter() - self.start
 
 
+class Template:
+    __slots__ = ("_components", "_template")
+
+    def __init__(self) -> None:
+        self._components: dict[ComponentKind, ComponentInfo] = {}
+        self._template: dict[str, Any] = {}
+
+    def __contains__(self, key: str) -> bool:
+        return key in self._template
+
+    def __getitem__(self, key: str) -> dict:
+        return self._template[key]
+
+    def get(self, key: str, default: Any = None) -> dict:
+        return self._template.get(key, default)
+
+    def add_parameter(self, location: str, name: str, value: coverage.GeneratedValue) -> None:
+        from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+        component_name = LOCATION_TO_CONTAINER[location]
+        kind = ComponentKind(component_name)
+        info = self._components.get(kind)
+        if info is None:
+            self._components[kind] = ComponentInfo(mode=value.generation_mode)
+        elif value.generation_mode == GenerationMode.NEGATIVE:
+            info.mode = GenerationMode.NEGATIVE
+
+        container = self._template.setdefault(component_name, {})
+        if _should_stringify(location, value):
+            container[name] = _stringify_value(value.value, location)
+        else:
+            container[name] = value.value
+
+    def set_body(self, body: coverage.GeneratedValue, media_type: str) -> None:
+        self._template["body"] = body.value
+        self._template["media_type"] = media_type
+        self._components[ComponentKind.BODY] = ComponentInfo(mode=body.generation_mode)
+
+    def unmodified(self) -> TemplateValue:
+        return TemplateValue(kwargs=self._template.copy(), components=self._components.copy())
+
+    def with_body(self, *, media_type: str, value: coverage.GeneratedValue) -> TemplateValue:
+        kwargs = {**self._template, "media_type": media_type, "body": value.value}
+        components = {**self._components, ComponentKind.BODY: ComponentInfo(mode=value.generation_mode)}
+        return TemplateValue(kwargs=kwargs, components=components)
+
+    def with_parameter(self, *, location: str, name: str, value: coverage.GeneratedValue) -> TemplateValue:
+        from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+        if _should_stringify(location, value):
+            generated = _stringify_value(value.value, location)
+        else:
+            generated = value.value
+
+        container_name = LOCATION_TO_CONTAINER[location]
+        container = self._template[container_name]
+        kwargs = {**self._template, container_name: {**container, name: generated}}
+        components = {**self._components, ComponentKind(container_name): ComponentInfo(mode=value.generation_mode)}
+        return TemplateValue(kwargs=kwargs, components=components)
+
+
+@dataclass
+class TemplateValue:
+    kwargs: dict[str, Any]
+    components: dict[ComponentKind, ComponentInfo]
+    __slots__ = ("kwargs", "components")
+
+
+def _should_stringify(location: str, value: coverage.GeneratedValue) -> bool:
+    return location in ("header", "cookie", "path", "query") and not isinstance(value.value, str)
+
+
+def _stringify_value(val: Any, location: str) -> str | list[str]:
+    if isinstance(val, list):
+        if location == "query":
+            # Having a list here ensures there will be multiple query parameters wit the same name
+            return [json.dumps(item) for item in val]
+        # use comma-separated values style for arrays
+        return ",".join(json.dumps(sub) for sub in val)
+    return json.dumps(val)
+
+
 def _iter_coverage_cases(
     operation: APIOperation, generation_modes: list[GenerationMode]
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
     from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
 
-    def _stringify_value(val: Any, location: str) -> str | list[str]:
-        if isinstance(val, list):
-            if location == "query":
-                # Having a list here ensures there will be multiple query parameters wit the same name
-                return [json.dumps(item) for item in val]
-            # use comma-separated values style for arrays
-            return ",".join(json.dumps(sub) for sub in val)
-        return json.dumps(val)
-
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
-    template: dict[str, Any] = {}
+    template = Template()
 
     instant = Instant()
     responses = find_in_responses(operation)
@@ -261,11 +341,7 @@ def _iter_coverage_cases(
         value = next(gen, NOT_SET)
         if isinstance(value, NotSet):
             continue
-        container = template.setdefault(LOCATION_TO_CONTAINER[location], {})
-        if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
-            container[name] = _stringify_value(value.value, location)
-        else:
-            container[name] = value.value
+        template.add_parameter(location, name, value)
         generators[(location, name)] = gen
     template_time = instant.elapsed
     if operation.body:
@@ -286,16 +362,16 @@ def _iter_coverage_cases(
             elapsed = instant.elapsed
             if "body" not in template:
                 template_time += elapsed
-                template["body"] = value.value
-                template["media_type"] = body.media_type
+                template.set_body(value, body.media_type)
+            data = template.with_body(value=value, media_type=body.media_type)
             yield operation.Case(
-                **{**template, "body": value.value, "media_type": body.media_type},
+                **data.kwargs,
                 meta=CaseMetadata(
                     generation=GenerationInfo(
                         time=elapsed,
                         mode=value.generation_mode,
                     ),
-                    components={},
+                    components=data.components,
                     phase=PhaseInfo.coverage(
                         description=value.description,
                         location=value.location,
@@ -309,14 +385,15 @@ def _iter_coverage_cases(
                 instant = Instant()
                 try:
                     next_value = next(iterator)
+                    data = template.with_body(value=next_value, media_type=body.media_type)
                     yield operation.Case(
-                        **{**template, "body": next_value.value, "media_type": body.media_type},
+                        **data.kwargs,
                         meta=CaseMetadata(
                             generation=GenerationInfo(
                                 time=instant.elapsed,
                                 mode=value.generation_mode,
                             ),
-                            components={},
+                            components=data.components,
                             phase=PhaseInfo.coverage(
                                 description=next_value.description,
                                 location=next_value.location,
@@ -328,37 +405,34 @@ def _iter_coverage_cases(
                 except StopIteration:
                     break
     elif GenerationMode.POSITIVE in generation_modes:
+        data = template.unmodified()
         yield operation.Case(
-            **template,
+            **data.kwargs,
             meta=CaseMetadata(
                 generation=GenerationInfo(
                     time=template_time,
                     mode=GenerationMode.POSITIVE,
                 ),
-                components={},
+                components=data.components,
                 phase=PhaseInfo.coverage(description="Default positive test case"),
             ),
         )
 
     for (location, name), gen in generators.items():
-        container_name = LOCATION_TO_CONTAINER[location]
-        container = template[container_name]
         iterator = iter(gen)
         while True:
             instant = Instant()
             try:
                 value = next(iterator)
-                if location in ("header", "cookie", "path", "query") and not isinstance(value.value, str):
-                    generated = _stringify_value(value.value, location)
-                else:
-                    generated = value.value
+                data = template.with_parameter(location=location, name=name, value=value)
             except StopIteration:
                 break
+
             yield operation.Case(
-                **{**template, container_name: {**container, name: generated}},
+                **data.kwargs,
                 meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=value.generation_mode),
-                    components={},
+                    components=data.components,
                     phase=PhaseInfo.coverage(
                         description=value.description,
                         location=value.location,
@@ -372,12 +446,13 @@ def _iter_coverage_cases(
         methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
         for method in sorted(methods):
             instant = Instant()
+            data = template.unmodified()
             yield operation.Case(
-                **template,
+                **data.kwargs,
                 method=method.upper(),
                 meta=CaseMetadata(
                     generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                    components={},
+                    components=data.components,
                     phase=PhaseInfo.coverage(description=f"Unspecified HTTP method: {method.upper()}"),
                 ),
             )
@@ -390,11 +465,15 @@ def _iter_coverage_cases(
                 # I.e. contains just `default` value without any other keywords
                 value = container.get(parameter.name, NOT_SET)
                 if value is not NOT_SET:
+                    data = template.unmodified()
                     yield operation.Case(
-                        **{**template, "query": {**container, parameter.name: [value, value]}},
+                        **{**data.kwargs, "query": {**container, parameter.name: [value, value]}},
                         meta=CaseMetadata(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                            components={},
+                            components={
+                                **data.components,
+                                ComponentKind.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
+                            },
                             phase=PhaseInfo.coverage(
                                 description=f"Duplicate `{parameter.name}` query parameter",
                                 parameter=parameter.name,
@@ -410,11 +489,15 @@ def _iter_coverage_cases(
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]
                 container = template[container_name]
+                data = template.unmodified()
                 yield operation.Case(
-                    **{**template, container_name: {k: v for k, v in container.items() if k != name}},
+                    **{**data.kwargs, container_name: {k: v for k, v in container.items() if k != name}},
                     meta=CaseMetadata(
                         generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                        components={},
+                        components={
+                            **data.components,
+                            ComponentKind(container_name): ComponentInfo(mode=GenerationMode.NEGATIVE),
+                        },
                         phase=PhaseInfo.coverage(
                             description=f"Missing `{name}` at {location}",
                             parameter=name,
@@ -457,14 +540,18 @@ def _iter_coverage_cases(
             else:
                 container = container_values
 
+            data = template.unmodified()
             return operation.Case(
-                **{**template, _container_name: container},
+                **{**data.kwargs, _container_name: container},
                 meta=CaseMetadata(
                     generation=GenerationInfo(
                         time=_instant.elapsed,
                         mode=_generation_mode,
                     ),
-                    components={},
+                    components={
+                        **data.components,
+                        ComponentKind(_container_name): ComponentInfo(mode=_generation_mode),
+                    },
                     phase=PhaseInfo.coverage(
                         description=description,
                         parameter=_parameter,
