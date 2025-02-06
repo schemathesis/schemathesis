@@ -30,7 +30,4 @@ Need more help?
 Performed checks:
     not_a_server_error                    N / N passed          PASSED 
 
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
-
 ========================= in 1.00s =============================================

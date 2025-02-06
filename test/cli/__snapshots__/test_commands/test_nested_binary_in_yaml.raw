@@ -21,7 +21,4 @@ Performed checks:
 
 WARNING: All API responses have a 404 status code. Did you specify the proper API location?
 
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
-
 ============================== 1 passed in 1.00s ===============================

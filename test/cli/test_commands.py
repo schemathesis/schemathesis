@@ -32,12 +32,7 @@ from schemathesis.cli import (
 from schemathesis.cli.cassettes import CassetteFormat
 from schemathesis.cli.constants import HealthCheck, Phase
 from schemathesis.code_samples import CodeSampleStyle
-from schemathesis.constants import (
-    DEFAULT_DEADLINE,
-    DEFAULT_RESPONSE_TIMEOUT,
-    FLAKY_FAILURE_MESSAGE,
-    REPORT_SUGGESTION_ENV_VAR,
-)
+from schemathesis.constants import DEFAULT_DEADLINE, DEFAULT_RESPONSE_TIMEOUT, FLAKY_FAILURE_MESSAGE
 from schemathesis.extra._flask import run_server
 from schemathesis.generation import DataGenerationMethod, GenerationConfig
 from schemathesis.internal.checks import CheckConfig
@@ -2412,14 +2407,6 @@ def test_rate_limit(cli, schema_url):
     result = cli.run(schema_url, "--rate-limit=1/s")
     lines = result.stdout.splitlines()
     assert lines[6] == "Rate limit: 1/s"
-
-
-@pytest.mark.openapi_version("3.0")
-@pytest.mark.operations("success")
-def test_disable_report_suggestion(monkeypatch, cli, schema_url):
-    monkeypatch.setenv(REPORT_SUGGESTION_ENV_VAR, "no")
-    result = cli.run(schema_url)
-    assert "You can visualize" not in result.stdout
 
 
 @pytest.mark.parametrize("version", ["3.0.2", "3.1.0"])

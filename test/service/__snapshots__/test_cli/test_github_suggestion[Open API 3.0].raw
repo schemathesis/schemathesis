@@ -19,9 +19,6 @@ GET /api/success .                                                        [100%]
 Performed checks:
     not_a_server_error                    1 / 1 passed          PASSED 
 
-Tip: Use the `--report` CLI option to visualize test results via Schemathesis.io.
-We run additional conformance checks on reports from public repos.
-Optionally, for reporting results as PR comments, install the Schemathesis GitHub App:
 
     https://github.com/apps/schemathesis
 
