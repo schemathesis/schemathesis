@@ -4,7 +4,6 @@ import pathlib
 import platform
 import sys
 import time
-from unittest.mock import Mock
 from urllib.parse import urljoin
 
 import hypothesis
@@ -16,7 +15,6 @@ import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 
-from schemathesis.cli.commands.run.handlers.output import has_too_many_responses_with_status
 from schemathesis.cli.commands.run.hypothesis import HealthCheck, Phase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
@@ -1114,6 +1112,13 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url, snapshot_cli):
     assert cli.run(openapi3_schema_url) == snapshot_cli
 
 
+@pytest.mark.operations("always_incorrect")
+def test_warning_on_no_2xx(cli, openapi3_schema_url, snapshot_cli):
+    # When endpoint does not return 2xx at all
+    # Then the output should contain a warning about it
+    assert cli.run(openapi3_schema_url) == snapshot_cli
+
+
 @pytest.fixture
 def data_generation_check(ctx):
     with ctx.check(
@@ -1228,6 +1233,7 @@ def test_unresolvable_reference_with_disabled_validation(
     ctx, cli, open_api_3_schema_with_recoverable_errors, snapshot_cli, openapi3_base_url
 ):
     # When there is an error in the schema
+    del open_api_3_schema_with_recoverable_errors["paths"]["/bar"]["get"]
     schema_path = ctx.makefile(open_api_3_schema_with_recoverable_errors)
     # And the validation is disabled (default)
     # Then we should show an error message derived from JSON Schema
@@ -1634,19 +1640,3 @@ class EventCounter(cli.EventHandler):
         )
         == snapshot_cli
     )
-
-
-def test_authorization_warning_no_checks():
-    # When there are no checks
-    # Then the warning should not be added
-    assert not has_too_many_responses_with_status([], 401)
-
-
-def test_authorization_warning_missing_threshold(response_factory):
-    # When there are not enough 401 responses to meet the threshold
-    responses = [
-        Mock(response=response_factory.requests(status_code=201)),
-        Mock(response=response_factory.requests(status_code=401)),
-    ]
-    # Then the warning should not be added
-    assert not has_too_many_responses_with_status(responses, 401)

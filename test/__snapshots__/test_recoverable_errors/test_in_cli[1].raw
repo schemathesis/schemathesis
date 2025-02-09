@@ -44,6 +44,14 @@ Ensure that the definition complies with the OpenAPI specification
 
 Need more help?
     Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== WARNINGS ===================================
+
+Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+
+  - GET /bar
+
+Tip: Check base URL or adjust data generation settings
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -58,6 +66,9 @@ Test Phases:
 
 Errors:
   🚫 Schema Error: 2
+
+Warnings:
+  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
   N generated, N passed

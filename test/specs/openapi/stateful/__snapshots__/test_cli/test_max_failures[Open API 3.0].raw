@@ -56,6 +56,15 @@ Reproduce with:
 
     <PLACEHOLDER>
 
+=================================== WARNINGS ===================================
+
+Schemathesis configuration: 2 operations returned only 4xx responses during unit tests
+
+  - GET /users/{user_id}
+  - PATCH /users/{user_id}
+
+Tip: Check base URL or adjust data generation settings
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -69,6 +78,9 @@ Test Phases:
 
 Failures:
   ❌ Server error: 2
+
+Warnings:
+  ⚠️ Schemathesis configuration: 2 operations returned only 4xx responses during unit tests
 
 Test cases:
   N generated, N found N unique failures

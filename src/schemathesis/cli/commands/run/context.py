@@ -20,7 +20,6 @@ if TYPE_CHECKING:
 class Statistic:
     """Running statistics about test execution."""
 
-    outcomes: dict[Status, int]
     failures: dict[str, dict[str, GroupedFailures]]
 
     extraction_failures: set[ExtractionFailure]
@@ -32,7 +31,6 @@ class Statistic:
     cases_without_checks: int
 
     __slots__ = (
-        "outcomes",
         "failures",
         "extraction_failures",
         "tested_operations",
@@ -42,7 +40,6 @@ class Statistic:
     )
 
     def __init__(self) -> None:
-        self.outcomes = {}
         self.failures = {}
         self.extraction_failures = set()
         self.tested_operations = set()
@@ -50,7 +47,7 @@ class Statistic:
         self.cases_with_failures = 0
         self.cases_without_checks = 0
 
-    def record_checks(self, recorder: ScenarioRecorder) -> None:
+    def on_scenario_finished(self, recorder: ScenarioRecorder) -> None:
         """Update statistics and store failures from a new batch of checks."""
         from schemathesis.generation.stateful.state_machine import ExtractionFailure
 
@@ -178,7 +175,7 @@ class ExecutionContext:
 
     def on_event(self, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
-            self.statistic.record_checks(event.recorder)
+            self.statistic.on_scenario_finished(event.recorder)
         elif isinstance(event, events.NonFatalError) or (
             isinstance(event, events.PhaseFinished)
             and event.phase.is_enabled

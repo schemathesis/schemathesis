@@ -22,11 +22,13 @@ from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
+from schemathesis.engine.config import EngineConfig
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
 if TYPE_CHECKING:
@@ -324,6 +326,7 @@ class ProbingProgressManager:
 @dataclass
 class WarningData:
     missing_auth: dict[int, list[str]] = field(default_factory=dict)
+    only_4xx_responses: list[str] = field(default_factory=list)  # operations that only returned 4xx
 
 
 @dataclass
@@ -784,10 +787,11 @@ def format_duration(duration_ms: int) -> str:
 @dataclass
 class OutputHandler(EventHandler):
     workers_num: int
-    # Seed can't be absent in the deterministic mode
+    # Seed can be absent in the deterministic mode
     seed: int | None
     rate_limit: str | None
     wait_for_schema: float | None
+    engine_config: EngineConfig
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -1050,9 +1054,21 @@ class OutputHandler(EventHandler):
             self.stateful_tests_manager.update(links_seen, event.status)
 
     def _check_warnings(self, event: events.ScenarioFinished) -> None:
+        statistic = aggregate_status_codes(event.recorder.interactions.values())
+
+        if statistic.total == 0:
+            return
+
         for status_code in (401, 403):
-            if has_too_many_responses_with_status(event.recorder.interactions.values(), status_code):
+            if statistic.ratio_for(status_code) >= TOO_MANY_RESPONSES_THRESHOLD:
                 self.warnings.missing_auth.setdefault(status_code, []).append(event.recorder.label)
+        # Only warn about 4xx responses in successful positive test scenarios
+        if (
+            event.status == Status.SUCCESS
+            and self.engine_config.execution.generation.modes == [GenerationMode.POSITIVE]
+            and statistic.should_warn_about_only_4xx()
+        ):
+            self.warnings.only_4xx_responses.append(event.recorder.label)
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
@@ -1122,36 +1138,62 @@ class OutputHandler(EventHandler):
 
     def display_warnings(self) -> None:
         display_section_name("WARNINGS")
-        total = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
-        suffix = "" if total == 1 else "s"
-        click.echo(
-            _style(
-                f"\nMissing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
-                fg="yellow",
-            )
-        )
-
-        for status_code, operations in self.warnings.missing_auth.items():
-            status_text = "Unauthorized" if status_code == 401 else "Forbidden"
-            count = len(operations)
-            suffix = "" if count == 1 else "s"
+        click.echo()
+        if self.warnings.missing_auth:
+            total = sum(len(endpoints) for endpoints in self.warnings.missing_auth.values())
+            suffix = "" if total == 1 else "s"
             click.echo(
                 _style(
-                    f"{status_code} {status_text} ({count} operation{suffix}):",
+                    f"Missing or invalid API credentials: {total} API operation{suffix} returned authentication errors\n",
                     fg="yellow",
                 )
             )
-            # Show first few API operations
-            for endpoint in operations[:3]:
-                click.echo(_style(f"  - {endpoint}", fg="yellow"))
-            if len(operations) > 3:
-                click.echo(_style(f"  + {len(operations) - 3} more", fg="yellow"))
+
+            for status_code, operations in self.warnings.missing_auth.items():
+                status_text = "Unauthorized" if status_code == 401 else "Forbidden"
+                count = len(operations)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"{status_code} {status_text} ({count} operation{suffix}):",
+                        fg="yellow",
+                    )
+                )
+                # Show first few API operations
+                for endpoint in operations[:3]:
+                    click.echo(_style(f"  - {endpoint}", fg="yellow"))
+                if len(operations) > 3:
+                    click.echo(_style(f"  + {len(operations) - 3} more", fg="yellow"))
+                click.echo()
+            click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
+            click.echo(_style(f"Use {bold('--auth')} ", fg="yellow"), nl=False)
+            click.echo(_style(f"or {bold('-H')} ", fg="yellow"), nl=False)
+            click.echo(_style("to provide authentication credentials", fg="yellow"))
             click.echo()
-        click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
-        click.echo(_style(f"Use {bold('--auth')} ", fg="yellow"), nl=False)
-        click.echo(_style(f"or {bold('-H')} ", fg="yellow"), nl=False)
-        click.echo(_style("to provide authentication credentials", fg="yellow"))
-        click.echo()
+
+        if self.warnings.only_4xx_responses:
+            if self.warnings.missing_auth:
+                # Add extra spacing if we had auth warnings before
+                click.echo()
+
+            count = len(self.warnings.only_4xx_responses)
+            suffix = "" if count == 1 else "s"
+            click.echo(
+                _style(
+                    f"Schemathesis configuration: {count} operation{suffix} returned only 4xx responses during unit tests\n",
+                    fg="yellow",
+                )
+            )
+
+            for endpoint in self.warnings.only_4xx_responses[:3]:
+                click.echo(_style(f"  - {endpoint}", fg="yellow"))
+            if len(self.warnings.only_4xx_responses) > 3:
+                click.echo(_style(f"  + {len(self.warnings.only_4xx_responses) - 3} more", fg="yellow"))
+            click.echo()
+
+            click.echo(_style("Tip: ", bold=True, fg="yellow"), nl=False)
+            click.echo(_style("Check base URL or adjust data generation settings", fg="yellow"))
+            click.echo()
 
     def display_experiments(self) -> None:
         display_section_name("EXPERIMENTS")
@@ -1406,7 +1448,7 @@ class OutputHandler(EventHandler):
                 )
             )
         display_failures(ctx)
-        if self.warnings.missing_auth:
+        if self.warnings.missing_auth or self.warnings.only_4xx_responses:
             self.display_warnings()
         if GLOBAL_EXPERIMENTS.enabled:
             self.display_experiments()
@@ -1426,10 +1468,22 @@ class OutputHandler(EventHandler):
         if self.errors:
             self.display_errors_summary()
 
-        if self.warnings.missing_auth:
-            affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
+        if self.warnings.missing_auth or self.warnings.only_4xx_responses:
             click.echo(_style("Warnings:", bold=True))
-            click.echo(_style(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow"))
+
+            if self.warnings.missing_auth:
+                affected = sum(len(operations) for operations in self.warnings.missing_auth.values())
+                click.echo(_style(f"  ⚠️ Missing authentication: {bold(str(affected))}", fg="yellow"))
+
+            if self.warnings.only_4xx_responses:
+                count = len(self.warnings.only_4xx_responses)
+                suffix = "" if count == 1 else "s"
+                click.echo(
+                    _style(
+                        f"  ⚠️ Schemathesis configuration: {bold(str(count))} operation{suffix} returned only 4xx responses during unit tests",
+                        fg="yellow",
+                    )
+                )
             click.echo()
 
         if ctx.summary_lines:
@@ -1448,14 +1502,44 @@ TOO_MANY_RESPONSES_WARNING_TEMPLATE = (
 TOO_MANY_RESPONSES_THRESHOLD = 0.9
 
 
-def has_too_many_responses_with_status(interactions: Iterable[Interaction], status_code: int) -> bool:
-    matched = 0
+@dataclass
+class StatusCodeStatistic:
+    """Statistics about HTTP status codes in a scenario."""
+
+    counts: dict[int, int]
+    total: int
+
+    __slots__ = ("counts", "total")
+
+    def ratio_for(self, status_code: int) -> float:
+        """Calculate the ratio of responses with the given status code."""
+        if self.total == 0:
+            return 0.0
+        return self.counts.get(status_code, 0) / self.total
+
+    def should_warn_about_only_4xx(self) -> bool:
+        """Check if an operation should be warned about (only 4xx responses, excluding auth)."""
+        if self.total == 0:
+            return False
+        # Don't warn if we saw any 2xx or 5xx responses
+        if any(status < 400 or status >= 500 for status in self.counts):
+            return False
+        # Don't duplicate auth warnings
+        if set(self.counts.keys()) <= {401, 403}:
+            return False
+        # At this point we know we only have 4xx responses
+        return True
+
+
+def aggregate_status_codes(interactions: Iterable[Interaction]) -> StatusCodeStatistic:
+    """Analyze status codes from interactions."""
+    counts: dict[int, int] = {}
     total = 0
+
     for interaction in interactions:
         if interaction.response is not None:
-            if interaction.response.status_code == status_code:
-                matched += 1
+            status = interaction.response.status_code
+            counts[status] = counts.get(status, 0) + 1
             total += 1
-    if not total:
-        return False
-    return matched / total >= TOO_MANY_RESPONSES_THRESHOLD
+
+    return StatusCodeStatistic(counts=counts, total=total)

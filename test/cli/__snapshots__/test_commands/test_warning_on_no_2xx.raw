@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/root/openapi.json (in N ms)
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -24,7 +24,7 @@ Schemathesis dev
 
 Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
-  - GET /test
+  - GET /always_incorrect
 
 Tip: Check base URL or adjust data generation settings
 

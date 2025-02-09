@@ -29,6 +29,7 @@ class Operation(Enum):
     teapot = ("POST", "/api/teapot")
     text = ("GET", "/api/text")
     cp866 = ("GET", "/api/cp866")
+    always_incorrect = ("GET", "/api/always_incorrect")
     conformance = ("GET", "/api/conformance")
     plain_text_body = ("POST", "/api/text")
     csv_payload = ("POST", "/api/csv")

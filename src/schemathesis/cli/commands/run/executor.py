@@ -125,6 +125,7 @@ def initialize_handlers(config: RunConfig) -> list[EventHandler]:
             seed=config.engine.execution.seed,
             rate_limit=config.rate_limit,
             wait_for_schema=config.wait_for_schema,
+            engine_config=config.engine,
             report_config=config.report,
         )
     )

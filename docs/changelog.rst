@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.4...HEAD>` - TBD
 ---------------------------------------------------
 
+**Added**
+
+- Warning for operations that return only 4xx responses during unit tests to help identify potential base URL or data generation issues.
+
 **Fixed**
 
 - Missing metadata for test case components generated during the coverage phase.

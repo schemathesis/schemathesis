@@ -203,6 +203,10 @@ async def write_only(request: web.Request) -> web.Response:
     raise web.HTTPInternalServerError
 
 
+async def always_incorrect(request: web.Request) -> web.Response:
+    raise web.HTTPBadRequest(text='{"detail": "Always incorrect"}')
+
+
 async def upload_file(request: web.Request) -> web.Response:
     if not request.headers.get("Content-Type", "").startswith("multipart/"):
         raise web.HTTPBadRequest(text="Not a multipart request!")
