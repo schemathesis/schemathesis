@@ -20,6 +20,14 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+
+  - GET /test
+
+Tip: Check base URL or adjust data generation settings
+
 ================================= EXPERIMENTS ==================================
 
 🧪 Positive Data Acceptance: Verifying schema-conformant data is accepted
@@ -37,6 +45,9 @@ Test Phases:
   ✅ API probing
   ✅ Unit testing
   ⏭️ Stateful testing (not applicable)
+
+Warnings:
+  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
   N generated, N passed
