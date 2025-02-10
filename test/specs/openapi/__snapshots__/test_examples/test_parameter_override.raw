@@ -19,4 +19,6 @@ POST /api/success .                                                       [100%]
 Performed checks:
     explicit_header                    1 / 1 passed          PASSED 
 
+WARNING: `POST /api/success` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+
 ============================== 1 passed in 1.00s ===============================

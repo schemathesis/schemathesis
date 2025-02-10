@@ -69,22 +69,6 @@ class RunnerContext:
     def is_stopped(self) -> bool:
         return self.stop_event.is_set()
 
-    @property
-    def has_all_not_found(self) -> bool:
-        """Check if all responses are 404."""
-        has_not_found = False
-        for entry in self.data.results:
-            for check in entry.checks:
-                if check.response is not None:
-                    if check.response.status_code == 404:
-                        has_not_found = True
-                    else:
-                        # There are non-404 responses, no reason to check any other response
-                        return False
-        # Only happens if all responses are 404, or there are no responses at all.
-        # In the first case, it returns True, for the latter - False
-        return has_not_found
-
     def add_result(self, result: TestResult) -> None:
         self.data.append(result)
 

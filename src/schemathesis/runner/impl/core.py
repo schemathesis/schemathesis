@@ -147,6 +147,34 @@ class BaseRunner:
         __probes = None
         __analysis: Result[AnalysisResult, Exception] | None = None
 
+        def _should_warn_about_only_4xx(result: TestResult) -> bool:
+            if all(check.response is None for check in result.checks):
+                return False
+            # Don't warn if we saw any 2xx or 5xx responses
+            if any(
+                check.response.status_code < 400 or check.response.status_code >= 500
+                for check in result.checks
+                if check.response is not None
+            ):
+                return False
+            # Don't duplicate auth warnings
+            if {check.response.status_code for check in result.checks if check.response is not None} <= {401, 403}:
+                return False
+            # At this point we know we only have 4xx responses
+            return True
+
+        def _check_warnings() -> None:
+            for result in ctx.data.results:
+                # Only warn about 4xx responses in successful positive test scenarios
+                if (
+                    all(check.value == Status.success for check in result.checks)
+                    and result.data_generation_method == [DataGenerationMethod.positive]
+                    and _should_warn_about_only_4xx(result)
+                ):
+                    ctx.add_warning(
+                        f"`{result.verbose_name}` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings"
+                    )
+
         def _initialize() -> events.Initialized:
             nonlocal initialized
             initialized = events.Initialized.from_schema(
@@ -159,8 +187,7 @@ class BaseRunner:
             return initialized
 
         def _finish() -> events.Finished:
-            if ctx.has_all_not_found:
-                ctx.add_warning(ALL_NOT_FOUND_WARNING_MESSAGE)
+            _check_warnings()
             return events.Finished.from_results(results=ctx.data, running_time=time.monotonic() - start_time)
 
         def _before_probes() -> events.BeforeProbing:
@@ -740,9 +767,6 @@ def has_too_many_responses_with_status(result: TestResult, status_code: int) -> 
     if not total:
         return False
     return unauthorized_count / total >= TOO_MANY_RESPONSES_THRESHOLD
-
-
-ALL_NOT_FOUND_WARNING_MESSAGE = "All API responses have a 404 status code. Did you specify the proper API location?"
 
 
 def setup_hypothesis_database_key(test: Callable, operation: APIOperation) -> None:

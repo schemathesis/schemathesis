@@ -19,4 +19,8 @@ Schema analysis: SKIP
 Performed checks:
     not_a_server_error                    N / N passed          PASSED 
 
+WARNINGS:
+  - `GET /api/users/{user_id}` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+  - `PATCH /api/users/{user_id}` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+
 ============================== in 1.00s ========================================

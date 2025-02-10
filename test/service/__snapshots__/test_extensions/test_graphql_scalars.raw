@@ -30,7 +30,7 @@ The following extensions have been applied:
 Performed checks:
     port_check                    10 / 10 passed          PASSED 
 
-WARNING: All API responses have a 404 status code. Did you specify the proper API location?
+WARNING: `Query.getByDate` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
 
 Experimental Features:
   - Schema Analysis: Analyzing API schemas via Schemathesis.io

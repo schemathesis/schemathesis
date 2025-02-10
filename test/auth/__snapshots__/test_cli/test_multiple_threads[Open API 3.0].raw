@@ -19,4 +19,6 @@ Schema analysis: SKIP
 Performed checks:
     not_a_server_error                    2 / 2 passed          PASSED 
 
+WARNING: `GET /api/custom_format` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+
 ============================== 2 passed in 1.00s ===============================

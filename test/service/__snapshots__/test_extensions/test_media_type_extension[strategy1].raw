@@ -30,6 +30,8 @@ The following extensions have been applied:
 Performed checks:
     not_a_server_error                    10 / 10 passed          PASSED 
 
+WARNING: `POST /api/success` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+
 Experimental Features:
   - Schema Analysis: Analyzing API schemas via Schemathesis.io
     Feedback: https://github.com/schemathesis/schemathesis/discussions/2056
