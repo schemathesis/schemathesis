@@ -137,13 +137,15 @@ def replacement(context, query):
 @schema.parametrize()
 @settings(max_examples=1)
 def test_a(case):
-    assert case.query["id"] == "foobar"
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query["id"] == "foobar"
 
 @schema.parametrize()
 @schema.hooks.apply(replacement, name="map_query")
 @settings(max_examples=1)
 def test_b(case):
-    assert case.query["id"] == "foobar"
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query["id"] == "foobar"
 
 def another_replacement(context, query):
     return {"id": "foobaz"}
@@ -157,13 +159,15 @@ def map_headers(context, headers):
 @schema.hooks.apply(map_headers)
 @settings(max_examples=1)
 def test_c(case):
-    assert case.query["id"] == "foobaz"
-    assert case.headers["value"] == "spam"
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query["id"] == "foobaz"
+        assert case.headers["value"] == "spam"
 
 @schema.parametrize()
 @settings(max_examples=1)
 def test_d(case):
-    assert case.query["id"] != "foobar"
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query["id"] != "foobar"
     """,
         schema=simple_openapi,
     )
@@ -381,7 +385,8 @@ def before_add_examples(context, examples):
 @schema.parametrize()
 @settings(phases=[Phase.explicit])
 def test_a(case):
-    assert case.query == {"foo": "bar"}
+    if not hasattr(case.meta, "phase"):
+        assert case.query == {"foo": "bar"}
 
 
 def another_hook(context, examples):
@@ -396,12 +401,13 @@ IDX = 0
 @schema.hooks.apply(another_hook, name="before_add_examples")
 @settings(phases=[Phase.explicit])
 def test_b(case):
-    global IDX
-    if IDX == 0:
-        assert case.query == {"spam": "baz"}
-    if IDX == 1:
-        assert case.query == {"foo": "bar"}
-    IDX += 1
+    if not hasattr(case.meta, "phase"):
+        global IDX
+        if IDX == 0:
+            assert case.query == {"spam": "baz"}
+        if IDX == 1:
+            assert case.query == {"foo": "bar"}
+        IDX += 1
     """,
         schema=simple_openapi,
     )
@@ -418,7 +424,8 @@ def before_init_operation(context, operation):
 
 @schema.parametrize()
 def test_a(case):
-    assert case.query == {"id": 42}
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query == {"id": 42}
     """,
         schema=simple_openapi,
     )

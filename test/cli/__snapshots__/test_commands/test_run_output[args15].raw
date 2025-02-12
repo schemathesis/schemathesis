@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--hypothesis-phases': invalid choice(s): first, second. Choose from explicit, reuse, generate, target.
+Error: Invalid SCHEMA, must be a valid URL or file path.

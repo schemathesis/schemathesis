@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--set-query': Expected NAME=VALUE format, received key.
+Error: Invalid value for '--set-query': Query parameter name should not be empty.

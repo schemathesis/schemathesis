@@ -16,6 +16,7 @@ from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase
 from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
 from ._hypothesis import get_default_format_strategies, openapi_cases
 from .constants import LOCATION_TO_CONTAINER
@@ -50,11 +51,7 @@ def get_strategies_from_examples(
     operation: APIOperation[OpenAPIParameter], **kwargs: Any
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
-    maps = {}
-    for location, container in LOCATION_TO_CONTAINER.items():
-        serializer = operation.get_parameter_serializer(location)
-        if serializer is not None:
-            maps[container] = serializer
+    maps = get_serializers_for_operation(operation)
 
     def serialize_components(case: Case) -> Case:
         """Applies special serialization rules for case components.

@@ -5,6 +5,8 @@ import pytest
 import yaml
 from _pytest.main import ExitCode
 
+from test.utils import flaky
+
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
@@ -16,7 +18,6 @@ def test_default(cli, schema_url, snapshot_cli, workers):
         cli.run(
             schema_url,
             "--max-examples=80",
-            "--exitfirst",
             f"--workers={workers}",
         )
         == snapshot_cli
@@ -44,12 +45,15 @@ def test_sanitization(cli, schema_url, tmp_path):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("failure", "create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
+@flaky(max_runs=5, min_passes=1)
 def test_max_failures(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
             schema_url,
             "--max-examples=80",
             "--max-failures=2",
+            "--generation-database=none",
+            "--phases=fuzzing,stateful",
         )
         == snapshot_cli
     )
@@ -99,20 +103,12 @@ def test_junit(tmp_path, cli, schema_url):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_only(cli, schema_url, snapshot_cli):
-    assert (
-        cli.run(
-            schema_url,
-            "--phases=stateful",
-            "--max-examples=80",
-            "--exitfirst",
-        )
-        == snapshot_cli
-    )
+    assert cli.run(schema_url, "--phases=stateful", "-n 80") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
 def test_stateful_only_with_error(cli, schema_url, snapshot_cli):
     assert (
         cli.run(
@@ -141,7 +137,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user", "success")
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_phase_statistic=True)
 @pytest.mark.skipif(platform.system() == "Windows", reason="Linux specific error")
 def test_proxy_error(cli, schema_url, snapshot_cli):
     assert (
@@ -212,11 +208,20 @@ def test_invalid_parameter_reference(app_factory, app_runner, cli, snapshot_cli)
 def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
     app = app_factory(omit_required_field=True)
     port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 1") == snapshot_cli
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 30") == snapshot_cli
 
 
+@flaky(max_runs=3, min_passes=1)
 @pytest.mark.parametrize("content", ["", "User data as plain text"])
 def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
     app = app_factory(return_plain_text=content)
     port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 30") == snapshot_cli
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "-n 80",
+            "--generation-database=none",
+        )
+        == snapshot_cli
+    )

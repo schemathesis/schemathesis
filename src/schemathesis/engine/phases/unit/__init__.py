@@ -11,11 +11,12 @@ import warnings
 from queue import Queue
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.generation.hypothesis.builder import HypothesisTestConfig
+from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
 from ._pool import TaskProducer, WorkerPool
@@ -34,6 +35,12 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     Implemented as a producer-consumer pattern via a task queue.
     The main thread provides an iterator over API operations and worker threads create test functions and run them.
     """
+    if phase.name == PhaseName.EXAMPLES:
+        mode = HypothesisTestMode.EXAMPLES
+    elif phase.name == PhaseName.COVERAGE:
+        mode = HypothesisTestMode.COVERAGE
+    else:
+        mode = HypothesisTestMode.FUZZING
     producer = TaskProducer(engine)
     workers_num = engine.config.execution.workers_num
 
@@ -45,7 +52,13 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     is_executed = False
 
     with WorkerPool(
-        workers_num=workers_num, producer=producer, worker_factory=worker_task, ctx=engine, suite_id=suite_started.id
+        workers_num=workers_num,
+        producer=producer,
+        worker_factory=worker_task,
+        ctx=engine,
+        mode=mode,
+        phase=phase.name,
+        suite_id=suite_started.id,
     ) as pool:
         try:
             while True:
@@ -74,7 +87,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
         except KeyboardInterrupt:
             engine.stop()
             status = Status.INTERRUPTED
-            yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
+            yield events.Interrupted(phase=phase.name)
 
     if not is_executed:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
@@ -86,12 +99,51 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     yield events.PhaseFinished(phase=phase, status=status, payload=None)
 
 
-def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineContext, suite_id: uuid.UUID) -> None:
-    from hypothesis.errors import HypothesisWarning
+def worker_task(
+    *,
+    events_queue: Queue,
+    producer: TaskProducer,
+    ctx: EngineContext,
+    mode: HypothesisTestMode,
+    phase: PhaseName,
+    suite_id: uuid.UUID,
+) -> None:
+    from hypothesis.errors import HypothesisWarning, InvalidArgument
 
     from schemathesis.generation.hypothesis.builder import create_test
 
     from ._executor import run_test, test_func
+
+    def on_error(error: Exception, *, method: str | None = None, path: str | None = None) -> None:
+        if method and path:
+            label = f"{method.upper()} {path}"
+            scenario_started = events.ScenarioStarted(label=label, phase=phase, suite_id=suite_id)
+            events_queue.put(scenario_started)
+
+            events_queue.put(events.NonFatalError(error=error, phase=phase, label=label, related_to_operation=True))
+
+            events_queue.put(
+                events.ScenarioFinished(
+                    id=scenario_started.id,
+                    suite_id=suite_id,
+                    phase=phase,
+                    label=label,
+                    status=Status.ERROR,
+                    recorder=ScenarioRecorder(label="Error"),
+                    elapsed_time=0.0,
+                    skip_reason=None,
+                    is_final=True,
+                )
+            )
+        else:
+            events_queue.put(
+                events.NonFatalError(
+                    error=error,
+                    phase=phase,
+                    label=path or "-",
+                    related_to_operation=False,
+                )
+            )
 
     warnings.filterwarnings("ignore", message="The recursion limit will not be reset", category=HypothesisWarning)
     with ignore_hypothesis_output():
@@ -104,61 +156,34 @@ def worker_task(*, events_queue: Queue, producer: TaskProducer, ctx: EngineConte
                 if isinstance(result, Ok):
                     operation = result.ok()
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
-                    test_function = create_test(
-                        operation=operation,
-                        test_func=test_func,
-                        config=HypothesisTestConfig(
-                            settings=ctx.config.execution.hypothesis_settings,
-                            seed=ctx.config.execution.seed,
-                            generation=ctx.config.execution.generation,
-                            as_strategy_kwargs=as_strategy_kwargs,
-                        ),
-                    )
+                    try:
+                        test_function = create_test(
+                            operation=operation,
+                            test_func=test_func,
+                            config=HypothesisTestConfig(
+                                modes=[mode],
+                                settings=ctx.config.execution.hypothesis_settings,
+                                seed=ctx.config.execution.seed,
+                                generation=ctx.config.execution.generation,
+                                as_strategy_kwargs=as_strategy_kwargs,
+                            ),
+                        )
+                    except (InvalidSchema, InvalidArgument) as exc:
+                        on_error(exc, method=operation.method, path=operation.path)
+                        continue
 
                     # The test is blocking, meaning that even if CTRL-C comes to the main thread, this tasks will continue
                     # executing. However, as we set a stop event, it will be checked before the next network request.
                     # However, this is still suboptimal, as there could be slow requests and they will block for longer
-                    for event in run_test(operation=operation, test_function=test_function, ctx=ctx, suite_id=suite_id):
+                    for event in run_test(
+                        operation=operation, test_function=test_function, ctx=ctx, phase=phase, suite_id=suite_id
+                    ):
                         events_queue.put(event)
                 else:
                     error = result.err()
-                    if error.method:
-                        label = f"{error.method.upper()} {error.path}"
-                        scenario_started = events.ScenarioStarted(
-                            label=label, phase=PhaseName.UNIT_TESTING, suite_id=suite_id
-                        )
-                        events_queue.put(scenario_started)
-
-                        events_queue.put(
-                            events.NonFatalError(
-                                error=error, phase=PhaseName.UNIT_TESTING, label=label, related_to_operation=True
-                            )
-                        )
-
-                        events_queue.put(
-                            events.ScenarioFinished(
-                                id=scenario_started.id,
-                                suite_id=suite_id,
-                                phase=PhaseName.UNIT_TESTING,
-                                label=label,
-                                status=Status.ERROR,
-                                recorder=ScenarioRecorder(label="Error"),
-                                elapsed_time=0.0,
-                                skip_reason=None,
-                                is_final=True,
-                            )
-                        )
-                    else:
-                        events_queue.put(
-                            events.NonFatalError(
-                                error=error,
-                                phase=PhaseName.UNIT_TESTING,
-                                label=error.path,
-                                related_to_operation=False,
-                            )
-                        )
+                    on_error(error, method=error.method, path=error.path)
         except KeyboardInterrupt:
-            events_queue.put(events.Interrupted(phase=PhaseName.UNIT_TESTING))
+            events_queue.put(events.Interrupted(phase=phase))
 
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:

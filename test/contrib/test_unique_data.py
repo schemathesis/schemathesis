@@ -95,7 +95,7 @@ def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_example
         "--generation-unique-inputs",
         "--mode=all",
         "--suppress-health-check=filter_too_much",
-        "--hypothesis-phases=generate",
+        "--phases=examples,fuzzing",
         *args,
         hooks=unique_hook,
     )
@@ -119,7 +119,7 @@ def test_cli_failure(unique_hook, cli, openapi3_schema_url, hypothesis_max_examp
             "--generation-unique-inputs",
             "--mode=all",
             "--suppress-health-check=filter_too_much",
-            "--hypothesis-phases=generate",
+            "--phases=fuzzing",
             hooks=unique_hook,
         )
         == snapshot_cli

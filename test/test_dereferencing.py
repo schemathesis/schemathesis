@@ -316,7 +316,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_recursive_dereference(testdir):
@@ -359,7 +359,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_inner_dereference(testdir):
@@ -398,7 +398,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_inner_dereference_with_lists(testdir):
@@ -443,7 +443,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 @pytest.mark.parametrize("extra", [{}, {"enum": ["foo"]}])
@@ -475,7 +475,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_nullable_properties(testdir):
@@ -513,7 +513,7 @@ def test_(request, case):
     result = testdir.runpytest("-vv", "-s")
     result.assert_outcomes(passed=1)
     # At least one `None` value should be generated
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_nullable_ref(testdir):
@@ -525,7 +525,8 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "POST"
-    assert case.body is None
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.body is None
 """,
         paths={
             "/users": {
@@ -547,7 +548,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_path_ref(testdir):
@@ -577,7 +578,7 @@ def test_(request, case):
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_nullable_enum(testdir):
@@ -589,14 +590,15 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.path == "/users"
     assert case.method == "GET"
-    assert case.query["id"] == "null"
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.query["id"] == "null"
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_complex_dereference(testdir, complex_schema):

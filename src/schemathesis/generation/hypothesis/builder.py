@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
+from enum import Enum
 from functools import wraps
 from itertools import combinations
 from time import perf_counter
@@ -13,14 +13,13 @@ from hypothesis import strategies as st
 from hypothesis.errors import Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
-from schemathesis.auths import AuthStorageMark
-from schemathesis.core import NOT_SET, NotSet, media_types
+from schemathesis import auths
+from schemathesis.auths import AuthStorage, AuthStorageMark
+from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
-from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
-from schemathesis.experimental import COVERAGE_PHASE
 from schemathesis.generation import GenerationConfig, GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
@@ -34,48 +33,21 @@ from schemathesis.generation.meta import (
     PhaseInfo,
 )
 from schemathesis.hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookDispatcherMark
-from schemathesis.schemas import APIOperation, BaseSchema, ParameterSet
+from schemathesis.schemas import APIOperation, ParameterSet
 
 setup()
 
 
-def get_all_tests(
-    *,
-    schema: BaseSchema,
-    test_func: Callable,
-    generation_config: GenerationConfig,
-    settings: hypothesis.settings | None = None,
-    seed: int | None = None,
-    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None,
-    given_kwargs: dict[str, GivenInput] | None = None,
-) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
-    """Generate all operations and Hypothesis tests for them."""
-    for result in schema.get_all_operations(generation_config=generation_config):
-        if isinstance(result, Ok):
-            operation = result.ok()
-            if callable(as_strategy_kwargs):
-                _as_strategy_kwargs = as_strategy_kwargs(operation)
-            else:
-                _as_strategy_kwargs = {}
-            test = create_test(
-                operation=operation,
-                test_func=test_func,
-                config=HypothesisTestConfig(
-                    settings=settings,
-                    seed=seed,
-                    generation=generation_config,
-                    as_strategy_kwargs=_as_strategy_kwargs,
-                    given_kwargs=given_kwargs or {},
-                ),
-            )
-            yield Ok((operation, test))
-        else:
-            yield result
+class HypothesisTestMode(Enum):
+    EXAMPLES = "examples"
+    COVERAGE = "coverage"
+    FUZZING = "fuzzing"
 
 
 @dataclass
 class HypothesisTestConfig:
     generation: GenerationConfig
+    modes: list[HypothesisTestMode]
     settings: hypothesis.settings | None = None
     seed: int | None = None
     as_strategy_kwargs: dict[str, Any] = field(default_factory=dict)
@@ -131,16 +103,33 @@ def create_test(
         phases = tuple(phase for phase in settings.phases if phase != Phase.explain)
         settings = hypothesis.settings(settings, phases=phases)
 
+    # Remove `reuse` & `generate` phases to avoid yielding any test cases if we don't do fuzzing
+    if HypothesisTestMode.FUZZING not in config.modes and (
+        Phase.generate in settings.phases or Phase.reuse in settings.phases
+    ):
+        phases = tuple(phase for phase in settings.phases if phase not in (Phase.reuse, Phase.generate))
+        settings = hypothesis.settings(settings, phases=phases)
+
+    specification = operation.schema.specification
+
     # Add examples if explicit phase is enabled
-    if Phase.explicit in settings.phases:
+    if (
+        HypothesisTestMode.EXAMPLES in config.modes
+        and Phase.explicit in settings.phases
+        and specification.supports_feature(SpecificationFeature.EXAMPLES)
+    ):
         hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
 
-    if COVERAGE_PHASE.is_enabled:
-        # Ensure explicit phase is enabled if coverage is enabled
-        if Phase.explicit not in settings.phases:
-            phases = settings.phases + (Phase.explicit,)
-            settings = hypothesis.settings(settings, phases=phases)
-        hypothesis_test = add_coverage(hypothesis_test, operation, config.generation.modes)
+    if (
+        HypothesisTestMode.COVERAGE in config.modes
+        and Phase.explicit in settings.phases
+        and specification.supports_feature(SpecificationFeature.COVERAGE)
+        and not config.given_args
+        and not config.given_kwargs
+    ):
+        hypothesis_test = add_coverage(
+            hypothesis_test, operation, config.generation.modes, auth_storage, config.as_strategy_kwargs
+        )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
 
@@ -191,6 +180,7 @@ def add_examples(
             NonSerializableMark.set(test, exc)
         if isinstance(exc, SchemaError):
             InvalidRegexMark.set(test, exc)
+
     context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, result)
     operation.schema.hooks.dispatch("before_add_examples", context, result)
@@ -205,6 +195,7 @@ def add_examples(
                 continue
         adjust_urlencoded_payload(example)
         test = hypothesis.example(case=example)(test)
+
     return test
 
 
@@ -218,10 +209,37 @@ def adjust_urlencoded_payload(case: Case) -> None:
             pass
 
 
-def add_coverage(test: Callable, operation: APIOperation, generation_modes: list[GenerationMode]) -> Callable:
-    for example in _iter_coverage_cases(operation, generation_modes):
-        adjust_urlencoded_payload(example)
-        test = hypothesis.example(case=example)(test)
+def add_coverage(
+    test: Callable,
+    operation: APIOperation,
+    generation_modes: list[GenerationMode],
+    auth_storage: AuthStorage | None,
+    as_strategy_kwargs: dict[str, Any],
+) -> Callable:
+    from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+    auth_context = auths.AuthContext(
+        operation=operation,
+        app=operation.app,
+    )
+    overrides = {
+        container: as_strategy_kwargs[container]
+        for container in LOCATION_TO_CONTAINER.values()
+        if container in as_strategy_kwargs
+    }
+    for case in _iter_coverage_cases(operation, generation_modes):
+        if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
+            continue
+        adjust_urlencoded_payload(case)
+        auths.set_on_case(case, auth_context, auth_storage)
+        for container_name, value in overrides.items():
+            container = getattr(case, container_name)
+            if container is None:
+                setattr(case, container_name, value)
+            else:
+                container.update(value)
+
+        test = hypothesis.example(case=case)(test)
     return test
 
 
@@ -237,11 +255,12 @@ class Instant:
 
 
 class Template:
-    __slots__ = ("_components", "_template")
+    __slots__ = ("_components", "_template", "_serializers")
 
-    def __init__(self) -> None:
+    def __init__(self, serializers: dict[str, Callable]) -> None:
         self._components: dict[ComponentKind, ComponentInfo] = {}
         self._template: dict[str, Any] = {}
+        self._serializers = serializers
 
     def __contains__(self, key: str) -> bool:
         return key in self._template
@@ -264,36 +283,57 @@ class Template:
             info.mode = GenerationMode.NEGATIVE
 
         container = self._template.setdefault(component_name, {})
-        if _should_stringify(location, value):
-            container[name] = _stringify_value(value.value, location)
-        else:
-            container[name] = value.value
+        container[name] = value.value
 
     def set_body(self, body: coverage.GeneratedValue, media_type: str) -> None:
         self._template["body"] = body.value
         self._template["media_type"] = media_type
         self._components[ComponentKind.BODY] = ComponentInfo(mode=body.generation_mode)
 
+    def _serialize(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        from schemathesis.specs.openapi._hypothesis import quote_all
+
+        output = {}
+        for container_name, value in kwargs.items():
+            serializer = self._serializers.get(container_name)
+            if container_name in ("headers", "cookies") and isinstance(value, dict):
+                value = _stringify_value(value, container_name)
+            if serializer is not None:
+                value = serializer(value)
+            if container_name == "query" and isinstance(value, dict):
+                value = _stringify_value(value, container_name)
+            if container_name == "path_parameters" and isinstance(value, dict):
+                value = _stringify_value(quote_all(value), container_name)
+            output[container_name] = value
+        return output
+
     def unmodified(self) -> TemplateValue:
-        return TemplateValue(kwargs=self._template.copy(), components=self._components.copy())
+        kwargs = self._template.copy()
+        if self._serializers:
+            kwargs = self._serialize(kwargs)
+        return TemplateValue(kwargs=kwargs, components=self._components.copy())
 
     def with_body(self, *, media_type: str, value: coverage.GeneratedValue) -> TemplateValue:
         kwargs = {**self._template, "media_type": media_type, "body": value.value}
+        if self._serializers:
+            kwargs = self._serialize(kwargs)
         components = {**self._components, ComponentKind.BODY: ComponentInfo(mode=value.generation_mode)}
         return TemplateValue(kwargs=kwargs, components=components)
 
     def with_parameter(self, *, location: str, name: str, value: coverage.GeneratedValue) -> TemplateValue:
         from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
-        if _should_stringify(location, value):
-            generated = _stringify_value(value.value, location)
-        else:
-            generated = value.value
-
         container_name = LOCATION_TO_CONTAINER[location]
         container = self._template[container_name]
-        kwargs = {**self._template, container_name: {**container, name: generated}}
-        components = {**self._components, ComponentKind(container_name): ComponentInfo(mode=value.generation_mode)}
+        return self.with_container(
+            container_name=container_name, value={**container, name: value.value}, generation_mode=value.generation_mode
+        )
+
+    def with_container(self, *, container_name: str, value: Any, generation_mode: GenerationMode) -> TemplateValue:
+        kwargs = {**self._template, container_name: value}
+        components = {**self._components, ComponentKind(container_name): ComponentInfo(mode=generation_mode)}
+        if self._serializers:
+            kwargs = self._serialize(kwargs)
         return TemplateValue(kwargs=kwargs, components=components)
 
 
@@ -304,18 +344,24 @@ class TemplateValue:
     __slots__ = ("kwargs", "components")
 
 
-def _should_stringify(location: str, value: coverage.GeneratedValue) -> bool:
-    return location in ("header", "cookie", "path", "query") and not isinstance(value.value, str)
-
-
-def _stringify_value(val: Any, location: str) -> str | list[str]:
+def _stringify_value(val: Any, container_name: str) -> Any:
+    if val is None:
+        return "null"
+    if val is True:
+        return "true"
+    if val is False:
+        return "false"
+    if isinstance(val, (int, float)):
+        return str(val)
     if isinstance(val, list):
-        if location == "query":
+        if container_name == "query":
             # Having a list here ensures there will be multiple query parameters wit the same name
-            return [json.dumps(item) for item in val]
+            return [_stringify_value(item, container_name) for item in val]
         # use comma-separated values style for arrays
-        return ",".join(json.dumps(sub) for sub in val)
-    return json.dumps(val)
+        return ",".join(_stringify_value(sub, container_name) for sub in val)
+    if isinstance(val, dict):
+        return {key: _stringify_value(sub, container_name) for key, sub in val.items()}
+    return val
 
 
 def _iter_coverage_cases(
@@ -323,9 +369,11 @@ def _iter_coverage_cases(
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
     from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
+    from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
-    template = Template()
+    serializers = get_serializers_for_operation(operation)
+    template = Template(serializers)
 
     instant = Instant()
     responses = find_in_responses(operation)
@@ -465,15 +513,16 @@ def _iter_coverage_cases(
                 # I.e. contains just `default` value without any other keywords
                 value = container.get(parameter.name, NOT_SET)
                 if value is not NOT_SET:
-                    data = template.unmodified()
+                    data = template.with_container(
+                        container_name="query",
+                        value={**container, parameter.name: [value, value]},
+                        generation_mode=GenerationMode.NEGATIVE,
+                    )
                     yield operation.Case(
-                        **{**data.kwargs, "query": {**container, parameter.name: [value, value]}},
+                        **data.kwargs,
                         meta=CaseMetadata(
                             generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                            components={
-                                **data.components,
-                                ComponentKind.QUERY: ComponentInfo(mode=GenerationMode.NEGATIVE),
-                            },
+                            components=data.components,
                             phase=PhaseInfo.coverage(
                                 description=f"Duplicate `{parameter.name}` query parameter",
                                 parameter=parameter.name,
@@ -489,15 +538,16 @@ def _iter_coverage_cases(
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]
                 container = template[container_name]
-                data = template.unmodified()
+                data = template.with_container(
+                    container_name=container_name,
+                    value={k: v for k, v in container.items() if k != name},
+                    generation_mode=GenerationMode.NEGATIVE,
+                )
                 yield operation.Case(
-                    **{**data.kwargs, container_name: {k: v for k, v in container.items() if k != name}},
+                    **data.kwargs,
                     meta=CaseMetadata(
                         generation=GenerationInfo(time=instant.elapsed, mode=GenerationMode.NEGATIVE),
-                        components={
-                            **data.components,
-                            ComponentKind(container_name): ComponentInfo(mode=GenerationMode.NEGATIVE),
-                        },
+                        components=data.components,
                         phase=PhaseInfo.coverage(
                             description=f"Missing `{name}` at {location}",
                             parameter=name,
@@ -532,26 +582,17 @@ def _iter_coverage_cases(
             _generation_mode: GenerationMode,
             _instant: Instant,
         ) -> Case:
-            if _location in ("header", "cookie", "path", "query"):
-                container = {
-                    name: _stringify_value(val, _location) if not isinstance(val, str) else val
-                    for name, val in container_values.items()
-                }
-            else:
-                container = container_values
-
-            data = template.unmodified()
+            data = template.with_container(
+                container_name=_container_name, value=container_values, generation_mode=_generation_mode
+            )
             return operation.Case(
-                **{**data.kwargs, _container_name: container},
+                **data.kwargs,
                 meta=CaseMetadata(
                     generation=GenerationInfo(
                         time=_instant.elapsed,
                         mode=_generation_mode,
                     ),
-                    components={
-                        **data.components,
-                        ComponentKind(_container_name): ComponentInfo(mode=_generation_mode),
-                    },
+                    components=data.components,
                     phase=PhaseInfo.coverage(
                         description=description,
                         parameter=_parameter,

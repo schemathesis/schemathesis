@@ -42,7 +42,6 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         f"--report-vcr-path={cassette_path}",
         f"--max-examples={hypothesis_max_examples}",
         f"--mode={mode}",
-        "--experimental=coverage-phase",
         "--seed=1",
         *args,
     )
@@ -97,7 +96,7 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
     else:
         with cassette_path.open(encoding="utf-8") as fd:
             data = json.load(fd)
-            assert len(data["log"]["entries"]) == 2
+            assert len(data["log"]["entries"]) == 3
             assert data["log"]["entries"][1]["response"]["bodySize"] == -1
 
 
@@ -159,7 +158,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
     assert "UnicodeEncodeError" not in result.stdout
     # And the cassette should be correctly recorded
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 1
+    assert len(cassette["http_interactions"]) == 2
     assert cassette["http_interactions"][0]["request"]["headers"][header_name] == [fixed_header]
 
 
@@ -175,7 +174,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 1
+    assert len(cassette["http_interactions"]) == 2
     command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {schema_url}"
     assert cassette["command"] == command
 

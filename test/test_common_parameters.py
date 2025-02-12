@@ -12,8 +12,9 @@ def test_common_parameters(testdir):
 def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.method in ["GET", "POST"]
-    assert_int(case.query["common_id"])
-    assert_int(case.query["not_common_id"])
+    if not hasattr(case.meta.phase.data, "description"):
+        assert_int(case.query["common_id"])
+        assert_int(case.query["not_common_id"])
 """,
         paths={
             "/users": {
@@ -32,7 +33,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used for all specified methods
     result.assert_outcomes(passed=2)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_common_parameters_with_references(testdir):
@@ -46,8 +47,9 @@ def impl(request, case):
     assert case.method in ["PUT", "POST"]
     if case.method == "POST":
         assert_int(case.body)
-    assert_int(case.query["not_common_id"])
-    assert_int(case.query["key"])
+    if not hasattr(case.meta.phase.data, "description"):
+        assert_int(case.query["not_common_id"])
+        assert_int(case.query["key"])
 
 @schema.include(path_regex="/foo").parametrize()
 @settings(max_examples=1)
@@ -81,7 +83,7 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
     result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 8$"])
 
 
 def test_common_parameters_with_references_stateful(ctx):
@@ -138,7 +140,8 @@ def test_common_parameters_multiple_tests(testdir):
 def impl(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.method in ["GET", "POST"]
-    assert_int(case.query["common_id"])
+    if not hasattr(case.meta.phase.data, "description"):
+        assert_int(case.query["common_id"])
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -160,5 +163,5 @@ def test_b(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all test functions
     result.assert_outcomes(passed=4)
-    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 8$"])
     # NOTE: current implementation requires a deepcopy of the whole schema

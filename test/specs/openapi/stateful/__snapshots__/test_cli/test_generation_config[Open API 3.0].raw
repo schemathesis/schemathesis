@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/schema.yaml (in N ms)
+ ✅  Loaded specification from http://127.0.0.1/schema.yaml (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,10 +16,10 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ❌  Stateful tests (in N ms)
+ ❌  Stateful (in 0.00s)
 
      Scenarios:    N
-     API Links:    4 covered / 4 selected / 4 total
+     API Links:    N covered / 4 selected / 4 total
 
      ✅ N passed  ❌ 1 failed
 
@@ -47,14 +47,16 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ⏭️ Unit testing (disabled)
-  ❌ Stateful testing
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ❌ Stateful
 
 Failures:
   ❌ Server error: 1
 
 Test cases:
-  N generated, N found N unique failures, N skipped
+  N generated, N found N unique failures
 
 Seed: 42
 

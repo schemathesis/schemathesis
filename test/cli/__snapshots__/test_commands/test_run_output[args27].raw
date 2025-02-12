@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--set-path': Path parameter value should not contain surrogates.
+Error: Invalid value for '--set-query': Query parameter key is specified multiple times.

@@ -15,6 +15,7 @@ from schemathesis.core.failures import FailureGroup
 from schemathesis.engine import Status
 from schemathesis.engine.config import NetworkConfig
 from schemathesis.engine.events import ScenarioFinished
+from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationConfig
 from schemathesis.specs.openapi.checks import (
     AuthKind,
@@ -30,9 +31,10 @@ def run(schema_url, headers=None, network_config=None, **configuration):
     schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
     stream = EventStream(
         schema,
+        phases=[PhaseName.FUZZING],
         checks=[ignored_auth],
         network=NetworkConfig(headers=headers, **(network_config or {})),
-        hypothesis_settings=settings(max_examples=1, phases=[Phase.generate]),
+        hypothesis_settings=settings(max_examples=1),
     ).execute()
     return stream.find(ScenarioFinished)
 

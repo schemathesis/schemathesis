@@ -69,10 +69,9 @@ class CheckArguments:
             checks_config[_max_response_time] = MaxResponseTimeConfig(self.max_response_time)
             selected_checks.append(_max_response_time)
 
-        if experimental.COVERAGE_PHASE.is_enabled:
-            from schemathesis.specs.openapi.checks import unsupported_method
+        from schemathesis.specs.openapi.checks import unsupported_method
 
-            selected_checks.append(unsupported_method)
+        selected_checks.append(unsupported_method)
 
         # Exclude checks based on their names
         selected_checks = [check for check in selected_checks if check.__name__ not in self.excluded_check_names]

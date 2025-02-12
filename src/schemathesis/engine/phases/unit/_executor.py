@@ -52,13 +52,17 @@ if TYPE_CHECKING:
 
 
 def run_test(
-    *, operation: APIOperation, test_function: Callable, ctx: EngineContext, suite_id: uuid.UUID
+    *,
+    operation: APIOperation,
+    test_function: Callable,
+    ctx: EngineContext,
+    phase: PhaseName,
+    suite_id: uuid.UUID,
 ) -> events.EventGenerator:
     """A single test run with all error handling needed."""
     import hypothesis.errors
 
-    # To simplify connecting `before` and `after` events in external systems
-    scenario_started = events.ScenarioStarted(label=operation.label, phase=PhaseName.UNIT_TESTING, suite_id=suite_id)
+    scenario_started = events.ScenarioStarted(label=operation.label, phase=phase, suite_id=suite_id)
     yield scenario_started
     errors: list[Exception] = []
     skip_reason = None
@@ -66,15 +70,13 @@ def run_test(
     recorder = ScenarioRecorder(label=operation.label)
 
     def non_fatal_error(error: Exception) -> events.NonFatalError:
-        return events.NonFatalError(
-            error=error, phase=PhaseName.UNIT_TESTING, label=operation.label, related_to_operation=True
-        )
+        return events.NonFatalError(error=error, phase=phase, label=operation.label, related_to_operation=True)
 
     def scenario_finished(status: Status) -> events.ScenarioFinished:
         return events.ScenarioFinished(
             id=scenario_started.id,
             suite_id=suite_id,
-            phase=PhaseName.UNIT_TESTING,
+            phase=phase,
             label=operation.label,
             recorder=recorder,
             status=status,
@@ -125,7 +127,7 @@ def run_test(
         yield non_fatal_error(hypothesis.errors.Unsatisfiable("Failed to generate test cases for this API operation"))
     except KeyboardInterrupt:
         yield scenario_finished(Status.INTERRUPTED)
-        yield events.Interrupted(phase=PhaseName.UNIT_TESTING)
+        yield events.Interrupted(phase=phase)
         return
     except AssertionError as exc:  # May come from `hypothesis-jsonschema` or `hypothesis`
         status = Status.ERROR

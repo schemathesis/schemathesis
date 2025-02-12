@@ -16,6 +16,8 @@ class SpecificationFeature(str, enum.Enum):
     """Features that Schemathesis can provide for different specifications."""
 
     STATEFUL_TESTING = "stateful_testing"
+    COVERAGE = "coverage_tests"
+    EXAMPLES = "example_tests"
 
 
 @dataclass
@@ -39,7 +41,11 @@ class Specification:
     def supports_feature(self, feature: SpecificationFeature) -> bool:
         """Check if Schemathesis supports a given feature for this specification."""
         if self.kind == SpecificationKind.OPENAPI:
-            return feature in {SpecificationFeature.STATEFUL_TESTING}
+            return feature in {
+                SpecificationFeature.STATEFUL_TESTING,
+                SpecificationFeature.COVERAGE,
+                SpecificationFeature.EXAMPLES,
+            }
         return False
 
 

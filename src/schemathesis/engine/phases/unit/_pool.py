@@ -7,9 +7,11 @@ from types import TracebackType
 from typing import TYPE_CHECKING, Callable
 
 from schemathesis.core.result import Result
+from schemathesis.engine.phases import PhaseName
 
 if TYPE_CHECKING:
     from schemathesis.engine.context import EngineContext
+    from schemathesis.generation.hypothesis.builder import HypothesisTestMode
 
 
 class TaskProducer:
@@ -34,12 +36,16 @@ class WorkerPool:
         producer: TaskProducer,
         worker_factory: Callable,
         ctx: EngineContext,
+        mode: HypothesisTestMode,
+        phase: PhaseName,
         suite_id: uuid.UUID,
     ) -> None:
         self.workers_num = workers_num
         self.producer = producer
         self.worker_factory = worker_factory
         self.ctx = ctx
+        self.mode = mode
+        self.phase = phase
         self.suite_id = suite_id
         self.workers: list[threading.Thread] = []
         self.events_queue: Queue = Queue()
@@ -51,6 +57,8 @@ class WorkerPool:
                 target=self.worker_factory,
                 kwargs={
                     "ctx": self.ctx,
+                    "mode": self.mode,
+                    "phase": self.phase,
                     "events_queue": self.events_queue,
                     "producer": self.producer,
                     "suite_id": self.suite_id,

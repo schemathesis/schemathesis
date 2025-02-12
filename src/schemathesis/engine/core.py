@@ -34,7 +34,17 @@ class Engine:
         """Create execution plan based on configuration."""
         phases = [
             self.get_phase_config(PhaseName.PROBING, is_supported=True, requires_links=False),
-            self.get_phase_config(PhaseName.UNIT_TESTING, is_supported=True, requires_links=False),
+            self.get_phase_config(
+                PhaseName.EXAMPLES,
+                is_supported=self.schema.specification.supports_feature(SpecificationFeature.EXAMPLES),
+                requires_links=False,
+            ),
+            self.get_phase_config(
+                PhaseName.COVERAGE,
+                is_supported=self.schema.specification.supports_feature(SpecificationFeature.COVERAGE),
+                requires_links=False,
+            ),
+            self.get_phase_config(PhaseName.FUZZING, is_supported=True, requires_links=False),
             self.get_phase_config(
                 PhaseName.STATEFUL_TESTING,
                 is_supported=self.schema.specification.supports_feature(SpecificationFeature.STATEFUL_TESTING),

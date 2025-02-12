@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in N ms)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,7 +16,15 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- 🚫  Unit tests (in N ms)
+ 🚫  Examples (in 0.00s)
+
+     🚫 1 errors
+
+ ⏭   Coverage (in 0.00s)
+
+     ⏭  1 skipped
+
+ 🚫  Fuzzing (in 0.00s)
 
      🚫 1 errors
 
@@ -24,7 +32,7 @@ Schemathesis dev
 ________________________________ POST /success _________________________________
 Schema Error
 
-Failed to generate test cases for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`
+Failed to generate test cases from examples for this API operation because of unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`
 
 Tip: Ensure your regex is compatible with Python's syntax.
 For guidance, visit: https://docs.python.org/3/library/re.html
@@ -40,8 +48,10 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  🚫 Unit testing
-  ⏭️ Stateful testing (not applicable)
+  🚫 Examples
+  ⏭  Coverage
+  🚫 Fuzzing
+  ⏭  Stateful (not applicable)
 
 Errors:
   🚫 Schema Error: 1
