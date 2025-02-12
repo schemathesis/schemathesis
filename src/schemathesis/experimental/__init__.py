@@ -64,12 +64,6 @@ class ExperimentSet:
 
 ENV_PREFIX = "SCHEMATHESIS_EXPERIMENTAL"
 GLOBAL_EXPERIMENTS = ExperimentSet()
-COVERAGE_PHASE = GLOBAL_EXPERIMENTS.create_experiment(
-    name="Coverage phase",
-    env_var="COVERAGE_PHASE",
-    description="Generate covering test cases",
-    discussion_url="https://github.com/schemathesis/schemathesis/discussions/2418",
-)
 POSITIVE_DATA_ACCEPTANCE = GLOBAL_EXPERIMENTS.create_experiment(
     name="Positive Data Acceptance",
     env_var="POSITIVE_DATA_ACCEPTANCE",

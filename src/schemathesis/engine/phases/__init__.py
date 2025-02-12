@@ -14,14 +14,22 @@ class PhaseName(enum.Enum):
     """Available execution phases."""
 
     PROBING = "API probing"
-    UNIT_TESTING = "Unit testing"
-    STATEFUL_TESTING = "Stateful testing"
+    EXAMPLES = "Examples"
+    COVERAGE = "Coverage"
+    FUZZING = "Fuzzing"
+    STATEFUL_TESTING = "Stateful"
+
+    @classmethod
+    def defaults(cls) -> list[PhaseName]:
+        return [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
 
     @classmethod
     def from_str(cls, value: str) -> PhaseName:
         return {
             "probing": cls.PROBING,
-            "unit": cls.UNIT_TESTING,
+            "examples": cls.EXAMPLES,
+            "coverage": cls.COVERAGE,
+            "fuzzing": cls.FUZZING,
             "stateful": cls.STATEFUL_TESTING,
         }[value.lower()]
 
@@ -60,7 +68,11 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
 
         if phase.name == PhaseName.PROBING:
             yield from probes.execute(ctx, phase)
-        elif phase.name == PhaseName.UNIT_TESTING:
+        elif phase.name == PhaseName.EXAMPLES:
+            yield from unit.execute(ctx, phase)
+        elif phase.name == PhaseName.COVERAGE:
+            yield from unit.execute(ctx, phase)
+        elif phase.name == PhaseName.FUZZING:
             yield from unit.execute(ctx, phase)
         elif phase.name == PhaseName.STATEFUL_TESTING:
             yield from stateful.execute(ctx, phase)

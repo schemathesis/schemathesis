@@ -75,7 +75,7 @@ def test_(request, case):
         ]
     )
     # 100 for /valid, 1 for /users
-    hypothesis_calls = (hypothesis_max_examples or 100) + 1
+    hypothesis_calls = (hypothesis_max_examples or 100) + 4
     result.stdout.re_match_lines([rf"Hypothesis calls: {hypothesis_calls}$"])
 
 
@@ -99,7 +99,7 @@ def test_(request, case, another):
     # Then the generated test should use these fixtures
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_fixtures.py::test_ PASSED", r".*1 passed"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_with_parametrize_filters(testdir):
@@ -155,7 +155,7 @@ def test_d(request, case):
             r".*4 passed",
         ]
     )
-    result.stdout.re_match_lines([r"Hypothesis calls: 6$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 12$"])
 
 
 def test_with_schema_filters(testdir):
@@ -176,7 +176,7 @@ def test_a(request, case):
     # Then the filters should be applied to the generated tests
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_schema_filters.py::test_a PASSED"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_invalid_fixture(testdir):
@@ -552,12 +552,13 @@ lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 @lazy_schema.include(path_regex="path_variable|custom_format").parametrize()
 @lazy_schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
-    if "key" in case.operation.path_parameters:
-        assert case.path_parameters["key"] == "foo"
-        assert "id" not in (case.query or {{}}), "`id` is present"
-    if "id" in case.operation.query:
-        assert case.query["id"] == "bar"
-        assert "key" not in (case.path_parameters or {{}}), "`key` is present"
+    if not hasattr(case.meta.phase.data, "description"):
+        if "key" in case.operation.path_parameters:
+            assert case.path_parameters["key"] == "foo"
+            assert "id" not in (case.query or {{}}), "`id` is present"
+        if "id" in case.operation.query:
+            assert case.query["id"] == "bar"
+            assert "key" not in (case.path_parameters or {{}}), "`key` is present"
 """
     )
     result = testdir.runpytest()

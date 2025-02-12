@@ -24,7 +24,7 @@ def test_(request, case):
     result.assert_outcomes(passed=1)
     # Then test name should contain method:path
     # And there should be only 1 hypothesis call
-    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"test_parametrization.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 2"])
 
 
 def test_pytest_parametrize(testdir):
@@ -54,7 +54,7 @@ def test_(request, param, case):
         [
             r"test_pytest_parametrize.py::test_\[GET /users\]\[A\] PASSED",
             r"test_pytest_parametrize.py::test_\[GET /users\]\[B\] PASSED",
-            r"Hypothesis calls: 4",
+            r"Hypothesis calls: 8",
         ]
     )
 
@@ -84,7 +84,7 @@ class TestAPI:
         [
             r"test_method.py::TestAPI::test_\[GET /users\] PASSED",
             r"test_method.py::TestAPI::test_\[POST /users\] PASSED",
-            r"Hypothesis calls: 2",
+            r"Hypothesis calls: 4",
         ]
     )
 
@@ -106,7 +106,7 @@ def test_(request, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
     # Then total number of Hypothesis calls should be `max_examples` per pytest test
-    result.stdout.re_match_lines([r"Hypothesis calls: 10$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 12$"])
 
 
 def test_direct_schema(testdir):
@@ -141,7 +141,7 @@ def test_(request, case):
     # Then it should be correctly used in the generated case
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_specified_example_body(testdir):
@@ -184,7 +184,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 @pytest.mark.parametrize(
@@ -246,7 +246,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
 
 
 def test_specified_example_parameter_override(testdir):
@@ -286,7 +286,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 4$"])
 
 
 def test_specified_example_body_media_type_override(testdir):
@@ -330,7 +330,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests, not the example from the schema
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_multiple_examples_different_locations(testdir):
@@ -343,8 +343,9 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.body in ({"name": "John1"}, {"name": "John2"})
-    assert case.query == {"age": 35}
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.body in ({"name": "John1"}, {"name": "John2"})
+        assert case.query == {"age": 35}
 """,
         schema={
             "openapi": "3.0.2",
@@ -376,7 +377,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used in tests as a part of a single request, i.e. combined
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_multiple_examples_same_location(testdir):
@@ -389,7 +390,8 @@ from hypothesis import Phase
 @settings(max_examples=1, phases=[Phase.explicit])
 def test(request, case):
     request.config.HYPOTHESIS_CASES += 1
-    assert case.path_parameters in ({"a": 1, "b": 2}, {"a": 42, "b": 43})
+    if not hasattr(case.meta.phase.data, "description"):
+        assert case.path_parameters in ({"a": 1, "b": 2}, {"a": 42, "b": 43})
 """,
         schema_name="simple_openapi.yaml",
         paths={
@@ -419,7 +421,7 @@ def test(request, case):
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used combined in tests
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 5$"])
 
 
 def test_deselecting(testdir):
@@ -442,7 +444,7 @@ def test_b(request, case):
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
-    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 4"])
 
 
 @pytest.mark.parametrize(
@@ -467,7 +469,7 @@ def test_(request, case):
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2"])
 
 
 def test_invalid_schema(testdir):
@@ -515,7 +517,7 @@ def test_(request, case):
     result = testdir.runpytest()
     # Then test should be executed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
 
 
 def test_exception_during_test(testdir):

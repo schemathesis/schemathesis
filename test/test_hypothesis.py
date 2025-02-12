@@ -504,4 +504,6 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
         }
     )
     # Then it should be able to generate requests
-    assert cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}") == snapshot_cli
+    assert (
+        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "--phases=fuzzing") == snapshot_cli
+    )

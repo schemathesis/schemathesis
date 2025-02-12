@@ -82,7 +82,8 @@ def test_path(testdir):
 @schema.include(path_regex="/users/{user_id}").parametrize()
 @settings(max_examples=3, deadline=None)
 def test_(case):
-    assert_int(case.path_parameters["user_id"])
+    if not hasattr(case.meta.phase.data, "description"):
+        assert_int(case.path_parameters["user_id"])
     assert_requests_call(case)
         """,
         paths={
@@ -105,8 +106,9 @@ def test_multiple_path_variables(testdir):
 @schema.include(path_regex="/users/{user_id}/{event_id}").parametrize()
 @settings(max_examples=3, deadline=None)
 def test_(case):
-    assert_int(case.path_parameters["user_id"])
-    assert_int(case.path_parameters["event_id"])
+    if not hasattr(case.meta.phase.data, "description"):
+        assert_int(case.path_parameters["user_id"])
+        assert_int(case.path_parameters["event_id"])
     assert_requests_call(case)
         """,
         paths={

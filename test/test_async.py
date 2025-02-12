@@ -43,7 +43,7 @@ async def test_(request, case):
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=1)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"test_simple.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 1"])
+    result.stdout.re_match_lines([r"test_simple.py::test_\[GET /users\] PASSED", r"Hypothesis calls: 2"])
 
 
 def test_settings_first(testdir, plugin):
@@ -66,7 +66,7 @@ async def test_(request, case):
     result = testdir.runpytest(*args)
     result.assert_outcomes(passed=2)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"Hypothesis calls: 10$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 12$"])
 
 
 def test_aiohttp_client(testdir):
@@ -100,7 +100,7 @@ async def test_(request, aiohttp_client, app, case):
     client = await aiohttp_client(app)
     response = await client.request(case.method, "/users", headers=case.headers)
     assert response.status < 500
-    assert len(app["saved_requests"]) == 1
+    assert len(app["saved_requests"]) <= 3
     assert app["saved_requests"][0].method == "GET"
     assert app["saved_requests"][0].path == "/users"
 """
@@ -108,4 +108,4 @@ async def test_(request, aiohttp_client, app, case):
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
     # Then it should be executed as any other test
-    result.stdout.re_match_lines([r"Hypothesis calls: 1$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])

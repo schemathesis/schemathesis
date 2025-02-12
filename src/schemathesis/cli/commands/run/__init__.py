@@ -15,7 +15,6 @@ from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
 from schemathesis.cli.commands.run.hypothesis import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
     HealthCheck,
-    Phase,
     prepare_health_checks,
     prepare_phases,
     prepare_settings,
@@ -44,7 +43,7 @@ from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
-DEFAULT_PHASES = ("unit", "stateful")
+DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 
 
 @click.argument("schema", type=str)  # type: ignore[misc]
@@ -76,7 +75,7 @@ DEFAULT_PHASES = ("unit", "stateful")
 @grouped_option(
     "--phases",
     help="A comma-separated list of test phases to run",
-    type=CsvChoice(["unit", "stateful"]),
+    type=CsvChoice(DEFAULT_PHASES),
     default=",".join(DEFAULT_PHASES),
     metavar="",
 )
@@ -407,7 +406,7 @@ DEFAULT_PHASES = ("unit", "stateful")
     default=None,
     callback=validation.reduce_list,
     show_default=True,
-    metavar="TARGET",
+    metavar="METRIC",
 )
 @grouped_option(
     "--generation-with-security-parameters",
@@ -486,19 +485,6 @@ DEFAULT_PHASES = ("unit", "stateful")
     type=str,
     callback=validation.validate_set_path,
 )
-@group("Hypothesis engine options")
-@grouped_option(
-    "--hypothesis-phases",
-    help="Testing phases to execute",
-    type=CsvEnumChoice(Phase),
-    metavar="",
-)
-@grouped_option(
-    "--hypothesis-no-phases",
-    help="Testing phases to exclude from execution",
-    type=CsvEnumChoice(Phase),
-    metavar="",
-)
 @group("Global options")
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
@@ -565,8 +551,6 @@ def run(
     output_sanitize: bool = True,
     output_truncate: bool = True,
     contrib_openapi_fill_missing_examples: bool = False,
-    hypothesis_phases: list[Phase] | None = None,
-    hypothesis_no_phases: list[Phase] | None = None,
     generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
@@ -593,7 +577,7 @@ def run(
 
     validation.validate_schema(schema, base_url)
 
-    _hypothesis_phases = prepare_phases(hypothesis_phases, hypothesis_no_phases, generation_no_shrink)
+    _hypothesis_phases = prepare_phases(generation_no_shrink)
     _hypothesis_suppress_health_check = prepare_health_checks(suppress_health_check)
 
     for experiment in experiments:

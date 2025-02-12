@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value: The `--auth` and `--set-header` options were both used to set the 'Authorization' header, which is not permitted.
+Error: Invalid value: The `--header` and `--set-header` options were both used to set the 'Authorization' header, which is not permitted.

@@ -3,7 +3,7 @@ import threading
 import pytest
 from pytest import ExitCode
 
-from schemathesis.experimental import COVERAGE_PHASE, ENV_PREFIX, ExperimentSet
+from schemathesis.experimental import ENV_PREFIX, POSITIVE_DATA_ACCEPTANCE, ExperimentSet
 
 
 def test_experiments():
@@ -22,8 +22,8 @@ def test_experiments():
 @pytest.mark.parametrize(
     ("args", "kwargs"),
     [
-        ((f"--experimental={COVERAGE_PHASE.label}",), {}),
-        ((), {"env": {COVERAGE_PHASE.env_var: "true"}}),
+        ((f"--experimental={POSITIVE_DATA_ACCEPTANCE.label}",), {}),
+        ((), {"env": {POSITIVE_DATA_ACCEPTANCE.env_var: "true"}}),
     ],
 )
 @pytest.mark.openapi_version("3.0")
@@ -32,7 +32,7 @@ def test_enable_via_cli(cli, schema_url, args, kwargs):
     result = cli.run(schema_url, *args, **kwargs)
     assert result.exit_code == ExitCode.OK, result.stdout
     assert "EXPERIMENTS" in result.stdout
-    assert COVERAGE_PHASE.is_enabled
+    assert POSITIVE_DATA_ACCEPTANCE.is_enabled
 
 
 def test_enable_via_env_var(monkeypatch):
