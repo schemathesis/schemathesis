@@ -7,7 +7,7 @@ Unique data generation
 ~~~~~~~~~~~~~~~~~~~~~~
 
 By default, Schemathesis may generate the same test cases as all data is randomized. If this behavior does not match your expectations, or
-your test budges, you can force Schemathesis to generate unique test cases.
+your test budgets, you can force Schemathesis to generate unique test cases.
 
 In CLI:
 
