@@ -145,9 +145,8 @@ def test_interactions(openapi3_base_url, real_app_schema, workers):
 def test_asgi_interactions(fastapi_app):
     schema = schemathesis.openapi.from_asgi("/openapi.json", fastapi_app)
     stream = EventStream(schema).execute()
-    event = stream.find(events.ScenarioFinished)
-    interaction = list(event.recorder.interactions.values())[0]
-    assert interaction.request.uri == "http://localhost/users"
+    interactions = stream.find_all_interactions()
+    assert interactions[0].request.uri == "http://localhost/users"
 
 
 @pytest.mark.operations("empty")
@@ -310,7 +309,7 @@ def test_unknown_response_code(real_app_schema):
 
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
+    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.status_code == 418
@@ -329,7 +328,7 @@ def test_unknown_response_code_with_default(real_app_schema):
     ).execute()
     # Then there should be no failure
     stream.assert_no_failures()
-    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
+    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
     assert check.name == "status_code_conformance"
     assert check.status == Status.SUCCESS
 
@@ -345,7 +344,7 @@ def test_unknown_content_type(real_app_schema):
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[0][0]
+    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
     assert check.name == "content_type_conformance"
     assert check.status == Status.FAILURE
     assert check.failure_info.failure.content_type == "text/plain"
@@ -376,7 +375,7 @@ def test_response_conformance_invalid(real_app_schema):
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
-    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[-1][-1]
+    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
     assert check.failure_info.failure.title == "Response violates schema"
     assert (
         check.failure_info.failure.message
@@ -467,7 +466,8 @@ def test_response_conformance_malformed_json(real_app_schema):
     # Then there should be a failure
     assert stream.failures_count == 1
     stream.assert_no_errors()
-    check = list(stream.find(events.ScenarioFinished).recorder.checks.values())[-1][-1]
+
+    check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
     assert check.failure_info.failure.title == "JSON deserialization error"
     assert check.failure_info.failure.validation_message == "Expecting property name enclosed in double quotes"
     assert check.failure_info.failure.position == 1
@@ -535,7 +535,7 @@ def test_internal_exceptions(real_app_schema, mocker):
 @pytest.mark.operations("payload")
 async def test_payload_explicit_example(app, real_app_schema):
     # When API operation has an example specified
-    stream = execute(real_app_schema, hypothesis_settings=hypothesis.settings(phases=[Phase.explicit], deadline=None))
+    stream = execute(real_app_schema)
     # Then run should be successful
     stream.assert_no_errors()
     stream.assert_no_failures()
@@ -715,9 +715,12 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
 @pytest.mark.parametrize(
     ("phases", "expected"),
     [
-        ([Phase.explicit, Phase.generate], "Schemathesis can't serialize data to any of the defined media types"),
         (
-            [Phase.explicit],
+            [PhaseName.FUZZING],
+            "Schemathesis can't serialize data to any of the defined media types",
+        ),
+        (
+            [PhaseName.EXAMPLES],
             (
                 "Failed to generate test cases from examples for this API operation because of "
                 "unsupported payload media types"
@@ -749,12 +752,12 @@ def test_non_serializable_example(ctx, phases, expected):
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
     stream = EventStream(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
+        schema, phases=phases, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
     ).execute()
     # And the tests are failing because of the serialization error
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
-    assert len(errors) == 1
+    assert len(errors) == len(phases)
     assert expected in str(errors[0].info)
 
 
@@ -762,12 +765,12 @@ def test_non_serializable_example(ctx, phases, expected):
     ("phases", "expected"),
     [
         (
-            [Phase.explicit, Phase.generate],
+            [PhaseName.FUZZING],
             "Failed to generate test cases for this API operation because of "
             r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`",
         ),
         (
-            [Phase.explicit],
+            [PhaseName.EXAMPLES],
             (
                 "Failed to generate test cases from examples for this API operation because of "
                 r"unsupported regular expression `^[\w\s\-\/\pL,.#;:()']+$`"
@@ -811,12 +814,13 @@ def test_invalid_regex_example(ctx, phases, expected):
     schema = schemathesis.openapi.from_dict(schema)
     stream = EventStream(
         schema,
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases),
+        phases=phases,
+        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
     ).execute()
     # And the tests are failing because of the invalid regex error
     stream.assert_errors()
-    errors = stream.find_all(events.NonFatalError)
-    assert len(errors) == 1
+    errors = list(set(stream.find_all(events.NonFatalError)))
+    assert len(errors) == len(phases)
     assert expected in str(errors[0].info)
 
 
@@ -920,7 +924,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
         checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
-    after = stream.find(events.ScenarioFinished)
+    after = stream.find_all(events.ScenarioFinished)[-1]
     assert after.status == Status.SUCCESS
     # And there should be requested amount of test examples
     assert sum(len(checks) for checks in after.recorder.checks.values()) == max_examples
@@ -982,7 +986,7 @@ def test_interrupted_in_test(openapi3_schema):
     interrupted = stream.find(events.Interrupted)
     # Then the `Interrupted` event should be emitted
     assert interrupted is not None
-    scenario_finished = stream.find(events.ScenarioFinished)
+    scenario_finished = stream.find_all(events.ScenarioFinished)[-1]
     assert scenario_finished is not None
     assert scenario_finished.recorder.cases
     assert scenario_finished.recorder.interactions
@@ -1185,9 +1189,7 @@ def test_stateful_override(real_app_schema):
         override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
-    interactions = sum(
-        [list(event.recorder.interactions.values()) for event in stream.find_all(events.ScenarioFinished)], []
-    )
+    interactions = stream.find_all_interactions()
     assert len(interactions) > 0
     get_requests = [i.request for i in interactions if i.request.method == "GET"]
     assert len(get_requests) > 0

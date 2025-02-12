@@ -25,7 +25,7 @@ def _default_hypothesis_settings() -> hypothesis.settings:
 class ExecutionConfig:
     """Configuration for test execution."""
 
-    phases: list[PhaseName] = field(default_factory=lambda: [PhaseName.UNIT_TESTING, PhaseName.STATEFUL_TESTING])
+    phases: list[PhaseName] = field(default_factory=PhaseName.defaults)
     checks: list[CheckFunction] = field(default_factory=lambda: [not_a_server_error])
     targets: list[TargetFunction] = field(default_factory=list)
     hypothesis_settings: hypothesis.settings = field(default_factory=_default_hypothesis_settings)

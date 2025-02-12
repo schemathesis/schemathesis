@@ -3,10 +3,22 @@ from __future__ import annotations
 import json
 from typing import Any, Callable, Dict, Generator, List
 
+from schemathesis.schemas import APIOperation
+from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
 Generated = Dict[str, Any]
 Definition = Dict[str, Any]
 DefinitionList = List[Definition]
 MapFunction = Callable[[Generated], Generated]
+
+
+def get_serializers_for_operation(operation: APIOperation) -> dict[str, Callable]:
+    serializers = {}
+    for location, container in LOCATION_TO_CONTAINER.items():
+        serializer = operation.get_parameter_serializer(location)
+        if serializer is not None:
+            serializers[container] = serializer
+    return serializers
 
 
 def make_serializer(

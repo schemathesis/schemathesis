@@ -187,7 +187,7 @@ def test_skipped(cli, tmp_path, schema_url, server_host):
         schema_url,
         f"--report-junit-path={xml_path}",
         "--seed=1",
-        "--hypothesis-phases=explicit",
+        "--phases=examples",
         "--checks=all",
     )
     tree = ElementTree.parse(xml_path)

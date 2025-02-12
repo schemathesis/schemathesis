@@ -382,9 +382,16 @@ def app_factory(ctx):
         config.auth_token = auth_token
         config.ignored_auth = ignored_auth
         config.return_plain_text = return_plain_text
-        if return_plain_text is not False:
+        if return_plain_text is not False or omit_required_field is not False:
             # To simplify snapshots
             schema["components"]["schemas"]["NewUser"]["properties"]["name"] = {"enum": ["fixed-name"]}
+        if omit_required_field:
+            link = post_links["DeleteUser"]
+            post_links.clear()
+            post_links["DeleteUser"] = link
+            get_links.clear()
+            delete_links.clear()
+            order_links.clear()
 
         config.omit_required_field = omit_required_field
         if ignored_auth:

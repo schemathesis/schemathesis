@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--max-response-time': 0.0 is not in the range x>0.0.
+Error: The specified file does not exist. Please provide a valid path to an existing file.

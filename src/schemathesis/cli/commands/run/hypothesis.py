@@ -3,39 +3,13 @@ from __future__ import annotations
 from enum import Enum, unique
 from typing import TYPE_CHECKING, Any
 
-import click
-
 if TYPE_CHECKING:
     import hypothesis
 
-PHASES_INVALID_USAGE_MESSAGE = "Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously"
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 
 # Importing Hypothesis is expensive, hence we re-create the enums we need in CLI commands definitions
 # Hypothesis is stable, hence it should not be a problem and adding new variants should not be automatic
-
-
-@unique
-class Phase(str, Enum):
-    explicit = "explicit"  #: controls whether explicit examples are run.
-    reuse = "reuse"  #: controls whether previous examples will be reused.
-    generate = "generate"  #: controls whether new examples will be generated.
-    target = "target"  #: controls whether examples will be mutated for targeting.
-    # The `explain` phase is not supported
-
-    def as_hypothesis(self) -> hypothesis.Phase:
-        from hypothesis import Phase
-
-        return Phase[self.name]
-
-    @staticmethod
-    def filter_from_all(variants: list[Phase], no_shrink: bool) -> list[hypothesis.Phase]:
-        from hypothesis import Phase
-
-        phases = set(Phase) - {Phase.explain} - set(variants)
-        if no_shrink:
-            return list(phases - {Phase.shrink})
-        return list(phases)
 
 
 @unique
@@ -65,25 +39,13 @@ def prepare_health_checks(
     return [entry for health_check in hypothesis_suppress_health_check for entry in health_check.as_hypothesis()]
 
 
-def prepare_phases(
-    hypothesis_phases: list[Phase] | None,
-    hypothesis_no_phases: list[Phase] | None,
-    no_shrink: bool = False,
-) -> list[hypothesis.Phase] | None:
-    from hypothesis import Phase as HypothesisPhase
+def prepare_phases(no_shrink: bool = False) -> list[hypothesis.Phase] | None:
+    from hypothesis import Phase
 
-    if hypothesis_phases is not None and hypothesis_no_phases is not None:
-        raise click.UsageError(PHASES_INVALID_USAGE_MESSAGE)
-    if hypothesis_phases:
-        phases = [phase.as_hypothesis() for phase in hypothesis_phases]
-        if not no_shrink:
-            phases.append(HypothesisPhase.shrink)
-        return phases
-    elif hypothesis_no_phases:
-        return Phase.filter_from_all(hypothesis_no_phases, no_shrink)
-    elif no_shrink:
-        return Phase.filter_from_all([], no_shrink)
-    return None
+    phases = set(Phase) - {Phase.explain}
+    if no_shrink:
+        return list(phases - {Phase.shrink})
+    return list(phases)
 
 
 def prepare_settings(

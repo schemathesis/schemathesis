@@ -108,7 +108,7 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, create_test
+        from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -133,6 +133,7 @@ class SchemathesisCase(PyCollector):
                     operation=operation,
                     test_func=self.test_function,
                     config=HypothesisTestConfig(
+                        modes=list(HypothesisTestMode),
                         given_kwargs=self.given_kwargs,
                         generation=self.schema.generation_config,
                         as_strategy_kwargs=as_strategy_kwargs,

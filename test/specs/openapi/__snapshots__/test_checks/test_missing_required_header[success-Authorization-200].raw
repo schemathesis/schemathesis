@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in N ms)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,7 +16,7 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ❌  Unit tests (in N ms)
+ ❌  Coverage (in 0.00s)
 
      ❌ 1 failed
 
@@ -37,13 +37,6 @@ Reproduce with:
 
     curl -X GET -H 'X-API-Key-2: [Filtered]' http://127.0.0.1/api/success
 
-================================= EXPERIMENTS ==================================
-
-🧪 Coverage phase: Generate covering test cases
-   Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -52,8 +45,10 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ❌ Unit testing
-  ⏭️ Stateful testing (not applicable)
+  ⏭  Examples (disabled)
+  ❌ Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
 
 Failures:
   ❌ Custom check failed: `missing_required_header`: 1

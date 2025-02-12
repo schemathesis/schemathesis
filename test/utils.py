@@ -20,6 +20,7 @@ from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
+from schemathesis.engine.recorder import Interaction
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.schemas import BaseSchema
 
@@ -138,7 +139,9 @@ class EventStream:
         options.setdefault("checks", [not_a_server_error])
         config = EngineConfig(
             execution=ExecutionConfig(
-                phases=options.get("phases", [PhaseName.PROBING, PhaseName.UNIT_TESTING, PhaseName.STATEFUL_TESTING]),
+                phases=options.get(
+                    "phases", [PhaseName.PROBING, PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
+                ),
                 checks=options.get("checks", []),
                 targets=options.get("targets", []),
                 hypothesis_settings=options.get("hypothesis_settings")
@@ -182,6 +185,9 @@ class EventStream:
             and all(v(getattr(e, k)) if callable(v) else getattr(e, k) == v for k, v in attrs.items())
         ]
 
+    def find_all_interactions(self) -> list[Interaction]:
+        return sum([list(event.recorder.interactions.values()) for event in self.find_all(events.ScenarioFinished)], [])
+
     def assert_errors(self):
         assert self.find(NonFatalError) is not None
 
@@ -190,7 +196,7 @@ class EventStream:
         assert event is None, format_exception(event.value)
 
     def assert_after_execution_status(self, status: Status) -> None:
-        assert self.find(ScenarioFinished).status == status
+        assert self.find_all(ScenarioFinished)[-1].status == status
 
     @property
     def failures_count(self) -> int:

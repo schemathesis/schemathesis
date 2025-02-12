@@ -21,6 +21,8 @@ class Statistic:
     """Running statistics about test execution."""
 
     failures: dict[str, dict[str, GroupedFailures]]
+    # Track first case_id where each unique failure was found
+    unique_failures_map: dict[Failure, str]
 
     extraction_failures: set[ExtractionFailure]
 
@@ -32,6 +34,7 @@ class Statistic:
 
     __slots__ = (
         "failures",
+        "unique_failures_map",
         "extraction_failures",
         "tested_operations",
         "total_cases",
@@ -41,6 +44,7 @@ class Statistic:
 
     def __init__(self) -> None:
         self.failures = {}
+        self.unique_failures_map = {}
         self.extraction_failures = set()
         self.tested_operations = set()
         self.total_cases = 0
@@ -77,20 +81,32 @@ class Statistic:
 
             self.tested_operations.add(case.value.operation.label)
             has_failures = False
-            for check in checks:
-                response = recorder.interactions[case_id].response
+            current_case_failures = []
+            last_failure_info = None
 
-                # Collect failures
+            for check in checks:
                 if check.failure_info is not None:
-                    has_failures = True
-                    if case_id not in failures:
-                        failures[case_id] = GroupedFailures(
-                            case_id=case_id,
-                            code_sample=check.failure_info.code_sample,
-                            failures=[],
-                            response=response,
-                        )
-                    failures[case_id].failures.append(check.failure_info.failure)
+                    failure = check.failure_info.failure
+
+                    # Check if this is a new unique failure
+                    if failure not in self.unique_failures_map:
+                        last_failure_info = check.failure_info
+                        self.unique_failures_map[failure] = case_id
+                        current_case_failures.append(failure)
+                        has_failures = True
+                    else:
+                        # This failure was already seen - skip it
+                        continue
+
+            if current_case_failures:
+                assert last_failure_info is not None
+                failures[case_id] = GroupedFailures(
+                    case_id=case_id,
+                    code_sample=last_failure_info.code_sample,
+                    failures=current_case_failures,
+                    response=recorder.interactions[case_id].response,
+                )
+
             if has_failures:
                 self.cases_with_failures += 1
 

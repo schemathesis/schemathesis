@@ -330,7 +330,7 @@ def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
     result = cli.run(
         str(schema_path),
         f"--url={base_url}",
-        "--hypothesis-phases=explicit",
+        "--phases=examples",
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -368,7 +368,7 @@ def before_generate_case(context, strategy):
             str(schema_file),
             "--url=http://127.0.0.1:1",
             "--seed=23",
-            "--hypothesis-phases=generate",
+            "--phases=fuzzing",
             hooks=module,
         )
         == snapshot_cli
@@ -417,7 +417,7 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
             "run",
             str(schema_file),
             "--seed=23",
-            "--hypothesis-phases=explicit",
+            "--phases=examples",
             f"--url={openapi3_base_url}",
             "--checks=explicit_header",
             "--set-header=anyKey=OVERRIDE",

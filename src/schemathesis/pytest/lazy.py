@@ -10,9 +10,10 @@ from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
 from schemathesis.core.errors import InvalidSchema
-from schemathesis.core.result import Ok
+from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation.hypothesis.builder import get_all_tests
+from schemathesis.generation import GenerationConfig
+from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
     GivenInput,
@@ -27,9 +28,46 @@ from schemathesis.pytest.control_flow import fail_on_no_matches
 from schemathesis.schemas import BaseSchema
 
 if TYPE_CHECKING:
+    import hypothesis
     from _pytest.fixtures import FixtureRequest
 
     from schemathesis.schemas import APIOperation
+
+
+def get_all_tests(
+    *,
+    schema: BaseSchema,
+    test_func: Callable,
+    generation_config: GenerationConfig,
+    modes: list[HypothesisTestMode],
+    settings: hypothesis.settings | None = None,
+    seed: int | None = None,
+    as_strategy_kwargs: Callable[[APIOperation], dict[str, Any]] | None = None,
+    given_kwargs: dict[str, GivenInput] | None = None,
+) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
+    """Generate all operations and Hypothesis tests for them."""
+    for result in schema.get_all_operations(generation_config=generation_config):
+        if isinstance(result, Ok):
+            operation = result.ok()
+            if callable(as_strategy_kwargs):
+                _as_strategy_kwargs = as_strategy_kwargs(operation)
+            else:
+                _as_strategy_kwargs = {}
+            test = create_test(
+                operation=operation,
+                test_func=test_func,
+                config=HypothesisTestConfig(
+                    settings=settings,
+                    modes=modes,
+                    seed=seed,
+                    generation=generation_config,
+                    as_strategy_kwargs=_as_strategy_kwargs,
+                    given_kwargs=given_kwargs or {},
+                ),
+            )
+            yield Ok((operation, test))
+        else:
+            yield result
 
 
 @dataclass
@@ -155,6 +193,7 @@ class LazySchema:
                         schema=schema,
                         test_func=test_func,
                         settings=settings,
+                        modes=list(HypothesisTestMode),
                         generation_config=schema.generation_config,
                         as_strategy_kwargs=as_strategy_kwargs,
                         given_kwargs=given_kwargs,

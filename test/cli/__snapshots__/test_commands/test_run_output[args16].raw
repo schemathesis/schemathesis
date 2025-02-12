@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid SCHEMA, must be a valid URL or file path.
+Error: Invalid value for '--max-response-time': 0.0 is not in the range x>0.0.

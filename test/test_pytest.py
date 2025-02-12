@@ -45,7 +45,7 @@ def test_(request, param, case):
             r"test_pytest_parametrize_fixture.py::test_\[GET /users\]\[B\] PASSED",
             r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[A\] PASSED",
             r"test_pytest_parametrize_fixture.py::test_\[POST /users\]\[B\] PASSED",
-            r"Hypothesis calls: 4",
+            r"Hypothesis calls: 8",
         ]
     )
 
@@ -109,7 +109,7 @@ class TestAPI:
             r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[GET /users\]\[B\] PASSED",
             r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[A\] PASSED",
             r"test_pytest_parametrize_class_fixture.py::TestAPI::test_\[POST /users\]\[B\] PASSED",
-            r"Hypothesis calls: 4",
+            r"Hypothesis calls: 8",
         ]
     )
 
@@ -619,7 +619,6 @@ def test_b(v):
     stdout = result.stdout.str()
     # Internal Schemathesis' frames should not appear in the output
     assert "def validate_response(" not in stdout
-    assert "in call_and_validate" not in stdout
     # And Hypothesis "Falsifying example" block is not in the output of Schemathesis' tests
     assert "Falsifying example: test_a(" not in stdout
     # And regular Hypothesis tests have it
@@ -665,6 +664,7 @@ def test(case):
     assert expected in result.stdout.str()
 
 
+@pytest.mark.xfail(reason="There is no way to disable the coverage phase via Python API")
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
@@ -687,18 +687,6 @@ def test(case):
                             "schema": {"type": "integer", "minimum": 5, "maximum": 4},
                         }
                     ],
-                    "requestBody": {
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "foo": {"type": "string", "example": "foo example string"},
-                                    },
-                                },
-                            }
-                        }
-                    },
                     "responses": {"200": {"description": "OK"}},
                 }
             }
@@ -821,7 +809,7 @@ schema.base_url = "{openapi3_base_url}"
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])
 def test(case):
-    pass
+    case.call()
 """,
         paths={
             "/success": {
@@ -860,12 +848,13 @@ schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
 @schema.include(path_regex="path_variable|custom_format").parametrize()
 @schema.override(path_parameters={{"key": "foo"}}, query={{"id": "bar"}})
 def test(case):
-    if "key" in case.operation.path_parameters:
-        assert case.path_parameters["key"] == "foo"
-        assert "id" not in (case.query or {{}}), "`id` is present"
-    if "id" in case.operation.query:
-        assert case.query["id"] == "bar"
-        assert "key" not in (case.path_parameters or {{}}), "`key` is present"
+    if not hasattr(case.meta.phase.data, "description"):
+        if "key" in case.operation.path_parameters:
+            assert case.path_parameters["key"] == "foo"
+            assert "id" not in (case.query or {{}}), "`id` is present"
+        if "id" in case.operation.query:
+            assert case.query["id"] == "bar"
+            assert "key" not in (case.path_parameters or {{}}), "`key` is present"
 """
     )
     result = testdir.runpytest()

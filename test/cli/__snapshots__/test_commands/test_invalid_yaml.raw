@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ❌  Failed to load specification from /tmp/schema.yaml after N ms
+ ❌  Failed to load specification from /tmp/schema.yaml after 0.00s
 
  Schema Loading Error
 

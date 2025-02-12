@@ -325,8 +325,8 @@ class ProbingProgressManager:
 
 @dataclass
 class WarningData:
-    missing_auth: dict[int, list[str]] = field(default_factory=dict)
-    only_4xx_responses: list[str] = field(default_factory=list)  # operations that only returned 4xx
+    missing_auth: dict[int, set[str]] = field(default_factory=dict)
+    only_4xx_responses: set[str] = field(default_factory=set)  # operations that only returned 4xx
 
 
 @dataclass
@@ -464,7 +464,7 @@ class UnitTestProgressManager:
         if self.stats[Status.ERROR]:
             parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} errors")
         if self.stats[Status.SKIP] or self.stats[Status.INTERRUPTED]:
-            parts.append(f"⏭️ {self.stats[Status.SKIP] + self.stats[Status.INTERRUPTED]:{width}d} skipped")
+            parts.append(f"⏭  {self.stats[Status.SKIP] + self.stats[Status.INTERRUPTED]:{width}d} skipped")
         return "  ".join(parts)
 
     def _update_stats_display(self) -> None:
@@ -516,7 +516,11 @@ class UnitTestProgressManager:
         if operation := self.current_operations.pop(label, None):
             if not self.current_operations:
                 assert self.title_task_id is not None
-                self.title_progress.update(self.title_task_id)
+                if self.current == self.total - 1:
+                    description = f"  {self.title}"
+                else:
+                    description = self.title
+                self.title_progress.update(self.title_task_id, description=description)
             self.operations_progress.update(operation.task_id, visible=False)
 
     def update_stats(self, status: Status) -> None:
@@ -545,7 +549,7 @@ class UnitTestProgressManager:
         elif self.stats[Status.SUCCESS] > 0:
             icon = "✅"
         elif self.stats[Status.SKIP] > 0:
-            icon = "⏭️"
+            icon = "⏭ "
         else:
             icon = default_icon
         return icon
@@ -664,7 +668,7 @@ class StatefulProgressManager:
         from rich.text import Text
 
         # Initialize progress displays
-        self.title_task_id = self.title_progress.add_task("Stateful tests")
+        self.title_task_id = self.title_progress.add_task("Stateful")
         self.progress_task_id = self.progress_bar.add_task(
             "", scenarios=0, links=f"0 covered / {self.links_selected} selected / {self.links_total} total links"
         )
@@ -715,7 +719,7 @@ class StatefulProgressManager:
         if self.stats[Status.ERROR]:
             parts.append(f"🚫 {self.stats[Status.ERROR]} errors")
         if self.stats[Status.SKIP]:
-            parts.append(f"⏭️ {self.stats[Status.SKIP]} skipped")
+            parts.append(f"⏭  {self.stats[Status.SKIP]} skipped")
         return "  ".join(parts)
 
     def _update_stats_display(self) -> None:
@@ -732,7 +736,7 @@ class StatefulProgressManager:
         elif self.stats[Status.SUCCESS] > 0:
             icon = "✅"
         elif self.stats[Status.SKIP] > 0:
-            icon = "⏭️"
+            icon = "⏭ "
         else:
             icon = default_icon
         return icon
@@ -758,30 +762,8 @@ class StatefulProgressManager:
 
 
 def format_duration(duration_ms: int) -> str:
-    """Format duration in milliseconds to human readable string."""
-    parts = []
-
-    # Convert to components
-    ms = duration_ms % 1000
-    seconds = (duration_ms // 1000) % 60
-    minutes = (duration_ms // (1000 * 60)) % 60
-    hours = duration_ms // (1000 * 60 * 60)
-
-    # Add non-empty components
-    if hours > 0:
-        parts.append(f"{hours} h")
-    if minutes > 0:
-        parts.append(f"{minutes} m")
-    if seconds > 0:
-        parts.append(f"{seconds} s")
-    if ms > 0:
-        parts.append(f"{ms} ms")
-
-    # Handle zero duration
-    if not parts:
-        return "0 ms"
-
-    return " ".join(parts)
+    """Format duration in milliseconds to seconds with 2 decimal places."""
+    return f"{duration_ms / 1000:.2f}s"
 
 
 @dataclass
@@ -802,7 +784,7 @@ class OutputHandler(EventHandler):
     skip_reasons: list[str] = field(default_factory=list)
     report_config: ReportConfig | None = None
     warnings: WarningData = field(default_factory=WarningData)
-    errors: list[events.NonFatalError] = field(default_factory=list)
+    errors: set[events.NonFatalError] = field(default_factory=set)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
         default_factory=lambda: {phase: (Status.SKIP, None) for phase in PhaseName}
     )
@@ -824,7 +806,7 @@ class OutputHandler(EventHandler):
         elif isinstance(event, events.FatalError):
             self._on_fatal_error(ctx, event)
         elif isinstance(event, events.NonFatalError):
-            self.errors.append(event)
+            self.errors.add(event)
         elif isinstance(event, LoadingStarted):
             self._on_loading_started(event)
         elif isinstance(event, LoadingFinished):
@@ -889,8 +871,8 @@ class OutputHandler(EventHandler):
         phase = event.phase
         if phase.name == PhaseName.PROBING and phase.is_enabled:
             self._start_probing()
-        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
-            self._start_unit_tests()
+        elif phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING] and phase.is_enabled:
+            self._start_unit_tests(phase.name)
         elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and phase.skip_reason is None:
             self._start_stateful_tests()
 
@@ -898,11 +880,12 @@ class OutputHandler(EventHandler):
         self.probing_manager = ProbingProgressManager(console=self.console)
         self.probing_manager.start()
 
-    def _start_unit_tests(self) -> None:
+    def _start_unit_tests(self, phase: PhaseName) -> None:
         assert self.statistic is not None
+        assert self.unit_tests_manager is None
         self.unit_tests_manager = UnitTestProgressManager(
             console=self.console,
-            title="Unit tests",
+            title=phase.value,
             total=self.statistic.operations.selected,
         )
         self.unit_tests_manager.start()
@@ -911,7 +894,7 @@ class OutputHandler(EventHandler):
         assert self.statistic is not None
         self.stateful_tests_manager = StatefulProgressManager(
             console=self.console,
-            title="Stateful tests",
+            title="Stateful",
             links_selected=self.statistic.links.selected,
             links_total=self.statistic.links.total,
         )
@@ -967,7 +950,7 @@ class OutputHandler(EventHandler):
             elif event.status == Status.SKIP:
                 message = Padding(
                     Text.assemble(
-                        ("⏭️  ", ""),
+                        ("⏭   ", ""),
                         ("API probing skipped", Style(color="yellow")),
                     ),
                     BLOCK_PADDING,
@@ -985,8 +968,7 @@ class OutputHandler(EventHandler):
                 )
             self.console.print(message)
             self.console.print()
-        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled:
-            assert self.stateful_tests_manager is not None
+        elif phase.name == PhaseName.STATEFUL_TESTING and phase.is_enabled and self.stateful_tests_manager is not None:
             self.stateful_tests_manager.stop()
             if event.status == Status.ERROR:
                 title, summary = self.stateful_tests_manager.get_completion_message("🚫")
@@ -1015,27 +997,29 @@ class OutputHandler(EventHandler):
             self.console.print(Padding(Text(summary, style="bright_white"), (0, 0, 0, 5)))
             self.console.print()
             self.stateful_tests_manager = None
-        elif phase.name == PhaseName.UNIT_TESTING and phase.is_enabled:
-            assert self.unit_tests_manager is not None
+        elif (
+            phase.name in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]
+            and phase.is_enabled
+            and self.unit_tests_manager is not None
+        ):
             self.unit_tests_manager.stop()
             if event.status == Status.ERROR:
                 message = self.unit_tests_manager.get_completion_message("🚫")
             else:
                 message = self.unit_tests_manager.get_completion_message()
             self.console.print(Padding(Text(message, style="white"), BLOCK_PADDING))
-            if event.status != Status.INTERRUPTED:
-                self.console.print()
+            self.console.print()
             self.unit_tests_manager = None
 
     def _on_scenario_started(self, event: events.ScenarioStarted) -> None:
-        if event.phase == PhaseName.UNIT_TESTING:
+        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
             # We should display execution result + percentage in the end. For example:
             assert event.label is not None
             assert self.unit_tests_manager is not None
             self.unit_tests_manager.start_operation(event.label)
 
     def _on_scenario_finished(self, event: events.ScenarioFinished) -> None:
-        if event.phase == PhaseName.UNIT_TESTING:
+        if event.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]:
             assert self.unit_tests_manager is not None
             if event.label:
                 self.unit_tests_manager.finish_operation(event.label)
@@ -1061,14 +1045,14 @@ class OutputHandler(EventHandler):
 
         for status_code in (401, 403):
             if statistic.ratio_for(status_code) >= TOO_MANY_RESPONSES_THRESHOLD:
-                self.warnings.missing_auth.setdefault(status_code, []).append(event.recorder.label)
+                self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
         # Only warn about 4xx responses in successful positive test scenarios
         if (
             event.status == Status.SUCCESS
             and self.engine_config.execution.generation.modes == [GenerationMode.POSITIVE]
             and statistic.should_warn_about_only_4xx()
         ):
-            self.warnings.only_4xx_responses.append(event.recorder.label)
+            self.warnings.only_4xx_responses.add(event.recorder.label)
 
     def _on_interrupted(self, event: events.Interrupted) -> None:
         from rich.padding import Padding
@@ -1160,7 +1144,7 @@ class OutputHandler(EventHandler):
                     )
                 )
                 # Show first few API operations
-                for endpoint in operations[:3]:
+                for endpoint in sorted(operations)[:3]:
                     click.echo(_style(f"  - {endpoint}", fg="yellow"))
                 if len(operations) > 3:
                     click.echo(_style(f"  + {len(operations) - 3} more", fg="yellow"))
@@ -1172,10 +1156,6 @@ class OutputHandler(EventHandler):
             click.echo()
 
         if self.warnings.only_4xx_responses:
-            if self.warnings.missing_auth:
-                # Add extra spacing if we had auth warnings before
-                click.echo()
-
             count = len(self.warnings.only_4xx_responses)
             suffix = "" if count == 1 else "s"
             click.echo(
@@ -1185,7 +1165,7 @@ class OutputHandler(EventHandler):
                 )
             )
 
-            for endpoint in self.warnings.only_4xx_responses[:3]:
+            for endpoint in sorted(self.warnings.only_4xx_responses)[:3]:
                 click.echo(_style(f"  - {endpoint}", fg="yellow"))
             if len(self.warnings.only_4xx_responses) > 3:
                 click.echo(_style(f"  + {len(self.warnings.only_4xx_responses) - 3} more", fg="yellow"))
@@ -1277,7 +1257,7 @@ class OutputHandler(EventHandler):
                 err.label
                 for err in self.errors
                 # Some API operations may have some tests before they have an error
-                if err.phase == PhaseName.UNIT_TESTING
+                if err.phase in [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING]
                 and err.label not in ctx.statistic.tested_operations
                 and err.related_to_operation
             }
@@ -1300,7 +1280,7 @@ class OutputHandler(EventHandler):
             status, skip_reason = self.phases[phase]
 
             if status == Status.SKIP:
-                click.echo(_style(f"  ⏭️ {phase.value}", fg="yellow"), nl=False)
+                click.echo(_style(f"  ⏭  {phase.value}", fg="yellow"), nl=False)
                 if skip_reason:
                     click.echo(_style(f" ({skip_reason.value})", fg="yellow"))
                 else:
@@ -1437,7 +1417,7 @@ class OutputHandler(EventHandler):
         assert self.stateful_tests_manager is None
         if self.errors:
             display_section_name("ERRORS")
-            errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label))
+            errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label, r.info.title))
             for error in errors:
                 display_section_name(error.label, "_", fg="red")
                 click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
@@ -1479,11 +1459,10 @@ class OutputHandler(EventHandler):
                 count = len(self.warnings.only_4xx_responses)
                 suffix = "" if count == 1 else "s"
                 click.echo(
-                    _style(
-                        f"  ⚠️ Schemathesis configuration: {bold(str(count))} operation{suffix} returned only 4xx responses during unit tests",
-                        fg="yellow",
-                    )
+                    _style(f"  ⚠️ Schemathesis configuration: {bold(str(count))}", fg="yellow"),
+                    nl=False,
                 )
+                click.echo(_style(f" operation{suffix} returned only 4xx responses during unit tests", fg="yellow"))
             click.echo()
 
         if ctx.summary_lines:

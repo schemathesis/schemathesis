@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in N ms)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,7 +16,15 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ✅  Unit tests (in N ms)
+ ⏭   Examples (in 0.00s)
+
+     ⏭  2 skipped
+
+ ✅  Coverage (in 0.00s)
+
+     ✅ 2 passed
+
+ ✅  Fuzzing (in 0.00s)
 
      ✅ 2 passed
 
@@ -24,8 +32,8 @@ Schemathesis dev
 
 Schemathesis configuration: 2 operations returned only 4xx responses during unit tests
 
-  - GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
   - GET /aaaaaaaaaa
+  - GET /aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 Tip: Check base URL or adjust data generation settings
 
@@ -37,8 +45,10 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ✅ Unit testing
-  ⏭️ Stateful testing (not applicable)
+  ⏭  Examples
+  ✅ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
 
 Warnings:
   ⚠️ Schemathesis configuration: 2 operations returned only 4xx responses during unit tests

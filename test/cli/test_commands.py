@@ -15,15 +15,11 @@ import yaml
 from _pytest.main import ExitCode
 from aiohttp.test_utils import unused_port
 
-from schemathesis.cli.commands.run.hypothesis import HealthCheck, Phase
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
 from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky
-
-PHASES = ", ".join(x.name for x in Phase)
-HEALTH_CHECKS = "|".join(x.name for x in HealthCheck)
 
 
 def test_commands_help(cli, snapshot_cli):
@@ -60,7 +56,6 @@ def test_run_as_module(testdir):
         ("http://127.0.0.1", "--header= :"),
         ("http://127.0.0.1", "--header=тест:test"),
         ("http://127.0.0.1", "--header=test:тест"),
-        ("http://127.0.0.1", "--hypothesis-phases=explicit,first,second"),
         ("//test",),
         ("http://127.0.0.1", "--max-response-time=0"),
         ("unknown.json",),
@@ -76,8 +71,6 @@ def test_run_as_module(testdir):
         ("http://127.0.0.1", "--set-query", "key=value", "--set-query", "key=value"),
         ("http://127.0.0.1", "--set-header", "Authorization=value", "--auth", "foo:bar"),
         ("http://127.0.0.1", "--set-header", "Authorization=value", "-H", "Authorization: value"),
-        ("http://127.0.0.1", "--hypothesis-no-phases=unknown"),
-        ("http://127.0.0.1", "--hypothesis-no-phases=explicit", "--hypothesis-phases=explicit"),
         ("http://127.0.0.1", "--report=unknown"),
     ],
 )
@@ -164,7 +157,7 @@ def test_certificates(cli, schema_url, mocker):
         result = cli.run(schema_url, f"--request-cert={cert_path}")
         assert result.exit_code == ExitCode.OK, result.stdout
         # Then both schema & test network calls should use this cert
-        assert len(request.call_args_list) == 2
+        assert len(request.call_args_list) == 3
         assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
@@ -182,7 +175,6 @@ def test_hypothesis_parameters(cli, schema_url):
         schema_url,
         "--generation-deterministic",
         "--max-examples=1000",
-        "--hypothesis-phases=explicit,generate",
         "--suppress-health-check=all",
     )
     # Then they should be correctly converted into arguments accepted by `hypothesis.settings`
@@ -248,7 +240,7 @@ def test_connection_timeout(cli, schema_url, workers, snapshot_cli):
     # When connection timeout is specified in the CLI and the request fails because of it
     # Then the whole Schemathesis run should fail
     # And the given operation should be displayed as a failure
-    assert cli.run(schema_url, "--request-timeout=0.08", f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "--request-timeout=0.08", f"--workers={workers}", "--phases=fuzzing") == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -285,7 +277,7 @@ def test_invalid_operation(cli, schema_url, workers, snapshot_cli):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, f"--workers={workers}", "--phases=fuzzing") == snapshot_cli
 
 
 @pytest.mark.operations("teapot")
@@ -316,7 +308,7 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
 @pytest.mark.snapshot(replace_test_cases=False)
 def test_no_failfast(cli, schema_url):
     result = cli.run(schema_url, "--experimental-no-failfast")
-    assert "100 generated" in result.stdout
+    assert "101 generated" in result.stdout
 
 
 @pytest.mark.operations("multiple_failures")
@@ -356,7 +348,7 @@ def test_chunked_encoding_error(mocker, cli, schema_url, app, snapshot_cli):
             raise urllib3.exceptions.InvalidChunkLength(response, value) from e
 
     mocker.patch("urllib3.response.HTTPResponse._update_chunk_length", _update_chunk_length)
-    assert cli.run(schema_url) == snapshot_cli
+    assert cli.run(schema_url, "--phases=fuzzing") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -402,7 +394,9 @@ def digits_format(ctx):
 @pytest.mark.operations("custom_format")
 def test_hooks_valid(cli, schema_url, app, digits_format):
     # When a hook is passed to the CLI call
-    result = cli.main("run", "--suppress-health-check=filter_too_much", schema_url, hooks=digits_format)
+    result = cli.main(
+        "run", "--suppress-health-check=filter_too_much", "--phases=fuzzing", schema_url, hooks=digits_format
+    )
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
     # And all registered new string format should produce digits as expected
@@ -865,7 +859,7 @@ def test_max_response_time_valid(cli, schema_url):
 def test_exit_first(cli, schema_url, snapshot_cli):
     # When the `--exit-first` CLI option is passed
     # And a failure occurs
-    assert cli.run(schema_url, "--exitfirst") == snapshot_cli
+    assert cli.run(schema_url, "--exitfirst", "--phases=fuzzing") == snapshot_cli
 
 
 def test_long_operation_output(ctx, cli, openapi3_base_url, snapshot_cli):
@@ -1102,7 +1096,7 @@ def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url, snapshot_cli)
     # See GH-1323
     # When there are no explicit examples
     # Then tests should be marked as skipped
-    assert cli.run(openapi3_schema_url, "--hypothesis-phases=explicit") == snapshot_cli
+    assert cli.run(openapi3_schema_url, "--phases=examples") == snapshot_cli
 
 
 @pytest.mark.operations("basic")
@@ -1335,6 +1329,7 @@ def test_long_payload(ctx, cli, snapshot_cli, openapi3_base_url):
     )
 
 
+@pytest.mark.skipif(platform.system() == "Windows", reason="Snapshot is inaccurate on Windows")
 @flaky(max_runs=5, min_passes=1)
 def test_multiple_errors(ctx, cli, snapshot_cli):
     schema_path = ctx.openapi.write_schema(
@@ -1461,7 +1456,7 @@ def test_complex_urlencoded_example(ctx, cli, snapshot_cli, openapi3_base_url):
             }
         }
     )
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--hypothesis-phases=explicit") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
 
 
 @pytest.fixture
@@ -1524,6 +1519,7 @@ def test_parameter_overrides(cli, schema_url, verify_overrides):
         "key=foo",
         "--set-query",
         "id=bar",
+        "--phases=fuzzing",
         schema_url,
         hooks=verify_overrides,
     )

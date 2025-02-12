@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in N ms)
+ ✅  Loaded specification from /tmp/schema.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,9 +16,17 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ❌  Unit tests (in N ms)
+ ⏭   Examples (in 0.00s)
+
+     ⏭  1 skipped
+
+ ❌  Coverage (in 0.00s)
 
      ❌ 1 failed
+
+ ✅  Fuzzing (in 0.00s)
+
+     ✅ 1 passed
 
 =================================== FAILURES ===================================
 __________________________________ POST /foo ___________________________________
@@ -39,59 +47,9 @@ Reproduce with:
 
 2. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `unsupported_method`
-
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with:
-
-    curl -X PUT 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-3. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `unsupported_method`
-
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with:
-
-    curl -X PATCH 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-4. Test Case ID: <PLACEHOLDER>
-
-- Custom check failed: `unsupported_method`
-
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
-
-[404] Not Found:
-
-    `404: Not Found`
-
-Reproduce with:
-
-    curl -X OPTIONS 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
-
-5. Test Case ID: <PLACEHOLDER>
-
 - Custom check failed: `failed`
 
     Should be Unspecified HTTP method: DELETE
-
-- Custom check failed: `unsupported_method`
-
-    Unexpected response status for unspecified HTTP method: 404
-    Expected: 405
 
 [404] Not Found:
 
@@ -101,13 +59,6 @@ Reproduce with:
 
     curl -X DELETE 'http://127.0.0.1/api/foo?key=%5BFiltered%5D'
 
-================================= EXPERIMENTS ==================================
-
-🧪 Coverage phase: Generate covering test cases
-   Feedback: https://github.com/schemathesis/schemathesis/discussions/2418
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -116,16 +67,18 @@ API Operations:
 
 Test Phases:
   ✅ API probing
-  ❌ Unit testing
-  ⏭️ Stateful testing (not applicable)
+  ⏭  Examples
+  ❌ Coverage
+  ✅ Fuzzing
+  ⏭  Stateful (not applicable)
 
 Failures:
   ❌ Custom check failed: `failed`: 1
-  ❌ Custom check failed: `unsupported_method`: 5
+  ❌ Custom check failed: `unsupported_method`: 1
 
 Test cases:
   N generated, N found N unique failures
 
 Seed: 42
 
-============================= 6 failures in 1.00s ==============================
+============================= 2 failures in 1.00s ==============================

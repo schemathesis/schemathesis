@@ -4,4 +4,4 @@ Stdout:
 Usage: run [OPTIONS] SCHEMA
 Try 'run -h' for help.
 
-Error: Invalid value for '--set-header': Header value should be latin-1 encodable.
+Error: Invalid value for '--set-cookie': Cookie value should be latin-1 encodable.

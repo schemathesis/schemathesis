@@ -291,6 +291,7 @@ class CliSnapshotConfig:
     replace_seed: bool = True
     replace_reproduce_with: bool = False
     replace_test_cases: bool = True
+    replace_phase_statistic: bool = False
     remove_last_line: bool = False
 
     @classmethod
@@ -349,10 +350,13 @@ class CliSnapshotConfig:
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
-        if "Stateful tests" in data:
-            before, after = data.split("Stateful tests", 1)
+        if self.replace_phase_statistic:
+            data = re.sub("🚫 [0-9]+ error", "🚫 1 error", data)
+        if "Stateful" in data:
+            data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
+            before, after = data.split("Stateful", 1)
             after = re.sub(r"\d+ passed", "N passed", after)
-            data = before + "Stateful tests" + after
+            data = before + "Stateful" + after
 
         if "Traceback (most recent call last):" in data:
             lines = [line for line in data.splitlines() if set(line) not in ({" ", "^"}, {" ", "^", "~"})]
@@ -377,11 +381,9 @@ class CliSnapshotConfig:
                 "No connection could be made because the target machine actively refused it", "Connection refused"
             )
         if self.replace_duration:
-            data = re.sub(r"It took [0-9]+\.[0-9]{2}ms", "It took 500.00ms", data)
-            data = re.sub(r"in (?:[0-9]+? s )?[0-9]+? ms", "in N ms", data)
-            data = re.sub(r"in [0-9]+? s", "in N ms", data)
-            data = re.sub(r"after [0-9]+? ms", "after N ms", data).strip()
-            data = re.sub(r"after (?:[0-9]+? s )?[0-9]+? ms", "after N ms", data)
+            data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
+            data = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 0.00s", data)
+            data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
             if "in 1.00s" in lines[-1]:
@@ -472,20 +474,25 @@ def clean_unit_tests(lines):
     else:
         return lines
 
-    indexes = [i for i, line in enumerate(lines) if "Unit tests" in line]
+    indices = []
+    for idx, line in enumerate(lines[probing_idx:], start=probing_idx):
+        if any(f"{phase} (in" in line for phase in ("Examples", "Coverage", "Fuzzing")):
+            indices.append(idx)
 
-    if not indexes:
+    if not indices:
         return lines
 
-    last_idx = indexes[-1]
-
-    return lines[:probing_idx] + lines[last_idx:]
+    output = lines[:probing_idx]
+    for idx in indices[:-1]:
+        output += lines[idx : idx + 4]
+    output += lines[indices[-1] :]
+    return output
 
 
 def clean_stateful_tests(lines):
     start_idx = None
     for i, line in enumerate(lines):
-        if "Unit tests (in" in line:
+        if "Fuzzing (in" in line:
             start_idx = i + 3
             break
     if start_idx is None:
@@ -499,7 +506,7 @@ def clean_stateful_tests(lines):
 
     end_idx = None
     for i, line in enumerate(lines):
-        if "Stateful tests (in" in line:
+        if "Stateful (in" in line:
             end_idx = i
             break
 

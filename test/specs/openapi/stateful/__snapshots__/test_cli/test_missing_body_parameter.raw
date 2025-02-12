@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from http://127.0.0.1/openapi.json (in N ms)
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
 
      Base URL:         http://127.0.0.1/
      Specification:    Open API 3.0.2
@@ -16,10 +16,10 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✓
 
- ✅  Stateful tests (in N ms)
+ ✅  Stateful (in 0.00s)
 
      Scenarios:    N
-     API Links:    3 covered / 7 selected / 7 total
+     API Links:    N covered / 1 selected / 1 total
 
      ✅ N passed
 
@@ -34,21 +34,23 @@ Failed to extract data from response:
         Could not resolve parameter `userId` via `$response.body#/id`
         Path `#/id` not found in response
 
-        [201] curl -X POST -H 'Content-Type: application/json' -d '{"name": ""}' http://127.0.0.1/users
+        [201] curl -X POST -H 'Content-Type: application/json' -d '{"name": "fixed-name"}' http://127.0.0.1/users
 
-        {"last_modified":"2021-01-01T00:00:00Z","name":""}
+        {"last_modified":"2021-01-01T00:00:00Z","name":"fixed-name"}
 
 =================================== SUMMARY ====================================
 
 API Operations:
   Selected: 6/6
-  Tested: 4
-  Skipped: 2
+  Tested: 2
+  Skipped: 4
 
 Test Phases:
   ✅ API probing
-  ⏭️ Unit testing (disabled)
-  ✅ Stateful testing
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  ✅ Stateful
 
 Test cases:
   N generated, N passed

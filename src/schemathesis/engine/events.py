@@ -209,6 +209,13 @@ class NonFatalError(EngineEvent):
         self.label = label
         self.related_to_operation = related_to_operation
 
+    def __eq__(self, other: object) -> bool:
+        assert isinstance(other, NonFatalError)
+        return self.label == other.label and type(self.value) is type(other.value)
+
+    def __hash__(self) -> int:
+        return hash((self.label, type(self.value)))
+
 
 @dataclass
 class FatalError(EngineEvent):
