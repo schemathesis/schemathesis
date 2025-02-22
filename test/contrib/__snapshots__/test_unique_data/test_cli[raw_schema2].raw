@@ -24,6 +24,14 @@ Schemathesis dev
 
      ✅ 1 passed
 
+=================================== WARNINGS ===================================
+
+Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
+
+  - GET /data/{path_param}/
+
+Tip: Check base URL or adjust data generation settings
+
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -36,6 +44,9 @@ Test Phases:
   ⏭  Coverage (disabled)
   ✅ Fuzzing
   ⏭  Stateful (disabled)
+
+Warnings:
+  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
   N generated, N passed

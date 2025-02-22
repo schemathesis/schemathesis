@@ -26,7 +26,7 @@ from schemathesis.engine.config import EngineConfig
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
-from schemathesis.engine.recorder import Interaction
+from schemathesis.engine.recorder import Interaction, ScenarioRecorder
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
@@ -1046,10 +1046,28 @@ class OutputHandler(EventHandler):
         for status_code in (401, 403):
             if statistic.ratio_for(status_code) >= TOO_MANY_RESPONSES_THRESHOLD:
                 self.warnings.missing_auth.setdefault(status_code, set()).add(event.recorder.label)
-        # Only warn about 4xx responses in successful positive test scenarios
+
+        # Warn if all positive test cases got 4xx in return and no failure was found
+        def all_positive_are_rejected(recorder: ScenarioRecorder) -> bool:
+            seen_positive = False
+            for case in recorder.cases.values():
+                if not (case.value.meta is not None and case.value.meta.generation.mode == GenerationMode.POSITIVE):
+                    continue
+                seen_positive = True
+                interaction = recorder.interactions.get(case.value.id)
+                if not (interaction is not None and interaction.response is not None):
+                    continue
+                # At least one positive response for positive test case
+                if 200 <= interaction.response.status_code < 300:
+                    return False
+            # If there are positive test cases, and we ended up here, then there are no 2xx responses for them
+            # Otherwise, there are no positive test cases at all and this check should pass
+            return seen_positive
+
         if (
             event.status == Status.SUCCESS
-            and self.engine_config.execution.generation.modes == [GenerationMode.POSITIVE]
+            and GenerationMode.POSITIVE in self.engine_config.execution.generation.modes
+            and all_positive_are_rejected(event.recorder)
             and statistic.should_warn_about_only_4xx()
         ):
             self.warnings.only_4xx_responses.add(event.recorder.label)
@@ -1499,9 +1517,6 @@ class StatusCodeStatistic:
     def should_warn_about_only_4xx(self) -> bool:
         """Check if an operation should be warned about (only 4xx responses, excluding auth)."""
         if self.total == 0:
-            return False
-        # Don't warn if we saw any 2xx or 5xx responses
-        if any(status < 400 or status >= 500 for status in self.counts):
             return False
         # Don't duplicate auth warnings
         if set(self.counts.keys()) <= {401, 403}:
