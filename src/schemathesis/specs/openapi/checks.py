@@ -299,7 +299,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
 
 def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     meta = case.meta
-    if meta is None or not isinstance(meta.phase.data, CoveragePhaseData):
+    if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or response.request.method == "OPTIONS":
         return None
     data = meta.phase.data
     if data.description and data.description.startswith("Unspecified HTTP method:"):

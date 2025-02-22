@@ -1113,6 +1113,11 @@ def test_warning_on_no_2xx(cli, openapi3_schema_url, snapshot_cli):
     assert cli.run(openapi3_schema_url) == snapshot_cli
 
 
+@pytest.mark.operations("always_incorrect")
+def test_warning_on_no_2xx_options_only(cli, openapi3_schema_url, snapshot_cli):
+    assert cli.run(openapi3_schema_url, "--mode=all", "--phases=coverage") == snapshot_cli
+
+
 @pytest.fixture
 def data_generation_check(ctx):
     with ctx.check(

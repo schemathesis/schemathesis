@@ -24,6 +24,7 @@ Phase configuration changes:
 **Changed**
 - Separated ``coverage`` and ``examples`` into independent testing phases
 - Replaced ``--hypothesis-phases`` with ``--phases`` for more intuitive configuration
+- Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
 
 **Fixed**
 
