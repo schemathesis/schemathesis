@@ -1,0 +1,99 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       1 selected / 1 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ ❌  Coverage (in 0.00s)
+
+     ❌ 1 failed
+
+=================================== FAILURES ===================================
+__________________________________ GET /test ___________________________________
+1. Test Case ID: <PLACEHOLDER>
+
+- Accepted negative data
+
+    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
+
+[406] Not Acceptable:
+
+    `{"message":"negative"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+2. Test Case ID: <PLACEHOLDER>
+
+- Response violates schema
+
+    'message' is a required property
+
+    Schema:
+
+        {
+            "properties": {
+                "message": {
+                    "type": "string"
+                }
+            },
+            "required": [
+                "message"
+            ],
+            "type": "object"
+        }
+
+    Value:
+
+        {
+            "incorrect": "positive"
+        }
+
+- Accepted negative data
+
+    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
+
+[200] OK:
+
+    `{"incorrect":"positive"}`
+
+Reproduce with:
+
+    <PLACEHOLDER>
+
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 1/1
+  Tested: 1
+
+Test Phases:
+  ✅ API probing
+  ⏭  Examples (disabled)
+  ❌ Coverage
+  ⏭  Fuzzing (disabled)
+  ⏭  Stateful (disabled)
+
+Failures:
+  ❌ Response violates schema: 1
+  ❌ Accepted negative data: 2
+
+Test cases:
+  N generated, N found N unique failures
+
+Seed: 42
+
+============================= 3 failures in 1.00s ==============================

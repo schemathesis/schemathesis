@@ -1,5 +1,6 @@
 import pytest
 from _pytest.main import ExitCode
+from flask import Flask, jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -44,6 +45,79 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
         "--max-examples=5",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cli):
+    raw_schema = {
+        "openapi": "3.0.0",
+        "paths": {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "Accept-Language",
+                            "in": "header",
+                            "required": True,
+                            "schema": {
+                                "type": "string",
+                                "enum": ["en-US", "fr-FR"],
+                            },
+                        },
+                        {
+                            "name": "$lang",
+                            "in": "query",
+                            "required": False,
+                            "schema": {
+                                "type": "string",
+                                "enum": ["ro-RO", "th-TH"],
+                                "example": "en-US",
+                            },
+                        },
+                    ],
+                    "responses": {
+                        "default": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"message": {"type": "string"}},
+                                        "required": ["message"],
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    }
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/test", methods=["GET"])
+    def test_endpoint():
+        header = request.headers.get("Accept-Language")
+        if header not in ["en-US", "fr-FR"]:
+            return jsonify({"message": "negative"}), 406
+        return jsonify({"incorrect": "positive"}), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-call",
+            "--mode=all",
+            "--phases=coverage",
+            "--experimental-no-failfast",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.fixture
