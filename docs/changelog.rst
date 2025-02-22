@@ -9,6 +9,10 @@ Changelog
 - Deduplicate failures from ``negative_data_rejection`` by response status code.
   It makes Schemathesis display more different failures for this check.
 
+**Changed**
+
+- Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
+
 .. _v3.39.10:
 
 :version:`3.39.10 <v3.39.9...v3.39.10>` - 2025-02-10

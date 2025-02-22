@@ -294,7 +294,12 @@ def missing_required_header(ctx: CheckContext, response: GenericResponse, case: 
 
 
 def unsupported_method(ctx: CheckContext, response: GenericResponse, case: Case) -> bool | None:
-    if case.meta and case.meta.description and case.meta.description.startswith("Unspecified HTTP method:"):
+    if (
+        case.meta
+        and case.meta.description
+        and case.meta.description.startswith("Unspecified HTTP method:")
+        and response.request.method != "OPTIONS"
+    ):
         if response.status_code != 405:
             raise AssertionError(
                 f"Unexpected response status for unspecified HTTP method: {response.status_code}\nExpected: 405"

@@ -1,0 +1,24 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1/schema.yaml
+Base URL: http://127.0.0.1/api
+Specification version: Open API 3.0.2
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+GET /api/always_incorrect .                                               [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                    1 / 1 passed          PASSED 
+
+WARNING: `GET /api/always_incorrect` returned only 4xx responses during unit tests. Check base URL or adjust data generation settings
+
+============================== 1 passed in 1.00s ===============================

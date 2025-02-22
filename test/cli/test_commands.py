@@ -2296,7 +2296,7 @@ def test_digest_auth(cli, openapi3_schema_url):
 
 
 @pytest.mark.operations("basic")
-def test_warning_on_unauthorized(cli, openapi3_schema_url):
+def test_warning_on_unauthorized(cli, openapi3_schema_url, snapshot_cli):
     # When endpoint returns only 401
     result = cli.run(openapi3_schema_url)
     # Then the output should contain a warning about it
@@ -2305,6 +2305,19 @@ def test_warning_on_unauthorized(cli, openapi3_schema_url):
         "WARNING: Most of the responses from `GET /api/basic` have a 401 status code. "
         "Did you specify proper API credentials?" in strip_style_win32(result.stdout)
     )
+    assert cli.run(openapi3_schema_url) == snapshot_cli
+
+
+@pytest.mark.operations("always_incorrect")
+def test_warning_on_no_2xx(cli, openapi3_schema_url, snapshot_cli):
+    # When endpoint does not return 2xx at all
+    # Then the output should contain a warning about it
+    assert cli.run(openapi3_schema_url) == snapshot_cli
+
+
+@pytest.mark.operations("always_incorrect")
+def test_warning_on_no_2xx_options_only(cli, openapi3_schema_url, snapshot_cli):
+    assert cli.run(openapi3_schema_url, "--data-generation-method=all", "--experimental=coverage-phase") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
