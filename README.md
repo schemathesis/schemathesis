@@ -41,36 +41,17 @@ Schemathesis is an API testing tool that automatically finds crashes and validat
 
 ### Highlights
 
-🎯 **Catches Hard-to-Find Bugs**
+- 🎯 **Catches Hard-to-Find Bugs**: Automatically uncover crashes and spec violations that manual testing might miss.
 
-- Uncover hidden crashes and edge cases that manual testing might miss
-- Identify spec violations and ensure your API adheres to its contract
+- ⚡ **Accelerates Testing**: Generate a wide range of test cases directly from your API schema.
 
-⚡ **Accelerates Testing Cycles**
+- 🧩 **Integrates Seamlessly**: Works with popular API formats such as OpenAPI and GraphQL, and easily integrates into your existing CI/CD workflows.
 
-- Automatically generate a wide range of test cases based on your API schema
-- Save time by reducing the need for manual test case creation
+- 🔧 **Customizable and Extendable**: Leverage Python extensions to configure and extend your test generation.
 
-🧩 **Integrates Seamlessly**
+- 🐞 **Simplifies Debugging**: Detailed reports and reproducible test cases with cURL commands streamline troubleshooting.
 
-- Works with popular API formats such as OpenAPI, GraphQL.
-- Easily integrate into your existing CI/CD workflows.
-
-🔧 **Customizable and Extendable**
-
-- Tune the testing process using Python extensions.
-- Adjust the testing flow to suit your needs with rich configuration options.
-
-🐞 **Simplifies Debugging**
-
-- Get detailed reports to identify and fix issues quickly.
-- Reproduce failing test cases with cURL commands.
-
-🔬 **Proven by Research**
-
-- Validated through academic studies on API testing automation
-- Featured in [ICSE 2022 paper](https://ieeexplore.ieee.org/document/9793781) on semantics-aware fuzzing
-- Recognized in [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as state-of-the-art RESTful API testing tool
+- 🔬 **Proven by Research**: Validated through academic studies on API testing automation, featured in the [ICSE 2022 paper](https://ieeexplore.ieee.org/document/9793781) on semantics-aware fuzzing, and recognized in an [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as a state-of-the-art RESTful API testing tool.
 
 ## Installation
 
