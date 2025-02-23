@@ -309,14 +309,12 @@ class Template:
 
     def unmodified(self) -> TemplateValue:
         kwargs = self._template.copy()
-        if self._serializers:
-            kwargs = self._serialize(kwargs)
+        kwargs = self._serialize(kwargs)
         return TemplateValue(kwargs=kwargs, components=self._components.copy())
 
     def with_body(self, *, media_type: str, value: coverage.GeneratedValue) -> TemplateValue:
         kwargs = {**self._template, "media_type": media_type, "body": value.value}
-        if self._serializers:
-            kwargs = self._serialize(kwargs)
+        kwargs = self._serialize(kwargs)
         components = {**self._components, ComponentKind.BODY: ComponentInfo(mode=value.generation_mode)}
         return TemplateValue(kwargs=kwargs, components=components)
 
@@ -332,8 +330,7 @@ class Template:
     def with_container(self, *, container_name: str, value: Any, generation_mode: GenerationMode) -> TemplateValue:
         kwargs = {**self._template, container_name: value}
         components = {**self._components, ComponentKind(container_name): ComponentInfo(mode=generation_mode)}
-        if self._serializers:
-            kwargs = self._serialize(kwargs)
+        kwargs = self._serialize(kwargs)
         return TemplateValue(kwargs=kwargs, components=components)
 
 
