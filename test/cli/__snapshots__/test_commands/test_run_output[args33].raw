@@ -1,7 +1,0 @@
-Exit code: 2
----
-Stdout:
-Usage: run [OPTIONS] SCHEMA
-Try 'run -h' for help.
-
-Error: Invalid value for '--report': invalid choice(s): unknown. Choose from junit, vcr, har.
