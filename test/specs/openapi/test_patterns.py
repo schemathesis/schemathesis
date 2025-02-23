@@ -105,6 +105,7 @@ SKIP_BEFORE_PY11 = pytest.mark.skipif(
         ("^[a-z]*-[0-9]*$", 3, 3, "^([a-z]){0}-([0-9]){2}$"),
         # Multiple fixed parts
         ("^abc[0-9]{1,3}def[a-z]{2,5}ghi$", 12, 12, "^abc([0-9]){1}def([a-z]){2}ghi$"),
+        ("^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,}$", None, 6000, "^(((?:DB|BR)[-a-zA-Z0-9_]+),?){1,6000}$"),
     ],
 )
 def test_update_quantifier(pattern, min_length, max_length, expected):
