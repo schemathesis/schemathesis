@@ -1,8 +1,13 @@
 Changelog
 =========
 
-:version:`Unreleased <v4.0.0-alpha.4...HEAD>` - TBD
+:version:`Unreleased <v4.0.0-alpha.5...HEAD>` - TBD
 ---------------------------------------------------
+
+.. _v4.0.0-alpha.5:
+
+:version:`4.0.0-alpha.5 <v4.0.0-alpha.4...v4.0.0-alpha.5>` - 2025-02-23
+-----------------------------------------------------------------------
 
 This release introduces a new phase management system for CLI that simplifies test execution control and separates unit testing into different stages.
 
