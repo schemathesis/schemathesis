@@ -26,6 +26,8 @@ Phase configuration changes:
 - Replace ``--hypothesis-phases`` with ``--phases``.
 - Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
 - Add HTTP 406 status to the list of status codes that are expected for negative test cases.
+- The experimental ``--experimental-no-failfast`` option has been stabilized as ``--continue-on-failure``.
+  This option ensures all test cases within a scenario are executed, even if failures occur.
 
 **Fixed**
 
@@ -38,6 +40,7 @@ Phase configuration changes:
 **Removed**
 
 - ``--hypothesis-no-phases``.
+- ``--exitfirst``. Use ``--max-failures=1`` instead.
 
 .. _v4.0.0-alpha.4:
 

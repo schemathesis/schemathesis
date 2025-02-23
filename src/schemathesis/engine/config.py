@@ -32,7 +32,7 @@ class ExecutionConfig:
     generation: GenerationConfig = field(default_factory=GenerationConfig)
     max_failures: int | None = None
     unique_inputs: bool = False
-    no_failfast: bool = False
+    continue_on_failure: bool = False
     seed: int | None = None
     workers_num: int = 1
 

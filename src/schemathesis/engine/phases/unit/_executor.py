@@ -180,7 +180,7 @@ def run_test(
             yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
-        and ctx.config.execution.no_failfast
+        and ctx.config.execution.continue_on_failure
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
@@ -285,7 +285,7 @@ def test_func(*, ctx: EngineContext, case: Case, recorder: ScenarioRecorder) -> 
         ctx=ctx.get_check_context(recorder),
         checks=ctx.config.execution.checks,
         response=response,
-        no_failfast=ctx.config.execution.no_failfast,
+        continue_on_failure=ctx.config.execution.continue_on_failure,
         recorder=recorder,
     )
 
@@ -296,7 +296,7 @@ def validate_response(
     ctx: CheckContext,
     checks: Iterable[CheckFunction],
     response: Response,
-    no_failfast: bool,
+    continue_on_failure: bool,
     recorder: ScenarioRecorder,
 ) -> None:
     failures = set()
@@ -323,5 +323,5 @@ def validate_response(
         on_success=on_success,
     )
 
-    if failures and not no_failfast:
+    if failures and not continue_on_failure:
         raise FailureGroup(list(failures)) from None
