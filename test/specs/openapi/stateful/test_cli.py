@@ -36,7 +36,7 @@ def test_sanitization(cli, schema_url, tmp_path):
         "--max-examples=80",
         f"--header=Authorization: Bearer {token}",
         f"--report-vcr-path={cassette_path}",
-        "--exitfirst",
+        "--max-failures=1",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     assert token not in result.stdout
@@ -66,7 +66,7 @@ def test_with_cassette(tmp_path, cli, schema_url):
     cli.run(
         schema_url,
         "--max-examples=40",
-        "--exitfirst",
+        "--max-failures=1",
         f"--report-vcr-path={cassette_path}",
     )
     assert cassette_path.exists()
@@ -84,7 +84,7 @@ def test_junit(tmp_path, cli, schema_url):
         schema_url,
         "--phases=stateful",
         "--max-examples=80",
-        "--exitfirst",
+        "--max-failures=1",
         f"--report-junit-path={junit_path}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -129,7 +129,7 @@ def test_filtered_out(cli, schema_url, snapshot_cli):
             schema_url,
             "--max-examples=40",
             "--include-path=/success",
-            "--exitfirst",
+            "--max-failures=1",
         )
         == snapshot_cli
     )

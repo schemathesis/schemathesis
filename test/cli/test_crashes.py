@@ -62,9 +62,10 @@ def csv_strategy(enum, exclude=()):
     return st.lists(st.sampled_from([item.name for item in enum if item.name not in exclude]), min_size=1).map(",".join)
 
 
-# The following strategies generate CLI parameters, for example "--workers=5" or "--exitfirst"
+# The following strategies generate CLI parameters, for example "--workers=5" or "--max-failures=10"
 @settings(
     suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
+    phases=[Phase.explicit, Phase.reuse, Phase.target, Phase.generate],
     deadline=None,
 )
 @given(
@@ -91,9 +92,8 @@ def csv_strategy(enum, exclude=()):
         optional={
             key: st.booleans()
             for key in (
-                "exitfirst",
                 "generation-deterministic",
-                "experimental-no-failfast",
+                "continue-on-failure",
                 "generation-unique-inputs",
                 "no-color",
             )
@@ -138,7 +138,11 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
     check_result(result)
 
 
-@settings(suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture], deadline=None)
+@settings(
+    suppress_health_check=[HealthCheck.too_slow, HealthCheck.function_scoped_fixture],
+    phases=[Phase.explicit, Phase.reuse, Phase.target, Phase.generate],
+    deadline=None,
+)
 @given(
     params=st.fixed_dictionaries(
         {},
@@ -161,9 +165,8 @@ def test_valid_parameters_combos(cli, schema_url, params, flags, multiple_params
         optional={
             key: st.booleans()
             for key in (
-                "exitfirst",
                 "generation-deterministic",
-                "experimental-no-failfast",
+                "continue-on-failure",
                 "generation-unique-inputs",
                 "no-color",
             )

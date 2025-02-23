@@ -633,7 +633,7 @@ def test_deduplication(ctx, response_factory):
             checks=(content_type_conformance, response_schema_conformance),
             recorder=recorder,
             response=response,
-            no_failfast=False,
+            continue_on_failure=False,
         )
     # Then the resulting output should be deduplicated
     assert (

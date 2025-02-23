@@ -114,7 +114,7 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
             "-call",
             "--mode=all",
             "--phases=coverage",
-            "--experimental-no-failfast",
+            "--continue-on-failure",
             "--experimental-negative-data-rejection-allowed-statuses=400,401,403,404,422,428,5xx",
         )
         == snapshot_cli

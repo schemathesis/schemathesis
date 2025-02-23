@@ -117,20 +117,19 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     metavar="",
 )
 @grouped_option(
-    "-x",
-    "--exitfirst",
-    "exit_first",
-    is_flag=True,
-    default=False,
-    help="Terminate the test suite immediately upon the first failure or error encountered",
-    show_default=True,
-)
-@grouped_option(
     "--max-failures",
     "max_failures",
     type=click.IntRange(min=1),
     help="Terminate the test suite after reaching a specified number of failures or errors",
     show_default=True,
+)
+@grouped_option(
+    "--continue-on-failure",
+    "continue_on_failure",
+    help="Continue executing all test cases within a scenario, even after encountering failures",
+    is_flag=True,
+    default=False,
+    metavar="",
 )
 @grouped_option(
     "--max-response-time",
@@ -305,15 +304,6 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     callback=validation.convert_experimental,
     multiple=True,
     metavar="FEATURES",
-)
-@grouped_option(
-    "--experimental-no-failfast",
-    "no_failfast",
-    help="Continue testing an API operation after a failure is found",
-    is_flag=True,
-    default=False,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_NO_FAILFAST",
 )
 @grouped_option(
     "--experimental-missing-required-header-allowed-statuses",
@@ -499,7 +489,6 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
-    no_failfast: bool,
     missing_required_header_allowed_statuses: list[str],
     positive_data_acceptance_allowed_statuses: list[str],
     negative_data_rejection_allowed_statuses: list[str],
@@ -507,8 +496,8 @@ def run(
     excluded_check_names: Sequence[str],
     max_response_time: float | None = None,
     phases: Sequence[str] = DEFAULT_PHASES,
-    exit_first: bool = False,
     max_failures: int | None = None,
+    continue_on_failure: bool = False,
     include_path: Sequence[str] = (),
     include_path_regex: str | None = None,
     include_method: Sequence[str] = (),
@@ -624,9 +613,6 @@ def run(
         max_response_time=max_response_time,
     ).into()
 
-    if exit_first and max_failures is None:
-        max_failures = 1
-
     report_config = None
     if report_formats or report_junit_path or report_vcr_path or report_har_path:
         report_config = ReportConfig(
@@ -671,7 +657,7 @@ def run(
                     with_security_parameters=generation_with_security_parameters,
                 ),
                 max_failures=max_failures,
-                no_failfast=no_failfast,
+                continue_on_failure=continue_on_failure,
                 unique_inputs=generation_unique_inputs,
                 seed=seed,
                 workers_num=workers_num,
