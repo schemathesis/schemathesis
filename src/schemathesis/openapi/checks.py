@@ -14,7 +14,9 @@ if TYPE_CHECKING:
 @dataclass
 class NegativeDataRejectionConfig:
     # 5xx will pass through
-    allowed_statuses: list[str] = field(default_factory=lambda: ["400", "401", "403", "404", "422", "428", "5xx"])
+    allowed_statuses: list[str] = field(
+        default_factory=lambda: ["400", "401", "403", "404", "406", "422", "428", "5xx"]
+    )
 
 
 @dataclass

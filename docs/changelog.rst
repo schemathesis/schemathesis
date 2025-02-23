@@ -25,6 +25,7 @@ Phase configuration changes:
 - Separate ``coverage`` and ``examples`` into independent testing phases.
 - Replace ``--hypothesis-phases`` with ``--phases``.
 - Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
+- Add HTTP 406 status to the list of status codes that are expected for negative test cases.
 
 **Fixed**
 
