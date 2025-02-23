@@ -25,6 +25,7 @@ from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.config import EngineConfig, ExecutionConfig
+from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 
@@ -144,6 +145,7 @@ def test_default(corpus, filename, app_port):
         schema,
         config=EngineConfig(
             execution=ExecutionConfig(
+                phases=[PhaseName.EXAMPLES, PhaseName.FUZZING],
                 checks=[combined_check],
                 hypothesis_settings=hypothesis.settings(
                     deadline=None,
