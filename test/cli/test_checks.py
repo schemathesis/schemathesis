@@ -93,7 +93,7 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
     assert result.exit_code == ExitCode.TESTS_FAILED
 
 
-@pytest.mark.snapshot(replace_reproduce_with=True)
+@pytest.mark.snapshot(replace_reproduce_with=True, replace_statistic=True)
 def test_negative_data_rejection_displays_all_cases(cli, snapshot_cli):
     raw_schema = {
         "openapi": "3.0.0",
@@ -161,6 +161,7 @@ def test_negative_data_rejection_displays_all_cases(cli, snapshot_cli):
             "--data-generation-method=all",
             "--experimental=coverage-phase",
             "--experimental-no-failfast",
+            "--experimental-negative-data-rejection-allowed-statuses=400,401,403,404,422,428,5xx",
         )
         == snapshot_cli
     )

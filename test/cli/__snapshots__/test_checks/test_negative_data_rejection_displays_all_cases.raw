@@ -2,8 +2,8 @@ Exit code: 1
 ---
 Stdout:
 ======================= Schemathesis test session starts =======================
-Schema location: http://127.0.0.1:58443/openapi.json
-Base URL: http://127.0.0.1:58443/
+Schema location: http://127.0.0.1:57599/openapi.json
+Base URL: http://127.0.0.1:57599/
 Specification version: Open API 3.0.0
 Random seed: 42
 Workers: 1
@@ -22,20 +22,6 @@ __________________________________ GET /test ___________________________________
 
     Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
 
-[406] Not Acceptable:
-
-    `{"message":"negative"}`
-
-Reproduce with: 
-
-    <PLACEHOLDER>
-
-2. Test Case ID: <PLACEHOLDER>
-
-- Accepted negative data
-
-    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
-
 [200] OK:
 
     `{"incorrect":"positive"}`
@@ -44,7 +30,7 @@ Reproduce with:
 
     <PLACEHOLDER>
 
-3. Test Case ID: <PLACEHOLDER>
+2. Test Case ID: <PLACEHOLDER>
 
 - Response violates schema
 
@@ -78,16 +64,15 @@ Reproduce with:
 
     <PLACEHOLDER>
 
-4. Test Case ID: <PLACEHOLDER>
+3. Test Case ID: <PLACEHOLDER>
 
-- Custom check failed: `unsupported_method`
+- Accepted negative data
 
-    Unexpected response status for unspecified HTTP method: 200
-    Expected: 405
+    Allowed statuses: 400, 401, 403, 404, 422, 428, 5xx
 
-[200] OK:
+[406] Not Acceptable:
 
-    <EMPTY>
+    `{"message":"negative"}`
 
 Reproduce with: 
 
@@ -96,14 +81,14 @@ Reproduce with:
 =================================== SUMMARY ====================================
 
 Performed checks:
-    not_a_server_error                              122 / 122 passed          PASSED 
-    status_code_conformance                         116 / 116 passed          PASSED 
-    content_type_conformance                        116 / 116 passed          PASSED 
-    response_headers_conformance                    116 / 116 passed          PASSED 
-    response_schema_conformance                     100 / 116 passed          FAILED 
-    negative_data_rejection                         11 / 116 passed           FAILED 
-    ignored_auth                                    116 / 116 passed          PASSED 
-    unsupported_method                              121 / 122 passed          FAILED 
+    not_a_server_error                              N / N passed          PASSED 
+    status_code_conformance                         N / N passed          PASSED 
+    content_type_conformance                        N / N passed          PASSED 
+    response_headers_conformance                    N / N passed          PASSED 
+    response_schema_conformance                     N / N passed          FAILED 
+    negative_data_rejection                         N / N passed          FAILED 
+    ignored_auth                                    N / N passed          PASSED 
+    unsupported_method                              N / N passed          PASSED 
 
 Experimental Features:
   - Coverage phase: Generate covering test cases
