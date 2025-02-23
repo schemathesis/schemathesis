@@ -351,7 +351,7 @@ class CliSnapshotConfig:
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
         if self.replace_phase_statistic:
-            data = re.sub("🚫 [0-9]+ error", "🚫 1 error", data)
+            data = re.sub("🚫 [0-9]+ errors", "🚫 1 error", data)
         if "Stateful" in data:
             data = re.sub(r"API Links:.*\d+ covered", r"API Links:    N covered", data)
             before, after = data.split("Stateful", 1)

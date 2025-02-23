@@ -18,15 +18,15 @@ Schemathesis dev
 
  🚫  Examples (in 0.00s)
 
-     🚫 1 errors  ⏭  1 skipped
+     🚫 1 error  ⏭  1 skipped
 
  🚫  Coverage (in 0.00s)
 
-     ✅ 1 passed  🚫 1 errors
+     ✅ 1 passed  🚫 1 error
 
  🚫  Fuzzing (in 0.00s)
 
-     ✅ 1 passed  🚫 1 errors
+     ✅ 1 passed  🚫 1 error
 
 ==================================== ERRORS ====================================
 _____________________________________ /foo _____________________________________

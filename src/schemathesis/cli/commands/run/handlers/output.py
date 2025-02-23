@@ -462,7 +462,8 @@ class UnitTestProgressManager:
         if self.stats[Status.FAILURE]:
             parts.append(f"❌ {self.stats[Status.FAILURE]:{width}d} failed")
         if self.stats[Status.ERROR]:
-            parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} errors")
+            suffix = "s" if self.stats[Status.ERROR] > 1 else ""
+            parts.append(f"🚫 {self.stats[Status.ERROR]:{width}d} error{suffix}")
         if self.stats[Status.SKIP] or self.stats[Status.INTERRUPTED]:
             parts.append(f"⏭  {self.stats[Status.SKIP] + self.stats[Status.INTERRUPTED]:{width}d} skipped")
         return "  ".join(parts)
@@ -717,7 +718,8 @@ class StatefulProgressManager:
         if self.stats[Status.FAILURE]:
             parts.append(f"❌ {self.stats[Status.FAILURE]} failed")
         if self.stats[Status.ERROR]:
-            parts.append(f"🚫 {self.stats[Status.ERROR]} errors")
+            suffix = "s" if self.stats[Status.ERROR] > 1 else ""
+            parts.append(f"🚫 {self.stats[Status.ERROR]} error{suffix}")
         if self.stats[Status.SKIP]:
             parts.append(f"⏭  {self.stats[Status.SKIP]} skipped")
         return "  ".join(parts)

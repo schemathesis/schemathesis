@@ -18,7 +18,7 @@ Schemathesis dev
 
  🚫  Examples (in 0.00s)
 
-     🚫 1 errors
+     🚫 1 error
 
  ⏭   Coverage (in 0.00s)
 
@@ -26,7 +26,7 @@ Schemathesis dev
 
  🚫  Fuzzing (in 0.00s)
 
-     🚫 1 errors
+     🚫 1 error
 
 ==================================== ERRORS ====================================
 ________________________________ POST /success _________________________________

@@ -1,7 +1,0 @@
-Exit code: 2
----
-Stdout:
-Usage: run [OPTIONS] SCHEMA
-Try 'run -h' for help.
-
-Error: Invalid value for '--hypothesis-no-phases': invalid choice(s): unknown. Choose from explicit, reuse, generate, target.

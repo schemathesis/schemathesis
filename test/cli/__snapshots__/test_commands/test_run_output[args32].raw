@@ -1,7 +1,0 @@
-Exit code: 2
----
-Stdout:
-Usage: run [OPTIONS] SCHEMA
-Try 'run -h' for help.
-
-Error: Can't use `--hypothesis-phases` and `--hypothesis-no-phases` simultaneously
