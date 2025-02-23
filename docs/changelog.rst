@@ -5,7 +5,6 @@ Changelog
 ---------------------------------------------------
 
 This release introduces a new phase management system for CLI that simplifies test execution control and separates unit testing into different stages.
-The key changes include renaming phase options to be more intuitive and establishing coverage and examples testing as independent phases.
 
 Phase configuration changes:
 
@@ -15,23 +14,24 @@ Phase configuration changes:
 - ``reuse`` and ``shrink`` remain enabled by default. Disable via ``--generation-database=none`` and ``--no-shrink``.
 - ``target`` phase available via ``--generation-maximize=<METRIC>``
 
-**NOTE**: Pytest integration does not currently provide a way to disable the coverage phase. Python API support is planned for future releases.
+**NOTE**: Pytest integration does not currently have a way to disable the coverage phase. Python API support is planned for future releases.
 
 **Added**
 
-- Warning for 4xx-only operations during unit tests to help identify configuration issues
+- Warning for 4xx-only operations during unit tests to help identify configuration issues.
 
 **Changed**
-- Separated ``coverage`` and ``examples`` into independent testing phases
-- Replaced ``--hypothesis-phases`` with ``--phases`` for more intuitive configuration
+
+- Separate ``coverage`` and ``examples`` into independent testing phases.
+- Replace ``--hypothesis-phases`` with ``--phases``.
 - Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
 
 **Fixed**
 
-- Coverage phase improvements:
-  - Added missing test case metadata
-  - Fixed query parameter serialization
-  - Applied custom auth data correctly
+- **Coverage phase**: Missing test case metadata leading to some failures not being detected.
+- **Coverage phase**: Missing parameter overrides.
+- **Coverage phase**: Custom auth implementation not applied to test cases.
+- **Coverage phase**: Not applying parameter serialization rules during test generation.
 
 **Removed**
 
