@@ -4,6 +4,11 @@ Changelog
 :version:`Unreleased <v3.39.10...HEAD>` - TBD
 ---------------------------------------------
 
+**Fixed**
+
+- Deduplicate failures from ``negative_data_rejection`` by response status code.
+  It makes Schemathesis display more different failures for this check.
+
 .. _v3.39.10:
 
 :version:`3.39.10 <v3.39.9...v3.39.10>` - 2025-02-10

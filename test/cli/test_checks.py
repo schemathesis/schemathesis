@@ -1,10 +1,12 @@
 import sys
 
+from flask import Flask, jsonify, request
 import pytest
 from _pytest.main import ExitCode
 
 import schemathesis
 from schemathesis.cli import reset_checks
+from schemathesis.extra._flask import run_server
 
 
 @pytest.fixture
@@ -89,6 +91,79 @@ def test_negative_data_rejection(ctx, cli, openapi3_base_url):
         "--hypothesis-max-examples=5",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED
+
+
+@pytest.mark.snapshot(replace_reproduce_with=True)
+def test_negative_data_rejection_displays_all_cases(cli, snapshot_cli):
+    raw_schema = {
+        "openapi": "3.0.0",
+        "paths": {
+            "/test": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "Accept-Language",
+                            "in": "header",
+                            "required": True,
+                            "schema": {
+                                "type": "string",
+                                "enum": ["en-US", "fr-FR"],
+                            },
+                        },
+                        {
+                            "name": "$lang",
+                            "in": "query",
+                            "required": False,
+                            "schema": {
+                                "type": "string",
+                                "enum": ["ro-RO", "th-TH"],
+                                "example": "en-US",
+                            },
+                        },
+                    ],
+                    "responses": {
+                        "default": {
+                            "description": "OK",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {"message": {"type": "string"}},
+                                        "required": ["message"],
+                                    },
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    }
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/test", methods=["GET"])
+    def test_endpoint():
+        header = request.headers.get("Accept-Language")
+        if header not in ["en-US", "fr-FR"]:
+            return jsonify({"message": "negative"}), 406
+        return jsonify({"incorrect": "positive"}), 200
+
+    port = run_server(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-call",
+            "--data-generation-method=all",
+            "--experimental=coverage-phase",
+            "--experimental-no-failfast",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.skipif(sys.version_info < (3, 9), reason="typing.Annotated is not available in Python 3.8")

@@ -143,6 +143,12 @@ class AcceptedNegativeData(FailureContext):
     title: str = "Accepted negative data"
     type: str = "accepted_negative_data"
 
+    def unique_by_key(self, check_message: str | None) -> tuple[str, ...]:
+        return (
+            check_message or self.message,
+            str(self.status_code),
+        )
+
 
 @dataclass(repr=False)
 class RejectedPositiveData(FailureContext):
