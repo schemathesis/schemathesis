@@ -8,6 +8,9 @@ Changelog
 
 - Deduplicate failures from ``negative_data_rejection`` by response status code.
   It makes Schemathesis display more different failures for this check.
+- Query parameter serialization during the coverage phase.
+- Apply custom auth data correctly during the coverage phase.
+- Apply parameter overrides during the coverage phase.
 
 **Changed**
 

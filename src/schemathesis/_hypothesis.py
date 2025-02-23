@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
-import json
 import warnings
 from functools import wraps
 from itertools import combinations
@@ -16,8 +15,10 @@ from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
 
+from schemathesis.serializers import get_first_matching_media_type
+
 from . import _patches
-from .auths import get_auth_storage_from_test
+from .auths import AuthStorage, get_auth_storage_from_test
 from .constants import DEFAULT_DEADLINE, NOT_SET
 from .exceptions import OperationSchemaError, SerializationNotPossible
 from .experimental import COVERAGE_PHASE
@@ -28,6 +29,7 @@ from .parameters import ParameterSet
 from .transports.content_types import parse_content_type
 from .transports.headers import has_invalid_characters, is_latin_1_encodable
 from .types import NotSet
+from schemathesis import auths
 
 if TYPE_CHECKING:
     from .utils import GivenInput
@@ -112,7 +114,9 @@ def create_test(
                 wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
             )
             if COVERAGE_PHASE.is_enabled:
-                wrapped_test = add_coverage(wrapped_test, operation, data_generation_methods)
+                wrapped_test = add_coverage(
+                    wrapped_test, operation, data_generation_methods, auth_storage, as_strategy_kwargs
+                )
     return wrapped_test
 
 
@@ -216,20 +220,45 @@ def adjust_urlencoded_payload(case: Case) -> None:
 
 
 def add_coverage(
-    test: Callable, operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
+    test: Callable,
+    operation: APIOperation,
+    data_generation_methods: list[DataGenerationMethod],
+    auth_storage: AuthStorage | None,
+    as_strategy_kwargs: dict[str, Any],
 ) -> Callable:
-    for example in _iter_coverage_cases(operation, data_generation_methods):
-        adjust_urlencoded_payload(example)
-        test = hypothesis.example(case=example)(test)
+    from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+    auth_context = auths.AuthContext(
+        operation=operation,
+        app=operation.app,
+    )
+    overrides = {
+        container: as_strategy_kwargs[container]
+        for container in LOCATION_TO_CONTAINER.values()
+        if container in as_strategy_kwargs
+    }
+    for case in _iter_coverage_cases(operation, data_generation_methods):
+        if case.media_type and get_first_matching_media_type(case.media_type) is None:
+            continue
+        adjust_urlencoded_payload(case)
+        auths.set_on_case(case, auth_context, auth_storage)
+        for container_name, value in overrides.items():
+            container = getattr(case, container_name)
+            if container is None:
+                setattr(case, container_name, value)
+            else:
+                container.update(value)
+        test = hypothesis.example(case=case)(test)
     return test
 
 
 class Template:
-    __slots__ = ("_components", "_template")
+    __slots__ = ("_components", "_template", "_serializers")
 
-    def __init__(self) -> None:
+    def __init__(self, serializers: dict[str, Callable]) -> None:
         self._components: dict[str, DataGenerationMethod] = {}
         self._template: dict[str, Any] = {}
+        self._serializers = serializers
 
     def __contains__(self, key: str) -> bool:
         return key in self._template
@@ -251,36 +280,58 @@ class Template:
             self._components[component_name] = DataGenerationMethod.negative
 
         container = self._template.setdefault(component_name, {})
-        if _should_stringify(location, value):
-            container[name] = _stringify_value(value.value, location)
-        else:
-            container[name] = value.value
+        container[name] = value.value
 
     def set_body(self, body: coverage.GeneratedValue, media_type: str) -> None:
         self._template["body"] = body.value
         self._template["media_type"] = media_type
         self._components["body"] = body.data_generation_method
 
+    def _serialize(self, kwargs: dict[str, Any]) -> dict[str, Any]:
+        from schemathesis.specs.openapi._hypothesis import quote_all
+
+        output = {}
+        for container_name, value in kwargs.items():
+            serializer = self._serializers.get(container_name)
+            if container_name in ("headers", "cookies") and isinstance(value, dict):
+                value = _stringify_value(value, container_name)
+            if serializer is not None:
+                value = serializer(value)
+            if container_name == "query" and isinstance(value, dict):
+                value = _stringify_value(value, container_name)
+            if container_name == "path_parameters" and isinstance(value, dict):
+                value = _stringify_value(quote_all(value), container_name)
+            output[container_name] = value
+        return output
+
     def unmodified(self) -> TemplateValue:
-        return TemplateValue(kwargs=self._template.copy(), components=self._components.copy())
+        kwargs = self._template.copy()
+        kwargs = self._serialize(kwargs)
+        return TemplateValue(kwargs=kwargs, components=self._components.copy())
 
     def with_body(self, *, media_type: str, value: coverage.GeneratedValue) -> TemplateValue:
         kwargs = {**self._template, "media_type": media_type, "body": value.value}
+        kwargs = self._serialize(kwargs)
         components = {**self._components, "body": value.data_generation_method}
         return TemplateValue(kwargs=kwargs, components=components)
 
     def with_parameter(self, *, location: str, name: str, value: coverage.GeneratedValue) -> TemplateValue:
         from .specs.openapi.constants import LOCATION_TO_CONTAINER
 
-        if _should_stringify(location, value):
-            generated = _stringify_value(value.value, location)
-        else:
-            generated = value.value
-
         container_name = LOCATION_TO_CONTAINER[location]
         container = self._template[container_name]
-        kwargs = {**self._template, container_name: {**container, name: generated}}
-        components = {**self._components, container_name: value.data_generation_method}
+        return self.with_container(
+            container_name=container_name,
+            value={**container, name: value.value},
+            data_generation_method=value.data_generation_method,
+        )
+
+    def with_container(
+        self, *, container_name: str, value: Any, data_generation_method: DataGenerationMethod
+    ) -> TemplateValue:
+        kwargs = {**self._template, container_name: value}
+        kwargs = self._serialize(kwargs)
+        components = {**self._components, container_name: data_generation_method}
         return TemplateValue(kwargs=kwargs, components=components)
 
 
@@ -291,18 +342,24 @@ class TemplateValue:
     __slots__ = ("kwargs", "components")
 
 
-def _should_stringify(location: str, value: coverage.GeneratedValue) -> bool:
-    return location in ("header", "cookie", "path", "query") and not isinstance(value.value, str)
-
-
-def _stringify_value(val: Any, location: str) -> str | list[str]:
+def _stringify_value(val: Any, container_name: str) -> Any:
+    if val is None:
+        return "null"
+    if val is True:
+        return "true"
+    if val is False:
+        return "false"
+    if isinstance(val, (int, float)):
+        return str(val)
     if isinstance(val, list):
-        if location == "query":
+        if container_name == "query":
             # Having a list here ensures there will be multiple query parameters wit the same name
-            return [json.dumps(item) for item in val]
+            return [_stringify_value(item, container_name) for item in val]
         # use comma-separated values style for arrays
-        return ",".join(json.dumps(sub) for sub in val)
-    return json.dumps(val)
+        return ",".join(_stringify_value(sub, container_name) for sub in val)
+    if isinstance(val, dict):
+        return {key: _stringify_value(sub, container_name) for key, sub in val.items()}
+    return val
 
 
 def _iter_coverage_cases(
@@ -310,18 +367,11 @@ def _iter_coverage_cases(
 ) -> Generator[Case, None, None]:
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
-
-    def _stringify_value(val: Any, location: str) -> str | list[str]:
-        if isinstance(val, list):
-            if location == "query":
-                # Having a list here ensures there will be multiple query parameters wit the same name
-                return [json.dumps(item) for item in val]
-            # use comma-separated values style for arrays
-            return ",".join(json.dumps(sub) for sub in val)
-        return json.dumps(val)
+    from schemathesis.specs.openapi.serialization import get_serializers_for_operation
 
     generators: dict[tuple[str, str], Generator[coverage.GeneratedValue, None, None]] = {}
-    template = Template()
+    serializers = get_serializers_for_operation(operation)
+    template = Template(serializers)
     responses = find_in_responses(operation)
     for parameter in operation.iter_parameters():
         location = parameter.location
@@ -415,10 +465,12 @@ def _iter_coverage_cases(
                 # I.e. contains just `default` value without any other keywords
                 value = container.get(parameter.name, NOT_SET)
                 if value is not NOT_SET:
-                    data = template.unmodified()
-                    case = operation.make_case(
-                        **{**data.kwargs, "query": {**container, parameter.name: [value, value]}}
+                    data = template.with_container(
+                        container_name="query",
+                        value={**container, parameter.name: [value, value]},
+                        data_generation_method=DataGenerationMethod.negative,
                     )
+                    case = operation.make_case(**data.kwargs)
                     case.data_generation_method = DataGenerationMethod.negative
                     case.meta = _make_meta(
                         description=f"Duplicate `{parameter.name}` query parameter",
@@ -435,17 +487,19 @@ def _iter_coverage_cases(
                 location = parameter.location
                 container_name = LOCATION_TO_CONTAINER[location]
                 container = template[container_name]
-                data = template.unmodified()
-                case = operation.make_case(
-                    **{**data.kwargs, container_name: {k: v for k, v in container.items() if k != name}}
+                data = template.with_container(
+                    container_name=container_name,
+                    value={k: v for k, v in container.items() if k != name},
+                    data_generation_method=DataGenerationMethod.negative,
                 )
+                case = operation.make_case(**data.kwargs)
                 case.data_generation_method = DataGenerationMethod.negative
                 case.meta = _make_meta(
                     description=f"Missing `{name}` at {location}",
                     location=None,
                     parameter=name,
                     parameter_location=location,
-                    **{**data.components, container_name: DataGenerationMethod.negative},
+                    **data.components,
                 )
                 yield case
     # Generate combinations for each location
@@ -474,23 +528,17 @@ def _iter_coverage_cases(
             _parameter: str | None,
             _data_generation_method: DataGenerationMethod,
         ) -> Case:
-            if _location in ("header", "cookie", "path", "query"):
-                container = {
-                    name: _stringify_value(val, _location) if not isinstance(val, str) else val
-                    for name, val in container_values.items()
-                }
-            else:
-                container = container_values
-
-            data = template.unmodified()
-            case = operation.make_case(**{**data.kwargs, _container_name: container})
+            data = template.with_container(
+                container_name=_container_name, value=container_values, data_generation_method=_data_generation_method
+            )
+            case = operation.make_case(**data.kwargs)
             case.data_generation_method = _data_generation_method
             case.meta = _make_meta(
                 description=description,
                 location=None,
                 parameter=_parameter,
                 parameter_location=_location,
-                **{**data.components, _container_name: _data_generation_method},
+                **data.components,
             )
             return case
 

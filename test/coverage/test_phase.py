@@ -36,12 +36,12 @@ NEGATIVE_CASES = [
     {"query": {"q1": ANY, "q2": ["0", "0"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": [ANY, ANY], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "00"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": ANY, "q2": "{}"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": ANY, "q2": {}}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": ["null", "null"]}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "null"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ANY, "q2": "false"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "4", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
-    {"query": {"q1": "{}", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
+    {"query": {"q1": {}, "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": ["null", "null"], "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
     {"query": {"q1": "null", "q2": "0"}, "headers": {"h1": ANY, "h2": "0"}, "body": 0},
@@ -89,14 +89,14 @@ MIXED_CASES = [
     {"query": {"q1": "5", "q2": ["000", "000"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["5", "5"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "00"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "5", "q2": "{}"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": "5", "q2": {}}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": ["null", "null"]}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "null"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "false"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "5", "q2": "0000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "4", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
-    {"query": {"q1": "{}", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
+    {"query": {"q1": {}, "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": ["null", "null"], "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
     {"query": {"q1": "null", "q2": "000"}, "headers": {"h1": "5", "h2": "000"}, "body": {"j-prop": 0}},
@@ -688,10 +688,10 @@ def test_mixed_type_keyword(ctx):
                 "query": {"key": [ANY]},
             },
             {
-                "query": {"key": ["{}"]},
+                "query": {"key": [{}]},
             },
             {
-                "query": {"key": ["[null, null]"]},
+                "query": {"key": [["null", "null"]]},
             },
             {
                 "query": {"key": ["null"]},
@@ -703,7 +703,7 @@ def test_mixed_type_keyword(ctx):
                 "query": {"key": ["0"]},
             },
             {
-                "query": {"key": "{}"},
+                "query": {"key": {}},
             },
             {
                 "query": {"key": ""},
@@ -848,7 +848,7 @@ def test_array_in_header_path_query(ctx):
             {
                 "headers": {"X-API-Key-1": "0"},
                 "path_parameters": {"bar": "0"},
-                "query": {"key": "{}"},
+                "query": {"key": {}},
             },
             {
                 "headers": {"X-API-Key-1": "0"},
@@ -887,7 +887,7 @@ def test_array_in_header_path_query(ctx):
             },
             {
                 "headers": {"X-API-Key-1": "0"},
-                "path_parameters": {"bar": "{}"},
+                "path_parameters": {"bar": {}},
                 "query": {"key": "0"},
             },
             {
@@ -1048,7 +1048,7 @@ def test_path_parameter(ctx):
         [
             {
                 "path_parameters": {
-                    "id": "{}",
+                    "id": {},
                 },
             },
             {
@@ -1133,7 +1133,7 @@ def test_optional_parameter_without_type(ctx):
             },
             {
                 "query": {
-                    "query": "{}",
+                    "query": {},
                 },
             },
             {
@@ -1172,7 +1172,7 @@ def test_optional_parameter_without_type(ctx):
             },
             {
                 "query": {
-                    "query": "{}",
+                    "query": {},
                 },
             },
             {
@@ -1286,7 +1286,7 @@ def test_negative_query_parameter(ctx):
     assert urls == [
         "http://127.0.0.1/foo?q=0&q=0",
         ANY,
-        "http://127.0.0.1/foo?q=%7B%7D",
+        "http://127.0.0.1/foo",
         "http://127.0.0.1/foo?q=null&q=null",
         "http://127.0.0.1/foo?q=null",
         "http://127.0.0.1/foo?q=false",

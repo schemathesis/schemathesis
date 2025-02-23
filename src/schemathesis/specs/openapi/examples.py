@@ -9,6 +9,8 @@ from typing import TYPE_CHECKING, Any, Generator, Iterator, Union, cast
 import requests
 from hypothesis_jsonschema import from_schema
 
+from schemathesis.specs.openapi.serialization import get_serializers_for_operation
+
 from ...constants import DEFAULT_RESPONSE_TIMEOUT
 from ...generation import get_single_example
 from ...internal.copy import fast_deepcopy
@@ -48,11 +50,7 @@ def get_strategies_from_examples(
     operation: APIOperation[OpenAPIParameter, Case], as_strategy_kwargs: dict[str, Any] | None = None
 ) -> list[SearchStrategy[Case]]:
     """Build a set of strategies that generate test cases based on explicit examples in the schema."""
-    maps = {}
-    for location, container in LOCATION_TO_CONTAINER.items():
-        serializer = operation.get_parameter_serializer(location)
-        if serializer is not None:
-            maps[container] = serializer
+    maps = get_serializers_for_operation(operation)
 
     def serialize_components(case: Case) -> Case:
         """Applies special serialization rules for case components.
