@@ -12,6 +12,7 @@ Changelog
 **Changed**
 
 - Do not report ``unsupported_method`` failure if the API returned HTTP 200 on OPTIONS request.
+- More precise warning about missing 2xx responses for positive test cases.
 
 .. _v3.39.10:
 

@@ -150,13 +150,6 @@ class BaseRunner:
         def _should_warn_about_only_4xx(result: TestResult) -> bool:
             if all(check.response is None for check in result.checks):
                 return False
-            # Don't warn if we saw any 2xx or 5xx responses
-            if any(
-                check.response.status_code < 400 or check.response.status_code >= 500
-                for check in result.checks
-                if check.response is not None
-            ):
-                return False
             # Don't duplicate auth warnings
             if {check.response.status_code for check in result.checks if check.response is not None} <= {401, 403}:
                 return False
@@ -164,11 +157,28 @@ class BaseRunner:
             return True
 
         def _check_warnings() -> None:
+            # Warn if all positive test cases got 4xx in return and no failure was found
+            def all_positive_are_rejected(result: TestResult) -> bool:
+                seen_positive = False
+                for check in result.checks:
+                    if check.example.data_generation_method != DataGenerationMethod.positive:
+                        continue
+                    seen_positive = True
+                    if check.response is None:
+                        continue
+                    # At least one positive response for positive test case
+                    if 200 <= check.response.status_code < 300:
+                        return False
+                # If there are positive test cases, and we ended up here, then there are no 2xx responses for them
+                # Otherwise, there are no positive test cases at all and this check should pass
+                return seen_positive
+
             for result in ctx.data.results:
                 # Only warn about 4xx responses in successful positive test scenarios
                 if (
                     all(check.value == Status.success for check in result.checks)
-                    and result.data_generation_method == [DataGenerationMethod.positive]
+                    and DataGenerationMethod.positive in result.data_generation_method
+                    and all_positive_are_rejected(result)
                     and _should_warn_about_only_4xx(result)
                 ):
                     ctx.add_warning(
