@@ -36,6 +36,7 @@ Phase configuration changes:
 - **Coverage phase**: Custom auth implementation not applied to test cases.
 - **Coverage phase**: Not applying parameter serialization rules during test generation.
 - Incorrect quantifiers merging for some patterns. :issue:`2732`
+- Showing ``1 errors`` instead of ``1 error`` in CLI output.
 
 **Removed**
 
