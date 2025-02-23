@@ -309,10 +309,12 @@ def _build_size(min_repeat: int, max_repeat: int, min_length: int | None, max_le
 def _strip_quantifier(pattern: str) -> str:
     """Remove quantifier from the pattern."""
     # Lazy & posessive quantifiers
-    if pattern.endswith(("*?", "+?", "??", "*+", "?+", "++")):
-        return pattern[:-2]
-    if pattern.endswith(("?", "*", "+")):
-        pattern = pattern[:-1]
+    for marker in ("*?", "+?", "??", "*+", "?+", "++"):
+        if pattern.endswith(marker) and not pattern.endswith(rf"\{marker}"):
+            return pattern[:-2]
+    for marker in ("?", "*", "+"):
+        if pattern.endswith(marker) and not pattern.endswith(rf"\{marker}"):
+            pattern = pattern[:-1]
     if pattern.endswith("}") and "{" in pattern:
         # Find the start of the exact quantifier and drop everything since that index
         idx = pattern.rfind("{")
