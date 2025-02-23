@@ -11,6 +11,7 @@ Changelog
 - Query parameter serialization during the coverage phase.
 - Apply custom auth data correctly during the coverage phase.
 - Apply parameter overrides during the coverage phase.
+- Incorrect quantifiers merging for some patterns. :issue:`2732`
 
 **Changed**
 
