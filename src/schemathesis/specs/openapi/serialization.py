@@ -28,6 +28,8 @@ def make_serializer(
 
     def _wrapper(definitions: DefinitionList) -> Callable | None:
         functions = list(func(definitions))
+        if not functions:
+            return None
 
         def composed(x: Any) -> Any:
             result = x
