@@ -33,6 +33,7 @@ Phase configuration changes:
 - **Coverage phase**: Missing parameter overrides.
 - **Coverage phase**: Custom auth implementation not applied to test cases.
 - **Coverage phase**: Not applying parameter serialization rules during test generation.
+- Incorrect quantifiers merging for some patterns. :issue:`2732`
 
 **Removed**
 
