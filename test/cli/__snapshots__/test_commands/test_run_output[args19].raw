@@ -44,10 +44,10 @@ API validation options:
                                 negative_data_rejection,
                                 positive_data_acceptance, use_after_free,
                                 ensure_resource_availability, ignored_auth, all]
-  -x, --exitfirst               Terminate the test suite immediately upon the
-                                first failure or error encountered
   --max-failures INTEGER RANGE  Terminate the test suite after reaching a
                                 specified number of failures or errors  [x>=1]
+  --continue-on-failure         Continue executing all test cases within a
+                                scenario, even after encountering failures
   --max-response-time SECONDS   Maximum allowed API response time in seconds
                                 [x>0.0]
 
@@ -101,8 +101,6 @@ Output options:
 Experimental options:
   --experimental FEATURES         Enable experimental features [possible values:
                                   positive-data-acceptance]
-  --experimental-no-failfast      Continue testing an API operation after a
-                                  failure is found
   --experimental-missing-required-header-allowed-statuses
                                   Comma-separated list of status codes expected
                                   for test cases with a missing required header

@@ -305,9 +305,8 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
 
 @pytest.mark.operations("multiple_failures")
 @pytest.mark.openapi_version("3.0")
-@pytest.mark.snapshot(replace_test_cases=False)
-def test_no_failfast(cli, schema_url):
-    result = cli.run(schema_url, "--experimental-no-failfast")
+def test_continue_on_failure(cli, schema_url):
+    result = cli.run(schema_url, "--continue-on-failure")
     assert "101 generated" in result.stdout
 
 
@@ -857,9 +856,9 @@ def test_max_response_time_valid(cli, schema_url):
 @pytest.mark.operations("failure", "success")
 @pytest.mark.snapshot(remove_last_line=True)
 def test_exit_first(cli, schema_url, snapshot_cli):
-    # When the `--exit-first` CLI option is passed
+    # When the `--max-failures=1` CLI option is passed
     # And a failure occurs
-    assert cli.run(schema_url, "--exitfirst", "--phases=fuzzing") == snapshot_cli
+    assert cli.run(schema_url, "--max-failures=1", "--phases=fuzzing") == snapshot_cli
 
 
 def test_long_operation_output(ctx, cli, openapi3_base_url, snapshot_cli):

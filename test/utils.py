@@ -148,7 +148,7 @@ class EventStream:
                 or hypothesis.settings(deadline=DEFAULT_DEADLINE),
                 generation=schema.generation_config,
                 max_failures=options.get("max_failures"),
-                no_failfast=options.get("no_failfast", False),
+                continue_on_failure=options.get("continue_on_failure", False),
                 unique_inputs=options.get("unique_data", False),
                 seed=options.get("seed"),
                 workers_num=options.get("workers_num", 1),

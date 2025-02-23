@@ -1382,7 +1382,7 @@ def failed(ctx, response, case):
             f"--url={openapi3_base_url}",
             "--mode=negative",
             "--max-examples=10",
-            "--experimental-no-failfast",
+            "--continue-on-failure",
             hooks=module,
         )
         == snapshot_cli
