@@ -382,7 +382,7 @@ class CliSnapshotConfig:
             )
         if self.replace_duration:
             data = re.sub(r"It took [0-9]+\.[0-9]{2}s", "It took 0.50s", data)
-            data = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 0.00s", data)
+            data = re.sub(r"\([0-9]+\.[0-9]{2}s\)", "(0.00s)", data)
             data = re.sub(r"after [0-9]+\.[0-9]{2}s", "after 0.00s", data).strip()
             lines = data.splitlines()
             lines[-1] = re.sub(r"in [0-9]+\.[0-9]{2}s", "in 1.00s", lines[-1])
@@ -476,7 +476,7 @@ def clean_unit_tests(lines):
 
     indices = []
     for idx, line in enumerate(lines[probing_idx:], start=probing_idx):
-        if any(f"{phase} (in" in line for phase in ("Examples", "Coverage", "Fuzzing")):
+        if any(f"{phase} (" in line for phase in ("Examples", "Coverage", "Fuzzing")):
             indices.append(idx)
 
     if not indices:
@@ -492,7 +492,7 @@ def clean_unit_tests(lines):
 def clean_stateful_tests(lines):
     start_idx = None
     for i, line in enumerate(lines):
-        if "Fuzzing (in" in line:
+        if "Fuzzing (" in line:
             start_idx = i + 3
             break
     if start_idx is None:

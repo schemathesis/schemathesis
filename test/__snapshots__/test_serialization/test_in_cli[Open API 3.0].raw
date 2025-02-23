@@ -5,7 +5,7 @@ Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
 
- ✅  Loaded specification from /tmp/schema.json (in 0.00s)
+ ✅  Loaded specification from /tmp/schema.json (0.00s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
@@ -16,15 +16,15 @@ Schemathesis dev
 
      Supports NULL byte in headers:    ✘
 
- ⏭   Examples (in 0.00s)
+ ⏭   Examples (0.00s)
 
      ⏭  1 skipped
 
- ⏭   Coverage (in 0.00s)
+ ⏭   Coverage (0.00s)
 
      ⏭  1 skipped
 
- 🚫  Fuzzing (in 0.00s)
+ 🚫  Fuzzing (0.00s)
 
      🚫 1 error
 

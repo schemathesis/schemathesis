@@ -472,7 +472,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(schema_url, f"--workers={workers}", "--phases=fuzzing")
     if workers == 1:
         assert result == snapshot_cli
     else:

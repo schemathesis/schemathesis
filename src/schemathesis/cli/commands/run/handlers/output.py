@@ -233,7 +233,7 @@ class LoadingProgressManager:
             ("✅  ", Style(color="green")),
             ("Loaded specification from ", Style(color="bright_white")),
             (self.location, Style(color="cyan")),
-            (f" (in {duration})", Style(color="bright_white")),
+            (f" ({duration})", Style(color="bright_white")),
         )
 
     def get_error_message(self, error: LoaderError) -> Group:
@@ -564,7 +564,7 @@ class UnitTestProgressManager:
         if self.is_interrupted:
             duration_message = f"interrupted after {duration}"
         else:
-            duration_message = f"in {duration}"
+            duration_message = duration
 
         return f"{icon}  {self.title} ({duration_message})\n\n    {message}"
 
@@ -758,7 +758,7 @@ class StatefulProgressManager:
         if self.is_interrupted:
             duration_message = f"interrupted after {duration}"
         else:
-            duration_message = f"in {duration}"
+            duration_message = duration
 
         return f"{icon}  {self.title} ({duration_message})", message
 

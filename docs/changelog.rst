@@ -28,6 +28,7 @@ Phase configuration changes:
 - Add HTTP 406 status to the list of status codes that are expected for negative test cases.
 - The experimental ``--experimental-no-failfast`` option has been stabilized as ``--continue-on-failure``.
   This option ensures all test cases within a scenario are executed, even if failures occur.
+- Minor readability improvements in CLI output.
 
 **Fixed**
 
