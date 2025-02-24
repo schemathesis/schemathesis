@@ -6,15 +6,6 @@ This page answers some of the often asked questions about Schemathesis.
 Usage & Configuration
 ---------------------
 
-What kind of data does Schemathesis generate?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Schemathesis generates random test data that conforms to the given API schema as well as not-conforming data, depending on the supplied data generation method config value.
-This data consists of all possible data types from the JSON schema specification in various combinations and different nesting levels.
-
-We can't guarantee that the generated data will always be accepted by the application under test since there could be validation rules not covered by the API schema.
-If you found that Schemathesis generated something that doesn't fit the API schema, consider `reporting a bug <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_
-
 How many tests does Schemathesis execute for an API operation?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -22,40 +13,12 @@ The total number of tests Schemathesis executes is influenced by the API schema'
 The process is designed to optimize coverage within a reasonable test budget rather than aiming for exhaustive coverage. 
 For detailed insights and customization options, refer to our :ref:`data generation docs <data-generation-overview>`.
 
-What kind errors Schemathesis is capable to find?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The main two groups of problems that Schemathesis targets are server-side errors and nonconformity to the behavior described in the API schema.
-
 What parts of the application is Schemathesis targeting during its tests?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 It depends. The test data that Schemathesis generates is random. Input validation is, therefore, more frequently examined than other parts.
 
 Since Schemathesis generates data that fits the application's API schema, it can reach the app's business logic, but it depends on the architecture of each particular application.
-
-What if my application doesn't have an API schema?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-As the first step, you can use schema generators like `flasgger <https://github.com/flasgger/flasgger>`_ for Python,
-`GrapeSwagger <https://github.com/ruby-grape/grape-swagger>`_ for Ruby, or `Swashbuckle <https://github.com/domaindrivendev/Swashbuckle.AspNetCore>`_ for ASP.Net.
-Then, running Schemathesis against the generated API schema will help you to refine its definitions.
-
-How is Schemathesis different from Dredd?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Schemathesis focuses on finding inputs that result in application crash, but it shares the goal of keeping the API documentation up to date with Dredd.
-Both tools can generate requests to the API under test, but they approach it differently.
-
-Schemathesis uses Property-Based Testing to infer all input values and uses examples defined in the API schema as separate test cases.
-Dredd uses examples described in the API schema as the primary source of inputs (and `requires <https://dredd.org/en/latest/how-it-works.html#uri-parameters>`_ them to work) and
-generates data only in `some situations <https://dredd.org/en/latest/how-it-works.html#id8>`_.
-
-By using `Hypothesis <https://hypothesis.readthedocs.io/en/latest/>`_ as the underlying testing framework, Schemathesis benefits from all its features like test case reduction and stateful testing.
-Dredd works more in a way that requires you to write some sort of example-based tests when Schemathesis requires only a valid API schema and will generate tests for you.
-
-There are a lot of features that Dredd has are Schemathesis has not (e.g., API Blueprint support, that powerful hook system, and many more) and probably vice versa.
-Definitely, Schemathesis can learn a lot from Dredd and if you miss any feature that exists in Dredd but doesn't exist in Schemathesis, let us know.
 
 Why are no examples generated in Schemathesis when using ``--hypothesis-phase=explicit``?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -65,33 +28,11 @@ It avoids generating new examples to maintain predictability and adhere strictly
 
 If you need random examples for API operations without explicit examples, consider using the ``--contrib-openapi-fill-missing-examples`` CLI option.
 
-How should I run Schemathesis?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-There are two main ways to run it — as a part of Python's test suite, and as a command-line tool.
-
-If you wrote a Python application and you want to utilize the features of an existing test suite, then the in-code option will best suit your needs.
-
-If you wrote your application in a language other than Python, you should use the built-in CLI. Please keep in mind that you will need to have a running application where you can run Schemathesis against.
-
 Should I always have my application running before starting the test suite?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For the ``pytest`` integration, there is ``schemathesis.pytest.from_fixture`` loader where you can postpone API schema loading
 and start the test application as a part of your test setup. See more information in the :doc:`../python` section.
-
-How long does it usually take for Schemathesis to test an app?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-It depends on many factors, including the API's complexity under test, the network connection speed, and the Schemathesis configuration.
-Usually, it takes from a few seconds to a few minutes to run all the tests. However, there are exceptions where it might take an hour and more.
-
-Can I exclude particular data from being generated?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Yes. Schemathesis's hooks mechanism allows you to adapt its behavior and generate data that better fits your use case.
-
-Also, if your application fails on some input early in the code, then it's often a good idea to exclude this input from the next test run so you can explore deeper parts of your codebase.
 
 How can I use database objects IDs in tests?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -297,14 +238,6 @@ Python:
     )
 
 This adjustment ensures that Schemathesis does not include NULL bytes in strings for all your tests, making them compatible with systems that reject such inputs.
-
-How can I use custom authentication methods with Schemathesis?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Schemathesis supports custom authentication through its extensions system.
-
-For detailed instructions on implementing custom authentication methods or using existing libraries for that, 
-refer to our :ref:`Custom Authentication <custom-auth>` and :ref:`Third-party Authentication <third-party-auth>` sections.
 
 Working with API schemas
 ------------------------

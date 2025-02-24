@@ -1,0 +1,62 @@
+site_name: Schemathesis
+repo_url: https://github.com/schemathesis/schemathesis
+
+nav:
+  - Overview: index.md 
+  - How It Works: how-it-works.md
+  - Getting Started: getting-started.md
+  - CLI Usage Guide: cli-usage-guide.md
+  - Python Integration: python-integration.md
+  - CI/CD Guide: ci-cd-guide.md
+  - Extending Schemathesis: extending.md
+  - Configuration Guide: configuration.md
+  - API Reference: reference.md
+  - Resources: resources.md
+  - FAQ: faq.md
+
+theme:
+  name: material
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default 
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+  features:
+    - navigation.footer
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/schemathesis/schemathesis
+      name: GitHub
+    - icon: fontawesome/brands/discord
+      link: https://discord.gg/R9ASRAmHnA
+      name: Discord
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
