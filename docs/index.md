@@ -107,4 +107,3 @@ api-tests:
 - [Configuration Guide](./configuration.md) - Customizing test execution for your API
 - [Extending Schemathesis](./extending.md) - Writing custom hooks and extensions
 - [FAQ](./faq.md) - Common questions and solutions
-
