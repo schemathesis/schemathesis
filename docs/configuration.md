@@ -54,7 +54,7 @@ headers = { "X-API-Key" = "${PAYMENTS_API_KEY}" }
 This allows you to maintain a single configuration file that works across different environments (development, staging, production) by changing environment variables rather than the configuration itself.
 
 !!! tip "Multi-Project Support"
-    Schemathesis supports multi-project configurations, enabling you to define separate settings for different APIs within the same configuration file. See [Project-Based Configuration](#multi-project-support) for details.
+    Schemathesis supports multi-project configurations, enabling you to define separate settings for different APIs within the same configuration file. See [Multi-Project Support](#multi-project-support) for details.
 
 Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios or multi-API environments.
 

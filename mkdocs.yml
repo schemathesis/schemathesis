@@ -60,3 +60,5 @@ markdown_extensions:
   - pymdownx.superfences
   - admonition
   - pymdownx.details
+
+copyright: Copyright &copy; 2020-2025 Dmitry Dygalo & Schemathesis.io
