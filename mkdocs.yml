@@ -2,7 +2,7 @@ site_name: Schemathesis
 repo_url: https://github.com/schemathesis/schemathesis
 
 nav:
-  - Overview: index.md 
+  - Overview: index.md
   - How It Works: how-it-works.md
   - Getting Started: getting-started.md
   - CLI Usage Guide: cli-usage-guide.md
@@ -27,7 +27,7 @@ theme:
 
     # Palette toggle for light mode
     - media: "(prefers-color-scheme: light)"
-      scheme: default 
+      scheme: default
       toggle:
         icon: material/brightness-7
         name: Switch to dark mode

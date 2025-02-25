@@ -100,4 +100,3 @@ Schemathesis supports various authentication methods:
 - **Header-based auth**: Use `--header "Authorization: Bearer TOKEN"` for token-based authentication.
 
 - **Auth extensions**: Schemathesis supports third-party authentication extensions for OAuth, API keys, and other auth methods via Python API
-
