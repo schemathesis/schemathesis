@@ -493,11 +493,11 @@ Most configuration option can be overridden via the corresponding CLI flag.
 
 This section provides a list of configuration options available in `schemathesis.toml`, organized by category and showing where each setting can be applied.
 
-## Global Settings
+### Global Settings
 
 These settings can only be applied at the global level.
 
-### `base-url`
+#### `base-url`
 
 !!! config ""
     **Type:** string
@@ -510,7 +510,7 @@ These settings can only be applied at the global level.
     base-url = "https://api.example.com"
     ```
 
-### `workers`
+#### `workers`
 
 !!! config ""
     **Type:** integer or "auto"
@@ -524,7 +524,7 @@ These settings can only be applied at the global level.
     workers = 4       # Use exactly 4 workers
     ```
 
-### `suppress-health-check`
+#### `suppress-health-check`
 
 !!! config ""
     **Type:** array of strings
@@ -539,7 +539,7 @@ These settings can only be applied at the global level.
 
     Possible values: `data_too_large`, `filter_too_much`, `too_slow`, `large_base_example`, `all`.
 
-### `wait-for-schema`
+#### `wait-for-schema`
 
 !!! config ""
     **Type:** float (≥1.0)
@@ -552,11 +552,11 @@ These settings can only be applied at the global level.
     wait-for-schema = 5.0
     ```
 
-## Check Configuration
+### Check Configuration
 
 Settings related to validation checks and failure handling.
 
-### `max-failures`
+#### `max-failures`
 
 !!! config ""
     **Type:** integer (≥1)
@@ -569,7 +569,7 @@ Settings related to validation checks and failure handling.
     max-failures = 5
     ```
 
-### `continue-on-failure`
+#### `continue-on-failure`
 
 !!! config ""
     **Type:** boolean
@@ -582,7 +582,7 @@ Settings related to validation checks and failure handling.
     continue-on-failure = true
     ```
 
-### `max-response-time`
+#### `max-response-time`
 
 !!! config ""
     **Type:** float (>0)
