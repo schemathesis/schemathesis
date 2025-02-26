@@ -490,3 +490,107 @@ schemathesis run --checks=not_a_server_error,status_code_conformance http://api.
 Most configuration option can be overridden via the corresponding CLI flag.
 
 ## Configuration Reference
+
+This section provides a list of configuration options available in `schemathesis.toml`, organized by category and showing where each setting can be applied.
+
+## Global Settings
+
+These settings can only be applied at the global level.
+
+### `base-url`
+
+!!! config ""
+    **Type:** string
+    **Default:** None
+    **Scopes:** :material-earth: Global
+
+    Sets the base URL for the API under test. This setting is required when testing with a file-based schema.
+
+    ```toml
+    base-url = "https://api.example.com"
+    ```
+
+### `workers`
+
+!!! config ""
+    **Type:** integer or "auto"
+    **Default:** 1
+    **Scopes:** :material-earth: Global
+
+    Specifies the number of concurrent workers for running test phases.
+
+    ```toml
+    workers = "auto"  # Auto-adjust based on available cores
+    workers = 4       # Use exactly 4 workers
+    ```
+
+### `suppress-health-check`
+
+!!! config ""
+    **Type:** array of strings
+    **Default:** []
+    **Scopes:** :material-earth: Global
+
+    Disables specific Schemathesis health checks that would otherwise interrupt testing when problematic patterns are detected.
+
+    ```toml
+    suppress-health-check = ["data_too_large", "filter_too_much", "too_slow", "large_base_example"]
+    ```
+
+    Possible values: `data_too_large`, `filter_too_much`, `too_slow`, `large_base_example`, `all`.
+
+### `wait-for-schema`
+
+!!! config ""
+    **Type:** float (≥1.0)
+    **Default:** 0 (disabled)
+    **Scopes:** :material-earth: Global
+
+    Maximum duration, in seconds, to wait for the API schema to become available. Useful when testing services that take time to start up.
+
+    ```toml
+    wait-for-schema = 5.0
+    ```
+
+## Check Configuration
+
+Settings related to validation checks and failure handling.
+
+### `max-failures`
+
+!!! config ""
+    **Type:** integer (≥1)
+    **Default:** None
+    **Scopes:** :material-earth: Global
+
+    Terminate the test run after reaching the specified number of failures or errors.
+
+    ```toml
+    max-failures = 5
+    ```
+
+### `continue-on-failure`
+
+!!! config ""
+    **Type:** boolean
+    **Default:** false
+    **Scopes:** :material-earth: Global, :material-folder-multiple: Project, :material-code-tags: Operation, :material-layers-triple: Phase
+
+    When enabled, continues executing all test cases within a scenario, even after encountering failures.
+
+    ```toml
+    continue-on-failure = true
+    ```
+
+### `max-response-time`
+
+!!! config ""
+    **Type:** float (>0)
+    **Default:** None
+    **Scopes:** :material-earth: Global, :material-folder-multiple: Project, :material-code-tags: Operation, :material-layers-triple: Phase
+
+    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
+
+    ```toml
+    max-response-time = 2.0
+    ```
