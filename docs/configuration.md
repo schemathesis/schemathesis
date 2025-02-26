@@ -1,24 +1,24 @@
 # Configuration Guide
 
-Schemathesis can be configured through a `schemathesis.toml` file, allowing you to customize how your API testing works.
+Schemathesis can be configured through a `schemathesis.toml` file.
 
 ## Configuration File Location
 
 Schemathesis will look for configuration in the following locations, in order:
 
-1. Path specified via `--config` CLI option: If provided, this file is used exclusively.
-2. `schemathesis.toml` in the current directory: Schemathesis checks the current working directory.
-3. `schemathesis.toml` in parent directories (up to the project root): The search continues upward through parent directories.
+1. Path specified via `--config` CLI option.
+2. `schemathesis.toml` in the current directory.
+3. `schemathesis.toml` in parent directories (up to the project root).
 
 !!! note "Configuration Preference"
-    Only one configuration file is used. Schemathesis does not merge settings from multiple configuration files. If no `schemathesis.toml` file is found, Schemathesis will use its built-in defaults.
+    Schemathesis uses only one configuration file and does not merge settings from multiple files. If no `schemathesis.toml` file is found, Schemathesis will use its built-in defaults.
 
 ## Why Use a Configuration File?
 
-While Schemathesis works well without explicit configuration, using a configuration file offers several advantages:
+While Schemathesis works well without explicit configuration, using a file offers several benefits:
 
-- **Operation-Specific Settings**: Configure different behaviors for specific endpoints.
-- **Validation Customization**: Define how response checks should apply validation.
+- **Operation-Specific Settings**: Configure different behaviors for specific API operations. For example, run more tests or apply different validation rules
+- **Validation Customization**: Adjust how API responses are validated. For example, trigger certain failures on non-default status codes.
 - **Consistent Testing**: Share configuration across different environments and test runs.
 
 !!! note "CLI and Python API Integration"
@@ -26,7 +26,7 @@ While Schemathesis works well without explicit configuration, using a configurat
 
 ## Basic Structure
 
-Schemathesis configuration uses the TOML format with a hierarchical structure. Global settings serve as defaults and can be overridden by more specific operation or project settings.
+Schemathesis configuration uses the TOML format with a hierarchical structure. Global settings serve as defaults and can be overridden by more specific ones such as operation-specific or project-specific configurations.
 
 ```toml
 # Global settings
@@ -51,10 +51,10 @@ headers = { "Authorization" = "Bearer ${API_TOKEN}" }
 headers = { "X-API-Key" = "${PAYMENTS_API_KEY}" }
 ```
 
-This allows you to maintain a single configuration file that works across different environments (development, staging, production) by changing environment variables rather than the configuration itself.
+This allows you to maintain a single configuration file that works across different environments (development, staging) by changing environment variables rather than the configuration itself.
 
 !!! tip "Multi-Project Support"
-    Schemathesis supports multi-project configurations, enabling you to define separate settings for different APIs within the same configuration file. See [Multi-Project Support](#multi-project-support) for details.
+    Schemathesis also supports multi-project configurations, where you can define separate settings for different APIs within the same configuration file. See [Multi-Project Support](#multi-project-support) for details.
 
 Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios or multi-API environments.
 
