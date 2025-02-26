@@ -28,17 +28,17 @@ A command-line tool that tests APIs using their OpenAPI/GraphQL schema.
 
 ```console
 # Try without installing (quickest way to start)
-uvx schemathesis run http://example.schemathesis.io/openapi.json
+$ uvx schemathesis run http://example.schemathesis.io/openapi.json
 ```
 
 For regular use, install with `uv pip install`:
 
 ```console
-uv pip install schemathesis
+$ uv pip install schemathesis
 
 # Also available via Docker
-docker run schemathesis/schemathesis:stable \
-    run http://example.schemathesis.io/openapi.json
+$ docker run schemathesis/schemathesis:stable \
+     run http://example.schemathesis.io/openapi.json
 ```
 
 Works with partially valid schemas - perfect for APIs under development.
@@ -49,13 +49,13 @@ After installation, Schemathesis operates with minimal configuration:
 
 ```console
 # Run comprehensive testing with default settings
-schemathesis run http://example.schemathesis.io/openapi.json
+$ schemathesis run http://example.schemathesis.io/openapi.json
 
 # Verify only the examples in your schema
-schemathesis run http://example.schemathesis.io/openapi.json --phases=examples
+$ schemathesis run http://example.schemathesis.io/openapi.json --phases=examples
 
 # Run intensive testing with many examples
-schemathesis run http://example.schemathesis.io/openapi.json --max-examples=1000
+$ schemathesis run http://example.schemathesis.io/openapi.json --max-examples=1000
 ```
 
 ## Types of Issues Detected
@@ -103,7 +103,7 @@ api-tests:
 - [How Schemathesis Works](./how-it-works.md) - Understanding the testing approach and design principles
 - [CLI Usage Guide](./cli-usage-guide.md) - Explore different testing scenarios and CLI capabilities
 - [Python & pytest Integration](./python-integration.md) - Using Schemathesis in Python test suites
-- [CI/CD Guide](./python-integration.md) - Using Schemathesis within CI/CD pipelines
 - [Configuration Guide](./configuration.md) - Customizing test execution for your API
+- [CI/CD Guide](./python-integration.md) - Using Schemathesis within CI/CD pipelines
 - [Extending Schemathesis](./extending.md) - Writing custom hooks and extensions
 - [FAQ](./faq.md) - Common questions and solutions
