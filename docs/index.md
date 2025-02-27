@@ -55,7 +55,7 @@ $ schemathesis run http://example.schemathesis.io/openapi.json
 $ schemathesis run http://example.schemathesis.io/openapi.json --phases=examples
 
 # Run intensive testing with many examples
-$ schemathesis run http://example.schemathesis.io/openapi.json --max-examples=1000
+$ schemathesis run http://example.schemathesis.io/openapi.json --max-examples=10
 ```
 
 ## Types of Issues Detected
