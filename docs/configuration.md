@@ -24,6 +24,8 @@ While Schemathesis works well without explicit configuration, using a file offer
 !!! note "CLI and Python API Integration"
     While the configuration file sets default behavior, CLI options and the Python API can override any settings.
 
+For a complete list of settings, see the [Configuration Reference](./reference/configuration.md).
+
 ## Basic Structure
 
 Schemathesis configuration uses the TOML format with a hierarchical structure. Global settings serve as defaults and can be overridden by more specific ones such as operation-specific or project-specific configurations.
@@ -31,11 +33,11 @@ Schemathesis configuration uses the TOML format with a hierarchical structure. G
 ```toml
 # Global settings
 base-url = "https://api.example.com"
-max-examples = 100
+generation.max-examples = 100
 
 # Operation-specific settings
 [operation."GET /users"]
-max-examples = 200
+generation.max-examples = 200
 request-timeout = 5.0
 ```
 ### Environment Variable Substitution
@@ -136,31 +138,31 @@ Customize test phases using the `[phases]` section in your configuration file. F
 coverage.enabled = false
 
 # Phase-specific settings
-stateful.max-examples = 30  # Maximum number of distinct API call sequences
-fuzzing.max-examples = 200  # Maximum examples per operation in fuzzing phase
+# Maximum number of distinct API call sequences
+stateful.generation.max-examples = 30
+# Maximum examples per operation in fuzzing phase
+fuzzing.generation.max-examples = 200
 ```
 
 ### Phase-Specific Behavior
 
-Certain settings are interpreted differently across test phases. For instance, the `max-examples` setting works as follows:
+Certain settings are interpreted differently across test phases. For instance, the `generation.max-examples` setting works as follows:
 
   - **fuzzing**: Controls the maximum number of examples generated per API operation.
   - **stateful**: Determines the maximum number of distinct API call sequences.
 
-Phases that use predetermined test cases (such as the **examples** and **coverage** phases) are unaffected by the `max-examples` setting.
+Phases that use predetermined test cases (such as the **examples** and **coverage** phases) are unaffected by the `generation.max-examples` setting.
 
 Consider this example, which sets a global default while overriding it for the stateful phase:
 
 ```toml
 # Global setting
-max-examples = 200
+generation.max-examples = 200
 
 [phases]
 # Override for stateful phase
-stateful.max-examples = 30
+stateful.generation.max-examples = 30
 ```
-
-For a complete list of settings available for each phase, see the [Configuration Reference](#configuration-reference).
 
 ## Check Configuration
 
@@ -241,12 +243,12 @@ Specify an operation using its exact identifier:
 ```toml
 # OpenAPI: HTTP method and path
 [operation."GET /users"]
-max-examples = 200
+generation.max-examples = 200
 request-timeout = 5.0
 
 # GraphQL: type and field name
 [operation."Query.getUser"]
-max-examples = 200
+generation.max-examples = 200
 ```
 
 ### Targeting with Regular Expressions
@@ -256,7 +258,7 @@ Select multiple operations matching a pattern:
 ```toml
 # Match operations with paths containing "users"
 [operation.regex."GET /users/.*"]
-max-examples = 150
+generation.max-examples = 150
 
 # Match operations that modify users
 [operation.regex."(POST|PUT|PATCH) /users.*"]
@@ -275,9 +277,54 @@ Apply settings to all operations with a specific tag:
 enabled = false  # Skip all admin-tagged operations
 
 [operation.tag."payment"]
-max-examples = 150
+generation.max-examples = 150
 rate-limit = "20/s"
 ```
+
+### Targeting with Expressions
+
+For more precise control, Schemathesis supports targeting operations using JSONPath-like expressions that query specific fields within operation definitions:
+
+```toml
+[operation.expr."tags/0 == 'user'"]
+generation.max-examples = 150
+
+[operation.expr."operationId == null"]
+enabled = false
+
+[operation.expr."responses/200/description != 'Success'"]
+checks.response_schema_conformance.enabled = false
+```
+
+Expressions follow the pattern `<json-pointer> <operator> <value>` where:
+
+- `<json-pointer>` is a path to a field in the operation definition
+- `<operator>` is either `==` (equals) or `!=` (not equals)
+- `<value>` can be a string, number, boolean, null, array, or object
+
+This is particularly useful for:
+
+- Targeting operations based on description content
+- Selecting operations with specific response codes
+- Filtering by operation metadata or extension fields
+
+#### Examples
+
+```toml
+# Target operations that include 'admin' in their summary
+[operation.expr."summary == 'Admin operations'"]
+enabled = false
+
+# Target operations that handle file uploads
+[operation.expr."requestBody/content/multipart\\/form-data != null"]
+generation.max-examples = 50
+
+# Target operations without tags
+[operation.expr."tags == null"]
+checks.response_schema_conformance.enabled = false
+```
+
+Expression-based targeting is particularly useful with complex API specifications where tag-based or path-based selection isn't specific enough.
 
 ### Operation Resolution
 
@@ -296,13 +343,13 @@ Configure phase-specific settings within individual operations for fine-grained 
 ```toml
 [operation."GET /users"]
 # Default settings for this operation
-max-examples = 100
+generation.max-examples = 100
 request-timeout = 5.0
 
 # Phase-specific overrides for this operation
 [operation."GET /users".phases]
-fuzzing.max-examples = 200  # Increase examples for fuzzing
-stateful.max-examples = 30   # Reduce examples for stateful tests
+fuzzing.generation.max-examples = 200  # Increase examples for fuzzing
+stateful.generation.max-examples = 30   # Reduce examples for stateful tests
 ```
 ### Resolution Order for Phase-Operation Settings
 
@@ -408,7 +455,7 @@ Override global defaults with project-specific settings:
 [projects.payments]
 base-url = "https://payments.example.com"
 workers = 4
-max-examples = 200
+generation.max-examples = 200
 hooks = "payment_hooks.py"
 
 [projects.users]
@@ -422,7 +469,7 @@ Customize operations within a project:
 
 ```toml
 [projects.payments.operation."POST /payments"]
-max-examples = 80
+generation.max-examples = 80
 headers = { "X-Idempotency-Key" = "${IDEMPOTENCY_KEY}" }
 
 [projects.payments.operation.tag."critical"]
@@ -442,7 +489,7 @@ When using projects, settings are applied in this order:
 
 ```toml
 # Global defaults
-max-examples = 50
+generation.max-examples = 50
 workers = "auto"
 
 [projects]
@@ -453,11 +500,11 @@ users = { title = "User Management API" }
 # Payments project settings
 [projects.payments]
 base-url = "https://payments.example.com"
-max-examples = 100
+generation.max-examples = 100
 
 # Operations for payments
 [projects.payments.operation."POST /payments"]
-max-examples = 200
+generation.max-examples = 200
 parameters = { "amount" = [10, 100, 1000] }
 checks.positive_data_acceptance.expected-statuses = [200, 201]
 
@@ -484,113 +531,7 @@ schemathesis run --max-examples=300 http://api.example.com/openapi.json
 schemathesis run --phases=examples,fuzzing http://api.example.com/openapi.json
 
 # Override check settings
-schemathesis run --checks=not_a_server_error,status_code_conformance http://api.example.com/openapi.json
+schemathesis run --checks=not_a_server_error http://api.example.com/openapi.json
 ```
 
 Most configuration option can be overridden via the corresponding CLI flag.
-
-## Configuration Reference
-
-This section provides a list of configuration options available in `schemathesis.toml`, organized by category and showing where each setting can be applied.
-
-### Global Settings
-
-These settings can only be applied at the global level.
-
-#### `base-url`
-
-!!! config ""
-    **Type:** string
-    **Default:** None
-    **Scopes:** :material-earth: Global
-
-    Sets the base URL for the API under test. This setting is required when testing with a file-based schema.
-
-    ```toml
-    base-url = "https://api.example.com"
-    ```
-
-#### `workers`
-
-!!! config ""
-    **Type:** integer or "auto"
-    **Default:** 1
-    **Scopes:** :material-earth: Global
-
-    Specifies the number of concurrent workers for running test phases.
-
-    ```toml
-    workers = "auto"  # Auto-adjust based on available cores
-    workers = 4       # Use exactly 4 workers
-    ```
-
-#### `suppress-health-check`
-
-!!! config ""
-    **Type:** array of strings
-    **Default:** []
-    **Scopes:** :material-earth: Global
-
-    Disables specific Schemathesis health checks that would otherwise interrupt testing when problematic patterns are detected.
-
-    ```toml
-    suppress-health-check = ["data_too_large", "filter_too_much", "too_slow", "large_base_example"]
-    ```
-
-    Possible values: `data_too_large`, `filter_too_much`, `too_slow`, `large_base_example`, `all`.
-
-#### `wait-for-schema`
-
-!!! config ""
-    **Type:** float (≥1.0)
-    **Default:** 0 (disabled)
-    **Scopes:** :material-earth: Global
-
-    Maximum duration, in seconds, to wait for the API schema to become available. Useful when testing services that take time to start up.
-
-    ```toml
-    wait-for-schema = 5.0
-    ```
-
-### Check Configuration
-
-Settings related to validation checks and failure handling.
-
-#### `max-failures`
-
-!!! config ""
-    **Type:** integer (≥1)
-    **Default:** None
-    **Scopes:** :material-earth: Global
-
-    Terminate the test run after reaching the specified number of failures or errors.
-
-    ```toml
-    max-failures = 5
-    ```
-
-#### `continue-on-failure`
-
-!!! config ""
-    **Type:** boolean
-    **Default:** false
-    **Scopes:** :material-earth: Global, :material-folder-multiple: Project, :material-code-tags: Operation, :material-layers-triple: Phase
-
-    When enabled, continues executing all test cases within a scenario, even after encountering failures.
-
-    ```toml
-    continue-on-failure = true
-    ```
-
-#### `max-response-time`
-
-!!! config ""
-    **Type:** float (>0)
-    **Default:** None
-    **Scopes:** :material-earth: Global, :material-folder-multiple: Project, :material-code-tags: Operation, :material-layers-triple: Phase
-
-    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
-
-    ```toml
-    max-response-time = 2.0
-    ```

@@ -10,7 +10,8 @@ nav:
   - CI/CD Guide: ci-cd-guide.md
   - Extending Schemathesis: extending.md
   - Configuration Guide: configuration.md
-  - API Reference: reference.md
+  - Reference:
+      - Configuration: reference/configuration.md
   - Resources: resources.md
   - FAQ: faq.md
 
@@ -40,6 +41,7 @@ theme:
         name: Switch to system preference
   features:
     - navigation.footer
+    - content.code.copy
 
 extra:
   social:
