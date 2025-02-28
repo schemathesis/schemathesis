@@ -5,11 +5,12 @@ nav:
   - Overview: index.md
   - How It Works: how-it-works.md
   - Getting Started: getting-started.md
-  - CLI Usage Guide: cli-usage-guide.md
+  - Command-Line Interface: cli.md
   - Python Integration: python-integration.md
-  - CI/CD Guide: ci-cd-guide.md
+  - Continuous Integration: ci.md
   - Extending Schemathesis: extending.md
-  - Configuration Guide: configuration.md
+  - Configuration: configuration.md
+  - Troubleshooting: troubleshooting.md
   - Reference:
       - Configuration: reference/configuration.md
   - Resources: resources.md

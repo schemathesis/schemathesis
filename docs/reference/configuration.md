@@ -1,6 +1,6 @@
 # Configuration Reference
 
-This reference details all the configuration options available in schemathesis.toml. The settings are organized into two main categories:
+This reference details all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
 
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
 - **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[project.<name>]` namespace), they are applied to the "default" project.
@@ -30,6 +30,34 @@ headers = { "Authorization" = "Bearer ${API_TOKEN}" }
 ```
 
 This allows you to maintain a single configuration file across different environments by changing environment variables rather than the configuration itself.
+
+## Operation Targeting
+
+Schemathesis allows targeting specific API operations in three ways:
+
+- By exact path: `[operation."GET /users"]`
+- By regex pattern: `[operation.regex."GET /users/.*"]`
+- By tag: `[operation.tag."admin"]`
+- By expression: `[operation.expr."tags/0 == 'user'"]`
+
+When multiple selectors match an operation, they're applied in the order: exact path (highest precedence), tag, expression, regex (lowest precedence).
+
+## Parameter Overrides
+
+Parameters can be overridden at the global or operation level:
+
+```toml
+# Global parameters
+[parameters]
+"api_version" = "v2"
+
+# Operation-specific parameters
+[operation."GET /users"]
+parameters = { "limit" = 50, "offset" = 0 }
+
+# Disambiguate parameters with the same name
+parameters = { "path.user_id" = 42, "query.user_id" = 100 }
+```
 
 ## Global Settings
 
@@ -372,7 +400,7 @@ These settings can only be applied at the project level.
     positive_data_acceptance.expected-statuses = [200, 201, 202]
     ```
 
-## Network
+### Network
 
 The following settings control how Schemathesis makes network requests to the API under test.
 
@@ -493,7 +521,7 @@ The following settings control how Schemathesis makes network requests to the AP
     request-cert-key = "/path/to/private-key.key"
     ```
 
-## Data Generation Settings
+### Data Generation
 
 The following settings control how Schemathesis generates test data for your API testing.
 
@@ -701,30 +729,3 @@ The following settings control how Schemathesis generates test data for your API
     fill-missing-examples = true
     ```
 
-## Operation Targeting
-
-Schemathesis allows targeting specific API operations in three ways:
-
-- By exact path: `[operation."GET /users"]`
-- By regex pattern: `[operation.regex."GET /users/.*"]`
-- By tag: `[operation.tag."admin"]`
-- By expression: `[operation.expr."tags/0 == 'user'"]`
-
-When multiple selectors match an operation, they're applied in the order: exact path (highest precedence), tag, expression, regex (lowest precedence).
-
-## Parameter Overrides
-
-Parameters can be overridden at the global or operation level:
-
-```toml
-# Global parameters
-[parameters]
-"api_version" = "v2"
-
-# Operation-specific parameters
-[operation."GET /users"]
-parameters = { "limit" = 50, "offset" = 0 }
-
-# Disambiguate parameters with the same name
-parameters = { "path.user_id" = 42, "query.user_id" = 100 }
-```

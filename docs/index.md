@@ -101,9 +101,10 @@ api-tests:
 ## Learn More
 
 - [How Schemathesis Works](./how-it-works.md) - Understanding the testing approach and design principles
-- [CLI Usage Guide](./cli-usage-guide.md) - Explore different testing scenarios and CLI capabilities
+- [Command-Line Interface](./cli.md) - Explore different testing scenarios and CLI capabilities
 - [Python & pytest Integration](./python-integration.md) - Using Schemathesis in Python test suites
-- [Configuration Guide](./configuration.md) - Customizing test execution for your API
-- [CI/CD Guide](./python-integration.md) - Using Schemathesis within CI/CD pipelines
+- [Configuration](./configuration.md) - Customizing test execution for your API
+- [Continuous Integration](./ci.md) - Using Schemathesis within CI/CD pipelines
 - [Extending Schemathesis](./extending.md) - Writing custom hooks and extensions
+- [Troubleshooting](./troubleshooting.md) - TODO
 - [FAQ](./faq.md) - Common questions and solutions
