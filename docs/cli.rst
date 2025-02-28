@@ -7,159 +7,6 @@ Installing Schemathesis installs the ``schemathesis`` script to your virtualenv,
 
     To see the full list of CLI options & commands use the ``--help`` option or check the `Full list of CLI options`_.
 
-Basic usage
------------
-
-To execute tests, use the ``st run`` command:
-
-.. code:: text
-
-    $ st run https://example.schemathesis.io/openapi.json
-
-With this command, Schemathesis will load the schema from ``https://example.schemathesis.io/openapi.json`` and generate separate
-test sets for each operation in this schema. Each test set includes up to 100 test cases by default, depending on the operation definition.
-
-For example, if your API schema has three operations, then you will see a similar output:
-
-.. code:: text
-
-    ================ Schemathesis test session starts ===============
-    Schema location: http://127.0.0.1:8081/schema.yaml
-    Base URL: http://127.0.0.1:8081/api
-    Specification version: Open API 2.0
-    Workers: 1
-    Collected API operations: 3
-
-    GET /api/path_variable/{key} .                             [ 33%]
-    GET /api/success .                                         [ 66%]
-    POST /api/users/ .                                         [100%]
-
-    ============================ SUMMARY ============================
-
-    Performed checks:
-        not_a_server_error              201 / 201 passed       PASSED
-
-    ======================= 3 passed in 1.77s =======================
-
-The output style is inspired by `pytest <https://docs.pytest.org/en/stable/>`_ and provides necessary information about the
-loaded API schema, processed operations, found errors, and used checks.
-
-.. note:: Schemathesis supports colorless output via the `NO_COLOR <https://no-color.org/>` environment variable or the ``--no-color`` CLI option.
-
-Narrowing the testing scope
----------------------------
-
-By default, Schemathesis tests all operations in your API. However, you can fine-tune your test scope with various CLI options to include or exclude specific operations based on paths, methods, names, tags, and operation IDs.
-
-Include and Exclude Options
-~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-Use the following format to include or exclude specific operations in your tests:
-
-- ``--{include,exclude}-{path,method,name,tag,operation-id} TEXT``
-- ``--{include,exclude}-{path,method,name,tag,operation-id}-regex TEXT``
-
-The ``-regex`` suffix enables regular expression matching for the specified criteria. 
-For example, ``--include-path-regex '^/users'`` matches any path starting with ``/users``. 
-Without this suffix (e.g., ``--include-path '/users'``), the option performs an exact match. 
-Use regex for flexible pattern matching and the non-regex version for precise, literal matching.
-
-Additionally, you can exclude deprecated operations with:
-
-- ``--exclude-deprecated``
-
-.. note::
-
-   The ``name`` property in Schemathesis refers to the full operation name. 
-   For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
-   For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
-
-.. important::
-
-   For GraphQL schemas, Schemathesis only supports filtration by the ``name`` property.
-
-You also can filter API operations by an expression over operation's definition:
-
-.. code:: text
-
-    st run --include-by="/x-property == 42" https://example.schemathesis.io/openapi.json
-
-The expression above will select only operations with the ``x-property`` field equal to ``42``.
-Expressions have the following form:
-
-.. code:: text
-
-    "<pointer> <operator> <value>"
-
-- ``<pointer>`` is a JSON Pointer to the value in the operation definition.
-- ``<operator>`` is one of the following: ``==``, ``!=``.
-- ``<value>`` is a JSON value to compare with. If it is not a valid JSON value, it is treated as a string.
-
-Examples
-~~~~~~~~
-
-Include operations with paths starting with ``/api/users``:
-
-.. code:: text
-
-  $ st run --include-path-regex '^/api/users' https://example.schemathesis.io/openapi.json
-
-Exclude POST method operations:
-
-.. code:: text
-
-  $ st run --exclude-method 'POST' https://example.schemathesis.io/openapi.json
-
-Include operations with the ``admin`` tag:
-
-.. code:: text
-
-  $ st run --include-tag 'admin' https://example.schemathesis.io/openapi.json
-
-Exclude deprecated operations:
-
-.. code:: text
-
-  $ st run --exclude-deprecated https://example.schemathesis.io/openapi.json
-
-Include ``GET /users`` and ``POST /orders``:
-
-.. code:: text
-
-  $ st run \
-    --include-name 'GET /users' \
-    --include-name 'POST /orders' \
-    https://example.schemathesis.io/openapi.json
-
-Include queries for ``getBook`` and ``updateBook`` operations in GraphQL:
-
-.. code:: text
-
-  $ st run \
-    --include-name 'Query.getBook' \
-    --include-name 'Mutation.updateBook' \
-    https://example.schemathesis.io/graphql
-
-Overriding test data
---------------------
-
-You can set specific values for Open API parameters in test cases, such as query parameters, headers and cookies.
-
-This is particularly useful for scenarios where specific parameter values are required for deeper testing.
-For instance, when dealing with values that represent data in a database, which Schemathesis might not automatically know or generate.
-
-Each override follows the general form of ``--set-[part] name=value``.
-For Open API, the ``[part]`` corresponds to the ``in`` value of a parameter which is ``query``, ``header``, ``cookie``, or ``path``.
-You can specify multiple overrides in a single command and each of them will be applied only to API operations that use such a parameter.
-
-For example, to override a query parameter and path:
-
-.. code:: bash
-
-    $ st run --set-query apiKey=secret --set-path user_id=42 ...
-
-This command overrides the ``apiKey`` query parameter and ``user_id`` path parameter, using ``secret`` and ``42`` as their respective values in all applicable test cases.
-
 Tests configuration
 -------------------
 
@@ -297,15 +144,6 @@ In some cases, you can speed up the testing process by distributing all tests am
 In the example above, all tests will be distributed among eight worker threads.
 Note that it is not guaranteed to improve performance because it depends on your application behavior.
 
-Code samples style
-------------------
-
-To reproduce test failures Schemathesis generates cURL commands:
-
-.. code:: python
-
-    curl -X GET http://127.0.0.1:8081/api/failure
-
 Output verbosity
 ----------------
 
@@ -314,34 +152,8 @@ By default, Schemathesis truncates these parts to make the output more readable.
 
 - ``--output-truncate=false``. Disables schema and response truncation in error messages.
 
-ASGI / WSGI support
--------------------
-
-Schemathesis natively supports testing of ASGI and WSGI compatible apps (e.g., Flask or FastAPI), which is significantly faster since it doesn't involve the network.
-
-To test your app with this approach, you need to pass a special "path" to your application instance via the ``--app`` CLI option. This path consists of two parts, separated by ``:``.
-The first one is an importable path to the module with your app. The second one is the variable name that points to your app. Example: ``--app=project.wsgi:app``.
-
-Then your schema location could be:
-
-- A full URL;
-- An existing filesystem path;
-- In-app path with the schema.
-
-For example:
-
-.. code:: bash
-
-    st run --app=src.wsgi:app /swagger.json
-
-**NOTE**. Depending on your setup, you might need to run this command with a custom ``PYTHONPATH`` environment variable like this:
-
-.. code:: bash
-
-    $ PYTHONPATH=$(pwd) st run --app=src.wsgi:app /swagger.json
-
-Storing and replaying test cases
---------------------------------
+Storing test cases
+------------------
 
 It can be useful for debugging purposes to store all requests generated by Schemathesis and all responses from the app into a separate file.
 Schemathesis allows you to do this with the ``--cassette-path`` command-line option:
@@ -458,33 +270,6 @@ If you use ``--cassette-preserve-exact-body-bytes`` then you need to look for th
 
     $ yq '.http_interactions.[] | select(.status == "FAILURE") | .response.body.base64_string' foo.yaml | head -n 1 | base64 -d
     500: Internal Server Error
-
-Saved cassettes can be replayed with ``st replay`` command. Additionally, you may filter what interactions to
-replay by these parameters:
-
-- ``id``. Specific, unique ID;
-- ``status``. Replay only interactions with this status (``SUCCESS`` or ``FAILURE``);
-- ``uri``. A regular expression for request URI;
-- ``method``. A regular expression for request method;
-
-During replaying, Schemathesis will output interactions being replayed together with the response codes from the initial and
-current execution:
-
-.. code:: bash
-
-    $ st replay foo.yaml --status=FAILURE
-    Replaying cassette: foo.yaml
-    Total interactions: 4005
-
-      ID              : 0
-      URI             : http://127.0.0.1:8081/api/failure
-      Old status code : 500
-      New status code : 500
-
-      ID              : 1
-      URI             : http://127.0.0.1:8081/api/failure
-      Old status code : 500
-      New status code : 500
 
 JUnit support
 -------------
@@ -719,13 +504,6 @@ Schemathesis CLI's ``--rate-limit`` option can be used to set the maximum number
     st run --rate-limit=1000/h
     # 10000 requests per day
     st run --rate-limit=10000/d
-
-Debugging
----------
-
-If Schemathesis produces an internal error, its traceback is displayed in the CLI output.
-
-Additionally you can dump all internal events to a JSON Lines file with the ``--debug-output-file`` CLI option.
 
 Running CLI via Docker
 ----------------------
