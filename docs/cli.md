@@ -293,6 +293,59 @@ For complex or multi-step authentication flows that require custom logic, please
 
     Python extensions allow you to use third-party libraries for specialized protocols. For example, you can use `requests_ntlm` for NTLM authentication
 
+## Checks
+
+Checks are validations Schemathesis performs on API responses to ensure they comply with your API specification and industry best practices.
+
+!!! note ""
+
+    All checks are enabled by default. Customize them to focus on schema compliance, server crashes or stateful issues as needed.
+
+### Selecting Checks
+
+Customize the test run by specifying the checks to include using the `--checks` option:
+
+```console
+$ st run openapi.yaml --checks not_a_server_error,response_schema_conformance
+```
+
+Disable specific checks while retaining others by using the `--exclude-checks` option:
+
+```console
+$ st run openapi.yaml --exclude-checks negative_data_rejection
+```
+
+!!! tip ""
+
+    Use `--checks` to run only the listed checks, or `--exclude-checks` to run all checks except the ones you specify.
+
+### Response Time Validation
+
+Use the `--max-response-time` option to ensure API responses are received within a specified time frame:
+
+```console
+$ st run openapi.yaml --max-response-time 0.5
+```
+In this example, tests will fail for any API response that takes longer than 500 milliseconds, helping you identify slow endpoints.
+
+### Common Check Combinations
+
+Different testing goals require different check combinations. Here's a common scenario:
+
+#### Schema Compliance Testing
+
+For schema compliance testing, run only the checks that validate response status codes, content types, and schema structures:
+
+```console
+$ st run openapi.yaml --checks status_code_conformance,content_type_conformance,response_schema_conformance
+```
+
+This combination ensures responses use the expected status codes, content types, and schema structures without testing additional behavior like authentication bypass.
+
+### Further Reading
+
+For detailed information about each available check, including what they validate and when to use them, see the [Checks Reference](./reference/checks.md).
+
 ## :whale: Docker Usage
 
 Schemathesis is available as a Docker image, allowing you to run API tests without installing the CLI directly on your system.
