@@ -458,6 +458,58 @@ This combination ensures responses use the expected status codes, content types,
 
     For more information about checks, including what they validate and when to use them, see the [Checks Reference](./reference/checks.md).
 
+## Reporting Test Results
+
+Schemathesis can generate structured reports of test results for integration with CI systems, sharing findings with your team, and analyzing API behavior.
+
+### Report Types and Use Cases
+
+Schemathesis supports three report formats, each serving different purposes:
+
+- **JUnit XML**: Integration with CI systems like Jenkins or GitLab CI. Provides structured test results that can be visualized in test reporting dashboards.
+
+- **VCR Cassettes**: Debugging API issues by preserving complete request and response details. Includes metadata like test case IDs and check results in YAML format.
+
+- **HAR Files**: Analyzing HTTP traffic with browser developer tools or third-party applications. Provides a standard format compatible with HTTP analyzers.
+
+### Generating and Storing Reports
+
+By default, Schemathesis doesn't generate any reports. Use the `--report` option with a comma-separated list of formats:
+
+```console
+$ st run openapi.yaml --report junit,vcr
+```
+
+Reports are stored in the `schemathesis-report` directory by default. You can change this with `--report-dir`:
+
+```console
+$ st run openapi.yaml --report junit --report-dir ./test-results
+```
+
+!!! note ""
+
+    Files in the report directory are overwritten on each run. Use unique directories or filenames for tests you want to preserve.
+
+For specific report types, you can customize the output path:
+
+```console
+$ st run openapi.yaml \
+  --report junit \
+  --report-junit-path ./jenkins/schemathesis-results.xml
+```
+
+Similar options exist for other formats:
+
+```console
+$ st run openapi.yaml \
+  --report vcr \
+  --report-vcr-path ./debug/api-responses.yaml
+
+$ st run openapi.yaml \
+  --report har \
+  --report-har-path ./analysis/http-archive.har
+```
+
 ## :whale: Docker Usage
 
 Schemathesis is available as a Docker image, allowing you to run API tests without installing the CLI directly on your system.
