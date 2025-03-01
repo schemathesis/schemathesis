@@ -330,6 +330,80 @@ $ st run openapi.yaml --phases coverage
 
     For more information about test phases, including how they work and when to use them, see the [Test Phases](./phases.md) page.
 
+## Data Generation
+
+Schemathesis generates test data for API operations based on your schema. These options let you control how test data is created.
+
+### Test Data Modes
+
+The `--mode` option determines whether Schemathesis generates valid data, invalid data, or both:
+
+```console
+$ st run openapi.yaml --mode positive
+```
+
+Available modes:
+
+- `positive`: Generate only valid data that should be accepted by the API
+- `negative`: Generate data that violates schema constraints to test error handling (slower generation)
+- `all`: Generate both valid and invalid data (default)
+
+!!! example ""
+
+    In negative mode, if your schema has a constraint like `minimum: 1`, Schemathesis might generate values like `0` or `-5` to test how your API handles invalid inputs.
+
+!!! tip ""
+
+    Use `--mode positive` during initial API development to focus on core functionality before testing error handling.
+
+### Number of Examples
+
+The `--max-examples` option controls the maximum number of test cases:
+
+```console
+$ st run openapi.yaml --max-examples 50
+```
+
+By default, Schemathesis generates up to 100 test cases per operation.
+
+!!! note ""
+
+    - In unit testing phases (examples, coverage, fuzzing): Limits the number of test cases per operation
+    - In stateful testing: Controls the number of API calls in a single sequence
+    - Testing may finish earlier if Schemathesis finds a failure or exhausts all possible inputs
+
+!!! example ""
+
+    For a parameter with constraints like `minimum: 1, maximum: 10`, Schemathesis might generate fewer than your requested examples if it exhausts all meaningful test cases.
+
+
+!!! tip ""
+
+    - Lower values (10-50) provide faster feedback during development
+    - Higher values (100+) offer more thorough testing but take longer to execute
+    - Use `--continue-on-failure` to test all examples even after finding failures
+
+### Reproducibility
+
+Use the `--seed` option to make test data generation reproducible in the same environment:
+
+```console
+$ st run openapi.yaml --seed 42
+```
+
+With a fixed seed, Schemathesis will attempt to generate consistent test data each time, which helps:
+
+- Reproduce reported issues: "Test fails with seed 12345"
+- Create predictable test runs in CI/CD environments
+
+!!! warning ""
+
+    Using the same seed only guarantees identical test data when other factors remain constant - including schema definition, API behavior, Schemathesis version, and Python version.
+
+!!! tip ""
+
+    For additional data generation options, see the [Data Generation Guide](./data-generation.md).
+
 ## Checks
 
 Checks are validations Schemathesis performs on API responses to ensure they comply with your API specification and industry best practices.
