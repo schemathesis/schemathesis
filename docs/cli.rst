@@ -381,37 +381,6 @@ This command will create an XML at a given path, as in the example below.
             </testsuite>
     </testsuites>
 
-Base URL configuration
-----------------------
-
-If your Open API schema defines ``servers`` (or ``basePath`` in Open API 2.0), these values will be used to
-construct a full operation URL during testing. In the case of Open API 3, the first value from ``servers`` will be used.
-
-However, you may want to run tests against a different base URL. To do this, you need to pass the ``--base-url`` option in CLI
-or provide ``base_url`` argument to a loader/runner if you use Schemathesis in your code:
-
-.. code:: bash
-
-    st run --base-url=http://127.0.0.1:8080/api/v2 http://production.com/api/openapi.json
-
-And if your schema defines ``servers`` like this:
-
-.. code:: yaml
-
-    servers:
-      - url: https://production.com/api/{basePath}
-        variables:
-          basePath:
-            default: v1
-
-Then the tests will be executed against ``/api/v2`` base path.
-
-The ``--base-url`` argument is also used if you wish to load the OpenAPI specification from a local file.
-
-.. code:: bash
-
-    st run --base-url=http://127.0.0.1:8080/api/v1 path/to/openapi.json
-
 .. _extend-cli:
 
 Extending CLI
@@ -504,4 +473,3 @@ Schemathesis CLI's ``--rate-limit`` option can be used to set the maximum number
     st run --rate-limit=1000/h
     # 10000 requests per day
     st run --rate-limit=10000/d
-
