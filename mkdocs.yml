@@ -3,7 +3,9 @@ repo_url: https://github.com/schemathesis/schemathesis
 
 nav:
   - Overview: index.md
-  - How It Works: how-it-works.md
+  - How It Works:
+      - how-it-works.md
+      - phases.md
   - Getting Started: getting-started.md
   - Command-Line Interface: cli.md
   - Python Integration: python-integration.md
