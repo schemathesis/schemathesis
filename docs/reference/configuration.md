@@ -530,7 +530,7 @@ The following settings control how Schemathesis generates test data for your API
 !!! note ""
 
     **Type:** `String`  
-    **Default:** `"positive"`  
+    **Default:** `"all"`  
     
     Test data generation mode. Controls whether Schemathesis generates valid data, invalid data, or both.
     
@@ -541,7 +541,7 @@ The following settings control how Schemathesis generates test data for your API
     
     ```toml
     [generation]
-    mode = "all"
+    mode = "positive"
     ```
 
 #### `generation.max-examples`
@@ -549,7 +549,7 @@ The following settings control how Schemathesis generates test data for your API
 !!! note ""
 
     **Type:** `Integer`  
-    **Default:** `null`  
+    **Default:** `100`  
 
     Maximum number of test cases generated per API operation. Must be greater than or equal to 1.
 

@@ -7,20 +7,6 @@ Installing Schemathesis installs the ``schemathesis`` script to your virtualenv,
 
     To see the full list of CLI options & commands use the ``--help`` option.
 
-Tests configuration
--------------------
-
-Schemathesis is built on top of the `Hypothesis <http://hypothesis.works/>`_ library and allows you to configure testing process in the same way.
-
-We support all configuration options accepted by the ``hypothesis.settings`` decorator.
-All of them are prefixed with ``--hypothesis-`` and underscores are replaced with dashes, for example:
-
-- ``--hypothesis-max-examples=1000``. Generate up to 1000 test cases per API operation;
-- ``--hypothesis-phases=explicit``. Run only examples, specified explicitly in the API schema;
-- ``--hypothesis-suppress-health-check=too_slow``. Disables the ``too_slow`` health check and makes Schemathesis continue testing even if it is considered too slow.
-
-See the whole list of available options via the ``st run --help`` command and in the `Hypothesis documentation <https://hypothesis.readthedocs.io/en/latest/settings.html#available-settings>`_.
-
 Storing test cases
 ------------------
 
