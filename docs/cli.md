@@ -13,11 +13,7 @@ $ st run https://example.schemathesis.io/openapi.json
 This command:
 
 - Loads the API schema from the specified URL.
-- Generates diverse test cases across multiple test phases:
-    - **examples:** Using schema-defined examples.
-    - **coverage:** Using deterministic edge cases and boundary values.
-    - **fuzzing:** Using randomly generated values.
-    - **stateful:** Testing API operation sequences.
+- Generates diverse test cases across multiple [test phases](#test-phases).
 - Executes the test cases and runs a suite of checks against the API responses.
 - Automatically minimizes any failing test case to help pinpoint the underlying issue.
 
@@ -180,7 +176,7 @@ You can combine multiple filters to create precise test scopes:
 $ st run --include-method POST --include-method PUT --exclude-tag admin ...
 ```
 
-This example tests only POST and PUT operations that don't have the "deprecated" tag.
+This example tests only POST and PUT operations that don't have the "admin" tag.
 
 ### Filtering by Schema Properties
 
@@ -380,7 +376,7 @@ By default, Schemathesis generates up to 100 test cases per operation.
 !!! tip ""
 
     - Lower values (10-50) provide faster feedback during development
-    - Higher values (100+) offer more thorough testing but take longer to execute
+    - Higher values (100+) find more edge cases but take longer to execute
     - Use `--continue-on-failure` to test all examples even after finding failures
 
 ### Reproducibility
@@ -391,7 +387,7 @@ Use the `--seed` option to make test data generation reproducible in the same en
 $ st run openapi.yaml --seed 42
 ```
 
-With a fixed seed, Schemathesis will attempt to generate consistent test data each time, which helps:
+With a fixed seed, Schemathesis generates the same sequence of test data within the same environment, which helps:
 
 - Reproduce reported issues: "Test fails with seed 12345"
 - Create predictable test runs in CI/CD environments
@@ -406,7 +402,7 @@ With a fixed seed, Schemathesis will attempt to generate consistent test data ea
 
 ## Checks
 
-Checks are validations Schemathesis performs on API responses to ensure they comply with your API specification and industry best practices.
+Checks are validations Schemathesis performs on API responses to verify correct behavior according to specifications.
 
 !!! note ""
 
