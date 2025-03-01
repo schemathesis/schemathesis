@@ -510,6 +510,11 @@ $ st run openapi.yaml \
   --report-har-path ./analysis/http-archive.har
 ```
 
+!!! tip ""
+
+    For detailed information about report structures and advanced usage, see the [Reporting Guide](./reporting.md).
+
+
 ## :whale: Docker Usage
 
 Schemathesis is available as a Docker image, allowing you to run API tests without installing the CLI directly on your system.

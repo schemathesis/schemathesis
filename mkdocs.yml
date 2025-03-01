@@ -7,6 +7,7 @@ nav:
       - how-it-works.md
       - phases.md
       - data-generation.md
+      - reporting.md
   - Getting Started: getting-started.md
   - Command-Line Interface: cli.md
   - Python Integration: python-integration.md
