@@ -14,6 +14,7 @@ nav:
   - Reference:
       - Configuration: reference/configuration.md
       - Command-Line Options: reference/cli.md
+      - Checks: reference/checks.md
   - Resources: resources.md
   - FAQ: faq.md
 
