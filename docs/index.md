@@ -109,12 +109,14 @@ Here are the key documentation sections based on your needs:
 * **Using Schemathesis**:
     * **[Command-Line Interface](using/cli.md)** — Run tests via CLI
     * **[Python Integration](using/python-integration.md)** — Embed API testing in Python test suites
-    * **[Continuous Integration](using/ci.md)** — Automate testing in CI/CD workflows
+    * **[Continuous Integration](ci/overview.md)** — Automate testing in CI/CD workflows
     * **[Configuration](using/configuration.md)** — Configure test execution behavior
 
 * **[Extending Schemathesis](extending/overview.md)** — Implement custom checks, hooks, and data generators
 
 * **[Troubleshooting](troubleshooting.md)** — Diagnose and resolve common issues
+
+* **[External Resources](resources.md)** — Explore articles, papers, videos, and tutorials from the community
 
 * **[Reference](reference/configuration.md)** — Complete documentation of all available options
 

@@ -1,3 +1,5 @@
+# Frequently Asked Questions
+
 ## What kind of data does Schemathesis generate?
 
 Schemathesis generates three types of test data:

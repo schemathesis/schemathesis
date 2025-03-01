@@ -1,57 +1,6 @@
 Recipes
 =======
 
-Disabling TLS certificate verification
---------------------------------------
-
-Sometimes, during testing, it is needed to disable TLS verification of the service under test.
-
-**CLI**
-
-.. code-block:: text
-
-    st run http://127.0.0.1/schema.json --request-tls-verify
-
-**Python**
-
-.. code-block:: python
-
-    import schemathesis
-
-    schema = schemathesis.openapi.from_uri("http://127.0.0.1/schema.json")
-
-
-    @schema.parametrize()
-    def test_api(case):
-        # If you need `response`
-        response = case.call(verify=False)
-        # Alternatively if you don't need `response`
-        case.call_and_validate(verify=False)
-
-It is possible to use an unencrypted certificate (e.g. PEM) by using the ``--request-cert /file/path/example.pem`` argument.
-
-.. code-block:: text
-
-    st run --request-cert client.pem ...
-
-
-It is also possible to provide the certificate and the private key separately with the usage of the ``--request-cert-key /file/path/example.key`` argument.
-
-.. code-block:: text
-
-    st run --request-cert client.crt --request-cert-key client.key ...
-
-Using an HTTP(S) proxy
-----------------------
-
-Sometimes you need to send your traffic to some other tools. You could set up a proxy via the following env variables:
-
-.. code-block:: bash
-
-    $ export HTTP_PROXY="http://10.10.1.10:3128"
-    $ export HTTPS_PROXY="http://10.10.1.10:1080"
-    $ st run http://127.0.0.1/schema.json
-
 Per-route request timeouts
 --------------------------
 
