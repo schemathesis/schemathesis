@@ -21,62 +21,48 @@
 
 ## Schemathesis
 
-> ⚠️ You are viewing the Schemathesis V4 README (Work in Progress) ⚠️
-
-> This branch is under active development, with substantial changes expected before stabilization. While V4 is fully functional and passing tests, some features are missing, and the documentation may be outdated.
-
-> For the stable release, see the [V3 branch](https://github.com/schemathesis/schemathesis/tree/v3).
-
-> 💡 Have feedback? Share your thoughts in [this discussion](https://github.com/schemathesis/schemathesis/discussions/2677)!
-
-Schemathesis is an API testing tool that automatically finds crashes and validates spec compliance.
+Schemathesis is a modern API testing tool that automatically generates and runs tests based on your OpenAPI or GraphQL schema.
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis Demo"/>
+  <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
+  <br>
+  <i>Automatically finding specification violations and server errors</i>
 </p>
 
-<p align="center">
-  <i>Finding server crashes in the Demo API.</i>
-</p>
+> **Note:** This is the V4 branch under active development. While fully functional and passing tests, some features may be missing, and documentation is being updated. For the stable release, see the [V3 branch](https://github.com/schemathesis/schemathesis/tree/v3).
 
-### Highlights
+## Why Schemathesis?
 
-- 🎯 **Catches Hard-to-Find Bugs**: Automatically uncover crashes and spec violations that manual testing might miss.
-
-- ⚡ **Accelerates Testing**: Generate a wide range of test cases directly from your API schema.
-
-- 🧩 **Integrates Seamlessly**: Works with popular API formats such as OpenAPI and GraphQL, and easily integrates into your existing CI/CD workflows.
-
-- 🔧 **Customizable and Extendable**: Leverage Python extensions to configure and extend your test generation.
-
-- 🐞 **Simplifies Debugging**: Detailed reports and reproducible test cases with cURL commands streamline troubleshooting.
-
-- 🔬 **Proven by Research**: Validated through academic studies on API testing automation, featured in the [ICSE 2022 paper](https://ieeexplore.ieee.org/document/9793781) on semantics-aware fuzzing, and recognized in an [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as a state-of-the-art RESTful API testing tool.
+- 🔬 **Research-backed testing**: Validated in [academic research](https://ieeexplore.ieee.org/document/9793781) and recognized in an [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as a state-of-the-art API testing tool
+- 🔍 **Schema-Based Generation** - Creates test cases directly from your API documentation
+- 🛡️ **Zero Configuration** - Works immediately with any valid OpenAPI or GraphQL schema
+- 🔄 **Advanced Testing Techniques** - Employs stateful testing, boundary analysis, and fuzzing
+- 🧪 **Continuous Testing** - Integrates with CI/CD pipelines for automated verification
+- ⚡ **Extensive Coverage** - Tests more scenarios than manual scenarios can reasonably cover
 
 ## Installation
 
-Use Schemathesis via Docker, or install it from [PyPI](https://pypi.org/project/schemathesis/)
-
 ```console
-# Via Docker.
-$ docker pull schemathesis/schemathesis:stable
+# Using uv (recommended)
+$ uv pip install schemathesis
 
-# With pip.
+# Using pip
 $ pip install schemathesis
+
+# Using Docker
+$ docker pull schemathesis/schemathesis:stable
 ```
 
-## Getting Started
+## Usage
 
-Schemathesis works as a standalone CLI:
+### Command Line
 
 ```console
-docker run schemathesis/schemathesis:stable
-   run --checks all https://example.schemathesis.io/openapi.json
-# Or when installed with pip
-schemathesis run --checks all https://example.schemathesis.io/openapi.json
+# Run tests against a schema URL
+$ st run https://example.schemathesis.io/openapi.json
 ```
 
-Or a Python library:
+### Python Library
 
 ```python
 import schemathesis
@@ -89,36 +75,35 @@ def test_api(case):
     case.call_and_validate()
 ```
 
-See a complete working example project in the [/example](https://github.com/schemathesis/schemathesis/tree/master/example) directory.
-
-Schemathesis can be easily integrated into your CI/CD pipeline using GitHub Actions. Add this block to your GitHub Actions to run Schemathesis against your API:
+### CI/CD Integration
 
 ```yaml
-api-tests:
-  runs-on: ubuntu-latest
-  steps:
-    - uses: schemathesis/action@v1
-      with:
-        schema: "https://example.schemathesis.io/openapi.json"
+# GitHub Actions example
+steps:
+  - uses: schemathesis/action@v1
+    with:
+      schema: "https://example.schemathesis.io/openapi.json"
 ```
 
-For more details, check out our [GitHub Action](https://github.com/schemathesis/action) repository or see our [GitHub Tutorial](https://docs.schemathesis.io/tutorials/github).
+## Documentation
+
+📚 **[Read the full documentation](https://schemathesis.github.io/schemathesis)** for comprehensive guides, examples, and reference material.
 
 ## Who's Using Schemathesis?
 
-Schemathesis is used by a number of projects and companies, including direct usage or integration into other tools:
+Schemathesis is used by companies and open-source projects including:
 
+- Netflix ([Dispatch](https://github.com/Netflix/dispatch))
+- Spotify ([Backstage](https://github.com/backstage/backstage))
+- WordPress ([OpenVerse](https://github.com/WordPress/openverse))
+- Chronosphere.io ([Calyptia](https://github.com/chronosphereio/calyptia-api))
+- [Qdrant](https://github.com/qdrant/qdrant)
+- [Pixie](https://github.com/pixie-io/pixie)
+- [CheckMK](https://github.com/Checkmk/checkmk)
+- [Weechat](https://github.com/weechat/weechat)
+- HXSecurity ([DongTai](https://github.com/HXSecurity/DongTai))
 - Abstract Machines ([Magistrala](https://github.com/absmach/magistrala))
 - Bundesstelle für Open Data ([smard-api](https://github.com/bundesAPI/smard-api))
-- [CheckMK](https://github.com/Checkmk/checkmk)
-- Chronosphere.io ([Calyptia](https://github.com/chronosphereio/calyptia-api))
-- HXSecurity ([DongTai](https://github.com/HXSecurity/DongTai))
-- Netflix ([Dispatch](https://github.com/Netflix/dispatch))
-- [Pixie](https://github.com/pixie-io/pixie)
-- [Qdrant](https://github.com/qdrant/qdrant)
-- Spotify ([Backstage](https://github.com/backstage/backstage))
-- [Weechat](https://github.com/weechat/weechat)
-- WordPress ([OpenVerse](https://github.com/WordPress/openverse))
 
 ## Testimonials
 
@@ -134,7 +119,7 @@ Schemathesis is used by a number of projects and companies, including direct usa
 
 ---
 
-"_The tool is absolutely amazing as it can do the negative scenario testing instead of me and much faster! Before I was doing the same tests in Postman client. But it's much slower and brings maintenance burden._"
+"_The tool is amazing as it can test negative scenarios instead of me and much faster!_"
 
 <div>Luděk Nový - <strong>JetBrains</strong></div>
 
@@ -154,24 +139,15 @@ Schemathesis is used by a number of projects and companies, including direct usa
 
 ## Contributing
 
-We welcome contributions in code and are especially interested in learning about your use cases. Your input is essential for improving Schemathesis and directly influences future updates.
+We welcome contributions! Your input directly influences Schemathesis development.
 
-### How to Contribute
-
-1. Discuss ideas and questions through [GitHub issues](https://github.com/schemathesis/schemathesis/issues) or on our [Discord channel](https://discord.gg/R9ASRAmHnA).
-2. For code contributions, see our [contributing guidelines](https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst).
-3. Share your experience and thoughts using [this feedback form](https://forms.gle/kJ4hSxc1Yp6Ga96t5).
-
-### Why Your Input Matters
-
-- Enables us to develop useful features and fix bugs faster
-- Improves our test suite and documentation
-
-Thank you for contributing to making Schemathesis better! 👍
+- Discuss ideas in [GitHub issues](https://github.com/schemathesis/schemathesis/issues) or our [Discord server](https://discord.gg/R9ASRAmHnA)
+- See our [contributing guidelines](https://github.com/schemathesis/schemathesis/blob/master/CONTRIBUTING.rst) for code contributions
+- Share your experience using [this feedback form](https://forms.gle/kJ4hSxc1Yp6Ga96t5)
 
 ## Get in Touch
 
-If you need assistance with integrating Schemathesis into your workflows or have specific questions, feel free to reach out at <a href="mailto:support@schemathesis.io">support@schemathesis.io</a>.
+Need assistance with integration or have specific questions? Contact us at <a href="mailto:support@schemathesis.io">support@schemathesis.io</a>.
 
 ## Acknowledgements
 
