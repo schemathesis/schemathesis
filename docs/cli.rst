@@ -5,7 +5,7 @@ Installing Schemathesis installs the ``schemathesis`` script to your virtualenv,
 
 .. note::
 
-    To see the full list of CLI options & commands use the ``--help`` option or check the `Full list of CLI options`_.
+    To see the full list of CLI options & commands use the ``--help`` option.
 
 Tests configuration
 -------------------
@@ -505,55 +505,3 @@ Schemathesis CLI's ``--rate-limit`` option can be used to set the maximum number
     # 10000 requests per day
     st run --rate-limit=10000/d
 
-Running CLI via Docker
-----------------------
-
-Schemathesis CLI is also available as a Docker image:
-
-.. code-block:: bash
-
-    docker run schemathesis/schemathesis:stable \
-        run http://api.com/schema.json
-
-To run it against the localhost server, add ``--network=host`` parameter:
-
-.. code-block:: bash
-
-    docker run --network="host" schemathesis/schemathesis:stable \
-        run http://127.0.0.1/schema.json
-
-If your API spec is stored in a file, you could use it too by specifying a Docker volume:
-
-.. code-block:: bash
-
-    docker run -v $(pwd):/app schemathesis/schemathesis:stable \
-        run /app/spec.json
-
-In the example above, the ``spec.json`` file from the current working directory is shared with the Schemathesis container.
-Note, that ``$(pwd)`` is shell-specific and works in ``sh`` / ``bash`` / ``zsh``, but could be different in e.g. ``PowerShell``.
-
-When running from Docker, by default color output is not present. You can use ``--force-color`` if you know that the host's terminal supports colors. 
-Note that ``--force-color`` and ``--no-color`` are not compatible with each other.
-
-.. note:: See Docker volumes `documentation <https://docs.docker.com/storage/volumes/>`_ for more information.
-
-Docker on MacOS
-~~~~~~~~~~~~~~~
-
-Due to the networking behavior of Docker on MacOS, the containerized application cannot directly reach ``localhost`` of the host machine.
-To address this, MacOS users should use the special DNS name ``host.docker.internal`` when referring to the host within Docker.
-
-.. code-block:: bash
-
-    docker run schemathesis/schemathesis:stable \
-        run http://host.docker.internal:8080/swagger.json
-
-.. note:: See `Docker on MacOS documentation <https://docs.docker.com/desktop/networking/#i-want-to-connect-from-a-container-to-a-service-on-the-host>`_ for more details
-
-Full list of CLI options
-------------------------
-
-.. click:: schemathesis.cli:schemathesis
-   :prog: schemathesis
-   :commands: run
-   :nested: full

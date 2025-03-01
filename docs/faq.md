@@ -78,4 +78,3 @@ Schemathesis differs from other API testing tools in several key ways:
 - **Schema-first workflow**: While tools like Postman or Insomnia focus on manual request creation, Schemathesis derives all test cases directly from your API specification.
 
 Compared to tools like Dredd, Schemathesis focuses more on finding unexpected edge cases through property-based testing rather than verifying documented examples.
-
