@@ -27,13 +27,11 @@ Example output:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-
  ✅  Loaded specification from https://schemathesis.io/openapi.json (in 0.32s)
 
      Base URL:         http://127.0.0.1/api
      Specification:    Open API 3.0.2
      Operations:       1 selected / 1 total
-
 
  ✅  API capabilities:
 
@@ -215,6 +213,85 @@ $ st run --exclude-deprecated ...
 !!! important "GraphQL Support"
 
     For GraphQL schemas, Schemathesis only supports filtration by the `name` property.
+
+## Authentication and Headers
+
+Schemathesis supports various authentication methods: token-based headers, HTTP Basic Auth, and advanced multi-step flows. Authentication settings apply to all API requests made during testing.
+
+### Token-based Authentication
+
+#### API Keys
+
+To provide an API key via header:
+
+```console
+$ st run openapi.yaml --header "X-API-Key: your-api-key-here"
+```
+
+!!! tip ""
+
+    Store tokens in environment variables to avoid exposing them in command history:
+
+    ```console
+    $ st run openapi.yaml --header "X-API-Key: ${API_KEY}"
+    ```
+
+#### Bearer Tokens
+
+For Bearer token authentication:
+
+```console
+$ st run openapi.yaml --header "Authorization: Bearer your-token-here"
+```
+
+!!! note ""
+
+    Specify multiple headers by repeating the `--header` option:
+
+    ```console
+    $ st run openapi.yaml \
+      --header "Authorization: Bearer ${TOKEN}" \
+      --header "X-Tenant-ID: ${TENANT_ID}"
+    ```
+
+### Basic Authentication
+
+For HTTP Basic Auth, use `--auth`:
+
+```console
+$ st run openapi.yaml --auth username:password
+```
+
+Schemathesis automatically encodes credentials in the `Authorization` header.
+
+### Using Configuration Files
+
+Configuration files allow you to set default authentication or override it for specific API operations. This flexible approach supports all authentication types, including OpenAPI security schemes, which are automatically applied when required by the API.
+
+By default, Schemathesis automatically loads a `schemathesis.toml` file from the current directory or project root. To use a custom configuration file, specify its path with the `--config` option:
+
+```console
+$ st run openapi.yaml --config config.toml
+```
+
+For more details, see the [Authentication Configuration Reference](./reference/configuration.md#authentication) section. For example:
+
+```toml
+[auth]
+bearer = "${TOKEN}"
+
+[auth.openapi]
+ApiKeyAuth = { value = "${API_KEY}" }
+```
+
+### Advanced Authentication
+
+For complex or multi-step authentication flows that require custom logic, please refer to the [Extensions Guide](./extending.md).
+
+
+!!! tip "Third-Party Authentication"
+
+    Python extensions allow you to use third-party libraries for specialized protocols. For example, you can use `requests_ntlm` for NTLM authentication
 
 ## :whale: Docker Usage
 

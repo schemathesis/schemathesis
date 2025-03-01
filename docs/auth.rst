@@ -8,25 +8,6 @@ Then, we'll move on to more advanced topics, including HTTP Basic, Digest Authen
 Setting credentials
 -------------------
 
-To set authentication credentials manually, you can pass a key-value pairs to Schemathesis when running tests.
-Here's an example command for setting a custom header or cookie using the CLI:
-
-.. code:: text
-
-    st run -H "Authorization: Bearer TOKEN" ...
-    st run -H "Cookie: session=SECRET" ...
-
-You can also provide multiple headers by using the ``-H`` option multiple times:
-
-.. code:: text
-
-    st run -H "Authorization: Bearer TOKEN" -H "X-Session-Id: SECRET" ...
-
-.. note::
-
-    Query string authentication is not yet supported in the Schemathesis CLI, however, you can use custom authentication mechanisms to set authentication in a query string parameter.
-    Details on how to do this are described in the :ref:`Custom Authentication <custom-auth>` section below.
-
 For Python tests you can set a header, cookie or a query parameter inside your test function:
 
 .. code-block:: python
@@ -49,10 +30,6 @@ Built-In Authentication mechanisms
 ----------------------------------
 
 `HTTP Basic <https://datatracker.ietf.org/doc/html/rfc7617>`_ is supported by Schemathesis out of the box.
-
-.. code:: text
-
-    st run --auth user:pass
 
 In Python tests, you can use the `requests <https://github.com/psf/requests>`_ library to send requests with HTTP Basic or HTTP Digest authentication.
 You can pass the authentication credentials using the ``auth`` arguments of the ``call`` or ``call_and_validate`` methods:
