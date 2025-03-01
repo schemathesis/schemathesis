@@ -8,8 +8,11 @@ nav:
   - Using Schemathesis:
       - Command-Line Interface: using/cli.md
       - Python Integration: using/python-integration.md
-      - Continuous Integration: using/ci.md
       - Configuration: using/configuration.md
+  - Continuous Integration:
+      - Overview: ci/overview.md
+      - GitHub Actions: ci/github-actions.md
+      - GitLab CI: ci/gitlab-ci.md
   - Extending:
       - Overview: extending/overview.md
       - Checks: extending/checks.md
@@ -23,7 +26,7 @@ nav:
       - Checks: reference/checks.md
       - Reporting: reference/reporting.md
       - Python API Reference: reference/python.md
-  - Resources: resources.md
+  - External Resources: resources.md
   - FAQ: faq.md
 
 theme:

@@ -3,27 +3,6 @@ Additional features
 
 Schemathesis ships a set of optional features that could help to tune your tests.
 
-Unique data generation
-~~~~~~~~~~~~~~~~~~~~~~
-
-By default, Schemathesis may generate the same test cases as all data is randomized. If this behavior does not match your expectations, or
-your test budgets, you can force Schemathesis to generate unique test cases.
-
-In CLI:
-
-.. code:: text
-
-    $ st run --contrib-unique-data https://example.schemathesis.io/openapi.json
-
-Uniqueness is determined by the following parts of the generated data:
-
-- ``media_type``
-- ``path_parameters``
-- ``headers``
-- ``cookies``
-- ``query``
-- ``body``
-
 Fill missing examples
 ~~~~~~~~~~~~~~~~~~~~~
 

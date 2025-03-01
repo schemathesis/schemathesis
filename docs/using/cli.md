@@ -583,3 +583,11 @@ $ docker run -v $(pwd):/app schemathesis/schemathesis:stable \
 ```
 
 This command will generate the JUnit report in the `test-results` directory on your local machine.
+
+## Next Steps
+
+Should you wish to go beyond the discussed CLI usage you can check the following:
+
+- See the [CLI Reference](../reference/cli.md) for a complete list of all available command-line options
+
+- Check [Extension Mechanisms](../extending/overview.md) to implement custom checks, hooks, or data generators when standard functionality doesn't meet your requirements
