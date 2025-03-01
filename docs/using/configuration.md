@@ -1,4 +1,4 @@
-# Configuration Guide
+# Configuration
 
 Schemathesis can be configured through a `schemathesis.toml` file.
 
@@ -24,7 +24,7 @@ While Schemathesis works well without explicit configuration, using a file offer
 !!! note "CLI and Python API Integration"
     While the configuration file sets default behavior, CLI options and the Python API can override any settings.
 
-For a complete list of settings, see the [Configuration Reference](./reference/configuration.md).
+For a complete list of settings, see the [Configuration Reference](../reference/configuration.md).
 
 ## Basic Structure
 

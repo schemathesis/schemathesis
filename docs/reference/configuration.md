@@ -1,4 +1,4 @@
-# Configuration Reference
+# Configuration Options
 
 This reference details all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
 

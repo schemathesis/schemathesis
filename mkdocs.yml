@@ -2,23 +2,27 @@ site_name: Schemathesis
 repo_url: https://github.com/schemathesis/schemathesis
 
 nav:
-  - Overview: index.md
-  - How It Works:
-      - how-it-works.md
-      - phases.md
-      - data-generation.md
-      - reporting.md
+  - Introduction: index.md
   - Getting Started: getting-started.md
-  - Command-Line Interface: cli.md
-  - Python Integration: python-integration.md
-  - Continuous Integration: ci.md
-  - Extending Schemathesis: extending.md
-  - Configuration: configuration.md
+  - Core Concepts: core-concepts.md
+  - Using Schemathesis:
+      - Command-Line Interface: using/cli.md
+      - Python Integration: using/python-integration.md
+      - Continuous Integration: using/ci.md
+      - Configuration: using/configuration.md
+  - Extending:
+      - Overview: extending/overview.md
+      - Checks: extending/checks.md
+      - Data Generation: extending/data-generation.md
+      - Authentication: extending/auth.md
+      - Hooks: extending/hooks.md
   - Troubleshooting: troubleshooting.md
   - Reference:
-      - Configuration: reference/configuration.md
-      - Command-Line Options: reference/cli.md
+      - Configuration Options: reference/configuration.md
+      - CLI Options: reference/cli.md
       - Checks: reference/checks.md
+      - Reporting: reference/reporting.md
+      - Python API Reference: reference/python.md
   - Resources: resources.md
   - FAQ: faq.md
 
