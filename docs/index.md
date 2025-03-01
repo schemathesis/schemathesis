@@ -10,6 +10,7 @@ Schemathesis is a modern API testing tool that automatically generates and runs 
 
 ## Why Schemathesis?
 
+- 🔬 **Research-backed testing**: Validated in [academic research](https://ieeexplore.ieee.org/document/9793781) and recognized in an [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as a state-of-the-art API testing tool
 - 🔍 **Schema-Based Generation** - Creates test cases directly from your API documentation
 - 🛡️ **Zero Configuration** - Works immediately with any valid OpenAPI or GraphQL schema
 - 🔄 **Advanced Testing Techniques** - Employs stateful testing, boundary analysis, and fuzzing
