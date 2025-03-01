@@ -293,6 +293,43 @@ For complex or multi-step authentication flows that require custom logic, please
 
     Python extensions allow you to use third-party libraries for specialized protocols. For example, you can use `requests_ntlm` for NTLM authentication
 
+## Test Phases
+
+Schemathesis divides testing into distinct phases—each designed to detect specific API issues.
+
+### Available Phases
+
+Schemathesis supports four test phases:
+
+- **Examples**: Uses schema-defined examples for quick verification.  
+- **Coverage**: Systematically tests boundary values, constraints, and edge cases.  
+- **Fuzzing**: Uses randomized data to uncover unexpected edge cases.  
+- **Stateful**: Tests sequences of API calls to assess stateful behavior.
+
+By default, all phases are enabled.
+
+!!! warning ""
+
+    Note: The stateful phase can significantly increase test duration.
+
+### Selecting Phases
+
+Use the `--phases` option with a comma-separated list to specify which phases to run:
+
+```console
+$ st run openapi.yaml --phases examples,fuzzing
+```
+
+To run a single phase:
+
+```console
+$ st run openapi.yaml --phases coverage
+```
+
+!!! tip ""
+
+    For more information about test phases, including how they work and when to use them, see the [Test Phases](./phases.md) page.
+
 ## Checks
 
 Checks are validations Schemathesis performs on API responses to ensure they comply with your API specification and industry best practices.
@@ -337,14 +374,15 @@ Different testing goals require different check combinations. Here's a common sc
 For schema compliance testing, run only the checks that validate response status codes, content types, and schema structures:
 
 ```console
-$ st run openapi.yaml --checks status_code_conformance,content_type_conformance,response_schema_conformance
+$ st run openapi.yaml --checks \
+    status_code_conformance,content_type_conformance,response_schema_conformance
 ```
 
 This combination ensures responses use the expected status codes, content types, and schema structures without testing additional behavior like authentication bypass.
 
-### Further Reading
+!!! tip ""
 
-For detailed information about each available check, including what they validate and when to use them, see the [Checks Reference](./reference/checks.md).
+    For more information about checks, including what they validate and when to use them, see the [Checks Reference](./reference/checks.md).
 
 ## :whale: Docker Usage
 
