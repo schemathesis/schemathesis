@@ -728,4 +728,3 @@ The following settings control how Schemathesis generates test data for your API
     [generation]
     fill-missing-examples = true
     ```
-

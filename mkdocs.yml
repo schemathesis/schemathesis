@@ -13,6 +13,7 @@ nav:
   - Troubleshooting: troubleshooting.md
   - Reference:
       - Configuration: reference/configuration.md
+      - Command-Line Options: reference/cli.md
   - Resources: resources.md
   - FAQ: faq.md
 

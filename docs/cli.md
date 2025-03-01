@@ -216,4 +216,75 @@ $ st run --exclude-deprecated ...
 
     For GraphQL schemas, Schemathesis only supports filtration by the `name` property.
 
+## :whale: Docker Usage
 
+Schemathesis is available as a Docker image, allowing you to run API tests without installing the CLI directly on your system.
+
+### Basic Docker Command
+
+The simplest way to run Schemathesis via Docker is to use a remote schema URL:
+
+```console
+$ docker run schemathesis/schemathesis:stable \
+    run http://api.example.com/openapi.json
+```
+
+!!! tip "Enabling Color Output"
+
+    By default, Docker containers don't enable color output. Use the `--force-color` option if your terminal supports colors.
+
+
+### Network Configuration by Platform
+
+Network configuration varies by platform when testing local APIs:
+
+#### 🐧 Linux
+
+On Linux, use the `--network=host` parameter to access services running on your local machine:
+
+```console
+$ docker run --network=host schemathesis/schemathesis:stable \
+    run http://localhost:8000/openapi.json
+```
+
+#### 🍎 macOS
+
+On macOS, Docker cannot directly access the host's `localhost`. Use the special DNS name `host.docker.internal` instead:
+
+```console
+$ docker run schemathesis/schemathesis:stable \
+    run http://host.docker.internal:8000/openapi.json
+```
+
+#### 🪟 Windows
+
+On Windows, similar to macOS, use `host.docker.internal` to access services on your host machine:
+
+```console
+$ docker run schemathesis/schemathesis:stable \
+   run http://host.docker.internal:8000/openapi.json
+```
+
+### Volume Mounting for Local Files
+
+If your API schema is stored locally, you can mount it into the container:
+
+
+For shells like bash, zsh, or sh:
+
+```console
+$ docker run -v $(pwd):/app schemathesis/schemathesis:stable \
+    run /app/openapi.json
+```
+
+In these examples, the current working directory is mounted to `/app` inside the container, making local files accessible to Schemathesis.
+
+When using volume mounting, you can also output reports to the local filesystem:
+
+```console
+$ docker run -v $(pwd):/app schemathesis/schemathesis:stable \
+    run /app/openapi.json \
+    --report junit --report-dir /app/test-results
+```
+
+This command will generate the JUnit report in the `test-results` directory on your local machine.

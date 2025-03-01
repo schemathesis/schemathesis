@@ -84,8 +84,9 @@ Network requests options:
                                  the client certificate
 
 Output options:
-  --report FORMAT               Generate test reports in specified formats
-                                [possible values: junit, vcr, har]
+  --report FORMAT               Generate test reports in formats specified as a
+                                comma-separated list [possible values: junit,
+                                vcr, har]
   --report-dir DIRECTORY        Directory to store all report files  [default:
                                 schemathesis-report]
   --report-junit-path FILENAME  Custom path for JUnit XML report

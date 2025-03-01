@@ -239,7 +239,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 @grouped_option(
     "--report",
     "report_formats",
-    help="Generate test reports in specified formats",
+    help="Generate test reports in formats specified as a comma-separated list",
     type=CsvEnumChoice(ReportFormat),
     is_eager=True,
     metavar="FORMAT",
