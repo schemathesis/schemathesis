@@ -60,7 +60,7 @@ This allows you to maintain a single configuration file that works across differ
 
 Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios or multi-API environments.
 
-## Authentication Configuration
+## Authentication
 
 Schemathesis supports multiple authentication methods for API testing.
 
@@ -164,7 +164,7 @@ generation.max-examples = 200
 stateful.generation.max-examples = 30
 ```
 
-## Check Configuration
+## Checks
 
 Schemathesis validates API responses with a series of checks that verify various aspects of your API's behavior—from server availability to schema conformance.
 

@@ -1,34 +1,6 @@
 Recipes
 =======
 
-Per-route request timeouts
---------------------------
-
-Different API operations may need different timeouts during testing. You could achieve it this way:
-
-.. code-block:: python
-
-    import schemathesis
-
-    DEFAULT_TIMEOUT = 10  # in seconds
-    SCHEMA_URL = "http://127.0.0.1/schema.json"
-    schema = schemathesis.openapi.from_uri(SCHEMA_URL)
-
-
-    @schema.parametrize()
-    def test_api(case):
-        key = (
-            case.operation.method.upper(),
-            case.operation.path,
-        )
-        timeout = {
-            ("GET", "/users"): 5,
-            # and so on
-        }.get(key, DEFAULT_TIMEOUT)
-        case.call_and_validate(timeout=timeout)
-
-In the example above, the default timeout is 10 seconds, but for `GET /users` it will be 5 seconds.
-
 Generating only required parameters
 -----------------------------------
 

@@ -19,6 +19,9 @@ nav:
       - Data Generation: extending/data-generation.md
       - Authentication: extending/auth.md
       - Hooks: extending/hooks.md
+      - Metrics: extending/metrics.md
+  - Advanced:
+      - Targeted Testing: advanced/targeted.md
   - Troubleshooting: troubleshooting.md
   - Reference:
       - Configuration Options: reference/configuration.md

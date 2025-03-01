@@ -77,4 +77,3 @@ For detailed setup instructions on specific CI platforms:
 - [GitLab CI](./gitlab-ci.md)
 
 Each platform guide includes concrete examples, authentication patterns, and troubleshooting advice specific to that environment.
-
