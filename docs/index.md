@@ -98,13 +98,26 @@ api-tests:
 - OpenAPI 2.0, 3.0, and 3.1
 - GraphQL (2018 spec)
 
-## Learn More
+## What's Next?
 
-- [How Schemathesis Works](./how-it-works.md) - Understanding the testing approach and design principles
-- [Command-Line Interface](./cli.md) - Explore different testing scenarios and CLI capabilities
-- [Python & pytest Integration](./python-integration.md) - Using Schemathesis in Python test suites
-- [Configuration](./configuration.md) - Customizing test execution for your API
-- [Continuous Integration](./ci.md) - Using Schemathesis within CI/CD pipelines
-- [Extending Schemathesis](./extending.md) - Writing custom hooks and extensions
-- [Troubleshooting](./troubleshooting.md) - TODO
-- [FAQ](./faq.md) - Common questions and solutions
+Here are the key documentation sections based on your needs:
+
+* **[Getting Started](getting-started.md)** — Install Schemathesis and execute your first API test
+
+* **[Core Concepts](core-concepts.md)** — Understand how Schemathesis generates tests from API schemas and verifies the API behavior
+
+* **Using Schemathesis**:
+    * **[Command-Line Interface](using/cli.md)** — Run tests via CLI
+    * **[Python Integration](using/python-integration.md)** — Embed API testing in Python test suites
+    * **[Continuous Integration](using/ci.md)** — Automate testing in CI/CD workflows
+    * **[Configuration](using/configuration.md)** — Configure test execution behavior
+
+* **[Extending Schemathesis](extending/overview.md)** — Implement custom checks, hooks, and data generators
+
+* **[Troubleshooting](troubleshooting.md)** — Diagnose and resolve common issues
+
+* **[Reference](reference/configuration.md)** — Complete documentation of all available options
+
+New users should start with **Getting Started** and **Core Concepts**.
+
+For specific functionality, go directly to the relevant section in **Using Schemathesis** or **Reference**.

@@ -105,7 +105,7 @@ The output reveals that the endpoint failed two checks: the response body did no
 
 !!! note "Troubleshooting"
 
-    For common issues with schema loading, authentication, or network connections, see the [Troubleshooting Guide](./troubleshooting.md).
+    For common issues with schema loading, authentication, or network connections, see the [Troubleshooting Guide](../troubleshooting.md).
 
 ### Testing with a Local Schema File
 
@@ -270,7 +270,7 @@ By default, Schemathesis automatically loads a `schemathesis.toml` file from the
 $ st run openapi.yaml --config config.toml
 ```
 
-For more details, see the [Authentication Configuration Reference](./reference/configuration.md#authentication) section. For example:
+For more details, see the [Authentication Configuration Reference](../reference/configuration.md#authentication) section. For example:
 
 ```toml
 [auth]
@@ -282,7 +282,7 @@ ApiKeyAuth = { value = "${API_KEY}" }
 
 ### Advanced Authentication
 
-For complex or multi-step authentication flows that require custom logic, please refer to the [Extensions Guide](./extending.md).
+For complex or multi-step authentication flows that require custom logic, please refer to the [Extensions Guide](../extending/auth.md).
 
 
 !!! tip "Third-Party Authentication"
@@ -324,7 +324,7 @@ $ st run openapi.yaml --phases coverage
 
 !!! tip ""
 
-    For more information about test phases, including how they work and when to use them, see the [Test Phases](./phases.md) page.
+    For more information about test phases, including how they work and when to use them, see the [Test Phases](../core-concepts.md#test-phases) section.
 
 ## Data Generation
 
@@ -398,7 +398,7 @@ With a fixed seed, Schemathesis generates the same sequence of test data within 
 
 !!! tip ""
 
-    For additional data generation options, see the [Data Generation Guide](./data-generation.md).
+    For additional data generation options, see the [Data Generation Reference](../reference/configuration.md#data-generation).
 
 ## Checks
 
@@ -452,7 +452,7 @@ This combination ensures responses use the expected status codes, content types,
 
 !!! tip ""
 
-    For more information about checks, including what they validate and when to use them, see the [Checks Reference](./reference/checks.md).
+    For more information about checks, including what they validate and when to use them, see the [Checks Reference](../reference/checks.md).
 
 ## Reporting Test Results
 
@@ -508,7 +508,7 @@ $ st run openapi.yaml \
 
 !!! tip ""
 
-    For detailed information about report structures and advanced usage, see the [Reporting Guide](./reporting.md).
+    For detailed information about report structures and advanced usage, see the [Reporting Reference](../reference/reporting.md).
 
 
 ## :whale: Docker Usage
