@@ -21,7 +21,7 @@
 
 ## Schemathesis
 
-Schemathesis is a modern API testing tool that automatically runs tests based on your OpenAPI or GraphQL schema.
+Schemathesis automatically generates and runs API tests from your OpenAPI or GraphQL schema to find bugs and spec violations.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
