@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-Usage: run [OPTIONS] SCHEMA
+Usage: schemathesis run [OPTIONS] SCHEMA
 
   Run tests against an API using a specified SCHEMA.
 
@@ -150,16 +150,6 @@ Data generation options:
   --contrib-openapi-fill-missing-examples
                                   Enable generation of random examples for API
                                   operations that do not have explicit examples
-
-Open API options:
-  --set-query TEXT   OpenAPI: Override a specific query parameter by specifying
-                     'parameter=value'
-  --set-header TEXT  OpenAPI: Override a specific header parameter by specifying
-                     'parameter=value'
-  --set-cookie TEXT  OpenAPI: Override a specific cookie parameter by specifying
-                     'parameter=value'
-  --set-path TEXT    OpenAPI: Override a specific path parameter by specifying
-                     'parameter=value'
 
 Global options:
   --no-color     Disable ANSI color escape codes

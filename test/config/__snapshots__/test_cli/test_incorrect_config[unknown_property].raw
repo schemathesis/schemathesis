@@ -1,0 +1,16 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from /tmp/test_incorrect_config_unknown_0/config.toml
+
+The loaded configuration is incorrect
+
+Error in root section:
+  Unknown properties:
+
+  - 'unknown_key'
+
+Valid properties for root are: 'color', 'suppress-health-check', 'max-failures', 'reports', 'output', 'base-url', 'parameters', 'generation', 'checks', 'phases', 'auth', 'operations', 'project', 'headers', 'hooks', 'proxy', 'max-response-time', 'workers', 'wait-for-schema', 'exclude-deprecated', 'continue-on-failure', 'tls-verify', 'rate-limit', 'request-timeout', 'request-cert', 'request-cert-key'.

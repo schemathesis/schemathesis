@@ -94,6 +94,20 @@ class InvalidSchema(SchemathesisError):
         return actual_test
 
 
+class HookError(SchemathesisError):
+    """Happens during hooks loading."""
+
+    module_path: str
+
+    __slots__ = ("module_path",)
+
+    def __init__(self, module_path: str) -> None:
+        self.module_path = module_path
+
+    def __str__(self) -> str:
+        return f"Failed to load Schemathesis extensions from `{self.module_path}`"
+
+
 class InvalidRegexType(InvalidSchema):
     """Raised when an invalid type is used where a regex pattern is expected."""
 

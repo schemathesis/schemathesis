@@ -13,6 +13,7 @@ from syrupy import SnapshotAssertion
 import schemathesis
 from schemathesis import Case
 from schemathesis.checks import not_a_server_error
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
@@ -154,11 +155,13 @@ class EventStream:
                 workers_num=options.get("workers_num", 1),
             ),
             network=options.get("network") or NetworkConfig(),
-            override=options.get("override"),
             checks_config=options.get("checks_config", {}),
         )
 
-        self.schema = from_schema(schema, config=config)
+        parameters = options.get("parameters", {})
+        cfg = SchemathesisConfig.from_dict({"parameters": parameters})
+
+        self.schema = from_schema(schema, config=config, cfg=cfg)
 
     def execute(self) -> EventStream:
         self.events = list(self.schema.execute())

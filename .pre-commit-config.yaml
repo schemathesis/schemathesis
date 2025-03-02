@@ -6,6 +6,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
+        exclude: ^.*\.raw$
       - id: trailing-whitespace
         exclude: ^.*\.(md|rst|raw)$
       - id: debug-statements
