@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'path.user_id': ParameterOverride(name='user_id', value=42, location='path'), 'query.user_id': ParameterOverride(name='user_id', value=100, location='query')})))
