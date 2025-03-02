@@ -80,3 +80,19 @@ Schemathesis differs from other API testing tools in several key ways:
 - **Schema-first workflow**: While tools like Postman or Insomnia focus on manual request creation, Schemathesis derives all test cases directly from your API specification.
 
 Compared to tools like Dredd, Schemathesis focuses more on finding unexpected edge cases through property-based testing rather than verifying documented examples.
+
+## What are the known limitations of Schemathesis?
+
+Schemathesis has the following known limitations:
+
+### Schema Processing Limitations
+
+- **Recursive References:**  
+  Schemathesis handles most recursive schemas by cutting recursion at a defined depth. However, in a very small fraction of cases (approximately 25 out of over 100,000 schemas tested), complex recursive patterns involving multiple reference hops may cause errors. For more details, see [GitHub issue #947](https://github.com/schemathesis/schemathesis/issues/947).
+
+### GraphQL Limitations
+
+- **Negative Testing:**  
+  Schemathesis does not support generating invalid inputs for GraphQL endpoints. The `--mode negative` and `--mode all` options are applicable only to OpenAPI schemas.
+
+If you encounter issues not listed here, please report them on our [GitHub issues page](https://github.com/schemathesis/schemathesis/issues).

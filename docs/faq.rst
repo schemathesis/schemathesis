@@ -28,12 +28,6 @@ It avoids generating new examples to maintain predictability and adhere strictly
 
 If you need random examples for API operations without explicit examples, consider using the ``--contrib-openapi-fill-missing-examples`` CLI option.
 
-Should I always have my application running before starting the test suite?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-For the ``pytest`` integration, there is ``schemathesis.pytest.from_fixture`` loader where you can postpone API schema loading
-and start the test application as a part of your test setup. See more information in the :doc:`../python` section.
-
 How can I use database objects IDs in tests?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
