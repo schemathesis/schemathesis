@@ -59,4 +59,3 @@ $ st run openapi.yaml --max-examples=10000 --generation-maximize response_time
 ```
 
 While results vary due to the random nature of property-based testing, targeted testing consistently improves efficiency on APIs with performance-related vulnerabilities.
-
