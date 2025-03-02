@@ -1,0 +1,1 @@
+Invalid rate limit value: `wrong`. Should be in form `limit/interval`. Example: `10/m` for 10 requests per minute.

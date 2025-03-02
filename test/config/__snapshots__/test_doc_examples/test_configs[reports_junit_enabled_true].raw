@@ -1,0 +1,1 @@
+SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True)))

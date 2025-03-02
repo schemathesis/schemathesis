@@ -1,6 +1,7 @@
 """Public Schemathesis errors."""
 
 from schemathesis.core.errors import (
+    HookError,
     IncorrectUsage,
     InternalError,
     InvalidHeadersExample,
@@ -21,6 +22,7 @@ from schemathesis.core.errors import (
 )
 
 __all__ = [
+    "HookError",
     "IncorrectUsage",
     "InternalError",
     "InvalidHeadersExample",

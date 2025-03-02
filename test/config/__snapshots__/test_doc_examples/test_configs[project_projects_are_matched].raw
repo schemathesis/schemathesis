@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(named={'Payment Processing API': ProjectConfig(base_url='https://payments.example.com')}))

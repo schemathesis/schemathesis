@@ -1,0 +1,1 @@
+SchemathesisConfig(suppress_health_check=[<HealthCheck.too_slow: 'too_slow'>, <HealthCheck.data_too_large: 'data_too_large'>])

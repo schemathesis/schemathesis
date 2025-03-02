@@ -142,8 +142,12 @@ def test_matchers(chain, expected):
     for method, kwargs in chain:
         getattr(filter_set, method)(**kwargs)
         schema = getattr(schema, method)(**kwargs)
-    assert filter_set.apply_to(OPERATIONS) == expected
-    assert schema.filter_set.apply_to(OPERATIONS) == expected
+    assert applies_to(filter_set, OPERATIONS) == expected
+    assert applies_to(schema.filter_set, OPERATIONS) == expected
+
+
+def applies_to(filter_set, operations) -> list[APIOperation]:
+    return [operation for operation in operations if filter_set.applies_to(operation=operation)]
 
 
 def matcher_func(ctx):

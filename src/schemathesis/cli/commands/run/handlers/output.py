@@ -13,9 +13,9 @@ import click
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.reports import ReportConfig, ReportFormat
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
+from schemathesis.config import ReportFormat, ReportsConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
@@ -776,6 +776,7 @@ class OutputHandler(EventHandler):
     rate_limit: str | None
     wait_for_schema: float | None
     engine_config: EngineConfig
+    report_config: ReportsConfig
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -784,7 +785,6 @@ class OutputHandler(EventHandler):
 
     statistic: ApiStatistic | None = None
     skip_reasons: list[str] = field(default_factory=list)
-    report_config: ReportConfig | None = None
     warnings: WarningData = field(default_factory=WarningData)
     errors: set[events.NonFatalError] = field(default_factory=set)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
@@ -1410,16 +1410,17 @@ class OutputHandler(EventHandler):
         display_section_name(message, fg=color)
 
     def display_reports(self) -> None:
-        if self.report_config is not None:
-            reports = [
-                (format.value.upper(), self.report_config.get_path(format).name)
-                for format in ReportFormat
-                if format in self.report_config.formats
-            ]
-
+        reports = self.report_config
+        if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
             click.echo(_style("Reports:", bold=True))
-            for report_type, path in reports:
-                click.echo(_style(f"  - {report_type}: {path}"))
+            for format, report in (
+                (ReportFormat.JUNIT, reports.junit),
+                (ReportFormat.VCR, reports.vcr),
+                (ReportFormat.HAR, reports.har),
+            ):
+                if report.enabled:
+                    path = reports.get_path(format)
+                    click.echo(_style(f"  - {format.value.upper()}: {path}"))
             click.echo()
 
     def display_seed(self) -> None:

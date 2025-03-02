@@ -23,7 +23,6 @@ from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Request
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.hypothesis.builder import add_examples
-from schemathesis.generation.overrides import Override
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,
     response_schema_conformance,
@@ -1186,7 +1185,7 @@ def test_stateful_override(real_app_schema):
     stream = EventStream(
         real_app_schema,
         phases=[PhaseName.STATEFUL_TESTING],
-        override=Override(path_parameters={"user_id": "42"}, headers={}, query={}, cookies={}),
+        parameters={"user_id": "42"},
         hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
     ).execute()
     interactions = stream.find_all_interactions()

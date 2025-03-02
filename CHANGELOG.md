@@ -2,6 +2,7 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.10...HEAD) - TBD
 
+<<<<<<< HEAD
 ## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
 
 ### :bug: Fixed
@@ -15,6 +16,35 @@
 ### :wrench: Changed
 
 - Support basic canonicalisation of regex patterns. For example, `[\\W\\w]` could be replaced with `.` in some scenarios.
+||||||| parent of 7518ab75 (feat: Config file)
+=======
+### :rocket: Added
+
+Introducing a new configuration file, `schemathesis.toml`, replacing CLI options as the primary source for settings.
+
+This file enables fine-grained control over per-API operation settings as well as multi-project configurations.
+Global settings are defined at the top level, while operation-specific and project-specific configurations can be set under dedicated sections.
+
+CLI options now only override the configuration file.
+
+Example:
+
+```toml
+# Default settings for any project
+base-url = "https://api.example.com"
+
+# Settings specific to `GET /users`
+[[operations]]
+include-name = "GET /users"
+request-timeout = 5.0
+
+# Specific to Payments API matched by `info.title`
+[[project]]
+title = "Payment Processing API"
+base-url = "https://payments.example.com"
+workers = 4
+```
+>>>>>>> 7518ab75 (feat: Config file)
 
 ### :bug: Fixed
 

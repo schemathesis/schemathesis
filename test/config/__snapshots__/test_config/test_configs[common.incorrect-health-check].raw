@@ -1,0 +1,6 @@
+Error in root section:
+  Invalid value:
+
+  - Item #0 in the 'suppress-health-check' array → 'wrong value' is not a valid value.
+
+Valid values are: 'all', 'data_too_large', 'filter_too_much', 'large_base_example', 'too_slow'.

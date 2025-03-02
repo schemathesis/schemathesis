@@ -48,6 +48,7 @@ dependencies = [
   "requests>=2.22,<3",
   "rich>=13.9.4",
   "starlette-testclient>=0.4.1,<1",
+  "tomli>=2.2.1",
   "typing-extensions>=4.12.2",
   "werkzeug>=0.16.0,<4",
 ]
@@ -66,6 +67,7 @@ tests = [
   "pytest-xdist>=3,<4.0",
   "strawberry-graphql[fastapi]>=0.109.0",
   "syrupy>=2,<5.0",
+  "tomli-w>=1.2.0",
   "trustme>=0.9.0,<1.0",
 ]
 cov = ["coverage-enable-subprocess", "coverage[toml]>=5.3"]

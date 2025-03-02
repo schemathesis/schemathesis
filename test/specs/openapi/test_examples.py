@@ -420,9 +420,13 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
             "--phases=examples",
             f"--url={openapi3_base_url}",
             "--checks=explicit_header",
-            "--set-header=anyKey=OVERRIDE",
-            "--set-query=id=OVERRIDE",
             hooks=explicit_header,
+            config={
+                "parameters": {
+                    "anyKey": "OVERRIDE",
+                    "id": "OVERRIDE",
+                }
+            },
         )
         == snapshot_cli
     )

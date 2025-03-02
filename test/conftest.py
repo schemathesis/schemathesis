@@ -18,6 +18,7 @@ import click
 import httpx
 import pytest
 import requests
+import tomli_w
 import yaml
 from click.testing import CliRunner, Result
 from hypothesis import settings
@@ -26,7 +27,7 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
-from schemathesis.cli.hooks import HOOKS_MODULE_ENV_VAR
+from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.specs.openapi import media_types
 
@@ -555,7 +556,7 @@ def snapshot_cli(request, snapshot):
 
 
 @pytest.fixture
-def cli():
+def cli(tmp_path):
     """CLI runner helper.
 
     Provides in-process execution via `click.CliRunner`.
@@ -565,14 +566,21 @@ def cli():
     class Runner:
         @staticmethod
         def run(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
+            return Runner.main("run", *args, **kwargs)
 
         @staticmethod
-        def main(*args, hooks=None, **kwargs):
+        def main(*args, config=None, hooks=None, **kwargs):
+            if config is not None:
+                path = tmp_path / "config.toml"
+                path.write_text(tomli_w.dumps(config))
+                args = ["--config-file", str(path), *args]
             if hooks is not None:
                 env = kwargs.setdefault("env", {})
                 env[HOOKS_MODULE_ENV_VAR] = hooks
-            return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
+            result = cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
+            if result.exception and not isinstance(result.exception, SystemExit):
+                raise result.exception
+            return result
 
     return Runner()
 

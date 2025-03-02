@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'path.id': ParameterOverride(value=42), 'query.id': ParameterOverride(value=100), 'header.X-API-Version': ParameterOverride(value='2.0'), 'cookie.session': ParameterOverride(value='secret-session-id!')})))

@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
+from schemathesis.config import ProjectConfig
+from schemathesis.config._parameters import ParameterOverride
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import diff
@@ -11,7 +13,7 @@ from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.schemas import APIOperation, ParameterSet
+    from schemathesis.schemas import APIOperation, Parameter, ParameterSet
 
 
 @dataclass
@@ -39,6 +41,44 @@ class Override:
                 for kind, stored in components.items()
             }
         )
+
+
+def for_operation(config: ProjectConfig, operation: APIOperation) -> dict[str, dict[str, str]]:
+    # Look up the first operation config that matches the given operation.
+    operation_config = next((config for config in config.operations if config.filter_set.applies_to(operation)), None)
+
+    output = {}
+    groups = [
+        ("query", operation.query),
+        ("headers", operation.headers),
+        ("cookies", operation.cookies),
+        ("path_parameters", operation.path_parameters),
+    ]
+    for key, params in groups:
+        overrides = {}
+        for param in params:
+            # Attempt to get the override from the operation-specific configuration.
+            value = None
+            if operation_config:
+                value = _get_override_value(param, operation_config.parameters)
+            # Fallback to the global project configuration.
+            if value is None:
+                value = _get_override_value(param, config.parameters)
+            if value is not None:
+                overrides[param.name] = value
+        output[key] = overrides
+
+    return output
+
+
+def _get_override_value(param: Parameter, parameters: dict[str, ParameterOverride]) -> Any:
+    key = param.name
+    full_key = f"{param.location}.{param.name}"
+    if key in parameters:
+        return parameters[key].value
+    elif full_key in parameters:
+        return parameters[full_key].value
+    return None
 
 
 def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[str, str]:

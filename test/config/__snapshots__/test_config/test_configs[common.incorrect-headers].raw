@@ -1,0 +1,4 @@
+Error in root section:
+  Type error:
+
+  - 'headers' → Must be an object, but got list: ['X-API-Key', 'API_KEY']

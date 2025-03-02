@@ -1,14 +1,16 @@
+from pathlib import Path
+
 import click
 
 from schemathesis.core.fs import ensure_parent
 
 
-def open_file(file: click.utils.LazyFile) -> None:
+def open_file(file: Path) -> None:
     try:
-        ensure_parent(file.name, fail_silently=False)
+        ensure_parent(file, fail_silently=False)
     except OSError as exc:
         raise click.BadParameter(f"'{file.name}': {exc.strerror}") from exc
     try:
-        file.open()
-    except click.FileError as exc:
-        raise click.BadParameter(exc.format_message()) from exc
+        file.open("w", encoding="utf-8")
+    except OSError as exc:
+        raise click.BadParameter(f"Could not open file {file.name}: {exc}") from exc
