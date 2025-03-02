@@ -20,6 +20,8 @@ nav:
       - Authentication: extending/auth.md
       - Hooks: extending/hooks.md
       - Metrics: extending/metrics.md
+  - Open API:
+      - Examples in API Schemas: openapi/examples.md
   - Advanced:
       - Targeted Testing: advanced/targeted.md
   - Troubleshooting: troubleshooting.md

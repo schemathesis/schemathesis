@@ -37,17 +37,6 @@ jobs:
 
       - run: uvx pre-commit run --all-files
 
-  docs:
-    name: Documentation
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v4.2.1
-        with:
-          fetch-depth: 1
-      - uses: ammaraskar/sphinx-action@8.2.1
-        with:
-          docs-folder: "docs/"
-
   tests:
     strategy:
       matrix:

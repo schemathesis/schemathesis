@@ -1,6 +1,6 @@
 # Getting Started with Schemathesis
 
-Schemathesis is a modern API testing tool that automatically generates and runs tests based on your OpenAPI or GraphQL schema.
+Schemathesis automatically generates and runs API tests from your OpenAPI or GraphQL schema to find bugs and spec violations.
 
 ## What is Schemathesis?
 
@@ -44,10 +44,6 @@ $ schemathesis --version
 $ st --version
 Schemathesis 4.0.0
 ```
-
-!!! note ""
-
-    `st` is the command-line alias for `schemathesis`. Both commands work identically.
 
 ## Testing a Sample API
 
@@ -167,16 +163,19 @@ For each issue found, Schemathesis provides:
 Schemathesis identifies these common categories of API problems:
 
 ### API Contract Violations
+
 - **Schema violations**: Response bodies that don't match the defined schema
 - **Status code issues**: Unexpected or undocumented HTTP status codes
-- **Header problems**: Missing or incorrect Content-Type headers
+- **Header problems**: Missing or incorrect response headers
 
 ### Implementation Flaws
+
 - **Server errors**: 5xx responses indicating server-side problems
 - **Data validation issues**: APIs accepting invalid data or rejecting valid data
 - **Security concerns**: Potential authentication bypasses
 
 ### Stateful Behavior Issues
+
 - **Resource state problems**: Resources inaccessible after creation or accessible after deletion
 
 When you encounter these issues:
@@ -184,7 +183,7 @@ When you encounter these issues:
 1. Use the provided curl command to reproduce and verify the problem
 2. Check your API implementation against the schema definition
 3. Determine if the issue is in the schema (incorrect definition) or the API (incorrect implementation)
-4. For schema issues, update your OpenAPI/GraphQL definition
+4. For schema issues, update your schema definition
 5. For API issues, modify your implementation to comply with the schema
 
 ## Testing Your Own API
@@ -202,7 +201,7 @@ $ st run https://your-api.com/openapi.json
 $ st run ./openapi.yaml --url https://your-api.com
 ```
 
-That's it! Schemathesis will automatically generate test cases based on your schema and identify any compliance issues.
+That's it! Schemathesis will automatically generate test cases based on your schema and identify any server errors or compliance issues.
 
 ## Where to Go Next
 
