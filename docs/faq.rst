@@ -55,66 +55,6 @@ There might be multiple reasons for that, but usually, this behavior occurs when
 Please, refer to the ``Data generation`` section in the documentation for more info. If you think that it is not the case, feel
 free to `open an issue <https://github.com/schemathesis/schemathesis/issues/new?assignees=Stranger6667&labels=Status%3A+Review+Needed%2C+Type%3A+Bug&template=bug_report.md&title=%5BBUG%5D>`_.
 
-How different is ``--request-timeout`` from ``--hypothesis-deadline``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-These CLI parameters both represent some kind of limit for the duration of a certain part of a single test. However, each of them has a different scope.
-
-``--hypothesis-deadline`` counts parts of a single test case execution, including waiting for the API response, and running all checks and relevant hooks for that single test case.
-
-``--request-timeout`` is only relevant for waiting for the API response. If this duration is exceeded, the test is marked as a "Timeout".
-
-Why Schemathesis reports "Flaky" errors?
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-When Schemathesis finds a failure, it tries to verify it by re-running the test again.
-If the same failure is not reproduced, then Schemathesis concludes the test as "Flaky".
-
-This situation usually happens, when the tested application state is not reset between tests.
-Let's imagine that we have an API where the user can create "orders", then the "Flaky" situation might look like this:
-
-1. Create order "A" -> 201 with payload that does not conform to the definition in the API schema;
-2. Create order "A" again to verify the failure -> 409 with conformant payload.
-
-With Python tests, you may want to write a context manager that cleans the application state between test runs as
-`suggested <https://hypothesis.readthedocs.io/en/latest/healthchecks.html#hypothesis.HealthCheck.function_scoped_fixture>`_ by Hypothesis docs.
-
-CLI reports flaky failures as regular failures with a special note about their flakiness. Cleaning the application state could be done via the :ref:`before_call <hooks_before_call>` hook.
-
-Does Schemathesis support Open API discriminators? Schemathesis raises an "Unsatisfiable" error.
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-The ``discriminator`` field does not affect data generation, and Schemathesis work directly with the underlying schemas.
-Usually, the problem comes from using the ``oneOf`` keyword with very permissive sub-schemas.
-For example:
-
-.. code:: yaml
-
-    discriminator:
-      propertyName: objectType
-    oneOf:
-      - type: object
-        required:
-          - objectType
-        properties:
-          objectType:
-            type: string
-          foo:
-            type: string
-      - type: object
-        required:
-          - objectType
-        properties:
-          objectType:
-            type: string
-          bar:
-            type: string
-
-Here both schemas do not restrict their additional properties, and for this reason, any object that is valid for the first sub-schema is also valid for the second one, which
-contradicts the definition of the ``oneOf`` keyword behavior, where the value should be valid against **exactly one** sub-schema.
-
-To solve this problem, you can use ``anyOf`` or make your sub-schemas less permissive.
-
 Schemathesis reports conformance issue for schemas with the ``oneOf`` keyword. Why?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
