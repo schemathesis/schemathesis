@@ -540,10 +540,10 @@ Schemathesis lets you configure multiple API projects in one file—a handy feat
 
 ### Defining Projects
 
-Define projects in the `[[projects]]` section by matching the API's title:
+Define projects in `[[project]]` tables by matching the API's title:
 
 ```toml
-[[projects]]
+[[project]]
 # Projects are matched by the API schema's `info.title``
 title = "Payment Processing API"
 base-url = "https://payments.example.com"
@@ -556,14 +556,14 @@ Schemathesis checks the `info.title` field of the API schema to apply the corres
 Override global defaults with project-specific settings:
 
 ```toml
-[[projects]]
+[[project]]
 title = "Payment Processing API"
 base-url = "https://payments.example.com"
 workers = 4
 generation.max-examples = 200
 hooks = "test.config.hooks.example"
 
-[[projects]]
+[[project]]
 title = "User Management API"
 base-url = "https://users.example.com"
 workers = 2
@@ -574,15 +574,15 @@ workers = 2
 Customize operations within a project:
 
 ```toml
-[[projects]]
+[[project]]
 title = "Payment Processing API"
 
-[[projects.operations]]
+[[project.operations]]
 include-name = "POST /payments"
 generation.max-examples = 80
 headers = { "X-Idempotency-Key" = "${IDEMPOTENCY_KEY}" }
 
-[[projects.operations]]
+[[project.operations]]
 include-tag = "slow"
 request-timeout = 10.0
 ```
@@ -603,20 +603,20 @@ When using projects, settings are applied in this order:
 generation.max-examples = 50
 workers = 2
 
-[[projects]]
+[[project]]
 title = "Payment Processing API"
 base-url = "https://payments.example.com"
 generation.max-examples = 100
 
 # Operations for payments
-[[projects.operations]]
+[[project.operations]]
 include-name = "POST /payments"
 generation.max-examples = 200
 parameters = { amount = [10, 100, 1000] }
 checks.positive_data_acceptance.expected-statuses = [200, 201]
 
 # Users project settings
-[[projects]]
+[[project]]
 title = "User Management API"
 base-url = "https://users.example.com"
 ```

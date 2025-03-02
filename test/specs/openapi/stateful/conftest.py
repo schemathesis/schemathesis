@@ -11,6 +11,7 @@ from flask import Flask, abort, jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
@@ -523,7 +524,7 @@ def engine_factory(app_factory, app_runner, stop_event):
             checks_config=checks_config or ChecksConfig(),
         )
         return stateful.execute(
-            engine=EngineContext(schema=schema, stop_event=stop_event, config=config),
+            engine=EngineContext(schema=schema, stop_event=stop_event, config=config, cfg=SchemathesisConfig()),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 

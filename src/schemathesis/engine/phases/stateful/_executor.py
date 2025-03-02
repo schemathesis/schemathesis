@@ -21,6 +21,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation import overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.stateful.state_machine import (
@@ -86,15 +87,13 @@ def execute_state_machine_loop(
         def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
             return ""
 
-        if config.override is not None:
-
-            def before_call(self, case: Case) -> None:
-                for location, entry in config.override.for_operation(case.operation).items():  # type: ignore[union-attr]
-                    if entry:
-                        container = getattr(case, location) or {}
-                        container.update(entry)
-                        setattr(case, location, container)
-                return super().before_call(case)
+        def before_call(self, case: Case) -> None:
+            for location, entry in overrides.for_operation(engine.cfg.projects.default, case.operation).items():
+                if entry:
+                    container = getattr(case, location) or {}
+                    container.update(entry)
+                    setattr(case, location, container)
+            return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently

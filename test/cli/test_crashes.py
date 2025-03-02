@@ -1,14 +1,17 @@
 from unittest import mock
 
 import pytest
-from hypothesis import HealthCheck, Phase, example, given, settings
+from hypothesis import HealthCheck, Phase, assume, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
+from hypothesis_jsonschema import from_schema
 from requests import Response
 
 from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.handlers.output import DEFAULT_INTERNAL_ERROR_MESSAGE
+from schemathesis.config._validator import CONFIG_SCHEMA
+from schemathesis.core.transforms import deepclone
 from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
 
@@ -221,5 +224,44 @@ def test_schema_validity(cli, schema, base_url):
 
 
 def check_result(result):
-    assert not (result.exception and not isinstance(result.exception, SystemExit)), result.stdout
+    if result.exception and not isinstance(result.exception, SystemExit):
+        raise result.exception
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
+
+
+def has_no_none(value):
+    if value is None:
+        return False
+    elif isinstance(value, dict):
+        return all(has_no_none(v) for v in value.values())
+    elif isinstance(value, (list, tuple)):
+        return all(has_no_none(item) for item in value)
+    return True
+
+
+@given(config=from_schema(deepclone(CONFIG_SCHEMA)))
+@settings(
+    phases=[Phase.explicit, Phase.generate],
+    suppress_health_check=list(HealthCheck),
+    deadline=None,
+    max_examples=10,
+)
+@pytest.mark.usefixtures("mocked_schema")
+def test_random_config(cli, config, schema_url, tmp_path):
+    assume(has_no_none(config))
+    reports = config.get("reports", {})
+    report_enabled = False
+    for report_type in ("vcr", "har", "junit"):
+        report = reports.get(report_type, {})
+        if "path" in report:
+            report["path"] = str(tmp_path / report["path"])
+            report_enabled = True
+        if report.get("enabled"):
+            report_enabled = True
+    # Add prefix to the 'directory' path if it exists
+    if "directory" in reports:
+        reports["directory"] = str(tmp_path / reports["directory"])
+    elif report_enabled:
+        reports["directory"] = str(tmp_path / "report")
+    result = cli.main("run", schema_url, "-n 1", "--phases=examples", config=config)
+    check_result(result)

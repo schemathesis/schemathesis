@@ -1,0 +1,2 @@
+[reports]
+directory = "${TEST_STRING_NOT_PRESENT}"
