@@ -13,8 +13,8 @@ from urllib.parse import urlparse
 import click
 
 from schemathesis import errors, experimental
-from schemathesis.cli.commands.run.reports import ReportFormat
 from schemathesis.cli.constants import DEFAULT_WORKERS
+from schemathesis.config import ReportFormat
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
