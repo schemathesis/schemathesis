@@ -3,6 +3,7 @@ from __future__ import annotations
 from enum import Enum
 from typing import TYPE_CHECKING
 
+from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.config import EngineConfig
 
 if TYPE_CHECKING:
@@ -24,7 +25,9 @@ class Status(str, Enum):
 _STATUS_ORDER = {Status.SUCCESS: 0, Status.FAILURE: 1, Status.ERROR: 2, Status.INTERRUPTED: 3, Status.SKIP: 4}
 
 
-def from_schema(schema: BaseSchema, *, config: EngineConfig | None = None) -> Engine:
+def from_schema(
+    schema: BaseSchema, *, config: EngineConfig | None = None, cfg: SchemathesisConfig | None = None
+) -> Engine:
     from .core import Engine
 
-    return Engine(schema=schema, config=config or EngineConfig())
+    return Engine(schema=schema, config=config or EngineConfig(), cfg=cfg or SchemathesisConfig())

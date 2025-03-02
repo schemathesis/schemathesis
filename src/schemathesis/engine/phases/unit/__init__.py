@@ -16,6 +16,7 @@ from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -193,10 +194,9 @@ def worker_task(
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
-    if ctx.config.override is not None:
-        for location, entry in ctx.config.override.for_operation(operation).items():
-            if entry:
-                kwargs[location] = entry
+    for location, entry in overrides.for_operation(ctx.cfg.projects.default, operation).items():
+        if entry:
+            kwargs[location] = entry
     if ctx.config.network.headers:
         kwargs["headers"] = {
             key: value for key, value in ctx.config.network.headers.items() if key.lower() != "user-agent"

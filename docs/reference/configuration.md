@@ -3,7 +3,7 @@
 This reference covers all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
 
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
-- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[project.<name>]` namespace), they are used as defaults for any tested project.
+- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[[project]]` namespace), they are used as defaults for any tested project.
 
 ## Configuration Resolution
 
@@ -13,7 +13,7 @@ Schemathesis applies settings in the following hierarchy (from highest to lowest
 2. Operation-specific phase settings
 3. Global phase settings (e.g., `[phases.fuzzing]`)
 4. Operation-level settings (e.g., `[[operations]]`)
-5. Project-level settings (e.g., `[[projects]]`)
+5. Project-level settings (e.g., `[[project]]`)
 6. Global settings
 
 ## Environment Variable Substitution
@@ -211,7 +211,7 @@ These settings can only be applied at the project level.
 
     ```toml
     # Optionally under a named project
-    # [[projects]]
+    # [[project]]
     base-url = "https://api.example.com"
     ```
 
@@ -229,7 +229,7 @@ These settings can only be applied at the project level.
     hooks = "myproject.tests.hooks"
     
     # Or project-specific hooks
-    # [[projects]]
+    # [[project]]
     # hooks = "myproject.payments.hooks"
     ```
 
@@ -327,6 +327,20 @@ These settings can only be applied at the project level.
     ```toml
     [phases.coverage]
     unexpected-methods = ["PATCH"]
+    ```
+
+#### `phases.<phase>.checks`
+
+!!! note "" 
+
+    **Type**: `Object`  
+    **Default**: `{}`  
+
+    Phase-specific overrides for checks.
+
+    ```toml
+    [phases.coverage.checks]
+    not_a_server_error.enabled = false
     ```
 
 ### Authentication

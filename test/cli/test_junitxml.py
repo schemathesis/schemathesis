@@ -26,18 +26,23 @@ def test_junitxml_option(cli, schema_url, hypothesis_max_examples, tmp_path):
     ElementTree.parse(xml_path)
 
 
+@pytest.mark.parametrize("in_config", [True, False])
 @pytest.mark.parametrize("path", ["junit.xml", "does-not-exist/junit.xml"])
 @pytest.mark.operations("success", "failure", "unsatisfiable", "empty_string")
-def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path, server_host):
+def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path, server_host, in_config):
     xml_path = tmp_path / path
-    result = cli.run(
-        schema_url,
-        f"--report-junit-path={xml_path}",
+    args = [
         f"--max-examples={hypothesis_max_examples or 1}",
         "--seed=1",
         "--checks=all",
         "--exclude-checks=positive_data_acceptance",
-    )
+    ]
+    kwargs = {}
+    if in_config:
+        kwargs["config"] = {"reports": {"junit": {"path": str(xml_path)}}}
+    else:
+        args.append(f"--report-junit-path={xml_path}")
+    result = cli.run(schema_url, *args, **kwargs)
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     tree = ElementTree.parse(xml_path)
     # Inspect root element `testsuites`

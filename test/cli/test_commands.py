@@ -62,15 +62,6 @@ def test_run_as_module(testdir):
         ("unknown.json", "--url=http://127.0.0.1"),
         ("--help",),
         ("http://127.0.0.1", "--generation-codec=foobar"),
-        ("http://127.0.0.1", "--set-query", "key=a\ud800b"),
-        ("http://127.0.0.1", "--set-query", "key"),
-        ("http://127.0.0.1", "--set-query", "=v"),
-        ("http://127.0.0.1", "--set-header", "Token=тест"),
-        ("http://127.0.0.1", "--set-cookie", "SESSION_ID=тест"),
-        ("http://127.0.0.1", "--set-path", "user_id=\ud800b"),
-        ("http://127.0.0.1", "--set-query", "key=value", "--set-query", "key=value"),
-        ("http://127.0.0.1", "--set-header", "Authorization=value", "--auth", "foo:bar"),
-        ("http://127.0.0.1", "--set-header", "Authorization=value", "-H", "Authorization: value"),
         ("http://127.0.0.1", "--report=unknown"),
     ],
 )
@@ -1053,8 +1044,8 @@ def test_explicit_query_token_sanitization(ctx, cli, snapshot_cli, base_url):
             }
         },
     )
-    token = "token=secret"
-    result = cli.run(str(schema_path), "--set-query", token, f"--url={base_url}")
+    token = "secret"
+    result = cli.run(str(schema_path), f"--url={base_url}", config={"parameters": {"token": token}})
     assert result == snapshot_cli
     assert token not in result.stdout
 
@@ -1519,13 +1510,10 @@ def test_parameter_overrides(cli, schema_url, verify_overrides):
         "run",
         "-c",
         "verify_overrides",
-        "--set-path",
-        "key=foo",
-        "--set-query",
-        "id=bar",
         "--phases=fuzzing",
         schema_url,
         hooks=verify_overrides,
+        config={"parameters": {"key": "foo", "id": "bar"}},
     )
     assert result.exit_code == ExitCode.OK, result.stdout
 

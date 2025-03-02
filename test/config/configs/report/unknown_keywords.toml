@@ -1,0 +1,9 @@
+[reports]
+directory = "reports"
+# Unknown keyword
+output_format = "pretty"
+# Typo
+preserve_byte = false
+
+[reports.junit]
+enabled = true
