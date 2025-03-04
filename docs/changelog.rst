@@ -8,6 +8,10 @@ Changelog
 
 - `--experimental-coverage-unspecified-methods` CLI option that accept a comma separated list of HTTP methods to use when generating test cases with methods not specified in the API during the **coverage** phase.
 
+**Fixed**
+
+- Incorrect quantifiers merging for patterns involving single-element set of characters like ``[+]``.
+
 .. _v3.39.11:
 
 :version:`3.39.11 <v3.39.10...v3.39.11>` - 2025-02-23
