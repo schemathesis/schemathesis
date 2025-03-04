@@ -24,6 +24,13 @@ Experimental options:
                                             schema-analysis, stateful-test-
                                             runner, stateful-only, coverage-
                                             phase, positive_data_acceptance]
+  --experimental-coverage-unexpected-methods 
+                                            HTTP methods to use when generating
+                                            test cases with methods not
+                                            specified in the API during the
+                                            coverage phase. [possible values:
+                                            delete, get, head, options, patch,
+                                            post, put, trace]
   --experimental-no-failfast                Continue testing an API operation
                                             after a failure is found
   --experimental-missing-required-header-allowed-statuses 
