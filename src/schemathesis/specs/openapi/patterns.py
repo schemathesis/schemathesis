@@ -124,6 +124,21 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
 
     for op, value in pattern_parts:
         if op == LITERAL:
+            # Check if the literal comes from a bracketed expression,
+            # e.g. Python regex parses "[+]" as a single LITERAL token.
+            if pattern[current_position] == "[":
+                # Find the matching closing bracket.
+                end_idx = current_position + 1
+                while end_idx < len(pattern):
+                    # Check for an unescaped closing bracket.
+                    if pattern[end_idx] == "]" and (end_idx == current_position + 1 or pattern[end_idx - 1] != "\\"):
+                        end_idx += 1
+                        break
+                    end_idx += 1
+                # Append the entire character set.
+                result += pattern[current_position:end_idx]
+                current_position = end_idx
+                continue
             if pattern[current_position] == "\\":
                 # Escaped value
                 current_position += 2

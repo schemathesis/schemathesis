@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.5...HEAD>` - TBD
 ---------------------------------------------------
 
+**Fixed**
+
+- Incorrect quantifiers merging for patterns involving single-element set of characters like ``[+]``.
+
 .. _v4.0.0-alpha.5:
 
 :version:`4.0.0-alpha.5 <v4.0.0-alpha.4...v4.0.0-alpha.5>` - 2025-02-23
