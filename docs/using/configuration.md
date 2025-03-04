@@ -6,7 +6,7 @@ Schemathesis can be configured through a `schemathesis.toml` file.
 
 Schemathesis will look for configuration in the following locations, in order:
 
-1. Path specified via `--config` CLI option.
+1. Path specified via `--config-file` CLI option.
 2. `schemathesis.toml` in the current directory.
 3. `schemathesis.toml` in parent directories (up to the project root).
 
@@ -36,7 +36,8 @@ base-url = "https://api.example.com"
 generation.max-examples = 100
 
 # Operation-specific settings
-[operation."GET /users"]
+[[operations]]
+include-name = "GET /users"
 generation.max-examples = 200
 request-timeout = 5.0
 ```
@@ -47,9 +48,10 @@ Schemathesis supports using environment variables in configuration files with th
 ```toml
 # Use environment variables for sensitive or environment-specific values
 base-url = "https://${API_HOST}/v1"
-headers = { "Authorization" = "Bearer ${API_TOKEN}" }
+headers = { Authorization = "Bearer ${API_TOKEN}" }
 
-[operation."POST /payments"]
+[[operations]]
+include-name = "POST /payments"
 headers = { "X-API-Key" = "${PAYMENTS_API_KEY}" }
 ```
 
@@ -201,7 +203,8 @@ negative_data_rejection.expected-statuses = [400, 422]
 Override check settings for a specific operation:
 
 ```toml
-[operation."POST /users"]
+[[operations]]
+include-name = "POST /users"
 # Operation-specific check settings
 checks.positive_data_acceptance.expected-statuses = [201]
 checks.response_schema_conformance.enabled = false
@@ -232,132 +235,211 @@ Schemathesis applies check configurations in the following order:
 
 This hierarchy lets you define global defaults while overriding settings for specific endpoints.
 
-## Operation Targeting
+## Operation-Specific Configuration
 
-Schemathesis lets you target specific API operations for custom configuration. Note that different specifications use different operation identifiers.
+Schemathesis allows you to apply custom configuration to specific API operations. You can include or exclude operations based on various criteria.
 
-### Targeting by Exact Path
+### Basic Configuration Structure
 
-Specify an operation using its exact identifier:
+Use arrays of tables with inclusion and exclusion filters:
 
 ```toml
-# OpenAPI: HTTP method and path
-[operation."GET /users"]
+[[operations]]
+include-path = "/users"
 generation.max-examples = 200
 request-timeout = 5.0
 
-# GraphQL: type and field name
-[operation."Query.getUser"]
-generation.max-examples = 200
+[[operations]]
+include-tag = "admin"
+enabled = false
 ```
 
-### Targeting with Regular Expressions
+### Multiple Values for Filters
 
-Select multiple operations matching a pattern:
+For any filter type, you can provide an array of strings to match against multiple values. This works as an OR condition - if any value in the array matches, the filter applies:
 
 ```toml
-# Match operations with paths containing "users"
-[operation.regex."GET /users/.*"]
+[[operations]]
+include-path = ["/users", "/accounts", "/profiles"]
 generation.max-examples = 150
 
-# Match operations that modify users
-[operation.regex."(POST|PUT|PATCH) /users.*"]
+[[operations]]
+include-tag = ["admin", "management"]
 request-timeout = 3.0
 ```
 
-!!! note "Regex patterns"
-    Regex patterns work with schema path templates, not resolved URLs.
+!!! note ""
 
-### Targeting by Tag
+    This feature works with all filter types, except regex and custom expressions.
 
-Apply settings to all operations with a specific tag:
+### Filter Types
+
+You can filter operations using several criteria types:
+
+#### Path
+
+Matches the operation's URL path:
 
 ```toml
-[operation.tag."admin"]
-enabled = false  # Skip all admin-tagged operations
+[[operations]]
+include-path = "/users/{id}"
+generation.max-examples = 150
+```
 
-[operation.tag."payment"]
+#### Method
+
+Matches the HTTP method (GET, POST, PUT, etc.):
+
+```toml
+[[operations]]
+include-method = "POST"
+request-timeout = 3.0
+```
+
+#### Name
+
+Matches the operation's name, which varies by specification:
+
+- For OpenAPI: "METHOD /path" (e.g., "GET /users")
+- For GraphQL: "Type.field" (e.g., "Query.getUser")
+
+```toml
+[[operations]]
+include-name = "GET /users"
+generation.max-examples = 200
+
+[[operations]]
+include-name = "Query.getUser"  # For GraphQL
+generation.max-examples = 200
+```
+
+#### Tag
+
+Matches operations with specific tags defined in the API specification:
+
+```toml
+[[operations]]
+include-tag = "payment"
 generation.max-examples = 150
 rate-limit = "20/s"
 ```
 
-### Targeting with Expressions
+#### Operation ID
+
+Matches the operationId field in OpenAPI specifications:
+
+```toml
+[[operations]]
+include-operation-id = "getUserById"
+generation.max-examples = 150
+```
+
+### Filtering with Regular Expressions
+
+Add "-regex" suffix to any filter type to use regular expression patterns:
+
+```toml
+[[operations]]
+include-path-regex = "/(users|orders)/"
+generation.max-examples = 150
+
+[[operations]]
+include-method-regex = "(POST|PUT|PATCH)"
+include-path-regex = "/(users|orders)/"
+request-timeout = 3.0
+
+[[operations]]
+include-operation-id-regex = ".*User.*"
+checks.not_a_server_error.enabled = false
+```
+
+### Exclusion Filters
+
+Use "exclude-" prefix to skip operations matching specific criteria:
+
+```toml
+[[operations]]
+exclude-path = "/internal/status"
+enabled = false
+
+[[operations]]
+exclude-tag = "deprecated"
+enabled = false
+```
+
+### Combining Multiple Criteria
+
+You can combine multiple criteria within a single configuration entry:
+
+```toml
+[[operations]]
+include-method = "POST"
+include-tag = "users"
+request-timeout = 3.0
+```
+
+All criteria must match for the configuration to apply.
+
+### Advanced Filtering with Expressions
 
 For more precise control, Schemathesis supports targeting operations using JSONPath-like expressions that query specific fields within operation definitions:
 
 ```toml
-[operation.expr."tags/0 == 'user'"]
+[[operations]]
+include-by = "tags/0 == 'user'"
 generation.max-examples = 150
 
-[operation.expr."operationId == null"]
+[[operations]]
+include-by = "operationId == null"
 enabled = false
 
-[operation.expr."responses/200/description != 'Success'"]
+[[operations]]
+exclude-by = "responses/200/description != 'Success'"
 checks.response_schema_conformance.enabled = false
 ```
 
-Expressions follow the pattern `<json-pointer> <operator> <value>` where:
+Include-by and exclude-by expressions follow the pattern `<json-pointer> <operator> <value>` where:
 
 - `<json-pointer>` is a path to a field in the operation definition
 - `<operator>` is either `==` (equals) or `!=` (not equals)
 - `<value>` can be a string, number, boolean, null, array, or object
 
-This is particularly useful for:
+This is particularly useful for filtering by operation metadata or extension fields.
 
-- Targeting operations based on description content
-- Selecting operations with specific response codes
-- Filtering by operation metadata or extension fields
+### Configuration Precedence
 
-#### Examples
+When multiple configuration entries match an operation:
 
-```toml
-# Target operations that include 'admin' in their summary
-[operation.expr."summary == 'Admin operations'"]
-enabled = false
+1. Earlier entries take precedence over later entries in the configuration file
+2. If multiple criteria are specified within one entry, all must match for the configuration to apply
+3. Exclusion takes precedence over inclusion when at the same level
 
-# Target operations that handle file uploads
-[operation.expr."requestBody/content/multipart\\/form-data != null"]
-generation.max-examples = 50
-
-# Target operations without tags
-[operation.expr."tags == null"]
-checks.response_schema_conformance.enabled = false
-```
-
-Expression-based targeting is particularly useful with complex API specifications where tag-based or path-based selection isn't specific enough.
-
-### Operation Resolution
-
-When multiple selectors match an endpoint, Schemathesis applies them in this order:
-
-- Exact path selectors (highest precedence)
-- Tag selectors
-- Regex selectors (lowest precedence)
-
-Within each category, more specific selectors override general ones.
+This allows for granular control by ordering your configuration appropriately.
 
 ## Phase-Specific Settings for Operations
 
 Configure phase-specific settings within individual operations for fine-grained control over each phase's behavior:
 
 ```toml
-[operation."GET /users"]
+[[operations]]
+include-name = "GET /users"
 # Default settings for this operation
 generation.max-examples = 100
 request-timeout = 5.0
 
 # Phase-specific overrides for this operation
-[operation."GET /users".phases]
-fuzzing.generation.max-examples = 200  # Increase examples for fuzzing
-stateful.generation.max-examples = 30   # Reduce examples for stateful tests
+[[operations]]
+include-name = "GET /users"
+phases.fuzzing.generation.max-examples = 200  # Increase examples for fuzzing
+phases.stateful.generation.max-examples = 30   # Reduce examples for stateful tests
 ```
 ### Resolution Order for Phase-Operation Settings
 
 When both operation-level and phase-level settings are defined, Schemathesis applies them in the following order:
 
-- Operation-specific phase settings (e.g., `[operation."GET /users".phases.fuzzing]`)
+- Operation-specific phase settings
 - Global phase settings (e.g., `[phases.fuzzing]`)
-- Operation-level settings (e.g., `[operation."GET /users"]`)
+- Operation-level settings (e.g., `[[operations]]`)
 - Global settings (top level)
 
 This hierarchy allows you to set defaults at higher levels while overriding specific phases as needed.
@@ -371,15 +453,16 @@ Override parameter values at different levels to control test data.
 Set parameter values for specific operations:
 
 ```toml
-[operation."GET /users/{user_id}"]
+[[operations]]
+include-name = "GET /users/{user_id}"
 # Fixed value
-parameters = { "user_id" = 42 }
+parameters = { user_id = 42 }
 
 # Multiple values for random selection
-parameters = { "user_id" = [1, 42, 499] }
+parameters = { user_id = [1, 42, 499] }
 
 # Using an environment variable
-parameters = { "user_id" = "${USER_ID}" }
+parameters = { user_id = "${USER_ID}" }
 
 # Disambiguate parameters with the same name
 parameters = { "path.user_id" = 42, "query.user_id" = 100 }
@@ -391,9 +474,9 @@ Apply parameters across all operations:
 
 ```toml
 [parameters]
-"api_version" = "v2"
-"limit" = 50
-"offset" = 0
+api_version = "v2"
+limit = 50
+offset = 0
 ```
 
 ### Parameter Resolution Order
@@ -424,8 +507,9 @@ parameters = {
 Provide an array of values; Schemathesis will randomly select one per test case:
 
 ```toml
-[operation."GET /users"]
-parameters = { "role" = ["admin", "user", "guest"] }
+[[operations]]
+include-name = "GET /users"
+parameters = { role = ["admin", "user", "guest"] }
 ```
 
 This configuration distributes the specified roles across test cases.
@@ -456,7 +540,7 @@ Override global defaults with project-specific settings:
 base-url = "https://payments.example.com"
 workers = 4
 generation.max-examples = 200
-hooks = "payment_hooks.py"
+hooks = "payment_hooks"
 
 [projects.users]
 base-url = "https://users.example.com"
@@ -505,7 +589,7 @@ generation.max-examples = 100
 # Operations for payments
 [projects.payments.operation."POST /payments"]
 generation.max-examples = 200
-parameters = { "amount" = [10, 100, 1000] }
+parameters = { amount = [10, 100, 1000] }
 checks.positive_data_acceptance.expected-statuses = [200, 201]
 
 # Users project settings
@@ -525,13 +609,13 @@ Command-line arguments take precedence over configuration file settings:
 
 ```bash
 # Override the max-examples setting
-schemathesis run --max-examples=300 http://api.example.com/openapi.json
+st run --max-examples=300 http://api.example.com/openapi.json
 
 # Override phases
-schemathesis run --phases=examples,fuzzing http://api.example.com/openapi.json
+st run --phases=examples,fuzzing http://api.example.com/openapi.json
 
 # Override check settings
-schemathesis run --checks=not_a_server_error http://api.example.com/openapi.json
+st run --checks=not_a_server_error http://api.example.com/openapi.json
 ```
 
 Most configuration option can be overridden via the corresponding CLI flag.

@@ -12,9 +12,9 @@ This structure simplifies single-project setups by allowing you to specify proje
 Schemathesis applies settings in the following hierarchy (from highest to lowest precedence):
 
 1. CLI options
-2. Operation-specific phase settings (e.g., `[operation."GET /users".phases.fuzzing]`)
+2. Operation-specific phase settings
 3. Global phase settings (e.g., `[phases.fuzzing]`)
-4. Operation-level settings (e.g., `[operation."GET /users"]`)
+4. Operation-level settings (e.g., `[[operations]]`)
 5. Project-level settings (e.g., `[projects.payments]`)
 6. Global settings (top level)
 
@@ -26,21 +26,29 @@ Schemathesis supports using environment variables in configuration files with th
 
 ```toml
 base-url = "https://${API_HOST}/v1"
-headers = { "Authorization" = "Bearer ${API_TOKEN}" }
+headers = { Authorization = "Bearer ${API_TOKEN}" }
 ```
 
 This allows you to maintain a single configuration file across different environments by changing environment variables rather than the configuration itself.
 
-## Operation Targeting
+## Operation-Specific Configuration
 
-Schemathesis allows targeting specific API operations in three ways:
+Schemathesis allows applying custom configuration to specific API operations in a few ways:
 
-- By exact path: `[operation."GET /users"]`
-- By regex pattern: `[operation.regex."GET /users/.*"]`
-- By tag: `[operation.tag."admin"]`
-- By expression: `[operation.expr."tags/0 == 'user'"]`
-
-When multiple selectors match an operation, they're applied in the order: exact path (highest precedence), tag, expression, regex (lowest precedence).
+```toml
+[[operations]]
+# By exact path
+include-path = "/users"
+# By HTTP method
+include-method = "POST"
+# By full operation name
+include-name = "POST /users/"
+# By Open API tag
+include-tag = "admin"
+# By Open API operation ID
+include-operation-id = "POST"
+# More configuration options follow ...
+```
 
 ## Parameter Overrides
 
@@ -49,12 +57,15 @@ Parameters can be overridden at the global or operation level:
 ```toml
 # Global parameters
 [parameters]
-"api_version" = "v2"
+api_version = "v2"
 
 # Operation-specific parameters
-[operation."GET /users"]
-parameters = { "limit" = 50, "offset" = 0 }
+[[operations]]
+include-name = "GET /users/"
+parameters = { limit = 50, offset = 0 }
 
+[[operations]]
+include-name = "GET /users/{user_id}/"
 # Disambiguate parameters with the same name
 parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 ```
@@ -92,7 +103,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 !!! note ""
 
     **Type**: `Integer (≥1)`  
-    **Default**: `Not set`  
+    **Default**: `null`  
 
     Terminates the test run after the specified number of failures is reached.
 
@@ -102,7 +113,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
 ### Reporting
 
-#### `report.directory`
+#### `reports.directory`
 
 !!! note "" 
 
@@ -112,11 +123,11 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     Specifies the directory where all test reports are stored.
 
     ```toml
-    [report]
-    directory = "schemathesis-report"
+    [reports]
+    directory = "test-results"
     ```
 
-#### `report.preserve-bytes`
+#### `reports.preserve-bytes`
 
 !!! note ""
 
@@ -126,11 +137,11 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     Retains the exact byte sequences of payloads in reports, encoded as base64 when enabled.
 
     ```toml
-    [report]
+    [reports]
     preserve-bytes = true
     ```
 
-#### `report.<format>.enabled`
+#### `reports.<format>.enabled`
 
 !!! note "" 
 
@@ -140,11 +151,11 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     Enables the generation of the specified report format. Replace `<format>` with one of: `junit`, `vcr`, or `har`.
 
     ```toml
-    [report.junit]
+    [reports.junit]
     enabled = true
     ```
 
-#### `report.<format>.path`
+#### `reports.<format>.path`
 
 !!! note ""
 
@@ -153,8 +164,10 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
     Specifies a custom path for the report of the specified format. Replace `<format>` with one of: `junit`, `vcr`, or `har`.
 
+    Setting this option automatically enables the report generation without requiring `enable = true`.
+
     ```toml
-    [report.junit]
+    [reports.junit]
     path = "./test-reports/schemathesis-results.xml"
     ```
 
