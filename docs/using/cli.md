@@ -264,10 +264,10 @@ Schemathesis automatically encodes credentials in the `Authorization` header.
 
 Configuration files allow you to set default authentication or override it for specific API operations. This flexible approach supports all authentication types, including OpenAPI security schemes, which are automatically applied when required by the API.
 
-By default, Schemathesis automatically loads a `schemathesis.toml` file from the current directory or project root. To use a custom configuration file, specify its path with the `--config` option:
+By default, Schemathesis automatically loads a `schemathesis.toml` file from the current directory or project root. To use a custom configuration file, specify its path with the `--config-file` option:
 
 ```console
-$ st run openapi.yaml --config config.toml
+$ st --config-file config.toml run openapi.yaml
 ```
 
 For more details, see the [Authentication Configuration Reference](../reference/configuration.md#authentication) section. For example:
@@ -489,26 +489,19 @@ $ st run openapi.yaml --report junit --report-dir ./test-results
 For specific report types, you can customize the output path:
 
 ```console
-$ st run openapi.yaml \
-  --report junit \
-  --report-junit-path ./jenkins/schemathesis-results.xml
+$ st run openapi.yaml --report-junit-path ./jenkins/schemathesis-results.xml
 ```
 
 Similar options exist for other formats:
 
 ```console
-$ st run openapi.yaml \
-  --report vcr \
-  --report-vcr-path ./debug/api-responses.yaml
-
-$ st run openapi.yaml \
-  --report har \
-  --report-har-path ./analysis/http-archive.har
+$ st run openapi.yaml --report-vcr-path ./debug/api-responses.yaml
+$ st run openapi.yaml --report-har-path ./analysis/http-archive.har
 ```
 
-!!! tip ""
+!!! note "Enable reports"
 
-    For detailed information about report structures and advanced usage, see the [Reporting Reference](../reference/reporting.md).
+    Passing `--report-{format}-path` option automatically enables reporting in the given format. For detailed information about report structures and advanced usage, see the [Reporting Reference](../reference/reporting.md).
 
 
 ## :whale: Docker Usage

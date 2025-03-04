@@ -37,7 +37,7 @@ This approach lets you test against a local schema file by specifying the target
 
 For CI environments, create a dedicated configuration file (`schemathesis.toml`) with your testing settings. Schemathesis automatically loads this file from the current directory or project root.
 
-Since the config file supports environment variable substitution, you can use the same file across different environments by supplying different environment variables. To use a custom file, specify its path with `--config`.
+Since the config file supports environment variable substitution, you can use the same file across different environments by supplying different environment variables. To use a custom file, specify its path with `--config-file`.
 
 ```toml
 [auth.openapi]
@@ -46,15 +46,14 @@ ApiKeyAuth = { value = "${API_KEY}" }
 [checks]
 response_schema_conformance.enabled = false
 
-[report.junit]
-enabled = "${JUNIT_ENABLE}"
+[reports.junit]
 path = "${JUNIT_REPORT_PATH}"
 ```
 
 Then in your CI workflow, simply reference this configuration:
 
 ```console
-$ st run http://api-host:port/openapi.json --config my-config.toml
+$ st --config-file my-config.toml run http://api-host:port/openapi.json
 ```
 
 !!! info "Configuration Reference"
