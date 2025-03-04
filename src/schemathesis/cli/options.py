@@ -26,7 +26,12 @@ class CustomHelpMessageChoice(click.Choice):
 class BaseCsvChoice(click.Choice):
     def parse_value(self, value: str) -> tuple[list[str], set[str]]:
         selected = [item for item in value.split(",") if item]
-        invalid_options = set(selected) - set(self.choices)
+        if not self.case_sensitive:
+            invalid_options = {
+                item for item in selected if item.upper() not in {choice.upper() for choice in self.choices}
+            }
+        else:
+            invalid_options = set(selected) - set(self.choices)
         return selected, invalid_options
 
     def fail_on_invalid_options(self, invalid_options: set[str], selected: list[str]) -> NoReturn:

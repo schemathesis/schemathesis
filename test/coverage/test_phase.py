@@ -9,6 +9,7 @@ from schemathesis import experimental
 from schemathesis._hypothesis import create_test
 from schemathesis.constants import NOT_SET
 from schemathesis.experimental import COVERAGE_PHASE
+from schemathesis.generation import GenerationConfig
 from schemathesis.generation._methods import DataGenerationMethod
 from schemathesis.models import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -1366,6 +1367,20 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     test_func()
 
     assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
+
+    methods = set()
+
+    test_func = create_test(
+        operation=operation,
+        test=test,
+        generation_config=GenerationConfig(unexpected_methods={"DELETE", "PUT"}),
+        data_generation_methods=[DataGenerationMethod.negative],
+        settings=settings(phases=[Phase.explicit]),
+    )
+
+    test_func()
+
+    assert methods == {"DELETE", "PUT"}
 
     module = ctx.write_pymodule(
         """

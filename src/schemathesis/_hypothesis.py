@@ -114,8 +114,14 @@ def create_test(
                 wrapped_test, operation, hook_dispatcher=hook_dispatcher, as_strategy_kwargs=as_strategy_kwargs
             )
             if COVERAGE_PHASE.is_enabled:
+                unexpected_methods = generation_config.unexpected_methods if generation_config else None
                 wrapped_test = add_coverage(
-                    wrapped_test, operation, data_generation_methods, auth_storage, as_strategy_kwargs
+                    wrapped_test,
+                    operation,
+                    data_generation_methods,
+                    auth_storage,
+                    as_strategy_kwargs,
+                    unexpected_methods,
                 )
     return wrapped_test
 
@@ -225,6 +231,7 @@ def add_coverage(
     data_generation_methods: list[DataGenerationMethod],
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
+    unexpected_methods: set[str] | None = None,
 ) -> Callable:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
@@ -237,7 +244,7 @@ def add_coverage(
         for container in LOCATION_TO_CONTAINER.values()
         if container in as_strategy_kwargs
     }
-    for case in _iter_coverage_cases(operation, data_generation_methods):
+    for case in _iter_coverage_cases(operation, data_generation_methods, unexpected_methods):
         if case.media_type and get_first_matching_media_type(case.media_type) is None:
             continue
         adjust_urlencoded_payload(case)
@@ -363,7 +370,9 @@ def _stringify_value(val: Any, container_name: str) -> Any:
 
 
 def _iter_coverage_cases(
-    operation: APIOperation, data_generation_methods: list[DataGenerationMethod]
+    operation: APIOperation,
+    data_generation_methods: list[DataGenerationMethod],
+    unexpected_methods: set[str] | None = None,
 ) -> Generator[Case, None, None]:
     from .specs.openapi.constants import LOCATION_TO_CONTAINER
     from .specs.openapi.examples import find_in_responses, find_matching_in_responses
@@ -373,6 +382,8 @@ def _iter_coverage_cases(
     serializers = get_serializers_for_operation(operation)
     template = Template(serializers)
     responses = find_in_responses(operation)
+    # NOTE: The HEAD method is excluded
+    unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -448,8 +459,7 @@ def _iter_coverage_cases(
             yield case
     if DataGenerationMethod.negative in data_generation_methods:
         # Generate HTTP methods that are not specified in the spec
-        # NOTE: The HEAD method is excluded
-        methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
+        methods = unexpected_methods - set(operation.schema[operation.path])
         for method in sorted(methods):
             data = template.unmodified()
             case = operation.make_case(**data.kwargs)

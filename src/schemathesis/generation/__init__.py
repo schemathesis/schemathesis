@@ -50,3 +50,4 @@ class GenerationConfig:
     with_security_parameters: bool = True
     # Header generation configuration
     headers: HeaderConfig = field(default_factory=HeaderConfig)
+    unexpected_methods: set[str] | None = None
