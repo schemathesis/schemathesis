@@ -234,8 +234,8 @@ These settings can only be applied at the project level.
     hooks = "myproject.tests.hooks"
     
     # Or project-specific hooks
-    [projects.payments]
-    hooks = "myproject.payments.hooks"
+    # [projects.payments]
+    # hooks = "myproject.payments.hooks"
     ```
 
 #### `workers`
@@ -248,7 +248,6 @@ These settings can only be applied at the project level.
     Specifies the number of concurrent workers for running unit test phases.
 
     ```toml
-    workers = "auto"  # Auto-adjust based on available cores
     workers = 4       # Use exactly 4 workers
     ```
 
@@ -548,13 +547,14 @@ The following settings control how Schemathesis generates test data for your API
     Test data generation mode. Controls whether Schemathesis generates valid data, invalid data, or both.
     
     Possible values:
+
     - `"positive"`: Generate only valid data according to the schema
     - `"negative"`: Generate only invalid data to test error handling
     - `"all"`: Generate both valid and invalid data
     
     ```toml
     [generation]
-    mode = "positive"
+    mode = "negative"
     ```
 
 #### `generation.max-examples`
@@ -574,7 +574,7 @@ The following settings control how Schemathesis generates test data for your API
 
     ```toml
     [generation]
-    max-examples = 100
+    max-examples = 200
     ```
 
 #### `generation.seed`
@@ -651,7 +651,7 @@ The following settings control how Schemathesis generates test data for your API
 
 !!! note ""
 
-    **Type:** `String`  
+    **Type:** `String` or `Array of Strings`  
     **Default:** `null`  
     
     Guide input generation to values more likely to expose bugs via targeted property-based testing.
@@ -685,7 +685,7 @@ The following settings control how Schemathesis generates test data for your API
     **Type:** `Boolean`  
     **Default:** `true`  
 
-    Controls whether to use `null` values for optional arguments in GraphQL queries. Applicable only for GraphQL API testing.
+    Controls whether to use `\x00` bytes in generated GraphQL queries. Applicable only for GraphQL API testing.
 
     ```toml
     [generation]
@@ -709,9 +709,13 @@ The following settings control how Schemathesis generates test data for your API
     ```toml
     [generation]
     database = ":memory:"
+    ```
 
-    # Or for persistent storage
-    database = "./schemathesis_examples.db"
+    Or for persistent storage:
+
+    ```toml
+    [generation]
+    database = "./.schemathesis/examples/"
     ```
 
 #### `generation.unique-inputs`

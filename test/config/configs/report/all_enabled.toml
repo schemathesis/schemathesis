@@ -1,0 +1,14 @@
+[reports]
+directory = "reports"
+preserve-bytes = true
+
+[reports.junit]
+enabled = true
+path = "./test-reports/schemathesis-results.xml"
+
+[reports.vcr]
+enabled = true
+path = "cassettes/api"
+
+[reports.har]
+enabled = true
