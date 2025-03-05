@@ -87,7 +87,7 @@ steps:
 
 ## Documentation
 
-📚 **[Read the full documentation](https://schemathesis.github.io/schemathesis)** for guides, examples, and reference material.
+📚 **[Read the full documentation](https://schemathesis.readthedocs.io/)** for guides, examples, and reference material.
 
 ## Who's Using Schemathesis?
 
