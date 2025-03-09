@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.12...HEAD>` - TBD
 ---------------------------------------------
 
+**Documentation**
+
+- Fix documentation build.
+
 .. _v3.39.12:
 
 :version:`3.39.12 <v3.39.11...v3.39.12>` - 2025-03-05
