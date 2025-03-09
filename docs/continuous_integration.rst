@@ -6,10 +6,6 @@ This guide outlines how to set up Schemathesis for automated API testing in your
 GitHub Actions
 --------------
 
-.. note::
-
-    💡 See our `GitHub Tutorial <https://docs.schemathesis.io/tutorials/github>`_ for a step-by-step guidance.
-
 For initial setup in a GitHub Actions workflow:
 
 .. code-block:: yaml
@@ -20,13 +16,6 @@ For initial setup in a GitHub Actions workflow:
       - uses: schemathesis/action@v1
         with:
           schema: 'http://127.0.0.1:5000/api/openapi.json'
-          # Optional, for PR comments
-          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
-
-To get test results as comments in your GitHub pull requests, both the ``token`` and the `GitHub app`_ are required.
-Obtain the token by signing up on `Schemathesis.io <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=ci>`_.
-
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
 
 To add headers like ``Authorization``:
 
@@ -81,8 +70,6 @@ In most cases, you'll want to set up your app in the CI environment. Here's a Gi
       - uses: schemathesis/action@v1
         with:
           schema: 'http://127.0.0.1:5000/api/openapi.json'
-          # Optional, for PR comments
-          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 API Schema in a File
 --------------------
@@ -120,4 +107,3 @@ You can configure Schemathesis behavior using the following environment variable
 - **SCHEMATHESIS_REPORT**: Enable or disable reporting. Valid values: ``true``, ``false``
 
 .. _Python app: https://github.com/schemathesis/schemathesis/tree/master/example
-.. _GitHub app: https://github.com/apps/schemathesis

@@ -87,16 +87,6 @@ Targeted testing
    :members:
 .. autofunction:: schemathesis.target
 
-Custom strategies for Open API "format" keyword
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction:: schemathesis.openapi.format
-
-Custom strategies for Open API media types
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-.. autofunction:: schemathesis.openapi.media_type
-
 Custom scalars for GraphQL
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 

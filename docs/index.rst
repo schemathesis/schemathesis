@@ -85,7 +85,6 @@ It generally follows the operational workflow of Schemathesis, detailing steps f
    python
    continuous_integration
    experimental
-   service
    auth
    contrib
    stateful

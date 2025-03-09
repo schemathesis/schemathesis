@@ -113,7 +113,7 @@ api-tests:
         schema: "https://example.schemathesis.io/openapi.json"
 ```
 
-For more details, check out our [GitHub Action](https://github.com/schemathesis/action) repository or see our [GitHub Tutorial](https://docs.schemathesis.io/tutorials/github).
+For more details, check out our [GitHub Action](https://github.com/schemathesis/action) repository.
 
 ## Who's Using Schemathesis?
 

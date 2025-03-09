@@ -58,10 +58,6 @@ GitHub Integration
 GitHub Actions
 ^^^^^^^^^^^^^^
 
-.. note::
-
-    💡 See our `GitHub Tutorial <https://docs.schemathesis.io/tutorials/github>`_ for a step-by-step guidance.
-
 Run Schemathesis tests as a part of your CI/CD pipeline. Add this YAML configuration to your GitHub Actions:
 
 .. code-block:: yaml
@@ -72,22 +68,6 @@ Run Schemathesis tests as a part of your CI/CD pipeline. Add this YAML configura
        - uses: schemathesis/action@v1
          with:
            schema: "https://example.schemathesis.io/openapi.json"
-           # OPTIONAL. Add Schemathesis.io token for pull request reports
-           token: ${{ secrets.SCHEMATHESIS_TOKEN }}
 
 For more details, check out our `GitHub Action <https://github.com/schemathesis/action>`_ repository.
 
-GitHub App
-^^^^^^^^^^
-
-Receive automatic comments in your pull requests and updates on GitHub checks status. Requires usage of our `SaaS platform <https://app.schemathesis.io/auth/sign-up/?utm_source=oss_docs&utm_content=index_note>`_.
-
-1. Install the `GitHub app <https://github.com/apps/schemathesis>`_.
-2. Enable in your repository settings.
-
-.. image:: https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/service_github_report.png
-
-Service
--------
-
-If you prefer an all-in-one solution with quick setup, we have a `free tier <https://schemathesis.io/#pricing>`_ available.
