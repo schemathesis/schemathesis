@@ -298,27 +298,36 @@ def test_forbid_preserve_bytes_without_cassette_path(cli, schema_url, snapshot_c
     assert cli.run(schema_url, "--report-preserve-bytes") == snapshot_cli
 
 
+@pytest.mark.parametrize("in_config", [True, False])
 @pytest.mark.openapi_version("3.0")
-def test_report_dir(cli, schema_url, tmp_path):
+def test_report_dir(cli, schema_url, tmp_path, in_config):
     # When report directory is specified with a report format
     report_dir = tmp_path / "reports"
-    cli.run(
-        schema_url,
-        f"--report-dir={report_dir}",
-        "--report=junit",
+    args = [
         "--max-examples=1",
-    )
+    ]
+    kwargs = {}
+    if in_config:
+        kwargs["config"] = {"reports": {"junit": {"enabled": True}, "directory": str(report_dir)}}
+    else:
+        args = ["--report=junit", f"--report-dir={report_dir}", *args]
+    cli.run(schema_url, *args, **kwargs)
     # And the report should be created in the specified directory
     assert report_dir.exists()
     assert (report_dir / "junit.xml").exists()
 
     # When multiple report formats are specified
-    cli.run(
-        schema_url,
-        f"--report-dir={report_dir}",
-        "--report=vcr,har",
+    args = [
         "--max-examples=1",
-    )
+    ]
+    kwargs = {}
+    if in_config:
+        kwargs["config"] = {
+            "reports": {"vcr": {"enabled": True}, "har": {"enabled": True}, "directory": str(report_dir)}
+        }
+    else:
+        args = [f"--report-dir={report_dir}", "--report=vcr,har", *args]
+    cli.run(schema_url, *args, **kwargs)
     # Then all reports should be created in the specified directory
     assert (report_dir / "vcr.yaml").exists()
     assert (report_dir / "har.json").exists()

@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(auth=AuthConfig(basic={'username': 'user-1', 'password': 'secret-password'}))))

@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(checks=ChecksConfig(response_schema_conformance=SimpleCheckConfig(enabled=False)))))

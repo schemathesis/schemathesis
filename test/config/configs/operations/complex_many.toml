@@ -1,0 +1,9 @@
+[[operations]]
+include-name-regex = ".+/users/.+"
+exclude-method = ["POST", "PUT"]
+parameters = { user_id = "${TEST_STRING_1}"}
+
+[[operations]]
+include-name = "GET /users/"
+exclude-by = "/x-prop == 42"
+parameters = { user_id = "${TEST_STRING_1}"}

@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-Usage: run [OPTIONS] SCHEMA
+Usage: schemathesis run [OPTIONS] SCHEMA
 
   Run tests against an API using a specified SCHEMA.
 
