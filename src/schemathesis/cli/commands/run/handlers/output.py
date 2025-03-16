@@ -788,7 +788,7 @@ class OutputHandler(EventHandler):
     warnings: WarningData = field(default_factory=WarningData)
     errors: set[events.NonFatalError] = field(default_factory=set)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
-        default_factory=lambda: {phase: (Status.SKIP, None) for phase in PhaseName}
+        default_factory=lambda: dict.fromkeys(PhaseName, (Status.SKIP, None))
     )
     console: Console = field(default_factory=_default_console)
 
