@@ -81,6 +81,10 @@ bearer = "${TOKEN}"
 
 The basic setting corresponds to the `--auth` CLI option, while bearer tokens can also be specified via CLI headers.
 
+!!! tip "Operation-specific Authentication"
+
+    You can also override auth on the [per-operation basic](#operation-specific-authentication).
+
 ### OpenAPI Security Schemes
 
 For OpenAPI specifications with defined security schemes, configure them by name:
@@ -412,6 +416,16 @@ When multiple configuration entries match an operation:
 3. Exclusion takes precedence over inclusion when at the same level
 
 This allows for granular control by ordering your configuration appropriately.
+
+### Operation-specific Authentication
+
+If you'd like to override auth for some API operations you can specify the `auth` key
+
+```toml
+[[operations]]
+include-name = "POST /orders"
+auth = { bearer = "${TOKEN}" }
+```
 
 ## Phase-Specific Settings for Operations
 
