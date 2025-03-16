@@ -1,11 +1,9 @@
 # Configuration Options
 
-This reference details all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
+This reference covers all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
 
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
-- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[project.<name>]` namespace), they are applied to the "default" project.
-
-This structure simplifies single-project setups by allowing you to specify project-level settings directly at the top level while still providing the flexibility to override them for specific projects.
+- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[project.<name>]` namespace), they are used as defaults for any tested project.
 
 ## Configuration Resolution
 
@@ -15,10 +13,8 @@ Schemathesis applies settings in the following hierarchy (from highest to lowest
 2. Operation-specific phase settings
 3. Global phase settings (e.g., `[phases.fuzzing]`)
 4. Operation-level settings (e.g., `[[operations]]`)
-5. Project-level settings (e.g., `[projects.payments]`)
-6. Global settings (top level)
-
-This hierarchy allows you to set sensible defaults at higher levels while overriding specific settings as needed.
+5. Project-level settings (e.g., `[[projects]]`)
+6. Global settings
 
 ## Environment Variable Substitution
 
@@ -47,7 +43,6 @@ exclude-method = "POST"
 # include-tag = "admin"
 # By Open API operation ID
 # include-operation-id = "delete-user"
-# More configuration options follow ...
 ```
 
 ## Parameter Overrides
@@ -216,7 +211,7 @@ These settings can only be applied at the project level.
 
     ```toml
     # Optionally under a named project
-    # [project.payments]
+    # [[projects]]
     base-url = "https://api.example.com"
     ```
 
@@ -234,7 +229,7 @@ These settings can only be applied at the project level.
     hooks = "myproject.tests.hooks"
     
     # Or project-specific hooks
-    # [projects.payments]
+    # [[projects]]
     # hooks = "myproject.payments.hooks"
     ```
 
@@ -242,8 +237,8 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Integer or "auto"`  
-    **Default:** `1`  
+    **Type:** `Integer`  
+    **Default:** `Number of available CPUs`  
 
     Specifies the number of concurrent workers for running unit test phases.
 
@@ -357,7 +352,7 @@ These settings can only be applied at the project level.
     **Type:** `String`  
     **Default:** `null`  
 
-    Specifies a bearer token for authentication. This token can alternatively be provided via CLI headers.
+    Specifies a bearer token for authentication.
 
     ```toml
     [auth]
@@ -371,7 +366,13 @@ These settings can only be applied at the project level.
     **Type:** `Object`  
     **Default:** `null`  
 
-    Defines authentication settings for OpenAPI security schemes. Each key in this object should match a security scheme defined in your OpenAPI specification. Schemathesis resolves authentication in order: CLI options, operation headers, OpenAPI-specific authentication, and then generic authentication.
+    Defines authentication settings for OpenAPI security schemes. Each key in this object should match a security scheme defined in your OpenAPI specification. 
+
+    Schemathesis resolves authentication in order: 
+
+      - CLI options
+      - Operation-specific auth
+      - Global
 
     ```toml
     [auth.openapi]
@@ -397,7 +398,18 @@ These settings can only be applied at the project level.
     **Type:** `Boolean`  
     **Default:** `true`  
 
-    Enables or disables the specified check. Replace `<check>` with the name of the check (for example, `not_a_server_error`, `status_code_conformance`, `content_type_conformance`, `response_schema_conformance`, `positive_data_acceptance`, `negative_data_rejection`, `use_after_free`, `ensure_resource_availability`, `missing_required_header`, or `ignored_auth`).
+    Enables or disables the specified check. Replace `<check>` with one of the following:
+
+      - `not_a_server_error`
+      - `status_code_conformance`
+      - `content_type_conformance`
+      - `response_schema_conformance`
+      - `positive_data_acceptance`
+      - `negative_data_rejection`
+      - `use_after_free`
+      - `ensure_resource_availability`
+      - `missing_required_header`
+      - `ignored_auth`
 
     ```toml
     [checks]
