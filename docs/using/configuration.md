@@ -52,12 +52,13 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 
 [[operations]]
 include-name = "POST /payments"
-headers = { "X-API-Key" = "${PAYMENTS_API_KEY}" }
+headers = { "X-API-Key" = "${API_KEY}" }
 ```
 
 This allows you to maintain a single configuration file that works across different environments (development, staging) by changing environment variables rather than the configuration itself.
 
 !!! tip "Multi-Project Support"
+
     Schemathesis also supports multi-project configurations, where you can define separate settings for different APIs within the same configuration file. See [Multi-Project Configuration](#multi-project-configuration) for details.
 
 Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios or multi-API environments.
@@ -66,7 +67,7 @@ Most users won't need a configuration file at all. Configuration becomes valuabl
 
 Schemathesis supports multiple authentication methods for API testing.
 
-For simple authentication, use the top-level `[auth]` section:
+For simple authentication, use the global `[auth]` section:
 
 ```toml
 [auth]
@@ -95,11 +96,7 @@ BearerAuth = { token = "${TOKEN}" }
 ApiKeyAuth = { value = "${API_KEY}" }
 
 # OAuth2 authentication
-OAuth2 = { 
-  client_id = "${CLIENT_ID}", 
-  client_secret = "${CLIENT_SECRET}",
-  scopes = ["read", "write"]
-}
+OAuth2 = { client_id = "${CLIENT_ID}", client_secret = "${CLIENT_SECRET}" }
 ```
 
 These settings map directly to the `securitySchemes` in your OpenAPI specification.
@@ -111,7 +108,7 @@ When multiple methods are specified, Schemathesis resolves authentication in the
 - CLI options (`--auth` or `--header`)
 - Operation-specific headers
 - Specification-specific authentication (`[auth.openapi]`)
-- Generic authentication (top-level `[auth]`)
+- Generic authentication (global `[auth]`)
 
 This flexible resolution lets you override settings at different levels while keeping sensitive data in environment variables.
 
@@ -345,7 +342,6 @@ generation.max-examples = 150
 
 [[operations]]
 include-method-regex = "(POST|PUT|PATCH)"
-include-path-regex = "/(users|orders)/"
 request-timeout = 3.0
 
 [[operations]]
@@ -374,7 +370,7 @@ You can combine multiple criteria within a single configuration entry:
 ```toml
 [[operations]]
 include-method = "POST"
-include-tag = "users"
+# include-tag = "users"
 request-timeout = 3.0
 ```
 
@@ -428,10 +424,10 @@ generation.max-examples = 100
 request-timeout = 5.0
 
 # Phase-specific overrides for this operation
-[[operations]]
-include-name = "GET /users"
-phases.fuzzing.generation.max-examples = 200  # Increase examples for fuzzing
-phases.stateful.generation.max-examples = 30   # Reduce examples for stateful tests
+# Increase examples for fuzzing
+phases.fuzzing.generation.max-examples = 200 
+# Reduce examples for stateful tests
+phases.stateful.generation.max-examples = 30
 ```
 ### Resolution Order for Phase-Operation Settings
 
@@ -457,13 +453,25 @@ Set parameter values for specific operations:
 include-name = "GET /users/{user_id}"
 # Fixed value
 parameters = { user_id = 42 }
+```
 
+```toml
+[[operations]]
+include-name = "GET /users/{user_id}"
 # Multiple values for random selection
 parameters = { user_id = [1, 42, 499] }
+```
 
+```toml
+[[operations]]
+include-name = "GET /users/{user_id}"
 # Using an environment variable
 parameters = { user_id = "${USER_ID}" }
+```
 
+```toml
+[[operations]]
+include-name = "GET /users/{user_id}"
 # Disambiguate parameters with the same name
 parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 ```
@@ -494,12 +502,11 @@ This cascading mechanism ensures that more specific settings override general on
 When parameters share the same name, prefix them to indicate their location:
 
 ```toml
-parameters = {
-  "path.id" = 42,            # Path parameter
-  "query.id" = 100,          # Query parameter
-  "header.X-API-Version" = "2.0",  # Header parameter
-  "cookie.session" = "${SESSION_ID}"  # Cookie parameter
-}
+[parameters]
+"path.id" = 42                      # Path parameter
+"query.id" = 100                    # Query parameter
+"header.X-API-Version" = "2.0"      # Header parameter
+"cookie.session" = "${SESSION_ID}"  # Cookie parameter
 ```
 
 ### Using Parameter Arrays
@@ -520,13 +527,13 @@ Schemathesis lets you configure multiple API projects in one file—a handy feat
 
 ### Defining Projects
 
-Define projects in the `[projects]` section by matching the API's title:
+Define projects in the `[[projects]]` section by matching the API's title:
 
 ```toml
-[projects]
+[[projects]]
 # Projects are matched by the API schema's info.title
-payments = { title = "Payment Processing API" }
-users = { title = "User Management Service" }
+title = "Payment Processing API"
+base-url = "https://payments.example.com"
 ```
 
 Schemathesis checks the `info.title` field of the API schema to apply the corresponding project settings.
@@ -536,13 +543,15 @@ Schemathesis checks the `info.title` field of the API schema to apply the corres
 Override global defaults with project-specific settings:
 
 ```toml
-[projects.payments]
+[[projects]]
+title = "Payment Processing API"
 base-url = "https://payments.example.com"
 workers = 4
 generation.max-examples = 200
-hooks = "payment_hooks"
+hooks = "test.config.hooks.example"
 
-[projects.users]
+[[projects]]
+title = "User Management API"
 base-url = "https://users.example.com"
 workers = 2
 ```
@@ -552,11 +561,16 @@ workers = 2
 Customize operations within a project:
 
 ```toml
-[projects.payments.operation."POST /payments"]
+[[projects]]
+title = "Payment Processing API"
+
+[[projects.operations]]
+include-name = "POST /payments"
 generation.max-examples = 80
 headers = { "X-Idempotency-Key" = "${IDEMPOTENCY_KEY}" }
 
-[projects.payments.operation.tag."critical"]
+[[projects.operations]]
+include-tag = "slow"
 request-timeout = 10.0
 ```
 
@@ -574,26 +588,23 @@ When using projects, settings are applied in this order:
 ```toml
 # Global defaults
 generation.max-examples = 50
-workers = "auto"
+workers = 2
 
-[projects]
-# Define projects by API title
-payments = { title = "Payment Processing API" }
-users = { title = "User Management API" }
-
-# Payments project settings
-[projects.payments]
+[[projects]]
+title = "Payment Processing API"
 base-url = "https://payments.example.com"
 generation.max-examples = 100
 
 # Operations for payments
-[projects.payments.operation."POST /payments"]
+[[projects.operations]]
+include-name = "POST /payments"
 generation.max-examples = 200
 parameters = { amount = [10, 100, 1000] }
 checks.positive_data_acceptance.expected-statuses = [200, 201]
 
 # Users project settings
-[projects.users]
+[[projects]]
+title = "User Management API"
 base-url = "https://users.example.com"
 ```
 

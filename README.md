@@ -33,12 +33,11 @@ Schemathesis automatically generates and runs API tests from your OpenAPI or Gra
 
 ## Why Schemathesis?
 
-- 🔬 **Research-backed testing**: Validated in [academic research](https://ieeexplore.ieee.org/document/9793781) and recognized in an [ACM survey](https://dl.acm.org/doi/10.1145/3617175) as a state-of-the-art API testing tool
-- 🔍 **Schema-Based Generation** - Creates test cases directly from your API documentation
-- 🛡️ **Zero Configuration** - Works immediately with any valid OpenAPI or GraphQL schema
-- 🔄 **Advanced Testing Techniques** - Employs stateful testing, boundary analysis, and fuzzing
-- 🧪 **Continuous Testing** - Integrates with CI/CD pipelines for automated verification
-- ⚡ **Extensive Coverage** - Tests more scenarios than manual scenarios can reasonably cover
+- 📑 **Schema-Based Testing** - Transform API documentation into a comprehensive test suite
+- 🚀 **Zero Configuration** - Begin testing immediately with a valid OpenAPI or GraphQL schema
+- ⚙️ **CI-Ready** - Integrate API testing into existing pipelines without complex configuration
+- 🛡️ **Effective Coverage** - Find edge cases no manual testing could uncover
+- 🔬 **Research-Backed**: [Recognized](https://dl.acm.org/doi/10.1145/3617175) in [academic research](https://ieeexplore.ieee.org/document/9793781) as a state-of-the-art API testing tool
 
 ## Installation
 
