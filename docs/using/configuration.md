@@ -18,17 +18,18 @@ Schemathesis will look for configuration in the following locations, in order:
 While Schemathesis works well without explicit configuration, using a file offers several benefits:
 
 - **Operation-Specific Settings**: Configure different behaviors for specific API operations. For example, run more tests or apply different validation rules
-- **Validation Customization**: Adjust how API responses are validated. For example, trigger certain failures on non-default status codes.
+- **Validation Customization**: Adjust how API responses are validated. For example, disable not relevant checks on certain API operations.
 - **Consistent Testing**: Share configuration across different environments and test runs.
 
 !!! note "CLI and Python API Integration"
+
     While the configuration file sets default behavior, CLI options and the Python API can override any settings.
 
 For a complete list of settings, see the [Configuration Reference](../reference/configuration.md).
 
 ## Basic Structure
 
-Schemathesis configuration uses the TOML format with a hierarchical structure. Global settings serve as defaults and can be overridden by more specific ones such as operation-specific or project-specific configurations.
+Schemathesis configuration uses the [TOML](https://toml.io/en/) format with a hierarchical structure. Global settings serve as defaults and can be overridden by more specific ones such as operation-specific or project-specific ones.
 
 ```toml
 # Global settings
@@ -55,13 +56,13 @@ include-name = "POST /payments"
 headers = { "X-API-Key" = "${API_KEY}" }
 ```
 
-This allows you to maintain a single configuration file that works across different environments (development, staging) by changing environment variables rather than the configuration itself.
+This allows you to maintain a single configuration file that works across different testing environments by changing environment variables rather than the configuration itself.
 
 !!! tip "Multi-Project Support"
 
     Schemathesis also supports multi-project configurations, where you can define separate settings for different APIs within the same configuration file. See [Multi-Project Configuration](#multi-project-configuration) for details.
 
-Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios or multi-API environments.
+Most users won't need a configuration file at all. Configuration becomes valuable primarily for complex testing scenarios.
 
 ## Authentication
 
@@ -99,7 +100,7 @@ ApiKeyAuth = { value = "${API_KEY}" }
 OAuth2 = { client_id = "${CLIENT_ID}", client_secret = "${CLIENT_SECRET}" }
 ```
 
-These settings map directly to the `securitySchemes` in your OpenAPI specification.
+These settings map directly to the `securitySchemes` in your OpenAPI specification and will be automatically used for API operations with corresponding security schemes.
 
 ### Authentication Resolution
 
@@ -171,15 +172,15 @@ Schemathesis validates API responses with a series of checks that verify various
 
 Schemathesis includes the following checks (all enabled by default):
 
-- **not_a_server_error**: Ensures the API doesn't return 5xx responses.
-- **status_code_conformance**: Confirms status codes match the schema.
-- **content_type_conformance**: Validates response content types against the schema.
-- **response_schema_conformance**: Checks that response bodies conform to their defined schemas.
-- **positive_data_acceptance**: Verifies that valid data is accepted.
-- **negative_data_rejection**: Ensures that invalid data is rejected.
-- **use_after_free**: Checks that resources are inaccessible after deletion.
-- **ensure_resource_availability**: Verifies that resources are available post-creation.
-- **ignored_auth**: Ensures authentication is properly enforced.
+- **not_a_server_error**: API doesn't return 5xx responses.
+- **status_code_conformance**: Status code is defined in the schema.
+- **content_type_conformance**: Response content type is defined in the schema.
+- **response_schema_conformance**: Response body conforms to its schema.
+- **positive_data_acceptance**: Valid data is accepted.
+- **negative_data_rejection**: Invalid data is rejected.
+- **use_after_free**: Resource is inaccessible after deletion.
+- **ensure_resource_availability**: Resource is available after creation.
+- **ignored_auth**: Authentication is properly enforced.
 
 ### Global Check Configuration
 
@@ -226,9 +227,9 @@ This configuration runs only the server error and status code checks.
 
 Schemathesis applies check configurations in the following order:
 
-- Operation-specific check configuration
-- Global check configuration
-- Default check behavior
+- Operation
+- Phase
+- Global
 
 This hierarchy lets you define global defaults while overriding settings for specific endpoints.
 
@@ -297,8 +298,8 @@ request-timeout = 3.0
 
 Matches the operation's name, which varies by specification:
 
-- For OpenAPI: "METHOD /path" (e.g., "GET /users")
-- For GraphQL: "Type.field" (e.g., "Query.getUser")
+- For OpenAPI: `METHOD /path` (e.g., `GET /users`)
+- For GraphQL: `Type.field` (e.g., `Query.getUser`)
 
 ```toml
 [[operations]]
@@ -333,7 +334,7 @@ generation.max-examples = 150
 
 ### Filtering with Regular Expressions
 
-Add "-regex" suffix to any filter type to use regular expression patterns:
+Add `-regex` suffix to any filter type to use regular expression patterns:
 
 ```toml
 [[operations]]
@@ -351,7 +352,7 @@ checks.not_a_server_error.enabled = false
 
 ### Exclusion Filters
 
-Use "exclude-" prefix to skip operations matching specific criteria:
+Use `exclude-` prefix to skip operations matching specific criteria:
 
 ```toml
 [[operations]]
@@ -434,15 +435,13 @@ phases.stateful.generation.max-examples = 30
 When both operation-level and phase-level settings are defined, Schemathesis applies them in the following order:
 
 - Operation-specific phase settings
-- Global phase settings (e.g., `[phases.fuzzing]`)
-- Operation-level settings (e.g., `[[operations]]`)
-- Global settings (top level)
-
-This hierarchy allows you to set defaults at higher levels while overriding specific phases as needed.
+- Operation (e.g., `[[operations]]`)
+- Phase (e.g., `[phases.fuzzing]`)
+- Global
 
 ## Parameter Overrides
 
-Override parameter values at different levels to control test data.
+Schemathesis allows you overriding API operation parameters for better test case control.
 
 ### Operation-Specific Parameters
 
@@ -487,15 +486,15 @@ limit = 50
 offset = 0
 ```
 
+These values will only be used if an API operation uses parameters with those names.
+
 ### Parameter Resolution Order
 
 Schemathesis resolves parameter values in this order:
 
-- Operation-specific values
-- Global values
-- Generated values from the schema
-
-This cascading mechanism ensures that more specific settings override general ones.
+- Operation overrides
+- Global overrides
+- Generated
 
 ### Parameter Type Disambiguation
 
@@ -519,7 +518,7 @@ include-name = "GET /users"
 parameters = { role = ["admin", "user", "guest"] }
 ```
 
-This configuration distributes the specified roles across test cases.
+The example above distributes the specified roles across test cases.
 
 ## Multi-Project Configuration
 
@@ -531,7 +530,7 @@ Define projects in the `[[projects]]` section by matching the API's title:
 
 ```toml
 [[projects]]
-# Projects are matched by the API schema's info.title
+# Projects are matched by the API schema's `info.title``
 title = "Payment Processing API"
 base-url = "https://payments.example.com"
 ```
@@ -608,11 +607,11 @@ title = "User Management API"
 base-url = "https://users.example.com"
 ```
 
-With this setup, each project uses its own settings while sharing a common configuration structure.
+With this setup, each project uses its own settings while sharing defaults.
 
 ## Configuration Overrides
 
-While the configuration file provides default settings, you can override them via CLI options.
+While the configuration file provides default settings, you can override most them via CLI options.
 
 ### CLI Overrides
 
@@ -628,5 +627,3 @@ st run --phases=examples,fuzzing http://api.example.com/openapi.json
 # Override check settings
 st run --checks=not_a_server_error http://api.example.com/openapi.json
 ```
-
-Most configuration option can be overridden via the corresponding CLI flag.
