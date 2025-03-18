@@ -6,6 +6,7 @@ from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
 from schemathesis.checks import CheckContext
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
@@ -28,6 +29,7 @@ class EngineContext:
     schema: BaseSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
+    cfg: SchemathesisConfig
     config: EngineConfig
     start_time: float
 
@@ -37,11 +39,13 @@ class EngineContext:
         schema: BaseSchema,
         stop_event: threading.Event,
         config: EngineConfig,
+        cfg: SchemathesisConfig,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
         self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
         self.outcome_cache = {}
+        self.cfg = cfg
         self.config = config
         self.start_time = time.monotonic()
         self._session = session
@@ -110,7 +114,8 @@ class EngineContext:
         from requests.models import CaseInsensitiveDict
 
         return CheckContext(
-            override=self.config.override,
+            # TODO:
+            override=None,
             auth=self.config.network.auth,
             headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
             config=self.config.checks_config,

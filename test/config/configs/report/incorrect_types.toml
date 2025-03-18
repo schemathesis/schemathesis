@@ -1,0 +1,2 @@
+[reports]
+preserve-bytes = "yes"  # should be boolean

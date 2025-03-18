@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [path='/users']>}, _excludes=set()), request_timeout=5.0, generation=GenerationConfig(max_examples=200)), OperationConfig(filter_set=FilterSet(_includes={<Filter: [tag='admin']>}, _excludes=set()), enabled=False)])))

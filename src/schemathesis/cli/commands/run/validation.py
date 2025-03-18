@@ -6,20 +6,19 @@ import os
 import pathlib
 import re
 from contextlib import contextmanager
-from functools import partial, reduce
+from functools import reduce
 from typing import Callable, Generator, Sequence
 from urllib.parse import urlparse
 
 import click
 
 from schemathesis import errors, experimental
-from schemathesis.cli.commands.run.reports import ReportFormat
 from schemathesis.cli.constants import DEFAULT_WORKERS
+from schemathesis.config import ReportFormat
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
-from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
+from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
-from schemathesis.generation.overrides import Override
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
@@ -122,19 +121,16 @@ def validate_auth(
     return None
 
 
-def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str], override: Override) -> None:
+def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str]) -> None:
     auth_is_set = auth is not None
     header_is_set = "authorization" in {header.lower() for header in headers}
-    override_is_set = "authorization" in {header.lower() for header in override.headers}
-    if len([is_set for is_set in (auth_is_set, header_is_set, override_is_set) if is_set]) > 1:
+    if len([is_set for is_set in (auth_is_set, header_is_set) if is_set]) > 1:
         message = "The "
         used = []
         if auth_is_set:
             used.append("`--auth`")
         if header_is_set:
             used.append("`--header`")
-        if override_is_set:
-            used.append("`--set-header`")
         message += " and ".join(used)
         message += " options were both used to set the 'Authorization' header, which is not permitted."
         raise click.BadParameter(message)
@@ -164,40 +160,6 @@ def validate_unique_filter(values: Sequence[str], arg_name: str) -> None:
     if len(values) != len(set(values)):
         duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
         raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
-
-
-def _validate_set_query(_: str, value: str) -> None:
-    if contains_unicode_surrogate_pair(value):
-        raise click.BadParameter("Query parameter value should not contain surrogates.")
-
-
-def validate_set_query(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
-) -> dict[str, str]:
-    return _validate_and_build_multiple_options(raw_value, "Query", _validate_set_query)
-
-
-def validate_set_header(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
-) -> dict[str, str]:
-    return _validate_and_build_multiple_options(raw_value, "Header", partial(_validate_header, where="Header"))
-
-
-def validate_set_cookie(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
-) -> dict[str, str]:
-    return _validate_and_build_multiple_options(raw_value, "Cookie", partial(_validate_header, where="Cookie"))
-
-
-def _validate_set_path(_: str, value: str) -> None:
-    if contains_unicode_surrogate_pair(value):
-        raise click.BadParameter("Path parameter value should not contain surrogates.")
-
-
-def validate_set_path(
-    ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]
-) -> dict[str, str]:
-    return _validate_and_build_multiple_options(raw_value, "Path", _validate_set_path)
 
 
 def _validate_header(key: str, value: str, where: str) -> None:

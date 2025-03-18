@@ -1,0 +1,4 @@
+color = true
+suppress-health-check = ["too_slow", "data_too_large"]
+max-failures = 42
+base-url = "https://api.example.com"

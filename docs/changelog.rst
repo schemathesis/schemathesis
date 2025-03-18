@@ -4,9 +4,39 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.5...HEAD>` - TBD
 ---------------------------------------------------
 
+**Added**
+
+Introduced a new configuration file, ``schemathesis.toml``, replacing CLI options as the primary source for settings.
+
+This file enables fine-grained control over per API operation settings as well as multi-project configurations.
+Global settings are defined at the top level, while operation-specific and project-specific configurations can be set under dedicated sections.
+CLI options now only override the configuration file.
+
+Example:
+
+.. code-block:: toml
+
+    # Default settings for any project
+    base-url = "https://api.example.com"
+
+    # Settings specific to `GET /users`
+    [[operations]]
+    include-name = "GET /users"
+    request-timeout = 5.0
+
+    # Specific to Payments API matched by `info.title`
+    [[projects]]
+    title = "Payment Processing API"
+    base-url = "https://payments.example.com"
+    workers = 4
+
 **Fixed**
 
 - Incorrect quantifiers merging for patterns involving single-element set of characters like ``[+]``.
+
+**Removed**
+
+- ``--set-{query,header,cookie,path}`` CLI options. Global parameters now reside under ``[parameters]`` and operation-specific overrides under ``[[operations]]`` in the configuration file.
 
 .. _v4.0.0-alpha.5:
 
