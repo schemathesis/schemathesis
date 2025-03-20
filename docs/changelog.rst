@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Incorrect quantifiers merging for patterns involving single-element set of characters like ``[+]``.
+- Internal error in the coverage phase due to incorrect example value extraction.
 
 .. _v4.0.0-alpha.5:
 

@@ -399,45 +399,62 @@ def find_matching_in_responses(examples: dict[str, list], param: str) -> Iterato
             if not isinstance(example, dict):
                 continue
             # Unwrapping example from `{"item": [{...}]}`
-            if isinstance(example, dict) and len(example) == 1 and list(example)[0].lower() == schema_name.lower():
-                inner = list(example.values())[0]
-                if isinstance(inner, list):
-                    for sub_example in inner:
-                        found = _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param)
-                        if found is not NOT_FOUND:
-                            yield found
-                    continue
-                if isinstance(inner, dict):
-                    example = inner
-            found = _find_matching_in_responses(example, schema_name, param, normalized, is_id_param)
-            if found is not NOT_FOUND:
-                yield found
+            if isinstance(example, dict):
+                inner = next((value for key, value in example.items() if key.lower() == schema_name.lower()), None)
+                if inner is not None:
+                    if isinstance(inner, list):
+                        for sub_example in inner:
+                            if isinstance(sub_example, dict):
+                                for found in _find_matching_in_responses(
+                                    sub_example, schema_name, param, normalized, is_id_param
+                                ):
+                                    if found is not NOT_FOUND:
+                                        yield found
+                        continue
+                    if isinstance(inner, dict):
+                        example = inner
+            for found in _find_matching_in_responses(example, schema_name, param, normalized, is_id_param):
+                if found is not NOT_FOUND:
+                    yield found
 
 
 def _find_matching_in_responses(
     example: dict[str, Any], schema_name: str, param: str, normalized: str, is_id_param: bool
-) -> Any:
+) -> Iterator[Any]:
     # Check for exact match
     if param in example:
-        return example[param]
+        yield example[param]
+        return
     if is_id_param and param[:-2] in example:
-        return example[param[:-2]]
+        value = example[param[:-2]]
+        if isinstance(value, list):
+            for sub_example in value:
+                for found in _find_matching_in_responses(sub_example, schema_name, param, normalized, is_id_param):
+                    if found is not NOT_FOUND:
+                        yield found
+            return
+        else:
+            yield value
+            return
 
     # Check for case-insensitive match
     for key in example:
         if key.lower() == normalized:
-            return example[key]
+            yield example[key]
+            return
     else:
         # If no match found and it's an ID parameter, try additional checks
         if is_id_param:
             # Check for 'id' if parameter is '{something}Id'
             if "id" in example:
-                return example["id"]
+                yield example["id"]
+                return
             # Check for '{schemaName}Id' or '{schemaName}_id'
             if normalized == "id" or normalized.startswith(schema_name.lower()):
                 for key in (schema_name, schema_name.lower()):
                     for suffix in ("_id", "Id"):
                         with_suffix = f"{key}{suffix}"
                         if with_suffix in example:
-                            return example[with_suffix]
-    return NOT_FOUND
+                            yield example[with_suffix]
+                            return
+    yield NOT_FOUND
