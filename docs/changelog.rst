@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.13...HEAD>` - TBD
 ---------------------------------------------
 
+**Fixed**
+
+- Internal error in the coverage phase due to incorrect example value extraction.
+
 .. _v3.39.13:
 
 :version:`3.39.13 <v3.39.12...v3.39.13>` - 2025-03-09
