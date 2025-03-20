@@ -70,4 +70,3 @@ Run Schemathesis tests as a part of your CI/CD pipeline. Add this YAML configura
            schema: "https://example.schemathesis.io/openapi.json"
 
 For more details, check out our `GitHub Action <https://github.com/schemathesis/action>`_ repository.
-

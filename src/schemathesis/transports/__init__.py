@@ -14,6 +14,7 @@ from .. import failures
 from .._dependency_versions import IS_WERKZEUG_ABOVE_3
 from ..constants import DEFAULT_RESPONSE_TIMEOUT, NOT_SET
 from ..exceptions import get_timeout_error
+from ..internal.copy import fast_deepcopy
 from ..serializers import SerializerContext
 from ..types import Cookies, NotSet, RequestCert
 
@@ -126,12 +127,21 @@ class RequestsTransport:
             # Additional headers, needed for the serializer
             for key, value in additional_headers.items():
                 final_headers.setdefault(key, value)
+
+        p = case.query
+
+        # Replace empty dictionaries with empty strings, so the parameters actually present in the query string
+        if any(value == {} for value in (p or {}).values()):
+            p = fast_deepcopy(p)
+            for k, v in p.items():
+                if v == {}:
+                    p[k] = ""
         data = {
             "method": case.method,
             "url": url,
             "cookies": case.cookies,
             "headers": final_headers,
-            "params": case.query,
+            "params": p,
             **extra,
         }
         if params is not None:

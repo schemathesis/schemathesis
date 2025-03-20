@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Internal error in the coverage phase due to incorrect example value extraction.
+- If the generated query parameter value is an empty object, send it as an empty string.
 
 .. _v3.39.13:
 
