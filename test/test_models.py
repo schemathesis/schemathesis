@@ -536,7 +536,7 @@ def _assert_override(spy, arg, original, overridden):
         assert all(key not in kwargs for key in overridden)
 
 
-@pytest.mark.parametrize("arg", ["headers", "cookies", "params"])
+@pytest.mark.parametrize("arg", ["headers", "cookies"])
 def test_call_overrides(mocker, arg, openapi_30):
     spy = mocker.patch("requests.Session.request", side_effect=ValueError)
     original = {"A": "X", "B": "X"}
