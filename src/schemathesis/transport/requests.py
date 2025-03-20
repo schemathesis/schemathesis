@@ -56,12 +56,21 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
             for key, value in additional_headers.items():
                 final_headers.setdefault(key, value)
 
+        params = case.query
+
+        # Replace empty dictionaries with empty strings, so the parameters actually present in the query string
+        if any(value == {} for value in (params or {}).values()):
+            params = deepclone(params)
+            for key, value in params.items():
+                if value == {}:
+                    params[key] = ""
+
         data = {
             "method": case.method,
             "url": url,
             "cookies": case.cookies,
             "headers": final_headers,
-            "params": case.query,
+            "params": params,
             **extra,
         }
 

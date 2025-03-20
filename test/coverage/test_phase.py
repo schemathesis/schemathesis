@@ -1280,7 +1280,7 @@ def test_negative_query_parameter(ctx):
     assert urls == [
         "http://127.0.0.1/foo?q=0&q=0",
         ANY,
-        "http://127.0.0.1/foo",
+        "http://127.0.0.1/foo?q=",
         "http://127.0.0.1/foo?q=null&q=null",
         "http://127.0.0.1/foo?q=null",
         "http://127.0.0.1/foo?q=false",
