@@ -1587,10 +1587,21 @@ def test_find_in_responses_only_in_2xx(ctx):
                     {"itemId": 789},
                     {"item": {"itemId": "42"}},
                     {"item": 55},
+                    {"item": [55]},
+                    {"item": [{"id": "143"}], "paginationInfo": {}},
                 ]
             },
             "itemId",
-            ["123", "789", "456", 789, "42", 55],
+            ["123", "789", "456", 789, "42", 55, "143"],
+        ),
+        (
+            {
+                "ItemResult": [
+                    {"item": [{"id": "143"}, {"id": 55}, [], {}], "paginationInfo": {}},
+                ]
+            },
+            "itemId",
+            ["143", 55],
         ),
         (
             {"Item": [{"id": "123"}, {"id": "456"}]},
