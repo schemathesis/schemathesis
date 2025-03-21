@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v4.0.0-alpha.6...HEAD>` - TBD
 ---------------------------------------------------
 
+**Added**
+
+- `--experimental-coverage-unspecified-methods` CLI option that accept a comma separated list of HTTP methods to use when generating test cases with methods not specified in the API during the **coverage** phase.
+
 .. _v4.0.0-alpha.6:
 
 :version:`4.0.0-alpha.6 <v4.0.0-alpha.5...v4.0.0-alpha.6>` - 2025-03-20

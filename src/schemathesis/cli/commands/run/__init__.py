@@ -306,6 +306,16 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     metavar="FEATURES",
 )
 @grouped_option(
+    "--experimental-coverage-unexpected-methods",
+    "coverage_unexpected_methods",
+    help="HTTP methods to use when generating test cases with methods not specified in the API during the coverage phase.",
+    type=CsvChoice(["get", "put", "post", "delete", "options", "head", "patch", "trace"], case_sensitive=False),
+    callback=validation.convert_http_methods,
+    metavar="",
+    default=None,
+    envvar="SCHEMATHESIS_EXPERIMENTAL_COVERAGE_UNEXPECTED_METHODS",
+)
+@grouped_option(
     "--experimental-missing-required-header-allowed-statuses",
     "missing_required_header_allowed_statuses",
     help="Comma-separated list of status codes expected for test cases with a missing required header",
@@ -489,6 +499,7 @@ def run(
     set_cookie: dict[str, str],
     set_path: dict[str, str],
     experiments: list,
+    coverage_unexpected_methods: set[str] | None,
     missing_required_header_allowed_statuses: list[str],
     positive_data_acceptance_allowed_statuses: list[str],
     negative_data_rejection_allowed_statuses: list[str],
@@ -655,6 +666,7 @@ def run(
                     graphql_allow_null=generation_graphql_allow_null,
                     codec=generation_codec,
                     with_security_parameters=generation_with_security_parameters,
+                    unexpected_methods=coverage_unexpected_methods,
                 ),
                 max_failures=max_failures,
                 continue_on_failure=continue_on_failure,

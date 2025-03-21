@@ -1361,6 +1361,22 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     assert methods == {"PATCH", "TRACE", "DELETE", "OPTIONS", "PUT"}
 
+    methods = set()
+
+    test_func = create_test(
+        operation=operation,
+        test_func=test,
+        config=HypothesisTestConfig(
+            modes=[HypothesisTestMode.COVERAGE],
+            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE], unexpected_methods={"DELETE", "PUT"}),
+            settings=settings(phases=[Phase.explicit]),
+        ),
+    )
+
+    test_func()
+
+    assert methods == {"DELETE", "PUT"}
+
     module = ctx.write_pymodule(
         """
 import schemathesis
