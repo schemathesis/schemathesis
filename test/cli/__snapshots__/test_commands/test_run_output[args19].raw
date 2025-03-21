@@ -102,6 +102,12 @@ Output options:
 Experimental options:
   --experimental FEATURES         Enable experimental features [possible values:
                                   positive-data-acceptance]
+  --experimental-coverage-unexpected-methods
+                                  HTTP methods to use when generating test cases
+                                  with methods not specified in the API during
+                                  the coverage phase. [possible values: get,
+                                  put, post, delete, options, head, patch,
+                                  trace]
   --experimental-missing-required-header-allowed-statuses
                                   Comma-separated list of status codes expected
                                   for test cases with a missing required header

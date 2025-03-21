@@ -128,7 +128,12 @@ def create_test(
         and not config.given_kwargs
     ):
         hypothesis_test = add_coverage(
-            hypothesis_test, operation, config.generation.modes, auth_storage, config.as_strategy_kwargs
+            hypothesis_test,
+            operation,
+            config.generation.modes,
+            auth_storage,
+            config.as_strategy_kwargs,
+            config.generation.unexpected_methods,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
@@ -215,6 +220,7 @@ def add_coverage(
     generation_modes: list[GenerationMode],
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
+    unexpected_methods: set[str] | None = None,
 ) -> Callable:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
@@ -227,7 +233,7 @@ def add_coverage(
         for container in LOCATION_TO_CONTAINER.values()
         if container in as_strategy_kwargs
     }
-    for case in _iter_coverage_cases(operation, generation_modes):
+    for case in _iter_coverage_cases(operation, generation_modes, unexpected_methods):
         if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
             continue
         adjust_urlencoded_payload(case)
@@ -362,7 +368,9 @@ def _stringify_value(val: Any, container_name: str) -> Any:
 
 
 def _iter_coverage_cases(
-    operation: APIOperation, generation_modes: list[GenerationMode]
+    operation: APIOperation,
+    generation_modes: list[GenerationMode],
+    unexpected_methods: set[str] | None = None,
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
     from schemathesis.specs.openapi.examples import find_in_responses, find_matching_in_responses
@@ -374,6 +382,8 @@ def _iter_coverage_cases(
 
     instant = Instant()
     responses = find_in_responses(operation)
+    # NOTE: The HEAD method is excluded
+    unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -488,7 +498,7 @@ def _iter_coverage_cases(
             )
     if GenerationMode.NEGATIVE in generation_modes:
         # Generate HTTP methods that are not specified in the spec
-        methods = {"get", "put", "post", "delete", "options", "patch", "trace"} - set(operation.schema[operation.path])
+        methods = unexpected_methods - set(operation.schema[operation.path])
         for method in sorted(methods):
             instant = Instant()
             data = template.unmodified()

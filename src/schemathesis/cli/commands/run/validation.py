@@ -270,6 +270,14 @@ def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tup
     return reduce(operator.iadd, value, [])
 
 
+def convert_http_methods(
+    ctx: click.core.Context, param: click.core.Parameter, value: list[str] | None
+) -> set[str] | None:
+    if value is None:
+        return value
+    return {item.lower() for item in value}
+
+
 def convert_status_codes(
     ctx: click.core.Context, param: click.core.Parameter, value: list[str] | None
 ) -> list[str] | None:
