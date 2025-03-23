@@ -38,7 +38,7 @@ from schemathesis.schemas import APIOperation, ParameterSet
 setup()
 
 
-class HypothesisTestMode(Enum):
+class HypothesisTestMode(str, Enum):
     EXAMPLES = "examples"
     COVERAGE = "coverage"
     FUZZING = "fuzzing"

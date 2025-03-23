@@ -6,7 +6,7 @@ from typing import Callable, Generator
 
 
 @unique
-class TokenType(Enum):
+class TokenType(int, Enum):
     VARIABLE = 1
     STRING = 2
     POINTER = 3

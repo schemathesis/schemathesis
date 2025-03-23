@@ -21,7 +21,7 @@ HookDispatcherMark = Mark["HookDispatcher"](attr_name="hook_dispatcher")
 
 
 @unique
-class HookScope(Enum):
+class HookScope(int, Enum):
     GLOBAL = 1
     SCHEMA = 2
     TEST = 3

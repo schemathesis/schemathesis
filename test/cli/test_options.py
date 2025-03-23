@@ -8,7 +8,7 @@ from hypothesis import strategies as st
 from schemathesis.cli.ext.options import CsvEnumChoice
 
 
-class Options(Enum):
+class Options(str, Enum):
     FIRST = "first"
     SECOND = "second"
 

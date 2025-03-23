@@ -251,7 +251,7 @@ class FailureGroup(BaseExceptionGroup):
         return super().__new__(cls, message, list(failures))
 
 
-class MessageBlock(Enum):
+class MessageBlock(str, Enum):
     CASE_ID = "case_id"
     FAILURE = "failure"
     STATUS = "status"
