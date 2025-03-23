@@ -25,7 +25,7 @@ class Node:
 
 
 @unique
-class NodeType(Enum):
+class NodeType(str, Enum):
     URL = "$url"
     METHOD = "$method"
     STATUS_CODE = "$statusCode"

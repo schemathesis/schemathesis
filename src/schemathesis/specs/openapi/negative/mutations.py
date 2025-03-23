@@ -20,7 +20,7 @@ from .utils import can_negate
 T = TypeVar("T")
 
 
-class MutationResult(enum.Enum):
+class MutationResult(int, enum.Enum):
     """The result of applying some mutation to some schema.
 
     Failing to mutate something means that by applying some mutation, it is not possible to change
