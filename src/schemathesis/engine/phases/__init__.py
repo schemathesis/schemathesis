@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.events import EventGenerator
 
 
-class PhaseName(enum.Enum):
+class PhaseName(str, enum.Enum):
     """Available execution phases."""
 
     PROBING = "API probing"
