@@ -2,6 +2,7 @@ import re
 import sys
 
 import pytest
+from flask import Flask, jsonify
 from hypothesis import HealthCheck, assume, given, settings
 from hypothesis import strategies as st
 
@@ -170,3 +171,71 @@ def is_valid_regex(pattern: str) -> bool:
         return True
     except re.error:
         return False
+
+
+def test_response_schema_is_not_mutated(cli, app_runner, snapshot_cli):
+    # See GH-2749
+    raw_schema = {
+        "openapi": "3.0.3",
+        "info": {"title": "Container Image API", "version": "1.0.0"},
+        "paths": {
+            "/container": {
+                "post": {
+                    "summary": "Create a container image",
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"container_image": {"$ref": "#/components/schemas/ContainerImage"}},
+                                }
+                            }
+                        },
+                    },
+                    "responses": {
+                        "200": {
+                            "description": "Successful response",
+                            "content": {
+                                "application/json": {
+                                    "schema": {
+                                        "type": "object",
+                                        "properties": {
+                                            "container_image": {"$ref": "#/components/schemas/ContainerImage"}
+                                        },
+                                    }
+                                }
+                            },
+                        }
+                    },
+                }
+            }
+        },
+        "components": {
+            "schemas": {
+                "ContainerImage": {
+                    "description": "A container image",
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "^[a-z0-9]+((\\.|_|__|-+)[a-z0-9]+)*(\\/[a-z0-9]+((\\.|_|__|-+)[a-z0-9]+)*)*(:[a-zA-Z0-9_][a-zA-Z0-9._-]{0,127}|@sha256:[a-fA-F0-9]{64}){0,1}$",
+                    "example": "renku/renkulab-py:3.10-0.18.1",
+                }
+            }
+        },
+    }
+
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def openapi_spec():
+        return jsonify(raw_schema)
+
+    @app.route("/container", methods=["POST"])
+    def create_container():
+        example_value = raw_schema["components"]["schemas"]["ContainerImage"]["example"]
+        response_body = {"container_image": example_value}
+        return jsonify(response_body), 200
+
+    port = app_runner.run_flask_app(app)
+
+    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "-call", "--phases=fuzzing", "-n 1") == snapshot_cli

@@ -139,7 +139,10 @@ class ConvertingResolver(InliningResolver):
     def resolve(self, ref: str) -> tuple[str, Any]:
         url, document = super().resolve(ref)
         document = to_json_schema_recursive(
-            document, nullable_name=self.nullable_name, is_response_schema=self.is_response_schema
+            document,
+            nullable_name=self.nullable_name,
+            is_response_schema=self.is_response_schema,
+            update_quantifiers=False,
         )
         return url, document
 
