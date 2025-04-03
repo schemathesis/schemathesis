@@ -108,7 +108,12 @@ class SchemathesisCase(PyCollector):
         This implementation is based on the original one in pytest, but with slight adjustments
         to produce tests out of hypothesis ones.
         """
-        from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
+        from schemathesis.generation.hypothesis.builder import (
+            HypothesisTestConfig,
+            HypothesisTestMode,
+            create_test,
+            make_async_test,
+        )
 
         is_trio_test = False
         for mark in getattr(self.test_function, "pytestmark", []):
@@ -219,19 +224,6 @@ class SchemathesisCase(PyCollector):
             return items
         except Exception:
             pytest.fail("Error during collection")
-
-
-def make_async_test(test: Callable) -> Callable:
-    def async_run(*args: Any, **kwargs: Any) -> None:
-        try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-        coro = test(*args, **kwargs)
-        future = asyncio.ensure_future(coro, loop=loop)
-        loop.run_until_complete(future)
-
-    return async_run
 
 
 @hookimpl(hookwrapper=True)  # type:ignore
