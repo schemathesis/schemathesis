@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
@@ -158,7 +159,24 @@ def create_base_test(
         __tracebackhide__ = True
         return test_function(*args, **kwargs)
 
-    return hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
+    funcobj = hypothesis.given(*args, **{**kwargs, "case": strategy})(test_wrapper)
+
+    if asyncio.iscoroutinefunction(test_function):
+        funcobj.hypothesis.inner_test = make_async_test(test_function)  # type: ignore
+    return funcobj
+
+
+def make_async_test(test: Callable) -> Callable:
+    def async_run(*args: Any, **kwargs: Any) -> None:
+        try:
+            loop = asyncio.get_event_loop()
+        except RuntimeError:
+            loop = asyncio.new_event_loop()
+        coro = test(*args, **kwargs)
+        future = asyncio.ensure_future(coro, loop=loop)
+        loop.run_until_complete(future)
+
+    return async_run
 
 
 def add_examples(

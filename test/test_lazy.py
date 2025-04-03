@@ -563,3 +563,32 @@ def test(case):
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
+
+
+def test_async_fixture(testdir, openapi3_schema_url):
+    testdir.make_test(
+        f"""
+import pytest_asyncio
+import schemathesis
+
+
+@pytest_asyncio.fixture
+async def lazy_schema():
+    return schemathesis.openapi.from_url('{openapi3_schema_url}')
+
+
+schema = schemathesis.pytest.from_fixture("lazy_schema")
+
+
+@schema.parametrize()
+async def test_pass(case):
+    pass
+
+
+@schema.parametrize()
+async def test_fail(case):
+    1 / 0
+            """
+    )
+    result = testdir.runpytest()
+    result.assert_outcomes(passed=2, failed=2)
