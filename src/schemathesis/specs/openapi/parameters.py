@@ -134,6 +134,7 @@ class OpenAPI20Parameter(OpenAPIParameter):
         "multipleOf",
         "example",
         "examples",
+        "default",
     )
 
 
@@ -178,6 +179,7 @@ class OpenAPI30Parameter(OpenAPIParameter):
         "format",
         "example",
         "examples",
+        "default",
     )
 
     def from_open_api_to_json_schema(self, operation: APIOperation, open_api_schema: dict[str, Any]) -> dict[str, Any]:
@@ -230,6 +232,7 @@ class OpenAPI20Body(OpenAPIBody, OpenAPI20Parameter):
         "additionalProperties",
         "example",
         "examples",
+        "default",
     )
     # NOTE. For Open API 2.0 bodies, we still give `x-example` precedence over the schema-level `example` field to keep
     # the precedence rules consistent.
