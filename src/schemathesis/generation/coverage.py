@@ -437,6 +437,36 @@ def cover_schema_iter(
                 elif key == "required":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_required(ctx, template, value)
+                elif key == "maxItems" and isinstance(value, int) and value < BUFFER_SIZE:
+                    try:
+                        # Force the array to have one more item than allowed
+                        new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
+                        array_value = ctx.generate_from_schema(new_schema)
+                        k = _to_hashable_key(array_value)
+                        if k not in seen:
+                            yield NegativeValue(
+                                array_value,
+                                description="Array with more items than allowed by maxItems",
+                                location=ctx.current_path,
+                            )
+                            seen.add(k)
+                    except (InvalidArgument, Unsatisfiable):
+                        pass
+                elif key == "minItems" and isinstance(value, int) and value > 0:
+                    try:
+                        # Force the array to have one less item than the minimum
+                        new_schema = {**schema, "minItems": value - 1, "maxItems": value - 1, "type": "array"}
+                        array_value = ctx.generate_from_schema(new_schema)
+                        k = _to_hashable_key(array_value)
+                        if k not in seen:
+                            yield NegativeValue(
+                                array_value,
+                                description="Array with fewer items than allowed by minItems",
+                                location=ctx.current_path,
+                            )
+                            seen.add(k)
+                    except (InvalidArgument, Unsatisfiable):
+                        pass
                 elif (
                     key == "additionalProperties"
                     and not value

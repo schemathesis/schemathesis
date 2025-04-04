@@ -1266,6 +1266,88 @@ def test_generate_empty_headers_too(ctx):
     )
 
 
+def test_more_than_max_items(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"type": "boolean"},
+                                    "maxItems": 3,
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {"body": [False, False, False, False]},
+            {"body": [{}]},
+            {"body": [[None, None]]},
+            {"body": [""]},
+            {"body": [None]},
+            {"body": [0]},
+            {"body": {}},
+            {"body": ""},
+            {},
+            {"body": False},
+            {"body": 0},
+        ],
+    )
+
+
+def test_less_than_min_items(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {"type": "boolean"},
+                                    "minItems": 3,
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {"body": [False, False]},
+            {"body": [{}]},
+            {"body": [[None, None]]},
+            {"body": [""]},
+            {"body": [None]},
+            {"body": [0]},
+            {"body": {}},
+            {"body": ""},
+            {},
+            {"body": False},
+            {"body": 0},
+        ],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
