@@ -303,15 +303,15 @@ This approach requires an initialized application instance to generate the API s
 
     @pytest.fixture
     def web_app(db):
-        # some dynamically built application
-        # that depends on other fixtures
-        app = FastAPI()
-
         @asynccontextmanager
         async def lifespan(_: FastAPI):
             await db.connect()
             yield
             await db.disconnect()
+
+        # some dynamically built application
+        # that depends on other fixtures
+        app = FastAPI(lifespan=lifespan)
 
         return schemathesis.openapi.from_dict(app.openapi(), app)
 
