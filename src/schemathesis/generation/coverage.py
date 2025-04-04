@@ -150,7 +150,7 @@ class CoverageContext:
 
     def is_valid_for_location(self, value: Any) -> bool:
         if self.location in ("header", "cookie") and isinstance(value, str):
-            return is_latin_1_encodable(value) and not has_invalid_characters("", value)
+            return not value or (is_latin_1_encodable(value) and not has_invalid_characters("", value))
         return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
