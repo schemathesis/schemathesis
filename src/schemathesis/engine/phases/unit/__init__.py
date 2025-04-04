@@ -51,43 +51,48 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     status = None
     is_executed = False
 
-    with WorkerPool(
-        workers_num=workers_num,
-        producer=producer,
-        worker_factory=worker_task,
-        ctx=engine,
-        mode=mode,
-        phase=phase.name,
-        suite_id=suite_started.id,
-    ) as pool:
-        try:
-            while True:
-                try:
-                    event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
-                    is_executed = True
-                    if engine.is_interrupted:
-                        raise KeyboardInterrupt
-                    yield event
-                    if isinstance(event, events.NonFatalError):
-                        status = Status.ERROR
-                    if isinstance(event, events.ScenarioFinished):
-                        if event.status != Status.SKIP and (status is None or status < event.status):
-                            status = event.status
-                        if event.status in (Status.ERROR, Status.FAILURE):
-                            engine.control.count_failure()
-                    if isinstance(event, events.Interrupted) or engine.is_interrupted:
-                        status = Status.INTERRUPTED
-                        engine.stop()
-                    if engine.has_to_stop:
-                        break  # type: ignore[unreachable]
-                except queue.Empty:
-                    if all(not worker.is_alive() for worker in pool.workers):
-                        break
-                    continue
-        except KeyboardInterrupt:
-            engine.stop()
-            status = Status.INTERRUPTED
-            yield events.Interrupted(phase=phase.name)
+    try:
+        with WorkerPool(
+            workers_num=workers_num,
+            producer=producer,
+            worker_factory=worker_task,
+            ctx=engine,
+            mode=mode,
+            phase=phase.name,
+            suite_id=suite_started.id,
+        ) as pool:
+            try:
+                while True:
+                    try:
+                        event = pool.events_queue.get(timeout=WORKER_TIMEOUT)
+                        is_executed = True
+                        if engine.is_interrupted:
+                            raise KeyboardInterrupt
+                        yield event
+                        if isinstance(event, events.NonFatalError):
+                            status = Status.ERROR
+                        if isinstance(event, events.ScenarioFinished):
+                            if event.status != Status.SKIP and (status is None or status < event.status):
+                                status = event.status
+                            if event.status in (Status.ERROR, Status.FAILURE):
+                                engine.control.count_failure()
+                        if isinstance(event, events.Interrupted) or engine.is_interrupted:
+                            status = Status.INTERRUPTED
+                            engine.stop()
+                        if engine.has_to_stop:
+                            break  # type: ignore[unreachable]
+                    except queue.Empty:
+                        if all(not worker.is_alive() for worker in pool.workers):
+                            break
+                        continue
+            except KeyboardInterrupt:
+                # Soft stop, waiting for workers to terminate
+                engine.stop()
+                status = Status.INTERRUPTED
+                yield events.Interrupted(phase=phase.name)
+    except KeyboardInterrupt:
+        # Hard stop, don't wait for worker threads
+        pass
 
     if not is_executed:
         phase.skip_reason = PhaseSkipReason.NOTHING_TO_TEST
