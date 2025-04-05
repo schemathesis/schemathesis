@@ -14,7 +14,7 @@ from typing import (
     NoReturn,
     TypeVar,
 )
-from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.core import NOT_SET, NotSet
@@ -436,6 +436,8 @@ class BaseSchema(Mapping):
         app: Any | NotSet = NOT_SET,
     ) -> Self:
         if not isinstance(base_url, NotSet):
+            if base_url is not None:
+                validate_base_url(base_url)
             self.base_url = base_url
         if not isinstance(location, NotSet):
             self.location = location
@@ -451,6 +453,21 @@ class BaseSchema(Mapping):
         if not isinstance(app, NotSet):
             self.app = app
         return self
+
+
+INVALID_BASE_URL_MESSAGE = (
+    "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
+    "Make sure it is a properly formatted URL."
+)
+
+
+def validate_base_url(value: str) -> None:
+    try:
+        netloc = urlparse(value).netloc
+    except ValueError as exc:
+        raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
+    if value and not netloc:
+        raise ValueError(INVALID_BASE_URL_MESSAGE)
 
 
 @dataclass
