@@ -399,14 +399,14 @@ Then, with this hook, you can query the database for some existing order and set
 .. code:: python
 
     import schemathesis
-    from typing import Any, Dict
+    from typing import Any
 
     database = ...  # Init the DB
 
 
     @schemathesis.hook
     def before_process_path(
-        context: schemathesis.hooks.HookContext, path: str, methods: Dict[str, Any]
+        context: schemathesis.HookContext, path: str, methods: dict[str, Any]
     ) -> None:
         if path == "/orders/{order_id}":
             order_id = database.get_orders().first().id
@@ -425,8 +425,8 @@ Called just before schema instance is created. Takes a raw schema representation
 
     @schemathesis.hook
     def before_load_schema(
-        context: schemathesis.hooks.HookContext,
-        raw_schema: Dict[str, Any],
+        context: schemathesis.HookContext,
+        raw_schema: dict[str, Any],
     ) -> None:
         ...
 
@@ -446,8 +446,8 @@ Called just after schema instance is created. Takes a loaded schema:
 
     @schemathesis.hook
     def after_load_schema(
-        context: schemathesis.hooks.HookContext,
-        schema: schemathesis.schemas.BaseSchema,
+        context: schemathesis.HookContext,
+        schema: schemathesis.BaseSchema,
     ) -> None:
         ...
 
@@ -466,7 +466,7 @@ Allows you to modify just initialized API operation:
 
     @schemathesis.hook
     def before_init_operation(
-        context: schemathesis.hooks.HookContext, operation: APIOperation
+        context: schemathesis.HookContext, operation: APIOperation
     ) -> None:
         # Overrides the existing schema
         operation.query[0].definition["schema"] = {"enum": [42]}
@@ -480,13 +480,12 @@ With this hook, you can add additional test cases that will be executed in Hypot
 
     import schemathesis
     from schemathesis import Case
-    from typing import List
 
 
     @schemathesis.hook
     def before_add_examples(
-        context: schemathesis.hooks.HookContext,
-        examples: List[Case],
+        context: schemathesis.HookContext,
+        examples: list[Case],
     ) -> None:
         examples.append(Case(operation=context.operation, query={"foo": "bar"}))
 
