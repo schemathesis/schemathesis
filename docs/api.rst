@@ -29,7 +29,7 @@ Authentication
 Hooks
 ~~~~~
 
-.. autoclass:: schemathesis.hooks.HookContext
+.. autoclass:: schemathesis.HookContext
    :members:
 
 These functions affect Schemathesis behavior globally:
@@ -38,7 +38,7 @@ These functions affect Schemathesis behavior globally:
 .. autofunction:: schemathesis.hooks.unregister
 .. autofunction:: schemathesis.hooks.unregister_all
 
-.. class:: schemathesis.schemas.BaseSchema
+.. class:: schemathesis.BaseSchema
   :noindex:
 
   All functions above can be accessed via ``schema.hooks.<function-name>`` on a schema instance. Such calls will affect
@@ -122,7 +122,7 @@ Sanitizing Output
 Schema
 ~~~~~~
 
-.. autoclass:: schemathesis.schemas.BaseSchema()
+.. autoclass:: schemathesis.BaseSchema()
 
   .. automethod:: parametrize
   .. automethod:: given
