@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.7...HEAD) - TBD
+## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...HEAD) - TBD
+
+## [4.0.0-alpha.8](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.7...v4.0.0-alpha.8) - 2025-04-05
 
 ### :rocket: Added
 
@@ -21,6 +23,7 @@
 - Use `default` value as valid input during the coverage phase.
 - Unknown `multipart/form-data` fields not added to the final test case payload.
 - Generate a non-empty string for negative testing of `type: string` enums during the coverage phase.
+- Export `HookContext` & `BaseSchema` as a part of the public Python API.
 
 ## [4.0.0-alpha.7](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.6...v4.0.0-alpha.7) - 2025-03-21
 
