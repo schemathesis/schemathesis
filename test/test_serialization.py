@@ -225,6 +225,85 @@ def test_binary_data(ctx, media_type):
     assert_requests_call(case)
 
 
+def test_unknown_multipart_fields_openapi3(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "multipart/form-data": {
+                                "schema": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "properties": {
+                                        "data": {"type": "string", "format": "binary"},
+                                        "note": {"type": "string"},
+                                    },
+                                    "required": ["data", "note"],
+                                }
+                            }
+                        },
+                    },
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        }
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(
+        body={"data": b"\x92\x42", "note": "foo", "unknown": "seen"}, media_type="multipart/form-data"
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] == [
+        ("data", b"\x92B"),
+        ("note", (None, "foo")),
+        ("unknown", (None, "seen")),
+    ]
+
+
+def test_unknown_multipart_fields_openapi2(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/test": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "body",
+                            "name": "body",
+                            "required": True,
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": False,
+                                "properties": {
+                                    "data": {"type": "string", "format": "binary"},
+                                    "note": {"type": "string"},
+                                },
+                                "required": ["data", "note"],
+                            },
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                },
+            },
+        },
+        version="2.0",
+    )
+    schema = schemathesis.openapi.from_dict(schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(
+        body={"data": b"\x92\x42", "note": "foo", "unknown": "seen"}, media_type="multipart/form-data"
+    )
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] == [
+        ("data", b"\x92B"),
+        ("note", "foo"),
+        ("unknown", "seen"),
+    ]
+
+
 TRANSPORT = RequestsTransport()
 
 
