@@ -12,6 +12,7 @@ Changelog
 - Use ``default`` value as valid input during the coverage phase.
 - Export ``BaseSchema`` and ``HookContext`` as a part of the public Python API. :issue:`2777`
 - Unknown ``multipart/form-data`` fields not added to the final test case payload.
+- Generate a non-empty string for negative testing of ``type: string`` enums during the coverage phase.
 
 .. _v3.39.14:
 
