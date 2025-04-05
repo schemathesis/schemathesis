@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Do not mutate `pattern` keywords in response schema validation. :issue:`2749`
+- Generate empty header values during the coverage phase.
 
 .. _v3.39.14:
 
