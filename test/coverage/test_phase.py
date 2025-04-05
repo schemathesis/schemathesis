@@ -1098,6 +1098,31 @@ def test_incorrect_headers(ctx):
     )
 
 
+def test_use_default(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "Key",
+                            "in": "query",
+                            "required": True,
+                            "schema": {"type": "string", "default": "DEFAULT-VALUE"},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [DataGenerationMethod.positive],
+        [{"query": {"Key": "DEFAULT-VALUE"}}],
+    )
+
+
 def test_optional_parameter_without_type(ctx):
     schema = ctx.openapi.build_schema(
         {
