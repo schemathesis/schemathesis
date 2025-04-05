@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.14...HEAD>` - TBD
 ---------------------------------------------
 
+**Fixed**
+
+- Do not mutate `pattern` keywords in response schema validation. :issue:`2749`
+
 .. _v3.39.14:
 
 :version:`3.39.14 <v3.39.13...v3.39.14>` - 2025-03-20
