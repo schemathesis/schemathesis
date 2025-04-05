@@ -522,7 +522,7 @@ def api_schema(ctx, request, openapi_version):
         base_url = request.getfixturevalue("base_url")
         return schemathesis.openapi.from_dict(schema).configure(base_url=base_url)
     app = request.getfixturevalue("flask_app")
-    return schemathesis.openapi.from_dict(schema).configure(base_url="/api", app=app)
+    return schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1/api", app=app)
 
 
 @pytest.mark.hypothesis_nested

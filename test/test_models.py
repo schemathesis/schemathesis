@@ -155,6 +155,19 @@ def test_reserved_characters_in_operation_name(swagger_20):
 
 
 @pytest.mark.parametrize(
+    "url",
+    [
+        "0.0.0.0/api",
+        "http:///api",
+        "http://",
+    ],
+)
+def test_invalid_base_url(swagger_20, url):
+    with pytest.raises(ValueError):
+        swagger_20.configure(base_url=url)
+
+
+@pytest.mark.parametrize(
     ("headers", "expected"),
     [
         (None, {"User-Agent": USER_AGENT, "X-Key": "foo"}),

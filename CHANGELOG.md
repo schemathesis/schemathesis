@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.7...HEAD) - TBD
 
+### :rocket: Added
+
+- Additional `base_url` validation for `BaseSchema.configure` method.
+
 ### :wrench: Changed
 
 - **INTERNAL**: Use `str` in enums.
