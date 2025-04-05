@@ -5,6 +5,7 @@
 ### :rocket: Added
 
 - Additional `base_url` validation for `BaseSchema.configure` method.
+- Temporary `SCHEMATHESIS_DISABLE_COVERAGE` environment variable so the coverage phase can be disabled for the pytest integration.
 
 ### :wrench: Changed
 

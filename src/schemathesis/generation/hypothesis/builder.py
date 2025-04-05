@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from itertools import combinations
+import os
 from time import perf_counter
 from typing import Any, Callable, Generator, Mapping
 
@@ -16,7 +17,7 @@ from jsonschema.exceptions import SchemaError
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
-from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
+from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import prepare_urlencoded
@@ -121,8 +122,11 @@ def create_test(
     ):
         hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
 
+    disable_coverage = string_to_boolean(os.getenv("SCHEMATHESIS_DISABLE_COVERAGE", ""))
+
     if (
-        HypothesisTestMode.COVERAGE in config.modes
+        not disable_coverage
+        and HypothesisTestMode.COVERAGE in config.modes
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.COVERAGE)
         and not config.given_args
