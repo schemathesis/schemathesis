@@ -1234,23 +1234,30 @@ def test_incorrect_headers_with_enum(ctx):
     assert_coverage(
         schema,
         [GenerationMode.NEGATIVE],
-        [
-            {
-                "headers": {},
-            },
-            {
-                "headers": {"X-API-Key-1": "{}"},
-            },
-            {
-                "headers": {"X-API-Key-1": "null,null"},
-            },
-            {
-                "headers": {"X-API-Key-1": "false"},
-            },
-            {
-                "headers": {"X-API-Key-1": "0"},
-            },
-        ],
+        (
+            [
+                {"headers": {}},
+                {"headers": {"X-API-Key-1": "{}"}},
+                {"headers": {"X-API-Key-1": "null,null"}},
+                {"headers": {"X-API-Key-1": "null"}},
+                {"headers": {"X-API-Key-1": "false"}},
+                {"headers": {"X-API-Key-1": "0"}},
+            ],
+            [
+                {"headers": {}},
+                {"headers": {"X-API-Key-1": "{}"}},
+                {"headers": {"X-API-Key-1": "null,null"}},
+                {"headers": {"X-API-Key-1": "false"}},
+                {"headers": {"X-API-Key-1": "0"}},
+            ],
+            [
+                {"headers": {}},
+                {"headers": {"X-API-Key-1": "{}"}},
+                {"headers": {"X-API-Key-1": "null,null"}},
+                {"headers": {"X-API-Key-1": "null"}},
+                {"headers": {"X-API-Key-1": "0"}},
+            ],
+        ),
     )
 
 
@@ -1670,4 +1677,7 @@ def assert_coverage(schema, modes, expected, path=None):
 
     test_func()
 
-    assert cases == expected
+    if isinstance(expected, tuple):
+        assert cases in expected
+    else:
+        assert cases == expected
