@@ -11,6 +11,7 @@ Changelog
 - Generate negative values for ``minItems`` & ``maxItems`` during the coverage phase.
 - Use ``default`` value as valid input during the coverage phase.
 - Export ``BaseSchema`` and ``HookContext`` as a part of the public Python API. :issue:`2777`
+- Unknown ``multipart/form-data`` fields not added to the final test case payload.
 
 .. _v3.39.14:
 
