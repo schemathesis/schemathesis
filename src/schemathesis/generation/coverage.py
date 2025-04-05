@@ -800,7 +800,12 @@ def _negative_enum(
         _hashed = _to_hashable_key(x)
         return _hashed not in seen
 
-    strategy = (st.none() | st.booleans() | NUMERIC_STRATEGY | st.text()).filter(is_not_in_value)
+    strategy = (
+        st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=122, categories=["L"]), min_size=3)
+        | st.none()
+        | st.booleans()
+        | NUMERIC_STRATEGY
+    ).filter(is_not_in_value)
     value = ctx.generate_from(strategy)
     yield NegativeValue(value, description="Invalid enum value", location=ctx.current_path)
     hashed = _to_hashable_key(value)
