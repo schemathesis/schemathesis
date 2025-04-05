@@ -6,6 +6,7 @@ from . import auths, checks, contrib, experimental, fixups, graphql, hooks, runn
 from ._lazy_import import lazy_import
 from .constants import SCHEMATHESIS_VERSION
 from .generation import DataGenerationMethod, GenerationConfig, HeaderConfig
+from .hooks import HookContext
 from .models import Case
 from .specs import openapi
 
@@ -65,6 +66,7 @@ __all__ = [
     "register_check",
     "register_target",
     "register_string_format",
+    "HookContext",
 ]
 
 
@@ -74,7 +76,13 @@ def _load_generic_response() -> Any:
     return GenericResponse
 
 
-_imports = {"GenericResponse": _load_generic_response}
+def _load_base_schema() -> Any:
+    from .schemas import BaseSchema
+
+    return BaseSchema
+
+
+_imports = {"GenericResponse": _load_generic_response, "BaseSchema": _load_base_schema}
 
 
 def __getattr__(name: str) -> Any:

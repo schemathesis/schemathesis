@@ -1,0 +1,28 @@
+Exit code: 0
+---
+Stdout:
+======================= Schemathesis test session starts =======================
+Schema location: http://127.0.0.1:42163/openapi.json
+Base URL: http://127.0.0.1:42163/
+Specification version: Open API 3.0.3
+Random seed: 42
+Workers: 1
+Collected API operations: 1
+Collected API links: 0
+API probing: SUCCESS
+Schema analysis: SKIP
+
+POST /container .                                                         [100%]
+
+=================================== SUMMARY ====================================
+
+Performed checks:
+    not_a_server_error                              2 / 2 passed          PASSED 
+    status_code_conformance                         2 / 2 passed          PASSED 
+    content_type_conformance                        2 / 2 passed          PASSED 
+    response_headers_conformance                    2 / 2 passed          PASSED 
+    response_schema_conformance                     2 / 2 passed          PASSED 
+    negative_data_rejection                         2 / 2 passed          PASSED 
+    ignored_auth                                    2 / 2 passed          PASSED 
+
+============================== 1 passed in 1.00s ===============================

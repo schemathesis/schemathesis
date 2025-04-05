@@ -6,10 +6,11 @@ Changelog
 
 **Fixed**
 
-- Do not mutate `pattern` keywords in response schema validation. :issue:`2749`
+- Do not mutate ``pattern`` keywords in response schema validation. :issue:`2749`
 - Generate empty header values during the coverage phase.
-- Generate negative values for `minItems` & `maxItems` during the coverage phase.
-- Use `default` value as valid input during the coverage phase.
+- Generate negative values for ``minItems`` & ``maxItems`` during the coverage phase.
+- Use ``default`` value as valid input during the coverage phase.
+- Export ``BaseSchema`` and ``HookContext`` as a part of the public Python API. :issue:`2777`
 
 .. _v3.39.14:
 

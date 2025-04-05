@@ -447,8 +447,8 @@ PARAMETERS = {KEY: EXPRESSION}
 
 @schemathesis.hook
 def after_load_schema(
-    context: schemathesis.hooks.HookContext,
-    schema: schemathesis.schemas.BaseSchema,
+    context: schemathesis.HookContext,
+    schema: schemathesis.BaseSchema,
 ) -> None:
     schema.add_link(
         source=schema["/query"]["get"],
