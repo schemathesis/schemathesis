@@ -8,6 +8,8 @@ from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
 from schemathesis.generation.case import Case
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
+from schemathesis.hooks import HookContext
+from schemathesis.schemas import BaseSchema
 
 __version__ = SCHEMATHESIS_VERSION
 
@@ -26,6 +28,8 @@ __all__ = [
     "Response",
     "TargetContext",
     "TargetFunction",
+    "HookContext",
+    "BaseSchema",
     "__version__",
     "auth",
     "check",
