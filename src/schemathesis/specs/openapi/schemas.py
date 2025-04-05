@@ -1022,24 +1022,30 @@ class SwaggerV20(BaseOpenAPISchema):
         content_types = self.get_request_payload_content_types(operation)
         is_multipart = "multipart/form-data" in content_types
 
-        def add_file(file_value: Any) -> None:
-            if isinstance(file_value, list):
-                for item in file_value:
-                    files.append((name, (None, item)))
-            else:
-                files.append((name, file_value))
+        known_fields: dict[str, dict] = {}
 
         for parameter in operation.body:
             if isinstance(parameter, OpenAPI20CompositeBody):
                 for form_parameter in parameter.definition:
-                    name = form_parameter.name
-                    # It might be not in `form_data`, if the parameter is optional
-                    if name in form_data:
-                        value = form_data[name]
-                        if form_parameter.definition.get("type") == "file" or is_multipart:
-                            add_file(value)
-                        else:
-                            data[name] = value
+                    known_fields[form_parameter.name] = form_parameter.definition
+
+        def add_file(name: str, value: Any) -> None:
+            if isinstance(value, list):
+                for item in value:
+                    files.append((name, (None, item)))
+            else:
+                files.append((name, value))
+
+        for name, value in form_data.items():
+            param_def = known_fields.get(name)
+            if param_def:
+                if param_def.get("type") == "file" or is_multipart:
+                    add_file(name, value)
+                else:
+                    data[name] = value
+            else:
+                # Unknown field — treat it as a file (safe default under multipart/form-data)
+                add_file(name, value)
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, data or None
 
@@ -1202,14 +1208,19 @@ class OpenApi30(SwaggerV20):
                 break
         else:
             raise InternalError("No 'multipart/form-data' media type found in the schema")
-        for name, property_schema in (schema or {}).get("properties", {}).items():
-            if name in form_data:
-                if isinstance(form_data[name], list):
-                    files.extend([(name, item) for item in form_data[name]])
+        for name, value in form_data.items():
+            property_schema = (schema or {}).get("properties", {}).get(name)
+            if property_schema:
+                if isinstance(value, list):
+                    files.extend([(name, item) for item in value])
                 elif property_schema.get("format") in ("binary", "base64"):
-                    files.append((name, form_data[name]))
+                    files.append((name, value))
                 else:
-                    files.append((name, (None, form_data[name])))
+                    files.append((name, (None, value)))
+            elif isinstance(value, list):
+                files.extend([(name, item) for item in value])
+            else:
+                files.append((name, (None, value)))
         # `None` is the default value for `files` and `data` arguments in `requests.request`
         return files or None, None
 
