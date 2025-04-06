@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING, Any
 from schemathesis.checks import CheckFunction, not_a_server_error
 from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationConfig
-from schemathesis.generation.overrides import Override
 
 if TYPE_CHECKING:
     import hypothesis
@@ -56,4 +55,3 @@ class EngineConfig:
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     network: NetworkConfig = field(default_factory=NetworkConfig)
     checks_config: ChecksConfig = field(default_factory=dict)
-    override: Override | None = None

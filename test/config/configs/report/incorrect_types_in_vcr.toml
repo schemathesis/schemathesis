@@ -1,0 +1,2 @@
+[reports.junit]
+enabled = 1  # should be boolean

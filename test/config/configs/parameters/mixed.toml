@@ -1,0 +1,5 @@
+parameters = { user_id = 42 }
+
+[[operations]]
+include-name = "GET /users/{used_id}"
+parameters = { user_id = "${TEST_STRING_1}"}

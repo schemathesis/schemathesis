@@ -1,0 +1,11 @@
+[reports]
+directory = "reports"
+
+[reports.junitxml]  # should be "junit"
+enabled = true
+
+[reports.json]  # unsupported format
+enabled = true
+
+[reports.vcr]
+enabled = true

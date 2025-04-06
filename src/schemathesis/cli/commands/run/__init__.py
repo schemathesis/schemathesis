@@ -14,12 +14,9 @@ from schemathesis.cli.commands.run.checks import CheckArguments
 from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
 from schemathesis.cli.commands.run.hypothesis import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    HealthCheck,
-    prepare_health_checks,
     prepare_phases,
     prepare_settings,
 )
-from schemathesis.cli.commands.run.reports import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
@@ -30,12 +27,12 @@ from schemathesis.cli.ext.options import (
     CustomHelpMessageChoice,
     RegistryChoice,
 )
+from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationConfig, GenerationMode
-from schemathesis.generation.overrides import Override
 from schemathesis.generation.targets import TARGETS
 
 # NOTE: Need to explicitly import all registered checks
@@ -246,6 +243,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 )
 @grouped_option(
     "--report-dir",
+    "report_directory",
     help="Directory to store all report files",
     type=click.Path(file_okay=False, dir_okay=True),
     default=DEFAULT_REPORT_DIRECTORY,
@@ -452,52 +450,16 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     show_default=True,
     metavar="BOOLEAN",
 )
-@group("Open API options")
-@grouped_option(
-    "--set-query",
-    "set_query",
-    help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_query,
-)
-@grouped_option(
-    "--set-header",
-    "set_header",
-    help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_header,
-)
-@grouped_option(
-    "--set-cookie",
-    "set_cookie",
-    help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_cookie,
-)
-@grouped_option(
-    "--set-path",
-    "set_path",
-    help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_path,
-)
 @group("Global options")
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
 @click.pass_context  # type: ignore[misc]
 def run(
     ctx: click.Context,
+    *,
     schema: str,
     auth: tuple[str, str] | None,
     headers: dict[str, str],
-    set_query: dict[str, str],
-    set_header: dict[str, str],
-    set_cookie: dict[str, str],
-    set_path: dict[str, str],
     experiments: list,
     coverage_unexpected_methods: set[str] | None,
     missing_required_header_allowed_statuses: list[str],
@@ -533,17 +495,17 @@ def run(
     exclude_by: str | None = None,
     exclude_deprecated: bool = False,
     workers_num: int = DEFAULT_WORKERS,
-    base_url: str | None = None,
+    base_url: str | None,
     wait_for_schema: float | None = None,
     rate_limit: str | None = None,
-    suppress_health_check: list[HealthCheck] | None = None,
+    suppress_health_check: list[HealthCheck] | None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
-    report_formats: list[ReportFormat] | None = None,
-    report_dir: Path = DEFAULT_REPORT_DIRECTORY,
+    report_formats: list[ReportFormat] | None,
+    report_directory: Path | str = DEFAULT_REPORT_DIRECTORY,
     report_junit_path: LazyFile | None = None,
     report_vcr_path: LazyFile | None = None,
     report_har_path: LazyFile | None = None,
@@ -573,21 +535,44 @@ def run(
     """
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
-    ensure_color(ctx, no_color, force_color)
 
-    validation.validate_schema(schema, base_url)
+    cfg: SchemathesisConfig = ctx.obj.config
+
+    if force_color:
+        color = True
+    elif no_color:
+        color = False
+    else:
+        color = None
+    cfg.override(
+        color=color,
+        suppress_health_check=suppress_health_check,
+        max_failures=max_failures,
+    )
+    cfg.projects.default.override(
+        base_url=base_url,
+    )
+    cfg.reports.override(
+        formats=report_formats,
+        junit_path=report_junit_path.name if report_junit_path else None,
+        vcr_path=report_vcr_path.name if report_vcr_path else None,
+        har_path=report_har_path.name if report_har_path else None,
+        directory=Path(report_directory),
+        preserve_bytes=report_preserve_bytes,
+    )
+
+    ensure_color(ctx, cfg)
+
+    validation.validate_schema(schema, cfg.projects.default.base_url)
 
     _hypothesis_phases = prepare_phases(generation_no_shrink)
-    _hypothesis_suppress_health_check = prepare_health_checks(suppress_health_check)
 
     for experiment in experiments:
         experiment.enable()
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
 
-    override = Override(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
-
-    validation.validate_auth_overlap(auth, headers, override)
+    validation.validate_auth_overlap(auth, headers)
 
     filter_set = FilterArguments(
         include_path=include_path,
@@ -624,18 +609,6 @@ def run(
         max_response_time=max_response_time,
     ).into()
 
-    report_config = None
-    if report_formats or report_junit_path or report_vcr_path or report_har_path:
-        report_config = ReportConfig(
-            formats=report_formats,
-            directory=Path(report_dir),
-            junit_path=report_junit_path if report_junit_path else None,
-            vcr_path=report_vcr_path if report_vcr_path else None,
-            har_path=report_har_path if report_har_path else None,
-            preserve_bytes=report_preserve_bytes,
-            sanitize_output=output_sanitize,
-        )
-
     # Use the same seed for all tests unless `derandomize=True` is used
     seed: int | None
     if generation_seed is None and not generation_deterministic:
@@ -647,7 +620,7 @@ def run(
 
     config = executor.RunConfig(
         location=schema,
-        base_url=base_url,
+        config=cfg,
         engine=EngineConfig(
             execution=ExecutionConfig(
                 phases=phases_,
@@ -658,7 +631,7 @@ def run(
                     derandomize=generation_deterministic,
                     max_examples=generation_max_examples,
                     phases=_hypothesis_phases,
-                    suppress_health_check=_hypothesis_suppress_health_check,
+                    suppress_health_check=cfg.suppress_health_check,
                 ),
                 generation=GenerationConfig(
                     modes=list(generation_modes),
@@ -668,7 +641,7 @@ def run(
                     with_security_parameters=generation_with_security_parameters,
                     unexpected_methods=coverage_unexpected_methods,
                 ),
-                max_failures=max_failures,
+                max_failures=cfg.max_failures,
                 continue_on_failure=continue_on_failure,
                 unique_inputs=generation_unique_inputs,
                 seed=seed,
@@ -684,14 +657,12 @@ def run(
                 if request_cert is not None and request_cert_key is not None
                 else request_cert,
             ),
-            override=override,
             checks_config=checks_config,
         ),
         filter_set=filter_set,
         wait_for_schema=wait_for_schema,
         rate_limit=rate_limit,
         output=OutputConfig(sanitize=output_sanitize, truncate=output_truncate),
-        report=report_config,
         args=ctx.args,
         params=ctx.params,
     )

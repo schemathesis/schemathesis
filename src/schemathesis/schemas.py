@@ -14,7 +14,7 @@ from typing import (
     NoReturn,
     TypeVar,
 )
-from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
 from schemathesis.core import NOT_SET, NotSet
@@ -23,6 +23,7 @@ from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
+from schemathesis.core.validation import validate_base_url
 from schemathesis.generation import GenerationConfig, GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
@@ -453,21 +454,6 @@ class BaseSchema(Mapping):
         if not isinstance(app, NotSet):
             self.app = app
         return self
-
-
-INVALID_BASE_URL_MESSAGE = (
-    "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
-    "Make sure it is a properly formatted URL."
-)
-
-
-def validate_base_url(value: str) -> None:
-    try:
-        netloc = urlparse(value).netloc
-    except ValueError as exc:
-        raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
-    if value and not netloc:
-        raise ValueError(INVALID_BASE_URL_MESSAGE)
 
 
 @dataclass
