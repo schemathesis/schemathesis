@@ -4,6 +4,10 @@ Changelog
 :version:`Unreleased <v3.39.15...HEAD>` - TBD
 ---------------------------------------------
 
+**Fixed**
+
+- Missing reference resolution scope when serializing ``multipart`` payloads. :issue:`2776`
+
 .. _v3.39.15:
 
 :version:`3.39.15 <v3.39.14...v3.39.15>` - 2025-04-05
