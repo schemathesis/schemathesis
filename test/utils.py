@@ -155,7 +155,6 @@ class EventStream:
                 workers_num=options.get("workers_num", 1),
             ),
             network=options.get("network") or NetworkConfig(),
-            checks_config=options.get("checks_config", {}),
         )
 
         parameters = options.get("parameters", {})

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
+from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
-ChecksConfig = dict[CheckFunction, Any]
 
 
 class CheckContext:
@@ -78,6 +78,9 @@ class CheckContext:
     def record_response(self, *, case_id: str, response: Response) -> None:
         if self.recorder is not None:
             self.recorder.record_response(case_id=case_id, response=response)
+
+    def iter_checks(self) -> list[CheckFunction]:
+        return CHECKS.get_all()
 
 
 CHECKS = Registry[CheckFunction]()

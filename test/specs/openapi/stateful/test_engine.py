@@ -552,7 +552,6 @@ def test_external_link(ctx, app_factory, app_runner):
                     generation=GenerationConfig(),
                 ),
                 network=NetworkConfig(),
-                checks_config=ChecksConfig(),
             ),
             stop_event=threading.Event(),
             cfg=SchemathesisConfig(),

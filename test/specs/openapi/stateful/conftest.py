@@ -521,7 +521,6 @@ def engine_factory(app_factory, app_runner, stop_event):
                 max_failures=max_failures,
             ),
             network=network or NetworkConfig(),
-            checks_config=checks_config or ChecksConfig(),
         )
         return stateful.execute(
             engine=EngineContext(schema=schema, stop_event=stop_event, config=config, cfg=SchemathesisConfig()),

@@ -11,6 +11,7 @@ import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 from hypothesis.stateful import Rule
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
@@ -79,7 +80,6 @@ def execute_state_machine_loop(
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
-            self._check_ctx = engine.get_check_context(self.recorder)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return transport_kwargs
@@ -138,11 +138,20 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
+            check_ctx = CheckContext(
+                # TODO:
+                override=None,
+                auth=engine.config.network.auth,
+                headers=CaseInsensitiveDict(engine.config.network.headers) if engine.config.network.headers else None,
+                config=engine.cfg.projects.default.checks_config_for(operation=case.operation, phase="stateful"),
+                transport_kwargs=engine.transport_kwargs,
+                recorder=self.recorder,
+            )
             validate_response(
                 response=response,
                 case=case,
                 stateful_ctx=ctx,
-                check_ctx=self._check_ctx,
+                check_ctx=check_ctx,
                 checks=config.execution.checks,
                 control=engine.control,
                 recorder=self.recorder,

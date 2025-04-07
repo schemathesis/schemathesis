@@ -5,10 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.checks import CheckContext
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
 from schemathesis.schemas import BaseSchema
 
@@ -109,16 +107,3 @@ class EngineContext:
         if self.config.network.proxy is not None:
             kwargs["proxies"] = {"all": self.config.network.proxy}
         return kwargs
-
-    def get_check_context(self, recorder: ScenarioRecorder) -> CheckContext:
-        from requests.models import CaseInsensitiveDict
-
-        return CheckContext(
-            # TODO:
-            override=None,
-            auth=self.config.network.auth,
-            headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
-            config=self.config.checks_config,
-            transport_kwargs=self.transport_kwargs,
-            recorder=recorder,
-        )
