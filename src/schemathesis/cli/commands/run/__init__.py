@@ -23,7 +23,6 @@ from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.ext.options import (
     CsvChoice,
     CsvEnumChoice,
-    CsvListChoice,
     CustomHelpMessageChoice,
     RegistryChoice,
 )
@@ -313,33 +312,6 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     default=None,
     envvar="SCHEMATHESIS_EXPERIMENTAL_COVERAGE_UNEXPECTED_METHODS",
 )
-@grouped_option(
-    "--experimental-missing-required-header-allowed-statuses",
-    "missing_required_header_allowed_statuses",
-    help="Comma-separated list of status codes expected for test cases with a missing required header",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-positive-data-acceptance-allowed-statuses",
-    "positive_data_acceptance_allowed_statuses",
-    help="Comma-separated list of status codes considered as successful responses",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-negative-data-rejection-allowed-statuses",
-    "negative_data_rejection_allowed_statuses",
-    help="Comma-separated list of status codes expected for rejected negative data",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
-)
 @group("Data generation options")
 @grouped_option(
     "--mode",
@@ -600,12 +572,9 @@ def run(
         exclude_deprecated=exclude_deprecated,
     ).into()
 
-    selected_checks, checks_config = CheckArguments(
+    selected_checks, _ = CheckArguments(
         included_check_names=included_check_names,
         excluded_check_names=excluded_check_names,
-        positive_data_acceptance_allowed_statuses=positive_data_acceptance_allowed_statuses,
-        missing_required_header_allowed_statuses=missing_required_header_allowed_statuses,
-        negative_data_rejection_allowed_statuses=negative_data_rejection_allowed_statuses,
         max_response_time=max_response_time,
     ).into()
 
@@ -657,7 +626,6 @@ def run(
                 if request_cert is not None and request_cert_key is not None
                 else request_cert,
             ),
-            checks_config=checks_config,
         ),
         filter_set=filter_set,
         wait_for_schema=wait_for_schema,

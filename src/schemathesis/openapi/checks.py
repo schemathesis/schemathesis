@@ -344,14 +344,14 @@ class AcceptedNegativeData(Failure):
         operation: str,
         message: str,
         status_code: int,
-        allowed_statuses: list[str],
+        expected_statuses: list[str],
         title: str = "Accepted negative data",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.status_code = status_code
-        self.allowed_statuses = allowed_statuses
+        self.allowed_statuses = expected_statuses
         self.title = title
         self.case_id = case_id
         self.severity = Severity.MEDIUM

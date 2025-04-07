@@ -64,13 +64,6 @@ class CsvEnumChoice(BaseCsvChoice):
         self.fail_on_invalid_options(invalid_options, selected)
 
 
-class CsvListChoice(click.ParamType):
-    def convert(  # type: ignore[return]
-        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
-    ) -> list[str]:
-        return [item for item in value.split(",") if item]
-
-
 class RegistryChoice(BaseCsvChoice):
     def __init__(self, registry: Registry, with_all: bool = False) -> None:
         self.registry = registry
