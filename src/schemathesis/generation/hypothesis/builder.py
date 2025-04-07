@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
 from itertools import combinations
-import os
 from time import perf_counter
 from typing import Any, Callable, Generator, Mapping
 
