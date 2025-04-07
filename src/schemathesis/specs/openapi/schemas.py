@@ -1195,7 +1195,11 @@ class OpenApi30(SwaggerV20):
         files = []
         definition = operation.definition.raw
         if "$ref" in definition["requestBody"]:
-            body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+            self.resolver.push_scope(operation.definition.scope)
+            try:
+                body = self.resolver.resolve_all(definition["requestBody"], RECURSION_DEPTH_LIMIT)
+            finally:
+                self.resolver.pop_scope()
         else:
             body = definition["requestBody"]
         content = body["content"]

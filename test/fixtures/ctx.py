@@ -34,10 +34,16 @@ class OpenApiContext:
         return {**template, **kwargs}
 
     def write_schema(
-        self, paths: dict[str, Any], *, version: str = "3.0.2", format: str = "json", **kwargs: dict[str, Any]
+        self,
+        paths: dict[str, Any],
+        *,
+        version: str = "3.0.2",
+        format: str = "json",
+        filename: str = "schema",
+        **kwargs: dict[str, Any],
     ) -> dict[str, Any]:
         schema = self.build_schema(paths, version=version, **kwargs)
-        return self.parent.makefile(schema, format=format)
+        return self.parent.makefile(schema, format=format, filename=filename)
 
 
 @dataclass
@@ -54,11 +60,11 @@ class Context:
     def _testdir(self):
         return self.request.getfixturevalue("testdir")
 
-    def makefile(self, schema: dict[str, Any], *, format: str = "json"):
+    def makefile(self, schema: dict[str, Any], *, format: str = "json", filename: str = "schema"):
         if format == "json":
-            return self._testdir.makefile(".json", schema=json.dumps(schema))
+            return self._testdir.makefile(".json", **{filename: json.dumps(schema)})
         if format == "yaml":
-            return self._testdir.makefile(".yaml", schema=yaml.dump(schema))
+            return self._testdir.makefile(".yaml", **{filename: yaml.dump(schema)})
         raise ValueError(f"Unknown format: {format}")
 
     def write_pymodule(self, content: str, *, filename: str = "module"):

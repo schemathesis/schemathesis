@@ -1,4 +1,5 @@
 import csv
+import platform
 import string
 from contextlib import suppress
 from io import StringIO
@@ -302,6 +303,35 @@ def test_unknown_multipart_fields_openapi2(ctx):
         ("note", "foo"),
         ("unknown", "seen"),
     ]
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
+def test_multipart_with_references(ctx):
+    # See GH-2776
+    paths = ctx.openapi.write_schema(
+        {"Test": {"post": {"requestBody": {"$ref": "#/components/requestBodies/Test"}}}},
+        components={
+            "requestBodies": {
+                "Test": {
+                    "content": {
+                        "multipart/form-data": {"schema": {"type": "object"}},
+                    },
+                },
+            },
+        },
+        filename="paths",
+    )
+
+    schema = ctx.openapi.write_schema(
+        {
+            "/test": {"$ref": f"{paths}#/paths/Test"},
+        }
+    )
+    schema = schemathesis.openapi.from_path(schema)
+    operation = schema["/test"]["POST"]
+    case = operation.Case(body={}, media_type="multipart/form-data")
+    serialized = REQUESTS_TRANSPORT.serialize_case(case)
+    assert serialized["files"] is None
 
 
 TRANSPORT = RequestsTransport()
