@@ -6,7 +6,7 @@ import hypothesis.errors
 import pytest
 
 import schemathesis
-from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
+from schemathesis.checks import CHECKS, max_response_time, not_a_server_error
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.engine import Status, events

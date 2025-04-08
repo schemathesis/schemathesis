@@ -2,7 +2,12 @@ from dataclasses import dataclass
 
 import pytest
 
-from schemathesis.config._checks import CheckConfig, ChecksConfig, SimpleCheckConfig
+from schemathesis.config._checks import (
+    ChecksConfig,
+    NotAServerErrorConfig,
+    PositiveDataAcceptanceConfig,
+    SimpleCheckConfig,
+)
 from schemathesis.config._projects import ConfigOverride, ProjectConfig
 
 
@@ -13,35 +18,35 @@ from schemathesis.config._projects import ConfigOverride, ProjectConfig
         ([], ChecksConfig()),
         # Single config should return that config
         (
-            [ChecksConfig(not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"}))],
-            ChecksConfig(not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"})),
+            [ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"}))],
+            ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"})),
         ),
         # Basic merging - first config takes precedence
         (
             [
-                ChecksConfig(not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"})),
+                ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"})),
                 ChecksConfig(
-                    not_a_server_error=CheckConfig(enabled=True, _explicit_attrs={"enabled"}),
+                    not_a_server_error=NotAServerErrorConfig(enabled=True, _explicit_attrs={"enabled"}),
                     status_code_conformance=SimpleCheckConfig(enabled=False, _explicit_attrs={"enabled"}),
                 ),
             ],
             ChecksConfig(
-                not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"}),
+                not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"}),
                 status_code_conformance=SimpleCheckConfig(enabled=False, _explicit_attrs={"enabled"}),
             ),
         ),
         # Merging nested attributes - first config's explicit attributes take precedence
         (
             [
-                ChecksConfig(not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"})),
+                ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"})),
                 ChecksConfig(
-                    not_a_server_error=CheckConfig(
+                    not_a_server_error=NotAServerErrorConfig(
                         enabled=True, expected_statuses=[200, 201], _explicit_attrs={"enabled", "expected_statuses"}
                     )
                 ),
             ],
             ChecksConfig(
-                not_a_server_error=CheckConfig(
+                not_a_server_error=NotAServerErrorConfig(
                     enabled=False, expected_statuses=[200, 201], _explicit_attrs={"enabled", "expected_statuses"}
                 )
             ),
@@ -51,25 +56,27 @@ from schemathesis.config._projects import ConfigOverride, ProjectConfig
             [
                 # Override
                 ChecksConfig(
-                    not_a_server_error=CheckConfig(enabled=False, _explicit_attrs={"enabled"}),
+                    not_a_server_error=NotAServerErrorConfig(enabled=False, _explicit_attrs={"enabled"}),
                 ),
                 # Project level config
                 ChecksConfig(
-                    not_a_server_error=CheckConfig(expected_statuses=[200, 201], _explicit_attrs={"expected_statuses"}),
-                    positive_data_acceptance=CheckConfig(enabled=False, _explicit_attrs={"enabled"}),
+                    not_a_server_error=NotAServerErrorConfig(
+                        expected_statuses=[200, 201], _explicit_attrs={"expected_statuses"}
+                    ),
+                    positive_data_acceptance=PositiveDataAcceptanceConfig(enabled=False, _explicit_attrs={"enabled"}),
                 ),
                 # Defaults
                 ChecksConfig(
-                    not_a_server_error=CheckConfig(enabled=True, _explicit_attrs={"enabled"}),
+                    not_a_server_error=NotAServerErrorConfig(enabled=True, _explicit_attrs={"enabled"}),
                     status_code_conformance=SimpleCheckConfig(enabled=False, _explicit_attrs={"enabled"}),
                 ),
             ],
             ChecksConfig(
-                not_a_server_error=CheckConfig(
+                not_a_server_error=NotAServerErrorConfig(
                     enabled=False, expected_statuses=[200, 201], _explicit_attrs={"enabled", "expected_statuses"}
                 ),
                 status_code_conformance=SimpleCheckConfig(enabled=False, _explicit_attrs={"enabled"}),
-                positive_data_acceptance=CheckConfig(enabled=False, _explicit_attrs={"enabled"}),
+                positive_data_acceptance=PositiveDataAcceptanceConfig(enabled=False, _explicit_attrs={"enabled"}),
             ),
         ),
     ],
@@ -165,7 +172,7 @@ def test_operation_and_phase_configuration(basic_operation):
     result = project_config.checks_config_for(operation=basic_operation, phase="fuzzing")
 
     assert result.not_a_server_error.enabled is True
-    assert result.not_a_server_error.expected_statuses == [200]
+    assert result.not_a_server_error.expected_statuses == ["200"]
 
 
 def test_override_configuration(basic_operation):
@@ -196,7 +203,7 @@ def test_override_configuration(basic_operation):
     result = project_config.checks_config_for(operation=basic_operation, phase="fuzzing")
 
     assert result.not_a_server_error.enabled is True
-    assert result.not_a_server_error.expected_statuses == [418]
+    assert result.not_a_server_error.expected_statuses == ["418"]
     assert result.status_code_conformance.enabled is False
 
 
