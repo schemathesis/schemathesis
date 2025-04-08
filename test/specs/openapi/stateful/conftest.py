@@ -10,7 +10,7 @@ import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.checks import CHECKS, ChecksConfig
+from schemathesis.checks import CHECKS
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
