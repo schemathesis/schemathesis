@@ -87,7 +87,7 @@ def run_test(
         )
 
     phase_name = phase.value.lower()
-    assert phase_name in ("examples", "fuzzing", "coverage")
+    assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
     check_ctx = CheckContext(
         # TODO:
         override=None,

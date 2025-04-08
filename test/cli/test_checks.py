@@ -138,24 +138,24 @@ def schema(ctx):
 
 
 @pytest.mark.parametrize(
-    "args",
+    "expected_statuses",
     [
         [],  # Default case
-        ["--experimental-positive-data-acceptance-allowed-statuses=404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=405"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=2xx,404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=2xx"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=4xx"],
+        ["404"],
+        ["405"],
+        ["2xx", "404"],
+        ["200"],
+        ["200", "404"],
+        ["2xx"],
+        ["4xx"],
         # Invalid status code
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,600"],
+        ["200", "600"],
         # Invalid wildcard
-        ["--experimental-positive-data-acceptance-allowed-statuses=xxx"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,201,400,401"],
+        ["xxx"],
+        ["200", 201, 400, 401],
     ],
 )
-def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, args):
+def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, expected_statuses):
     schema_path = ctx.makefile(schema)
     assert (
         cli.run(
@@ -163,7 +163,7 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
             f"--url={openapi3_base_url}",
             "--max-examples=5",
             "--experimental=positive-data-acceptance",
-            *args,
+            config={"checks": {"positive_data_acceptance": {"expected-statuses": expected_statuses}}},
         )
         == snapshot_cli
     )

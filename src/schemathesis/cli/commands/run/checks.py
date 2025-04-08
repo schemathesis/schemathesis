@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
-from schemathesis import experimental
 from schemathesis.checks import CHECKS, CheckFunction, ChecksConfig
 
 

@@ -274,7 +274,10 @@
         "expected-statuses": {
           "type": "array",
           "items": {
-            "type": "integer"
+            "type": [
+              "integer",
+              "string"
+            ]
           }
         }
       }

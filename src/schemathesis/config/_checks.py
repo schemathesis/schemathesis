@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Sequence
+from typing import Any, ClassVar, Sequence
 
 from schemathesis.config._diff_base import DiffBase
 
@@ -40,6 +40,7 @@ class CheckConfig(DiffBase):
     enabled: bool
     expected_statuses: list[str]
     _explicit_attrs: set[str]
+    _DEFAULT_EXPECTED_STATUSES: ClassVar[list[str]]
 
     __slots__ = ("enabled", "expected_statuses", "_explicit_attrs")
 
@@ -47,34 +48,54 @@ class CheckConfig(DiffBase):
         self,
         *,
         enabled: bool = True,
-        expected_statuses: Sequence[str | int],
+        expected_statuses: Sequence[str | int] | None = None,
         _explicit_attrs: set[str] | None = None,
     ) -> None:
         self.enabled = enabled
-        self.expected_statuses = [str(status) for status in expected_statuses]
+        self.expected_statuses = (
+            [str(status) for status in expected_statuses]
+            if expected_statuses is not None
+            else self._DEFAULT_EXPECTED_STATUSES
+        )
         self._explicit_attrs = _explicit_attrs or set()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any], default_expected_statuses: list[str]) -> CheckConfig:
+    def from_dict(cls, data: dict[str, Any]) -> CheckConfig:
         enabled = data.get("enabled", True)
         return cls(
             enabled=enabled,
-            expected_statuses=data.get("expected-statuses", default_expected_statuses),
+            expected_statuses=data.get("expected-statuses", cls._DEFAULT_EXPECTED_STATUSES),
             _explicit_attrs=cls.get_explicit_attrs(set(data)),
         )
 
 
+class NotAServerErrorConfig(CheckConfig):
+    _DEFAULT_EXPECTED_STATUSES = NOT_A_SERVER_ERROR_EXPECTED_STATUSES
+
+
+class PositiveDataAcceptanceConfig(CheckConfig):
+    _DEFAULT_EXPECTED_STATUSES = POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES
+
+
+class NegativeDataRejectionConfig(CheckConfig):
+    _DEFAULT_EXPECTED_STATUSES = NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES
+
+
+class MissingRequiredHeaderConfig(CheckConfig):
+    _DEFAULT_EXPECTED_STATUSES = MISSING_REQUIRED_HEADER_EXPECTED_STATUSES
+
+
 @dataclass(repr=False)
 class ChecksConfig(DiffBase):
-    not_a_server_error: CheckConfig
+    not_a_server_error: NotAServerErrorConfig
     status_code_conformance: SimpleCheckConfig
     content_type_conformance: SimpleCheckConfig
     response_schema_conformance: SimpleCheckConfig
-    positive_data_acceptance: CheckConfig
-    negative_data_rejection: CheckConfig
+    positive_data_acceptance: PositiveDataAcceptanceConfig
+    negative_data_rejection: NegativeDataRejectionConfig
     use_after_free: SimpleCheckConfig
     ensure_resource_availability: SimpleCheckConfig
-    missing_required_header: CheckConfig
+    missing_required_header: MissingRequiredHeaderConfig
     ignored_auth: SimpleCheckConfig
 
     __slots__ = (
@@ -93,34 +114,26 @@ class ChecksConfig(DiffBase):
     def __init__(
         self,
         *,
-        not_a_server_error: CheckConfig | None = None,
+        not_a_server_error: NotAServerErrorConfig | None = None,
         status_code_conformance: SimpleCheckConfig | None = None,
         content_type_conformance: SimpleCheckConfig | None = None,
         response_schema_conformance: SimpleCheckConfig | None = None,
-        positive_data_acceptance: CheckConfig | None = None,
-        negative_data_rejection: CheckConfig | None = None,
+        positive_data_acceptance: PositiveDataAcceptanceConfig | None = None,
+        negative_data_rejection: NegativeDataRejectionConfig | None = None,
         use_after_free: SimpleCheckConfig | None = None,
         ensure_resource_availability: SimpleCheckConfig | None = None,
-        missing_required_header: CheckConfig | None = None,
+        missing_required_header: MissingRequiredHeaderConfig | None = None,
         ignored_auth: SimpleCheckConfig | None = None,
     ) -> None:
-        self.not_a_server_error = not_a_server_error or CheckConfig(
-            expected_statuses=NOT_A_SERVER_ERROR_EXPECTED_STATUSES
-        )
+        self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
         self.status_code_conformance = status_code_conformance or SimpleCheckConfig()
         self.content_type_conformance = content_type_conformance or SimpleCheckConfig()
         self.response_schema_conformance = response_schema_conformance or SimpleCheckConfig()
-        self.positive_data_acceptance = positive_data_acceptance or CheckConfig(
-            expected_statuses=POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES
-        )
-        self.negative_data_rejection = negative_data_rejection or CheckConfig(
-            expected_statuses=NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES
-        )
+        self.positive_data_acceptance = positive_data_acceptance or PositiveDataAcceptanceConfig()
+        self.negative_data_rejection = negative_data_rejection or NegativeDataRejectionConfig()
         self.use_after_free = use_after_free or SimpleCheckConfig()
         self.ensure_resource_availability = ensure_resource_availability or SimpleCheckConfig()
-        self.missing_required_header = missing_required_header or CheckConfig(
-            expected_statuses=MISSING_REQUIRED_HEADER_EXPECTED_STATUSES
-        )
+        self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
 
     @classmethod
@@ -135,28 +148,24 @@ class ChecksConfig(DiffBase):
             return sub
 
         return cls(
-            not_a_server_error=CheckConfig.from_dict(
+            not_a_server_error=NotAServerErrorConfig.from_dict(
                 merge(data.get("not_a_server_error", {})),
-                default_expected_statuses=NOT_A_SERVER_ERROR_EXPECTED_STATUSES,
             ),
             status_code_conformance=SimpleCheckConfig.from_dict(merge(data.get("status_code_conformance", {}))),
             content_type_conformance=SimpleCheckConfig.from_dict(merge(data.get("content_type_conformance", {}))),
             response_schema_conformance=SimpleCheckConfig.from_dict(merge(data.get("response_schema_conformance", {}))),
-            positive_data_acceptance=CheckConfig.from_dict(
+            positive_data_acceptance=PositiveDataAcceptanceConfig.from_dict(
                 merge(data.get("positive_data_acceptance", {})),
-                default_expected_statuses=POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES,
             ),
-            negative_data_rejection=CheckConfig.from_dict(
+            negative_data_rejection=NegativeDataRejectionConfig.from_dict(
                 merge(data.get("negative_data_rejection", {})),
-                default_expected_statuses=NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES,
             ),
             use_after_free=SimpleCheckConfig.from_dict(merge(data.get("use_after_free", {}))),
             ensure_resource_availability=SimpleCheckConfig.from_dict(
                 merge(data.get("ensure_resource_availability", {}))
             ),
-            missing_required_header=CheckConfig.from_dict(
+            missing_required_header=MissingRequiredHeaderConfig.from_dict(
                 merge(data.get("missing_required_header", {})),
-                default_expected_statuses=MISSING_REQUIRED_HEADER_EXPECTED_STATUSES,
             ),
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
         )

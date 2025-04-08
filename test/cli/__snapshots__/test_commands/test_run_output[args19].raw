@@ -108,15 +108,6 @@ Experimental options:
                                   the coverage phase. [possible values: get,
                                   put, post, delete, options, head, patch,
                                   trace]
-  --experimental-missing-required-header-allowed-statuses
-                                  Comma-separated list of status codes expected
-                                  for test cases with a missing required header
-  --experimental-positive-data-acceptance-allowed-statuses
-                                  Comma-separated list of status codes
-                                  considered as successful responses
-  --experimental-negative-data-rejection-allowed-statuses
-                                  Comma-separated list of status codes expected
-                                  for rejected negative data
 
 Data generation options:
   -m, --mode                      Test data generation mode  [default: positive]
