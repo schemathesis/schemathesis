@@ -228,7 +228,9 @@ def convert_experimental(
     ]
 
 
-def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str]:
+def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str] | None:
+    if not value:
+        return None
     return reduce(operator.iadd, value, [])
 
 
