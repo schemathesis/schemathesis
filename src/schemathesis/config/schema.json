@@ -235,6 +235,9 @@
         "response_schema_conformance": {
           "$ref": "#/$defs/SimpleCheckConfig"
         },
+        "response_headers_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
         "positive_data_acceptance": {
           "$ref": "#/$defs/CheckConfig"
         },

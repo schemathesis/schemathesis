@@ -23,6 +23,8 @@ if TYPE_CHECKING:
 class ConfigOverride:
     checks: ChecksConfig | None
 
+    __slots__ = ("checks",)
+
 
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
@@ -154,9 +156,20 @@ class ProjectConfig(DiffBase):
             operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])],
         )
 
-    def override(self, *, base_url: str | None) -> None:
+    def override(
+        self, *, base_url: str | None, included_check_names: list[str] | None, excluded_check_names: list[str] | None
+    ) -> None:
         if base_url is not None:
             self.base_url = base_url
+        if not self._override:
+            self._override = ConfigOverride(checks=None)
+
+        if self._override.checks is None:
+            self._override.checks = ChecksConfig()
+
+        self._override.checks.override(
+            included_check_names=included_check_names, excluded_check_names=excluded_check_names
+        )
 
     def checks_config_for(
         self,

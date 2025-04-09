@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import unittest
 import uuid
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import TYPE_CHECKING, Callable
 from warnings import WarningMessage, catch_warnings
 
 import requests
@@ -13,7 +13,7 @@ from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
 from requests.structures import CaseInsensitiveDict
 
-from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.checks import CheckContext, run_checks
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -97,12 +97,11 @@ def run_test(
         transport_kwargs=ctx.transport_kwargs,
         recorder=recorder,
     )
-    checks = list(check_ctx.iter_checks())
 
     try:
         setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
-            test_function(ctx=ctx, errors=errors, check_ctx=check_ctx, checks=checks, recorder=recorder)
+            test_function(ctx=ctx, errors=errors, check_ctx=check_ctx, recorder=recorder)
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
@@ -257,7 +256,6 @@ def cached_test_func(f: Callable) -> Callable:
         case: Case,
         errors: list[Exception],
         check_ctx: CheckContext,
-        checks: list[CheckFunction],
         recorder: ScenarioRecorder,
     ) -> None:
         try:
@@ -270,14 +268,14 @@ def cached_test_func(f: Callable) -> Callable:
                 elif cached is None:
                     return None
                 try:
-                    f(ctx=ctx, case=case, check_ctx=check_ctx, checks=checks, recorder=recorder)
+                    f(ctx=ctx, case=case, check_ctx=check_ctx, recorder=recorder)
                 except BaseException as exc:
                     ctx.cache_outcome(case, exc)
                     raise
                 else:
                     ctx.cache_outcome(case, None)
             else:
-                f(ctx=ctx, case=case, check_ctx=check_ctx, checks=checks, recorder=recorder)
+                f(ctx=ctx, case=case, check_ctx=check_ctx, recorder=recorder)
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
@@ -290,9 +288,7 @@ def cached_test_func(f: Callable) -> Callable:
 
 
 @cached_test_func
-def test_func(
-    *, ctx: EngineContext, case: Case, check_ctx: CheckContext, checks: list[CheckFunction], recorder: ScenarioRecorder
-) -> None:
+def test_func(*, ctx: EngineContext, case: Case, check_ctx: CheckContext, recorder: ScenarioRecorder) -> None:
     recorder.record_case(parent_id=None, transition=None, case=case)
     try:
         response = case.call(**ctx.transport_kwargs)
@@ -307,7 +303,6 @@ def test_func(
     validate_response(
         case=case,
         ctx=check_ctx,
-        checks=checks,
         response=response,
         continue_on_failure=ctx.config.execution.continue_on_failure,
         recorder=recorder,
@@ -318,7 +313,6 @@ def validate_response(
     *,
     case: Case,
     ctx: CheckContext,
-    checks: Iterable[CheckFunction],
     response: Response,
     continue_on_failure: bool,
     recorder: ScenarioRecorder,
@@ -342,7 +336,7 @@ def validate_response(
         case=case,
         response=response,
         ctx=ctx,
-        checks=checks,
+        checks=ctx.checks,
         on_failure=on_failure,
         on_success=on_success,
     )
