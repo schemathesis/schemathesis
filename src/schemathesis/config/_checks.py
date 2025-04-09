@@ -91,6 +91,7 @@ class ChecksConfig(DiffBase):
     status_code_conformance: SimpleCheckConfig
     content_type_conformance: SimpleCheckConfig
     response_schema_conformance: SimpleCheckConfig
+    response_headers_conformance: SimpleCheckConfig
     positive_data_acceptance: PositiveDataAcceptanceConfig
     negative_data_rejection: NegativeDataRejectionConfig
     use_after_free: SimpleCheckConfig
@@ -103,12 +104,15 @@ class ChecksConfig(DiffBase):
         "status_code_conformance",
         "content_type_conformance",
         "response_schema_conformance",
+        "response_headers_conformance",
         "positive_data_acceptance",
         "negative_data_rejection",
         "use_after_free",
         "ensure_resource_availability",
         "missing_required_header",
         "ignored_auth",
+        "_unknown_included",
+        "_unknown_excluded",
     )
 
     def __init__(
@@ -118,6 +122,7 @@ class ChecksConfig(DiffBase):
         status_code_conformance: SimpleCheckConfig | None = None,
         content_type_conformance: SimpleCheckConfig | None = None,
         response_schema_conformance: SimpleCheckConfig | None = None,
+        response_headers_conformance: SimpleCheckConfig | None = None,
         positive_data_acceptance: PositiveDataAcceptanceConfig | None = None,
         negative_data_rejection: NegativeDataRejectionConfig | None = None,
         use_after_free: SimpleCheckConfig | None = None,
@@ -129,12 +134,15 @@ class ChecksConfig(DiffBase):
         self.status_code_conformance = status_code_conformance or SimpleCheckConfig()
         self.content_type_conformance = content_type_conformance or SimpleCheckConfig()
         self.response_schema_conformance = response_schema_conformance or SimpleCheckConfig()
+        self.response_headers_conformance = response_headers_conformance or SimpleCheckConfig()
         self.positive_data_acceptance = positive_data_acceptance or PositiveDataAcceptanceConfig()
         self.negative_data_rejection = negative_data_rejection or NegativeDataRejectionConfig()
         self.use_after_free = use_after_free or SimpleCheckConfig()
         self.ensure_resource_availability = ensure_resource_availability or SimpleCheckConfig()
         self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
+        self._unknown_included: set[str] = set()
+        self._unknown_excluded: set[str] = set()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChecksConfig:
@@ -154,6 +162,9 @@ class ChecksConfig(DiffBase):
             status_code_conformance=SimpleCheckConfig.from_dict(merge(data.get("status_code_conformance", {}))),
             content_type_conformance=SimpleCheckConfig.from_dict(merge(data.get("content_type_conformance", {}))),
             response_schema_conformance=SimpleCheckConfig.from_dict(merge(data.get("response_schema_conformance", {}))),
+            response_headers_conformance=SimpleCheckConfig.from_dict(
+                merge(data.get("response_headers_conformance", {}))
+            ),
             positive_data_acceptance=PositiveDataAcceptanceConfig.from_dict(
                 merge(data.get("positive_data_acceptance", {})),
             ),
@@ -170,6 +181,37 @@ class ChecksConfig(DiffBase):
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
         )
 
+    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig:
+        try:
+            return getattr(self, name)
+        except AttributeError:
+            enabled = True
+            if name in self._unknown_excluded:
+                enabled = False
+            return SimpleCheckConfig(enabled=enabled, _explicit_attrs={"enabled"})
+
+    def override(
+        self, *, included_check_names: list[str] | None = None, excluded_check_names: list[str] | None = None
+    ) -> None:
+        known_names = {name for name in self.__slots__ if not name.startswith("_")}
+        for name in known_names:
+            # Check in explicitly excluded or not in explicitly included
+            if name in (excluded_check_names or []) or (
+                included_check_names is not None and name not in included_check_names
+            ):
+                config = self.get_by_name(name=name)
+                config.enabled = False
+                config._explicit_attrs.add("enabled")
+            elif included_check_names is not None and name in included_check_names:
+                config = self.get_by_name(name=name)
+                config.enabled = True
+                config._explicit_attrs.add("enabled")
+
+        self._unknown_included.update(
+            name for name in (included_check_names or []) if name not in known_names and name != "all"
+        )
+        self._unknown_excluded.update(name for name in (excluded_check_names or []) if name not in known_names)
+
     @classmethod
     def from_many(cls, configs: list[ChecksConfig]) -> ChecksConfig:
         if not configs:
@@ -183,6 +225,9 @@ class ChecksConfig(DiffBase):
                 status_code_conformance=cfg.status_code_conformance.merge(merged.status_code_conformance),
                 content_type_conformance=cfg.content_type_conformance.merge(merged.content_type_conformance),
                 response_schema_conformance=cfg.response_schema_conformance.merge(merged.response_schema_conformance),
+                response_headers_conformance=cfg.response_headers_conformance.merge(
+                    merged.response_headers_conformance
+                ),
                 positive_data_acceptance=cfg.positive_data_acceptance.merge(merged.positive_data_acceptance),
                 negative_data_rejection=cfg.negative_data_rejection.merge(merged.negative_data_rejection),
                 use_after_free=cfg.use_after_free.merge(merged.use_after_free),

@@ -26,9 +26,8 @@ Options:
 
 API validation options:
   -c, --checks                  Comma-separated list of checks to run against
-                                API responses  [default: not_a_server_error]
-                                [possible values: not_a_server_error,
-                                status_code_conformance,
+                                API responses [possible values:
+                                not_a_server_error, status_code_conformance,
                                 content_type_conformance,
                                 response_headers_conformance,
                                 response_schema_conformance,

@@ -10,7 +10,6 @@ from click.utils import LazyFile
 from schemathesis import contrib, experimental
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run import executor, validation
-from schemathesis.cli.commands.run.checks import CheckArguments
 from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
 from schemathesis.cli.commands.run.hypothesis import (
     HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
@@ -96,7 +95,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     multiple=True,
     help="Comma-separated list of checks to run against API responses",
     type=RegistryChoice(CHECKS, with_all=True),
-    default=("not_a_server_error",),
+    default=None,
     callback=validation.reduce_list,
     show_default=True,
     metavar="",
@@ -107,7 +106,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     multiple=True,
     help="Comma-separated list of checks to skip during testing",
     type=RegistryChoice(CHECKS, with_all=True),
-    default=(),
+    default=None,
     callback=validation.reduce_list,
     show_default=True,
     metavar="",
@@ -434,8 +433,8 @@ def run(
     headers: dict[str, str],
     experiments: list,
     coverage_unexpected_methods: set[str] | None,
-    included_check_names: Sequence[str],
-    excluded_check_names: Sequence[str],
+    included_check_names: list[str] | None,
+    excluded_check_names: list[str] | None,
     max_response_time: float | None = None,
     phases: Sequence[str] = DEFAULT_PHASES,
     max_failures: int | None = None,
@@ -518,8 +517,11 @@ def run(
         suppress_health_check=suppress_health_check,
         max_failures=max_failures,
     )
+    # TODO: max_response_time
     cfg.projects.default.override(
         base_url=base_url,
+        included_check_names=included_check_names,
+        excluded_check_names=excluded_check_names,
     )
     cfg.reports.override(
         formats=report_formats,
@@ -569,12 +571,6 @@ def run(
         exclude_deprecated=exclude_deprecated,
     ).into()
 
-    selected_checks, _ = CheckArguments(
-        included_check_names=included_check_names,
-        excluded_check_names=excluded_check_names,
-        max_response_time=max_response_time,
-    ).into()
-
     # Use the same seed for all tests unless `derandomize=True` is used
     seed: int | None
     if generation_seed is None and not generation_deterministic:
@@ -590,7 +586,8 @@ def run(
         engine=EngineConfig(
             execution=ExecutionConfig(
                 phases=phases_,
-                checks=selected_checks,
+                # TODO: remove
+                checks=[],
                 targets=TARGETS.get_by_names(generation_maximize or []),
                 hypothesis_settings=prepare_settings(
                     database=generation_database,
