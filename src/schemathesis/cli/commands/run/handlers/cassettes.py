@@ -55,7 +55,7 @@ class CassetteWriter(EventHandler):
         self.worker.start()
 
     def start(self, ctx: ExecutionContext) -> None:
-        self.queue.put(Initialize(seed=ctx.seed))
+        self.queue.put(Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):

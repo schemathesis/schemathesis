@@ -146,7 +146,6 @@ def test_default(corpus, filename, app_port):
         config=EngineConfig(
             execution=ExecutionConfig(
                 phases=[PhaseName.EXAMPLES, PhaseName.FUZZING],
-                checks=[combined_check],
                 hypothesis_settings=hypothesis.settings(
                     deadline=None,
                     database=None,

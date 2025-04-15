@@ -42,6 +42,45 @@ def reraise_filter_error(attr: str) -> Generator:
 
 
 @dataclass
+class OperationsConfig(DiffBase):
+    operations: list[OperationConfig]
+
+    __slots__ = ("operations",)
+
+    def __init__(self, *, operations: list[OperationConfig] | None = None):
+        self.operations = operations or []
+
+    def set(
+        self,
+        *,
+        include_path: tuple[str, ...],
+        include_method: tuple[str, ...],
+        include_name: tuple[str, ...],
+        include_tag: tuple[str, ...],
+        include_operation_id: tuple[str, ...],
+        include_path_regex: str | None,
+        include_method_regex: str | None,
+        include_name_regex: str | None,
+        include_tag_regex: str | None,
+        include_operation_id_regex: str | None,
+        exclude_path: tuple[str, ...],
+        exclude_method: tuple[str, ...],
+        exclude_name: tuple[str, ...],
+        exclude_tag: tuple[str, ...],
+        exclude_operation_id: tuple[str, ...],
+        exclude_path_regex: str | None,
+        exclude_method_regex: str | None,
+        exclude_name_regex: str | None,
+        exclude_tag_regex: str | None,
+        exclude_operation_id_regex: str | None,
+        include_by: str | None,
+        exclude_by: str | None,
+        exclude_deprecated: bool,
+    ) -> None:
+        pass
+
+
+@dataclass
 class OperationConfig(DiffBase):
     filter_set: FilterSet
     enabled: bool

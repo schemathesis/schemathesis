@@ -1,21 +1,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from random import Random
-from typing import Any, Sequence
+from typing import Any
 
 import click
 from click.utils import LazyFile
 
-from schemathesis import contrib, experimental
+from schemathesis import contrib
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run import executor, validation
-from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
-from schemathesis.cli.commands.run.hypothesis import (
-    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    prepare_phases,
-    prepare_settings,
-)
+from schemathesis.cli.commands.run.filters import with_filters
+from schemathesis.cli.commands.run.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
@@ -26,22 +21,23 @@ from schemathesis.cli.ext.options import (
     RegistryChoice,
 )
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
-from schemathesis.core.output import OutputConfig
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.engine.phases import PhaseName
-from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationConfig, GenerationMode
-from schemathesis.generation.targets import TARGETS
+from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationMode
+from schemathesis.generation.targets import TARGETS, TargetFunction
 
 # NOTE: Need to explicitly import all registered checks
 from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
-DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
+DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
 
-@click.argument("schema", type=str)  # type: ignore[misc]
+@click.argument(
+    "location",
+    type=str,
+    callback=validation.validate_schema_location,
+)
 @group("Options")
 @grouped_option(
     "--url",
@@ -56,13 +52,13 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 @grouped_option(
     "--workers",
     "-w",
-    "workers_num",
+    "workers",
     help="Number of concurrent workers for testing. Auto-adjusts if 'auto' is specified",
     type=CustomHelpMessageChoice(
         ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
         choices_repr=f"[auto, {MIN_WORKERS}-{MAX_WORKERS}]",
     ),
-    default=str(DEFAULT_WORKERS),
+    default="auto",
     show_default=True,
     callback=validation.convert_workers,
     metavar="",
@@ -94,7 +90,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     "included_check_names",
     multiple=True,
     help="Comma-separated list of checks to run against API responses",
-    type=RegistryChoice(CHECKS, with_all=True),
+    type=RegistryChoice(CHECKS),
     default=None,
     callback=validation.reduce_list,
     show_default=True,
@@ -291,26 +287,6 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     metavar="BOOLEAN",
     callback=validation.convert_boolean_string,
 )
-@group("Experimental options")
-@grouped_option(
-    "--experimental",
-    "experiments",
-    help="Enable experimental features",
-    type=click.Choice(sorted([experiment.label for experiment in experimental.GLOBAL_EXPERIMENTS.available])),
-    callback=validation.convert_experimental,
-    multiple=True,
-    metavar="FEATURES",
-)
-@grouped_option(
-    "--experimental-coverage-unexpected-methods",
-    "coverage_unexpected_methods",
-    help="HTTP methods to use when generating test cases with methods not specified in the API during the coverage phase.",
-    type=CsvChoice(["get", "put", "post", "delete", "options", "head", "patch", "trace"], case_sensitive=False),
-    callback=validation.convert_http_methods,
-    metavar="",
-    default=None,
-    envvar="SCHEMATHESIS_EXPERIMENTAL_COVERAGE_UNEXPECTED_METHODS",
-)
 @group("Data generation options")
 @grouped_option(
     "--mode",
@@ -373,7 +349,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
     default=None,
-    callback=validation.reduce_list,
+    callback=validation.convert_maximize,
     show_default=True,
     metavar="METRIC",
 )
@@ -428,45 +404,43 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 def run(
     ctx: click.Context,
     *,
-    schema: str,
+    location: str,
     auth: tuple[str, str] | None,
     headers: dict[str, str],
-    experiments: list,
-    coverage_unexpected_methods: set[str] | None,
     included_check_names: list[str] | None,
     excluded_check_names: list[str] | None,
     max_response_time: float | None = None,
-    phases: Sequence[str] = DEFAULT_PHASES,
+    phases: list[str] = DEFAULT_PHASES,
     max_failures: int | None = None,
     continue_on_failure: bool = False,
-    include_path: Sequence[str] = (),
-    include_path_regex: str | None = None,
-    include_method: Sequence[str] = (),
-    include_method_regex: str | None = None,
-    include_name: Sequence[str] = (),
-    include_name_regex: str | None = None,
-    include_tag: Sequence[str] = (),
-    include_tag_regex: str | None = None,
-    include_operation_id: Sequence[str] = (),
-    include_operation_id_regex: str | None = None,
-    exclude_path: Sequence[str] = (),
-    exclude_path_regex: str | None = None,
-    exclude_method: Sequence[str] = (),
-    exclude_method_regex: str | None = None,
-    exclude_name: Sequence[str] = (),
-    exclude_name_regex: str | None = None,
-    exclude_tag: Sequence[str] = (),
-    exclude_tag_regex: str | None = None,
-    exclude_operation_id: Sequence[str] = (),
-    exclude_operation_id_regex: str | None = None,
+    include_path: tuple[str, ...],
+    include_path_regex: str | None,
+    include_method: tuple[str, ...],
+    include_method_regex: str | None,
+    include_name: tuple[str, ...],
+    include_name_regex: str | None,
+    include_tag: tuple[str, ...],
+    include_tag_regex: str | None,
+    include_operation_id: tuple[str, ...],
+    include_operation_id_regex: str | None,
+    exclude_path: tuple[str, ...],
+    exclude_path_regex: str | None,
+    exclude_method: tuple[str, ...],
+    exclude_method_regex: str | None,
+    exclude_name: tuple[str, ...],
+    exclude_name_regex: str | None,
+    exclude_tag: tuple[str, ...],
+    exclude_tag_regex: str | None,
+    exclude_operation_id: tuple[str, ...],
+    exclude_operation_id_regex: str | None,
     include_by: str | None = None,
     exclude_by: str | None = None,
     exclude_deprecated: bool = False,
-    workers_num: int = DEFAULT_WORKERS,
+    workers: int = DEFAULT_WORKERS,
     base_url: str | None,
     wait_for_schema: float | None = None,
-    rate_limit: str | None = None,
     suppress_health_check: list[HealthCheck] | None,
+    rate_limit: str | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
@@ -481,10 +455,10 @@ def run(
     output_sanitize: bool = True,
     output_truncate: bool = True,
     contrib_openapi_fill_missing_examples: bool = False,
-    generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
+    generation_modes: list[GenerationMode] = DEFAULT_GENERATOR_MODES,
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
-    generation_maximize: Sequence[str] | None = None,
+    generation_maximize: list[TargetFunction] | None,
     generation_deterministic: bool | None = None,
     generation_database: str | None = None,
     generation_unique_inputs: bool = False,
@@ -504,26 +478,34 @@ def run(
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
 
-    cfg: SchemathesisConfig = ctx.obj.config
+    config: SchemathesisConfig = ctx.obj.config
 
+    # First, set the right color
     if force_color:
         color = True
     elif no_color:
         color = False
     else:
-        color = None
-    cfg.override(
+        color = config.color
+    ensure_color(ctx, color)
+
+    validation.validate_auth_overlap(auth, headers)
+
+    if contrib_openapi_fill_missing_examples:
+        contrib.openapi.fill_missing_examples.install()
+
+    # Then override the global config from CLI options
+    config.set(
         color=color,
         suppress_health_check=suppress_health_check,
+        seed=generation_seed,
         max_failures=max_failures,
     )
-    # TODO: max_response_time
-    cfg.projects.default.override(
-        base_url=base_url,
-        included_check_names=included_check_names,
-        excluded_check_names=excluded_check_names,
+    config.output.set(
+        sanitize=output_sanitize,
+        truncate=output_truncate,
     )
-    cfg.reports.override(
+    config.reports.set(
         formats=report_formats,
         junit_path=report_junit_path.name if report_junit_path else None,
         vcr_path=report_vcr_path.name if report_vcr_path else None,
@@ -531,21 +513,22 @@ def run(
         directory=Path(report_directory),
         preserve_bytes=report_preserve_bytes,
     )
-
-    ensure_color(ctx, cfg)
-
-    validation.validate_schema(schema, cfg.projects.default.base_url)
-
-    _hypothesis_phases = prepare_phases(generation_no_shrink)
-
-    for experiment in experiments:
-        experiment.enable()
-    if contrib_openapi_fill_missing_examples:
-        contrib.openapi.fill_missing_examples.install()
-
-    validation.validate_auth_overlap(auth, headers)
-
-    filter_set = FilterArguments(
+    # Other CLI options work as an override for all defined projects
+    config.projects.override.set(
+        base_url=base_url,
+        headers=headers,
+        auth=auth,
+        workers=workers,
+        wait_for_schema=wait_for_schema,
+        continue_on_failure=continue_on_failure,
+        rate_limit=rate_limit,
+        request_timeout=request_timeout,
+        tls_verify=request_tls_verify,
+        request_cert=request_cert,
+        request_cert_key=request_cert_key,
+        proxy=request_proxy,
+    )
+    config.projects.override.operations.set(
         include_path=include_path,
         include_method=include_method,
         include_name=include_name,
@@ -569,63 +552,25 @@ def run(
         include_by=include_by,
         exclude_by=exclude_by,
         exclude_deprecated=exclude_deprecated,
-    ).into()
-
-    # Use the same seed for all tests unless `derandomize=True` is used
-    seed: int | None
-    if generation_seed is None and not generation_deterministic:
-        seed = Random().getrandbits(128)
-    else:
-        seed = generation_seed
-
-    phases_ = [PhaseName.PROBING] + [PhaseName.from_str(phase) for phase in phases]
-
-    config = executor.RunConfig(
-        location=schema,
-        config=cfg,
-        engine=EngineConfig(
-            execution=ExecutionConfig(
-                phases=phases_,
-                # TODO: remove
-                checks=[],
-                targets=TARGETS.get_by_names(generation_maximize or []),
-                hypothesis_settings=prepare_settings(
-                    database=generation_database,
-                    derandomize=generation_deterministic,
-                    max_examples=generation_max_examples,
-                    phases=_hypothesis_phases,
-                    suppress_health_check=cfg.suppress_health_check,
-                ),
-                generation=GenerationConfig(
-                    modes=list(generation_modes),
-                    allow_x00=generation_allow_x00,
-                    graphql_allow_null=generation_graphql_allow_null,
-                    codec=generation_codec,
-                    with_security_parameters=generation_with_security_parameters,
-                    unexpected_methods=coverage_unexpected_methods,
-                ),
-                max_failures=cfg.max_failures,
-                continue_on_failure=continue_on_failure,
-                unique_inputs=generation_unique_inputs,
-                seed=seed,
-                workers_num=workers_num,
-            ),
-            network=NetworkConfig(
-                auth=auth,
-                headers=headers,
-                timeout=request_timeout,
-                tls_verify=request_tls_verify,
-                proxy=request_proxy,
-                cert=(request_cert, request_cert_key)
-                if request_cert is not None and request_cert_key is not None
-                else request_cert,
-            ),
-        ),
-        filter_set=filter_set,
-        wait_for_schema=wait_for_schema,
-        rate_limit=rate_limit,
-        output=OutputConfig(sanitize=output_sanitize, truncate=output_truncate),
-        args=ctx.args,
-        params=ctx.params,
     )
-    executor.execute(config)
+    config.projects.override.phases.set(phases=phases)
+    config.projects.override.checks.set(
+        included_check_names=included_check_names,
+        excluded_check_names=excluded_check_names,
+        max_response_time=max_response_time,
+    )
+    config.projects.override.generation.set(
+        modes=generation_modes,
+        no_shrink=generation_no_shrink,
+        max_examples=generation_max_examples,
+        maximize=generation_maximize,
+        deterministic=generation_deterministic,
+        database=generation_database,
+        unique_inputs=generation_unique_inputs,
+        allow_x00=generation_allow_x00,
+        graphql_allow_null=generation_graphql_allow_null,
+        with_security_parameters=generation_with_security_parameters,
+        codec=generation_codec,
+    )
+
+    executor.execute(location=location, config=config, args=ctx.args, params=ctx.params)

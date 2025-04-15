@@ -10,7 +10,7 @@ if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
 
 
-DEFAULT_GENERATOR_MODES = (GenerationMode.default(),)
+DEFAULT_GENERATOR_MODES = [GenerationMode.default()]
 
 
 CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"

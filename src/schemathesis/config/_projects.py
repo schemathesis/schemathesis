@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -9,7 +10,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError, validate_rate_limit
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.config._operations import OperationConfig
+from schemathesis.config._operations import OperationConfig, OperationsConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.core import hooks
@@ -17,6 +18,8 @@ from schemathesis.core.validation import validate_base_url
 
 if TYPE_CHECKING:
     from schemathesis.schemas import APIOperation
+
+DEFAULT_WORKERS = 1
 
 
 @dataclass(repr=False)
@@ -26,6 +29,18 @@ class ConfigOverride:
     __slots__ = ("checks",)
 
 
+def get_workers_count() -> int:
+    """Detect the number of available CPUs for the current process, if possible.
+
+    Use ``DEFAULT_WORKERS`` if not possible to detect.
+    """
+    if hasattr(os, "sched_getaffinity"):
+        # In contrast with `os.cpu_count` this call respects limits on CPU resources on some Unix systems
+        return len(os.sched_getaffinity(0))
+    # Number of CPUs in the system, or 1 if undetermined
+    return os.cpu_count() or DEFAULT_WORKERS
+
+
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
     _override: ConfigOverride | None
@@ -33,9 +48,8 @@ class ProjectConfig(DiffBase):
     headers: dict
     hooks: str | None
     proxy: str | None
-    workers: int | str
+    workers: int
     max_response_time: float | int | None
-    wait_for_schema: float | int | None
     exclude_deprecated: bool | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
@@ -48,7 +62,7 @@ class ProjectConfig(DiffBase):
     checks: ChecksConfig
     phases: PhasesConfig
     generation: GenerationConfig
-    operations: list[OperationConfig]
+    operations: OperationsConfig
 
     __slots__ = (
         "_override",
@@ -58,7 +72,6 @@ class ProjectConfig(DiffBase):
         "proxy",
         "workers",
         "max_response_time",
-        "wait_for_schema",
         "exclude_deprecated",
         "continue_on_failure",
         "tls_verify",
@@ -80,10 +93,9 @@ class ProjectConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         hooks_: str | None = None,
-        workers: int | str = "auto",
+        workers: int | Literal["auto"] = "auto",
         proxy: str | None = None,
         max_response_time: float | int | None = None,
-        wait_for_schema: float | int | None = None,
         exclude_deprecated: bool | None = None,
         continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
@@ -96,7 +108,7 @@ class ProjectConfig(DiffBase):
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
         generation: GenerationConfig | None = None,
-        operations: list[OperationConfig] | None = None,
+        operations: OperationsConfig | None = None,
     ) -> None:
         self._override = None
         if base_url is not None:
@@ -111,10 +123,12 @@ class ProjectConfig(DiffBase):
             hooks.load_from_path(hooks_)
         else:
             hooks.load_from_env()
-        self.workers = workers
+        if isinstance(workers, int):
+            self.workers = workers
+        else:
+            self.workers = get_workers_count()
         self.proxy = proxy
         self.max_response_time = max_response_time
-        self.wait_for_schema = wait_for_schema
         self.exclude_deprecated = exclude_deprecated
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
@@ -129,7 +143,7 @@ class ProjectConfig(DiffBase):
         self.checks = checks or ChecksConfig()
         self.phases = phases or PhasesConfig()
         self.generation = generation or GenerationConfig()
-        self.operations = operations or []
+        self.operations = operations or OperationsConfig()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProjectConfig:
@@ -140,7 +154,6 @@ class ProjectConfig(DiffBase):
             workers=data.get("workers", "auto"),
             proxy=resolve(data.get("proxy"), None),
             max_response_time=data.get("max-response-time"),
-            wait_for_schema=data.get("wait-for-schema"),
             exclude_deprecated=data.get("exclude-deprecated"),
             continue_on_failure=data.get("continue-on-failure"),
             tls_verify=resolve(data.get("tls-verify"), None),
@@ -153,23 +166,33 @@ class ProjectConfig(DiffBase):
             checks=ChecksConfig.from_dict(data.get("checks", {})),
             phases=PhasesConfig.from_dict(data.get("phases", {})),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
-            operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])],
+            operations=OperationsConfig(
+                operations=[OperationConfig.from_dict(operation) for operation in data.get("operations", [])]
+            ),
         )
 
-    def override(
-        self, *, base_url: str | None, included_check_names: list[str] | None, excluded_check_names: list[str] | None
+    @classmethod
+    def from_many(cls, configs: list[ProjectConfig]) -> ProjectConfig:
+        raise NotImplementedError
+
+    def set(
+        self,
+        *,
+        base_url: str | None = None,
+        headers: dict | None = None,
+        auth: tuple[str, str] | None = None,
+        workers: int | Literal["auto"] = "auto",
+        wait_for_schema: float | int | None = None,
+        continue_on_failure: bool | None = None,
+        rate_limit: str | None = None,
+        request_timeout: float | int | None = None,
+        tls_verify: bool | str | None = None,
+        request_cert: str | None = None,
+        request_cert_key: str | None = None,
+        proxy: str | None = None,
     ) -> None:
         if base_url is not None:
             self.base_url = base_url
-        if not self._override:
-            self._override = ConfigOverride(checks=None)
-
-        if self._override.checks is None:
-            self._override.checks = ChecksConfig()
-
-        self._override.checks.override(
-            included_check_names=included_check_names, excluded_check_names=excluded_check_names
-        )
 
     def checks_config_for(
         self,
@@ -181,7 +204,7 @@ class ProjectConfig(DiffBase):
         if self._override is not None and self._override.checks is not None:
             configs.append(self._override.checks)
         if operation is not None:
-            for op in self.operations:
+            for op in self.operations.operations:
                 if op.filter_set.applies_to(operation=operation):
                     if phase is not None:
                         phase_config = op.phases.get_by_name(name=phase)
@@ -198,8 +221,9 @@ class ProjectConfig(DiffBase):
 class ProjectsConfig(DiffBase):
     default: ProjectConfig
     named: dict[str, ProjectConfig]
+    override: ProjectConfig
 
-    __slots__ = ("default", "named")
+    __slots__ = ("default", "named", "override")
 
     def __init__(
         self,
@@ -209,6 +233,7 @@ class ProjectsConfig(DiffBase):
     ) -> None:
         self.default = default or ProjectConfig()
         self.named = named or {}
+        self.override = ProjectConfig()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProjectsConfig:
@@ -216,3 +241,13 @@ class ProjectsConfig(DiffBase):
             default=ProjectConfig.from_dict(data),
             named={project["title"]: ProjectConfig.from_dict(project) for project in data.get("project", [])},
         )
+
+    def get(self, schema: dict[str, Any]) -> ProjectConfig:
+        configs = [self.override]
+        title = schema.get("info", {}).get("title")
+        if title is not None:
+            named = self.named.get(title)
+            if named is not None:
+                configs.append(named)
+        configs.append(self.default)
+        return ProjectConfig.from_many(configs)

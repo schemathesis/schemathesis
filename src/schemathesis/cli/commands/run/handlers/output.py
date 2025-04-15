@@ -15,14 +15,13 @@ from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
-from schemathesis.config import ReportFormat, ReportsConfig
+from schemathesis.config import ReportFormat, SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.config import EngineConfig
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
@@ -100,7 +99,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
                 failures=group.failures,
                 curl=group.code_sample,
                 formatter=failure_formatter,
-                config=ctx.output_config,
+                config=ctx.config.output,
             )
         )
         click.echo()
@@ -770,13 +769,7 @@ def format_duration(duration_ms: int) -> str:
 
 @dataclass
 class OutputHandler(EventHandler):
-    workers_num: int
-    # Seed can be absent in the deterministic mode
-    seed: int | None
-    rate_limit: str | None
-    wait_for_schema: float | None
-    engine_config: EngineConfig
-    report_config: ReportsConfig
+    config: SchemathesisConfig
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -1068,7 +1061,7 @@ class OutputHandler(EventHandler):
 
         if (
             event.status == Status.SUCCESS
-            and GenerationMode.POSITIVE in self.engine_config.execution.generation.modes
+            and GenerationMode.POSITIVE in self.config.projects.default.generation.modes
             and all_positive_are_rejected(event.recorder)
             and statistic.should_warn_about_only_4xx()
         ):
@@ -1116,7 +1109,9 @@ class OutputHandler(EventHandler):
                     self.console.print(Padding(Text(extra), (0, 0, 0, 5)))
                 self.console.print()
 
-            if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.wait_for_schema is not None):
+            if not (
+                event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.config.wait_for_schema is not None
+            ):
                 suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
                 if suggestion is not None:
                     click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
@@ -1134,7 +1129,7 @@ class OutputHandler(EventHandler):
         if not (
             isinstance(event.exception, LoaderError)
             and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
-            and self.wait_for_schema is not None
+            and self.config.wait_for_schema is not None
         ):
             click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
@@ -1255,7 +1250,7 @@ class OutputHandler(EventHandler):
                     click.echo(f"\n{indent}<EMPTY>")
                 else:
                     try:
-                        payload = prepare_response_payload(response.text, config=ctx.output_config)
+                        payload = prepare_response_payload(response.text, config=ctx.config.output)
                         click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
                     except UnicodeDecodeError:
                         click.echo(f"\n{indent}<BINARY>")
@@ -1410,7 +1405,7 @@ class OutputHandler(EventHandler):
         display_section_name(message, fg=color)
 
     def display_reports(self) -> None:
-        reports = self.report_config
+        reports = self.config.reports
         if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
             click.echo(_style("Reports:", bold=True))
             for format, report in (
@@ -1425,10 +1420,10 @@ class OutputHandler(EventHandler):
 
     def display_seed(self) -> None:
         click.echo(_style("Seed: ", bold=True), nl=False)
-        if self.seed is None:
+        if self.config.seed is None:
             click.echo("not used in the deterministic mode")
         else:
-            click.echo(str(self.seed))
+            click.echo(str(self.config.seed))
         click.echo()
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:

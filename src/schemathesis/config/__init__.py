@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
+from random import Random
 
 import tomli
 
@@ -42,18 +43,31 @@ __all__ = [
 class SchemathesisConfig(DiffBase):
     color: bool | None
     suppress_health_check: list[HealthCheck]
+    seed: int | None
+    wait_for_schema: float | int | None
     max_failures: int | None
     reports: ReportsConfig
     output: OutputConfig
     projects: ProjectsConfig
 
-    __slots__ = ("color", "suppress_health_check", "max_failures", "reports", "output", "projects")
+    __slots__ = (
+        "color",
+        "suppress_health_check",
+        "seed",
+        "wait_for_schema",
+        "max_failures",
+        "reports",
+        "output",
+        "projects",
+    )
 
     def __init__(
         self,
         *,
         color: bool | None = None,
         suppress_health_check: list[HealthCheck] | None = None,
+        seed: int | None = None,
+        wait_for_schema: float | int | None = None,
         max_failures: int | None = None,
         reports: ReportsConfig | None = None,
         output: OutputConfig | None = None,
@@ -61,6 +75,11 @@ class SchemathesisConfig(DiffBase):
     ):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
+
+        if seed is None:
+            seed = Random().getrandbits(128)
+        self.seed = seed
+        self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
         self.reports = reports or ReportsConfig()
         self.output = output or OutputConfig()
@@ -97,13 +116,20 @@ class SchemathesisConfig(DiffBase):
             return cls.from_path(config_file)
         return cls()
 
-    def override(
-        self, *, color: bool | None, suppress_health_check: list[HealthCheck] | None, max_failures: int | None
+    def set(
+        self,
+        *,
+        color: bool | None,
+        suppress_health_check: list[HealthCheck] | None,
+        seed: int | None = None,
+        max_failures: int | None,
     ) -> None:
         if color is not None:
             self.color = color
         if suppress_health_check is not None:
             self.suppress_health_check = suppress_health_check
+        if seed is not None:
+            self.seed = seed
         if max_failures is not None:
             self.max_failures = max_failures
 
@@ -133,6 +159,7 @@ class SchemathesisConfig(DiffBase):
         return cls(
             color=data.get("color"),
             suppress_health_check=[HealthCheck(name) for name in data.get("suppress-health-check", [])],
+            seed=data.get("seed"),
             max_failures=data.get("max-failures"),
             reports=ReportsConfig.from_dict(data.get("reports", {})),
             output=OutputConfig.from_dict(data.get("output", {})),

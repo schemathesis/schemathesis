@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.output import OutputConfig
 from schemathesis.core.result import Err, Ok
@@ -176,12 +177,12 @@ class GroupedFailures:
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
+    config: SchemathesisConfig = field(default_factory=SchemathesisConfig.discover)
     statistic: Statistic = field(default_factory=Statistic)
     exit_code: int = 0
     output_config: OutputConfig = field(default_factory=OutputConfig)
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
     summary_lines: list[str | Generator[str, None, None]] = field(default_factory=list)
-    seed: int | None = None
 
     def add_initialization_line(self, line: str | Generator[str, None, None]) -> None:
         self.initialization_lines.append(line)

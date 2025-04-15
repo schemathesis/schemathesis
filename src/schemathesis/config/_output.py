@@ -28,3 +28,12 @@ class OutputConfig(DiffBase):
             sanitize=data.get("sanitize", True),
             truncate=data.get("truncate", True),
         )
+
+    def set(
+        self,
+        *,
+        sanitize: bool = True,
+        truncate: bool = True,
+    ) -> None:
+        self.sanitize = sanitize
+        self.truncate = truncate

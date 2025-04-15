@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
@@ -21,7 +22,7 @@ if TYPE_CHECKING:
     from schemathesis.engine.config import NetworkConfig
     from schemathesis.schemas import BaseSchema
 
-Loader = Callable[["AutodetectConfig"], "BaseSchema"]
+Loader = Callable[["SchemathesisConfig"], "BaseSchema"]
 
 
 @dataclass
@@ -35,13 +36,13 @@ class AutodetectConfig:
     output: OutputConfig | NotSet = NOT_SET
 
 
-def load_schema(config: AutodetectConfig) -> BaseSchema:
+def load_schema(location: str, config: SchemathesisConfig) -> BaseSchema:
     """Load API schema automatically based on the provided configuration."""
-    if is_probably_graphql(config.location):
+    if is_probably_graphql(location):
         # Try GraphQL first, then fallback to Open API
-        return _try_load_schema(config, graphql, openapi)
+        return _try_load_schema(location, config, graphql, openapi)
     # Try Open API first, then fallback to GraphQL
-    return _try_load_schema(config, openapi, graphql)
+    return _try_load_schema(location, config, openapi, graphql)
 
 
 def should_try_more(exc: LoaderError) -> bool:
@@ -69,18 +70,18 @@ def detect_loader(schema_or_location: str | dict[str, Any], module: Any) -> Call
     raise NotImplementedError
 
 
-def _try_load_schema(config: AutodetectConfig, first_module: Any, second_module: Any) -> BaseSchema:
+def _try_load_schema(location: str, config: SchemathesisConfig, first_module: Any, second_module: Any) -> BaseSchema:
     """Try to load schema with fallback option."""
     from urllib3.exceptions import InsecureRequestWarning
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
         try:
-            return _load_schema(config, first_module)
+            return _load_schema(location, config, first_module)
         except LoaderError as exc:
             if should_try_more(exc):
                 try:
-                    return _load_schema(config, second_module)
+                    return _load_schema(location, config, second_module)
                 except Exception as second_exc:
                     if is_specific_exception(second_exc):
                         raise second_exc
@@ -88,25 +89,26 @@ def _try_load_schema(config: AutodetectConfig, first_module: Any, second_module:
             raise exc
 
 
-def _load_schema(config: AutodetectConfig, module: Any) -> BaseSchema:
+def _load_schema(location: str, config: SchemathesisConfig, module: Any) -> BaseSchema:
     """Unified schema loader for both GraphQL and OpenAPI."""
-    loader = detect_loader(config.location, module)
+    loader = detect_loader(location, module)
 
     kwargs: dict = {}
     if loader is module.from_url:
         if config.wait_for_schema is not None:
             kwargs["wait_for_schema"] = config.wait_for_schema
-        kwargs["verify"] = config.network.tls_verify
-        if config.network.cert:
-            kwargs["cert"] = config.network.cert
-        if config.network.auth:
-            kwargs["auth"] = config.network.auth
+        kwargs["verify"] = config.projects.default.tls_verify
+        if config.projects.default.request_cert:
+            kwargs["cert"] = config.projects.default.request_cert
+        # TODO: Fix this check
+        # if config.projects.default.auth:
+        #     kwargs["auth"] = config.network.auth
 
-    return loader(config.location, **kwargs).configure(
-        base_url=config.base_url,
-        rate_limit=config.rate_limit,
+    return loader(location, **kwargs).configure(
+        base_url=config.projects.default.base_url,
+        rate_limit=config.projects.default.rate_limit,
         output=config.output,
-        generation=config.generation,
+        generation=config.projects.default.generation,
     )
 
 

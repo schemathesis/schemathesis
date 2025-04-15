@@ -43,7 +43,6 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     else:
         mode = HypothesisTestMode.FUZZING
     producer = TaskProducer(engine)
-    workers_num = engine.config.execution.workers_num
 
     suite_started = events.SuiteStarted(phase=phase.name)
 
@@ -54,7 +53,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     try:
         with WorkerPool(
-            workers_num=workers_num,
+            workers_num=engine.config.projects.default.workers,
             producer=producer,
             worker_factory=worker_task,
             ctx=engine,
@@ -168,9 +167,9 @@ def worker_task(
                             test_func=test_func,
                             config=HypothesisTestConfig(
                                 modes=[mode],
-                                settings=ctx.config.execution.hypothesis_settings,
+                                settings=ctx.config.projects.default.hypothesis_settings,
                                 seed=ctx.config.execution.seed,
-                                generation=ctx.config.execution.generation,
+                                generation=ctx.config.projects.default.generation,
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
@@ -194,11 +193,11 @@ def worker_task(
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
-    for location, entry in overrides.for_operation(ctx.cfg.projects.default, operation).items():
+    for location, entry in overrides.for_operation(ctx.config.projects.default, operation).items():
         if entry:
             kwargs[location] = entry
-    if ctx.config.network.headers:
+    if ctx.config.projects.default.headers:
         kwargs["headers"] = {
-            key: value for key, value in ctx.config.network.headers.items() if key.lower() != "user-agent"
+            key: value for key, value in ctx.config.projects.default.headers.items() if key.lower() != "user-agent"
         }
     return kwargs

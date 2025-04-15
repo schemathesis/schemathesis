@@ -190,8 +190,12 @@ class ChecksConfig(DiffBase):
                 enabled = False
             return SimpleCheckConfig(enabled=enabled, _explicit_attrs={"enabled"})
 
-    def override(
-        self, *, included_check_names: list[str] | None = None, excluded_check_names: list[str] | None = None
+    def set(
+        self,
+        *,
+        included_check_names: list[str] | None = None,
+        excluded_check_names: list[str] | None = None,
+        max_response_time: float | None = None,
     ) -> None:
         known_names = {name for name in self.__slots__ if not name.startswith("_")}
         for name in known_names:

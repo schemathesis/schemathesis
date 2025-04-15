@@ -108,3 +108,6 @@ class PhasesConfig(DiffBase):
             fuzzing=PhaseConfig.from_dict(data.get("fuzzing", {})),
             stateful=PhaseConfig.from_dict(data.get("stateful", {})),
         )
+
+    def set(self, *, phases: list[str]) -> None:
+        pass

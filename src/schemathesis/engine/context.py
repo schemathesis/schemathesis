@@ -17,8 +17,6 @@ if TYPE_CHECKING:
 
     import requests
 
-    from schemathesis.engine.config import EngineConfig
-
 
 @dataclass
 class EngineContext:
@@ -27,8 +25,7 @@ class EngineContext:
     schema: BaseSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
-    cfg: SchemathesisConfig
-    config: EngineConfig
+    config: SchemathesisConfig
     start_time: float
 
     def __init__(
@@ -36,14 +33,12 @@ class EngineContext:
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
-        config: EngineConfig,
-        cfg: SchemathesisConfig,
+        config: SchemathesisConfig,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
-        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
+        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.max_failures)
         self.outcome_cache = {}
-        self.cfg = cfg
         self.config = config
         self.start_time = time.monotonic()
         self._session = session
@@ -83,27 +78,30 @@ class EngineContext:
         import requests
 
         session = requests.Session()
-        config = self.config.network
+        config = self.config.projects.default
         session.verify = config.tls_verify
         if config.auth is not None:
-            session.auth = config.auth
+            # TODO: Update
+            # session.auth = self.config.auth
+            pass
         if config.headers:
             session.headers.update(config.headers)
-        if config.cert is not None:
-            session.cert = config.cert
+        if config.request_cert is not None:
+            session.cert = config.request_cert
         if config.proxy is not None:
             session.proxies["all"] = config.proxy
         return session
 
     @property
     def transport_kwargs(self) -> dict[str, Any]:
+        config = self.config.projects.default
         kwargs: dict[str, Any] = {
             "session": self.session,
-            "headers": self.config.network.headers,
-            "timeout": self.config.network.timeout,
-            "verify": self.config.network.tls_verify,
-            "cert": self.config.network.cert,
+            "headers": config.headers,
+            "timeout": config.request_timeout,
+            "verify": config.tls_verify,
+            "cert": config.request_cert,
         }
-        if self.config.network.proxy is not None:
-            kwargs["proxies"] = {"all": self.config.network.proxy}
+        if config.proxy is not None:
+            kwargs["proxies"] = {"all": config.proxy}
         return kwargs

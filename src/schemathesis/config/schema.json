@@ -20,6 +20,9 @@
         ]
       }
     },
+    "seed": {
+      "type": "integer"
+    },
     "max-failures": {
       "type": "integer",
       "minimum": 1
@@ -353,9 +356,6 @@
           ]
         },
         "max-examples": {
-          "type": "integer"
-        },
-        "seed": {
           "type": "integer"
         },
         "no-shrink": {
