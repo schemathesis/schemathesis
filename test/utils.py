@@ -18,7 +18,7 @@ from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.engine.config import ExecutionConfig, NetworkConfig
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Interaction
@@ -143,7 +143,6 @@ class EventStream:
                 phases=options.get(
                     "phases", [PhaseName.PROBING, PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
                 ),
-                checks=options.get("checks", []),
                 targets=options.get("targets", []),
                 hypothesis_settings=options.get("hypothesis_settings")
                 or hypothesis.settings(deadline=DEFAULT_DEADLINE),

@@ -56,7 +56,7 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.execution.hypothesis_settings)
+    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.projects.default.hypothesis_settings)
     if kwargs:
         config = replace(
             engine.config,
@@ -152,7 +152,7 @@ def execute_state_machine_loop(
                 case=case,
                 stateful_ctx=ctx,
                 check_ctx=check_ctx,
-                checks=config.execution.checks,
+                checks=check_ctx.checks,
                 control=engine.control,
                 recorder=self.recorder,
                 additional_checks=additional_checks,

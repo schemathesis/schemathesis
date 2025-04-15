@@ -195,7 +195,6 @@ def test_events():
         BBCI_SCHEMA,
         config=EngineConfig(
             execution=ExecutionConfig(
-                checks=(),
                 hypothesis_settings=hypothesis.settings(
                     deadline=None,
                     database=None,

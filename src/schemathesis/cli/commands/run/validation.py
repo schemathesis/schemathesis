@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import codecs
 import operator
-import os
 import pathlib
 import re
 from contextlib import contextmanager
@@ -12,9 +11,8 @@ from urllib.parse import urlparse
 
 import click
 
-from schemathesis import errors, experimental
-from schemathesis.cli.constants import DEFAULT_WORKERS
 from schemathesis.config import ReportFormat
+from schemathesis.config._projects import get_workers_count
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
@@ -38,23 +36,21 @@ MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a sch
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 
-def validate_schema(schema: str, base_url: str | None) -> None:
+def validate_schema_location(ctx: click.core.Context, param: click.core.Parameter, location: str) -> str:
     try:
-        netloc = urlparse(schema).netloc
+        netloc = urlparse(location).netloc
         if netloc:
-            validate_url(schema)
-            return None
+            validate_url(location)
+            return location
     except ValueError as exc:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE) from exc
-    if "\x00" in schema or not schema:
+    if "\x00" in location or not location:
         raise click.UsageError(INVALID_SCHEMA_MESSAGE)
-    exists = file_exists(schema)
-    if exists or bool(pathlib.Path(schema).suffix):
+    exists = file_exists(location)
+    if exists or bool(pathlib.Path(location).suffix):
         if not exists:
             raise click.UsageError(FILE_DOES_NOT_EXIST_MESSAGE)
-        if base_url is None:
-            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
-        return None
+        return location
     raise click.UsageError(INVALID_SCHEMA_MESSAGE)
 
 
@@ -218,20 +214,17 @@ def validate_preserve_bytes(ctx: click.core.Context, param: click.core.Parameter
     return True
 
 
-def convert_experimental(
-    ctx: click.core.Context, param: click.core.Parameter, value: tuple[str, ...]
-) -> list[experimental.Experiment]:
-    return [
-        feature
-        for feature in experimental.GLOBAL_EXPERIMENTS.available
-        if feature.label in value or feature.is_env_var_set
-    ]
-
-
 def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str] | None:
     if not value:
         return None
     return reduce(operator.iadd, value, [])
+
+
+def convert_maximize(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]):
+    from schemathesis.generation.targets import TARGETS
+
+    names = reduce(operator.iadd, value, [])
+    return TARGETS.get_by_names(names)
 
 
 def convert_http_methods(
@@ -300,18 +293,6 @@ def reraise_format_error(raw_value: str) -> Generator[None, None, None]:
         yield
     except ValueError as exc:
         raise click.BadParameter(f"Expected KEY:VALUE format, received {raw_value}.") from exc
-
-
-def get_workers_count() -> int:
-    """Detect the number of available CPUs for the current process, if possible.
-
-    Use ``DEFAULT_WORKERS`` if not possible to detect.
-    """
-    if hasattr(os, "sched_getaffinity"):
-        # In contrast with `os.cpu_count` this call respects limits on CPU resources on some Unix systems
-        return len(os.sched_getaffinity(0))
-    # Number of CPUs in the system, or 1 if undetermined
-    return os.cpu_count() or DEFAULT_WORKERS
 
 
 def convert_workers(ctx: click.core.Context, param: click.core.Parameter, value: str) -> int:

@@ -83,7 +83,7 @@ class ReportsConfig(DiffBase):
             har=ReportConfig.from_dict(data.get("har", {})),
         )
 
-    def override(
+    def set(
         self,
         *,
         formats: list[ReportFormat] | None = None,

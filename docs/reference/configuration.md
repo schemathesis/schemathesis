@@ -93,6 +93,19 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     suppress-health-check = ["too_slow", "data_too_large"]
     ```
 
+#### `seed`
+
+!!! note ""
+
+    **Type:** `Integer`  
+    **Default:** `null`  
+
+    Random seed for reproducible test runs. Setting the same seed value will result in the same sequence of generated test cases.
+
+    ```toml
+    seed = 42
+    ```
+
 #### `max-failures`
 
 !!! note ""
@@ -637,20 +650,6 @@ The following settings control how Schemathesis generates test data for your API
     ```toml
     [generation]
     max-examples = 200
-    ```
-
-#### `generation.seed`
-
-!!! note ""
-
-    **Type:** `Integer`  
-    **Default:** `null`  
-
-    Random seed for reproducible test runs. Setting the same seed value will result in the same sequence of generated test cases.
-
-    ```toml
-    [generation]
-    seed = 42
     ```
 
 #### `generation.no-shrink`

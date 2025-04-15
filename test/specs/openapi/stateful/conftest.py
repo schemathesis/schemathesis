@@ -10,7 +10,6 @@ import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.checks import CHECKS
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
@@ -513,7 +512,6 @@ def engine_factory(app_factory, app_runner, stop_event):
             schema = schema.include(**include)
         config = EngineConfig(
             execution=ExecutionConfig(
-                checks=checks or CHECKS.get_all(),
                 targets=targets or [],
                 generation=GenerationConfig(),
                 hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
@@ -522,8 +520,9 @@ def engine_factory(app_factory, app_runner, stop_event):
             ),
             network=network or NetworkConfig(),
         )
+        cfg = SchemathesisConfig()
         return stateful.execute(
-            engine=EngineContext(schema=schema, stop_event=stop_event, config=config, cfg=SchemathesisConfig()),
+            engine=EngineContext(schema=schema, stop_event=stop_event, config=config, cfg=cfg),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 

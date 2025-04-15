@@ -85,9 +85,6 @@ class CheckContext:
         if self.recorder is not None:
             self.recorder.record_response(case_id=case_id, response=response)
 
-    def iter_checks(self) -> list[CheckFunction]:
-        return CHECKS.get_all()
-
 
 CHECKS = Registry[CheckFunction]()
 check = CHECKS.register
