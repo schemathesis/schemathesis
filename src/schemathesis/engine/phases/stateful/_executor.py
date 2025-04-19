@@ -11,6 +11,7 @@ import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 from hypothesis.stateful import Rule
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
@@ -21,6 +22,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation import overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.stateful.state_machine import (
@@ -54,7 +56,7 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.execution.hypothesis_settings)
+    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.projects.default.hypothesis_settings)
     if kwargs:
         config = replace(
             engine.config,
@@ -78,7 +80,6 @@ def execute_state_machine_loop(
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
-            self._check_ctx = engine.get_check_context(self.recorder)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return transport_kwargs
@@ -86,15 +87,13 @@ def execute_state_machine_loop(
         def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
             return ""
 
-        if config.override is not None:
-
-            def before_call(self, case: Case) -> None:
-                for location, entry in config.override.for_operation(case.operation).items():  # type: ignore[union-attr]
-                    if entry:
-                        container = getattr(case, location) or {}
-                        container.update(entry)
-                        setattr(case, location, container)
-                return super().before_call(case)
+        def before_call(self, case: Case) -> None:
+            for location, entry in overrides.for_operation(engine.cfg.projects.default, case.operation).items():
+                if entry:
+                    container = getattr(case, location) or {}
+                    container.update(entry)
+                    setattr(case, location, container)
+            return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
@@ -139,12 +138,21 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
+            check_ctx = CheckContext(
+                # TODO:
+                override=None,
+                auth=engine.config.network.auth,
+                headers=CaseInsensitiveDict(engine.config.network.headers) if engine.config.network.headers else None,
+                config=engine.cfg.projects.default.checks_config_for(operation=case.operation, phase="stateful"),
+                transport_kwargs=engine.transport_kwargs,
+                recorder=self.recorder,
+            )
             validate_response(
                 response=response,
                 case=case,
                 stateful_ctx=ctx,
-                check_ctx=self._check_ctx,
-                checks=config.execution.checks,
+                check_ctx=check_ctx,
+                checks=check_ctx.checks,
                 control=engine.control,
                 recorder=self.recorder,
                 additional_checks=additional_checks,

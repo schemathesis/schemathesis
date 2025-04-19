@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
+from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
@@ -23,7 +24,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
-ChecksConfig = dict[CheckFunction, Any]
 
 
 class CheckContext:
@@ -38,8 +38,9 @@ class CheckContext:
     config: ChecksConfig
     transport_kwargs: dict[str, Any] | None
     recorder: ScenarioRecorder | None
+    checks: list[CheckFunction]
 
-    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "recorder")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "recorder", "checks")
 
     def __init__(
         self,
@@ -56,6 +57,11 @@ class CheckContext:
         self.config = config
         self.transport_kwargs = transport_kwargs
         self.recorder = recorder
+        self.checks = []
+        for check in CHECKS.get_all():
+            name = check.__name__
+            if self.config.get_by_name(name=name).enabled:
+                self.checks.append(check)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         if self.recorder is not None:

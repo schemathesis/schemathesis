@@ -1,7 +1,7 @@
 Exit code: 0
 ---
 Stdout:
-Usage: run [OPTIONS] SCHEMA
+Usage: schemathesis run [OPTIONS] SCHEMA
 
   Run tests against an API using a specified SCHEMA.
 
@@ -26,9 +26,8 @@ Options:
 
 API validation options:
   -c, --checks                  Comma-separated list of checks to run against
-                                API responses  [default: not_a_server_error]
-                                [possible values: not_a_server_error,
-                                status_code_conformance,
+                                API responses [possible values:
+                                not_a_server_error, status_code_conformance,
                                 content_type_conformance,
                                 response_headers_conformance,
                                 response_schema_conformance,
@@ -108,15 +107,6 @@ Experimental options:
                                   the coverage phase. [possible values: get,
                                   put, post, delete, options, head, patch,
                                   trace]
-  --experimental-missing-required-header-allowed-statuses
-                                  Comma-separated list of status codes expected
-                                  for test cases with a missing required header
-  --experimental-positive-data-acceptance-allowed-statuses
-                                  Comma-separated list of status codes
-                                  considered as successful responses
-  --experimental-negative-data-rejection-allowed-statuses
-                                  Comma-separated list of status codes expected
-                                  for rejected negative data
 
 Data generation options:
   -m, --mode                      Test data generation mode  [default: positive]
@@ -150,16 +140,6 @@ Data generation options:
   --contrib-openapi-fill-missing-examples
                                   Enable generation of random examples for API
                                   operations that do not have explicit examples
-
-Open API options:
-  --set-query TEXT   OpenAPI: Override a specific query parameter by specifying
-                     'parameter=value'
-  --set-header TEXT  OpenAPI: Override a specific header parameter by specifying
-                     'parameter=value'
-  --set-cookie TEXT  OpenAPI: Override a specific cookie parameter by specifying
-                     'parameter=value'
-  --set-path TEXT    OpenAPI: Override a specific path parameter by specifying
-                     'parameter=value'
 
 Global options:
   --no-color     Disable ANSI color escape codes

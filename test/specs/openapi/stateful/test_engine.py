@@ -6,7 +6,8 @@ import hypothesis.errors
 import pytest
 
 import schemathesis
-from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
+from schemathesis.checks import max_response_time, not_a_server_error
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.engine import Status, events
 from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
@@ -543,15 +544,14 @@ def test_external_link(ctx, app_factory, app_runner):
             schema=schema,
             config=EngineConfig(
                 execution=ExecutionConfig(
-                    checks=CHECKS.get_all(),
                     targets=[],
                     hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
                     generation=GenerationConfig(),
                 ),
                 network=NetworkConfig(),
-                checks_config=ChecksConfig(),
             ),
             stop_event=threading.Event(),
+            cfg=SchemathesisConfig(),
         ),
         phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
     )

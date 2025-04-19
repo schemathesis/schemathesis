@@ -12,12 +12,12 @@ from ..utils import SIMPLE_PATH
 @pytest.mark.parametrize("value", ["//test", "//ÿ["])
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
-        validation.validate_schema(value, None)
+        validation.validate_schema_location(value, None)
 
 
 def test_validate_schema_path_without_base_url():
     with pytest.raises(click.UsageError):
-        validation.validate_schema(SIMPLE_PATH, None)
+        validation.validate_schema_location(SIMPLE_PATH, None)
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))

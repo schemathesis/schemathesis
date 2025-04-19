@@ -100,7 +100,10 @@ def test_in_cli(ctx, cli, open_api_3_schema_with_recoverable_errors, workers, op
     schema_path = ctx.makefile(open_api_3_schema_with_recoverable_errors)
     # Then valid operation should be tested
     # And errors on the single operation error should be displayed
-    assert cli.run(str(schema_path), f"--workers={workers}", f"--url={openapi3_base_url}") == snapshot_cli
+    assert (
+        cli.run(str(schema_path), f"--workers={workers}", f"--url={openapi3_base_url}", "-c not_a_server_error")
+        == snapshot_cli
+    )
 
 
 def test_direct_access(schema):
