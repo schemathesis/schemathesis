@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping
 
 import hypothesis
 from hypothesis import Phase
+from hypothesis._settings import all_settings
 from hypothesis.errors import HypothesisWarning, Unsatisfiable
 from hypothesis.internal.entropy import deterministic_PRNG
 from jsonschema.exceptions import SchemaError
@@ -101,7 +102,11 @@ def create_test(
             default = hypothesis.settings.default
             wrapped_test._hypothesis_internal_use_settings = hypothesis.settings(
                 wrapped_test._hypothesis_internal_use_settings,
-                **{item: value for item, value in settings.__dict__.items() if value != getattr(default, item)},
+                **{
+                    item: getattr(settings, item)
+                    for item in all_settings
+                    if getattr(settings, item) != getattr(default, item)
+                },
             )
         else:
             wrapped_test = settings(wrapped_test)

@@ -7,6 +7,7 @@ Changelog
 **Fixed**
 
 - Missing reference resolution scope when serializing ``multipart`` payloads. :issue:`2776`
+- Compatibility with hypothesis >= 6.131.4. :issue:`2797`
 
 .. _v3.39.15:
 
