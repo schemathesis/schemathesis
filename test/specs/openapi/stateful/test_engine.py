@@ -309,7 +309,9 @@ def test_failed_health_check(engine_factory):
         hypothesis.reject()
 
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, suppress_health_check=[]),
+        hypothesis_settings=hypothesis.settings(
+            max_examples=1, database=None, suppress_health_check=[hypothesis.HealthCheck.differing_executors]
+        ),
         checks=[rejected_check],
     )
     result = collect_result(engine)
