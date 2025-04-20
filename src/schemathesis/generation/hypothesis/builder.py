@@ -12,6 +12,7 @@ from typing import Any, Callable, Generator, Mapping
 import hypothesis
 from hypothesis import Phase
 from hypothesis import strategies as st
+from hypothesis._settings import all_settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema.exceptions import SchemaError
 
@@ -98,7 +99,11 @@ def create_test(
         # Merge the user-provided settings with the current ones
         settings = hypothesis.settings(
             settings,
-            **{item: value for item, value in config.settings.__dict__.items() if value != getattr(default, item)},
+            **{
+                item: getattr(config.settings, item)
+                for item in all_settings
+                if getattr(config.settings, item) != getattr(default, item)
+            },
         )
 
     if Phase.explain in settings.phases:
