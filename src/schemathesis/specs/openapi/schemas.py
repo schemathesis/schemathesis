@@ -713,7 +713,7 @@ class BaseOpenAPISchema(BaseSchema):
                     JsonSchemaError.from_exception(
                         operation=operation.label,
                         exc=exc,
-                        output_config=operation.schema.output_config,
+                        config=operation.schema.output_config,
                     )
                 )
         _maybe_raise_one_or_more(failures)

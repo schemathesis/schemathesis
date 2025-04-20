@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import click
 from click.utils import LazyFile
@@ -144,12 +144,14 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "include_by",
     type=str,
     metavar="EXPR",
+    callback=validation.validate_filter_expression,
     help="Include using custom expression",
 )
 @grouped_option(
     "--exclude-by",
     "exclude_by",
     type=str,
+    callback=validation.validate_filter_expression,
     metavar="EXPR",
     help="Exclude using custom expression",
 )
@@ -433,8 +435,8 @@ def run(
     exclude_tag_regex: str | None,
     exclude_operation_id: tuple[str, ...],
     exclude_operation_id_regex: str | None,
-    include_by: str | None = None,
-    exclude_by: str | None = None,
+    include_by: Callable | None = None,
+    exclude_by: Callable | None = None,
     exclude_deprecated: bool = False,
     workers: int = DEFAULT_WORKERS,
     base_url: str | None,
@@ -499,12 +501,11 @@ def run(
         color=color,
         suppress_health_check=suppress_health_check,
         seed=generation_seed,
+        wait_for_schema=wait_for_schema,
         max_failures=max_failures,
     )
-    config.output.set(
-        sanitize=output_sanitize,
-        truncate=output_truncate,
-    )
+    config.output.sanitization.set(enabled=output_sanitize)
+    config.output.truncation.set(enabled=output_truncate)
     config.reports.set(
         formats=report_formats,
         junit_path=report_junit_path.name if report_junit_path else None,
@@ -519,7 +520,6 @@ def run(
         headers=headers,
         auth=auth,
         workers=workers,
-        wait_for_schema=wait_for_schema,
         continue_on_failure=continue_on_failure,
         rate_limit=rate_limit,
         request_timeout=request_timeout,
@@ -528,6 +528,7 @@ def run(
         request_cert_key=request_cert_key,
         proxy=request_proxy,
     )
+    # These are filters for what API operations should be tested
     config.projects.override.operations.set(
         include_path=include_path,
         include_method=include_method,
@@ -573,4 +574,4 @@ def run(
         codec=generation_codec,
     )
 
-    executor.execute(location=location, config=config, args=ctx.args, params=ctx.params)
+    executor.execute(location=location, run_config=config, args=ctx.args, params=ctx.params)

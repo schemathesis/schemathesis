@@ -44,8 +44,7 @@ class Override:
 
 
 def for_operation(config: ProjectConfig, operation: APIOperation) -> dict[str, dict[str, str]]:
-    # Look up the first operation config that matches the given operation.
-    operation_config = next((config for config in config.operations if config.filter_set.applies_to(operation)), None)
+    operation_config = config.operations.get_for_operation(operation)
 
     output = {}
     groups = [

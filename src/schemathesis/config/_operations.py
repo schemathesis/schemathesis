@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Callable, Generator
 
 from schemathesis.config._auth import AuthConfig
 from schemathesis.config._checks import ChecksConfig
@@ -14,7 +14,10 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.filters import FilterSet, expression_to_filter_function
+from schemathesis.filters import FilterSet, expression_to_filter_function, is_deprecated
+
+if TYPE_CHECKING:
+    from schemathesis.schemas import APIOperation
 
 FILTER_ATTRIBUTES = [
     ("name", "name"),
@@ -50,6 +53,10 @@ class OperationsConfig(DiffBase):
     def __init__(self, *, operations: list[OperationConfig] | None = None):
         self.operations = operations or []
 
+    def get_for_operation(self, operation: APIOperation):
+        configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
+        return OperationConfig.from_hierarchy(configs)
+
     def set(
         self,
         *,
@@ -73,16 +80,93 @@ class OperationsConfig(DiffBase):
         exclude_name_regex: str | None,
         exclude_tag_regex: str | None,
         exclude_operation_id_regex: str | None,
-        include_by: str | None,
-        exclude_by: str | None,
+        include_by: Callable | None,
+        exclude_by: Callable | None,
         exclude_deprecated: bool,
     ) -> None:
-        pass
+        filter_set = FilterSet()
+        # Apply include filters
+        if include_by:
+            filter_set.include(include_by)
+        for name_ in include_name:
+            filter_set.include(name=name_)
+        for method in include_method:
+            filter_set.include(method=method)
+        for path in include_path:
+            filter_set.include(path=path)
+        for tag in include_tag:
+            filter_set.include(tag=tag)
+        for operation_id in include_operation_id:
+            filter_set.include(operation_id=operation_id)
+        if (
+            include_name_regex
+            or include_method_regex
+            or include_path_regex
+            or include_tag_regex
+            or include_operation_id_regex
+        ):
+            filter_set.include(
+                name_regex=include_name_regex,
+                method_regex=include_method_regex,
+                path_regex=include_path_regex,
+                tag_regex=include_tag_regex,
+                operation_id_regex=include_operation_id_regex,
+            )
+
+        # Enable all explicitly enabled operations
+        self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=True))
+
+        filter_set = FilterSet()
+        # Apply exclude filters - everything explicitly excluded should be disabled
+        if exclude_by:
+            filter_set.include(exclude_by)
+        for name_ in exclude_name:
+            filter_set.include(name=name_)
+        for method in exclude_method:
+            filter_set.include(method=method)
+        for path in exclude_path:
+            filter_set.include(path=path)
+        for tag in exclude_tag:
+            filter_set.include(tag=tag)
+        for operation_id in exclude_operation_id:
+            filter_set.include(operation_id=operation_id)
+        if (
+            exclude_name_regex
+            or exclude_method_regex
+            or exclude_path_regex
+            or exclude_tag_regex
+            or exclude_operation_id_regex
+        ):
+            filter_set.include(
+                name_regex=exclude_name_regex,
+                method_regex=exclude_method_regex,
+                path_regex=exclude_path_regex,
+                tag_regex=exclude_tag_regex,
+                operation_id_regex=exclude_operation_id_regex,
+            )
+
+        # Exclude deprecated operations
+        if exclude_deprecated:
+            filter_set.include(is_deprecated)
+
+        self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=False))
+
+
+def apply_exclude_filter(filter_set: FilterSet, option_name: str, **kwargs: Any) -> None:
+    """Apply an exclude filter with proper error handling."""
+    try:
+        filter_set.include(**kwargs)
+    except IncorrectUsage as e:
+        if str(e) == "Filter already exists":
+            raise ConfigError(
+                f"Filter for {option_name} already exists. You can't simultaneously include and exclude the same thing."
+            ) from None
+        raise ConfigError(str(e)) from None
 
 
 @dataclass
 class OperationConfig(DiffBase):
-    filter_set: FilterSet
+    _filter_set: FilterSet
     enabled: bool
     base_url: str | None
     headers: dict
@@ -103,7 +187,7 @@ class OperationConfig(DiffBase):
     generation: GenerationConfig
 
     __slots__ = (
-        "filter_set",
+        "_filter_set",
         "enabled",
         "base_url",
         "headers",
@@ -147,7 +231,7 @@ class OperationConfig(DiffBase):
         phases: PhasesConfig | None = None,
         generation: GenerationConfig | None = None,
     ) -> None:
-        self.filter_set = filter_set or FilterSet()
+        self._filter_set = filter_set or FilterSet()
         self.enabled = enabled
         self.base_url = base_url
         self.headers = headers or {}
@@ -212,6 +296,3 @@ class OperationConfig(DiffBase):
             phases=PhasesConfig.from_dict(data.get("phases", {})),
             generation=GenerationConfig.from_dict(data.get("generation", {})),
         )
-
-    def __repr__(self) -> str:
-        return super().__repr__()

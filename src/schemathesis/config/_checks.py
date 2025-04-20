@@ -14,50 +14,32 @@ MISSING_REQUIRED_HEADER_EXPECTED_STATUSES = ["406"]
 @dataclass(repr=False)
 class SimpleCheckConfig(DiffBase):
     enabled: bool
-    _explicit_attrs: set[str]
 
-    __slots__ = ("enabled", "_explicit_attrs")
+    __slots__ = ("enabled",)
 
-    def __init__(
-        self,
-        *,
-        enabled: bool = True,
-        _explicit_attrs: set[str] | None = None,
-    ) -> None:
+    def __init__(self, *, enabled: bool = True) -> None:
         self.enabled = enabled
-        self._explicit_attrs = _explicit_attrs or set()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> SimpleCheckConfig:
-        return cls(
-            enabled=data.get("enabled", True),
-            _explicit_attrs=cls.get_explicit_attrs(set(data)),
-        )
+        return cls(enabled=data.get("enabled", True))
 
 
 @dataclass(repr=False)
 class CheckConfig(DiffBase):
     enabled: bool
     expected_statuses: list[str]
-    _explicit_attrs: set[str]
     _DEFAULT_EXPECTED_STATUSES: ClassVar[list[str]]
 
-    __slots__ = ("enabled", "expected_statuses", "_explicit_attrs")
+    __slots__ = ("enabled", "expected_statuses")
 
-    def __init__(
-        self,
-        *,
-        enabled: bool = True,
-        expected_statuses: Sequence[str | int] | None = None,
-        _explicit_attrs: set[str] | None = None,
-    ) -> None:
+    def __init__(self, *, enabled: bool = True, expected_statuses: Sequence[str | int] | None = None) -> None:
         self.enabled = enabled
         self.expected_statuses = (
             [str(status) for status in expected_statuses]
             if expected_statuses is not None
             else self._DEFAULT_EXPECTED_STATUSES
         )
-        self._explicit_attrs = _explicit_attrs or set()
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CheckConfig:
@@ -65,7 +47,6 @@ class CheckConfig(DiffBase):
         return cls(
             enabled=enabled,
             expected_statuses=data.get("expected-statuses", cls._DEFAULT_EXPECTED_STATUSES),
-            _explicit_attrs=cls.get_explicit_attrs(set(data)),
         )
 
 
@@ -188,7 +169,7 @@ class ChecksConfig(DiffBase):
             enabled = True
             if name in self._unknown_excluded:
                 enabled = False
-            return SimpleCheckConfig(enabled=enabled, _explicit_attrs={"enabled"})
+            return SimpleCheckConfig(enabled=enabled)
 
     def set(
         self,
@@ -205,40 +186,11 @@ class ChecksConfig(DiffBase):
             ):
                 config = self.get_by_name(name=name)
                 config.enabled = False
-                config._explicit_attrs.add("enabled")
             elif included_check_names is not None and name in included_check_names:
                 config = self.get_by_name(name=name)
                 config.enabled = True
-                config._explicit_attrs.add("enabled")
 
         self._unknown_included.update(
             name for name in (included_check_names or []) if name not in known_names and name != "all"
         )
         self._unknown_excluded.update(name for name in (excluded_check_names or []) if name not in known_names)
-
-    @classmethod
-    def from_many(cls, configs: list[ChecksConfig]) -> ChecksConfig:
-        if not configs:
-            return cls()
-        # Start with the lowest precedence config.
-        merged = configs[-1]
-        # Iterate from second-last to first, merging upward.
-        for cfg in reversed(configs[:-1]):
-            merged = cls(
-                not_a_server_error=cfg.not_a_server_error.merge(merged.not_a_server_error),
-                status_code_conformance=cfg.status_code_conformance.merge(merged.status_code_conformance),
-                content_type_conformance=cfg.content_type_conformance.merge(merged.content_type_conformance),
-                response_schema_conformance=cfg.response_schema_conformance.merge(merged.response_schema_conformance),
-                response_headers_conformance=cfg.response_headers_conformance.merge(
-                    merged.response_headers_conformance
-                ),
-                positive_data_acceptance=cfg.positive_data_acceptance.merge(merged.positive_data_acceptance),
-                negative_data_rejection=cfg.negative_data_rejection.merge(merged.negative_data_rejection),
-                use_after_free=cfg.use_after_free.merge(merged.use_after_free),
-                ensure_resource_availability=cfg.ensure_resource_availability.merge(
-                    merged.ensure_resource_availability
-                ),
-                missing_required_header=cfg.missing_required_header.merge(merged.missing_required_header),
-                ignored_auth=cfg.ignored_auth.merge(merged.ignored_auth),
-            )
-        return merged

@@ -4,8 +4,9 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
-from schemathesis.core.output import OutputConfig, truncate_json
+from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
@@ -141,11 +142,10 @@ class JsonSchemaError(Failure):
         title: str = "Response violates schema",
         operation: str,
         exc: ValidationError,
-        output_config: OutputConfig | None = None,
+        config: OutputConfig,
     ) -> JsonSchemaError:
-        output_config = OutputConfig.from_parent(output_config, max_lines=20)
-        schema = textwrap.indent(truncate_json(exc.schema, config=output_config), prefix="    ")
-        value = textwrap.indent(truncate_json(exc.instance, config=output_config), prefix="    ")
+        schema = textwrap.indent(truncate_json(exc.schema, config=config, max_lines=20), prefix="    ")
+        value = textwrap.indent(truncate_json(exc.instance, config=config, max_lines=20), prefix="    ")
         schema_path = list(exc.absolute_schema_path)
         if len(schema_path) > 1:
             # Exclude the last segment, which is already in the schema

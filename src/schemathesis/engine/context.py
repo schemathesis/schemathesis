@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
+from schemathesis.engine import EngineConfig
 from schemathesis.generation.case import Case
 from schemathesis.schemas import BaseSchema
 
@@ -25,7 +26,7 @@ class EngineContext:
     schema: BaseSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
-    config: SchemathesisConfig
+    config: EngineConfig
     start_time: float
 
     def __init__(
@@ -33,11 +34,11 @@ class EngineContext:
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
-        config: SchemathesisConfig,
+        config: EngineConfig,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
-        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.max_failures)
+        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.run.max_failures)
         self.outcome_cache = {}
         self.config = config
         self.start_time = time.monotonic()
@@ -78,7 +79,7 @@ class EngineContext:
         import requests
 
         session = requests.Session()
-        config = self.config.projects.default
+        config = self.config.project
         session.verify = config.tls_verify
         if config.auth is not None:
             # TODO: Update
@@ -94,7 +95,7 @@ class EngineContext:
 
     @property
     def transport_kwargs(self) -> dict[str, Any]:
-        config = self.config.projects.default
+        config = self.config.project
         kwargs: dict[str, Any] = {
             "session": self.session,
             "headers": config.headers,

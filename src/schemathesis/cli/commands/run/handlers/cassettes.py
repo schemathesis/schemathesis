@@ -15,7 +15,7 @@ import harfile
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.config import ReportFormat
+from schemathesis.config import ReportFormat, SchemathesisConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
@@ -34,16 +34,14 @@ class CassetteWriter(EventHandler):
 
     format: ReportFormat
     path: Path
-    sanitize_output: bool = True
-    preserve_bytes: bool = False
+    config: SchemathesisConfig
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
     def __post_init__(self) -> None:
         kwargs = {
             "path": self.path,
-            "sanitize_output": self.sanitize_output,
-            "preserve_bytes": self.preserve_bytes,
+            "config": self.config,
             "queue": self.queue,
         }
         writer: Callable
@@ -103,7 +101,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
+def vcr_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -118,11 +116,11 @@ def vcr_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Q
     def format_header_values(values: list[str]) -> str:
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
-    if sanitize_output:
+    if config.output.sanitization.enabled:
 
         def format_headers(headers: dict[str, list[str]]) -> str:
             headers = deepclone(headers)
-            sanitize_value(headers)
+            sanitize_value(headers, config=config.output.sanitization)
             return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
     else:
@@ -144,7 +142,7 @@ def vcr_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Q
   checks:
 {items}"""
 
-    if preserve_bytes:
+    if config.reports.preserve_bytes:
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.encoded_body is not None:
@@ -266,8 +264,8 @@ http_interactions:"""
                     else:
                         stream.write("null")
 
-                    if sanitize_output:
-                        uri = sanitize_url(interaction.request.uri)
+                    if config.output.sanitization.enabled:
+                        uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
                     else:
                         uri = interaction.request.uri
                     recorded_at = datetime.datetime.fromtimestamp(
@@ -351,14 +349,14 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
     stream.write('"')
 
 
-def har_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
+def har_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
     with harfile.open(path) as har:
         while True:
             item = queue.get()
             if isinstance(item, Process):
                 for interaction in item.recorder.interactions.values():
-                    if sanitize_output:
-                        uri = sanitize_url(interaction.request.uri)
+                    if config.output.sanitization.enabled:
+                        uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
                     else:
                         uri = interaction.request.uri
                     query_params = urlparse(uri).query
@@ -366,7 +364,7 @@ def har_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Q
                         post_data = harfile.PostData(
                             mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                             text=interaction.request.encoded_body
-                            if preserve_bytes
+                            if config.reports.preserve_bytes
                             else interaction.request.body.decode("utf-8", "replace"),
                         )
                     else:
@@ -377,16 +375,18 @@ def har_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Q
                             size=interaction.response.body_size or 0,
                             mimeType=content_type,
                             text=interaction.response.encoded_body
-                            if preserve_bytes
+                            if config.reports.preserve_bytes
                             else interaction.response.content.decode("utf-8", "replace")
                             if interaction.response.content is not None
                             else None,
-                            encoding="base64" if interaction.response.content is not None and preserve_bytes else None,
+                            encoding="base64"
+                            if interaction.response.content is not None and config.reports.preserve_bytes
+                            else None,
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"
-                        if sanitize_output:
+                        if config.output.sanitization.enabled:
                             headers = deepclone(interaction.response.headers)
-                            sanitize_value(headers)
+                            sanitize_value(headers, config=config.output.sanitization)
                         else:
                             headers = interaction.response.headers
                         response = harfile.Response(
@@ -406,9 +406,9 @@ def har_writer(path: Path, sanitize_output: bool, preserve_bytes: bool, queue: Q
                         time = 0
                         http_version = ""
 
-                    if sanitize_output:
+                    if config.output.sanitization.enabled:
                         headers = deepclone(interaction.request.headers)
-                        sanitize_value(headers)
+                        sanitize_value(headers, config=config.output.sanitization)
                     else:
                         headers = interaction.request.headers
                     started_datetime = datetime.datetime.fromtimestamp(

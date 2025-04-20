@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from schemathesis import auths, contrib, engine, errors, experimental, graphql, hooks, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
-from schemathesis.core.output import OutputConfig, sanitization
+from schemathesis.core.output import sanitization
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
@@ -24,7 +24,6 @@ __all__ = [
     "GenerationMode",
     "GenerationConfig",
     "HeaderConfig",
-    "OutputConfig",
     "Response",
     "TargetContext",
     "TargetFunction",

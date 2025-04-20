@@ -6,7 +6,7 @@ import pathlib
 import re
 from contextlib import contextmanager
 from functools import reduce
-from typing import Callable, Generator, Sequence
+from typing import Callable, Generator
 from urllib.parse import urlparse
 
 import click
@@ -16,6 +16,7 @@ from schemathesis.config._projects import get_workers_count
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
+from schemathesis.filters import expression_to_filter_function
 from schemathesis.generation import GenerationMode
 
 INVALID_DERANDOMIZE_MESSAGE = (
@@ -152,10 +153,16 @@ def _validate_and_build_multiple_options(
     return output
 
 
-def validate_unique_filter(values: Sequence[str], arg_name: str) -> None:
-    if len(values) != len(set(values)):
-        duplicates = ",".join(sorted({value for value in values if values.count(value) > 1}))
-        raise click.UsageError(f"Duplicate values are not allowed for `{arg_name}`: {duplicates}")
+def validate_filter_expression(
+    ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
+) -> Callable | None:
+    if raw_value:
+        try:
+            return expression_to_filter_function(raw_value)
+        except ValueError:
+            arg_name = param.opts[0]
+            raise click.UsageError(f"Invalid expression for {arg_name}: {raw_value}") from None
+    return None
 
 
 def _validate_header(key: str, value: str, where: str) -> None:

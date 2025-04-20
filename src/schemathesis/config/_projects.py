@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, is_dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from schemathesis.config._auth import AuthConfig
@@ -22,13 +22,6 @@ if TYPE_CHECKING:
 DEFAULT_WORKERS = 1
 
 
-@dataclass(repr=False)
-class ConfigOverride:
-    checks: ChecksConfig | None
-
-    __slots__ = ("checks",)
-
-
 def get_workers_count() -> int:
     """Detect the number of available CPUs for the current process, if possible.
 
@@ -43,7 +36,6 @@ def get_workers_count() -> int:
 
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
-    _override: ConfigOverride | None
     base_url: str | None
     headers: dict
     hooks: str | None
@@ -65,7 +57,6 @@ class ProjectConfig(DiffBase):
     operations: OperationsConfig
 
     __slots__ = (
-        "_override",
         "base_url",
         "headers",
         "hooks",
@@ -110,12 +101,8 @@ class ProjectConfig(DiffBase):
         generation: GenerationConfig | None = None,
         operations: OperationsConfig | None = None,
     ) -> None:
-        self._override = None
         if base_url is not None:
-            try:
-                validate_base_url(base_url)
-            except ValueError as exc:
-                raise ConfigError(str(exc)) from None
+            _validate_base_url(base_url)
         self.base_url = base_url
         self.headers = headers or {}
         self.hooks = hooks_
@@ -171,10 +158,6 @@ class ProjectConfig(DiffBase):
             ),
         )
 
-    @classmethod
-    def from_many(cls, configs: list[ProjectConfig]) -> ProjectConfig:
-        raise NotImplementedError
-
     def set(
         self,
         *,
@@ -182,7 +165,6 @@ class ProjectConfig(DiffBase):
         headers: dict | None = None,
         auth: tuple[str, str] | None = None,
         workers: int | Literal["auto"] = "auto",
-        wait_for_schema: float | int | None = None,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,
@@ -192,7 +174,38 @@ class ProjectConfig(DiffBase):
         proxy: str | None = None,
     ) -> None:
         if base_url is not None:
+            _validate_base_url(base_url)
             self.base_url = base_url
+
+        if headers is not None:
+            self.headers.update(headers)
+
+        if isinstance(workers, int):
+            self.workers = workers
+        else:
+            self.workers = get_workers_count()
+
+        if continue_on_failure is not None:
+            self.continue_on_failure = continue_on_failure
+
+        if rate_limit is not None:
+            validate_rate_limit(rate_limit)
+            self.rate_limit = rate_limit
+
+        if request_timeout is not None:
+            self.request_timeout = request_timeout
+
+        if tls_verify is not None:
+            self.tls_verify = tls_verify
+
+        if request_cert is not None:
+            self.request_cert = request_cert
+
+        if request_cert_key is not None:
+            self.request_cert_key = request_cert_key
+
+        if proxy is not None:
+            self.proxy = proxy
 
     def checks_config_for(
         self,
@@ -201,11 +214,9 @@ class ProjectConfig(DiffBase):
         phase: Literal["examples", "coverage", "fuzzing", "stateful"] | None = None,
     ) -> ChecksConfig:
         configs = []
-        if self._override is not None and self._override.checks is not None:
-            configs.append(self._override.checks)
         if operation is not None:
             for op in self.operations.operations:
-                if op.filter_set.applies_to(operation=operation):
+                if op._filter_set.applies_to(operation=operation):
                     if phase is not None:
                         phase_config = op.phases.get_by_name(name=phase)
                         configs.append(phase_config.checks)
@@ -214,7 +225,14 @@ class ProjectConfig(DiffBase):
             phase_config = self.phases.get_by_name(name=phase)
             configs.append(phase_config.checks)
         configs.append(self.checks)
-        return ChecksConfig.from_many(configs)
+        return ChecksConfig.from_hierarchy(configs)
+
+
+def _validate_base_url(base_url: str) -> None:
+    try:
+        validate_base_url(base_url)
+    except ValueError as exc:
+        raise ConfigError(str(exc)) from None
 
 
 @dataclass(repr=False)
@@ -243,6 +261,8 @@ class ProjectsConfig(DiffBase):
         )
 
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
+        # Highest priority goes to `override`, then config specifically
+        # for the given project, then the "default" project config
         configs = [self.override]
         title = schema.get("info", {}).get("title")
         if title is not None:
@@ -250,4 +270,4 @@ class ProjectsConfig(DiffBase):
             if named is not None:
                 configs.append(named)
         configs.append(self.default)
-        return ProjectConfig.from_many(configs)
+        return ProjectConfig.from_hierarchy(configs)

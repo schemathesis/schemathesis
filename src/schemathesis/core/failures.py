@@ -9,8 +9,9 @@ from enum import Enum, auto
 from json import JSONDecodeError
 from typing import Any, Callable
 
+from schemathesis.config import OutputConfig
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.output import OutputConfig, prepare_response_payload
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transport import Response
 
 

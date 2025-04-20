@@ -110,4 +110,7 @@ class PhasesConfig(DiffBase):
         )
 
     def set(self, *, phases: list[str]) -> None:
-        pass
+        self.examples.enabled = "examples" in phases
+        self.coverage.enabled = "coverage" in phases
+        self.fuzzing.enabled = "fuzzing" in phases
+        self.stateful.enabled = "stateful" in phases

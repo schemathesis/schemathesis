@@ -408,11 +408,50 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "sanitize": {
-          "type": "boolean"
+        "sanitization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "keys_to_sanitize": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sensitive_markers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "replacement": {
+              "type": "string"
+            }
+          }
         },
-        "truncate": {
-          "type": "boolean"
+        "truncation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "max_payload_size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_lines": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max_width": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
         }
       }
     },

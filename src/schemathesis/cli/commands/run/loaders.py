@@ -7,36 +7,20 @@ supporting both GraphQL and OpenAPI specifications.
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
-from schemathesis.config import SchemathesisConfig
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
-from schemathesis.core.output import OutputConfig
-from schemathesis.generation import GenerationConfig
+from schemathesis.engine import EngineConfig
 
 if TYPE_CHECKING:
-    from schemathesis.engine.config import NetworkConfig
     from schemathesis.schemas import BaseSchema
 
-Loader = Callable[["SchemathesisConfig"], "BaseSchema"]
+Loader = Callable[["EngineConfig"], "BaseSchema"]
 
 
-@dataclass
-class AutodetectConfig:
-    location: str
-    network: NetworkConfig
-    wait_for_schema: float | None
-    base_url: str | None | NotSet = NOT_SET
-    rate_limit: str | None | NotSet = NOT_SET
-    generation: GenerationConfig | NotSet = NOT_SET
-    output: OutputConfig | NotSet = NOT_SET
-
-
-def load_schema(location: str, config: SchemathesisConfig) -> BaseSchema:
+def load_schema(location: str, config: EngineConfig) -> BaseSchema:
     """Load API schema automatically based on the provided configuration."""
     if is_probably_graphql(location):
         # Try GraphQL first, then fallback to Open API
@@ -70,7 +54,7 @@ def detect_loader(schema_or_location: str | dict[str, Any], module: Any) -> Call
     raise NotImplementedError
 
 
-def _try_load_schema(location: str, config: SchemathesisConfig, first_module: Any, second_module: Any) -> BaseSchema:
+def _try_load_schema(location: str, config: EngineConfig, first_module: Any, second_module: Any) -> BaseSchema:
     """Try to load schema with fallback option."""
     from urllib3.exceptions import InsecureRequestWarning
 
@@ -89,27 +73,22 @@ def _try_load_schema(location: str, config: SchemathesisConfig, first_module: An
             raise exc
 
 
-def _load_schema(location: str, config: SchemathesisConfig, module: Any) -> BaseSchema:
+def _load_schema(location: str, config: EngineConfig, module: Any) -> BaseSchema:
     """Unified schema loader for both GraphQL and OpenAPI."""
     loader = detect_loader(location, module)
 
     kwargs: dict = {}
     if loader is module.from_url:
-        if config.wait_for_schema is not None:
-            kwargs["wait_for_schema"] = config.wait_for_schema
-        kwargs["verify"] = config.projects.default.tls_verify
-        if config.projects.default.request_cert:
-            kwargs["cert"] = config.projects.default.request_cert
+        if config.run.wait_for_schema is not None:
+            kwargs["wait_for_schema"] = config.run.wait_for_schema
+        kwargs["verify"] = config.project.tls_verify
+        if config.project.request_cert:
+            kwargs["cert"] = config.project.request_cert
         # TODO: Fix this check
         # if config.projects.default.auth:
         #     kwargs["auth"] = config.network.auth
 
-    return loader(location, **kwargs).configure(
-        base_url=config.projects.default.base_url,
-        rate_limit=config.projects.default.rate_limit,
-        output=config.output,
-        generation=config.projects.default.generation,
-    )
+    return loader(location, **kwargs)
 
 
 def is_specific_exception(exc: Exception) -> bool:

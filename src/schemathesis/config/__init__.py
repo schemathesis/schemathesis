@@ -12,7 +12,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
-from schemathesis.config._output import OutputConfig
+from schemathesis.config._output import OutputConfig, SanitizationConfig, TruncationConfig
 from schemathesis.config._parameters import ParameterOverride
 from schemathesis.config._phases import CoveragePhaseConfig, PhaseConfig, PhasesConfig
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig
@@ -29,6 +29,8 @@ __all__ = [
     "ParameterOverride",
     "GenerationConfig",
     "OutputConfig",
+    "SanitizationConfig",
+    "TruncationConfig",
     "ChecksConfig",
     "CheckConfig",
     "PhaseConfig",
@@ -43,7 +45,7 @@ __all__ = [
 class SchemathesisConfig(DiffBase):
     color: bool | None
     suppress_health_check: list[HealthCheck]
-    seed: int | None
+    _seed: int | None
     wait_for_schema: float | int | None
     max_failures: int | None
     reports: ReportsConfig
@@ -53,7 +55,7 @@ class SchemathesisConfig(DiffBase):
     __slots__ = (
         "color",
         "suppress_health_check",
-        "seed",
+        "_seed",
         "wait_for_schema",
         "max_failures",
         "reports",
@@ -76,14 +78,18 @@ class SchemathesisConfig(DiffBase):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
 
-        if seed is None:
-            seed = Random().getrandbits(128)
-        self.seed = seed
+        self._seed = seed
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures
         self.reports = reports or ReportsConfig()
         self.output = output or OutputConfig()
         self.projects = projects or ProjectsConfig()
+
+    @property
+    def seed(self) -> int:
+        if self._seed is None:
+            self._seed = Random().getrandbits(128)
+        return self._seed
 
     @classmethod
     def discover(cls) -> SchemathesisConfig:
@@ -122,14 +128,18 @@ class SchemathesisConfig(DiffBase):
         color: bool | None,
         suppress_health_check: list[HealthCheck] | None,
         seed: int | None = None,
+        wait_for_schema: float | int | None = None,
         max_failures: int | None,
     ) -> None:
+        """Set top-level configuration options."""
         if color is not None:
             self.color = color
         if suppress_health_check is not None:
             self.suppress_health_check = suppress_health_check
         if seed is not None:
-            self.seed = seed
+            self._seed = seed
+        if wait_for_schema is not None:
+            self.wait_for_schema = wait_for_schema
         if max_failures is not None:
             self.max_failures = max_failures
 
@@ -160,6 +170,7 @@ class SchemathesisConfig(DiffBase):
             color=data.get("color"),
             suppress_health_check=[HealthCheck(name) for name in data.get("suppress-health-check", [])],
             seed=data.get("seed"),
+            wait_for_schema=data.get("wait-for-schema"),
             max_failures=data.get("max-failures"),
             reports=ReportsConfig.from_dict(data.get("reports", {})),
             output=OutputConfig.from_dict(data.get("output", {})),

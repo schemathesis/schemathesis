@@ -1,1 +1,1 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(wait_for_schema=5.0)))
+SchemathesisConfig(wait_for_schema=5.0)

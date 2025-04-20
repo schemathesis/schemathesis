@@ -65,18 +65,32 @@ class DiffBase:
             key.replace("-", "_") for key in keys
         }
 
-    def merge(self, other: T) -> T:
-        kwargs: dict[str, Any] = {}
-        for field in fields(other):
-            field_name = field.name
-            if field_name.startswith("_"):
+    @classmethod
+    def from_hierarchy(cls, configs: list[T]) -> T:
+        # Source for default values
+        default_config = cls()
+        # This config will accumulate "merged" config options
+        output = cls()
+        for option in cls.__slots__:
+            if option.startswith("_"):
                 continue
-            if field_name in self._explicit_attrs:  # type: ignore[attr-defined]
-                kwargs[field_name] = getattr(self, field_name)
+            default_value = getattr(default_config, option)
+            if is_dataclass(default_value):
+                # Sub-configs require merging of nested config options
+                sub_configs = [getattr(config, option) for config in configs]
+                merged = type(default_value).from_hierarchy(sub_configs)
+                setattr(output, option, merged)
             else:
-                kwargs[field_name] = getattr(other, field_name)
-        merged_explicit = other._explicit_attrs | self._explicit_attrs  # type: ignore[attr-defined]
-        return type(other)(**kwargs, _explicit_attrs=merged_explicit)  # type: ignore[call-arg]
+                # Primitive config options can be compared directly and do not
+                # require merging of nested options
+                for config in configs:
+                    current_value = getattr(config, option)
+                    if current_value != default_value:
+                        setattr(output, option, current_value)
+                        # As we go from the highest priority to the lowest one,
+                        # we can just stop on the first non-default value
+                        break
+        return output
 
 
 def _repr(item: object) -> str:

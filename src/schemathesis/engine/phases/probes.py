@@ -135,7 +135,7 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
         request.headers["User-Agent"] = USER_AGENT
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = ctx.session.send(request, timeout=ctx.config.projects.default.request_timeout or 2)
+            response = ctx.session.send(request, timeout=ctx.config.project.request_timeout or 2)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented

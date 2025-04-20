@@ -17,9 +17,9 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
+from schemathesis.config._output import OutputConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
-from schemathesis.core.output import OutputConfig
 from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
