@@ -6,6 +6,7 @@
 ### :bug: Fixed
 
 - Missing reference resolution scope when serializing `multipart` payloads. [#2776](https://github.com/schemathesis/schemathesis/issues/2776)
+- Compatibility with hypothesis >= 6.131.4. [#2797](https://github.com/schemathesis/schemathesis/issues/2797)
 
 ## [4.0.0-alpha.8](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.7...v4.0.0-alpha.8) - 2025-04-05
 
