@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config import SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.engine import EngineConfig
 from schemathesis.generation.case import Case

@@ -15,7 +15,6 @@ from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.loaders import load_schema
 from schemathesis.cli.ext.fs import open_file
 from schemathesis.config import ReportFormat, SchemathesisConfig
-from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import LoaderError
 from schemathesis.engine import EngineConfig, from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted

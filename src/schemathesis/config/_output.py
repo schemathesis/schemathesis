@@ -5,7 +5,6 @@ from typing import Any
 
 from schemathesis.config._diff_base import DiffBase
 
-
 # Exact keys to sanitize
 DEFAULT_KEYS_TO_SANITIZE = [
     "phpsessid",

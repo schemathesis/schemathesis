@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
-from typing import Any, TypeVar
+from typing import TypeVar
 
 T = TypeVar("T", bound="DiffBase")
 

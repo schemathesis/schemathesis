@@ -3,7 +3,6 @@ from __future__ import annotations
 import queue
 import time
 import unittest
-from dataclasses import replace
 from typing import Any
 from warnings import catch_warnings
 
@@ -56,19 +55,11 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.projects.default.hypothesis_settings)
-    if kwargs:
-        config = replace(
-            engine.config,
-            execution=replace(
-                engine.config.execution,
-                hypothesis_settings=hypothesis.settings(engine.config.execution.hypothesis_settings, **kwargs),
-            ),
-        )
-    else:
-        config = engine.config
+    configures_hypothesis_settings = engine.config.get_hypothesis_settings()
+    kwargs = _get_hypothesis_settings_kwargs_override(configures_hypothesis_settings)
+    hypothesis_settings = hypothesis.settings(configures_hypothesis_settings, **kwargs)
 
-    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=config.execution.targets))
+    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.project.generation.maximize))
 
     transport_kwargs = engine.transport_kwargs
 
@@ -88,7 +79,7 @@ def execute_state_machine_loop(
             return ""
 
         def before_call(self, case: Case) -> None:
-            for location, entry in overrides.for_operation(engine.cfg.projects.default, case.operation).items():
+            for location, entry in overrides.for_operation(engine.config.project, case.operation).items():
                 if entry:
                     container = getattr(case, location) or {}
                     container.update(entry)
@@ -101,7 +92,7 @@ def execute_state_machine_loop(
             if engine.has_to_stop:
                 raise KeyboardInterrupt
             try:
-                if config.execution.unique_inputs:
+                if engine.config.project.generation.unique_inputs:
                     cached = ctx.get_step_outcome(input.case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -110,13 +101,13 @@ def execute_state_machine_loop(
                 result = super().step(input)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if config.execution.unique_inputs:
+                if engine.config.project.generation.unique_inputs:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if config.execution.unique_inputs:
+                if engine.config.project.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
@@ -124,11 +115,11 @@ def execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if config.execution.unique_inputs:
+                if engine.config.project.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 raise exc
             else:
-                if config.execution.unique_inputs:
+                if engine.config.project.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, None)
             return result
 
@@ -177,7 +168,7 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    seed = config.execution.seed
+    seed = engine.config.run.seed
 
     while True:
         # This loop is running until no new failures are found in a single iteration
@@ -204,7 +195,7 @@ def execute_state_machine_loop(
             InstrumentedStateMachine = _InstrumentedStateMachine
         try:
             with catch_warnings(), ignore_hypothesis_output():  # type: ignore
-                InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
+                InstrumentedStateMachine.run(settings=hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code
             # that is placed in the base class of the state machine.
@@ -238,7 +229,7 @@ def execute_state_machine_loop(
             if isinstance(exc, Unsatisfiable) and ctx.completed_scenarios > 0:
                 # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
                 # values are possible to generate based on the previous observations, we retry the generation
-                if ctx.completed_scenarios >= config.execution.hypothesis_settings.max_examples:
+                if ctx.completed_scenarios >= hypothesis_settings.max_examples:
                     # Avoid infinite restarts
                     break
                 continue

@@ -162,14 +162,15 @@ def worker_task(
                     operation = result.ok()
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
                     try:
+                        # TODO: Get hypothesis / generation config specifically for this operation
                         test_function = create_test(
                             operation=operation,
                             test_func=test_func,
                             config=HypothesisTestConfig(
                                 modes=[mode],
-                                settings=ctx.config.hypothesis_settings,
-                                seed=ctx.config.execution.seed,
-                                generation=ctx.config.projects.default.generation,
+                                settings=ctx.config.get_hypothesis_settings(),
+                                seed=ctx.config.run.seed,
+                                generation=ctx.config.project.generation,
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
@@ -196,8 +197,8 @@ def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str
     for location, entry in overrides.for_operation(ctx.config.project, operation).items():
         if entry:
             kwargs[location] = entry
-    if ctx.config.projects.default.headers:
+    if ctx.config.project.headers:
         kwargs["headers"] = {
-            key: value for key, value in ctx.config.projects.default.headers.items() if key.lower() != "user-agent"
+            key: value for key, value in ctx.config.project.headers.items() if key.lower() != "user-agent"
         }
     return kwargs

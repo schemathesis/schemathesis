@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, is_dataclass
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
 from schemathesis.config._auth import AuthConfig
