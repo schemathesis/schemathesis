@@ -53,7 +53,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     try:
         with WorkerPool(
-            workers_num=engine.config.project.workers,
+            workers_num=engine.config.workers,
             producer=producer,
             worker_factory=worker_task,
             ctx=engine,
@@ -169,8 +169,8 @@ def worker_task(
                             config=HypothesisTestConfig(
                                 modes=[mode],
                                 settings=ctx.config.get_hypothesis_settings(),
-                                seed=ctx.config.run.seed,
-                                project=ctx.config.project,
+                                seed=ctx.config.seed,
+                                project=ctx.config,
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
@@ -194,11 +194,9 @@ def worker_task(
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
-    for location, entry in overrides.for_operation(ctx.config.project, operation).items():
+    for location, entry in overrides.for_operation(ctx.config, operation).items():
         if entry:
             kwargs[location] = entry
-    if ctx.config.project.headers:
-        kwargs["headers"] = {
-            key: value for key, value in ctx.config.project.headers.items() if key.lower() != "user-agent"
-        }
+    if ctx.config.headers:
+        kwargs["headers"] = {key: value for key, value in ctx.config.headers.items() if key.lower() != "user-agent"}
     return kwargs

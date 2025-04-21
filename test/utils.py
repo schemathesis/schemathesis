@@ -4,7 +4,6 @@ import os
 from functools import lru_cache, wraps
 from typing import Any, Callable, TypeVar
 
-import hypothesis
 import pytest
 import requests
 import urllib3
@@ -12,8 +11,6 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.checks import not_a_server_error
-from schemathesis.config import SchemathesisConfig
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
@@ -21,7 +18,6 @@ from schemathesis.engine import Status, events, from_schema
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Interaction
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -135,30 +131,31 @@ E = TypeVar("E", bound=EngineEvent)
 
 
 class EventStream:
-    def __init__(self, schema, **options):
-        options.setdefault("checks", [not_a_server_error])
-        config = EngineConfig(
-            execution=ExecutionConfig(
-                phases=options.get(
-                    "phases", [PhaseName.PROBING, PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
-                ),
-                targets=options.get("targets", []),
-                hypothesis_settings=options.get("hypothesis_settings")
-                or hypothesis.settings(deadline=DEFAULT_DEADLINE),
-                generation=schema.generation_config,
-                max_failures=options.get("max_failures"),
-                continue_on_failure=options.get("continue_on_failure", False),
-                unique_inputs=options.get("unique_data", False),
-                seed=options.get("seed"),
-                workers_num=options.get("workers_num", 1),
-            ),
-            network=options.get("network") or NetworkConfig(),
+    def __init__(
+        self,
+        schema,
+        checks=None,
+        phases=None,
+        seed=None,
+        max_examples=None,
+        deterministic=None,
+        headers=None,
+        auth=None,
+        workers=None,
+        max_failures=None,
+    ):
+        schema.config.checks.set(
+            included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
         )
-
-        parameters = options.get("parameters", {})
-        cfg = SchemathesisConfig.from_dict({"parameters": parameters})
-
-        self.schema = from_schema(schema, config=config, cfg=cfg)
+        phases = phases or [PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
+        schema.config.phases.set(phases=[phase.value.lower() for phase in phases])
+        schema.config.generation.set(max_examples=max_examples, deterministic=deterministic)
+        schema.config.set(headers=headers, workers=workers)
+        if auth is not None:
+            schema.config.auth.basic = {"username": auth[0], "password": auth[1]}
+        schema.config.seed = seed
+        schema.config.max_failures = max_failures
+        self.schema = from_schema(schema)
 
     def execute(self) -> EventStream:
         self.events = list(self.schema.execute())

@@ -4,8 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
-from schemathesis.config import ProjectConfig
-from schemathesis.config._parameters import ParameterOverride
+from schemathesis.config import ParameterOverride, ProjectConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import diff

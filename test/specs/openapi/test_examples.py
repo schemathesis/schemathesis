@@ -10,7 +10,6 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.config import GenerationConfig
 from schemathesis.generation.hypothesis import examples, strategies
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
@@ -957,7 +956,8 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(generation=GenerationConfig(allow_x00=False))
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.allow_x00 = False
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
 

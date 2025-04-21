@@ -124,11 +124,6 @@ class CustomFailure(Failure):
         return self.origin
 
 
-@dataclass
-class MaxResponseTimeConfig:
-    limit: float = 10.0
-
-
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
 

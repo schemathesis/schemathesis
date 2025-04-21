@@ -6,7 +6,7 @@ from typing import Sequence
 
 from schemathesis.auths import unregister as unregister_auth
 from schemathesis.core import SpecificationFeature
-from schemathesis.engine import EngineConfig, Status, events, phases
+from schemathesis.engine import Status, events, phases
 from schemathesis.schemas import BaseSchema
 
 from .context import EngineContext
@@ -17,15 +17,14 @@ from .phases import Phase, PhaseName, PhaseSkipReason
 @dataclass
 class Engine:
     schema: BaseSchema
-    config: EngineConfig
 
     def execute(self) -> EventStream:
         """Execute all test phases."""
         # Unregister auth if explicitly provided
-        if self.config.project.auth is not None:
+        if self.schema.config.auth is not None:
             unregister_auth()
 
-        ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), config=self.config)
+        ctx = EngineContext(schema=self.schema, stop_event=threading.Event())
         plan = self._create_execution_plan()
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
@@ -72,7 +71,7 @@ class Engine:
         phase = phase_name.value.lower()
         if (
             phase in ("examples", "coverage", "fuzzing", "stateful")
-            and not self.config.project.phases.get_by_name(name=phase).enabled
+            and not self.schema.config.phases.get_by_name(name=phase).enabled
         ):
             return Phase(
                 name=phase_name,

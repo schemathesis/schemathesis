@@ -11,8 +11,7 @@ from urllib.parse import urlparse
 
 import click
 
-from schemathesis.config import ReportFormat
-from schemathesis.config._projects import get_workers_count
+from schemathesis.config import ReportFormat, get_workers_count
 from schemathesis.core import errors, rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable

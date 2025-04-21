@@ -24,7 +24,6 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import EngineConfig, ExecutionConfig
 from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
@@ -178,9 +177,9 @@ def _load_schema(corpus, filename, app_port=None):
     raw_content = CORPUS_FILES[corpus].extractfile(filename)
     raw_schema = json_loads(raw_content.read())
     try:
-        return schemathesis.openapi.from_dict(raw_schema).configure(
-            base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None,
-        )
+        schema = schemathesis.openapi.from_dict(raw_schema)
+        schema.config.base_url = f"http://127.0.0.1:{app_port}/" if app_port is not None else None
+        return schema
     except LoaderError as exc:
         assert_invalid_schema(exc)
 

@@ -14,9 +14,9 @@ from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
 from schemathesis.cli.commands.run.loaders import load_schema
 from schemathesis.cli.ext.fs import open_file
-from schemathesis.config import ReportFormat, SchemathesisConfig
+from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError
-from schemathesis.engine import EngineConfig, from_schema
+from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
@@ -34,17 +34,15 @@ def handler() -> Callable[[type], None]:
 def execute(
     *,
     location: str,
-    run_config: SchemathesisConfig,
+    config: ProjectConfig,
     args: list[str],
     params: dict[str, Any],
 ) -> None:
-    # Use default project config until the project is loaded and we can get the specific config for this project
-    config = EngineConfig(run=run_config, project=run_config.projects.default)
     event_stream = into_event_stream(location=location, config=config)
     _execute(event_stream, config=config, args=args, params=params)
 
 
-def into_event_stream(*, location: str, config: EngineConfig) -> EventGenerator:
+def into_event_stream(*, location: str, config: ProjectConfig) -> EventGenerator:
     loading_started = LoadingStarted(location=location)
     yield loading_started
 
@@ -66,36 +64,37 @@ def into_event_stream(*, location: str, config: EngineConfig) -> EventGenerator:
         specification=schema.specification,
         statistic=schema.statistic,
         schema=schema.raw_schema,
+        config=schema.config,
         base_path=schema.base_path,
     )
 
     try:
-        yield from from_schema(schema, config=config).execute()
+        yield from from_schema(schema).execute()
     except Exception as exc:
         yield FatalError(exception=exc)
 
 
 def initialize_handlers(
     *,
-    config: EngineConfig,
+    config: ProjectConfig,
     args: list[str],
     params: dict[str, Any],
 ) -> list[EventHandler]:
     """Create event handlers based on run configuration."""
     handlers: list[EventHandler] = []
 
-    if config.run.reports.junit.enabled:
-        path = config.run.reports.get_path(ReportFormat.JUNIT)
+    if config.reports.junit.enabled:
+        path = config.reports.get_path(ReportFormat.JUNIT)
         open_file(path)
         handlers.append(JunitXMLHandler(path))
     for format, report in (
-        (ReportFormat.VCR, config.run.reports.vcr),
-        (ReportFormat.HAR, config.run.reports.har),
+        (ReportFormat.VCR, config.reports.vcr),
+        (ReportFormat.HAR, config.reports.har),
     ):
         if report.enabled:
-            path = config.run.reports.get_path(format)
+            path = config.reports.get_path(format)
             open_file(path)
-            handlers.append(CassetteWriter(format=format, path=path, config=config.run))
+            handlers.append(CassetteWriter(format=format, path=path, config=config))
 
     for custom_handler in CUSTOM_HANDLERS:
         handlers.append(custom_handler(*args, **params))
@@ -108,7 +107,7 @@ def initialize_handlers(
 def _execute(
     event_stream: EventGenerator,
     *,
-    config: EngineConfig,
+    config: ProjectConfig,
     args: list[str],
     params: dict[str, Any],
 ) -> None:

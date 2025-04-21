@@ -10,17 +10,17 @@ import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
+from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
-from schemathesis.engine import EngineConfig
 
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-Loader = Callable[["EngineConfig"], "BaseSchema"]
+Loader = Callable[["ProjectConfig"], "BaseSchema"]
 
 
-def load_schema(location: str, config: EngineConfig) -> BaseSchema:
+def load_schema(location: str, config: ProjectConfig) -> BaseSchema:
     """Load API schema automatically based on the provided configuration."""
     if is_probably_graphql(location):
         # Try GraphQL first, then fallback to Open API
@@ -54,7 +54,7 @@ def detect_loader(schema_or_location: str | dict[str, Any], module: Any) -> Call
     raise NotImplementedError
 
 
-def _try_load_schema(location: str, config: EngineConfig, first_module: Any, second_module: Any) -> BaseSchema:
+def _try_load_schema(location: str, config: ProjectConfig, first_module: Any, second_module: Any) -> BaseSchema:
     """Try to load schema with fallback option."""
     from urllib3.exceptions import InsecureRequestWarning
 
@@ -73,22 +73,22 @@ def _try_load_schema(location: str, config: EngineConfig, first_module: Any, sec
             raise exc
 
 
-def _load_schema(location: str, config: EngineConfig, module: Any) -> BaseSchema:
+def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchema:
     """Unified schema loader for both GraphQL and OpenAPI."""
     loader = detect_loader(location, module)
 
     kwargs: dict = {}
     if loader is module.from_url:
-        if config.run.wait_for_schema is not None:
-            kwargs["wait_for_schema"] = config.run.wait_for_schema
-        kwargs["verify"] = config.project.tls_verify
-        if config.project.request_cert:
-            kwargs["cert"] = config.project.request_cert
+        if config.wait_for_schema is not None:
+            kwargs["wait_for_schema"] = config.wait_for_schema
+        kwargs["verify"] = config.tls_verify
+        if config.request_cert:
+            kwargs["cert"] = config.request_cert
         # TODO: Fix this check
         # if config.projects.default.auth:
         #     kwargs["auth"] = config.network.auth
 
-    return loader(location, config=config.run, **kwargs)
+    return loader(location, config=config._parent, **kwargs)
 
 
 def is_specific_exception(exc: Exception) -> bool:

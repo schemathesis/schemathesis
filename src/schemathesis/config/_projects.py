@@ -15,10 +15,12 @@ from schemathesis.config._output import OutputConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
+from schemathesis.config._report import ReportsConfig
 from schemathesis.core import hooks
 from schemathesis.core.validation import validate_base_url
 
 if TYPE_CHECKING:
+    import hypothesis
     from pyrate_limiter import Limiter
 
     from schemathesis.config import SchemathesisConfig
@@ -41,7 +43,7 @@ def get_workers_count() -> int:
 
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
-    __parent: SchemathesisConfig | None
+    _parent: SchemathesisConfig | None
     base_url: str | None
     headers: dict | None
     hooks: str | None
@@ -63,7 +65,7 @@ class ProjectConfig(DiffBase):
     operations: OperationsConfig
 
     __slots__ = (
-        "__parent",
+        "_parent",
         "base_url",
         "headers",
         "hooks",
@@ -109,7 +111,7 @@ class ProjectConfig(DiffBase):
         generation: GenerationConfig | None = None,
         operations: OperationsConfig | None = None,
     ) -> None:
-        self.__parent = parent
+        self._parent = parent
         if base_url is not None:
             _validate_base_url(base_url)
         self.base_url = base_url
@@ -291,20 +293,65 @@ class ProjectConfig(DiffBase):
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
 
-    @property
-    def _parent(self) -> SchemathesisConfig:
-        if self.__parent is None:
+    def get_hypothesis_settings(self) -> hypothesis.settings:
+        # TODO: rework so it accepts optional operation / phase too
+        import hypothesis
+
+        # "database",
+        # "phases",
+        # "stateful_step_count",
+        # "suppress_health_check",
+        # "deadline",
+        kwargs: dict[str, Any] = {
+            "derandomize": self.generation.deterministic,
+            "deadline": None,
+        }
+        if self.generation.max_examples is not None:
+            kwargs["max_examples"] = self.generation.max_examples
+        # TODO: prepare
+        # suppress_health_check = self.run.suppress_health_check
+        # TODO: Prepare DB settings
+        # database = self.project.generation.database
+        # Prepare phases
+
+        return hypothesis.settings(**kwargs)
+
+    def _get_parent(self) -> SchemathesisConfig:
+        if self._parent is None:
             from schemathesis.config import SchemathesisConfig
 
-            self.__parent = SchemathesisConfig.discover()
-        return self.__parent
+            self._parent = SchemathesisConfig.discover()
+        return self._parent
 
     @property
     def output(self) -> OutputConfig:
-        return self._parent.output
+        return self._get_parent().output
 
-    def get_rate_limit(self):
-        pass
+    @property
+    def wait_for_schema(self) -> float | int | None:
+        return self._get_parent().wait_for_schema
+
+    @property
+    def max_failures(self) -> int | None:
+        return self._get_parent().max_failures
+
+    @max_failures.setter
+    def max_failures(self, value: int) -> None:
+        parent = self._get_parent()
+        parent.max_failures = value
+
+    @property
+    def reports(self) -> ReportsConfig:
+        return self._get_parent().reports
+
+    @property
+    def seed(self) -> int:
+        return self._get_parent().seed
+
+    @seed.setter
+    def seed(self, value: int) -> None:
+        parent = self._get_parent()
+        parent._seed = value
 
 
 def _validate_base_url(base_url: str) -> None:
@@ -340,10 +387,15 @@ class ProjectsConfig(DiffBase):
         )
 
     def _set_parent(self, parent: SchemathesisConfig) -> None:
-        self.default.__parent = parent
+        self.default._parent = parent
         for project in self.named.values():
-            project.__parent = parent
-        self.override.__parent = parent
+            project._parent = parent
+        self.override._parent = parent
+
+    def get_default(self) -> ProjectConfig:
+        config = ProjectConfig.from_hierarchy([self.override, self.default])
+        config._parent = self.default._parent
+        return config
 
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
         # Highest priority goes to `override`, then config specifically
@@ -355,4 +407,6 @@ class ProjectsConfig(DiffBase):
             if named is not None:
                 configs.append(named)
         configs.append(self.default)
-        return ProjectConfig.from_hierarchy(configs)
+        config = ProjectConfig.from_hierarchy(configs)
+        config._parent = self.default._parent
+        return config

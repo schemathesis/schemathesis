@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Mapping
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import ChecksConfig
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response

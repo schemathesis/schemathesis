@@ -15,7 +15,7 @@ from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._output import OutputConfig, SanitizationConfig, TruncationConfig
 from schemathesis.config._parameters import ParameterOverride
 from schemathesis.config._phases import CoveragePhaseConfig, PhaseConfig, PhasesConfig
-from schemathesis.config._projects import ProjectConfig, ProjectsConfig
+from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
 from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
 
 __all__ = [
@@ -38,6 +38,7 @@ __all__ = [
     "CoveragePhaseConfig",
     "ProjectsConfig",
     "ProjectConfig",
+    "get_workers_count",
 ]
 
 
@@ -125,8 +126,8 @@ class SchemathesisConfig(DiffBase):
     def set(
         self,
         *,
-        color: bool | None,
-        suppress_health_check: list[HealthCheck] | None,
+        color: bool | None = None,
+        suppress_health_check: list[HealthCheck] | None = None,
         seed: int | None = None,
         wait_for_schema: float | int | None = None,
         max_failures: int | None,

@@ -17,12 +17,11 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config._projects import ProjectConfig
+from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
-from schemathesis.core.validation import validate_base_url
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
@@ -42,7 +41,6 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScop
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
-    from pyrate_limiter import Limiter
     from typing_extensions import Self
 
     from schemathesis.core import Specification

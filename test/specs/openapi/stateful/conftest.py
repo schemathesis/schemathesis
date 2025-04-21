@@ -5,12 +5,11 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
-import hypothesis
 import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.config import GenerationConfig, SchemathesisConfig
+from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
 
@@ -497,30 +496,23 @@ def engine_factory(app_factory, app_runner, stop_event):
         targets=None,
         network=None,
         max_failures=None,
-        unique_data=False,
-        configuration=None,
+        unique_inputs=False,
+        generation_modes=None,
         include=None,
     ):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
-        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
-            **(configuration or {})
-        )
+        config = SchemathesisConfig()
+        config.set(max_failures=max_failures)
+        if isinstance(checks, list):
+            config.projects.override.checks.set(included_check_names=[func.__name__ for func in checks])
+        if generation_modes is not None:
+            config.projects.override.generation.set(modes=generation_modes, unique_inputs=unique_inputs)
+        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
         if include is not None:
             schema = schema.include(**include)
-        config = EngineConfig(
-            execution=ExecutionConfig(
-                targets=targets or [],
-                generation=GenerationConfig(),
-                hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
-                unique_inputs=unique_data,
-                max_failures=max_failures,
-            ),
-            network=network or NetworkConfig(),
-        )
-        cfg = SchemathesisConfig()
         return stateful.execute(
-            engine=EngineContext(schema=schema, stop_event=stop_event, config=config, cfg=cfg),
+            engine=EngineContext(schema=schema, stop_event=stop_event),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 

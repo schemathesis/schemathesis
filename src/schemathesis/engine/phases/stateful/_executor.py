@@ -59,7 +59,7 @@ def execute_state_machine_loop(
     kwargs = _get_hypothesis_settings_kwargs_override(configures_hypothesis_settings)
     hypothesis_settings = hypothesis.settings(configures_hypothesis_settings, **kwargs)
 
-    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.project.generation.maximize))
+    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.generation.maximize))
 
     transport_kwargs = engine.transport_kwargs
 
@@ -79,7 +79,7 @@ def execute_state_machine_loop(
             return ""
 
         def before_call(self, case: Case) -> None:
-            for location, entry in overrides.for_operation(engine.config.project, case.operation).items():
+            for location, entry in overrides.for_operation(engine.config, case.operation).items():
                 if entry:
                     container = getattr(case, location) or {}
                     container.update(entry)
@@ -92,7 +92,7 @@ def execute_state_machine_loop(
             if engine.has_to_stop:
                 raise KeyboardInterrupt
             try:
-                if engine.config.project.generation.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     cached = ctx.get_step_outcome(input.case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -101,13 +101,13 @@ def execute_state_machine_loop(
                 result = super().step(input)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if engine.config.project.generation.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if engine.config.project.generation.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
@@ -115,11 +115,11 @@ def execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if engine.config.project.generation.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 raise exc
             else:
-                if engine.config.project.generation.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, None)
             return result
 
@@ -130,14 +130,14 @@ def execute_state_machine_loop(
             ctx.collect_metric(case, response)
             ctx.current_response = response
             # TODO: convert overrides to Override class
-            override = engine.config.project.parameters_for(operation=case.operation)
-            auth = engine.config.project.auth_for(operation=case.operation)
-            headers = engine.config.project.headers_for(operation=case.operation)
+            override = engine.config.parameters_for(operation=case.operation)
+            auth = engine.config.auth_for(operation=case.operation)
+            headers = engine.config.headers_for(operation=case.operation)
             check_ctx = CheckContext(
                 override=override,
                 auth=auth,
                 headers=CaseInsensitiveDict(headers) if headers else None,
-                config=engine.config.project.checks_config_for(operation=case.operation, phase="stateful"),
+                config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
                 transport_kwargs=engine.transport_kwargs,
                 recorder=self.recorder,
             )
@@ -171,7 +171,7 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    seed = engine.config.run.seed
+    seed = engine.config.seed
 
     while True:
         # This loop is running until no new failures are found in a single iteration

@@ -15,7 +15,7 @@ import harfile
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.config import ReportFormat, SchemathesisConfig
+from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
@@ -34,7 +34,7 @@ class CassetteWriter(EventHandler):
 
     format: ReportFormat
     path: Path
-    config: SchemathesisConfig
+    config: ProjectConfig
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
@@ -53,7 +53,7 @@ class CassetteWriter(EventHandler):
         self.worker.start()
 
     def start(self, ctx: ExecutionContext) -> None:
-        self.queue.put(Initialize(seed=ctx.config.run.seed))
+        self.queue.put(Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
@@ -101,7 +101,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
+def vcr_writer(path: Path, config: ProjectConfig, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:

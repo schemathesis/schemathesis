@@ -112,7 +112,7 @@ class GenerationConfig(DiffBase):
         modes: list[GenerationMode] | None = None,
         max_examples: int | None = None,
         no_shrink: bool = False,
-        deterministic: bool = False,
+        deterministic: bool | None = None,
         allow_x00: bool = True,
         codec: str | None = None,
         maximize: list[TargetFunction] | None = None,
@@ -120,13 +120,14 @@ class GenerationConfig(DiffBase):
         graphql_allow_null: bool = True,
         database: str | None = None,
         unique_inputs: bool = False,
-    ):
+        exclude_header_characters: str | None = None,
+    ) -> None:
         if modes is not None:
             self.modes = modes
         if max_examples is not None:
             self.max_examples = max_examples
         self.no_shrink = no_shrink
-        self.deterministic = deterministic
+        self.deterministic = deterministic or False
         self.allow_x00 = allow_x00
         if codec is not None:
             self.codec = codec
@@ -137,6 +138,8 @@ class GenerationConfig(DiffBase):
         if database is not None:
             self.database = database
         self.unique_inputs = unique_inputs
+        if exclude_header_characters is not None:
+            self.exclude_header_characters = exclude_header_characters
 
 
 def _get_maximize(value: Any) -> list[TargetFunction]:

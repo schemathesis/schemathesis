@@ -376,7 +376,9 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             self.validate()
         except jsonschema.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(exc, path=path, method=method) from None
+            raise InvalidSchema.from_jsonschema_error(
+                exc, path=path, method=method, config=self.config.output
+            ) from None
         raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method) from error
 
     def validate(self) -> None:

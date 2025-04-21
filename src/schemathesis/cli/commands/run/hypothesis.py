@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.config._health_check import HealthCheck
+from schemathesis.config import HealthCheck
 
 if TYPE_CHECKING:
     import hypothesis

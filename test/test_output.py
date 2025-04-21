@@ -64,14 +64,14 @@ def test_no_dict_truncation():
     ],
 )
 def test_prepare_response_payload(payload, expected):
-    assert prepare_response_payload(payload) == expected
+    assert prepare_response_payload(payload, config=OutputConfig()) == expected
 
 
 def test_prepare_response_payload_truncated():
     value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" * 30
-    assert prepare_response_payload(value).endswith(" // Output truncated...")
+    assert prepare_response_payload(value, config=OutputConfig()).endswith(" // Output truncated...")
 
 
 def test_prepare_response_payload_no_truncation():
     value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    assert prepare_response_payload(value, config=OutputConfig(truncate=False)) == value
+    assert prepare_response_payload(value, config=OutputConfig(truncation=TruncationConfig(enabled=False))) == value

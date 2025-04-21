@@ -5,8 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.engine import EngineConfig
 from schemathesis.generation.case import Case
 from schemathesis.schemas import BaseSchema
 
@@ -25,7 +25,6 @@ class EngineContext:
     schema: BaseSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
-    config: EngineConfig
     start_time: float
 
     def __init__(
@@ -33,17 +32,19 @@ class EngineContext:
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
-        config: EngineConfig,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
-        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.run.max_failures)
+        self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
         self.outcome_cache = {}
-        self.config = config
         self.start_time = time.monotonic()
         self._session = session
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
+    @property
+    def config(self) -> ProjectConfig:
+        return self.schema.config
 
     @property
     def running_time(self) -> float:
@@ -78,7 +79,7 @@ class EngineContext:
         import requests
 
         session = requests.Session()
-        config = self.config.project
+        config = self.config
         session.verify = config.tls_verify
         if config.auth is not None:
             # TODO: Update
@@ -94,7 +95,7 @@ class EngineContext:
 
     @property
     def transport_kwargs(self) -> dict[str, Any]:
-        config = self.config.project
+        config = self.config
         kwargs: dict[str, Any] = {
             "session": self.session,
             "headers": config.headers,

@@ -1,6 +1,7 @@
 import time
 import uuid
 
+from schemathesis.config import ProjectConfig
 from schemathesis.core import Specification
 from schemathesis.engine import events
 from schemathesis.schemas import ApiStatistic
@@ -26,6 +27,7 @@ class LoadingFinished(events.EngineEvent):
         "specification",
         "statistic",
         "schema",
+        "config",
     )
 
     def __init__(
@@ -38,6 +40,7 @@ class LoadingFinished(events.EngineEvent):
         specification: Specification,
         statistic: ApiStatistic,
         schema: dict,
+        config: ProjectConfig,
     ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
@@ -48,3 +51,4 @@ class LoadingFinished(events.EngineEvent):
         self.statistic = statistic
         self.schema = schema
         self.base_path = base_path
+        self.config = config

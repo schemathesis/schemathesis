@@ -26,14 +26,13 @@ from schemathesis.transport.requests import RequestsTransport
 from test.utils import EventStream
 
 
-def run(schema_url, headers=None, network_config=None, **configuration):
-    schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
+def run(schema_url, **config):
+    schema = schemathesis.openapi.from_url(schema_url)
     stream = EventStream(
         schema,
         phases=[PhaseName.FUZZING],
         checks=[ignored_auth],
-        network=NetworkConfig(headers=headers, **(network_config or {})),
-        hypothesis_settings=settings(max_examples=1),
+        **config,
     ).execute()
     return stream.find(ScenarioFinished)
 

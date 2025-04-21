@@ -3,11 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generator
 
+from schemathesis.config import ProjectConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.transforms import UNRESOLVABLE
 from schemathesis.core.transport import Response
-from schemathesis.engine import EngineConfig, Status, events
+from schemathesis.engine import Status, events
 from schemathesis.engine.recorder import CaseNode, ScenarioRecorder
 from schemathesis.generation.case import Case
 
@@ -175,7 +176,7 @@ class GroupedFailures:
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
-    config: EngineConfig = field(default_factory=EngineConfig.discover)
+    config: ProjectConfig = field(default_factory=ProjectConfig.discover)
     statistic: Statistic = field(default_factory=Statistic)
     exit_code: int = 0
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)

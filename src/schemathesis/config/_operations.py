@@ -56,7 +56,7 @@ class OperationsConfig(DiffBase):
     def __init__(self, *, operations: list[OperationConfig] | None = None):
         self.operations = operations or []
 
-    def get_for_operation(self, operation: APIOperation):
+    def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
         return OperationConfig.from_hierarchy(configs)
 
@@ -117,7 +117,8 @@ class OperationsConfig(DiffBase):
             )
 
         # Enable all explicitly enabled operations
-        self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=True))
+        if not filter_set.is_empty():
+            self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=True))
 
         filter_set = FilterSet()
         # Apply exclude filters - everything explicitly excluded should be disabled
@@ -152,7 +153,8 @@ class OperationsConfig(DiffBase):
         if exclude_deprecated:
             filter_set.include(is_deprecated)
 
-        self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=False))
+        if not filter_set.is_empty():
+            self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=False))
 
 
 def apply_exclude_filter(filter_set: FilterSet, option_name: str, **kwargs: Any) -> None:

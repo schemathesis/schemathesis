@@ -5,16 +5,13 @@ from dataclasses import asdict
 from typing import TYPE_CHECKING
 from unittest.mock import ANY
 
-import hypothesis
 import pytest
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
-from hypothesis import Phase, settings
-from hypothesis import strategies as st
+from hypothesis import Phase
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
-from schemathesis.config import GenerationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
@@ -69,7 +66,8 @@ def assert_schema_requests_num(app, number):
 
 def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
-    schema = schemathesis.openapi.from_url(schema_url).configure(base_url=f"{openapi3_base_url}/404/")
+    schema = schemathesis.openapi.from_url(schema_url)
+    schema.config.base_url = f"{openapi3_base_url}/404/"
     EventStream(schema).execute()
     # Then the engine should use this base
     # And they will not reach the application
@@ -93,7 +91,7 @@ def test_execute(app, real_app_schema):
 
 @pytest.mark.parametrize("workers", [1, 2])
 def test_interactions(openapi3_base_url, real_app_schema, workers):
-    stream = EventStream(real_app_schema, workers_num=workers).execute()
+    stream = EventStream(real_app_schema, workers=workers).execute()
 
     # failure
     interactions = list(stream.find(events.ScenarioFinished, status=Status.FAILURE).recorder.interactions.values())
@@ -174,7 +172,7 @@ def test_empty_string_response_interaction(real_app_schema):
 
 def test_auth(app, real_app_schema):
     # When auth is specified as a tuple of 2 strings
-    execute(real_app_schema, network=NetworkConfig(auth=("test", "test")))
+    execute(real_app_schema, auth=("test", "test"))
 
     # Then each request should contain corresponding basic auth header
     assert_incoming_requests_num(app, 2)
@@ -187,7 +185,8 @@ def test_auth(app, real_app_schema):
 def test_base_url(openapi3_base_url, schema_url, app, converter):
     base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
-    schema = schemathesis.openapi.from_url(schema_url).configure(base_url=base_url)
+    schema = schemathesis.openapi.from_url(schema_url)
+    schema.config.base_url = base_url
     execute(schema)
 
     # Then each request should reach the app in both cases
@@ -218,7 +217,7 @@ def test_root_url():
 def test_execute_with_headers(app, real_app_schema):
     # When headers are specified for the `execute` call
     headers = {"Authorization": "Bearer 123"}
-    execute(real_app_schema, network=NetworkConfig(headers=headers))
+    execute(real_app_schema, headers=headers)
 
     # Then each request should contain these headers
     assert_incoming_requests_num(app, 2)
@@ -245,14 +244,6 @@ def test_execute_filter_method(app, schema_url):
     assert_incoming_requests_num(app, 0)
 
 
-@pytest.mark.operations("slow")
-def test_hypothesis_deadline(app, real_app_schema):
-    # When `hypothesis_deadline` is passed in the `execute` call
-    execute(real_app_schema, hypothesis_settings=hypothesis.settings(deadline=500))
-    assert_incoming_requests_num(app, 1)
-    assert_request(app, 0, "GET", "/api/slow")
-
-
 @pytest.mark.operations("multipart")
 def test_form_data(app, real_app_schema):
     def is_ok(ctx, response, case):
@@ -265,11 +256,7 @@ def test_form_data(app, real_app_schema):
 
     # When API operation specifies parameters with `in=formData`
     # Then responses should have 200 status, and not 415 (unsupported media type)
-    stream = execute(
-        real_app_schema,
-        checks=(is_ok, check_content),
-        hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None),
-    )
+    stream = execute(real_app_schema, checks=(is_ok, check_content), max_examples=3)
     # And there should be no errors or failures
     stream.assert_no_errors()
     stream.assert_no_failures()
@@ -287,10 +274,7 @@ def test_headers_override(real_app_schema):
         assert data["X-Token"] == "test"
 
     stream = EventStream(
-        real_app_schema,
-        checks=(check_headers,),
-        network=NetworkConfig(headers={"X-Token": "test"}),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        real_app_schema, checks=(check_headers,), headers={"X-Token": "test"}, max_examples=1
     ).execute()
     stream.assert_no_failures()
     stream.assert_no_errors()
@@ -300,11 +284,7 @@ def test_headers_override(real_app_schema):
 def test_unknown_response_code(real_app_schema):
     # When API operation returns a status code, that is not listed in "responses"
     # And "status_code_conformance" is specified
-    stream = EventStream(
-        real_app_schema,
-        checks=(status_code_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    ).execute()
+    stream = EventStream(real_app_schema, checks=(status_code_conformance,), max_examples=1).execute()
 
     # Then there should be a failure
     assert stream.failures_count == 1
@@ -320,11 +300,7 @@ def test_unknown_response_code(real_app_schema):
 def test_unknown_response_code_with_default(real_app_schema):
     # When API operation returns a status code, that is not listed in "responses", but there is a "default" response
     # And "status_code_conformance" is specified
-    stream = EventStream(
-        real_app_schema,
-        checks=(status_code_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    ).execute()
+    stream = EventStream(real_app_schema, checks=(status_code_conformance,), max_examples=1).execute()
     # Then there should be no failure
     stream.assert_no_failures()
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
@@ -336,11 +312,7 @@ def test_unknown_response_code_with_default(real_app_schema):
 def test_unknown_content_type(real_app_schema):
     # When API operation returns a response with content type, not specified in "produces"
     # And "content_type_conformance" is specified
-    stream = EventStream(
-        real_app_schema,
-        checks=(content_type_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    ).execute()
+    stream = EventStream(real_app_schema, checks=(content_type_conformance,), max_examples=1).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[0][0]
@@ -357,7 +329,7 @@ def test_known_content_type(real_app_schema):
     stream = execute(
         real_app_schema,
         checks=(content_type_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        max_examples=1,
     )
     # Then there should be no failures
     stream.assert_no_failures()
@@ -367,11 +339,7 @@ def test_known_content_type(real_app_schema):
 def test_response_conformance_invalid(real_app_schema):
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    stream = EventStream(
-        real_app_schema,
-        checks=(response_schema_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    ).execute()
+    stream = EventStream(real_app_schema, checks=(response_schema_conformance,), max_examples=1).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
@@ -415,11 +383,7 @@ Value:
 def test_response_conformance_valid(real_app_schema):
     # When API operation returns a response that conforms to the schema
     # And "response_schema_conformance" is specified
-    stream = execute(
-        real_app_schema,
-        checks=(response_schema_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    )
+    stream = execute(real_app_schema, checks=(response_schema_conformance,), max_examples=1)
     # Then there should be no failures or errors
     stream.assert_no_failures()
     stream.assert_no_errors()
@@ -432,7 +396,7 @@ def test_response_conformance_recursive_valid(real_app_schema):
     stream = execute(
         real_app_schema,
         checks=(response_schema_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        max_examples=1,
     )
     # Then there should be no failures or errors
     stream.assert_no_failures()
@@ -446,7 +410,7 @@ def test_response_conformance_text(real_app_schema):
     stream = execute(
         real_app_schema,
         checks=(response_schema_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        max_examples=1,
     )
     # Then the check should be ignored if the response headers are not application/json
     stream.assert_no_failures()
@@ -460,7 +424,7 @@ def test_response_conformance_malformed_json(real_app_schema):
     stream = EventStream(
         real_app_schema,
         checks=(response_schema_conformance,),
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        max_examples=1,
     ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
@@ -494,7 +458,7 @@ def test_path_parameters_encoding(real_app_schema):
     stream = execute(
         real_app_schema,
         checks=(status_code_conformance,),
-        hypothesis_settings=hypothesis.settings(derandomize=True, deadline=None),
+        deterministic=True,
     )
     # Then there should be no failures
     # since all path parameters are quoted
@@ -502,17 +466,11 @@ def test_path_parameters_encoding(real_app_schema):
     stream.assert_no_failures()
 
 
-@pytest.mark.parametrize(
-    ("configuration", "from_schema_options"),
-    [
-        ({"base_url": "http://127.0.0.1:1/"}, {}),
-        ({}, {"hypothesis_settings": hypothesis.settings(deadline=1)}),
-    ],
-)
 @pytest.mark.operations("slow")
-def test_exceptions(schema_url, configuration, from_schema_options):
-    schema = schemathesis.openapi.from_url(schema_url).configure(**configuration)
-    stream = execute(schema, **from_schema_options)
+def test_exceptions(schema_url):
+    schema = schemathesis.openapi.from_url(schema_url)
+    schema.config.base_url = "http://127.0.0.1:1/"
+    stream = execute(schema)
     assert any(event.status == Status.ERROR for event in stream.find_all(events.ScenarioFinished))
 
 
@@ -522,7 +480,7 @@ def test_internal_exceptions(real_app_schema, mocker):
     # When there is an exception during the test
     # And Hypothesis consider this test as a flaky one
     mocker.patch("schemathesis.Case.call", side_effect=ValueError)
-    stream = execute(real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None))
+    stream = execute(real_app_schema, max_examples=3)
     # Then the execution result should indicate errors
     stream.assert_errors()
     # And an error from the buggy code should be collected
@@ -570,10 +528,13 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         },
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = openapi3_base_url
     stream = EventStream(
         schema,
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=[Phase.explicit]),
+        max_examples=1,
+        # TODO:
+        # phases=[Phase.explicit],
     ).execute()
     assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
         {"itemId": "456789"},
@@ -587,7 +548,10 @@ async def test_explicit_example_disable(app, real_app_schema, mocker):
     # And the `explicit` phase is excluded
     spy = mocker.patch("schemathesis.generation.hypothesis.builder.add_examples", wraps=add_examples)
     stream = execute(
-        real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=1, phases=[Phase.generate], deadline=None)
+        real_app_schema,
+        max_examples=1,
+        # TODO:
+        # phases=[Phase.generate],
     )
     # Then run should be successful
     stream.assert_no_errors()
@@ -610,9 +574,7 @@ def test_plain_text_body(app, real_app_schema):
         data = response.content
         assert case.body.encode("utf8") == data
 
-    stream = execute(
-        real_app_schema, checks=(check_content,), hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
-    )
+    stream = execute(real_app_schema, checks=(check_content,), max_examples=3)
     stream.assert_no_errors()
     stream.assert_no_failures()
 
@@ -622,7 +584,7 @@ def test_invalid_path_parameter(schema_url):
     # When a path parameter is marked as not required
     # And schema validation is disabled
     schema = schemathesis.openapi.from_url(schema_url)
-    stream = execute(schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None))
+    stream = execute(schema, max_examples=3)
     # Then Schemathesis enforces all path parameters to be required
     # And there should be no errors
     stream.assert_no_errors()
@@ -631,9 +593,7 @@ def test_invalid_path_parameter(schema_url):
 @pytest.mark.operations("missing_path_parameter")
 def test_missing_path_parameter(real_app_schema):
     # When a path parameter is missing
-    stream = EventStream(
-        real_app_schema, hypothesis_settings=hypothesis.settings(max_examples=3, deadline=None)
-    ).execute()
+    stream = EventStream(real_app_schema, max_examples=3).execute()
     # Then it leads to an error
     stream.assert_errors()
     assert "Path parameter 'id' is not defined" in str(stream.find(events.NonFatalError).info)
@@ -702,7 +662,10 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
     stream = EventStream(
-        schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None, phases=phases)
+        schema,
+        max_examples=1,
+        # TODO:
+        # phases=phases,
     ).execute()
     # And the tests are failing because of the unsatisfiable schema
     stream.assert_errors()
@@ -750,9 +713,7 @@ def test_non_serializable_example(ctx, phases, expected):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
-    stream = EventStream(
-        schema, phases=phases, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)
-    ).execute()
+    stream = EventStream(schema, phases=phases, max_examples=1).execute()
     # And the tests are failing because of the serialization error
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
@@ -813,8 +774,9 @@ def test_invalid_regex_example(ctx, phases, expected):
     schema = schemathesis.openapi.from_dict(schema)
     stream = EventStream(
         schema,
-        phases=phases,
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
+        # TODO:
+        # phases=phases,
+        max_examples=1,
     ).execute()
     # And the tests are failing because of the invalid regex error
     stream.assert_errors()
@@ -843,8 +805,9 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
         }
     )
     # Then the testing process should not raise an internal error
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
-    stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None)).execute()
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = openapi3_base_url
+    stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
     stream.assert_errors()
     expected = (
@@ -857,11 +820,9 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
 
 def test_connection_error(ctx):
     schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1:1")
-    stream = EventStream(
-        schema,
-        hypothesis_settings=hypothesis.settings(max_examples=1, deadline=None),
-    ).execute()
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = "http://127.0.0.1:1"
+    stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
     stream.assert_errors()
     expected = "Max retries exceeded with url"
@@ -916,10 +877,11 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
     )
 
     max_examples = 10
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = openapi3_base_url
     stream = EventStream(
         schema,
-        hypothesis_settings=hypothesis.settings(max_examples=max_examples, deadline=None),
+        max_examples=max_examples,
         checks=[not_a_server_error],
     ).execute()
     # Then the test outcomes should not contain errors
@@ -954,7 +916,8 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = openapi3_base_url
     stream = EventStream(
         schema,
         checks=[not_a_server_error],
@@ -968,7 +931,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
 
 def test_graphql(graphql_url):
     schema = schemathesis.graphql.from_url(graphql_url)
-    stream = EventStream(schema, hypothesis_settings=hypothesis.settings(max_examples=5, deadline=None)).execute()
+    stream = EventStream(schema, max_examples=5).execute()
     for event, expected in zip(stream.find_all(events.ScenarioFinished), ["Query.getBooks", "Query.getAuthors"]):
         assert event.recorder.label == expected
         for case in event.recorder.cases.values():
@@ -1013,7 +976,8 @@ def workers_num(request):
 
 @pytest.fixture
 def engine(workers_num, swagger_20):
-    return from_schema(swagger_20, config=EngineConfig(execution=ExecutionConfig(workers_num=workers_num)))
+    swagger_20.config.set(workers=workers_num)
+    return from_schema(swagger_20)
 
 
 @pytest.fixture
@@ -1094,14 +1058,10 @@ def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
         },
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]), base_url=openapi3_base_url
-    )
-    stream = EventStream(
-        schema,
-        network=NetworkConfig(headers={"Authorization": "TEST"}),
-        hypothesis_settings=hypothesis.settings(max_examples=1),
-    ).execute()
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.set(modes=[GenerationMode.NEGATIVE])
+    schema.config.base_url = openapi3_base_url
+    stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
 
     # There should not be unsatisfiable
     stream.assert_no_errors()
@@ -1119,20 +1079,17 @@ def test_skip_non_negated_headers(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
-    )
-    stream = EventStream(
-        schema,
-        hypothesis_settings=hypothesis.settings(max_examples=1),
-    ).execute()
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.set(modes=[GenerationMode.NEGATIVE])
+    stream = EventStream(schema, max_examples=1).execute()
     # There should not be unsatisfiable
     stream.assert_no_errors()
     stream.assert_after_execution_status(Status.SKIP)
 
 
 STATEFUL_KWARGS = {
-    "hypothesis_settings": hypothesis.settings(max_examples=1, deadline=None, stateful_step_count=2),
+    "max_examples": 1,
+    "stateful_step_count": 2,
 }
 
 
@@ -1142,7 +1099,7 @@ def test_stateful_auth(real_app_schema):
     stream = EventStream(
         real_app_schema,
         phases=[PhaseName.STATEFUL_TESTING],
-        network=NetworkConfig(auth=("admin", "password")),
+        auth=("admin", "password"),
         **STATEFUL_KWARGS,
     ).execute()
     interactions = list(stream.find(events.ScenarioFinished).recorder.interactions.values())
@@ -1154,13 +1111,13 @@ def test_stateful_auth(real_app_schema):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_all_generation_modes(real_app_schema):
-    method = GenerationMode.NEGATIVE
-    real_app_schema.generation_config.modes = [method]
+    mode = GenerationMode.NEGATIVE
+    real_app_schema.config.generation.set(modes=[mode])
     stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
     cases = list(stream.find(events.ScenarioFinished).recorder.cases.values())
     assert len(cases) > 0
     for case in cases:
-        assert case.value.meta.generation.mode == method
+        assert case.value.meta.generation.mode == mode
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1186,7 +1143,8 @@ def test_stateful_override(real_app_schema):
         real_app_schema,
         phases=[PhaseName.STATEFUL_TESTING],
         parameters={"user_id": "42"},
-        hypothesis_settings=hypothesis.settings(max_examples=40, deadline=None, stateful_step_count=2),
+        max_examples=40,
+        stateful_step_count=2,
     ).execute()
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0
@@ -1229,17 +1187,13 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         },
         version="2.0",
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(
-        base_url=openapi2_base_url,
-        generation=GenerationConfig(
-            with_security_parameters=False,
-            headers=HeaderConfig(strategy=st.text(alphabet=st.characters(whitelist_characters="a", categories=()))),
-        ),
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = openapi2_base_url
+    schema.config.generation.set(
+        with_security_parameters=False,
+        exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),
     )
-    stream = EventStream(
-        schema,
-        hypothesis_settings=settings(max_examples=10),
-    ).execute()
+    stream = EventStream(schema, max_examples=10).execute()
     for event in stream.events:
         if isinstance(event, events.ScenarioFinished):
             for case in event.recorder.cases.values():

@@ -574,4 +574,4 @@ def run(
         codec=generation_codec,
     )
 
-    executor.execute(location=location, run_config=config, args=ctx.args, params=ctx.params)
+    executor.execute(location=location, config=config.projects.get_default(), args=ctx.args, params=ctx.params)

@@ -964,7 +964,7 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from schemathesis.core import NOT_SET
-        from schemathesis.config import GenerationConfig, OutputConfig, SanitizationConfig
+        from schemathesis.config import *
         from schemathesis.generation import GenerationMode
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
@@ -976,12 +976,11 @@ def testdir(testdir):
         def simple_schema():
             return schema
 
+        config = SchemathesisConfig()
+        config.output.sanitization.set(enabled={sanitize_output!r})
+
         schema = schemathesis.openapi.from_dict(
-            raw_schema
-        ).configure(
-            output=OutputConfig(
-                sanitization=SanitizationConfig(enabled={sanitize_output!r})
-            )
+            raw_schema, config=config
         )
         """
         )

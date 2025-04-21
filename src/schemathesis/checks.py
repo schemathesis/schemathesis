@@ -9,7 +9,6 @@ from schemathesis.core.failures import (
     Failure,
     FailureGroup,
     MalformedJson,
-    MaxResponseTimeConfig,
     ResponseTimeExceeded,
     ServerError,
 )
@@ -108,15 +107,19 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
     return None
 
 
+DEFAULT_MAX_RESPONSE_TIME = 10.0
+
+
 def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    config = ctx.config.get(max_response_time, MaxResponseTimeConfig())
+    limit = ctx.config.max_response_time.limit or DEFAULT_MAX_RESPONSE_TIME
     elapsed = response.elapsed
-    if elapsed > config.limit:
+    if elapsed > limit:
         raise ResponseTimeExceeded(
             operation=case.operation.label,
-            message=f"Actual: {elapsed:.2f}ms\nLimit: {config.limit * 1000:.2f}ms",
+            message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
             elapsed=elapsed,
-            deadline=config.limit,
+            # TODO: Fix type
+            deadline=limit,
         )
     return None
 
