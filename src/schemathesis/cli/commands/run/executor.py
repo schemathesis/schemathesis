@@ -50,13 +50,6 @@ def into_event_stream(*, location: str, config: EngineConfig) -> EventGenerator:
 
     try:
         schema = load_schema(location=location, config=config)
-        config.project = config.run.projects.get(schema.raw_schema)
-        schema.configure(
-            base_url=config.project.base_url,
-            rate_limit=config.project.rate_limit,
-            output=config.run.output,
-            generation=config.project.generation,
-        )
         # TODO: extract filters
         # schema.filter_set = config.filter_set
     except KeyboardInterrupt:

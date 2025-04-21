@@ -53,7 +53,6 @@ def openapi_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
@@ -76,6 +75,8 @@ def openapi_cases(
     """
     start = time.monotonic()
     strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
+
+    generation_config = operation.schema.config.generation_for(operation=operation)
 
     context = HookContext(operation)
 

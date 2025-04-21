@@ -99,7 +99,8 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
         verify = data.get("verify", True)
 
         try:
-            with ratelimit(case.operation.schema.rate_limiter, case.operation.schema.base_url):
+            config = case.operation.schema.config
+            with ratelimit(config.rate_limit, config.base_url):
                 response = session.request(**data)  # type: ignore
             return Response.from_requests(response, verify=verify)
         finally:

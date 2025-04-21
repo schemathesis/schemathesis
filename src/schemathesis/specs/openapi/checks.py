@@ -182,7 +182,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                             title="Response header does not conform to the schema",
                             operation=case.operation.label,
                             exc=exc,
-                            config=case.operation.schema.output_config,
+                            config=case.operation.schema.config.output,
                         )
                     )
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]

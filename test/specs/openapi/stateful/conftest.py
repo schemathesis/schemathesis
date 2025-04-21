@@ -10,10 +10,9 @@ import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import GenerationConfig, SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.config import GenerationConfig
 
 
 @dataclass

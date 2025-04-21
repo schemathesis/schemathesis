@@ -140,7 +140,7 @@ class SchemathesisCase(PyCollector):
                     config=HypothesisTestConfig(
                         modes=list(HypothesisTestMode),
                         given_kwargs=self.given_kwargs,
-                        project=self.schema.generation_config,
+                        project=self.schema.config,
                         as_strategy_kwargs=as_strategy_kwargs,
                     ),
                 )

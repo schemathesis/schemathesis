@@ -8,6 +8,7 @@ from urllib.parse import urlencode
 import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
+
 from schemathesis.config import GenerationConfig
 
 from ..constants import ALL_KEYWORDS

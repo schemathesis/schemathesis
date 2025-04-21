@@ -1,7 +1,6 @@
 import pytest
 
-from schemathesis.config import OutputConfig
-from schemathesis.config import TruncationConfig
+from schemathesis.config import OutputConfig, TruncationConfig
 from schemathesis.core.output import prepare_response_payload, truncate_json
 
 SIMPLE_DICT = {

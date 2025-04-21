@@ -25,7 +25,6 @@ from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
-from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
@@ -140,8 +139,8 @@ class GraphQLSchema(BaseSchema):
 
     @property
     def base_path(self) -> str:
-        if self.base_url:
-            return urlsplit(self.base_url).path
+        if self.config.base_url:
+            return urlsplit(self.config.base_url).path
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
@@ -225,7 +224,6 @@ class GraphQLSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return graphql_cases(
@@ -233,7 +231,6 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
-            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 
@@ -325,7 +322,6 @@ def graphql_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
@@ -347,9 +343,9 @@ def graphql_cases(
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
-        allow_x00=generation_config.allow_x00,
-        allow_null=generation_config.graphql_allow_null,
-        codec=generation_config.codec,
+        allow_x00=operation.schema.config.generation.allow_x00,
+        allow_null=operation.schema.config.generation.graphql_allow_null,
+        codec=operation.schema.config.generation.codec,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)

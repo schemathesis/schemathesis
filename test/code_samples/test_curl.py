@@ -29,7 +29,7 @@ def loose_schema(ctx):
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
-    case.operation.schema.output_config.sanitization.enabled = False
+    case.operation.schema.config.output.sanitization.enabled = False
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
     assert command == f"curl -X GET{expected_headers} http://localhost/users"

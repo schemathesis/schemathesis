@@ -29,7 +29,6 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
-from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
@@ -351,9 +350,6 @@ class BaseOpenAPISchema(BaseSchema):
                                 entry,
                                 resolved,
                                 scope,
-                                with_security_parameters=self.config.with_security_parameters
-                                if generation_config
-                                else None,
                             )
                             yield Ok(operation)
                         except SCHEMA_PARSING_ERRORS as exc:
@@ -416,7 +412,6 @@ class BaseOpenAPISchema(BaseSchema):
         raw: dict[str, Any],
         resolved: dict[str, Any],
         scope: str,
-        with_security_parameters: bool | None = None,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -431,12 +426,8 @@ class BaseOpenAPISchema(BaseSchema):
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
-        with_security_parameters = (
-            with_security_parameters
-            if with_security_parameters is not None
-            else self.generation_config.with_security_parameters
-        )
-        if with_security_parameters:
+        config = self.config.generation_for(operation=operation)
+        if config.with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
@@ -544,21 +535,21 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
             operation=operation,
-            auth_storage=auth_storage,
             hooks=hooks,
+            auth_storage=auth_storage,
             generation_mode=generation_mode,
-            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
-        if self.generation_config.with_security_parameters:
+        # TODO: What about phase?
+        config = self.config.generation_for(operation=operation)
+        if config.with_security_parameters:
             security_parameters = self.security.get_security_definitions_as_parameters(
                 self.raw_schema, operation, self.resolver, location
             )
@@ -712,7 +703,7 @@ class BaseOpenAPISchema(BaseSchema):
                     JsonSchemaError.from_exception(
                         operation=operation.label,
                         exc=exc,
-                        config=operation.schema.output_config,
+                        config=operation.schema.config.output,
                     )
                 )
         _maybe_raise_one_or_more(failures)

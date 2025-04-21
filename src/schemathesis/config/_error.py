@@ -3,8 +3,7 @@ from __future__ import annotations
 import difflib
 from typing import TYPE_CHECKING
 
-from schemathesis.core.errors import InvalidRateLimit, SchemathesisError
-from schemathesis.core.rate_limit import parse_units
+from schemathesis.core.errors import SchemathesisError
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
@@ -29,13 +28,6 @@ class ConfigError(SchemathesisError):
         elif error.validator == "anyOf":
             message = _format_anyof_error(error)
         return cls(message)
-
-
-def validate_rate_limit(value: str) -> None:
-    try:
-        parse_units(value)
-    except InvalidRateLimit as exc:
-        raise ConfigError(str(exc)) from None
 
 
 def _format_minimum_error(error: ValidationError) -> str:

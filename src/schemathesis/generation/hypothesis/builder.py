@@ -72,7 +72,6 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
-        "generation_config": config.project.generation,
         **config.as_strategy_kwargs,
     }
     strategy = strategies.combine(

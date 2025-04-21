@@ -8,15 +8,20 @@ from schemathesis.config._auth import AuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
-from schemathesis.config._error import ConfigError, validate_rate_limit
+from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._operations import OperationConfig, OperationsConfig
+from schemathesis.config._output import OutputConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
+from schemathesis.config._rate_limit import build_limiter
 from schemathesis.core import hooks
 from schemathesis.core.validation import validate_base_url
 
 if TYPE_CHECKING:
+    from pyrate_limiter import Limiter
+
+    from schemathesis.config import SchemathesisConfig
     from schemathesis.schemas import APIOperation
 
 DEFAULT_WORKERS = 1
@@ -36,6 +41,7 @@ def get_workers_count() -> int:
 
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
+    __parent: SchemathesisConfig | None
     base_url: str | None
     headers: dict | None
     hooks: str | None
@@ -45,7 +51,7 @@ class ProjectConfig(DiffBase):
     exclude_deprecated: bool | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
-    rate_limit: str | None
+    rate_limit: Limiter | None
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
@@ -57,6 +63,7 @@ class ProjectConfig(DiffBase):
     operations: OperationsConfig
 
     __slots__ = (
+        "__parent",
         "base_url",
         "headers",
         "hooks",
@@ -81,6 +88,7 @@ class ProjectConfig(DiffBase):
     def __init__(
         self,
         *,
+        parent: SchemathesisConfig | None = None,
         base_url: str | None = None,
         headers: dict | None = None,
         hooks_: str | None = None,
@@ -101,6 +109,7 @@ class ProjectConfig(DiffBase):
         generation: GenerationConfig | None = None,
         operations: OperationsConfig | None = None,
     ) -> None:
+        self.__parent = parent
         if base_url is not None:
             _validate_base_url(base_url)
         self.base_url = base_url
@@ -120,8 +129,9 @@ class ProjectConfig(DiffBase):
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
-            validate_rate_limit(rate_limit)
-        self.rate_limit = rate_limit
+            self.rate_limit = build_limiter(rate_limit)
+        else:
+            self.rate_limit = rate_limit
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
@@ -158,6 +168,12 @@ class ProjectConfig(DiffBase):
             ),
         )
 
+    @classmethod
+    def discover(cls) -> ProjectConfig:
+        from schemathesis.config import SchemathesisConfig
+
+        return SchemathesisConfig.discover().projects.default
+
     def set(
         self,
         *,
@@ -191,8 +207,7 @@ class ProjectConfig(DiffBase):
             self.continue_on_failure = continue_on_failure
 
         if rate_limit is not None:
-            validate_rate_limit(rate_limit)
-            self.rate_limit = rate_limit
+            self.rate_limit = build_limiter(rate_limit)
 
         if request_timeout is not None:
             self.request_timeout = request_timeout
@@ -236,6 +251,26 @@ class ProjectConfig(DiffBase):
                 headers = config.headers
         return headers
 
+    def generation_for(
+        self,
+        *,
+        operation: APIOperation | None = None,
+        phase: Literal["examples", "coverage", "fuzzing", "stateful"] | None = None,
+    ) -> GenerationConfig:
+        configs = []
+        if operation is not None:
+            for op in self.operations.operations:
+                if op._filter_set.applies_to(operation=operation):
+                    if phase is not None:
+                        phase_config = op.phases.get_by_name(name=phase)
+                        configs.append(phase_config.generation)
+                    configs.append(op.generation)
+        if phase is not None:
+            phase_config = self.phases.get_by_name(name=phase)
+            configs.append(phase_config.generation)
+        configs.append(self.generation)
+        return GenerationConfig.from_hierarchy(configs)
+
     def checks_config_for(
         self,
         *,
@@ -255,6 +290,21 @@ class ProjectConfig(DiffBase):
             configs.append(phase_config.checks)
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
+
+    @property
+    def _parent(self) -> SchemathesisConfig:
+        if self.__parent is None:
+            from schemathesis.config import SchemathesisConfig
+
+            self.__parent = SchemathesisConfig.discover()
+        return self.__parent
+
+    @property
+    def output(self) -> OutputConfig:
+        return self._parent.output
+
+    def get_rate_limit(self):
+        pass
 
 
 def _validate_base_url(base_url: str) -> None:
@@ -288,6 +338,12 @@ class ProjectsConfig(DiffBase):
             default=ProjectConfig.from_dict(data),
             named={project["title"]: ProjectConfig.from_dict(project) for project in data.get("project", [])},
         )
+
+    def _set_parent(self, parent: SchemathesisConfig) -> None:
+        self.default.__parent = parent
+        for project in self.named.values():
+            project.__parent = parent
+        self.override.__parent = parent
 
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
         # Highest priority goes to `override`, then config specifically

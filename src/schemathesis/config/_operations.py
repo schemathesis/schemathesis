@@ -9,14 +9,17 @@ from schemathesis.config._auth import AuthConfig
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
-from schemathesis.config._error import ConfigError, validate_rate_limit
+from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
+from schemathesis.config._rate_limit import build_limiter
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.filters import FilterSet, expression_to_filter_function, is_deprecated
 
 if TYPE_CHECKING:
+    from pyrate_limiter import Limiter
+
     from schemathesis.schemas import APIOperation
 
 FILTER_ATTRIBUTES = [
@@ -176,7 +179,7 @@ class OperationConfig(DiffBase):
     exclude_deprecated: bool | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
-    rate_limit: str | None
+    rate_limit: Limiter | None
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
@@ -242,8 +245,9 @@ class OperationConfig(DiffBase):
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
-            validate_rate_limit(rate_limit)
-        self.rate_limit = rate_limit
+            self.rate_limit = build_limiter(rate_limit)
+        else:
+            self.rate_limit = rate_limit
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key

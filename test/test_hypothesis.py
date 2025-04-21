@@ -6,8 +6,8 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.core import NOT_SET
 from schemathesis.config import GenerationConfig
+from schemathesis.core import NOT_SET
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode

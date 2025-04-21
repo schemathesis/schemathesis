@@ -85,9 +85,10 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
 
     if config is None:
         config = SchemathesisConfig.discover()
+    project_config = config.projects.get(schema)
 
     if "swagger" in schema:
-        instance = SwaggerV20(raw_schema=schema)
+        instance = SwaggerV20(raw_schema=schema, config=project_config)
     elif "openapi" in schema:
         version = schema["openapi"]
         if not OPENAPI_VERSION_RE.match(version):
@@ -95,7 +96,7 @@ def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = Non
                 LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",
             )
-        instance = OpenApi30(raw_schema=schema)
+        instance = OpenApi30(raw_schema=schema, config=project_config)
     else:
         raise LoaderError(
             LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,

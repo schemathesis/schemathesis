@@ -83,6 +83,7 @@ class SchemathesisConfig(DiffBase):
         self.reports = reports or ReportsConfig()
         self.output = output or OutputConfig()
         self.projects = projects or ProjectsConfig()
+        self.projects._set_parent(self)
 
     @property
     def seed(self) -> int:

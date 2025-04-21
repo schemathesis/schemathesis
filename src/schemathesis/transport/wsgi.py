@@ -75,10 +75,8 @@ class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
         client = session or wsgi.get_client(application)
         cookies = {**(case.cookies or {}), **(cookies or {})}
 
-        with (
-            cookie_handler(client, cookies),
-            ratelimit(case.operation.schema.rate_limiter, case.operation.schema.base_url),
-        ):
+        config = case.operation.schema.config
+        with cookie_handler(client, cookies), ratelimit(config.rate_limit, config.base_url):
             start = time.monotonic()
             response = client.open(**data)
             elapsed = time.monotonic() - start
