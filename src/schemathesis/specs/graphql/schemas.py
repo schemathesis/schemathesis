@@ -172,9 +172,7 @@ class GraphQLSchema(BaseSchema):
                                 statistic.operations.selected += 1
         return statistic
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),

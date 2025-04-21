@@ -293,9 +293,7 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = operation.get("parameters", ())
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -353,7 +351,7 @@ class BaseOpenAPISchema(BaseSchema):
                                 entry,
                                 resolved,
                                 scope,
-                                with_security_parameters=generation_config.with_security_parameters
+                                with_security_parameters=self.config.with_security_parameters
                                 if generation_config
                                 else None,
                             )

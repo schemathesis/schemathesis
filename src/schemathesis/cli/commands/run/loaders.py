@@ -88,7 +88,7 @@ def _load_schema(location: str, config: EngineConfig, module: Any) -> BaseSchema
         # if config.projects.default.auth:
         #     kwargs["auth"] = config.network.auth
 
-    return loader(location, **kwargs)
+    return loader(location, config=config.run, **kwargs)
 
 
 def is_specific_exception(exc: Exception) -> bool:

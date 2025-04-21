@@ -17,7 +17,7 @@ from typing import (
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
-from schemathesis.config import GenerationConfig, OutputConfig
+from schemathesis.config import GenerationConfig, OutputConfig, SchemathesisConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
 from schemathesis.core.rate_limit import build_limiter
@@ -103,6 +103,7 @@ class ApiOperationsCount:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
+    config: SchemathesisConfig = field(default_factory=SchemathesisConfig.discover)
     location: str | None = None
     base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
@@ -260,9 +261,7 @@ class BaseSchema(Mapping):
     def _measure_statistic(self) -> ApiStatistic:
         raise NotImplementedError
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
