@@ -48,7 +48,7 @@ def add_failure(test_case: TestCase, checks: Iterable[GroupedFailures], context:
             response=group.response,
             failures=group.failures,
             curl=group.code_sample,
-            config=context.config.output,
+            config=context.config.run.output,
         )
         for idx, group in enumerate(checks, 1)
     ]

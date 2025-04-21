@@ -18,6 +18,7 @@ from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.filters import expression_to_filter_function
 from schemathesis.generation import GenerationMode
+from schemathesis.generation.targets import TargetFunction
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
@@ -201,13 +202,17 @@ def validate_preserve_bytes(ctx: click.core.Context, param: click.core.Parameter
     return True
 
 
-def reduce_list(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]) -> list[str] | None:
+def reduce_list(
+    ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]] | None
+) -> list[str] | None:
     if not value:
         return None
     return reduce(operator.iadd, value, [])
 
 
-def convert_maximize(ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]):
+def convert_maximize(
+    ctx: click.core.Context, param: click.core.Parameter, value: tuple[list[str]]
+) -> list[TargetFunction]:
     from schemathesis.generation.targets import TARGETS
 
     names = reduce(operator.iadd, value, [])
