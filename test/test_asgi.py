@@ -7,7 +7,7 @@ from hypothesis import HealthCheck, Phase, given, settings
 from pydantic import BaseModel
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 
 
 @pytest.mark.hypothesis_nested

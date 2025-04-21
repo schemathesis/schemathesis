@@ -11,7 +11,7 @@ from hypothesis_jsonschema import from_schema
 
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import TestPhase

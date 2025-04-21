@@ -9,8 +9,9 @@ from hypothesis_jsonschema._canonicalise import FALSEY, canonicalish
 from jsonschema import Draft4Validator
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core.transforms import deepclone
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 from schemathesis.specs.openapi.negative import mutated, negative_schema

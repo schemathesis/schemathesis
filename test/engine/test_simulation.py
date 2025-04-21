@@ -9,11 +9,10 @@ from hypothesis import strategies as st
 from requests.exceptions import HTTPError, Timeout
 
 from schemathesis.config import SchemathesisConfig
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.core import Engine
 from schemathesis.engine.events import FatalError
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 
 
 class FaultInjectingSession(requests.Session):

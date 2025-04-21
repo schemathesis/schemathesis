@@ -10,7 +10,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 from schemathesis.generation.hypothesis import examples, strategies
 from schemathesis.specs.openapi.examples import (
     ParameterExample,

@@ -90,7 +90,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "included_check_names",
     multiple=True,
     help="Comma-separated list of checks to run against API responses",
-    type=RegistryChoice(CHECKS),
+    type=RegistryChoice(CHECKS, with_all=True),
     default=None,
     callback=validation.reduce_list,
     show_default=True,

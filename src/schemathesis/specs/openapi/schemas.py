@@ -29,6 +29,7 @@ from requests.exceptions import InvalidHeader
 from requests.structures import CaseInsensitiveDict
 from requests.utils import check_header_validity
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, Specification, media_types
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import InternalError, InvalidSchema, LoaderError, LoaderErrorKind, OperationNotFound
@@ -43,7 +44,7 @@ from schemathesis.generation.overrides import Override, OverrideMark, check_no_o
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.stateful import links
 
-from ...generation import GenerationConfig, GenerationMode
+from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization

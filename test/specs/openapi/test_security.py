@@ -2,7 +2,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 from schemathesis.specs.openapi.references import InliningResolver
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 

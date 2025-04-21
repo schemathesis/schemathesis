@@ -9,10 +9,10 @@ import pytest
 from hypothesis.core import HypothesisHandle
 from pytest_subtests import SubTests
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -60,7 +60,7 @@ def get_all_tests(
                     settings=settings,
                     modes=modes,
                     seed=seed,
-                    generation=generation_config,
+                    project=generation_config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     given_kwargs=given_kwargs or {},
                 ),

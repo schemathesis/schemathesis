@@ -1,6 +1,8 @@
 import pytest
 
-from schemathesis.core.output import OutputConfig, prepare_response_payload, truncate_json
+from schemathesis.config import OutputConfig
+from schemathesis.config import TruncationConfig
+from schemathesis.core.output import prepare_response_payload, truncate_json
 
 SIMPLE_DICT = {
     "name": "John",
@@ -20,7 +22,7 @@ SIMPLE_DICT = {
 
 def test_truncate_simple_dict():
     assert (
-        truncate_json(SIMPLE_DICT)
+        truncate_json(SIMPLE_DICT, config=OutputConfig())
         == """{
     "name": "John",
     "age": 30,
@@ -37,7 +39,7 @@ def test_truncate_simple_dict():
 
 def test_no_dict_truncation():
     assert (
-        truncate_json(SIMPLE_DICT, config=OutputConfig(truncate=False))
+        truncate_json(SIMPLE_DICT, config=OutputConfig(truncation=TruncationConfig(enabled=False)))
         == """{
     "name": "John",
     "age": 30,

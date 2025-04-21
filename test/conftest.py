@@ -964,8 +964,8 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from schemathesis.core import NOT_SET
-        from schemathesis.core.output import OutputConfig
-        from schemathesis.generation import GenerationMode, GenerationConfig
+        from schemathesis.config import GenerationConfig, OutputConfig, SanitizationConfig
+        from schemathesis.generation import GenerationMode
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}
@@ -980,7 +980,7 @@ def testdir(testdir):
             raw_schema
         ).configure(
             output=OutputConfig(
-                sanitize={sanitize_output!r}
+                sanitization=SanitizationConfig(enabled={sanitize_output!r})
             )
         )
         """

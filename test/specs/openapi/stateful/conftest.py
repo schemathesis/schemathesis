@@ -11,10 +11,9 @@ from flask import Flask, abort, jsonify, request
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.generation import GenerationConfig
+from schemathesis.config import GenerationConfig
 
 
 @dataclass

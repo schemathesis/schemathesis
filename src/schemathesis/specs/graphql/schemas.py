@@ -25,10 +25,11 @@ from hypothesis_graphql import strategies as gql_st
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis import auths
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,

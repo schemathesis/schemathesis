@@ -5,8 +5,9 @@ from hypothesis import Phase, settings
 from requests import Request
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.meta import TestPhase
 from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -1531,7 +1532,7 @@ def test_negative_query_parameter(ctx):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
+            project=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
             settings=settings(phases=[Phase.explicit]),
         ),
     )
@@ -1613,7 +1614,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
+            project=GenerationConfig(modes=[GenerationMode.NEGATIVE]),
             settings=settings(phases=[Phase.explicit]),
         ),
     )
@@ -1629,7 +1630,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=[GenerationMode.NEGATIVE], unexpected_methods={"DELETE", "PUT"}),
+            project=GenerationConfig(modes=[GenerationMode.NEGATIVE], unexpected_methods={"DELETE", "PUT"}),
             settings=settings(phases=[Phase.explicit]),
         ),
     )
@@ -1705,7 +1706,7 @@ def test_urlencoded_payloads_are_valid(ctx):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=GenerationMode.all()),
+            project=GenerationConfig(modes=GenerationMode.all()),
             settings=settings(phases=[Phase.explicit]),
         ),
     )
@@ -1743,7 +1744,7 @@ def test_no_missing_header_duplication(ctx):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=GenerationMode.all()),
+            project=GenerationConfig(modes=GenerationMode.all()),
             settings=settings(phases=[Phase.explicit]),
         ),
     )
@@ -1780,7 +1781,7 @@ def assert_coverage(schema, modes, expected, path=None):
         test_func=test,
         config=HypothesisTestConfig(
             modes=[HypothesisTestMode.COVERAGE],
-            generation=GenerationConfig(modes=modes),
+            project=GenerationConfig(modes=modes),
             settings=settings(phases=[Phase.explicit]),
         ),
     )

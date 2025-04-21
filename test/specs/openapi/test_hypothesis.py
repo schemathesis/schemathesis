@@ -5,7 +5,7 @@ from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig, HeaderConfig
+from schemathesis.config import GenerationConfig
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy

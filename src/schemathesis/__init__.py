@@ -5,7 +5,7 @@ from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.output import sanitization
 from schemathesis.core.transport import Response
 from schemathesis.core.version import SCHEMATHESIS_VERSION
-from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.targets import TargetContext, TargetFunction, target
 from schemathesis.hooks import HookContext
@@ -22,8 +22,6 @@ __all__ = [
     "CheckContext",
     "CheckFunction",
     "GenerationMode",
-    "GenerationConfig",
-    "HeaderConfig",
     "Response",
     "TargetContext",
     "TargetFunction",

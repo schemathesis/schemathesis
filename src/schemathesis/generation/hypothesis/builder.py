@@ -18,12 +18,13 @@ from jsonschema.exceptions import SchemaError
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
+from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types, string_to_boolean
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
-from schemathesis.generation import GenerationConfig, GenerationMode, coverage
+from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
@@ -49,7 +50,7 @@ class HypothesisTestMode(str, Enum):
 
 @dataclass
 class HypothesisTestConfig:
-    generation: GenerationConfig
+    project: ProjectConfig
     modes: list[HypothesisTestMode]
     settings: hypothesis.settings | None = None
     seed: int | None = None
@@ -71,11 +72,11 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
-        "generation_config": config.generation,
+        "generation_config": config.project.generation,
         **config.as_strategy_kwargs,
     }
     strategy = strategies.combine(
-        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in config.generation.modes]
+        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in config.project.generation.modes]
     )
 
     hypothesis_test = create_base_test(
@@ -140,10 +141,10 @@ def create_test(
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
-            config.generation.modes,
+            config.project.generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
-            config.generation.unexpected_methods,
+            config.project.phases.coverage.unexpected_methods,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)

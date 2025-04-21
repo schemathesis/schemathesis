@@ -16,10 +16,14 @@ class GenerationConfig(DiffBase):
     max_examples: int | None
     no_shrink: bool
     deterministic: bool
+    # Allow generating `\x00` bytes in strings
     allow_x00: bool
+    # Generate strings using the given codec
     codec: str | None
     maximize: list[TargetFunction]
+    # Whether to generate security parameters
     with_security_parameters: bool
+    # Allowing using `null` for optional arguments in GraphQL queries
     graphql_allow_null: bool
     database: str | None
     unique_inputs: bool

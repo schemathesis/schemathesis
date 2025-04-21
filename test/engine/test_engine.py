@@ -14,14 +14,14 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.checks import not_a_server_error
+from schemathesis.config import GenerationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.core.transport import USER_AGENT
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Request
-from schemathesis.generation import GenerationConfig, GenerationMode, HeaderConfig
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import add_examples
 from schemathesis.specs.openapi.checks import (
     content_type_conformance,

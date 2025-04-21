@@ -10,10 +10,9 @@ from schemathesis.checks import max_response_time, not_a_server_error
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.failures import MaxResponseTimeConfig
 from schemathesis.engine import Status, events
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from test.utils import flaky
 

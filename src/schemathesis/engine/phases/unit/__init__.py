@@ -170,7 +170,7 @@ def worker_task(
                                 modes=[mode],
                                 settings=ctx.config.get_hypothesis_settings(),
                                 seed=ctx.config.run.seed,
-                                generation=ctx.config.project.generation,
+                                project=ctx.config.project,
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
