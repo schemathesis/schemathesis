@@ -6,18 +6,22 @@ import pathlib
 import re
 from contextlib import contextmanager
 from functools import reduce
-from typing import Callable, Generator
+from typing import TYPE_CHECKING, Callable, Generator
 from urllib.parse import urlparse
 
 import click
 
 from schemathesis.config import ReportFormat
+from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._projects import get_workers_count
 from schemathesis.core import rate_limit, string_to_boolean
 from schemathesis.core.fs import file_exists
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.filters import expression_to_filter_function
 from schemathesis.generation import GenerationMode
+
+if TYPE_CHECKING:
+    import hypothesis
 
 INVALID_DERANDOMIZE_MESSAGE = (
     "`--generation-deterministic` implies no database, so passing `--generation-database` too is invalid."
@@ -131,26 +135,6 @@ def validate_auth_overlap(auth: tuple[str, str] | None, headers: dict[str, str])
         message += " and ".join(used)
         message += " options were both used to set the 'Authorization' header, which is not permitted."
         raise click.BadParameter(message)
-
-
-def _validate_and_build_multiple_options(
-    values: tuple[str, ...], name: str, callback: Callable[[str, str], None]
-) -> dict[str, str]:
-    output = {}
-    for raw in values:
-        try:
-            key, value = raw.split("=", maxsplit=1)
-        except ValueError as exc:
-            raise click.BadParameter(f"Expected NAME=VALUE format, received {raw}.") from exc
-        key = key.strip()
-        if not key:
-            raise click.BadParameter(f"{name} parameter name should not be empty.")
-        if key in output:
-            raise click.BadParameter(f"{name} parameter {key} is specified multiple times.")
-        value = value.strip()
-        callback(key, value)
-        output[key] = value
-    return output
 
 
 def validate_filter_expression(
@@ -282,6 +266,19 @@ def convert_status_codes(
             "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
         )
     return value
+
+
+def convert_health_check(
+    ctx: click.core.Context, param: click.core.Parameter, value: list[HealthCheck] | None
+) -> list[hypothesis.HealthCheck] | None:
+    if value is None:
+        return value
+    if HealthCheck.all in value:
+        return HealthCheck.all.as_hypothesis()
+    health_checks = []
+    for entry in value:
+        health_checks.extend(entry.as_hypothesis())
+    return health_checks
 
 
 def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:

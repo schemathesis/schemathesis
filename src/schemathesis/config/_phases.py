@@ -7,6 +7,8 @@ from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._generation import GenerationConfig
 
+DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace"}
+
 
 @dataclass(repr=False)
 class PhaseConfig(DiffBase):
@@ -39,22 +41,22 @@ class PhaseConfig(DiffBase):
 @dataclass(repr=False)
 class CoveragePhaseConfig(DiffBase):
     enabled: bool
-    unexpected_methods: set[str]
     generation: GenerationConfig
     checks: ChecksConfig
+    unexpected_methods: set[str]
 
-    __slots__ = ("enabled", "unexpected_methods", "generation", "checks")
+    __slots__ = ("enabled", "generation", "checks", "unexpected_methods")
 
     def __init__(
         self,
         *,
         enabled: bool = True,
-        unexpected_methods: set[str] | None = None,
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
+        unexpected_methods: set[str] | None = None,
     ) -> None:
         self.enabled = enabled
-        self.unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
+        self.unexpected_methods = unexpected_methods or DEFAULT_UNEXPECTED_METHODS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
 

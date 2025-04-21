@@ -74,6 +74,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "--suppress-health-check",
     help="A comma-separated list of Schemathesis health checks to disable",
     type=CsvEnumChoice(HealthCheck),
+    callback=validation.convert_health_check,
     metavar="",
 )
 @grouped_option(
@@ -325,7 +326,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     help="Enables deterministic mode, which eliminates random variation between tests",
     is_flag=True,
     is_eager=True,
-    default=None,
+    default=False,
     show_default=True,
 )
 @grouped_option(
@@ -461,7 +462,7 @@ def run(
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
     generation_maximize: list[TargetFunction] | None,
-    generation_deterministic: bool | None = None,
+    generation_deterministic: bool = False,
     generation_database: str | None = None,
     generation_unique_inputs: bool = False,
     generation_allow_x00: bool = True,
@@ -562,8 +563,8 @@ def run(
     )
     config.projects.override.generation.set(
         modes=generation_modes,
-        no_shrink=generation_no_shrink,
         max_examples=generation_max_examples,
+        no_shrink=generation_no_shrink,
         maximize=generation_maximize,
         deterministic=generation_deterministic,
         database=generation_database,

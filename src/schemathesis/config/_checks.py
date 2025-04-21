@@ -26,6 +26,22 @@ class SimpleCheckConfig(DiffBase):
 
 
 @dataclass(repr=False)
+class MaxResponseTimeConfig(DiffBase):
+    enabled: bool
+    limit: float | None
+
+    __slots__ = ("enabled", "limit")
+
+    def __init__(self, *, enabled: bool = True, limit: float | None = None) -> None:
+        self.enabled = enabled
+        self.limit = limit
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> MaxResponseTimeConfig:
+        return cls(enabled=data.get("enabled", True), limit=data.get("limit"))
+
+
+@dataclass(repr=False)
 class CheckConfig(DiffBase):
     enabled: bool
     expected_statuses: list[str]
@@ -79,6 +95,8 @@ class ChecksConfig(DiffBase):
     ensure_resource_availability: SimpleCheckConfig
     missing_required_header: MissingRequiredHeaderConfig
     ignored_auth: SimpleCheckConfig
+    max_response_time: MaxResponseTimeConfig
+    _unknown: dict[str, SimpleCheckConfig]
 
     __slots__ = (
         "not_a_server_error",
@@ -92,8 +110,8 @@ class ChecksConfig(DiffBase):
         "ensure_resource_availability",
         "missing_required_header",
         "ignored_auth",
-        "_unknown_included",
-        "_unknown_excluded",
+        "max_response_time",
+        "_unknown",
     )
 
     def __init__(
@@ -110,6 +128,7 @@ class ChecksConfig(DiffBase):
         ensure_resource_availability: SimpleCheckConfig | None = None,
         missing_required_header: MissingRequiredHeaderConfig | None = None,
         ignored_auth: SimpleCheckConfig | None = None,
+        max_response_time: MaxResponseTimeConfig | None = None,
     ) -> None:
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
         self.status_code_conformance = status_code_conformance or SimpleCheckConfig()
@@ -122,8 +141,8 @@ class ChecksConfig(DiffBase):
         self.ensure_resource_availability = ensure_resource_availability or SimpleCheckConfig()
         self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
-        self._unknown_included: set[str] = set()
-        self._unknown_excluded: set[str] = set()
+        self.max_response_time = max_response_time or MaxResponseTimeConfig()
+        self._unknown = {}
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ChecksConfig:
@@ -162,14 +181,11 @@ class ChecksConfig(DiffBase):
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
         )
 
-    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig:
+    def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:
         try:
             return getattr(self, name)
         except AttributeError:
-            enabled = True
-            if name in self._unknown_excluded:
-                enabled = False
-            return SimpleCheckConfig(enabled=enabled)
+            return self._unknown.setdefault(name, SimpleCheckConfig())
 
     def set(
         self,
@@ -190,7 +206,14 @@ class ChecksConfig(DiffBase):
                 config = self.get_by_name(name=name)
                 config.enabled = True
 
-        self._unknown_included.update(
-            name for name in (included_check_names or []) if name not in known_names and name != "all"
-        )
-        self._unknown_excluded.update(name for name in (excluded_check_names or []) if name not in known_names)
+        if max_response_time is not None:
+            self.max_response_time.enabled = True
+            self.max_response_time.limit = max_response_time
+
+        for name in included_check_names or []:
+            if name not in known_names and name != "all":
+                self._unknown[name] = SimpleCheckConfig(enabled=True)
+
+        for name in excluded_check_names or []:
+            if name not in known_names and name != "all":
+                self._unknown[name] = SimpleCheckConfig(enabled=False)

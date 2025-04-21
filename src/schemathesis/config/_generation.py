@@ -22,8 +22,8 @@ class GenerationConfig(DiffBase):
     with_security_parameters: bool
     graphql_allow_null: bool
     database: str | None
-    unique_inputs: bool | None
-    fill_missing_examples: bool | None
+    unique_inputs: bool
+    fill_missing_examples: bool
 
     __slots__ = (
         "modes",
@@ -112,8 +112,20 @@ class GenerationConfig(DiffBase):
         database: str | None = None,
         unique_inputs: bool = False,
     ):
+        if modes is not None:
+            self.modes = modes
+        if max_examples is not None:
+            self.max_examples = max_examples
+        self.no_shrink = no_shrink
+        self.deterministic = deterministic
+        self.allow_x00 = allow_x00
+        if codec is not None:
+            self.codec = codec
         if maximize is not None:
             self.maximize = maximize
+        self.with_security_parameters = with_security_parameters
+        self.graphql_allow_null = graphql_allow_null
+        self.unique_inputs = unique_inputs
 
 
 def _get_maximize(value: Any) -> list[TargetFunction]:
