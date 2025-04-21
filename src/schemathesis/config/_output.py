@@ -137,9 +137,9 @@ class TruncationConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> TruncationConfig:
         return cls(
             enabled=data.get("enabled", True),
-            max_payload_size=data.get("max_payload_size", MAX_PAYLOAD_SIZE),
-            max_lines=data.get("max_lines", MAX_LINES),
-            max_width=data.get("max_width", MAX_WIDTH),
+            max_payload_size=data.get("max-payload-size", MAX_PAYLOAD_SIZE),
+            max_lines=data.get("max-lines", MAX_LINES),
+            max_width=data.get("max-width", MAX_WIDTH),
         )
 
     def set(self, *, enabled: bool | None = None) -> None:

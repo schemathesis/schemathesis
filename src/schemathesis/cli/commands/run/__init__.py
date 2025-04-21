@@ -74,7 +74,6 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "--suppress-health-check",
     help="A comma-separated list of Schemathesis health checks to disable",
     type=CsvEnumChoice(HealthCheck),
-    callback=validation.convert_health_check,
     metavar="",
 )
 @grouped_option(

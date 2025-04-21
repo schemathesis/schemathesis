@@ -88,12 +88,16 @@ def run_test(
 
     phase_name = phase.value.lower()
     assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
+
+    override = ctx.config.project.parameters_for(operation=operation)
+    auth = ctx.config.project.auth_for(operation=operation)
+    headers = ctx.config.project.headers_for(operation=operation)
     check_ctx = CheckContext(
         # TODO:
-        override=None,
-        auth=ctx.config.network.auth,
-        headers=CaseInsensitiveDict(ctx.config.network.headers) if ctx.config.network.headers else None,
-        config=ctx.cfg.projects.default.checks_config_for(operation=operation, phase=phase_name),
+        override=override,
+        auth=auth,
+        headers=CaseInsensitiveDict(headers) if headers else None,
+        config=ctx.config.project.checks_config_for(operation=operation, phase=phase_name),
         transport_kwargs=ctx.transport_kwargs,
         recorder=recorder,
     )
@@ -193,7 +197,7 @@ def run_test(
             yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
-        and ctx.config.execution.continue_on_failure
+        and ctx.config.project.continue_on_failure is True
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
@@ -261,7 +265,7 @@ def cached_test_func(f: Callable) -> Callable:
         try:
             if ctx.has_to_stop:
                 raise KeyboardInterrupt
-            if ctx.config.execution.unique_inputs:
+            if ctx.config.project.generation.unique_inputs:
                 cached = ctx.get_cached_outcome(case)
                 if isinstance(cached, BaseException):
                     raise cached
@@ -299,12 +303,12 @@ def test_func(*, ctx: EngineContext, case: Case, check_ctx: CheckContext, record
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
-    targets.run(ctx.config.execution.targets, case=case, response=response)
+    targets.run(ctx.config.project.generation.maximize, case=case, response=response)
     validate_response(
         case=case,
         ctx=check_ctx,
         response=response,
-        continue_on_failure=ctx.config.execution.continue_on_failure,
+        continue_on_failure=ctx.config.project.continue_on_failure or False,
         recorder=recorder,
     )
 

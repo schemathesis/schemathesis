@@ -15,10 +15,12 @@ class DiffBase:
         diffs = []
         for field in fields(self):
             name = field.name
-            if name.startswith("_"):
+            if name.startswith("_") and name != "_seed":
                 continue
             current_value = getattr(self, name)
             default_value = getattr(default, name)
+            if name == "_seed":
+                name = "seed"
             if self._has_diff(current_value, default_value):
                 diffs.append(f"{name}={self._diff_repr(current_value, default_value)}")
         return f"{self.__class__.__name__}({', '.join(diffs)})"
@@ -58,12 +60,6 @@ class DiffBase:
                     diff_items.append(f"{k!r}: {self._diff_repr(v, d)}")
             return f"{{{', '.join(diff_items)}}}"
         return repr(value)
-
-    @classmethod
-    def get_explicit_attrs(cls, keys: set[str]) -> set[str]:
-        return {field.name for field in fields(cls) if not field.name.startswith("_")} & {
-            key.replace("-", "_") for key in keys
-        }
 
     @classmethod
     def from_hierarchy(cls, configs: list[T]) -> T:

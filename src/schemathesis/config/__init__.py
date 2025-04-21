@@ -77,7 +77,6 @@ class SchemathesisConfig(DiffBase):
     ):
         self.color = color
         self.suppress_health_check = suppress_health_check or []
-
         self._seed = seed
         self.wait_for_schema = wait_for_schema
         self.max_failures = max_failures

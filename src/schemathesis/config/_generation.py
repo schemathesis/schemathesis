@@ -24,6 +24,7 @@ class GenerationConfig(DiffBase):
     database: str | None
     unique_inputs: bool
     fill_missing_examples: bool
+    exclude_header_characters: str | None
 
     __slots__ = (
         "modes",
@@ -38,6 +39,7 @@ class GenerationConfig(DiffBase):
         "database",
         "unique_inputs",
         "fill_missing_examples",
+        "exclude_header_characters",
     )
 
     def __init__(
@@ -55,6 +57,7 @@ class GenerationConfig(DiffBase):
         database: str | None = None,
         unique_inputs: bool = False,
         fill_missing_examples: bool = False,
+        exclude_header_characters: str | None = None,
     ) -> None:
         from schemathesis.generation import GenerationMode
 
@@ -71,6 +74,7 @@ class GenerationConfig(DiffBase):
         self.database = database
         self.unique_inputs = unique_inputs
         self.fill_missing_examples = fill_missing_examples
+        self.exclude_header_characters = exclude_header_characters
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> GenerationConfig:
@@ -95,6 +99,7 @@ class GenerationConfig(DiffBase):
             database=data.get("database"),
             unique_inputs=data.get("unique-inputs", False),
             fill_missing_examples=data.get("fill-missing-examples", False),
+            exclude_header_characters=data.get("exclude-header-characters"),
         )
 
     def set(
@@ -125,6 +130,8 @@ class GenerationConfig(DiffBase):
             self.maximize = maximize
         self.with_security_parameters = with_security_parameters
         self.graphql_allow_null = graphql_allow_null
+        if database is not None:
+            self.database = database
         self.unique_inputs = unique_inputs
 
 

@@ -370,6 +370,9 @@
         "codec": {
           "type": "string"
         },
+        "exclude-header-characters": {
+          "type": "string"
+        },
         "maximize": {
           "anyOf": [
             {
@@ -415,13 +418,13 @@
             "enabled": {
               "type": "boolean"
             },
-            "keys_to_sanitize": {
+            "keys-to-sanitize": {
               "type": "array",
               "items": {
                 "type": "string"
               }
             },
-            "sensitive_markers": {
+            "sensitive-markers": {
               "type": "array",
               "items": {
                 "type": "string"
@@ -439,15 +442,15 @@
             "enabled": {
               "type": "boolean"
             },
-            "max_payload_size": {
+            "max-payload-size": {
               "type": "integer",
               "minimum": 1
             },
-            "max_lines": {
+            "max-lines": {
               "type": "integer",
               "minimum": 1
             },
-            "max_width": {
+            "max-width": {
               "type": "integer",
               "minimum": 1
             }

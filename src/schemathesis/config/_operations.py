@@ -169,7 +169,7 @@ class OperationConfig(DiffBase):
     _filter_set: FilterSet
     enabled: bool
     base_url: str | None
-    headers: dict
+    headers: dict | None
     proxy: str | None
     max_response_time: float | int | None
     wait_for_schema: float | int | None
@@ -234,7 +234,7 @@ class OperationConfig(DiffBase):
         self._filter_set = filter_set or FilterSet()
         self.enabled = enabled
         self.base_url = base_url
-        self.headers = headers or {}
+        self.headers = headers
         self.proxy = proxy
         self.max_response_time = max_response_time
         self.wait_for_schema = wait_for_schema

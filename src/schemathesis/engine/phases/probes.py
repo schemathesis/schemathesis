@@ -43,7 +43,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             from ...specs.openapi import formats
             from ...specs.openapi.formats import HEADER_FORMAT, header_values
 
-            formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
+            formats.register(HEADER_FORMAT, header_values(exclude_characters="\n\r\x00"))
         if result.error is not None:
             status = Status.ERROR
             payload = Err(result.error)

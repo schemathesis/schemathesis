@@ -37,7 +37,7 @@ def get_workers_count() -> int:
 @dataclass(repr=False)
 class ProjectConfig(DiffBase):
     base_url: str | None
-    headers: dict
+    headers: dict | None
     hooks: str | None
     proxy: str | None
     workers: int
@@ -104,7 +104,7 @@ class ProjectConfig(DiffBase):
         if base_url is not None:
             _validate_base_url(base_url)
         self.base_url = base_url
-        self.headers = headers or {}
+        self.headers = headers
         self.hooks = hooks_
         if hooks_:
             hooks.load_from_path(hooks_)
@@ -178,7 +178,9 @@ class ProjectConfig(DiffBase):
             self.base_url = base_url
 
         if headers is not None:
-            self.headers.update(headers)
+            _headers = self.headers or {}
+            _headers.update(headers)
+            self.headers = _headers
 
         if isinstance(workers, int):
             self.workers = workers
@@ -206,6 +208,33 @@ class ProjectConfig(DiffBase):
 
         if proxy is not None:
             self.proxy = proxy
+
+    def parameters_for(self, *, operation: APIOperation | None = None) -> dict:
+        parameters = {name: param.value for name, param in self.parameters.items()}
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            parameters.update({name: param.value for name, param in config.parameters.items()})
+        return parameters
+
+    def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
+        auth = None
+        if self.auth.basic is not None:
+            auth = self.auth.basic["username"], self.auth.basic["password"]
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.auth.basic is not None:
+                auth = config.auth.basic["username"], config.auth.basic["password"]
+        return auth
+
+    def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str] | None:
+        headers = None
+        if self.headers is not None:
+            headers = self.headers
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.headers is not None:
+                headers = config.headers
+        return headers
 
     def checks_config_for(
         self,

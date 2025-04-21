@@ -11,6 +11,7 @@ from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
@@ -30,7 +31,7 @@ from schemathesis.openapi.generation.filters import is_valid_header, is_valid_pa
 from schemathesis.schemas import APIOperation
 
 from ... import auths
-from ...generation import GenerationConfig, GenerationMode
+from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
@@ -407,10 +408,10 @@ def _build_custom_formats(
     custom_formats: dict[str, st.SearchStrategy] | None, generation_config: GenerationConfig
 ) -> dict[str, st.SearchStrategy]:
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
-    if generation_config.headers.strategy is not None:
-        custom_formats[HEADER_FORMAT] = generation_config.headers.strategy
+    if generation_config.exclude_header_characters is not None:
+        custom_formats[HEADER_FORMAT] = header_values(exclude_characters=generation_config.exclude_header_characters)
     elif not generation_config.allow_x00:
-        custom_formats[HEADER_FORMAT] = header_values(blacklist_characters="\n\r\x00")
+        custom_formats[HEADER_FORMAT] = header_values(exclude_characters="\n\r\x00")
     return custom_formats
 
 

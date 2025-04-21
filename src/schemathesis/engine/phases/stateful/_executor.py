@@ -129,12 +129,15 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
+            # TODO: convert overrides to Override class
+            override = engine.config.project.parameters_for(operation=case.operation)
+            auth = engine.config.project.auth_for(operation=case.operation)
+            headers = engine.config.project.headers_for(operation=case.operation)
             check_ctx = CheckContext(
-                # TODO:
-                override=None,
-                auth=engine.config.network.auth,
-                headers=CaseInsensitiveDict(engine.config.network.headers) if engine.config.network.headers else None,
-                config=engine.cfg.projects.default.checks_config_for(operation=case.operation, phase="stateful"),
+                override=override,
+                auth=auth,
+                headers=CaseInsensitiveDict(headers) if headers else None,
+                config=engine.config.project.checks_config_for(operation=case.operation, phase="stateful"),
                 transport_kwargs=engine.transport_kwargs,
                 recorder=self.recorder,
             )

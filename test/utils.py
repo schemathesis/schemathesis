@@ -18,7 +18,6 @@ from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import ExecutionConfig
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Interaction
