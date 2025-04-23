@@ -5,7 +5,6 @@ import pytest
 from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.engine.config import NetworkConfig
 from schemathesis.engine.phases import probes
 
 

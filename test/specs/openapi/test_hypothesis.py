@@ -169,9 +169,7 @@ def test_configure_headers():
         "GET /users/",
         "header",
         None,
-        GenerationConfig(
-            headers=HeaderConfig(strategy=st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=67)))
-        ),
+        GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"ABC"})),
     )
 
     @given(strategy)

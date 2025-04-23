@@ -115,7 +115,11 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
             "--mode=all",
             "--phases=coverage",
             "--continue-on-failure",
-            "--experimental-negative-data-rejection-allowed-statuses=400,401,403,404,422,428,5xx",
+            config={
+                "checks": {
+                    "negative-data-rejection": {"expected-statuses": ["400", "401", "403", "404", "422", "428", "5xx"]}
+                }
+            },
         )
         == snapshot_cli
     )
@@ -140,7 +144,7 @@ def schema(ctx):
 @pytest.mark.parametrize(
     "expected_statuses",
     [
-        [],  # Default case
+        None,  # Default case
         ["404"],
         ["405"],
         ["2xx", "404"],
@@ -157,13 +161,17 @@ def schema(ctx):
 )
 def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, expected_statuses):
     schema_path = ctx.makefile(schema)
+    kwargs = {}
+    if expected_statuses is not None:
+        kwargs["config"] = {"checks": {"positive_data_acceptance": {"expected-statuses": expected_statuses}}}
+
     assert (
         cli.run(
             str(schema_path),
             f"--url={openapi3_base_url}",
             "--max-examples=5",
-            "--experimental=positive-data-acceptance",
-            config={"checks": {"positive_data_acceptance": {"expected-statuses": expected_statuses}}},
+            "--checks=positive_data_acceptance",
+            **kwargs,
         )
         == snapshot_cli
     )

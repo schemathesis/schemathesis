@@ -7,7 +7,6 @@ import pytest
 
 import schemathesis
 from schemathesis.checks import max_response_time, not_a_server_error
-from schemathesis.config import SchemathesisConfig
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
@@ -359,7 +358,7 @@ def test_custom_headers(engine_factory):
     engine = engine_factory(
         app_kwargs={"custom_headers": headers},
         hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        network=NetworkConfig(headers=headers),
+        headers=headers,
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
@@ -540,20 +539,9 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.base_url = f"http://127.0.0.1:{root_app_port}/"
+    schema.config.generation.set(max_examples=75, database="none")
     engine = stateful.execute(
-        engine=EngineContext(
-            schema=schema,
-            config=EngineConfig(
-                execution=ExecutionConfig(
-                    targets=[],
-                    hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
-                    generation=GenerationConfig(),
-                ),
-                network=NetworkConfig(),
-            ),
-            stop_event=threading.Event(),
-            cfg=SchemathesisConfig(),
-        ),
+        engine=EngineContext(schema=schema, stop_event=threading.Event()),
         phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
     )
     result = collect_result(engine)
@@ -612,7 +600,7 @@ def test_ignored_auth_valid(engine_factory):
     engine = engine_factory(
         app_kwargs={"auth_token": token},
         checks=[ignored_auth],
-        network=NetworkConfig(headers={"Authorization": f"Bearer {token}"}),
+        headers={"Authorization": f"Bearer {token}"},
     )
     result = collect_result(engine)
     # Then no failures are reported
@@ -625,7 +613,7 @@ def test_ignored_auth_invalid(engine_factory):
     engine = engine_factory(
         app_kwargs={"auth_token": token, "ignored_auth": True},
         checks=[ignored_auth],
-        network=NetworkConfig(headers={"Authorization": "Bearer UNKNOWN"}),
+        headers={"Authorization": "Bearer UNKNOWN"},
     )
     result = collect_result(engine)
     # Then it should be reported

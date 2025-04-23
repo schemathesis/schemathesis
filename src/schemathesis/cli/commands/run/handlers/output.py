@@ -26,7 +26,6 @@ from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
@@ -1192,25 +1191,6 @@ class OutputHandler(EventHandler):
             click.echo(_style("Check base URL or adjust data generation settings", fg="yellow"))
             click.echo()
 
-    def display_experiments(self) -> None:
-        display_section_name("EXPERIMENTS")
-
-        click.echo()
-        for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
-            click.echo(_style(f"🧪 {experiment.name}: ", bold=True), nl=False)
-            click.echo(_style(experiment.description))
-            click.echo(_style(f"   Feedback: {experiment.discussion_url}"))
-            click.echo()
-
-        click.echo(
-            _style(
-                "Your feedback is crucial for experimental features. "
-                "Please visit the provided URL(s) to share your thoughts.",
-                dim=True,
-            )
-        )
-        click.echo()
-
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
 
@@ -1448,8 +1428,6 @@ class OutputHandler(EventHandler):
         display_failures(ctx)
         if self.warnings.missing_auth or self.warnings.only_4xx_responses:
             self.display_warnings()
-        if GLOBAL_EXPERIMENTS.enabled:
-            self.display_experiments()
         if ctx.statistic.extraction_failures:
             self.display_stateful_failures(ctx)
         display_section_name("SUMMARY")

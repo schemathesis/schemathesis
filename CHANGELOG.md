@@ -2,22 +2,6 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.10...HEAD) - TBD
 
-<<<<<<< HEAD
-## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
-
-### :bug: Fixed
-
-- Generate negative test cases for large nested arrays during the coverage phase.
-- Generate strings larger than 10000 characters during the coverage phase.
-- Internal error on building a JUnit report if the same failures appear multiple times across multiple test phases. [#2814](https://github.com/schemathesis/schemathesis/issues/2814)
-
-## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
-
-### :wrench: Changed
-
-- Support basic canonicalisation of regex patterns. For example, `[\\W\\w]` could be replaced with `.` in some scenarios.
-||||||| parent of 7518ab75 (feat: Config file)
-=======
 ### :rocket: Added
 
 Introducing a new configuration file, `schemathesis.toml`, replacing CLI options as the primary source for settings.
@@ -44,7 +28,20 @@ title = "Payment Processing API"
 base-url = "https://payments.example.com"
 workers = 4
 ```
->>>>>>> 7518ab75 (feat: Config file)
+
+## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
+
+### :bug: Fixed
+
+- Generate negative test cases for large nested arrays during the coverage phase.
+- Generate strings larger than 10000 characters during the coverage phase.
+- Internal error on building a JUnit report if the same failures appear multiple times across multiple test phases. [#2814](https://github.com/schemathesis/schemathesis/issues/2814)
+
+## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
+
+### :wrench: Changed
+
+- Support basic canonicalisation of regex patterns. For example, `[\\W\\w]` could be replaced with `.` in some scenarios.
 
 ### :bug: Fixed
 

@@ -28,7 +28,6 @@ from urllib3 import HTTPResponse
 import schemathesis.cli
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
 from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.specs.openapi import media_types
 
 from .apps import _graphql as graphql
@@ -57,13 +56,11 @@ settings.register_profile("CI", max_examples=2000)
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
-    GLOBAL_EXPERIMENTS.disable_all()
     CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     media_types.unregister_all()
     yield
-    GLOBAL_EXPERIMENTS.disable_all()
     CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()

@@ -6,18 +6,11 @@ from hypothesis import strategies as st
 from schemathesis.cli.commands.run import validation
 from schemathesis.core.validation import is_latin_1_encodable
 
-from ..utils import SIMPLE_PATH
-
 
 @pytest.mark.parametrize("value", ["//test", "//ÿ["])
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
-        validation.validate_schema_location(value, None)
-
-
-def test_validate_schema_path_without_base_url():
-    with pytest.raises(click.UsageError):
-        validation.validate_schema_location(SIMPLE_PATH, None)
+        validation.validate_schema_location(None, None, value)
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))

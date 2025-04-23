@@ -11,7 +11,7 @@ from starlette_testclient import TestClient
 
 import schemathesis
 from schemathesis.checks import CheckContext
-from schemathesis.config import GenerationConfig
+from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import FailureGroup
 from schemathesis.engine import Status
 from schemathesis.engine.events import ScenarioFinished
@@ -42,7 +42,7 @@ def run(schema_url, **config):
 def test_auth_is_not_checked(with_generated, schema_url):
     kwargs = {}
     if not with_generated:
-        kwargs["generation"] = GenerationConfig(with_security_parameters=False)
+        kwargs["with_security_parameters"] = False
     # When auth is present
     # And endpoint declares auth as a requirement but doesn't actually require it
     event = run(schema_url, **kwargs)
@@ -87,10 +87,8 @@ def test_keep_tls_verification(schema_url, mocker):
     send = mocker.spy(RequestsTransport, "send")
     run(
         schema_url,
-        network_config={
-            "timeout": 5,
-            "tls_verify": False,
-        },
+        timeout=5,
+        tls_verify=False,
         headers={"Authorization": "Basic dGVzdDp0ZXN0"},
     )
     for call in send.mock_calls:
@@ -124,7 +122,7 @@ def test_keep_tls_verification(schema_url, mocker):
                 override=None,
                 auth=None,
                 headers=None,
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
@@ -136,7 +134,7 @@ def test_keep_tls_verification(schema_url, mocker):
                 override=None,
                 auth=None,
                 headers={"Foo": "Bar"},
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
@@ -148,7 +146,7 @@ def test_keep_tls_verification(schema_url, mocker):
                 override=None,
                 auth=None,
                 headers={"A": "V"},
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             {"url": "https://example.com", "headers": {"A": "V"}},
@@ -156,25 +154,25 @@ def test_keep_tls_verification(schema_url, mocker):
             AuthKind.EXPLICIT,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
             {"url": "https://example.com", "headers": {"A": "V"}},
             [{"name": "B", "in": "header"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "A", "in": "query"}],
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
             {"url": "https://example.com?A=V"},
             [{"name": "B", "in": "query"}],
             None,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "A", "in": "cookie"}],
             AuthKind.GENERATED,
@@ -184,7 +182,7 @@ def test_keep_tls_verification(schema_url, mocker):
                 override=None,
                 auth=None,
                 headers={"Cookie": "A=v;"},
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
@@ -196,7 +194,7 @@ def test_keep_tls_verification(schema_url, mocker):
                 override=None,
                 auth=None,
                 headers={"Cookie": "B=v;"},
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             {"url": "https://example.com", "cookies": {"A": "V"}},
@@ -204,7 +202,7 @@ def test_keep_tls_verification(schema_url, mocker):
             AuthKind.GENERATED,
         ),
         (
-            CheckContext(override=None, auth=None, headers={}, config={}, transport_kwargs=None),
+            CheckContext(override=None, auth=None, headers={}, config=ChecksConfig(), transport_kwargs=None),
             {"url": "https://example.com", "cookies": {"A": "V"}},
             [{"name": "B", "in": "cookie"}],
             None,

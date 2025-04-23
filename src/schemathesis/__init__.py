@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from schemathesis import auths, contrib, engine, errors, experimental, graphql, hooks, openapi, pytest, python
+from schemathesis import auths, contrib, engine, errors, graphql, hooks, openapi, pytest, python
 from schemathesis.checks import CheckContext, CheckFunction, check
 from schemathesis.core.output import sanitization
 from schemathesis.core.transport import Response
@@ -33,7 +33,6 @@ __all__ = [
     "contrib",
     "engine",
     "errors",
-    "experimental",
     "graphql",
     "hook",
     "hooks",

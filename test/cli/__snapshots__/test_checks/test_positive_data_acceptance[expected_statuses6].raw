@@ -34,7 +34,7 @@ __________________________________ GET /test ___________________________________
 
 - Rejected positive data
 
-    Allowed statuses: 405
+    Allowed statuses: 2xx
 
 [404] Not Found:
 
@@ -43,13 +43,6 @@ __________________________________ GET /test ___________________________________
 Reproduce with:
 
     curl -X GET http://127.0.0.1/api/test
-
-================================= EXPERIMENTS ==================================
-
-🧪 Positive Data Acceptance: Verifying schema-conformant data is accepted
-   Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
 
 =================================== SUMMARY ====================================
 

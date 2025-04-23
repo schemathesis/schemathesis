@@ -44,13 +44,6 @@ Reproduce with:
 
     curl -X GET http://127.0.0.1/api/test
 
-================================= EXPERIMENTS ==================================
-
-🧪 Positive Data Acceptance: Verifying schema-conformant data is accepted
-   Feedback: https://github.com/schemathesis/schemathesis/discussions/2499
-
-Your feedback is crucial for experimental features. Please visit the provided URL(s) to share your thoughts.
-
 =================================== SUMMARY ====================================
 
 API Operations:

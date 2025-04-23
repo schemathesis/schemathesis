@@ -12,7 +12,6 @@ from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.handlers.output import DEFAULT_INTERNAL_ERROR_MESSAGE
 from schemathesis.config._validator import CONFIG_SCHEMA
 from schemathesis.core.transforms import deepclone
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.targets import TARGETS
 
 
@@ -85,9 +84,6 @@ def csv_strategy(enum, exclude=()):
             "generation-database": st.text(),
             "generation-max-examples": st.integers(min_value=1),
             "generation-seed": st.integers(),
-            "experimental": st.sampled_from(
-                [experiment.name.lower().replace(" ", "-") for experiment in GLOBAL_EXPERIMENTS.available]
-            ),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
