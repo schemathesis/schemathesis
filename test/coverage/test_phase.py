@@ -1380,6 +1380,92 @@ def test_less_than_min_items(ctx):
     )
 
 
+def test_query_parameters_with_nested_enum(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "in": "query",
+                            "name": "q1",
+                            "schema": {
+                                "items": {
+                                    "enum": [
+                                        "A",
+                                        "B",
+                                        "C",
+                                        "D",
+                                        "E",
+                                        "F",
+                                    ],
+                                    "type": "string",
+                                },
+                                "type": "array",
+                            },
+                            "required": True,
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [
+            {
+                "query": {
+                    "q1": [
+                        "F",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [
+                        "E",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [
+                        "D",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [
+                        "C",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [
+                        "B",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [
+                        "A",
+                    ],
+                },
+            },
+            {
+                "query": {
+                    "q1": [],
+                },
+            },
+        ],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
