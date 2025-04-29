@@ -58,7 +58,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore()
+    testdir.assert_petstore(tests_num=9)
 
 
 def test_find_by_tag(testdir):

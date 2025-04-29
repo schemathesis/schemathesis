@@ -683,19 +683,22 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
 
     if example or examples or default:
         if example:
+            seen.add(_to_hashable_key(example))
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
+                seen.add(_to_hashable_key(example))
                 yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
+            seen.add(_to_hashable_key(default))
             yield PositiveValue(default, description="Default value")
     else:
         yield PositiveValue(template, description="Valid array")
-    seen.add(len(template))
+    seen.add(_to_hashable_key(template))
 
     # Boundary and near-boundary sizes
     min_items = schema.get("minItems")
@@ -706,19 +709,19 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         # One item more than minimum if possible
         larger = min_items + 1
         if larger not in seen and (max_items is None or larger <= max_items):
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger}),
-                description="Near-boundary items array",
-            )
-            seen.add(larger)
+            value = ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger})
+            key = _to_hashable_key(value)
+            if key not in seen:
+                seen.add(key)
+                yield PositiveValue(value, description="Near-boundary items array")
 
     if max_items is not None:
         if max_items < BUFFER_SIZE and max_items not in seen:
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minItems": max_items}),
-                description="Maximum items array",
-            )
-            seen.add(max_items)
+            value = ctx.generate_from_schema({**schema, "minItems": max_items})
+            key = _to_hashable_key(value)
+            if key not in seen:
+                seen.add(key)
+                yield PositiveValue(value, description="Maximum items array")
 
         # One item smaller than maximum if possible
         smaller = max_items - 1
@@ -728,11 +731,21 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             and smaller not in seen
             and (min_items is None or smaller >= min_items)
         ):
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller}),
-                description="Near-boundary items array",
-            )
-            seen.add(smaller)
+            value = ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
+            key = _to_hashable_key(value)
+            if key not in seen:
+                seen.add(key)
+                yield PositiveValue(value, description="Near-boundary items array")
+
+    if "items" in schema and "enum" in schema["items"] and isinstance(schema["items"]["enum"], list) and max_items != 0:
+        # Ensure there is enough items to pass `minItems` if it is specified
+        length = min_items or 1
+        for variant in schema["items"]["enum"]:
+            value = [variant] * length
+            key = _to_hashable_key(value)
+            if key not in seen:
+                seen.add(key)
+                yield PositiveValue(value, description="Enum value from available for items array")
 
 
 def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:
