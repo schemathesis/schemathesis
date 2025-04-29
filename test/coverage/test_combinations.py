@@ -494,7 +494,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
         ),
         (
             {"type": "array", "items": {"enum": ["FOO"]}},
-            [[]],
+            [[], ["FOO"]],
         ),
         (
             {"type": "array", "items": {"enum": ["FOO"]}, "minItems": 1},
