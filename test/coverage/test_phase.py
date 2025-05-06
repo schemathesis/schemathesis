@@ -558,6 +558,19 @@ def test_with_examples_openapi_3_request_body(ctx):
             },
             {
                 "body": {
+                    "address": {
+                        "city": "Anytown",
+                        "street": "123 Main St",
+                    },
+                    "age": 25,
+                    "name": "John Doe",
+                    "tags": [
+                        "",
+                    ],
+                },
+            },
+            {
+                "body": {
                     "address": {"city": "Anytown", "street": "123 Main St"},
                     "age": 25,
                     "name": "John Doe",

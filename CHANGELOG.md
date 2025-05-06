@@ -15,6 +15,7 @@
 - Avoid extremely slow generation of large strings combined with `patterns` during the coverage phase.
 - Generate objects during the coverage phase even if `"type": "object"` is not present.
 - Generate empty strings in more cases during the coverage phase.
+- Generate nested `items` during the coverage phase.
 
 ## [4.0.0-alpha.8](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.7...v4.0.0-alpha.8) - 2025-04-05
 
