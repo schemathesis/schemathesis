@@ -257,6 +257,9 @@ def _cover_positive_for_type(
     if ty == "object" or ty == "array":
         template_schema = _get_template_schema(schema, ty)
         template = ctx.generate_from_schema(template_schema)
+    elif "properties" in schema or "required" in schema:
+        template_schema = _get_template_schema(schema, "object")
+        template = ctx.generate_from_schema(template_schema)
     else:
         template = None
     if GenerationMode.POSITIVE in ctx.generation_modes:
@@ -295,6 +298,8 @@ def _cover_positive_for_type(
                 yield from _positive_array(ctx, schema, cast(list, template))
             elif ty == "object":
                 yield from _positive_object(ctx, schema, cast(dict, template))
+        elif "properties" in schema or "required" in schema:
+            yield from _positive_object(ctx, schema, cast(dict, template))
 
 
 @contextmanager
