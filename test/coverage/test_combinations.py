@@ -1099,3 +1099,19 @@ def test_ignoring_unknown_formats(pctx, schema, expected):
 )
 def test_negative_value_locations(nctx, schema, expected):
     assert {v.location for v in cover_schema_iter(nctx, schema)} == expected
+
+
+def test_generate_large_string(pctx):
+    schema = {
+        "properties": {
+            "name": {"maxLength": 4000, "minLength": 1, "pattern": "^[\\w\\W]+$", "type": "string"},
+        },
+        "required": ["name"],
+        "type": "object",
+    }
+    assert cover_schema(pctx, schema) == [
+        {"name": "0"},
+        {"name": "00"},
+        {"name": "0" * 4000},
+        {"name": "0" * 3999},
+    ]
