@@ -69,13 +69,18 @@ def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, m
         trailing_anchor_length = _get_anchor_length(parsed[2][1])
         leading_anchor = pattern[:leading_anchor_length]
         trailing_anchor = pattern[-trailing_anchor_length:]
-        return (
-            leading_anchor
-            + _update_quantifier(
-                op, value, pattern[leading_anchor_length:-trailing_anchor_length], min_length, max_length
-            )
-            + trailing_anchor
-        )
+        # Special case for patterns canonicalisation. Some frameworks generate `\\w\\W` instead of `.`
+        # Such patterns lead to significantly slower data generation
+        if op == sre.IN and _matches_anything(value):
+            op = sre.ANY
+            value = None
+            inner_pattern = "."
+        elif op in REPEATS and len(value[2]) == 1 and value[2][0][0] == sre.IN and _matches_anything(value[2][0][1]):
+            value = (value[0], value[1], [(sre.ANY, None)], *value[3:])
+            inner_pattern = "."
+        else:
+            inner_pattern = pattern[leading_anchor_length:-trailing_anchor_length]
+        return leading_anchor + _update_quantifier(op, value, inner_pattern, min_length, max_length) + trailing_anchor
     elif (
         len(parsed) > 3
         and parsed[0][0] == ANCHOR
@@ -84,6 +89,19 @@ def _handle_parsed_pattern(parsed: list, pattern: str, min_length: int | None, m
     ):
         return _handle_anchored_pattern(parsed, pattern, min_length, max_length)
     return pattern
+
+
+def _matches_anything(value: list) -> bool:
+    """Check if the given pattern is equivalent to '.' (match any character)."""
+    # Common forms: [\w\W], [\s\S], etc.
+    return value in (
+        [(sre.CATEGORY, sre.CATEGORY_WORD), (sre.CATEGORY, sre.CATEGORY_NOT_WORD)],
+        [(sre.CATEGORY, sre.CATEGORY_SPACE), (sre.CATEGORY, sre.CATEGORY_NOT_SPACE)],
+        [(sre.CATEGORY, sre.CATEGORY_DIGIT), (sre.CATEGORY, sre.CATEGORY_NOT_DIGIT)],
+        [(sre.CATEGORY, sre.CATEGORY_NOT_WORD), (sre.CATEGORY, sre.CATEGORY_WORD)],
+        [(sre.CATEGORY, sre.CATEGORY_NOT_SPACE), (sre.CATEGORY, sre.CATEGORY_SPACE)],
+        [(sre.CATEGORY, sre.CATEGORY_NOT_DIGIT), (sre.CATEGORY, sre.CATEGORY_DIGIT)],
+    )
 
 
 def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None, max_length: int | None) -> str:
@@ -269,13 +287,26 @@ def _get_anchor_length(node_type: int) -> int:
     return 1  # ^ or $ or their multiline/locale/unicode variants
 
 
-def _update_quantifier(op: int, value: tuple, pattern: str, min_length: int | None, max_length: int | None) -> str:
+def _update_quantifier(
+    op: int, value: tuple | None, pattern: str, min_length: int | None, max_length: int | None
+) -> str:
     """Update the quantifier based on the operation type and given constraints."""
-    if op in REPEATS:
+    if op in REPEATS and value is not None:
         return _handle_repeat_quantifier(value, pattern, min_length, max_length)
     if op in (LITERAL, IN) and max_length != 0:
         return _handle_literal_or_in_quantifier(pattern, min_length, max_length)
+    if op == sre.ANY and value is None:
+        # Equivalent to `.` which is in turn is the same as `.{1}`
+        return _handle_repeat_quantifier(
+            SINGLE_ANY,
+            pattern,
+            min_length,
+            max_length,
+        )
     return pattern
+
+
+SINGLE_ANY = sre_parse.parse(".{1}")[0][1]
 
 
 def _handle_repeat_quantifier(
