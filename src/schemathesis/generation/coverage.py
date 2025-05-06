@@ -392,27 +392,39 @@ def cover_schema_iter(
                             yield value_
                             seen.add(k)
                 elif key == "minLength" and 0 < value < BUFFER_SIZE:
-                    with suppress(InvalidArgument):
-                        min_length = max_length = value - 1
-                        new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
-                        new_schema.setdefault("type", "string")
-                        if "pattern" in new_schema:
-                            new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                            if new_schema["pattern"] == schema["pattern"]:
-                                # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
-                                del new_schema["minLength"]
-                                del new_schema["maxLength"]
-                                value = ctx.generate_from_schema(new_schema)[:max_length]
-                            else:
-                                value = ctx.generate_from_schema(new_schema)
-                        else:
-                            value = ctx.generate_from_schema(new_schema)
+                    if value == 1:
+                        # In this case, the only possible negative string is an empty one
+                        # The `pattern` value may require an non-empty one and the generation will fail
+                        # However, it is fine to violate `pattern` here as it is negative string generation anyway
+                        value = ""
                         k = _to_hashable_key(value)
                         if k not in seen:
                             yield NegativeValue(
                                 value, description="String smaller than minLength", location=ctx.current_path
                             )
                             seen.add(k)
+                    else:
+                        with suppress(InvalidArgument):
+                            min_length = max_length = value - 1
+                            new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
+                            new_schema.setdefault("type", "string")
+                            if "pattern" in new_schema:
+                                new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                if new_schema["pattern"] == schema["pattern"]:
+                                    # Pattern wasn't updated, try to generate a valid value then shrink the string to the required length
+                                    del new_schema["minLength"]
+                                    del new_schema["maxLength"]
+                                    value = ctx.generate_from_schema(new_schema)[:max_length]
+                                else:
+                                    value = ctx.generate_from_schema(new_schema)
+                            else:
+                                value = ctx.generate_from_schema(new_schema)
+                            k = _to_hashable_key(value)
+                            if k not in seen:
+                                yield NegativeValue(
+                                    value, description="String smaller than minLength", location=ctx.current_path
+                                )
+                                seen.add(k)
                 elif key == "maxLength" and value < BUFFER_SIZE:
                     try:
                         min_length = max_length = value + 1
