@@ -38,6 +38,7 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 BUFFER_SIZE = 8 * 1024
 NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
+NEGATIVE_MODE_MAX_ITEMS = 15
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
@@ -461,10 +462,22 @@ def cover_schema_iter(
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_required(ctx, template, value)
                 elif key == "maxItems" and isinstance(value, int) and value < BUFFER_SIZE:
-                    try:
-                        # Force the array to have one more item than allowed
-                        new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
+                    if value > NEGATIVE_MODE_MAX_ITEMS:
+                        # It could be extremely slow to generate large arrays
+                        # Generate values up to the limit and reuse them to construct the final array
+                        new_schema = {
+                            **schema,
+                            "minItems": NEGATIVE_MODE_MAX_ITEMS,
+                            "maxItems": NEGATIVE_MODE_MAX_ITEMS,
+                            "type": "array",
+                        }
                         array_value = ctx.generate_from_schema(new_schema)
+                        # Extend the array to be of length value + 1 by repeating its own elements
+                        diff = value + 1 - len(array_value)
+                        if diff > 0:
+                            array_value += (
+                                array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
+                            )
                         k = _to_hashable_key(array_value)
                         if k not in seen:
                             yield NegativeValue(
@@ -473,8 +486,21 @@ def cover_schema_iter(
                                 location=ctx.current_path,
                             )
                             seen.add(k)
-                    except (InvalidArgument, Unsatisfiable):
-                        pass
+                    else:
+                        try:
+                            # Force the array to have one more item than allowed
+                            new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
+                            array_value = ctx.generate_from_schema(new_schema)
+                            k = _to_hashable_key(array_value)
+                            if k not in seen:
+                                yield NegativeValue(
+                                    array_value,
+                                    description="Array with more items than allowed by maxItems",
+                                    location=ctx.current_path,
+                                )
+                                seen.add(k)
+                        except (InvalidArgument, Unsatisfiable):
+                            pass
                 elif key == "minItems" and isinstance(value, int) and value > 0:
                     try:
                         # Force the array to have one less item than the minimum
