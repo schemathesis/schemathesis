@@ -1435,3 +1435,30 @@ def test_deeply_nested_values(pctx):
             },
         },
     ]
+
+
+def test_large_arrays(nctx):
+    schema = {
+        "properties": {
+            "questions": {
+                "items": {
+                    "properties": {
+                        "id": {"minLength": 6, "pattern": "^[0-9]+$", "type": "string"},
+                    },
+                    "required": ["id"],
+                    "type": "object",
+                    "additionalProperties": False,
+                },
+                "maxItems": 500,
+                "minItems": 0,
+                "type": "array",
+            },
+        },
+        "type": "object",
+    }
+
+    assert 501 in {
+        len(item["questions"])
+        for item in cover_schema(nctx, schema)
+        if isinstance(item, dict) and isinstance(item["questions"], list)
+    }
