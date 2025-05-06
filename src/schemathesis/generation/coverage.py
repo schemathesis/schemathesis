@@ -769,6 +769,11 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
             if key not in seen:
                 seen.add(key)
                 yield PositiveValue(value, description="Enum value from available for items array")
+    elif min_items is None and max_items is None and "items" in schema and isinstance(schema["items"], dict):
+        # Otherwise only an empty array is generated
+        sub_schema = schema["items"]
+        for item in cover_schema_iter(ctx, sub_schema):
+            yield PositiveValue([item.value], description=f"Single-item array: {item.description}")
 
 
 def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Generator[GeneratedValue, None, None]:

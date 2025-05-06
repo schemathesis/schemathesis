@@ -72,7 +72,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore()
+    testdir.assert_petstore(tests_num=7)
 
 
 def test_get_pet(testdir):
@@ -212,7 +212,7 @@ def test_(request, case):
     assert_requests_call(case)
 """
     )
-    testdir.assert_petstore(2, 12)
+    testdir.assert_petstore(2, 44)
 
 
 def test_login(testdir):
