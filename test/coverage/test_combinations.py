@@ -326,7 +326,37 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                     }
                 },
             },
-            [{"foo": []}],
+            [
+                {"foo": []},
+                {
+                    "foo": [
+                        {
+                            "bar": "0",
+                        },
+                    ],
+                },
+                {
+                    "foo": [
+                        {
+                            "bar": "00",
+                        },
+                    ],
+                },
+                {
+                    "foo": [
+                        {
+                            "bar": "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                        },
+                    ],
+                },
+                {
+                    "foo": [
+                        {
+                            "bar": "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+                        },
+                    ],
+                },
+            ],
         ),
         (
             {
@@ -339,7 +369,14 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
                     }
                 },
             },
-            [{"foo": []}],
+            [
+                {"foo": []},
+                {
+                    "foo": [
+                        "",
+                    ],
+                },
+            ],
         ),
         (
             {
@@ -517,12 +554,14 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3]},
             [
                 [1, 2, 3],
+                [0],
             ],
         ),
         (
             {"type": "array", "items": {"type": "integer"}, "example": [1, 2, 3], "default": [1, 2, 3]},
             [
                 [1, 2, 3],
+                [0],
             ],
         ),
         (
@@ -530,12 +569,14 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             [
                 [1, 2, 3],
                 [4, 5, 6],
+                [0],
             ],
         ),
         (
             {"type": "array", "items": {"type": "integer"}, "default": [1, 2, 3]},
             [
                 [1, 2, 3],
+                [0],
             ],
         ),
         (
@@ -543,6 +584,7 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
             [
                 [1, 2, 3],
                 [4, 5, 6],
+                [0],
             ],
         ),
         (
@@ -1192,4 +1234,204 @@ def test_large_string_with_complex_pattern(nctx):
             None,
         ],
         {},
+    ]
+
+
+def test_deeply_nested_values(pctx):
+    schema = {
+        "properties": {
+            "customer": {
+                "properties": {
+                    "contacts": {
+                        "properties": {
+                            "contact": {
+                                "items": {
+                                    "properties": {
+                                        "name": {
+                                            "maxLength": 10,
+                                            "minLength": 1,
+                                            "type": "string",
+                                        },
+                                        "phone": {
+                                            "items": {
+                                                "properties": {
+                                                    "phoneNumber": {
+                                                        "maxLength": 15,
+                                                        "minLength": 1,
+                                                        "type": "string",
+                                                    }
+                                                },
+                                                "type": "object",
+                                            },
+                                            "type": "array",
+                                        },
+                                    },
+                                    "required": ["name"],
+                                    "type": "object",
+                                },
+                                "type": "array",
+                            }
+                        },
+                        "type": "object",
+                    }
+                },
+                "type": "object",
+            },
+        },
+        "type": "object",
+    }
+    assert cover_schema(pctx, schema) == [
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [],
+                },
+            },
+        },
+        {},
+        {
+            "customer": {},
+        },
+        {
+            "customer": {
+                "contacts": {},
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "00",
+                            "phone": [],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0000000000",
+                            "phone": [],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "000000000",
+                            "phone": [],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [
+                                {
+                                    "phoneNumber": "0",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [
+                                {},
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [
+                                {
+                                    "phoneNumber": "00",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [
+                                {
+                                    "phoneNumber": "000000000000000",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
+        {
+            "customer": {
+                "contacts": {
+                    "contact": [
+                        {
+                            "name": "0",
+                            "phone": [
+                                {
+                                    "phoneNumber": "00000000000000",
+                                },
+                            ],
+                        },
+                    ],
+                },
+            },
+        },
     ]
