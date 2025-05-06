@@ -270,6 +270,16 @@ def test_positive_number(ctx, schema, multiple_of, values, with_multiple_of):
         ),
         (
             {
+                # No `type`
+                "properties": {"foo": {"type": "integer", "example": 42}},
+                "required": ["foo"],
+            },
+            [
+                {"foo": 42},
+            ],
+        ),
+        (
+            {
                 "type": "object",
                 "properties": {"foo": {"type": "integer", "default": 42}},
                 "required": ["foo"],
