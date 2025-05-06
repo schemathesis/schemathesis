@@ -3,7 +3,7 @@
 This reference covers all the configuration options available in `schemathesis.toml`. The settings are organized into two main categories:
 
 - **Global**: These control CLI behavior, output formatting, and overall test execution. They are defined at the top level and affect the CLI invocation.
-- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[project.<name>]` namespace), they are used as defaults for any tested project.
+- **Per-Project**: These let you customize configurations for individual API projects. If project-level settings are placed at the top level (without a `[[project]]` namespace), they are used as defaults for any tested project.
 
 ## Configuration Resolution
 
@@ -13,7 +13,7 @@ Schemathesis applies settings in the following hierarchy (from highest to lowest
 2. Operation-specific phase settings
 3. Global phase settings (e.g., `[phases.fuzzing]`)
 4. Operation-level settings (e.g., `[[operations]]`)
-5. Project-level settings (e.g., `[[projects]]`)
+5. Project-level settings (e.g., `[[project]]`)
 6. Global settings
 
 ## Environment Variable Substitution
@@ -93,6 +93,19 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     suppress-health-check = ["too_slow", "data_too_large"]
     ```
 
+#### `seed`
+
+!!! note ""
+
+    **Type:** `Integer`  
+    **Default:** `null`  
+
+    Random seed for reproducible test runs. Setting the same seed value will result in the same sequence of generated test cases.
+
+    ```toml
+    seed = 42
+    ```
+
 #### `max-failures`
 
 !!! note ""
@@ -168,7 +181,7 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
 
 ### Output
 
-#### `output.sanitize`
+#### `output.sanitization.enabled`
 
 !!! note ""
 
@@ -178,22 +191,106 @@ parameters = { "path.user_id" = 42, "query.user_id" = 100 }
     Controls automatic sanitization of output data to obscure sensitive information.
 
     ```toml
-    [output]
-    sanitize = false
+    [output.sanitization]
+    enabled = false
     ```
 
-#### `output.truncate`
+#### `output.sanitization.keys-to-sanitize`
+
+!!! note ""
+
+    **Type**: `List[String]`  
+    **Default**: List of common sensitive keys (auth tokens, passwords, etc.)  
+
+    Specific keys that will be automatically sanitized in output data.
+
+    ```toml
+    [output.sanitization]
+    keys-to-sanitize = ["password", "token", "auth"]
+    ```
+
+#### `output.sanitization.sensitive-markers`
+
+!!! note ""
+
+    **Type**: `List[String]`  
+    **Default**: `["token", "key", "secret", "password", "auth", "session", "passwd", "credential"]`  
+
+    Substrings that indicate a key might contain sensitive information requiring sanitization.
+
+    ```toml
+    [output.sanitization]
+    sensitive-markers = ["secret", "auth", "key"]
+    ```
+
+#### `output.sanitization.replacement`
+
+!!! note ""
+
+    **Type**: `String`  
+    **Default**: `"[Filtered]"`  
+
+    The text used to replace sensitive data in output.
+
+    ```toml
+    [output.sanitization]
+    replacement = "***REDACTED***"
+    ```
+
+#### `output.truncation.enabled`
 
 !!! note ""
 
     **Type**: `Boolean`  
     **Default**: `true`  
 
-    Truncates long output in error messages for improved readability.
+    Controls whether large output data should be truncated.
 
     ```toml
-    [output]
-    truncate = false
+    [output.truncation]
+    enabled = false
+    ```
+
+#### `output.truncation.max-payload-size`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `512`  
+
+    Maximum size in bytes for payloads before truncation occurs.
+
+    ```toml
+    [output.truncation]
+    max-payload-size = 1024
+    ```
+
+#### `output.truncation.max-lines`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `10`  
+
+    Maximum number of lines to display for multi-line output.
+
+    ```toml
+    [output.truncation]
+    max-lines = 20
+    ```
+
+#### `output.truncation.max-width`
+
+!!! note ""
+
+    **Type**: `Integer`  
+    **Default**: `80`  
+
+    Maximum width in characters for each line before horizontal truncation.
+
+    ```toml
+    [output.truncation]
+    max-width = 100
     ```
 
 ## Project Settings
@@ -211,7 +308,7 @@ These settings can only be applied at the project level.
 
     ```toml
     # Optionally under a named project
-    # [[projects]]
+    # [[project]]
     base-url = "https://api.example.com"
     ```
 
@@ -229,7 +326,7 @@ These settings can only be applied at the project level.
     hooks = "myproject.tests.hooks"
     
     # Or project-specific hooks
-    # [[projects]]
+    # [[project]]
     # hooks = "myproject.payments.hooks"
     ```
 
@@ -327,6 +424,20 @@ These settings can only be applied at the project level.
     ```toml
     [phases.coverage]
     unexpected-methods = ["PATCH"]
+    ```
+
+#### `phases.<phase>.checks`
+
+!!! note "" 
+
+    **Type**: `Object`  
+    **Default**: `{}`  
+
+    Phase-specific overrides for checks.
+
+    ```toml
+    [phases.coverage.checks]
+    not_a_server_error.enabled = false
     ```
 
 ### Authentication
@@ -625,20 +736,6 @@ The following settings control how Schemathesis generates test data for your API
     max-examples = 200
     ```
 
-#### `generation.seed`
-
-!!! note ""
-
-    **Type:** `Integer`  
-    **Default:** `null`  
-
-    Random seed for reproducible test runs. Setting the same seed value will result in the same sequence of generated test cases.
-
-    ```toml
-    [generation]
-    seed = 42
-    ```
-
 #### `generation.no-shrink`
 
 !!! note ""
@@ -679,6 +776,21 @@ The following settings control how Schemathesis generates test data for your API
     ```toml
     [generation]
     allow-x00 = false
+    ```
+
+
+#### `generation.exclude-header-characters`
+
+!!! note ""
+
+    **Type:** `String`  
+    **Default:** `\r\n`  
+
+    All characters from the given strings will be excluded from generated header values.
+
+    ```toml
+    [generation]
+    exclude-header-characters = "\r\nABC"
     ```
 
 #### `generation.codec`
