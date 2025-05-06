@@ -1111,7 +1111,58 @@ def test_negative_value_locations(nctx, schema, expected):
     assert {v.location for v in cover_schema_iter(nctx, schema)} == expected
 
 
-def test_generate_large_string(pctx):
+@pytest.mark.parametrize(
+    "ctx, expected",
+    (
+        (
+            "pctx",
+            [
+                {"name": "0"},
+                {"name": "00"},
+                {"name": "0" * 4000},
+                {"name": "0" * 3999},
+            ],
+        ),
+        (
+            "nctx",
+            [
+                {"name": "0" * 4001},
+                {
+                    "name": "",
+                },
+                {
+                    "name": 0,
+                },
+                {
+                    "name": False,
+                },
+                {
+                    "name": None,
+                },
+                {
+                    "name": [
+                        None,
+                        None,
+                    ],
+                },
+                {
+                    "name": {},
+                },
+                {},
+                0,
+                False,
+                None,
+                "",
+                [
+                    None,
+                    None,
+                ],
+            ],
+        ),
+    ),
+)
+def test_generate_large_string(request, ctx, expected):
+    ctx = request.getfixturevalue(ctx)
     schema = {
         "properties": {
             "name": {"maxLength": 4000, "minLength": 1, "pattern": "^[\\w\\W]+$", "type": "string"},
@@ -1119,9 +1170,4 @@ def test_generate_large_string(pctx):
         "required": ["name"],
         "type": "object",
     }
-    assert cover_schema(pctx, schema) == [
-        {"name": "0"},
-        {"name": "00"},
-        {"name": "0" * 4000},
-        {"name": "0" * 3999},
-    ]
+    assert cover_schema(ctx, schema) == expected
