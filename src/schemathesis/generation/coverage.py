@@ -37,6 +37,7 @@ def json_recursive_strategy(strategy: st.SearchStrategy) -> st.SearchStrategy:
 
 
 BUFFER_SIZE = 8 * 1024
+NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN = 100
 FLOAT_STRATEGY: st.SearchStrategy = st.floats(allow_nan=False, allow_infinity=False).map(_replace_zero_with_nonzero)
 NUMERIC_STRATEGY: st.SearchStrategy = st.integers() | FLOAT_STRATEGY
 JSON_STRATEGY: st.SearchStrategy = st.recursive(
@@ -431,14 +432,19 @@ def cover_schema_iter(
                         new_schema = {**schema, "minLength": min_length, "maxLength": max_length}
                         new_schema.setdefault("type", "string")
                         if "pattern" in new_schema:
-                            new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
-                            if new_schema["pattern"] == schema["pattern"]:
-                                # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
-                                del new_schema["minLength"]
-                                del new_schema["maxLength"]
-                                value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
-                            else:
+                            if value > NEGATIVE_MODE_MAX_LENGTH_WITH_PATTERN:
+                                # Large `maxLength` value can be extremely slow to generate when combined with `pattern`
+                                del new_schema["pattern"]
                                 value = ctx.generate_from_schema(new_schema)
+                            else:
+                                new_schema["pattern"] = update_quantifier(schema["pattern"], min_length, max_length)
+                                if new_schema["pattern"] == schema["pattern"]:
+                                    # Pattern wasn't updated, try to generate a valid value then extend the string to the required length
+                                    del new_schema["minLength"]
+                                    del new_schema["maxLength"]
+                                    value = ctx.generate_from_schema(new_schema).ljust(max_length, "0")
+                                else:
+                                    value = ctx.generate_from_schema(new_schema)
                         else:
                             value = ctx.generate_from_schema(new_schema)
                         k = _to_hashable_key(value)

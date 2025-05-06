@@ -1171,3 +1171,25 @@ def test_generate_large_string(request, ctx, expected):
         "type": "object",
     }
     assert cover_schema(ctx, schema) == expected
+
+
+def test_large_string_with_complex_pattern(nctx):
+    schema = {
+        "maxLength": 4000,
+        "minLength": 1,
+        "pattern": "^question\\.custom\\.[^,]+(?:,question\\.custom\\.[^,]+)*$",
+        "type": "string",
+    }
+    assert cover_schema(nctx, schema) == [
+        "0" * 4001,
+        "",
+        "0",
+        0,
+        False,
+        None,
+        [
+            None,
+            None,
+        ],
+        {},
+    ]
