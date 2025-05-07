@@ -1462,3 +1462,37 @@ def test_large_arrays(nctx):
         for item in cover_schema(nctx, schema)
         if isinstance(item, dict) and isinstance(item["questions"], list)
     }
+
+
+def test_large_arrays_nested(nctx):
+    schema = {
+        "properties": {
+            "questions": {
+                "items": {
+                    "properties": {
+                        "answers": {
+                            "items": {
+                                "type": "null",
+                            },
+                            "maxItems": 100,
+                            "type": "array",
+                        },
+                        "id": {"minLength": 6, "pattern": "^[0-9]+$", "type": "string"},
+                    },
+                    "required": ["id"],
+                    "type": "object",
+                },
+                "maxItems": 500,
+                "minItems": 1,
+                "type": "array",
+            },
+        },
+        "required": ["questions"],
+        "type": "object",
+    }
+
+    assert 501 in {
+        len(item["questions"])
+        for item in cover_schema(nctx, schema)
+        if isinstance(item, dict) and isinstance(item.get("questions"), list)
+    }
