@@ -471,7 +471,18 @@ def cover_schema_iter(
                             "maxItems": NEGATIVE_MODE_MAX_ITEMS,
                             "type": "array",
                         }
-                        array_value = ctx.generate_from_schema(new_schema)
+                        if "items" in schema and isinstance(schema["items"], dict):
+                            # The schema may have another large array nested, therefore generate covering cases
+                            # and use them to build an array for the current schema
+                            negative = [case.value for case in cover_schema_iter(ctx, schema["items"])]
+                            positive = [case.value for case in cover_schema_iter(ctx.with_positive(), schema["items"])]
+                            # Interleave positive & negative values
+                            array_value = [value for pair in zip(positive, negative) for value in pair][
+                                :NEGATIVE_MODE_MAX_ITEMS
+                            ]
+                        else:
+                            array_value = ctx.generate_from_schema(new_schema)
+
                         # Extend the array to be of length value + 1 by repeating its own elements
                         diff = value + 1 - len(array_value)
                         if diff > 0:
