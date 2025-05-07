@@ -102,7 +102,6 @@ class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
     config: ProjectConfig = field(default_factory=ProjectConfig.discover)
     location: str | None = None
-    base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
     app: Any = None
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
