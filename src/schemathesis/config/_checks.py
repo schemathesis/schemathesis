@@ -198,7 +198,9 @@ class ChecksConfig(DiffBase):
         for name in known_names:
             # Check in explicitly excluded or not in explicitly included
             if name in (excluded_check_names or []) or (
-                included_check_names is not None and name not in included_check_names
+                included_check_names is not None
+                and "all" not in included_check_names
+                and name not in included_check_names
             ):
                 config = self.get_by_name(name=name)
                 config.enabled = False

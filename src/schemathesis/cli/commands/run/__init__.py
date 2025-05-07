@@ -58,7 +58,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
         ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
         choices_repr=f"[auto, {MIN_WORKERS}-{MAX_WORKERS}]",
     ),
-    default="auto",
+    default="1",
     show_default=True,
     callback=validation.convert_workers,
     metavar="",
