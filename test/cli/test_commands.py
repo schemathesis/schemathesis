@@ -1640,3 +1640,32 @@ class EventCounter(cli.EventHandler):
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.openapi_version("3.0")
+@pytest.mark.operations("create_user", "get_user", "update_user")
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires a more complex test setup")
+def test_rediscover_the_same_failure_in_different_phases_and_store_junit(ctx, cli, schema_url, tmp_path, snapshot_cli):
+    # See GH-2814
+    report_dir = tmp_path / "reports"
+    with ctx.check(
+        r"""
+@schemathesis.check
+def always_fails(ctx, response, case):
+    if case.operation.label == "GET /users/{user_id}":
+        raise AssertionError("Failed!")
+"""
+    ) as module:
+        assert (
+            cli.main(
+                "run",
+                schema_url,
+                "-c",
+                "always_fails",
+                "--max-examples=1",
+                f"--report-dir={report_dir}",
+                "--report=junit",
+                hooks=module,
+            )
+            == snapshot_cli
+        )
