@@ -6,6 +6,7 @@
 
 - Generate negative test cases for large nested arrays during the coverage phase.
 - Generate strings larger than 10000 characters during the coverage phase.
+- Internal error on building a JUnit report if the same failures appear multiple times across multiple test phases. [#2814](https://github.com/schemathesis/schemathesis/issues/2814)
 
 ## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
 
