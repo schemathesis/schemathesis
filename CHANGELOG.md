@@ -2,10 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...HEAD) - TBD
 
-
 ### :bug: Fixed
 
 - Generate negative test cases for large nested arrays during the coverage phase.
+- Generate strings larger than 10000 characters during the coverage phase.
 
 ## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
 

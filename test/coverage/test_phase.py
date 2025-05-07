@@ -538,64 +538,75 @@ def test_with_examples_openapi_3_request_body(ctx):
         schema,
         [GenerationMode.POSITIVE],
         [
-            {"body": {"address": {}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
             {
                 "body": {
-                    "address": {"street": "456 Elm St"},
-                    "age": 25,
                     "name": "John Doe",
-                    "tags": ["designer", "ui/ux"],
-                }
-            },
-            {"body": {"address": {"city": "Anytown"}, "age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
-            {
-                "body": {
-                    "address": {"street": "456 Elm St", "city": "Somewhere"},
-                    "age": 25,
-                    "name": "John Doe",
-                    "tags": ["designer", "ui/ux"],
-                }
-            },
-            {
-                "body": {
-                    "address": {
-                        "city": "Anytown",
-                        "street": "123 Main St",
-                    },
-                    "age": 25,
-                    "name": "John Doe",
-                    "tags": [
-                        "",
-                    ],
-                },
-            },
-            {
-                "body": {
-                    "address": {"city": "Anytown", "street": "123 Main St"},
-                    "age": 25,
-                    "name": "John Doe",
-                    "tags": ["developer", "python"],
-                }
-            },
-            {
-                "body": {
-                    "address": {"city": "Anytown", "street": "123 Main St"},
                     "age": 30,
-                    "name": "John Doe",
-                    "tags": ["designer", "ui/ux"],
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": "Somewhere"},
                 }
             },
             {
                 "body": {
-                    "address": {"city": "Anytown", "street": "123 Main St"},
-                    "age": 25,
-                    "name": "Jane Smith",
-                    "tags": ["designer", "ui/ux"],
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "456 Elm St", "city": "Anytown"},
                 }
             },
-            {"body": {"age": 25, "name": "John Doe"}},
-            {"body": {"age": 25, "name": "John Doe", "tags": ["designer", "ui/ux"]}},
-            {"body": {"address": {"city": "Anytown", "street": "123 Main St"}, "age": 25, "name": "John Doe"}},
+            {"body": {"name": "John Doe", "age": 30, "tags": ["developer", "python"], "address": {}}},
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St"},
+                }
+            },
+            {"body": {"name": "John Doe", "age": 30, "tags": ["developer", "python"], "address": {"city": "Anytown"}}},
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "456 Elm St", "city": "Somewhere"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": [""],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 30,
+                    "tags": ["designer", "ui/ux"],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {
+                "body": {
+                    "name": "John Doe",
+                    "age": 25,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {
+                "body": {
+                    "name": "Jane Smith",
+                    "age": 30,
+                    "tags": ["developer", "python"],
+                    "address": {"street": "123 Main St", "city": "Anytown"},
+                }
+            },
+            {"body": {"name": "John Doe", "age": 30}},
+            {"body": {"name": "John Doe", "age": 30, "tags": ["developer", "python"]}},
+            {"body": {"name": "John Doe", "age": 30, "address": {"street": "123 Main St", "city": "Anytown"}}},
             {
                 "body": {
                     "name": "Jane Smith",
