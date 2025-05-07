@@ -494,7 +494,7 @@ def test_health_check_failed_large_base_example(ctx, cli, snapshot_cli, openapi3
                         "required": True,
                         "content": {
                             "application/json": {
-                                "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 10000}
+                                "schema": {"type": "array", "items": {"type": "integer"}, "minItems": 100000}
                             }
                         },
                     },

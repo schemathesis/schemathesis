@@ -4,6 +4,7 @@ import enum
 from dataclasses import dataclass
 
 SCHEMATHESIS_TEST_CASE_HEADER = "X-Schemathesis-TestCaseId"
+INTERNAL_BUFFER_SIZE = 32 * 1024
 
 
 class NotSet: ...

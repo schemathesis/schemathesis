@@ -1215,6 +1215,22 @@ def test_generate_large_string(request, ctx, expected):
     assert cover_schema(ctx, schema) == expected
 
 
+def test_generate_very_large_string(nctx):
+    schema = {
+        "properties": {
+            "name": {"maxLength": 10000, "minLength": 1, "pattern": "^[\\w\\W]*$", "type": "string"},
+        },
+        "required": ["name"],
+        "type": "object",
+    }
+
+    assert 10001 in {
+        len(item["name"])
+        for item in cover_schema(nctx, schema)
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    }
+
+
 def test_large_string_with_complex_pattern(nctx):
     schema = {
         "maxLength": 4000,
