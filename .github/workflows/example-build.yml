@@ -28,8 +28,6 @@ jobs:
         with:
           # A local API schema location
           schema: "http://127.0.0.1:5123/openapi.json"
-          # Set your token from secrets
-          token: ${{ secrets.SCHEMATHESIS_TOKEN }}
           max-examples: "10"
           # To avoid failing the build
           args: "-E does-not-exist"
