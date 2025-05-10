@@ -5,9 +5,8 @@ from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Any
 
-from schemathesis.checks import CheckContext
+from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
-from schemathesis.engine.recorder import ScenarioRecorder
 from schemathesis.generation.case import Case
 from schemathesis.schemas import BaseSchema
 
@@ -18,8 +17,6 @@ if TYPE_CHECKING:
 
     import requests
 
-    from schemathesis.engine.config import EngineConfig
-
 
 @dataclass
 class EngineContext:
@@ -28,7 +25,6 @@ class EngineContext:
     schema: BaseSchema
     control: ExecutionControl
     outcome_cache: dict[int, BaseException | None]
-    config: EngineConfig
     start_time: float
 
     def __init__(
@@ -36,17 +32,19 @@ class EngineContext:
         *,
         schema: BaseSchema,
         stop_event: threading.Event,
-        config: EngineConfig,
         session: requests.Session | None = None,
     ) -> None:
         self.schema = schema
-        self.control = ExecutionControl(stop_event=stop_event, max_failures=config.execution.max_failures)
+        self.control = ExecutionControl(stop_event=stop_event, max_failures=schema.config.max_failures)
         self.outcome_cache = {}
-        self.config = config
         self.start_time = time.monotonic()
         self._session = session
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
+
+    @property
+    def config(self) -> ProjectConfig:
+        return self.schema.config
 
     @property
     def running_time(self) -> float:
@@ -81,39 +79,30 @@ class EngineContext:
         import requests
 
         session = requests.Session()
-        config = self.config.network
+        config = self.config
         session.verify = config.tls_verify
         if config.auth is not None:
-            session.auth = config.auth
+            # TODO: Update
+            # session.auth = self.config.auth
+            pass
         if config.headers:
             session.headers.update(config.headers)
-        if config.cert is not None:
-            session.cert = config.cert
+        if config.request_cert is not None:
+            session.cert = config.request_cert
         if config.proxy is not None:
             session.proxies["all"] = config.proxy
         return session
 
     @property
     def transport_kwargs(self) -> dict[str, Any]:
+        config = self.config
         kwargs: dict[str, Any] = {
             "session": self.session,
-            "headers": self.config.network.headers,
-            "timeout": self.config.network.timeout,
-            "verify": self.config.network.tls_verify,
-            "cert": self.config.network.cert,
+            "headers": config.headers,
+            "timeout": config.request_timeout,
+            "verify": config.tls_verify,
+            "cert": config.request_cert,
         }
-        if self.config.network.proxy is not None:
-            kwargs["proxies"] = {"all": self.config.network.proxy}
+        if config.proxy is not None:
+            kwargs["proxies"] = {"all": config.proxy}
         return kwargs
-
-    def get_check_context(self, recorder: ScenarioRecorder) -> CheckContext:
-        from requests.models import CaseInsensitiveDict
-
-        return CheckContext(
-            override=self.config.override,
-            auth=self.config.network.auth,
-            headers=CaseInsensitiveDict(self.config.network.headers) if self.config.network.headers else None,
-            config=self.config.checks_config,
-            transport_kwargs=self.transport_kwargs,
-            recorder=recorder,
-        )

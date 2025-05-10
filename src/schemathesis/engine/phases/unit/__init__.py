@@ -16,6 +16,7 @@ from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation import overrides
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 
@@ -42,7 +43,6 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
     else:
         mode = HypothesisTestMode.FUZZING
     producer = TaskProducer(engine)
-    workers_num = engine.config.execution.workers_num
 
     suite_started = events.SuiteStarted(phase=phase.name)
 
@@ -53,7 +53,7 @@ def execute(engine: EngineContext, phase: Phase) -> events.EventGenerator:
 
     try:
         with WorkerPool(
-            workers_num=workers_num,
+            workers_num=engine.config.workers,
             producer=producer,
             worker_factory=worker_task,
             ctx=engine,
@@ -162,14 +162,15 @@ def worker_task(
                     operation = result.ok()
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
                     try:
+                        # TODO: Get hypothesis / generation config specifically for this operation
                         test_function = create_test(
                             operation=operation,
                             test_func=test_func,
                             config=HypothesisTestConfig(
                                 modes=[mode],
-                                settings=ctx.config.execution.hypothesis_settings,
-                                seed=ctx.config.execution.seed,
-                                generation=ctx.config.execution.generation,
+                                settings=ctx.config.get_hypothesis_settings(),
+                                seed=ctx.config.seed,
+                                project=ctx.config,
                                 as_strategy_kwargs=as_strategy_kwargs,
                             ),
                         )
@@ -193,12 +194,9 @@ def worker_task(
 
 def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
-    if ctx.config.override is not None:
-        for location, entry in ctx.config.override.for_operation(operation).items():
-            if entry:
-                kwargs[location] = entry
-    if ctx.config.network.headers:
-        kwargs["headers"] = {
-            key: value for key, value in ctx.config.network.headers.items() if key.lower() != "user-agent"
-        }
+    for location, entry in overrides.for_operation(ctx.config, operation).items():
+        if entry:
+            kwargs[location] = entry
+    if ctx.config.headers:
+        kwargs["headers"] = {key: value for key, value in ctx.config.headers.items() if key.lower() != "user-agent"}
     return kwargs

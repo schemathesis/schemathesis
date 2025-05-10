@@ -6,13 +6,11 @@ import hypothesis.errors
 import pytest
 
 import schemathesis
-from schemathesis.checks import CHECKS, ChecksConfig, max_response_time, not_a_server_error
-from schemathesis.core.failures import MaxResponseTimeConfig
+from schemathesis.checks import max_response_time, not_a_server_error
 from schemathesis.engine import Status, events
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.specs.openapi.checks import ignored_auth, response_schema_conformance, use_after_free
 from test.utils import flaky
 
@@ -120,7 +118,7 @@ def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_ev
 
 @pytest.mark.parametrize(
     ["kwargs"],
-    [({},), ({"unique_data": True},)],
+    [({},), ({"unique_inputs": True},)],
 )
 def test_internal_error_in_check(engine_factory, kwargs):
     def bugged_check(*args, **kwargs):
@@ -360,7 +358,7 @@ def test_custom_headers(engine_factory):
     engine = engine_factory(
         app_kwargs={"custom_headers": headers},
         hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        network=NetworkConfig(headers=headers),
+        headers=headers,
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
@@ -539,22 +537,11 @@ def test_external_link(ctx, app_factory, app_runner):
     )
     root_app = app_factory(independent_500=True)
     root_app_port = app_runner.run_flask_app(root_app)
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=f"http://127.0.0.1:{root_app_port}/")
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.base_url = f"http://127.0.0.1:{root_app_port}/"
+    schema.config.generation.set(max_examples=75, database="none")
     engine = stateful.execute(
-        engine=EngineContext(
-            schema=schema,
-            config=EngineConfig(
-                execution=ExecutionConfig(
-                    checks=CHECKS.get_all(),
-                    targets=[],
-                    hypothesis_settings=hypothesis.settings(max_examples=75, database=None),
-                    generation=GenerationConfig(),
-                ),
-                network=NetworkConfig(),
-                checks_config=ChecksConfig(),
-            ),
-            stop_event=threading.Event(),
-        ),
+        engine=EngineContext(schema=schema, stop_event=threading.Event()),
         phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
     )
     result = collect_result(engine)
@@ -593,10 +580,10 @@ def test_negative_tests(engine_factory):
     assert result.events[-1].status == Status.FAILURE, result.errors
 
 
-def test_unique_data(engine_factory):
+def test_unique_inputs(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
-        unique_data=True,
+        unique_inputs=True,
         hypothesis_settings=hypothesis.settings(max_examples=25, database=None, stateful_step_count=50),
     )
     cases = []
@@ -613,7 +600,7 @@ def test_ignored_auth_valid(engine_factory):
     engine = engine_factory(
         app_kwargs={"auth_token": token},
         checks=[ignored_auth],
-        network=NetworkConfig(headers={"Authorization": f"Bearer {token}"}),
+        headers={"Authorization": f"Bearer {token}"},
     )
     result = collect_result(engine)
     # Then no failures are reported
@@ -626,7 +613,7 @@ def test_ignored_auth_invalid(engine_factory):
     engine = engine_factory(
         app_kwargs={"auth_token": token, "ignored_auth": True},
         checks=[ignored_auth],
-        network=NetworkConfig(headers={"Authorization": "Bearer UNKNOWN"}),
+        headers={"Authorization": "Bearer UNKNOWN"},
     )
     result = collect_result(engine)
     # Then it should be reported

@@ -67,6 +67,6 @@ Failures:
 Test cases:
   N generated, N found N unique failures
 
-Seed: 42
+Seed: not used in the deterministic mode
 
 ============================= 2 failures in 1.00s ==============================

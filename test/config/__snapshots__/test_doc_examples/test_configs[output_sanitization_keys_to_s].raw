@@ -1,0 +1,1 @@
+SchemathesisConfig(output=OutputConfig(sanitization=SanitizationConfig(keys_to_sanitize=['password', 'token', 'auth'])))
