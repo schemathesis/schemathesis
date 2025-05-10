@@ -95,6 +95,7 @@ class ChecksConfig(DiffBase):
     ensure_resource_availability: SimpleCheckConfig
     missing_required_header: MissingRequiredHeaderConfig
     ignored_auth: SimpleCheckConfig
+    unsupported_method: SimpleCheckConfig
     max_response_time: MaxResponseTimeConfig
     _unknown: dict[str, SimpleCheckConfig]
 
@@ -110,6 +111,7 @@ class ChecksConfig(DiffBase):
         "ensure_resource_availability",
         "missing_required_header",
         "ignored_auth",
+        "unsupported_method",
         "max_response_time",
         "_unknown",
     )
@@ -128,6 +130,7 @@ class ChecksConfig(DiffBase):
         ensure_resource_availability: SimpleCheckConfig | None = None,
         missing_required_header: MissingRequiredHeaderConfig | None = None,
         ignored_auth: SimpleCheckConfig | None = None,
+        unsupported_method: SimpleCheckConfig | None = None,
         max_response_time: MaxResponseTimeConfig | None = None,
     ) -> None:
         self.not_a_server_error = not_a_server_error or NotAServerErrorConfig()
@@ -141,6 +144,7 @@ class ChecksConfig(DiffBase):
         self.ensure_resource_availability = ensure_resource_availability or SimpleCheckConfig()
         self.missing_required_header = missing_required_header or MissingRequiredHeaderConfig()
         self.ignored_auth = ignored_auth or SimpleCheckConfig()
+        self.unsupported_method = unsupported_method or SimpleCheckConfig()
         self.max_response_time = max_response_time or MaxResponseTimeConfig()
         self._unknown = {}
 
@@ -179,6 +183,7 @@ class ChecksConfig(DiffBase):
                 merge(data.get("missing_required_header", {})),
             ),
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
+            unsupported_method=SimpleCheckConfig.from_dict(merge(data.get("unsupported_method", {}))),
         )
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:

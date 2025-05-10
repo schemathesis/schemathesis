@@ -15,7 +15,7 @@ from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.core.errors import IncorrectUsage
-from schemathesis.filters import FilterSet, expression_to_filter_function, is_deprecated
+from schemathesis.filters import FilterSet, HasAPIOperation, expression_to_filter_function, is_deprecated
 
 if TYPE_CHECKING:
     from pyrate_limiter import Limiter
@@ -60,7 +60,7 @@ class OperationsConfig(DiffBase):
         configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
         return OperationConfig.from_hierarchy(configs)
 
-    def set(
+    def create_filter_set(
         self,
         *,
         include_path: tuple[str, ...],
@@ -86,21 +86,21 @@ class OperationsConfig(DiffBase):
         include_by: Callable | None,
         exclude_by: Callable | None,
         exclude_deprecated: bool,
-    ) -> None:
-        filter_set = FilterSet()
-        # Apply include filters
+    ) -> FilterSet:
+        # Build explicit include filters
+        include_set = FilterSet()
         if include_by:
-            filter_set.include(include_by)
+            include_set.include(include_by)
         for name_ in include_name:
-            filter_set.include(name=name_)
+            include_set.include(name=name_)
         for method in include_method:
-            filter_set.include(method=method)
+            include_set.include(method=method)
         for path in include_path:
-            filter_set.include(path=path)
+            include_set.include(path=path)
         for tag in include_tag:
-            filter_set.include(tag=tag)
+            include_set.include(tag=tag)
         for operation_id in include_operation_id:
-            filter_set.include(operation_id=operation_id)
+            include_set.include(operation_id=operation_id)
         if (
             include_name_regex
             or include_method_regex
@@ -108,7 +108,7 @@ class OperationsConfig(DiffBase):
             or include_tag_regex
             or include_operation_id_regex
         ):
-            filter_set.include(
+            include_set.include(
                 name_regex=include_name_regex,
                 method_regex=include_method_regex,
                 path_regex=include_path_regex,
@@ -116,24 +116,20 @@ class OperationsConfig(DiffBase):
                 operation_id_regex=include_operation_id_regex,
             )
 
-        # Enable all explicitly enabled operations
-        if not filter_set.is_empty():
-            self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=True))
-
-        filter_set = FilterSet()
-        # Apply exclude filters - everything explicitly excluded should be disabled
+        # Build explicit exclude filters
+        exclude_set = FilterSet()
         if exclude_by:
-            filter_set.include(exclude_by)
+            exclude_set.include(exclude_by)
         for name_ in exclude_name:
-            filter_set.include(name=name_)
+            exclude_set.include(name=name_)
         for method in exclude_method:
-            filter_set.include(method=method)
+            exclude_set.include(method=method)
         for path in exclude_path:
-            filter_set.include(path=path)
+            exclude_set.include(path=path)
         for tag in exclude_tag:
-            filter_set.include(tag=tag)
+            exclude_set.include(tag=tag)
         for operation_id in exclude_operation_id:
-            filter_set.include(operation_id=operation_id)
+            exclude_set.include(operation_id=operation_id)
         if (
             exclude_name_regex
             or exclude_method_regex
@@ -141,7 +137,7 @@ class OperationsConfig(DiffBase):
             or exclude_tag_regex
             or exclude_operation_id_regex
         ):
-            filter_set.include(
+            exclude_set.include(
                 name_regex=exclude_name_regex,
                 method_regex=exclude_method_regex,
                 path_regex=exclude_path_regex,
@@ -149,12 +145,44 @@ class OperationsConfig(DiffBase):
                 operation_id_regex=exclude_operation_id_regex,
             )
 
-        # Exclude deprecated operations
+        # Add deprecated operations to exclude filters if requested
         if exclude_deprecated:
-            filter_set.include(is_deprecated)
+            exclude_set.include(is_deprecated)
 
-        if not filter_set.is_empty():
-            self.operations.insert(0, OperationConfig(filter_set=filter_set, enabled=False))
+        # Also update operations list for consistency with config structure
+        if not include_set.is_empty():
+            self.operations.insert(0, OperationConfig(filter_set=include_set, enabled=True))
+        if not exclude_set.is_empty():
+            self.operations.insert(0, OperationConfig(filter_set=exclude_set, enabled=False))
+
+        final = FilterSet()
+
+        # Get a stable reference to operations
+        operations = list(self.operations)
+
+        # Define a closure that implements our priority logic
+        def priority_filter(ctx: HasAPIOperation) -> bool:
+            """Filter operations according to CLI and config priority."""
+            # 1. CLI includes override everything if present
+            if not include_set.is_empty():
+                return include_set.match(ctx)
+
+            # 2. CLI excludes take precedence over config
+            if not exclude_set.is_empty() and exclude_set.match(ctx):
+                return False
+
+            # 3. Check config operations in priority order (first match wins)
+            for op_config in operations:
+                if op_config._filter_set.match(ctx):
+                    return op_config.enabled
+
+            # 4. Default to include if no rule matches
+            return True
+
+        # Add our priority function as the filter
+        final.include(priority_filter)
+
+        return final
 
 
 def apply_exclude_filter(filter_set: FilterSet, option_name: str, **kwargs: Any) -> None:

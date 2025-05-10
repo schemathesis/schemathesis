@@ -271,8 +271,8 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     return None
 
 
+@schemathesis.check
 def missing_required_header(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    # NOTE: This check is intentionally not registered with `@schemathesis.check` because it is experimental
     meta = case.meta
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or is_unexpected_http_status_case(case):
         return None
@@ -294,6 +294,7 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
     return None
 
 
+@schemathesis.check
 def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     meta = case.meta
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or response.request.method == "OPTIONS":

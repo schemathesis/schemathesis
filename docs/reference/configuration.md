@@ -521,6 +521,7 @@ These settings can only be applied at the project level.
       - `ensure_resource_availability`
       - `missing_required_header`
       - `ignored_auth`
+      - `unsupported_method`
 
     ```toml
     [checks]

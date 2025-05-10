@@ -18,6 +18,7 @@ from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError
 from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
+from schemathesis.filters import FilterSet
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 
@@ -35,21 +36,21 @@ def execute(
     *,
     location: str,
     config: ProjectConfig,
+    filter_set: FilterSet,
     args: list[str],
     params: dict[str, Any],
 ) -> None:
-    event_stream = into_event_stream(location=location, config=config)
+    event_stream = into_event_stream(location=location, config=config, filter_set=filter_set)
     _execute(event_stream, config=config, args=args, params=params)
 
 
-def into_event_stream(*, location: str, config: ProjectConfig) -> EventGenerator:
+def into_event_stream(*, location: str, config: ProjectConfig, filter_set: FilterSet) -> EventGenerator:
     loading_started = LoadingStarted(location=location)
     yield loading_started
 
     try:
         schema = load_schema(location=location, config=config)
-        # TODO: extract filters
-        # schema.filter_set = config.filter_set
+        schema.filter_set = filter_set
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return

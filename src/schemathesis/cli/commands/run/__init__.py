@@ -529,7 +529,7 @@ def run(
         proxy=request_proxy,
     )
     # These are filters for what API operations should be tested
-    config.projects.override.operations.set(
+    filter_set = config.projects.default.operations.create_filter_set(
         include_path=include_path,
         include_method=include_method,
         include_name=include_name,
@@ -574,4 +574,6 @@ def run(
         codec=generation_codec,
     )
 
-    executor.execute(location=location, config=config.projects.get_default(), args=ctx.args, params=ctx.params)
+    executor.execute(
+        location=location, filter_set=filter_set, config=config.projects.get_default(), args=ctx.args, params=ctx.params
+    )

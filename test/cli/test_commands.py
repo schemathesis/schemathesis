@@ -689,7 +689,10 @@ def test_no_schema_in_media_type(ctx, cli, base_url, snapshot_cli):
             },
         }
     )
-    assert cli.run(str(schema_path), f"--url={base_url}", "--max-examples=1") == snapshot_cli
+    assert (
+        cli.run(str(schema_path), f"--url={base_url}", "--max-examples=1", "--checks=not_a_server_error")
+        == snapshot_cli
+    )
 
 
 def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
@@ -768,7 +771,9 @@ def test_exclude_deprecated(ctx, cli, openapi3_base_url, options, expected):
             }
         }
     )
-    result = cli.run(str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1", *options)
+    result = cli.run(
+        str(schema_path), f"--url={openapi3_base_url}", "--max-examples=1", "--checks=not_a_server_error", *options
+    )
     assert result.exit_code == ExitCode.OK, result.stdout
     # Then only not deprecated API operations should be selected
     assert expected in result.stdout
@@ -787,7 +792,7 @@ def test_invalid_filter(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 def test_filter_case_sensitivity(cli, schema_url, snapshot_cli):
     # Method filter should be case insensitive
-    assert cli.run(schema_url, "--include-method=get") == snapshot_cli
+    assert cli.run(schema_url, "--include-method=get", "--checks=not_a_server_error") == snapshot_cli
 
 
 @pytest.mark.parametrize("value", ["--include-by=/x-property == 42", "--exclude-by=/x-property != 42"])
@@ -854,7 +859,7 @@ def test_max_response_time_valid(cli, schema_url):
 def test_exit_first(cli, schema_url, snapshot_cli):
     # When the `--max-failures=1` CLI option is passed
     # And a failure occurs
-    assert cli.run(schema_url, "--max-failures=1", "--phases=fuzzing") == snapshot_cli
+    assert cli.run(schema_url, "--max-failures=1", "--phases=fuzzing", "--checks=not_a_server_error") == snapshot_cli
 
 
 def test_long_operation_output(ctx, cli, openapi3_base_url, snapshot_cli):

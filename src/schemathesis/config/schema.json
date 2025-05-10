@@ -258,6 +258,9 @@
         },
         "ignored_auth": {
           "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "unsupported_method": {
+          "$ref": "#/$defs/SimpleCheckConfig"
         }
       }
     },

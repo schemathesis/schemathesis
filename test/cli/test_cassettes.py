@@ -43,6 +43,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         f"--max-examples={hypothesis_max_examples}",
         f"--mode={mode}",
         "--seed=1",
+        "--checks=not_a_server_error",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -59,13 +60,13 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     if mode == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in interactions)
-    assert len(interactions[0]["checks"]) == 2
+    assert len(interactions[0]["checks"]) == 1
     assert interactions[0]["checks"][0] == {
         "name": "not_a_server_error",
         "status": "SUCCESS",
         "message": None,
     }
-    assert len(interactions[1]["checks"]) == 2
+    assert len(interactions[1]["checks"]) == 1
     for interaction in interactions:
         if interaction["phase"]["name"] == "coverage":
             if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][
