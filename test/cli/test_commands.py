@@ -826,7 +826,7 @@ paths:
         '200':
           description: OK"""
     schema_file = testdir.makefile(".yaml", schema=schema)
-    result = cli.run(str(schema_file), f"--url={base_url}")
+    result = cli.run(str(schema_file), f"--url={base_url}", "--phases=fuzzing", "--checks=not_a_server_error")
     assert "Invalid `pattern` value: expected a string" in result.stdout
 
 
@@ -1462,7 +1462,10 @@ def test_complex_urlencoded_example(ctx, cli, snapshot_cli, openapi3_base_url):
             }
         }
     )
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples") == snapshot_cli
+    assert (
+        cli.run(str(schema_path), f"--url={openapi3_base_url}", "--phases=examples", "--checks=not_a_server_error")
+        == snapshot_cli
+    )
 
 
 @pytest.fixture
