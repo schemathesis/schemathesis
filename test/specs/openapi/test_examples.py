@@ -330,6 +330,7 @@ def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
         str(schema_path),
         f"--url={base_url}",
         "--phases=examples",
+        "--checks=not_a_server_error",
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout

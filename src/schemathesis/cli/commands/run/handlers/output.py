@@ -1402,7 +1402,7 @@ class OutputHandler(EventHandler):
 
     def display_seed(self) -> None:
         click.echo(_style("Seed: ", bold=True), nl=False)
-        if self.config.seed is None:
+        if self.config.seed is None or self.config.generation.deterministic:
             click.echo("not used in the deterministic mode")
         else:
             click.echo(str(self.config.seed))

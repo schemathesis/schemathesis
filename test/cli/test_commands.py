@@ -291,7 +291,7 @@ def test_headers_conformance_valid(cli, schema_url):
 
 @pytest.mark.operations("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--seed=1", "--generation-deterministic", "-c not_a_server_error") == snapshot_cli
+    assert cli.run(schema_url, "--generation-deterministic", "-c not_a_server_error") == snapshot_cli
 
 
 @pytest.mark.operations("multiple_failures")
@@ -311,7 +311,6 @@ def test_multiple_failures_different_check(cli, schema_url, snapshot_cli):
             "-c",
             "not_a_server_error",
             "--generation-deterministic",
-            "--seed=1",
         )
         == snapshot_cli
     )

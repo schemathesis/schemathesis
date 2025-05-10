@@ -32,8 +32,10 @@ API validation options:
                                 response_headers_conformance,
                                 response_schema_conformance,
                                 negative_data_rejection,
-                                positive_data_acceptance, use_after_free,
-                                ensure_resource_availability, ignored_auth, all]
+                                positive_data_acceptance,
+                                missing_required_header, unsupported_method,
+                                use_after_free, ensure_resource_availability,
+                                ignored_auth, all]
   --exclude-checks              Comma-separated list of checks to skip during
                                 testing [possible values: not_a_server_error,
                                 status_code_conformance,
@@ -41,8 +43,10 @@ API validation options:
                                 response_headers_conformance,
                                 response_schema_conformance,
                                 negative_data_rejection,
-                                positive_data_acceptance, use_after_free,
-                                ensure_resource_availability, ignored_auth, all]
+                                positive_data_acceptance,
+                                missing_required_header, unsupported_method,
+                                use_after_free, ensure_resource_availability,
+                                ignored_auth, all]
   --max-failures INTEGER RANGE  Terminate the test suite after reaching a
                                 specified number of failures or errors  [x>=1]
   --continue-on-failure         Continue executing all test cases within a

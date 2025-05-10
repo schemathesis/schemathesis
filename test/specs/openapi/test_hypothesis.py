@@ -169,7 +169,7 @@ def test_configure_headers():
         "GET /users/",
         "header",
         None,
-        GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"ABC"})),
+        GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"A", "B", "C"})),
     )
 
     @given(strategy)
