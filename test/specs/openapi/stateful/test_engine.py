@@ -6,7 +6,7 @@ import hypothesis.errors
 import pytest
 
 import schemathesis
-from schemathesis.checks import max_response_time, not_a_server_error
+from schemathesis.checks import not_a_server_error
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
@@ -135,10 +135,7 @@ def test_custom_assertion_in_check(engine_factory, exception_args):
     def custom_check(*args, **kwargs):
         raise AssertionError(*exception_args)
 
-    engine = engine_factory(
-        checks=[custom_check],
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-    )
+    engine = engine_factory(checks=[custom_check], max_examples=1)
     result = collect_result(engine)
     # Failures on different API operations
     assert len(result.failures) == 4
@@ -158,10 +155,7 @@ def test_custom_assertion_with_random_message(engine_factory):
         counter += 1
         raise AssertionError(f"Fail counter: {counter}")
 
-    engine = engine_factory(
-        checks=[custom_check],
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-    )
+    engine = engine_factory(checks=[custom_check], max_examples=1)
     result = collect_result(engine)
     # Failures on different API operations
     assert len(result.failures) == 4
@@ -187,10 +181,7 @@ def test_distinct_assertions(engine_factory):
             # With message
             assert case.headers == 43, "Fourth"
 
-    engine = engine_factory(
-        checks=[custom_check],
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-    )
+    engine = engine_factory(checks=[custom_check], max_examples=1)
     result = collect_result(engine)
     # Then all of them should be reported
     assert len(result.failures) == 4
@@ -220,11 +211,7 @@ def test_flaky_assertions(engine_factory, kwargs):
             raise AssertionError("Second")
         assert case.headers == 43
 
-    engine = engine_factory(
-        checks=[custom_check],
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        **kwargs,
-    )
+    engine = engine_factory(checks=[custom_check], max_examples=1, **kwargs)
     result = collect_result(engine)
     # Then all of them should be reported
     if "max_failures" in kwargs:
@@ -258,7 +245,7 @@ def test_failure_hidden_behind_another_failure(engine_factory):
     engine = engine_factory(
         app_kwargs={"failure_behind_failure": True},
         checks=[dynamic_check],
-        hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
+        max_examples=60,
     )
     failures = []
     for event in engine:
@@ -294,7 +281,7 @@ def test_find_use_after_free(engine_factory):
     engine = engine_factory(
         app_kwargs={"use_after_free": True},
         checks=[use_after_free],
-        hypothesis_settings=hypothesis.settings(max_examples=60, database=None),
+        max_examples=60,
     )
     result = collect_result(engine)
     assert len(result.failures) == 1
@@ -307,9 +294,8 @@ def test_failed_health_check(engine_factory):
         hypothesis.reject()
 
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(
-            max_examples=1, database=None, suppress_health_check=[hypothesis.HealthCheck.differing_executors]
-        ),
+        hypothesis_settings=hypothesis.settings(suppress_health_check=[hypothesis.HealthCheck.differing_executors]),
+        max_examples=1,
         checks=[rejected_check],
     )
     result = collect_result(engine)
@@ -331,11 +317,7 @@ def test_flaky(engine_factory, kwargs):
             found = True
             raise AssertionError("Flaky")
 
-    engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        checks=[flaky_check],
-        **kwargs,
-    )
+    engine = engine_factory(checks=[flaky_check], max_examples=1, **kwargs)
     result = collect_result(engine)
     failures = result.failures
     assert len(failures) == 1
@@ -343,10 +325,7 @@ def test_flaky(engine_factory, kwargs):
 
 
 def test_unsatisfiable(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"unsatisfiable": True},
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-    )
+    engine = engine_factory(app_kwargs={"unsatisfiable": True}, max_examples=1)
     result = collect_result(engine)
     assert result.errors
     assert isinstance(result.errors[0].value, hypothesis.errors.InvalidArgument)
@@ -355,11 +334,7 @@ def test_unsatisfiable(engine_factory):
 
 def test_custom_headers(engine_factory):
     headers = {"X-Foo": "Bar"}
-    engine = engine_factory(
-        app_kwargs={"custom_headers": headers},
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        headers=headers,
-    )
+    engine = engine_factory(app_kwargs={"custom_headers": headers}, max_examples=1, headers=headers)
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
 
@@ -367,19 +342,16 @@ def test_custom_headers(engine_factory):
 def test_multiple_source_links(engine_factory):
     # When there are multiple links coming to the same operation from different operations
     # Then there should be no error during getting the previous step results
-    engine = engine_factory(
-        app_kwargs={"multiple_source_links": True},
-        hypothesis_settings=hypothesis.settings(max_examples=10, database=None),
-    )
+    engine = engine_factory(app_kwargs={"multiple_source_links": True}, max_examples=10)
     result = collect_result(engine)
     assert not result.errors, result.errors
 
 
 def test_max_response_time_valid(engine_factory):
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None),
-        checks=[max_response_time],
-        checks_config={max_response_time: MaxResponseTimeConfig(10.0)},
+        max_examples=1,
+        checks=[],
+        max_response_time=10.0,
     )
     result = collect_result(engine)
     assert not result.errors, result.errors
@@ -389,9 +361,10 @@ def test_max_response_time_valid(engine_factory):
 def test_max_response_time_invalid(engine_factory):
     engine = engine_factory(
         app_kwargs={"slowdown": 0.010},
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, stateful_step_count=2),
-        checks=[max_response_time],
-        checks_config={max_response_time: MaxResponseTimeConfig(0.005)},
+        hypothesis_settings=hypothesis.settings(stateful_step_count=2),
+        max_examples=1,
+        checks=[],
+        max_response_time=0.005,
     )
     result = collect_result(engine)
     failures = result.failures
@@ -408,7 +381,8 @@ def test_targeted(engine_factory):
         return 1.0
 
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=1, database=None, stateful_step_count=5),
+        hypothesis_settings=hypothesis.settings(stateful_step_count=5),
+        max_examples=1,
         checks=[not_a_server_error],
         targets=[custom_target],
     )
@@ -552,7 +526,7 @@ def test_new_resource_is_not_available(engine_factory):
     # When a resource is not available after creation
     engine = engine_factory(
         app_kwargs={"ensure_resource_availability": True},
-        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
+        max_examples=50,
     )
     result = collect_result(engine)
     # Then it is a failure
@@ -563,9 +537,7 @@ def test_new_resource_is_not_available(engine_factory):
 def test_resource_availability(engine_factory):
     # By default it is available unless was explicitly deleted
     # Ensure the check properly finds such DELETE calls
-    engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
-    )
+    engine = engine_factory(max_examples=50)
     result = collect_result(engine)
     assert result.events[-1].status == Status.SUCCESS
 
@@ -573,7 +545,7 @@ def test_resource_availability(engine_factory):
 def test_negative_tests(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
-        hypothesis_settings=hypothesis.settings(max_examples=50, database=None),
+        max_examples=50,
         configuration={"generation": GenerationConfig(modes=GenerationMode.all())},
     )
     result = collect_result(engine)
@@ -584,7 +556,8 @@ def test_unique_inputs(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
         unique_inputs=True,
-        hypothesis_settings=hypothesis.settings(max_examples=25, database=None, stateful_step_count=50),
+        hypothesis_settings=hypothesis.settings(stateful_step_count=50),
+        max_examples=25,
     )
     cases = []
     for event in engine:
@@ -632,45 +605,30 @@ def test_multiple_incoming_link_without_override(app_factory):
 
 
 def test_circular_links(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"circular_links": True},
-        hypothesis_settings=hypothesis.settings(max_examples=5),
-    )
+    engine = engine_factory(app_kwargs={"circular_links": True}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_link_subset(engine_factory):
-    engine = engine_factory(
-        include={"method_regex": "POST|GET"},
-        hypothesis_settings=hypothesis.settings(max_examples=5),
-    )
+    engine = engine_factory(include={"method_regex": "POST|GET"}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_duplicate_operation_links(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"duplicate_operation_links": True},
-        hypothesis_settings=hypothesis.settings(max_examples=5),
-    )
+    engine = engine_factory(app_kwargs={"duplicate_operation_links": True}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_list_users_as_root(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"list_users_as_root": True},
-        hypothesis_settings=hypothesis.settings(max_examples=5),
-    )
+    engine = engine_factory(app_kwargs={"list_users_as_root": True}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR
 
 
 def test_no_reliable_transitions(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"no_reliable_transitions": True},
-        hypothesis_settings=hypothesis.settings(max_examples=5),
-    )
+    engine = engine_factory(app_kwargs={"no_reliable_transitions": True}, max_examples=5)
     result = collect_result(engine)
     assert result.events[-1].status != Status.ERROR

@@ -491,6 +491,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         *,
         app_kwargs=None,
         hypothesis_settings=None,
+        max_examples=None,
         checks=None,
         checks_config=None,
         targets=None,
@@ -499,16 +500,21 @@ def engine_factory(app_factory, app_runner, stop_event):
         unique_inputs=False,
         generation_modes=None,
         include=None,
+        max_response_time=None,
     ):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
         config = SchemathesisConfig()
         config.set(max_failures=max_failures)
-        if isinstance(checks, list):
-            config.projects.override.checks.set(included_check_names=[func.__name__ for func in checks])
-        if generation_modes is not None:
-            config.projects.override.generation.set(modes=generation_modes, unique_inputs=unique_inputs)
+        config.projects.override.checks.set(
+            included_check_names=[func.__name__ for func in checks] if isinstance(checks, list) else None,
+            max_response_time=max_response_time,
+        )
+        config.projects.override.generation.set(
+            modes=generation_modes, unique_inputs=unique_inputs, max_examples=max_examples
+        )
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+
         if include is not None:
             schema = schema.include(**include)
         return stateful.execute(
