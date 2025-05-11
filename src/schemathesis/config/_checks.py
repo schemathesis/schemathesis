@@ -4,11 +4,52 @@ from dataclasses import dataclass
 from typing import Any, ClassVar, Sequence
 
 from schemathesis.config._diff_base import DiffBase
+from schemathesis.config._error import ConfigError
 
 NOT_A_SERVER_ERROR_EXPECTED_STATUSES = ["2xx", "3xx", "4xx"]
 NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = ["400", "401", "403", "404", "406", "422", "428", "5xx"]
 POSITIVE_DATA_ACCEPTANCE_EXPECTED_STATUSES = ["2xx", "401", "403", "404"]
 MISSING_REQUIRED_HEADER_EXPECTED_STATUSES = ["406"]
+
+
+def validate_status_codes(value: Sequence[str] | None) -> Sequence[str] | None:
+    if not value:
+        return value
+
+    invalid = []
+
+    for code in value:
+        if len(code) != 3:
+            invalid.append(code)
+            continue
+
+        if code[0] not in {"1", "2", "3", "4", "5"}:
+            invalid.append(code)
+            continue
+
+        upper_code = code.upper()
+
+        if "X" in upper_code:
+            if (
+                upper_code[1:] == "XX"
+                or (upper_code[1] == "X" and upper_code[2].isdigit())
+                or (upper_code[1].isdigit() and upper_code[2] == "X")
+            ):
+                continue
+            else:
+                invalid.append(code)
+                continue
+
+        if not code.isnumeric():
+            invalid.append(code)
+
+    if invalid:
+        raise ConfigError(
+            f"Invalid status code(s): {', '.join(invalid)}. "
+            "Use valid 3-digit codes between 100 and 599, "
+            "or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit."
+        )
+    return value
 
 
 @dataclass(repr=False)
@@ -51,11 +92,12 @@ class CheckConfig(DiffBase):
 
     def __init__(self, *, enabled: bool = True, expected_statuses: Sequence[str | int] | None = None) -> None:
         self.enabled = enabled
-        self.expected_statuses = (
-            [str(status) for status in expected_statuses]
-            if expected_statuses is not None
-            else self._DEFAULT_EXPECTED_STATUSES
-        )
+        if expected_statuses is not None:
+            statuses = [str(status) for status in expected_statuses]
+            validate_status_codes(statuses)
+            self.expected_statuses = statuses
+        else:
+            self.expected_statuses = self._DEFAULT_EXPECTED_STATUSES
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> CheckConfig:

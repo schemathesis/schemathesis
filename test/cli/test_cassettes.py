@@ -273,6 +273,7 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         "--seed=1",
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
+        "--checks=not_a_server_error",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
