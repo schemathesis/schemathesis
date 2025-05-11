@@ -384,7 +384,7 @@ def test_targeted(engine_factory):
         hypothesis_settings=hypothesis.settings(stateful_step_count=5),
         max_examples=1,
         checks=[not_a_server_error],
-        targets=[custom_target],
+        maximize=[custom_target],
     )
     result = collect_result(engine)
     assert not result.errors, result.errors

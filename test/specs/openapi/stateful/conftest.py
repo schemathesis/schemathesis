@@ -492,6 +492,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         app_kwargs=None,
         hypothesis_settings=None,
         max_examples=None,
+        maximize=None,
         checks=None,
         max_failures=None,
         unique_inputs=False,
@@ -509,7 +510,7 @@ def engine_factory(app_factory, app_runner, stop_event):
             max_response_time=max_response_time,
         )
         config.projects.override.generation.set(
-            modes=generation_modes, unique_inputs=unique_inputs, max_examples=max_examples
+            modes=generation_modes, unique_inputs=unique_inputs, max_examples=max_examples, maximize=maximize
         )
         config.projects.override.set(headers=headers)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)

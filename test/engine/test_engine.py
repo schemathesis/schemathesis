@@ -530,12 +530,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
     )
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.base_url = openapi3_base_url
-    stream = EventStream(
-        schema,
-        max_examples=1,
-        # TODO:
-        # phases=[Phase.explicit],
-    ).execute()
+    stream = EventStream(schema, max_examples=1, phases=[PhaseName.EXAMPLES]).execute()
     assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
         {"itemId": "456789"},
         {"itemId": "123456"},
@@ -621,8 +616,8 @@ def test_skip_operations_with_recursive_references(schema_with_recursive_referen
 @pytest.mark.parametrize(
     ("phases", "expected", "total_errors"),
     [
-        ([Phase.explicit, Phase.generate], "Failed to generate test cases for this API operation", 2),
-        ([Phase.explicit], "Failed to generate test cases from examples for this API operation", 1),
+        ([PhaseName.EXAMPLES, PhaseName.FUZZING], "Failed to generate test cases for this API operation", 2),
+        ([PhaseName.EXAMPLES], "Failed to generate test cases from examples for this API operation", 1),
     ],
 )
 def test_unsatisfiable_example(ctx, phases, expected, total_errors):
@@ -660,12 +655,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
-    stream = EventStream(
-        schema,
-        max_examples=1,
-        # TODO:
-        # phases=phases,
-    ).execute()
+    stream = EventStream(schema, max_examples=1, phases=phases).execute()
     # And the tests are failing because of the unsatisfiable schema
     stream.assert_errors()
     errors = stream.find_all(events.NonFatalError)
