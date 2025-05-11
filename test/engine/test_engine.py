@@ -771,12 +771,7 @@ def test_invalid_regex_example(ctx, phases, expected):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
-    stream = EventStream(
-        schema,
-        # TODO:
-        # phases=phases,
-        max_examples=1,
-    ).execute()
+    stream = EventStream(schema, phases=phases, max_examples=1).execute()
     # And the tests are failing because of the invalid regex error
     stream.assert_errors()
     errors = list(set(stream.find_all(events.NonFatalError)))
