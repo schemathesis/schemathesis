@@ -550,8 +550,7 @@ async def test_explicit_example_disable(app, real_app_schema, mocker):
     stream = execute(
         real_app_schema,
         max_examples=1,
-        # TODO:
-        # phases=[Phase.generate],
+        phases=[PhaseName.FUZZING],
     )
     # Then run should be successful
     stream.assert_no_errors()
@@ -941,10 +940,11 @@ def test_graphql(graphql_url):
 @pytest.mark.operations("success")
 def test_interrupted_in_test(openapi3_schema):
     # When an interrupt happens within a test body (check is called within a test body)
-    def check(ctx, response, case):
+    @schemathesis.check
+    def interrupt_check(ctx, response, case):
         raise KeyboardInterrupt
 
-    stream = EventStream(openapi3_schema, checks=(check,)).execute()
+    stream = EventStream(openapi3_schema, checks=(interrupt_check,)).execute()
     interrupted = stream.find(events.Interrupted)
     # Then the `Interrupted` event should be emitted
     assert interrupted is not None

@@ -532,7 +532,7 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Array[Integer]`  
+    **Type:** `Array[Integer | String]`  
     **Default:** `[200]`  
 
     Defines the HTTP status codes expected from the API for specific checks. Different checks may interpret this setting differently:
@@ -543,6 +543,8 @@ These settings can only be applied at the project level.
       - For `not_a_server_error`: Defines status codes that are not considered server errors within the 5xx range
 
     This allows you to customize validation for APIs that use non-standard success or error codes.
+
+    Status codes can be specified as exact integers (e.g., `200`) or as wildcard strings using the `X` character to match any digit (e.g., `"2XX"` to match all 2xx codes, `"4XX"` for all client error responses).
 
     ```toml
     [checks]

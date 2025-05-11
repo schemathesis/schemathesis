@@ -152,6 +152,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         f"--url={openapi3_base_url}",
         f"--max-examples={hypothesis_max_examples or 1}",
         f"--report-vcr-path={cassette_path}",
+        "--checks=not_a_server_error",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout

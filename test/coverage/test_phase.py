@@ -1662,7 +1662,7 @@ def failed(ctx, response, case):
             "run",
             str(schema_path),
             "-c",
-            "failed",
+            "failed,unsupported_method",
             "--include-method=POST",
             f"--url={openapi3_base_url}",
             "--mode=negative",

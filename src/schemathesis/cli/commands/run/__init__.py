@@ -33,7 +33,7 @@ COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color
 DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
 
-@click.argument(
+@click.argument(  # type: ignore[misc]
     "location",
     type=str,
     callback=validation.validate_schema_location,
@@ -483,6 +483,7 @@ def run(
     config: SchemathesisConfig = ctx.obj.config
 
     # First, set the right color
+    color: bool | None
     if force_color:
         color = True
     elif no_color:

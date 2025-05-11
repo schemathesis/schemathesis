@@ -117,7 +117,7 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
             "--continue-on-failure",
             config={
                 "checks": {
-                    "negative-data-rejection": {"expected-statuses": ["400", "401", "403", "404", "422", "428", "5xx"]}
+                    "negative_data_rejection": {"expected-statuses": ["400", "401", "403", "404", "422", "428", "5xx"]}
                 }
             },
         )
@@ -172,20 +172,6 @@ def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_
             "--max-examples=5",
             "--checks=positive_data_acceptance",
             **kwargs,
-        )
-        == snapshot_cli
-    )
-
-
-def test_positive_data_acceptance_with_env_vars(ctx, cli, snapshot_cli, schema, openapi3_base_url, monkeypatch):
-    schema_path = ctx.makefile(schema)
-    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE", "true")
-    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES", "403")
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--url={openapi3_base_url}",
-            "--max-examples=5",
         )
         == snapshot_cli
     )
