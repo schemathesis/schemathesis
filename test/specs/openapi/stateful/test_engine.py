@@ -546,7 +546,7 @@ def test_negative_tests(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
         max_examples=50,
-        configuration={"generation": GenerationConfig(modes=GenerationMode.all())},
+        generation_modes=GenerationMode.all(),
     )
     result = collect_result(engine)
     assert result.events[-1].status == Status.FAILURE, result.errors
