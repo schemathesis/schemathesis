@@ -21,6 +21,9 @@ class DiffBase:
             default_value = getattr(default, name)
             if name == "_seed":
                 name = "seed"
+            if name == "rate_limit" and current_value is not None:
+                current_value = self._rate_limit
+
             if self._has_diff(current_value, default_value):
                 diffs.append(f"{name}={self._diff_repr(current_value, default_value)}")
         return f"{self.__class__.__name__}({', '.join(diffs)})"

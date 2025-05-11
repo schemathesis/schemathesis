@@ -76,6 +76,7 @@ class ProjectConfig(DiffBase):
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
+        "_rate_limit",
         "request_timeout",
         "request_cert",
         "request_cert_key",
@@ -134,6 +135,7 @@ class ProjectConfig(DiffBase):
             self.rate_limit = build_limiter(rate_limit)
         else:
             self.rate_limit = rate_limit
+        self._rate_limit = rate_limit
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
@@ -148,7 +150,9 @@ class ProjectConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> ProjectConfig:
         return cls(
             base_url=resolve(data.get("base-url"), None),
-            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()},
+            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()}
+            if "headers" in data
+            else None,
             hooks_=resolve(data.get("hooks"), None),
             workers=data.get("workers", "auto"),
             proxy=resolve(data.get("proxy"), None),
