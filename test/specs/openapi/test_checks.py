@@ -17,7 +17,6 @@ from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
-    missing_required_header,
     negative_data_rejection,
     positive_data_acceptance,
     response_schema_conformance,
