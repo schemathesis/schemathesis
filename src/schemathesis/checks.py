@@ -61,6 +61,8 @@ class CheckContext:
             name = check.__name__
             if self.config.get_by_name(name=name).enabled:
                 self.checks.append(check)
+        if self.config.max_response_time.enabled:
+            self.checks.append(max_response_time)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         if self.recorder is not None:
@@ -111,16 +113,17 @@ DEFAULT_MAX_RESPONSE_TIME = 10.0
 
 
 def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    limit = ctx.config.max_response_time.limit or DEFAULT_MAX_RESPONSE_TIME
-    elapsed = response.elapsed
-    if elapsed > limit:
-        raise ResponseTimeExceeded(
-            operation=case.operation.label,
-            message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
-            elapsed=elapsed,
-            # TODO: Fix type
-            deadline=limit,
-        )
+    if ctx.config.max_response_time.enabled:
+        limit = ctx.config.max_response_time.limit or DEFAULT_MAX_RESPONSE_TIME
+        elapsed = response.elapsed
+        if elapsed > limit:
+            raise ResponseTimeExceeded(
+                operation=case.operation.label,
+                message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
+                elapsed=elapsed,
+                # TODO: Fix type
+                deadline=limit,
+            )
     return None
 
 
