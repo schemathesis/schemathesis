@@ -455,7 +455,6 @@ def make_negative_strategy(
     custom_formats: dict[str, st.SearchStrategy] | None = None,
 ) -> st.SearchStrategy:
     custom_formats = _build_custom_formats(custom_formats, generation_config)
-    print(generation_config)
     return negative_schema(
         schema,
         operation_name=operation_name,

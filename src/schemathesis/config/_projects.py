@@ -186,7 +186,7 @@ class ProjectConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         auth: tuple[str, str] | None = None,
-        workers: int | Literal["auto"] = "auto",
+        workers: int | Literal["auto"] = 1,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,

@@ -141,7 +141,7 @@ class EventStream:
         deterministic=None,
         headers=None,
         auth=None,
-        workers=None,
+        workers=1,
         max_failures=None,
     ):
         schema.config.checks.set(
