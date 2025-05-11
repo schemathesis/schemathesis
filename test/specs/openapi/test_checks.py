@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
     has_only_additional_properties_in_non_body_parameters,
+    missing_required_header,
     negative_data_rejection,
     positive_data_acceptance,
     response_schema_conformance,
@@ -339,6 +340,7 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
             f"--url={openapi3_base_url}",
             "--phases=coverage",
             "--mode=negative",
+            "--checks=missing_required_header",
             config={"checks": {"missing_required_header": {"expected-statuses": [expected_status]}}},
         )
         == snapshot_cli

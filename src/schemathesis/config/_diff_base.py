@@ -15,15 +15,16 @@ class DiffBase:
         diffs = []
         for field in fields(self):
             name = field.name
-            if name.startswith("_") and name != "_seed":
+            if name.startswith("_") and name not in ("_seed", "_filter_set"):
                 continue
             current_value = getattr(self, name)
             default_value = getattr(default, name)
             if name == "_seed":
                 name = "seed"
+            if name == "_filter_set":
+                name = "filter_set"
             if name == "rate_limit" and current_value is not None:
                 current_value = self._rate_limit
-
             if self._has_diff(current_value, default_value):
                 diffs.append(f"{name}={self._diff_repr(current_value, default_value)}")
         return f"{self.__class__.__name__}({', '.join(diffs)})"

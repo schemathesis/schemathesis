@@ -56,6 +56,11 @@ class OperationsConfig(DiffBase):
     def __init__(self, *, operations: list[OperationConfig] | None = None):
         self.operations = operations or []
 
+    def __repr__(self) -> str:
+        if self.operations:
+            return f"[{', '.join(DiffBase.__repr__(cfg) for cfg in self.operations)}]"
+        return "[]"
+
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
         return OperationConfig.from_hierarchy(configs)
@@ -231,6 +236,7 @@ class OperationConfig(DiffBase):
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
+        "_rate_limit",
         "request_timeout",
         "request_cert",
         "request_cert_key",
@@ -278,6 +284,7 @@ class OperationConfig(DiffBase):
             self.rate_limit = build_limiter(rate_limit)
         else:
             self.rate_limit = rate_limit
+        self._rate_limit = rate_limit
         self.request_timeout = request_timeout
         self.request_cert = request_cert
         self.request_cert_key = request_cert_key
@@ -313,7 +320,9 @@ class OperationConfig(DiffBase):
             filter_set=filter_set,
             enabled=data.get("enabled", True),
             base_url=resolve(data.get("base-url"), None),
-            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()},
+            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()}
+            if "headers" in data
+            else None,
             proxy=resolve(data.get("proxy"), None),
             max_response_time=data.get("max-response-time"),
             wait_for_schema=data.get("wait-for-schema"),

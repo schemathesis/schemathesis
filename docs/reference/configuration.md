@@ -334,8 +334,8 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Integer`  
-    **Default:** `Number of available CPUs`  
+    **Type:** `Integer or "auto"`  
+    **Default:** `1`  
 
     Specifies the number of concurrent workers for running unit test phases.
 

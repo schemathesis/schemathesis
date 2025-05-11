@@ -4,7 +4,7 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-❌  Failed to load configuration file from /tmp/test_positive_data_acceptance_8/config.toml
+❌  Failed to load configuration file from config.toml
 
 The loaded configuration is incorrect
 

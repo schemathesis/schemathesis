@@ -4,7 +4,7 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-❌  Failed to load configuration file from /tmp/test_incorrect_config_operatio2/config.toml
+❌  Failed to load configuration file from config.toml
 
 The loaded configuration is incorrect
 

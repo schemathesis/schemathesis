@@ -95,7 +95,7 @@ class ProjectConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         hooks_: str | None = None,
-        workers: int | Literal["auto"] = "auto",
+        workers: int | Literal["auto"] = 1,
         proxy: str | None = None,
         max_response_time: float | int | None = None,
         exclude_deprecated: bool | None = None,
@@ -154,7 +154,7 @@ class ProjectConfig(DiffBase):
             if "headers" in data
             else None,
             hooks_=resolve(data.get("hooks"), None),
-            workers=data.get("workers", "auto"),
+            workers=data.get("workers", 1),
             proxy=resolve(data.get("proxy"), None),
             max_response_time=data.get("max-response-time"),
             exclude_deprecated=data.get("exclude-deprecated"),

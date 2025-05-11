@@ -4,7 +4,7 @@ Stdout:
 Schemathesis dev
 ━━━━━━━━━━━━━━━━
 
-❌  Failed to load configuration file from /tmp/test_incorrect_config_syntacti0/config.toml
+❌  Failed to load configuration file from config.toml
 
 The configuration file content is not valid TOML
 

@@ -345,6 +345,12 @@ class CliSnapshotConfig:
         package_root = "/package-root"
         site_packages = "/site-packages/"
         data = data.replace(str(PACKAGE_ROOT), package_root)
+        data = re.sub(
+            "❌  Failed to load configuration file from .*toml$",
+            "❌  Failed to load configuration file from config.toml",
+            data,
+            flags=re.MULTILINE,
+        )
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
