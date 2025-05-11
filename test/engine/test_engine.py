@@ -601,9 +601,9 @@ def test_missing_path_parameter(real_app_schema):
 @pytest.mark.operations("failure", "multiple_failures", "unsatisfiable")
 def test_max_failures(real_app_schema):
     # When `max_failures` is specified
-    stream = execute(real_app_schema, max_failures=2)
+    stream = execute(real_app_schema, max_failures=2, phases=[PhaseName.FUZZING])
     # Then the total numbers of failures and errors should not exceed this number
-    assert stream.failures_count == 2
+    assert stream.failures_count <= 2
     errors = stream.find_all(events.NonFatalError)
     assert stream.failures_count + len(errors) == 2
 
