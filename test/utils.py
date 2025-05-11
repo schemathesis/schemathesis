@@ -134,6 +134,7 @@ class EventStream:
     def __init__(
         self,
         schema,
+        *,
         checks=None,
         phases=None,
         seed=None,
@@ -143,14 +144,19 @@ class EventStream:
         auth=None,
         workers=1,
         max_failures=None,
+        request_timeout=None,
+        tls_verify=None,
+        with_security_parameters=None,
     ):
         schema.config.checks.set(
             included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
         )
         phases = phases or [PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
         schema.config.phases.set(phases=[phase.value.lower() for phase in phases])
-        schema.config.generation.set(max_examples=max_examples, deterministic=deterministic)
-        schema.config.set(headers=headers, workers=workers)
+        schema.config.generation.set(
+            max_examples=max_examples, deterministic=deterministic, with_security_parameters=with_security_parameters
+        )
+        schema.config.set(headers=headers, workers=workers, request_timeout=request_timeout, tls_verify=tls_verify)
         if auth is not None:
             schema.config.auth.basic = {"username": auth[0], "password": auth[1]}
         schema.config.seed = seed

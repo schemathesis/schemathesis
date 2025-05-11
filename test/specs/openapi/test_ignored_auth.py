@@ -87,7 +87,7 @@ def test_keep_tls_verification(schema_url, mocker):
     send = mocker.spy(RequestsTransport, "send")
     run(
         schema_url,
-        timeout=5,
+        request_timeout=5,
         tls_verify=False,
         headers={"Authorization": "Basic dGVzdDp0ZXN0"},
     )

@@ -493,13 +493,11 @@ def engine_factory(app_factory, app_runner, stop_event):
         hypothesis_settings=None,
         max_examples=None,
         checks=None,
-        checks_config=None,
-        targets=None,
-        network=None,
         max_failures=None,
         unique_inputs=False,
         generation_modes=None,
         include=None,
+        headers=None,
         max_response_time=None,
     ):
         app = app_factory(**(app_kwargs or {}))
@@ -513,6 +511,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         config.projects.override.generation.set(
             modes=generation_modes, unique_inputs=unique_inputs, max_examples=max_examples
         )
+        config.projects.override.set(headers=headers)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
 
         if include is not None:
