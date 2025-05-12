@@ -40,3 +40,7 @@ class AuthConfig(DiffBase):
             bearer=data.get("bearer"),
             openapi=data.get("openapi"),
         )
+
+    @property
+    def is_defined(self) -> bool:
+        return self.basic is not None or self.bearer is not None or self.openapi is not None

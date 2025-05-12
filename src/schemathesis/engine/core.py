@@ -21,7 +21,7 @@ class Engine:
     def execute(self) -> EventStream:
         """Execute all test phases."""
         # Unregister auth if explicitly provided
-        if self.schema.config.auth is not None:
+        if self.schema.config.auth.is_defined:
             unregister_auth()
 
         ctx = EngineContext(schema=self.schema, stop_event=threading.Event())
