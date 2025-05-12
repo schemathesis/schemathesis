@@ -204,6 +204,9 @@ class ProjectConfig(DiffBase):
             _headers.update(headers)
             self.headers = _headers
 
+        if auth is not None:
+            self.auth.basic = {"username": auth[0], "password": auth[1]}
+
         if isinstance(workers, int):
             self.workers = workers
         else:
