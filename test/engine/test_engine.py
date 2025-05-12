@@ -922,8 +922,10 @@ def test_graphql(graphql_url):
 
 
 @pytest.mark.operations("success")
+@pytest.mark.usefixtures("restore_checks")
 def test_interrupted_in_test(openapi3_schema):
     # When an interrupt happens within a test body (check is called within a test body)
+    @schemathesis.check
     def interrupt_check(ctx, response, case):
         raise KeyboardInterrupt
 
