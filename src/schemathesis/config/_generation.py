@@ -116,7 +116,7 @@ class GenerationConfig(DiffBase):
         allow_x00: bool = True,
         codec: str | None = None,
         maximize: list[TargetFunction] | None = None,
-        with_security_parameters: bool = True,
+        with_security_parameters: bool | None = None,
         graphql_allow_null: bool = True,
         database: str | None = None,
         unique_inputs: bool = False,
@@ -133,7 +133,8 @@ class GenerationConfig(DiffBase):
             self.codec = codec
         if maximize is not None:
             self.maximize = maximize
-        self.with_security_parameters = with_security_parameters
+        if with_security_parameters is not None:
+            self.with_security_parameters = with_security_parameters
         self.graphql_allow_null = graphql_allow_null
         if database is not None:
             self.database = database

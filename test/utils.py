@@ -146,7 +146,7 @@ class EventStream:
         max_failures=None,
         request_timeout=None,
         tls_verify=None,
-        with_security_parameters=None,
+        with_security_parameters=True,
     ):
         schema.config.checks.set(
             included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
