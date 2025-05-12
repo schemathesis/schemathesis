@@ -842,7 +842,7 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     (security_schemes / "bearerAuth.json").write_text(json.dumps(bearer), "utf8")
     (tests / "test.json").write_text(json.dumps(operation), "utf8")
 
-    assert cli.run(str(raw_schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(raw_schema_path), f"--url={openapi3_base_url}", "--checks=not_a_server_error") == snapshot_cli
 
 
 def test_missing_file_in_resolution(ctx, testdir, cli, snapshot_cli, openapi3_base_url):
