@@ -11,6 +11,7 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.config._parameters import ParameterOverride
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
@@ -165,6 +166,11 @@ class EventStream:
         schema.config.max_failures = max_failures
         if max_steps is not None:
             schema.config.phases.stateful.max_steps = max_steps
+        if parameters is not None:
+            result = schema.config.parameters or {}
+            for name, value in parameters.items():
+                result[name] = ParameterOverride.from_value(value)
+            schema.config.parameters = result
         self.schema = from_schema(schema)
 
     def execute(self) -> EventStream:
