@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, fields, is_dataclass
-from typing import TypeVar
+from typing import TypeVar, cast
 
 T = TypeVar("T", bound="DiffBase")
 
@@ -24,6 +24,7 @@ class DiffBase:
             if name == "_filter_set":
                 name = "filter_set"
             if name == "rate_limit" and current_value is not None:
+                assert hasattr(self, "_rate_limit")
                 current_value = self._rate_limit
             if self._has_diff(current_value, default_value):
                 diffs.append(f"{name}={self._diff_repr(current_value, default_value)}")
@@ -71,6 +72,7 @@ class DiffBase:
         default_config = cls()
         # This config will accumulate "merged" config options
         output = cls()
+        assert hasattr(cls, "__slots__")
         for option in cls.__slots__:
             if option.startswith("_"):
                 continue
@@ -78,7 +80,7 @@ class DiffBase:
             if is_dataclass(default_value):
                 # Sub-configs require merging of nested config options
                 sub_configs = [getattr(config, option) for config in configs]
-                merged = type(default_value).from_hierarchy(sub_configs)
+                merged = type(default_value).from_hierarchy(sub_configs)  # type: ignore[union-attr]
                 setattr(output, option, merged)
             else:
                 # Primitive config options can be compared directly and do not
@@ -90,7 +92,7 @@ class DiffBase:
                         # As we go from the highest priority to the lowest one,
                         # we can just stop on the first non-default value
                         break
-        return output
+        return cast(T, output)
 
 
 def _repr(item: object) -> str:

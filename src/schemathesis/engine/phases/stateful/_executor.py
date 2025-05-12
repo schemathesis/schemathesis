@@ -189,13 +189,10 @@ def execute_state_machine_loop(
             )
             break
         suite_status = Status.SUCCESS
-        if seed is not None:
-            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
-            # Predictably change the seed to avoid re-running the same sequences if tests fail
-            # yet have reproducible results
-            seed += 1
-        else:
-            InstrumentedStateMachine = _InstrumentedStateMachine
+        InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
+        # Predictably change the seed to avoid re-running the same sequences if tests fail
+        # yet have reproducible results
+        seed += 1
         try:
             with catch_warnings(), ignore_hypothesis_output():  # type: ignore
                 InstrumentedStateMachine.run(settings=hypothesis_settings)

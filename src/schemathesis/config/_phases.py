@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any
 
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
@@ -125,9 +125,7 @@ class PhasesConfig(DiffBase):
         self.fuzzing = fuzzing or PhaseConfig()
         self.stateful = stateful or StatefulPhaseConfig()
 
-    def get_by_name(
-        self, *, name: Literal["examples", "coverage", "fuzzing", "stateful"]
-    ) -> PhaseConfig | CoveragePhaseConfig | StatefulPhaseConfig:
+    def get_by_name(self, *, name: str) -> PhaseConfig | CoveragePhaseConfig | StatefulPhaseConfig:
         return {
             "examples": self.examples,
             "coverage": self.coverage,

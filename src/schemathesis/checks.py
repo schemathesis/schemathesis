@@ -121,7 +121,6 @@ def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool
                 operation=case.operation.label,
                 message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
                 elapsed=elapsed,
-                # TODO: Fix type
                 deadline=limit,
             )
     return None

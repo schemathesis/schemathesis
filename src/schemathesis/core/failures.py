@@ -134,7 +134,7 @@ class ResponseTimeExceeded(Failure):
         *,
         operation: str,
         elapsed: float,
-        deadline: int,
+        deadline: float,
         message: str,
         title: str = "Response time limit exceeded",
         case_id: str | None = None,
