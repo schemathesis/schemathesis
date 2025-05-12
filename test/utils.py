@@ -147,6 +147,8 @@ class EventStream:
         request_timeout=None,
         tls_verify=None,
         with_security_parameters=True,
+        parameters=None,
+        max_steps=None,
     ):
         schema.config.checks.set(
             included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
@@ -161,6 +163,8 @@ class EventStream:
             schema.config.auth.basic = {"username": auth[0], "password": auth[1]}
         schema.config.seed = seed
         schema.config.max_failures = max_failures
+        if max_steps is not None:
+            schema.config.phases.stateful.max_steps = max_steps
         self.schema = from_schema(schema)
 
     def execute(self) -> EventStream:

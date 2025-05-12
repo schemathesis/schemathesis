@@ -1073,7 +1073,7 @@ def test_skip_non_negated_headers(ctx):
 
 STATEFUL_KWARGS = {
     "max_examples": 1,
-    "stateful_step_count": 2,
+    "max_steps": 2,
 }
 
 
@@ -1128,7 +1128,7 @@ def test_stateful_override(real_app_schema):
         phases=[PhaseName.STATEFUL_TESTING],
         parameters={"user_id": "42"},
         max_examples=40,
-        stateful_step_count=2,
+        max_steps=2,
     ).execute()
     interactions = stream.find_all_interactions()
     assert len(interactions) > 0

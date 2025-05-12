@@ -305,7 +305,7 @@
           "$ref": "#/$defs/PhaseConfig"
         },
         "stateful": {
-          "$ref": "#/$defs/PhaseConfig"
+          "$ref": "#/$defs/StatefulPhaseConfig"
         }
       }
     },
@@ -315,6 +315,25 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        }
+      }
+    },
+    "StatefulPhaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max-steps": {
+          "type": "integer",
+          "minimum": 2
         },
         "generation": {
           "$ref": "#/$defs/GenerationConfig"

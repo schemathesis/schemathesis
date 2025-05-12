@@ -6,6 +6,7 @@ from typing import Any, Literal
 from schemathesis.config._checks import ChecksConfig
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._generation import GenerationConfig
+from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 
 DEFAULT_UNEXPECTED_METHODS = {"get", "put", "post", "delete", "options", "patch", "trace"}
 
@@ -71,11 +72,43 @@ class CoveragePhaseConfig(DiffBase):
 
 
 @dataclass(repr=False)
+class StatefulPhaseConfig(DiffBase):
+    enabled: bool
+    generation: GenerationConfig
+    checks: ChecksConfig
+    max_steps: int
+
+    __slots__ = ("enabled", "generation", "checks", "max_steps")
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        generation: GenerationConfig | None = None,
+        checks: ChecksConfig | None = None,
+        max_steps: int | None = None,
+    ) -> None:
+        self.enabled = enabled
+        self.max_steps = max_steps or DEFAULT_STATEFUL_STEP_COUNT
+        self.generation = generation or GenerationConfig()
+        self.checks = checks or ChecksConfig()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
+        return cls(
+            enabled=data.get("enabled", True),
+            max_steps=data.get("max-steps"),
+            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            checks=ChecksConfig.from_dict(data.get("checks", {})),
+        )
+
+
+@dataclass(repr=False)
 class PhasesConfig(DiffBase):
     examples: PhaseConfig
     coverage: CoveragePhaseConfig
     fuzzing: PhaseConfig
-    stateful: PhaseConfig
+    stateful: StatefulPhaseConfig
 
     __slots__ = ("examples", "coverage", "fuzzing", "stateful")
 
@@ -85,16 +118,16 @@ class PhasesConfig(DiffBase):
         examples: PhaseConfig | None = None,
         coverage: CoveragePhaseConfig | None = None,
         fuzzing: PhaseConfig | None = None,
-        stateful: PhaseConfig | None = None,
+        stateful: StatefulPhaseConfig | None = None,
     ) -> None:
         self.examples = examples or PhaseConfig()
         self.coverage = coverage or CoveragePhaseConfig()
         self.fuzzing = fuzzing or PhaseConfig()
-        self.stateful = stateful or PhaseConfig()
+        self.stateful = stateful or StatefulPhaseConfig()
 
     def get_by_name(
         self, *, name: Literal["examples", "coverage", "fuzzing", "stateful"]
-    ) -> PhaseConfig | CoveragePhaseConfig:
+    ) -> PhaseConfig | CoveragePhaseConfig | StatefulPhaseConfig:
         return {
             "examples": self.examples,
             "coverage": self.coverage,
@@ -108,7 +141,7 @@ class PhasesConfig(DiffBase):
             examples=PhaseConfig.from_dict(data.get("examples", {})),
             coverage=CoveragePhaseConfig.from_dict(data.get("coverage", {})),
             fuzzing=PhaseConfig.from_dict(data.get("fuzzing", {})),
-            stateful=PhaseConfig.from_dict(data.get("stateful", {})),
+            stateful=StatefulPhaseConfig.from_dict(data.get("stateful", {})),
         )
 
     def set(self, *, phases: list[str]) -> None:

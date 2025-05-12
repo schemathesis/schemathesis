@@ -426,6 +426,20 @@ These settings can only be applied at the project level.
     unexpected-methods = ["PATCH"]
     ```
 
+#### `phases.stateful.max-steps`
+
+!!! note ""
+
+    **Type**: `Integer (≥2)`  
+    **Default**: `null`  
+
+    Specifies the maximum number of stateful steps (i.e., transitions between states) to perform in the **stateful** phase. When set, Schemathesis will stop exploring new state transitions once this limit is reached, even if additional valid transitions are available.  
+
+    ```toml
+    [phases.stateful]
+    max-steps = 50
+    ```
+
 #### `phases.<phase>.checks`
 
 !!! note "" 
