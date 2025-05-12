@@ -214,7 +214,7 @@ def convert_maximize(
 ) -> list[TargetFunction]:
     from schemathesis.generation.targets import TARGETS
 
-    names = reduce(operator.iadd, value, [])
+    names: list[str] = reduce(operator.iadd, value, [])
     return TARGETS.get_by_names(names)
 
 

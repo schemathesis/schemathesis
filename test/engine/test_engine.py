@@ -8,7 +8,6 @@ from unittest.mock import ANY
 import pytest
 from aiohttp.streams import EmptyStreamReader
 from fastapi import FastAPI
-from hypothesis import Phase
 
 import schemathesis
 from schemathesis.checks import not_a_server_error

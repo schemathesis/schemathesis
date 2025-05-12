@@ -78,7 +78,9 @@ def stop_engine(e):
 
 
 @pytest.mark.parametrize("func", [keyboard_interrupt, stop_engine])
+@pytest.mark.usefixtures("restore_checks")
 def test_stop_in_check(engine_factory, func, stop_event):
+    @schemathesis.check
     def stop_immediately(*args, **kwargs):
         func(stop_event)
 
@@ -120,18 +122,22 @@ def test_stop_outside_of_state_machine_execution(engine_factory, mocker, stop_ev
     ["kwargs"],
     [({},), ({"unique_inputs": True},)],
 )
+@pytest.mark.usefixtures("restore_checks")
 def test_internal_error_in_check(engine_factory, kwargs):
+    @schemathesis.check
     def bugged_check(*args, **kwargs):
         raise ZeroDivisionError("Oops!")
 
-    engine = engine_factory(checks=[bugged_check], **kwargs)
+    engine = engine_factory(**kwargs)
     result = collect_result(engine)
     assert result.errors
     assert isinstance(result.errors[0].value, ZeroDivisionError)
 
 
 @pytest.mark.parametrize("exception_args", [(), ("Oops!",)])
+@pytest.mark.usefixtures("restore_checks")
 def test_custom_assertion_in_check(engine_factory, exception_args):
+    @schemathesis.check
     def custom_check(*args, **kwargs):
         raise AssertionError(*exception_args)
 
@@ -147,9 +153,11 @@ def test_custom_assertion_in_check(engine_factory, exception_args):
         assert failure.failure_info.failure.message == "Oops!"
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_custom_assertion_with_random_message(engine_factory):
     counter = 0
 
+    @schemathesis.check
     def custom_check(*args, **kwargs):
         nonlocal counter
         counter += 1
@@ -163,10 +171,12 @@ def test_custom_assertion_with_random_message(engine_factory):
     assert failure.failure_info.failure.title == "Custom check failed: `custom_check`"
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_distinct_assertions(engine_factory):
     counter = 0
 
     # When a check contains different failing assertions
+    @schemathesis.check
     def custom_check(ctx, response, case):
         nonlocal counter
         counter += 1
@@ -198,10 +208,12 @@ def test_distinct_assertions(engine_factory):
     "kwargs",
     [{}, {"max_failures": 1}],
 )
+@pytest.mark.usefixtures("restore_checks")
 def test_flaky_assertions(engine_factory, kwargs):
     counter = 0
 
     # When a check contains different failing assertions and one of them is considered flaky by Hypothesis
+    @schemathesis.check
     def custom_check(ctx, response, case):
         nonlocal counter
         counter += 1
@@ -231,11 +243,13 @@ def test_flaky_assertions(engine_factory, kwargs):
         }
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_failure_hidden_behind_another_failure(engine_factory):
     # The same API operation, but one error is far less frequent and is located behind another one that happens more often, so it is not found in the first test suite
 
     suite_number = 0
 
+    @schemathesis.check
     def dynamic_check(*args, **kwargs):
         if suite_number == 0:
             not_a_server_error(*args, **kwargs)
@@ -289,7 +303,9 @@ def test_find_use_after_free(engine_factory):
     assert result.events[-1].status == Status.FAILURE
 
 
+@pytest.mark.usefixtures("restore_checks")
 def test_failed_health_check(engine_factory):
+    @schemathesis.check
     def rejected_check(*args, **kwargs):
         hypothesis.reject()
 
@@ -308,9 +324,11 @@ def test_failed_health_check(engine_factory):
     "kwargs",
     [{"max_failures": None}, {"max_failures": 1}],
 )
+@pytest.mark.usefixtures("restore_checks")
 def test_flaky(engine_factory, kwargs):
     found = False
 
+    @schemathesis.check
     def flaky_check(*args, **kwargs):
         nonlocal found
         if not found:

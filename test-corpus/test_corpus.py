@@ -4,11 +4,9 @@ import threading
 from time import sleep
 from typing import NoReturn
 
-import hypothesis
 import pytest
 from aiohttp.test_utils import unused_port
 from flask import Flask
-from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
 from schemathesis.checks import CHECKS
@@ -24,7 +22,6 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 
@@ -140,23 +137,10 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
         pass
 
-    engine = from_schema(
-        schema,
-        config=EngineConfig(
-            execution=ExecutionConfig(
-                phases=[PhaseName.EXAMPLES, PhaseName.FUZZING],
-                hypothesis_settings=hypothesis.settings(
-                    deadline=None,
-                    database=None,
-                    max_examples=1,
-                    suppress_health_check=list(HealthCheck),
-                    phases=[Phase.explicit, Phase.generate],
-                    verbosity=Verbosity.quiet,
-                ),
-            )
-        ),
-    )
-    for event in engine.execute():
+    schema.config.phases.set(phases=["examples", "fuzzing"])
+    schema.config.generation.set(max_examples=1)
+
+    for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
         assert_event(filename, event)

@@ -94,7 +94,7 @@ class StatefulPhaseConfig(DiffBase):
         self.checks = checks or ChecksConfig()
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
+    def from_dict(cls, data: dict[str, Any]) -> StatefulPhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
             max_steps=data.get("max-steps"),

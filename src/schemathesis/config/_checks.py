@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, ClassVar, Sequence
+from typing import TYPE_CHECKING, Any, ClassVar, Sequence
 
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
+
+if TYPE_CHECKING:
+    from typing_extensions import Self
 
 NOT_A_SERVER_ERROR_EXPECTED_STATUSES = ["2xx", "3xx", "4xx"]
 NEGATIVE_DATA_REJECTION_EXPECTED_STATUSES = ["400", "401", "403", "404", "406", "422", "428", "5xx"]
@@ -100,7 +103,7 @@ class CheckConfig(DiffBase):
             self.expected_statuses = self._DEFAULT_EXPECTED_STATUSES
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> CheckConfig:
+    def from_dict(cls, data: dict[str, Any]) -> Self:
         enabled = data.get("enabled", True)
         return cls(
             enabled=enabled,
