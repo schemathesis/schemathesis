@@ -657,11 +657,12 @@ def test(case):
     assert expected in result.stdout.str()
 
 
-@pytest.mark.xfail(reason="There is no way to disable the coverage phase via Python API")
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
 schema.config.base_url = "{openapi3_base_url}"
+schema.config.phases.coverage.enabled = False
+schema.config.phases.fuzzing.enabled = False
 
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])
@@ -680,6 +681,18 @@ def test(case):
                             "schema": {"type": "integer", "minimum": 5, "maximum": 4},
                         }
                     ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "foo": {"type": "string", "example": "foo example string"},
+                                    },
+                                },
+                            }
+                        }
+                    },
                     "responses": {"200": {"description": "OK"}},
                 }
             }
