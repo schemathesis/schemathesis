@@ -6,6 +6,7 @@ from hypothesis import HealthCheck, Phase, given, settings
 
 import schemathesis
 import schemathesis.engine
+from schemathesis.config import HealthCheck as SchemathesisHealthCheck
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.engine import events
 
@@ -21,6 +22,7 @@ IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema)
 @settings(max_examples=20, phases=[Phase.generate], deadline=None, suppress_health_check=list(HealthCheck))
 def test_random_schemas(schema, openapi3_base_url):
     schema = schemathesis.openapi.from_dict(schema)
+    schema.config._get_parent().suppress_health_check = [SchemathesisHealthCheck.all]
     schema.config.base_url = openapi3_base_url
     schema.config.phases.set(phases=["examples", "fuzzing"])
     schema.config.generation.set(

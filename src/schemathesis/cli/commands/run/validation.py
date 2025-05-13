@@ -33,7 +33,6 @@ INVALID_BASE_URL_MESSAGE = (
     "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
     "Make sure it is a properly formatted URL."
 )
-MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 MISSING_REQUEST_CERT_MESSAGE = "The `--request-cert` option must be specified if `--request-cert-key` is used."
 
 

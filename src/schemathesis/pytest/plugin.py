@@ -141,7 +141,6 @@ class SchemathesisCase(PyCollector):
                     modes.append(HypothesisTestMode.FUZZING)
                 if self.schema.config.phases.coverage.enabled:
                     modes.append(HypothesisTestMode.COVERAGE)
-                print(modes)
 
                 funcobj = create_test(
                     operation=operation,

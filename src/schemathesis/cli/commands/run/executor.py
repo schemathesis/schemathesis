@@ -16,6 +16,7 @@ from schemathesis.cli.commands.run.loaders import load_schema
 from schemathesis.cli.ext.fs import open_file
 from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError
+from schemathesis.core.fs import file_exists
 from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
 from schemathesis.filters import FilterSet
@@ -44,6 +45,9 @@ def execute(
     _execute(event_stream, config=config, args=args, params=params)
 
 
+MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
+
+
 def into_event_stream(*, location: str, config: ProjectConfig, filter_set: FilterSet) -> EventGenerator:
     loading_started = LoadingStarted(location=location)
     yield loading_started
@@ -51,6 +55,8 @@ def into_event_stream(*, location: str, config: ProjectConfig, filter_set: Filte
     try:
         schema = load_schema(location=location, config=config)
         schema.filter_set = filter_set
+        if file_exists(location) and schema.config.base_url is None:
+            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return

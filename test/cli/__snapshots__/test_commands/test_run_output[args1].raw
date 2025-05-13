@@ -1,7 +1,11 @@
 Exit code: 2
 ---
 Stdout:
-Usage: schemathesis run [OPTIONS] SCHEMA
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+Usage: schemathesis run [OPTIONS] LOCATION
 Try 'schemathesis run -h' for help.
 
 Error: The `--url` option is required when specifying a schema via a file.
