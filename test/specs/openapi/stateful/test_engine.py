@@ -310,7 +310,7 @@ def test_failed_health_check(engine_factory):
         hypothesis.reject()
 
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(suppress_health_check=[hypothesis.HealthCheck.differing_executors]),
+        hypothesis_settings={"suppress_health_check": [hypothesis.HealthCheck.differing_executors]},
         max_examples=1,
         checks=[rejected_check],
     )
@@ -379,7 +379,7 @@ def test_max_response_time_valid(engine_factory):
 def test_max_response_time_invalid(engine_factory):
     engine = engine_factory(
         app_kwargs={"slowdown": 0.010},
-        hypothesis_settings=hypothesis.settings(stateful_step_count=2),
+        max_steps=2,
         max_examples=1,
         checks=[],
         max_response_time=0.005,
@@ -399,7 +399,7 @@ def test_targeted(engine_factory):
         return 1.0
 
     engine = engine_factory(
-        hypothesis_settings=hypothesis.settings(stateful_step_count=5),
+        max_steps=5,
         max_examples=1,
         checks=[not_a_server_error],
         maximize=[custom_target],
@@ -574,7 +574,7 @@ def test_unique_inputs(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
         unique_inputs=True,
-        hypothesis_settings=hypothesis.settings(stateful_step_count=50),
+        max_steps=50,
         max_examples=25,
     )
     cases = []

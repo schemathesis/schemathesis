@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass
 from typing import Literal
 
+import hypothesis
 import pytest
 from flask import Flask, abort, jsonify, request
 
@@ -492,6 +493,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         app_kwargs=None,
         hypothesis_settings=None,
         max_examples=None,
+        max_steps=None,
         maximize=None,
         checks=None,
         max_failures=None,
@@ -509,11 +511,21 @@ def engine_factory(app_factory, app_runner, stop_event):
             included_check_names=[func.__name__ for func in checks] if isinstance(checks, list) else None,
             max_response_time=max_response_time,
         )
+        if max_steps is not None:
+            config.projects.override.phases.stateful.max_steps = max_steps
         config.projects.override.generation.set(
-            modes=generation_modes, unique_inputs=unique_inputs, max_examples=max_examples, maximize=maximize
+            modes=generation_modes,
+            unique_inputs=unique_inputs,
+            max_examples=max_examples,
+            maximize=maximize,
         )
         config.projects.override.set(headers=headers)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+
+        if hypothesis_settings is not None:
+            current = schema.config.get_hypothesis_settings()
+            new = hypothesis.settings(current, **hypothesis_settings)
+            schema.config.get_hypothesis_settings = lambda: new
 
         if include is not None:
             schema = schema.include(**include)
