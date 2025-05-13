@@ -10,6 +10,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
+from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._operations import OperationConfig, OperationsConfig
 from schemathesis.config._output import OutputConfig
 from schemathesis.config._parameters import ParameterOverride, load_parameters
@@ -350,6 +351,10 @@ class ProjectConfig(DiffBase):
     @property
     def reports(self) -> ReportsConfig:
         return self._get_parent().reports
+
+    @property
+    def suppress_health_check(self) -> list[HealthCheck]:
+        return self._get_parent().suppress_health_check
 
     @property
     def seed(self) -> int:
