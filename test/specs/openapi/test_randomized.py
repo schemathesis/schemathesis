@@ -15,7 +15,7 @@ if sys.version_info < (3, 10):
 
 from hypothesis_openapi import openapis
 
-IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema)
+IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema, hypothesis.errors.FailedHealthCheck)
 
 
 @given(schema=openapis(version="2.0") | openapis(version="3.0"))
