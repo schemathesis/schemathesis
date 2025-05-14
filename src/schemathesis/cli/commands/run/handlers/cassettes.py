@@ -185,7 +185,7 @@ def vcr_writer(path: Path, config: ProjectConfig, queue: Queue) -> None:
                 )
                 write_double_quoted(output, string)
 
-    with open(path, "w") as stream:
+    with open(path, "w", encoding="utf-8") as stream:
         while True:
             item = queue.get()
             if isinstance(item, Initialize):
