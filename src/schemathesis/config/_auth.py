@@ -5,6 +5,8 @@ from typing import Any
 
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
+from schemathesis.config._error import ConfigError
+from schemathesis.core.validation import is_latin_1_encodable
 
 
 @dataclass(repr=False)
@@ -23,6 +25,11 @@ class AuthConfig(DiffBase):
         openapi: dict[str, dict[str, str]] | None = None,
     ) -> None:
         self.basic = {key: resolve(value, value) for key, value in basic.items()} if basic else None
+        if self.basic:
+            if not is_latin_1_encodable(self.basic["username"]):
+                raise ConfigError("Username should be latin-1 encodable.")
+            if not is_latin_1_encodable(self.basic["password"]):
+                raise ConfigError("Password should be latin-1 encodable.")
         self.bearer = resolve(bearer, bearer) if bearer else None
         self.openapi = (
             {
