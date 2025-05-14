@@ -394,6 +394,7 @@ class ProjectsConfig(DiffBase):
     def override(self) -> ProjectConfig:
         if not hasattr(self, "_override"):
             self._override = ProjectConfig()
+            self._override._parent = self.default._parent
         return self._override
 
     @classmethod
@@ -407,7 +408,6 @@ class ProjectsConfig(DiffBase):
         self.default._parent = parent
         for project in self.named.values():
             project._parent = parent
-        self.override._parent = parent
 
     def get_default(self) -> ProjectConfig:
         config = ProjectConfig.from_hierarchy([self.override, self.default])
