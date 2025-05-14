@@ -56,7 +56,7 @@ AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWA
     ids=("bbci", "vmware", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_iter_operations(raw_schema, loader):
-    schema = loader(raw_schema)
+    schema = loader(raw_schema, config=CONFIG)
 
     for _ in schema.get_all_operations():
         pass
