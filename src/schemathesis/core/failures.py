@@ -241,6 +241,9 @@ class FailureGroup(BaseExceptionGroup):
 
     exceptions: Sequence[Failure]
 
+    def __init__(self, exceptions: Sequence[Failure], message: str = "", /) -> None:
+        super().__init__(message, exceptions)
+
     def __new__(cls, failures: Sequence[Failure], message: str | None = None) -> FailureGroup:
         if message is None:
             message = failure_report_title(failures)
