@@ -575,7 +575,7 @@ def cli(tmp_path):
         def main(*args, config=None, hooks=None, **kwargs):
             if config is not None:
                 path = tmp_path / "config.toml"
-                path.write_text(tomli_w.dumps(config))
+                path.write_text(tomli_w.dumps(config), encoding="utf-8")
                 args = ["--config-file", str(path), *args]
             if hooks is not None:
                 env = kwargs.setdefault("env", {})
