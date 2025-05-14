@@ -338,7 +338,9 @@ def test_known_content_type(real_app_schema):
 def test_response_conformance_invalid(real_app_schema):
     # When API operation returns a response that doesn't conform to the schema
     # And "response_schema_conformance" is specified
-    stream = EventStream(real_app_schema, checks=(response_schema_conformance,), max_examples=1).execute()
+    stream = EventStream(
+        real_app_schema, checks=(response_schema_conformance,), max_examples=1, phases=[PhaseName.FUZZING]
+    ).execute()
     # Then there should be a failure
     assert stream.failures_count == 1
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
