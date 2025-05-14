@@ -377,9 +377,9 @@ def _validate_base_url(base_url: str) -> None:
 class ProjectsConfig(DiffBase):
     default: ProjectConfig
     named: dict[str, ProjectConfig]
-    override: ProjectConfig
+    _override: ProjectConfig
 
-    __slots__ = ("default", "named", "override")
+    __slots__ = ("default", "named", "_override")
 
     def __init__(
         self,
@@ -389,7 +389,12 @@ class ProjectsConfig(DiffBase):
     ) -> None:
         self.default = default or ProjectConfig()
         self.named = named or {}
-        self.override = ProjectConfig()
+
+    @property
+    def override(self) -> ProjectConfig:
+        if not hasattr(self, "_override"):
+            self._override = ProjectConfig()
+        return self._override
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProjectsConfig:
@@ -412,12 +417,16 @@ class ProjectsConfig(DiffBase):
     def get(self, schema: dict[str, Any]) -> ProjectConfig:
         # Highest priority goes to `override`, then config specifically
         # for the given project, then the "default" project config
-        configs = [self.override]
+        configs = []
+        if hasattr(self, "_override"):
+            configs.append(self._override)
         title = schema.get("info", {}).get("title")
         if title is not None:
             named = self.named.get(title)
             if named is not None:
                 configs.append(named)
+        if not configs:
+            return self.default
         configs.append(self.default)
         config = ProjectConfig.from_hierarchy(configs)
         config._parent = self.default._parent

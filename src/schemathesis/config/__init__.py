@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from os import PathLike
-from pathlib import Path
 from random import Random
 
 import tomli
@@ -41,6 +41,8 @@ __all__ = [
     "ProjectConfig",
     "get_workers_count",
 ]
+
+_join = os.path.join
 
 
 @dataclass(repr=False)
@@ -101,24 +103,25 @@ class SchemathesisConfig(DiffBase):
         stopping when a directory containing a '.git' folder is encountered or the filesystem root is reached.
         If a config file is found, load it; otherwise, return a default configuration.
         """
-        current_dir = Path.cwd()
+        current_dir = os.getcwd()
         config_file = None
 
         while True:
-            candidate = current_dir / "schemathesis.toml"
-            if candidate.exists():
+            candidate = os.path.join(current_dir, "schemathesis.toml")
+            if os.path.isfile(candidate):
                 config_file = candidate
                 break
 
             # Stop searching if we've reached a git repository root
-            if (current_dir / ".git").exists():
+            git_dir = os.path.join(current_dir, ".git")
+            if os.path.isdir(git_dir):
                 break
 
             # Stop if we've reached the filesystem root
-            if current_dir.parent == current_dir:
+            parent = os.path.dirname(current_dir)
+            if parent == current_dir:
                 break
-
-            current_dir = current_dir.parent
+            current_dir = parent
 
         if config_file:
             return cls.from_path(config_file)

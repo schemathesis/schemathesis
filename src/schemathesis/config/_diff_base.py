@@ -68,31 +68,28 @@ class DiffBase:
 
     @classmethod
     def from_hierarchy(cls, configs: list[T]) -> T:
-        # Source for default values
-        default_config = cls()
         # This config will accumulate "merged" config options
         output = cls()
-        assert hasattr(cls, "__slots__")
-        for option in cls.__slots__:
+        for option in cls.__slots__:  # type: ignore
             if option.startswith("_"):
                 continue
-            default_value = getattr(default_config, option)
-            if is_dataclass(default_value):
+            default = getattr(output, option)
+            if is_dataclass(default):
                 # Sub-configs require merging of nested config options
                 sub_configs = [getattr(config, option) for config in configs]
-                merged = type(default_value).from_hierarchy(sub_configs)  # type: ignore[union-attr]
+                merged = type(default).from_hierarchy(sub_configs)  # type: ignore[union-attr]
                 setattr(output, option, merged)
             else:
                 # Primitive config options can be compared directly and do not
                 # require merging of nested options
                 for config in configs:
-                    current_value = getattr(config, option)
-                    if current_value != default_value:
-                        setattr(output, option, current_value)
+                    current = getattr(config, option)
+                    if current != default:
+                        setattr(output, option, current)
                         # As we go from the highest priority to the lowest one,
                         # we can just stop on the first non-default value
                         break
-        return cast(T, output)
+        return output  # type: ignore
 
 
 def _repr(item: object) -> str:
