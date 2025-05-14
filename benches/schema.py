@@ -4,6 +4,7 @@ import sys
 import pytest
 
 import schemathesis
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import from_schema
 
@@ -12,6 +13,8 @@ sys.path.append(str(CURRENT_DIR.parent))
 CATALOG_DIR = CURRENT_DIR / "data"
 
 from corpus.tools import load_from_corpus, read_corpus_file  # noqa: E402
+
+CONFIG = SchemathesisConfig()
 
 CORPUS_OPENAPI_30 = read_corpus_file("openapi-3.0")
 CORPUS_SWAGGER_20 = read_corpus_file("swagger-2.0")
@@ -76,7 +79,7 @@ def test_iter_operations(raw_schema, loader):
     ids=("bbci", "vmware", "stripe", "universe", "appveyor", "evetech", "osisoft", "ml_webservices", "azure_network"),
 )
 def test_length(raw_schema, loader):
-    schema = loader(raw_schema)
+    schema = loader(raw_schema, config=CONFIG)
     _ = len(schema)
 
 
@@ -105,7 +108,7 @@ UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE[UNIVERSE_OPERATION_KEY[0]][UNIVERSE_OPERAT
     ids=("bbci", "vmware", "universe"),
 )
 def test_get_operation_single(raw_schema, key, loader):
-    schema = loader(raw_schema)
+    schema = loader(raw_schema, config=CONFIG)
     current = schema
     for segment in key:
         current = current[segment]
@@ -134,7 +137,7 @@ def test_get_operation_repeatedly(schema, key):
     ids=("bbci", "vmware"),
 )
 def test_get_operation_by_id_single(raw_schema, key):
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
     _ = schema.get_operation_by_id(key)
 
 
@@ -161,7 +164,7 @@ def test_get_operation_by_id_repeatedly(schema, key):
     ids=("bbci", "vmware"),
 )
 def test_get_operation_by_reference_single(raw_schema, key):
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
     _ = schema.get_operation_by_reference(key)
 
 
@@ -198,7 +201,7 @@ def test_events():
 @pytest.mark.benchmark
 @pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
 def test_rewritten_components(raw_schema):
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
 
     _ = schema.rewritten_components
 
@@ -206,7 +209,7 @@ def test_rewritten_components(raw_schema):
 @pytest.mark.benchmark
 @pytest.mark.parametrize("raw_schema", [BBCI, VMWARE, STRIPE], ids=("bbci", "vmware", "stripe"))
 def test_links_count(raw_schema):
-    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema = schemathesis.openapi.from_dict(raw_schema, config=CONFIG)
 
     _ = schema.statistic.links.total
 
