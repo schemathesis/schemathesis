@@ -151,7 +151,7 @@ class SchemathesisConfig(DiffBase):
     @classmethod
     def from_path(cls, path: PathLike | str) -> SchemathesisConfig:
         """Load configuration from a file path."""
-        with open(path) as fd:
+        with open(path, encoding="utf-8") as fd:
             return cls.from_str(fd.read())
 
     @classmethod

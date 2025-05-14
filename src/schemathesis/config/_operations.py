@@ -190,18 +190,6 @@ class OperationsConfig(DiffBase):
         return final
 
 
-def apply_exclude_filter(filter_set: FilterSet, option_name: str, **kwargs: Any) -> None:
-    """Apply an exclude filter with proper error handling."""
-    try:
-        filter_set.include(**kwargs)
-    except IncorrectUsage as e:
-        if str(e) == "Filter already exists":
-            raise ConfigError(
-                f"Filter for {option_name} already exists. You can't simultaneously include and exclude the same thing."
-            ) from None
-        raise ConfigError(str(e)) from None
-
-
 @dataclass
 class OperationConfig(DiffBase):
     _filter_set: FilterSet

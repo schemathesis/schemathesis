@@ -10,15 +10,6 @@ if TYPE_CHECKING:
 HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER = ":memory:"
 
 
-def prepare_phases(no_shrink: bool = False) -> list[hypothesis.Phase] | None:
-    from hypothesis import Phase
-
-    phases = set(Phase) - {Phase.explain}
-    if no_shrink:
-        return list(phases - {Phase.shrink})
-    return list(phases)
-
-
 def prepare_settings(
     *,
     database: str | None = None,
