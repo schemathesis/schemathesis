@@ -344,8 +344,7 @@ def test_response_conformance_invalid(real_app_schema):
     # Then there should be a failure
     assert stream.failures_count == 1
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
-    print(check)
-    assert check.failure_info.failure.title == "Response violates schema"
+    assert check.failure_info.failure.title == "Response violates schema", check
     assert (
         check.failure_info.failure.message
         == """'success' is a required property

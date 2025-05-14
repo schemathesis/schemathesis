@@ -1646,7 +1646,8 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
 
     assert methods == {"DELETE", "PUT"}
 
-    module = ctx.write_pymodule(
+    schema_path = ctx.openapi.write_schema(raw_schema)
+    with ctx.check(
         """
 import schemathesis
 
@@ -1655,23 +1656,22 @@ def failed(ctx, response, case):
     if case.meta and getattr(case.meta.phase.data, "description", "") == "Unspecified HTTP method: DELETE":
         raise AssertionError(f"Should be {case.meta.phase.data.description}")
 """
-    )
-    schema_path = ctx.openapi.write_schema(raw_schema)
-    assert (
-        cli.main(
-            "run",
-            str(schema_path),
-            "-c",
-            "failed,unsupported_method",
-            "--include-method=POST",
-            f"--url={openapi3_base_url}",
-            "--mode=negative",
-            "--max-examples=10",
-            "--continue-on-failure",
-            hooks=module,
+    ) as module:
+        assert (
+            cli.main(
+                "run",
+                str(schema_path),
+                "-c",
+                "failed,unsupported_method",
+                "--include-method=POST",
+                f"--url={openapi3_base_url}",
+                "--mode=negative",
+                "--max-examples=10",
+                "--continue-on-failure",
+                hooks=module,
+            )
+            == snapshot_cli
         )
-        == snapshot_cli
-    )
 
 
 def test_urlencoded_payloads_are_valid(ctx):
