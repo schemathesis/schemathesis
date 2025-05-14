@@ -614,6 +614,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
                                     "type": "object",
                                     "properties": {"file": {"type": "string", "format": "binary"}},
                                     "required": ["file"],
+                                    "additionalProperties": False,
                                 }
                             }
                         },
@@ -633,6 +634,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
                                         "files": {"type": "array", "items": {"type": "string", "format": "binary"}}
                                     },
                                     "required": ["files"],
+                                    "additionalProperties": False,
                                 }
                             }
                         },
@@ -669,6 +671,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
         assert b'Content-Disposition: form-data; name="file"; filename="file"\r\n' in first_decoded
     last_decoded = decode(-1)
     if last_decoded:
+        print(last_decoded)
         assert b'Content-Disposition: form-data; name="files"; filename="files"\r\n' in last_decoded
     # NOTE, that the actual API operation is not checked in this test
 
