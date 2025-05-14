@@ -1,1 +1,1 @@
-SchemathesisConfig(reports=ReportsConfig(directory=PosixPath('test-results')))
+SchemathesisConfig(reports=ReportsConfig(directory=Path('test-results')))

@@ -8,7 +8,7 @@ class ConfigSnapshotExtension(SingleFileSnapshotExtension):
     def serialize(self, data, **kwargs) -> str:
         if isinstance(data, str):
             return data
-        return repr(data)
+        return repr(data).replace("PosixPath", "Path").replace("WindowsPath", "Path")
 
 
 @pytest.fixture

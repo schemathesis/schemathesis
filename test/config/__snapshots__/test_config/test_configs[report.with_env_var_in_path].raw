@@ -1,1 +1,1 @@
-SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True, path=PosixPath('foo'))))
+SchemathesisConfig(reports=ReportsConfig(junit=ReportConfig(enabled=True, path=Path('foo'))))
