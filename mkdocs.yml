@@ -5,10 +5,10 @@ nav:
   - Introduction: index.md
   - Getting Started: getting-started.md
   - Core Concepts: core-concepts.md
-  - Using Schemathesis:
+  - Tutorials:
       - Command-Line Interface: using/cli.md
-      - Python Integration: using/python-integration.md
-      - Configuration: using/configuration.md
+      - Pytest: using/pytest.md
+  - Configuration: using/configuration.md
   - Continuous Integration:
       - Overview: ci/overview.md
       - GitHub Actions: ci/github-actions.md
