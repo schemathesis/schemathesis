@@ -302,7 +302,7 @@ Schemathesis automatically encodes credentials in the `Authorization` header.
 
 ### Using Configuration Files
 
-Configuration files allow you to set default authentication or override it for specific API operations. This flexible approach supports all authentication types, including OpenAPI security schemes, which are automatically applied when required by the API.
+Configuration files allow you to set default authentication or override it for specific API operations.
 
 By default, Schemathesis automatically loads a `schemathesis.toml` file from the current directory or project root. To use a custom configuration file, specify its path with the `--config-file` option:
 
@@ -314,10 +314,7 @@ For more details, see the [Authentication Configuration Reference](../reference/
 
 ```toml
 [auth]
-bearer = "${TOKEN}"
-
-[auth.openapi]
-ApiKeyAuth = { value = "${API_KEY}" }
+basic = { username = "${USERNAME}", password = "${PASSWORD}" }
 ```
 
 ### Advanced Authentication

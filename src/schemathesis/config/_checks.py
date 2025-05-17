@@ -80,10 +80,6 @@ class MaxResponseTimeConfig(DiffBase):
         self.enabled = enabled
         self.limit = limit
 
-    @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> MaxResponseTimeConfig:
-        return cls(enabled=data.get("enabled", True), limit=data.get("limit"))
-
 
 @dataclass(repr=False)
 class CheckConfig(DiffBase):

@@ -65,7 +65,9 @@ class CoveragePhaseConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
-            unexpected_methods={method.lower() for method in data.get("unexpected-methods", [])},
+            unexpected_methods={method.lower() for method in data.get("unexpected-methods", [])}
+            if "unexpected-methods" in data
+            else None,
             generation=GenerationConfig.from_dict(data.get("generation", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
         )

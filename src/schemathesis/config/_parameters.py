@@ -31,5 +31,5 @@ class ParameterOverride:
     @classmethod
     def from_value(cls, value: Any) -> ParameterOverride:
         if isinstance(value, str):
-            value = resolve(value, None)
+            value = resolve(value)
         return cls(value=value)

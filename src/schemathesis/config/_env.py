@@ -7,10 +7,10 @@ from typing import Any
 from schemathesis.config._error import ConfigError
 
 
-def resolve(value: Any, default: Any) -> Any:
+def resolve(value: Any) -> Any:
     """Resolve environment variables using string templates."""
     if value is None:
-        return default
+        return None
     if not isinstance(value, str):
         return value
     try:
@@ -18,4 +18,4 @@ def resolve(value: Any, default: Any) -> Any:
     except ValueError:
         raise ConfigError(f"Invalid placeholder in string: `{value}`") from None
     except KeyError:
-        return default
+        raise ConfigError(f"Missing environment variable: `{value}`") from None

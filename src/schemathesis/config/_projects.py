@@ -150,21 +150,21 @@ class ProjectConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ProjectConfig:
         return cls(
-            base_url=resolve(data.get("base-url"), None),
-            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()}
+            base_url=resolve(data.get("base-url")),
+            headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
             if "headers" in data
             else None,
-            hooks_=resolve(data.get("hooks"), None),
+            hooks_=resolve(data.get("hooks")),
             workers=data.get("workers", 1),
-            proxy=resolve(data.get("proxy"), None),
+            proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
             exclude_deprecated=data.get("exclude-deprecated"),
             continue_on_failure=data.get("continue-on-failure"),
-            tls_verify=resolve(data.get("tls-verify"), None),
-            rate_limit=resolve(data.get("rate-limit"), None),
+            tls_verify=resolve(data.get("tls-verify")),
+            rate_limit=resolve(data.get("rate-limit")),
             request_timeout=data.get("request-timeout"),
-            request_cert=resolve(data.get("request-cert"), None),
-            request_cert_key=resolve(data.get("request-cert-key"), None),
+            request_cert=resolve(data.get("request-cert")),
+            request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),
             auth=AuthConfig.from_dict(data.get("auth", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),
@@ -299,29 +299,6 @@ class ProjectConfig(DiffBase):
             configs.append(phase_config.checks)
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
-
-    # def get_hypothesis_settings(self) -> hypothesis.settings:
-    #     # TODO: rework so it accepts optional operation / phase too
-    #     import hypothesis
-    #
-    #     # "database",
-    #     # "phases",
-    #     # "stateful_step_count",
-    #     # "suppress_health_check",
-    #     # "deadline",
-    #     kwargs: dict[str, Any] = {
-    #         "derandomize": self.generation.deterministic,
-    #         "deadline": None,
-    #     }
-    #     if self.generation.max_examples is not None:
-    #         kwargs["max_examples"] = self.generation.max_examples
-    #     # TODO: prepare
-    #     # suppress_health_check = self.run.suppress_health_check
-    #     # TODO: Prepare DB settings
-    #     # database = self.project.generation.database
-    #     # Prepare phases
-    #
-    #     return hypothesis.settings(**kwargs)
 
     def get_hypothesis_settings(self) -> hypothesis.settings:
         import hypothesis

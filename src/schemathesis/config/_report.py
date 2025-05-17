@@ -41,7 +41,7 @@ class ReportConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ReportConfig:
-        path = resolve(data.get("path"), None)
+        path = resolve(data.get("path"))
         if path is not None:
             return cls(enabled=True, path=Path(path))
         enabled = data.get("enabled", False)
@@ -67,7 +67,7 @@ class ReportsConfig(DiffBase):
         vcr: ReportConfig | None = None,
         har: ReportConfig | None = None,
     ) -> None:
-        self.directory = Path(resolve(directory, DEFAULT_REPORT_DIRECTORY))
+        self.directory = Path(resolve(directory) or DEFAULT_REPORT_DIRECTORY)
         self.preserve_bytes = preserve_bytes
         self.junit = junit or ReportConfig()
         self.vcr = vcr or ReportConfig()

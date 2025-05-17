@@ -66,45 +66,20 @@ Most users won't need a configuration file at all. Configuration becomes valuabl
 
 ## Authentication
 
-Schemathesis supports multiple authentication methods for API testing.
-
 For simple authentication, use the global `[auth]` section:
 
 ```toml
 [auth]
 # Basic authentication
 basic = { username = "${USERNAME}", password = "${PASSWORD}" }
-
-# Bearer token authentication
-bearer = "${TOKEN}"
 ```
 
-The basic setting corresponds to the `--auth` CLI option, while bearer tokens can also be specified via CLI headers.
+The `basic` setting corresponds to the `--auth` CLI option.
 
 !!! tip "Operation-specific Authentication"
 
     You can also override auth on the [per-operation basis](#operation-specific-authentication).
 
-### OpenAPI Security Schemes
-
-For OpenAPI specifications with defined security schemes, configure them by name:
-
-```toml
-[auth.openapi]
-# Basic HTTP authentication
-BasicAuth = { username = "${USERNAME}", password = "${PASSWORD}" }
-
-# Bearer token authentication
-BearerAuth = { token = "${TOKEN}" }
-
-# API Key authentication
-ApiKeyAuth = { value = "${API_KEY}" }
-
-# OAuth2 authentication
-OAuth2 = { client_id = "${CLIENT_ID}", client_secret = "${CLIENT_SECRET}" }
-```
-
-These settings map directly to the `securitySchemes` in your OpenAPI specification and will be automatically used for API operations with corresponding security schemes.
 
 ### Authentication Resolution
 
@@ -112,7 +87,6 @@ When multiple methods are specified, Schemathesis resolves authentication in the
 
 - CLI options (`--auth` or `--header`)
 - Operation-specific headers
-- Specification-specific authentication (`[auth.openapi]`)
 - Generic authentication (global `[auth]`)
 
 This flexible resolution lets you override settings at different levels while keeping sensitive data in environment variables.
@@ -328,7 +302,7 @@ rate-limit = "20/s"
 
 #### Operation ID
 
-Matches the operationId field in OpenAPI specifications:
+Matches the `operationId` field in OpenAPI specifications:
 
 ```toml
 [[operations]]
@@ -424,7 +398,7 @@ If you'd like to override auth for some API operations you can specify the `auth
 ```toml
 [[operations]]
 include-name = "POST /orders"
-auth = { bearer = "${TOKEN}" }
+auth = { basic = { username = "${USERNAME}", password = "${PASSWORD}" } }
 ```
 
 ## Phase-Specific Settings for Operations

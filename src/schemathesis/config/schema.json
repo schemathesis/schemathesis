@@ -162,60 +162,6 @@
             "password"
           ],
           "additionalProperties": false
-        },
-        "bearer": {
-          "type": "string"
-        },
-        "openapi": {
-          "type": "object",
-          "additionalProperties": {
-            "type": "object",
-            "properties": {
-              "username": {
-                "type": "string"
-              },
-              "password": {
-                "type": "string"
-              },
-              "token": {
-                "type": "string"
-              },
-              "value": {
-                "type": "string"
-              },
-              "client_id": {
-                "type": "string"
-              },
-              "client_secret": {
-                "type": "string"
-              }
-            },
-            "oneOf": [
-              {
-                "required": [
-                  "username",
-                  "password"
-                ]
-              },
-              {
-                "required": [
-                  "token"
-                ]
-              },
-              {
-                "required": [
-                  "value"
-                ]
-              },
-              {
-                "required": [
-                  "client_id",
-                  "client_secret"
-                ]
-              }
-            ],
-            "additionalProperties": false
-          }
         }
       }
     },

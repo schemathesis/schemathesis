@@ -307,20 +307,20 @@ class OperationConfig(DiffBase):
         return cls(
             filter_set=filter_set,
             enabled=data.get("enabled", True),
-            base_url=resolve(data.get("base-url"), None),
-            headers={resolve(key, key): resolve(value, value) for key, value in data.get("headers", {}).items()}
+            base_url=resolve(data.get("base-url")),
+            headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
             if "headers" in data
             else None,
-            proxy=resolve(data.get("proxy"), None),
+            proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
             wait_for_schema=data.get("wait-for-schema"),
             exclude_deprecated=data.get("exclude-deprecated"),
             continue_on_failure=data.get("continue-on-failure"),
-            tls_verify=resolve(data.get("tls-verify"), None),
-            rate_limit=resolve(data.get("rate-limit"), None),
+            tls_verify=resolve(data.get("tls-verify")),
+            rate_limit=resolve(data.get("rate-limit")),
             request_timeout=data.get("request-timeout"),
-            request_cert=resolve(data.get("request-cert"), None),
-            request_cert_key=resolve(data.get("request-cert-key"), None),
+            request_cert=resolve(data.get("request-cert")),
+            request_cert_key=resolve(data.get("request-cert-key")),
             parameters=load_parameters(data),
             auth=AuthConfig.from_dict(data.get("auth", {})),
             checks=ChecksConfig.from_dict(data.get("checks", {})),

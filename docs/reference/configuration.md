@@ -470,50 +470,6 @@ These settings can only be applied at the project level.
     basic = { username = "${USERNAME}", password = "${PASSWORD}" }
     ```
 
-#### `auth.bearer`
-
-!!! note ""
-
-    **Type:** `String`  
-    **Default:** `null`  
-
-    Specifies a bearer token for authentication.
-
-    ```toml
-    [auth]
-    bearer = "${API_TOKEN}"
-    ```
-
-#### `auth.openapi`
-
-!!! note ""
-
-    **Type:** `Object`  
-    **Default:** `null`  
-
-    Defines authentication settings for OpenAPI security schemes. Each key in this object should match a security scheme defined in your OpenAPI specification. 
-
-    Schemathesis resolves authentication in order: 
-
-      - CLI options
-      - Operation-specific auth
-      - Global
-
-    ```toml
-    [auth.openapi]
-    # Basic HTTP authentication
-    BasicAuth = { username = "${USERNAME}", password = "${PASSWORD}" }
-
-    # Bearer token authentication
-    BearerAuth = { token = "${API_TOKEN}" }
-
-    # API Key authentication
-    ApiKeyAuth = { value = "${API_KEY}" }
-
-    # OAuth2 authentication
-    OAuth2 = { client_id = "${CLIENT_ID}", client_secret = "${CLIENT_SECRET}" }
-    ```
-
 ### Checks
 
 #### `checks.<check>.enabled`
