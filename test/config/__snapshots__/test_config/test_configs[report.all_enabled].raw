@@ -1,0 +1,1 @@
+SchemathesisConfig(reports=ReportsConfig(directory=Path('reports'), preserve_bytes=True, junit=ReportConfig(enabled=True, path=Path('test-reports/schemathesis-results.xml')), vcr=ReportConfig(enabled=True, path=Path('cassettes/api')), har=ReportConfig(enabled=True)))

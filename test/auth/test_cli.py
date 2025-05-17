@@ -57,7 +57,7 @@ def after_call(context, case, response):
     )
     # Then it overrides the one from the auth provider
     # And the auth should be used
-    assert cli.main("run", schema_url, *args, hooks=module) == snapshot_cli
+    assert cli.main("run", schema_url, "--checks=not_a_server_error", *args, hooks=module) == snapshot_cli
 
 
 def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, openapi3_base_url):
@@ -90,7 +90,16 @@ def test_multiple_auth_mechanisms_with_explicit_auth(ctx, cli, snapshot_cli, ope
         security=[{"bearerAuth": []}, {"basicAuth": []}],
     )
     # Then it should be able to generate requests
-    assert cli.run(str(schema_path), "-H", "Authorization: Bearer foo", f"--url={openapi3_base_url}") == snapshot_cli
+    assert (
+        cli.run(
+            str(schema_path),
+            "-H",
+            "Authorization: Bearer foo",
+            f"--url={openapi3_base_url}",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")
@@ -130,6 +139,7 @@ def test_multiple_threads(ctx, cli, schema_url, snapshot_cli):
             "--workers",
             "2",
             "--max-examples=1",
+            "--checks=not_a_server_error",
             hooks=module,
         )
         == snapshot_cli
@@ -158,7 +168,7 @@ def after_call(context, case, response):
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, hooks=module) == snapshot_cli
+    assert cli.main("run", schema_url, "--checks=not_a_server_error", hooks=module) == snapshot_cli
 
 
 @pytest.fixture

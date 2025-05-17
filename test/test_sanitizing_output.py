@@ -1,12 +1,10 @@
-from dataclasses import replace
 from urllib.parse import urlencode
 
 import pytest
 
+from schemathesis.config._output import DEFAULT_KEYS_TO_SANITIZE, DEFAULT_REPLACEMENT
 from schemathesis.core import NOT_SET
 from schemathesis.core.output.sanitization import (
-    DEFAULT_KEYS_TO_SANITIZE,
-    DEFAULT_REPLACEMENT,
     SanitizationConfig,
     sanitize_url,
     sanitize_value,
@@ -132,74 +130,4 @@ URLENCODED_REPLACEMENT = urlencode({"": DEFAULT_REPLACEMENT})[1:]  # skip the `=
     ],
 )
 def test_sanitize_url(input_url, expected_url):
-    assert sanitize_url(input_url) == expected_url
-
-
-@pytest.mark.parametrize(
-    "kwargs, expected_changes",
-    [
-        (
-            {"replacement": "[HIDDEN]"},
-            {"replacement": "[HIDDEN]"},
-        ),
-        (
-            {"keys_to_sanitize": ["New-Key"]},
-            {"keys_to_sanitize": frozenset(["new-key"])},
-        ),
-        (
-            {"sensitive_markers": ["New-Marker"]},
-            {"sensitive_markers": frozenset(["new-marker"])},
-        ),
-        (
-            {
-                "replacement": "[SECRET]",
-                "keys_to_sanitize": ["Key1"],
-                "sensitive_markers": ["Marker1"],
-            },
-            {
-                "replacement": "[SECRET]",
-                "keys_to_sanitize": frozenset(["key1"]),
-                "sensitive_markers": frozenset(["marker1"]),
-            },
-        ),
-    ],
-)
-def test_from_config(kwargs, expected_changes):
-    config = SanitizationConfig()
-    assert SanitizationConfig.from_config(config, **kwargs) == replace(config, **expected_changes)
-
-
-@pytest.mark.parametrize(
-    "base_values, extend_values, expected",
-    [
-        (
-            {"keys_to_sanitize": frozenset(["existing-key"])},
-            {"keys_to_sanitize": ["new-key"]},
-            {"keys_to_sanitize": frozenset(["existing-key", "new-key"])},
-        ),
-        (
-            {"sensitive_markers": frozenset(["existing-marker"])},
-            {"sensitive_markers": ["new-marker"]},
-            {"sensitive_markers": frozenset(["existing-marker", "new-marker"])},
-        ),
-        (
-            {
-                "keys_to_sanitize": frozenset(["existing-key"]),
-                "sensitive_markers": frozenset(["existing-marker"]),
-            },
-            {
-                "keys_to_sanitize": ["NEW-KEY"],
-                "sensitive_markers": ["NEW-MARKER"],
-            },
-            {
-                "keys_to_sanitize": frozenset(["existing-key", "new-key"]),
-                "sensitive_markers": frozenset(["existing-marker", "new-marker"]),
-            },
-        ),
-    ],
-)
-def test_extend(base_values, extend_values, expected):
-    base = SanitizationConfig(**base_values)
-    new = base.extend(**extend_values)
-    expected = replace(base, **expected)
-    assert new == expected
+    assert sanitize_url(input_url, config=SanitizationConfig()) == expected_url

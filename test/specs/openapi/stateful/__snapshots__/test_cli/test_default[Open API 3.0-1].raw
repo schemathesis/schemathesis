@@ -80,7 +80,7 @@ Warnings:
   ⚠️ Schemathesis configuration: 2 operations returned only 4xx responses during unit tests
 
 Test cases:
-  N generated, N found N unique failures
+  N generated, N found N unique failures, N skipped
 
 Seed: 42
 

@@ -18,6 +18,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
         cli.run(
             schema_url,
             "--max-examples=80",
+            "-c not_a_server_error",
             f"--workers={workers}",
         )
         == snapshot_cli
@@ -34,6 +35,7 @@ def test_sanitization(cli, schema_url, tmp_path):
         schema_url,
         "--phases=stateful",
         "--max-examples=80",
+        "-c not_a_server_error",
         f"--header=Authorization: Bearer {token}",
         f"--report-vcr-path={cassette_path}",
         "--max-failures=1",
@@ -53,6 +55,7 @@ def test_max_failures(cli, schema_url, snapshot_cli):
             "--max-examples=80",
             "--max-failures=2",
             "--generation-database=none",
+            "-c not_a_server_error",
             "--phases=fuzzing,stateful",
         )
         == snapshot_cli
@@ -67,6 +70,7 @@ def test_with_cassette(tmp_path, cli, schema_url):
         schema_url,
         "--max-examples=40",
         "--max-failures=1",
+        "-c not_a_server_error",
         f"--report-vcr-path={cassette_path}",
     )
     assert cassette_path.exists()
@@ -85,6 +89,7 @@ def test_junit(tmp_path, cli, schema_url):
         "--phases=stateful",
         "--max-examples=80",
         "--max-failures=1",
+        "-c not_a_server_error",
         f"--report-junit-path={junit_path}",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
@@ -103,7 +108,15 @@ def test_junit(tmp_path, cli, schema_url):
 @pytest.mark.operations("create_user", "get_user", "update_user")
 @pytest.mark.snapshot(replace_reproduce_with=True)
 def test_stateful_only(cli, schema_url, snapshot_cli):
-    assert cli.run(schema_url, "--phases=stateful", "-n 80") == snapshot_cli
+    assert (
+        cli.run(
+            schema_url,
+            "--phases=stateful",
+            "-n 80",
+            "-c not_a_server_error",
+        )
+        == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")
@@ -165,6 +178,7 @@ def test_generation_config(cli, mocker, schema_url, snapshot_cli):
             "--generation-allow-x00=false",
             "--generation-codec=ascii",
             "--generation-with-security-parameters=false",
+            "-c not_a_server_error",
         )
         == snapshot_cli
     )
@@ -208,7 +222,15 @@ def test_invalid_parameter_reference(app_factory, app_runner, cli, snapshot_cli)
 def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
     app = app_factory(omit_required_field=True)
     port = app_runner.run_flask_app(app)
-    assert cli.run(f"http://127.0.0.1:{port}/openapi.json", "--phases=stateful", "-n 30") == snapshot_cli
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "-n 30",
+            "-c not_a_server_error",
+        )
+        == snapshot_cli
+    )
 
 
 @flaky(max_runs=3, min_passes=1)
@@ -222,6 +244,7 @@ def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
             "--phases=stateful",
             "-n 80",
             "--generation-database=none",
+            "-c not_a_server_error",
         )
         == snapshot_cli
     )

@@ -6,18 +6,11 @@ from hypothesis import strategies as st
 from schemathesis.cli.commands.run import validation
 from schemathesis.core.validation import is_latin_1_encodable
 
-from ..utils import SIMPLE_PATH
-
 
 @pytest.mark.parametrize("value", ["//test", "//ÿ["])
 def test_parse_schema_kind(value):
     with pytest.raises(click.UsageError):
-        validation.validate_schema(value, None)
-
-
-def test_validate_schema_path_without_base_url():
-    with pytest.raises(click.UsageError):
-        validation.validate_schema(SIMPLE_PATH, None)
+        validation.validate_schema_location(None, None, value)
 
 
 @given(value=st.text().filter(lambda x: x.count(":") != 1))
@@ -57,15 +50,6 @@ def test_reraise_format_error():
 
 
 @pytest.mark.parametrize(
-    "value",
-    ["+", "\\", "[", r"0EEE|[>:>\UEEEEEEEEEEEEEEEEEEEEEEEE>", "(?(8))"],
-)
-def test_validate_regex(value):
-    with pytest.raises(click.BadParameter, match="Invalid regex: "):
-        validation.validate_regex(None, None, (value,))
-
-
-@pytest.mark.parametrize(
     ("value", "expected"),
     [
         ("On", True),
@@ -94,35 +78,3 @@ def test_validate_rate_limit_invalid(value):
 
 def test_validate_rate_limit_valid():
     assert validation.validate_rate_limit(None, None, "10/m") == "10/m"
-
-
-@pytest.mark.parametrize(
-    ("input_codes", "output", "error"),
-    [
-        (["200", "404"], ["200", "404"], None),
-        (["2xx", "4xx"], ["2xx", "4xx"], None),
-        (["200", "2xx", "404", "4xx"], ["200", "2xx", "404", "4xx"], None),
-        ([], [], None),
-        (["200", "600"], None, "Invalid status code(s): 600"),
-        (["2xx", "6xx"], None, "Invalid status code(s): 6xx"),
-        (["2xx", "xxx"], None, "Invalid status code(s): xxx"),
-        (["2xx", "999"], None, "Invalid status code(s): 999"),
-        (["200", "abc"], None, "Invalid status code(s): abc"),
-        (["200", "2bc"], None, "Invalid status code(s): 2bc"),
-        (["200", "2Xc"], None, "Invalid status code(s): 2Xc"),
-        (["200", "20"], None, "Invalid status code(s): 20"),
-        (["200", "2xxx"], None, "Invalid status code(s): 2xxx"),
-        (["200", "xx"], None, "Invalid status code(s): xx"),
-    ],
-)
-def test_convert_status_codes(input_codes, output, error):
-    if error:
-        with pytest.raises(click.UsageError) as excinfo:
-            validation.convert_status_codes(None, None, input_codes)
-        assert error in str(excinfo.value)
-    else:
-        assert validation.convert_status_codes(None, None, input_codes) == output
-
-
-def test_convert_status_codes_empty_input():
-    assert validation.convert_status_codes(None, None, None) is None

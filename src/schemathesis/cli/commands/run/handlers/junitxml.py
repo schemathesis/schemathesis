@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import platform
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Iterable
 
-from click.utils import LazyFile
 from junit_xml import TestCase, TestSuite, to_xml_report_file
 
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
@@ -15,7 +15,7 @@ from schemathesis.engine import Status, events
 
 @dataclass
 class JunitXMLHandler(EventHandler):
-    file_handle: LazyFile
+    path: Path
     test_cases: dict = field(default_factory=dict)
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
@@ -34,7 +34,8 @@ class JunitXMLHandler(EventHandler):
             test_suites = [
                 TestSuite("schemathesis", test_cases=list(self.test_cases.values()), hostname=platform.node())
             ]
-            to_xml_report_file(file_descriptor=self.file_handle, test_suites=test_suites, prettyprint=True)
+            with open(self.path, "w") as fd:
+                to_xml_report_file(file_descriptor=fd, test_suites=test_suites, prettyprint=True)
 
     def get_or_create_test_case(self, label: str) -> TestCase:
         return self.test_cases.setdefault(label, TestCase(label, elapsed_sec=0.0, allow_multiple_subelements=True))
@@ -47,7 +48,7 @@ def add_failure(test_case: TestCase, checks: Iterable[GroupedFailures], context:
             response=group.response,
             failures=group.failures,
             curl=group.code_sample,
-            config=context.output_config,
+            config=context.config.output,
         )
         for idx, group in enumerate(checks, 1)
     ]

@@ -18,7 +18,7 @@ class TaskProducer:
     """Produces test tasks for workers to execute."""
 
     def __init__(self, ctx: EngineContext) -> None:
-        self.operations = ctx.schema.get_all_operations(generation_config=ctx.config.execution.generation)
+        self.operations = ctx.schema.get_all_operations()
         self.lock = threading.Lock()
 
     def next_operation(self) -> Result | None:

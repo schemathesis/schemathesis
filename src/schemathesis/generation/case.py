@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Mapping
 
 from schemathesis.checks import CHECKS, CheckContext, CheckFunction, run_checks
+from schemathesis.config import ChecksConfig
 from schemathesis.core import NOT_SET, SCHEMATHESIS_TEST_CASE_HEADER, NotSet, curl
 from schemathesis.core.failures import FailureGroup, failure_report_title, format_failures
 from schemathesis.core.transport import Response
@@ -71,7 +72,7 @@ class Case:
 
     def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
-        request_data = prepare_request(self, headers, self.operation.schema.output_config.sanitize)
+        request_data = prepare_request(self, headers, config=self.operation.schema.config.output.sanitization)
         return curl.generate(
             method=str(request_data.method),
             url=str(request_data.url),
@@ -142,7 +143,7 @@ class Case:
             override=self._override,
             auth=None,
             headers=CaseInsensitiveDict(headers) if headers else None,
-            config={},
+            config=ChecksConfig.from_dict({}),
             transport_kwargs=transport_kwargs,
             recorder=None,
         )
@@ -163,7 +164,7 @@ class Case:
                 response=response,
                 failures=_failures,
                 curl=curl,
-                config=self.operation.schema.output_config,
+                config=self.operation.schema.config.output,
             )
             raise FailureGroup(_failures, message) from None
 

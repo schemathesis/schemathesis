@@ -9,12 +9,12 @@ import jsonschema
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
+from schemathesis.config import GenerationConfig
+
 from ..constants import ALL_KEYWORDS
 from .mutations import MutationContext
 
 if TYPE_CHECKING:
-    from schemathesis.generation import GenerationConfig
-
     from .types import Draw, Schema
 
 

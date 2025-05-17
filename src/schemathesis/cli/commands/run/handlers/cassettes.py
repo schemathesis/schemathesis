@@ -6,16 +6,16 @@ import sys
 import threading
 from dataclasses import dataclass, field
 from http.cookies import SimpleCookie
+from pathlib import Path
 from queue import Queue
 from typing import IO, Callable, Iterator
 from urllib.parse import parse_qsl, urlparse
 
 import harfile
-from click.utils import LazyFile
 
 from schemathesis.cli.commands.run.context import ExecutionContext
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.reports import ReportFormat
+from schemathesis.config import ProjectConfig, ReportFormat, SchemathesisConfig
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import Response
@@ -33,17 +33,15 @@ class CassetteWriter(EventHandler):
     """Write network interactions to a cassette."""
 
     format: ReportFormat
-    path: LazyFile
-    sanitize_output: bool = True
-    preserve_bytes: bool = False
+    path: Path
+    config: ProjectConfig
     queue: Queue = field(default_factory=Queue)
     worker: threading.Thread = field(init=False)
 
     def __post_init__(self) -> None:
         kwargs = {
             "path": self.path,
-            "sanitize_output": self.sanitize_output,
-            "preserve_bytes": self.preserve_bytes,
+            "config": self.config,
             "queue": self.queue,
         }
         writer: Callable
@@ -55,7 +53,7 @@ class CassetteWriter(EventHandler):
         self.worker.start()
 
     def start(self, ctx: ExecutionContext) -> None:
-        self.queue.put(Initialize(seed=ctx.seed))
+        self.queue.put(Initialize(seed=ctx.config.seed))
 
     def handle_event(self, ctx: ExecutionContext, event: events.EngineEvent) -> None:
         if isinstance(event, events.ScenarioFinished):
@@ -103,7 +101,7 @@ def get_command_representation() -> str:
     return f"st {args}"
 
 
-def vcr_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
+def vcr_writer(path: Path, config: ProjectConfig, queue: Queue) -> None:
     """Write YAML to a file in an incremental manner.
 
     This implementation doesn't use `pyyaml` package and composes YAML manually as string due to the following reasons:
@@ -114,16 +112,15 @@ def vcr_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
         providing tags, anchors to have incremental writing, with primitive types it is much simpler.
     """
     current_id = 1
-    stream = path.open()
 
     def format_header_values(values: list[str]) -> str:
         return "\n".join(f"      - {json.dumps(v)}" for v in values)
 
-    if sanitize_output:
+    if config.output.sanitization.enabled:
 
         def format_headers(headers: dict[str, list[str]]) -> str:
             headers = deepclone(headers)
-            sanitize_value(headers)
+            sanitize_value(headers, config=config.output.sanitization)
             return "\n".join(f'      "{name}":\n{format_header_values(values)}' for name, values in headers.items())
 
     else:
@@ -145,7 +142,7 @@ def vcr_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
   checks:
 {items}"""
 
-    if preserve_bytes:
+    if config.reports.preserve_bytes:
 
         def format_request_body(output: IO, request: Request) -> None:
             if request.encoded_body is not None:
@@ -188,102 +185,105 @@ def vcr_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
                 )
                 write_double_quoted(output, string)
 
-    while True:
-        item = queue.get()
-        if isinstance(item, Initialize):
-            stream.write(
-                f"""command: '{get_command_representation()}'
+    with open(path, "w", encoding="utf-8") as stream:
+        while True:
+            item = queue.get()
+            if isinstance(item, Initialize):
+                stream.write(
+                    f"""command: '{get_command_representation()}'
 recorded_with: 'Schemathesis {SCHEMATHESIS_VERSION}'
 seed: {item.seed}
 http_interactions:"""
-            )
-        elif isinstance(item, Process):
-            for case_id, interaction in item.recorder.interactions.items():
-                case = item.recorder.cases[case_id]
-                if interaction.response is not None:
-                    if case_id in item.recorder.checks:
-                        checks = item.recorder.checks[case_id]
-                        status = Status.SUCCESS
-                        for check in checks:
-                            if check.status == Status.FAILURE:
-                                status = check.status
-                                break
-                    else:
-                        # NOTE: Checks recording could be skipped if Schemathesis start skipping just
-                        # discovered failures in order to get past them and potentially discover more failures
-                        checks = []
-                        status = Status.SKIP
-                else:
-                    checks = []
-                    status = Status.ERROR
-                # Body payloads are handled via separate `stream.write` calls to avoid some allocations
-                stream.write(
-                    f"""\n- id: '{case_id}'
-  status: '{status.name}'"""
                 )
-                meta = case.value.meta
-                if meta is not None:
-                    # Start metadata block
-                    stream.write(f"""
+            elif isinstance(item, Process):
+                for case_id, interaction in item.recorder.interactions.items():
+                    case = item.recorder.cases[case_id]
+                    if interaction.response is not None:
+                        if case_id in item.recorder.checks:
+                            checks = item.recorder.checks[case_id]
+                            status = Status.SUCCESS
+                            for check in checks:
+                                if check.status == Status.FAILURE:
+                                    status = check.status
+                                    break
+                        else:
+                            # NOTE: Checks recording could be skipped if Schemathesis start skipping just
+                            # discovered failures in order to get past them and potentially discover more failures
+                            checks = []
+                            status = Status.SKIP
+                    else:
+                        checks = []
+                        status = Status.ERROR
+                    # Body payloads are handled via separate `stream.write` calls to avoid some allocations
+                    stream.write(
+                        f"""\n- id: '{case_id}'
+  status: '{status.name}'"""
+                    )
+                    meta = case.value.meta
+                    if meta is not None:
+                        # Start metadata block
+                        stream.write(f"""
   generation:
     time: {meta.generation.time}
     mode: {meta.generation.mode.value}
   components:""")
 
-                    # Write components
-                    for kind, info in meta.components.items():
-                        stream.write(f"""
+                        # Write components
+                        for kind, info in meta.components.items():
+                            stream.write(f"""
     {kind.value}:
       mode: '{info.mode.value}'""")
-                    # Write phase info
-                    stream.write("\n  phase:")
-                    stream.write(f"\n    name: '{meta.phase.name.value}'")
-                    stream.write("\n    data: ")
+                        # Write phase info
+                        stream.write("\n  phase:")
+                        stream.write(f"\n    name: '{meta.phase.name.value}'")
+                        stream.write("\n    data: ")
 
-                    # Write phase-specific data
-                    if isinstance(meta.phase.data, CoveragePhaseData):
-                        stream.write("""
+                        # Write phase-specific data
+                        if isinstance(meta.phase.data, CoveragePhaseData):
+                            stream.write("""
       description: """)
-                        write_double_quoted(stream, meta.phase.data.description)
-                        stream.write("""
+                            write_double_quoted(stream, meta.phase.data.description)
+                            stream.write("""
       location: """)
-                        write_double_quoted(stream, meta.phase.data.location)
-                        stream.write("""
+                            write_double_quoted(stream, meta.phase.data.location)
+                            stream.write("""
       parameter: """)
-                        if meta.phase.data.parameter is not None:
-                            write_double_quoted(stream, meta.phase.data.parameter)
-                        else:
-                            stream.write("null")
-                        stream.write("""
+                            if meta.phase.data.parameter is not None:
+                                write_double_quoted(stream, meta.phase.data.parameter)
+                            else:
+                                stream.write("null")
+                            stream.write("""
       parameter_location: """)
-                        if meta.phase.data.parameter_location is not None:
-                            write_double_quoted(stream, meta.phase.data.parameter_location)
+                            if meta.phase.data.parameter_location is not None:
+                                write_double_quoted(stream, meta.phase.data.parameter_location)
+                            else:
+                                stream.write("null")
                         else:
-                            stream.write("null")
+                            # Empty objects for these phases
+                            stream.write("{}")
                     else:
-                        # Empty objects for these phases
-                        stream.write("{}")
-                else:
-                    stream.write("null")
+                        stream.write("null")
 
-                if sanitize_output:
-                    uri = sanitize_url(interaction.request.uri)
-                else:
-                    uri = interaction.request.uri
-                recorded_at = datetime.datetime.fromtimestamp(interaction.timestamp, datetime.timezone.utc).isoformat()
-                stream.write(
-                    f"""
+                    if config.output.sanitization.enabled:
+                        uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
+                    else:
+                        uri = interaction.request.uri
+                    recorded_at = datetime.datetime.fromtimestamp(
+                        interaction.timestamp, datetime.timezone.utc
+                    ).isoformat()
+                    stream.write(
+                        f"""
   recorded_at: '{recorded_at}'{format_checks(checks)}
   request:
     uri: '{uri}'
     method: '{interaction.request.method}'
     headers:
 {format_headers(interaction.request.headers)}"""
-                )
-                format_request_body(stream, interaction.request)
-                if interaction.response is not None:
-                    stream.write(
-                        f"""
+                    )
+                    format_request_body(stream, interaction.request)
+                    if interaction.response is not None:
+                        stream.write(
+                            f"""
   response:
     status:
       code: '{interaction.response.status_code}'
@@ -292,19 +292,18 @@ http_interactions:"""
     headers:
 {format_headers(interaction.response.headers)}
 """
-                    )
-                    format_response_body(stream, interaction.response)
-                    stream.write(
-                        f"""
+                        )
+                        format_response_body(stream, interaction.response)
+                        stream.write(
+                            f"""
     http_version: '{interaction.response.http_version}'"""
-                    )
-                else:
-                    stream.write("""
+                        )
+                    else:
+                        stream.write("""
   response: null""")
-                current_id += 1
-        else:
-            break
-    path.close()
+                    current_id += 1
+            else:
+                break
 
 
 def write_double_quoted(stream: IO, text: str | None) -> None:
@@ -350,14 +349,14 @@ def write_double_quoted(stream: IO, text: str | None) -> None:
     stream.write('"')
 
 
-def har_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queue: Queue) -> None:
+def har_writer(path: Path, config: SchemathesisConfig, queue: Queue) -> None:
     with harfile.open(path) as har:
         while True:
             item = queue.get()
             if isinstance(item, Process):
                 for interaction in item.recorder.interactions.values():
-                    if sanitize_output:
-                        uri = sanitize_url(interaction.request.uri)
+                    if config.output.sanitization.enabled:
+                        uri = sanitize_url(interaction.request.uri, config=config.output.sanitization)
                     else:
                         uri = interaction.request.uri
                     query_params = urlparse(uri).query
@@ -365,7 +364,7 @@ def har_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
                         post_data = harfile.PostData(
                             mimeType=interaction.request.headers.get("Content-Type", [""])[0],
                             text=interaction.request.encoded_body
-                            if preserve_bytes
+                            if config.reports.preserve_bytes
                             else interaction.request.body.decode("utf-8", "replace"),
                         )
                     else:
@@ -376,16 +375,18 @@ def har_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
                             size=interaction.response.body_size or 0,
                             mimeType=content_type,
                             text=interaction.response.encoded_body
-                            if preserve_bytes
+                            if config.reports.preserve_bytes
                             else interaction.response.content.decode("utf-8", "replace")
                             if interaction.response.content is not None
                             else None,
-                            encoding="base64" if interaction.response.content is not None and preserve_bytes else None,
+                            encoding="base64"
+                            if interaction.response.content is not None and config.reports.preserve_bytes
+                            else None,
                         )
                         http_version = f"HTTP/{interaction.response.http_version}"
-                        if sanitize_output:
+                        if config.output.sanitization.enabled:
                             headers = deepclone(interaction.response.headers)
-                            sanitize_value(headers)
+                            sanitize_value(headers, config=config.output.sanitization)
                         else:
                             headers = interaction.response.headers
                         response = harfile.Response(
@@ -405,9 +406,9 @@ def har_writer(path: LazyFile, sanitize_output: bool, preserve_bytes: bool, queu
                         time = 0
                         http_version = ""
 
-                    if sanitize_output:
+                    if config.output.sanitization.enabled:
                         headers = deepclone(interaction.request.headers)
-                        sanitize_value(headers)
+                        sanitize_value(headers, config=config.output.sanitization)
                     else:
                         headers = interaction.request.headers
                     started_datetime = datetime.datetime.fromtimestamp(

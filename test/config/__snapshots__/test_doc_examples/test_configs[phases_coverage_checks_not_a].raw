@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(coverage=CoveragePhaseConfig(checks=ChecksConfig(not_a_server_error=NotAServerErrorConfig(enabled=False)))))))

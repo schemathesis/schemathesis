@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from jsonschema import ValidationError
     from requests import RequestException
 
+    from schemathesis.config import OutputConfig
     from schemathesis.core.compat import RefResolutionError
 
 
@@ -44,7 +45,9 @@ class InvalidSchema(SchemathesisError):
         self.method = method
 
     @classmethod
-    def from_jsonschema_error(cls, error: ValidationError, path: str | None, method: str | None) -> InvalidSchema:
+    def from_jsonschema_error(
+        cls, error: ValidationError, path: str | None, method: str | None, config: OutputConfig
+    ) -> InvalidSchema:
         if error.absolute_path:
             part = error.absolute_path[-1]
             if isinstance(part, int) and len(error.absolute_path) > 1:
@@ -56,7 +59,7 @@ class InvalidSchema(SchemathesisError):
             message = "Invalid schema definition"
         error_path = " -> ".join(str(entry) for entry in error.path) or "[root]"
         message += f"\n\nLocation:\n    {error_path}"
-        instance = truncate_json(error.instance)
+        instance = truncate_json(error.instance, config=config)
         message += f"\n\nProblematic definition:\n{instance}"
         message += "\n\nError details:\n    "
         # This default message contains the instance which we already printed
@@ -92,6 +95,20 @@ class InvalidSchema(SchemathesisError):
             raise self
 
         return actual_test
+
+
+class HookError(SchemathesisError):
+    """Happens during hooks loading."""
+
+    module_path: str
+
+    __slots__ = ("module_path",)
+
+    def __init__(self, module_path: str) -> None:
+        self.module_path = module_path
+
+    def __str__(self) -> str:
+        return f"Failed to load Schemathesis extensions from `{self.module_path}`"
 
 
 class InvalidRegexType(InvalidSchema):

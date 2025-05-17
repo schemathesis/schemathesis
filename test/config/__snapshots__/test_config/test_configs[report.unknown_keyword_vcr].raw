@@ -1,0 +1,6 @@
+Error in [reports.junit] section:
+  Unknown properties:
+
+  - 'foo'
+
+Valid properties for [reports.junit] are: 'enabled', 'path'.

@@ -3,7 +3,6 @@ from __future__ import annotations
 import queue
 import time
 import unittest
-from dataclasses import replace
 from typing import Any
 from warnings import catch_warnings
 
@@ -11,6 +10,7 @@ import hypothesis
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 from hypothesis.stateful import Rule
+from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
 from schemathesis.core.failures import Failure, FailureGroup
@@ -21,6 +21,7 @@ from schemathesis.engine.control import ExecutionControl
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
+from schemathesis.generation import overrides
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.reporting import ignore_hypothesis_output
 from schemathesis.generation.stateful.state_machine import (
@@ -54,19 +55,11 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    kwargs = _get_hypothesis_settings_kwargs_override(engine.config.execution.hypothesis_settings)
-    if kwargs:
-        config = replace(
-            engine.config,
-            execution=replace(
-                engine.config.execution,
-                hypothesis_settings=hypothesis.settings(engine.config.execution.hypothesis_settings, **kwargs),
-            ),
-        )
-    else:
-        config = engine.config
+    configures_hypothesis_settings = engine.config.get_hypothesis_settings()
+    kwargs = _get_hypothesis_settings_kwargs_override(configures_hypothesis_settings)
+    hypothesis_settings = hypothesis.settings(configures_hypothesis_settings, **kwargs)
 
-    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=config.execution.targets))
+    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.generation.maximize))
 
     transport_kwargs = engine.transport_kwargs
 
@@ -78,7 +71,6 @@ def execute_state_machine_loop(
             self._start_time = time.monotonic()
             self._scenario_id = scenario_started.id
             event_queue.put(scenario_started)
-            self._check_ctx = engine.get_check_context(self.recorder)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
             return transport_kwargs
@@ -86,15 +78,13 @@ def execute_state_machine_loop(
         def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
             return ""
 
-        if config.override is not None:
-
-            def before_call(self, case: Case) -> None:
-                for location, entry in config.override.for_operation(case.operation).items():  # type: ignore[union-attr]
-                    if entry:
-                        container = getattr(case, location) or {}
-                        container.update(entry)
-                        setattr(case, location, container)
-                return super().before_call(case)
+        def before_call(self, case: Case) -> None:
+            for location, entry in overrides.for_operation(engine.config, case.operation).items():
+                if entry:
+                    container = getattr(case, location) or {}
+                    container.update(entry)
+                    setattr(case, location, container)
+            return super().before_call(case)
 
         def step(self, input: StepInput) -> StepOutput | None:
             # Checking the stop event once inside `step` is sufficient as it is called frequently
@@ -102,7 +92,7 @@ def execute_state_machine_loop(
             if engine.has_to_stop:
                 raise KeyboardInterrupt
             try:
-                if config.execution.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     cached = ctx.get_step_outcome(input.case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -111,13 +101,13 @@ def execute_state_machine_loop(
                 result = super().step(input)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if config.execution.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if config.execution.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
@@ -125,11 +115,11 @@ def execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if config.execution.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 raise exc
             else:
-                if config.execution.unique_inputs:
+                if engine.config.generation.unique_inputs:
                     ctx.store_step_outcome(input.case, None)
             return result
 
@@ -139,12 +129,24 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
+            # TODO: convert overrides to Override class
+            override = engine.config.parameters_for(operation=case.operation)
+            auth = engine.config.auth_for(operation=case.operation)
+            headers = engine.config.headers_for(operation=case.operation)
+            check_ctx = CheckContext(
+                override=override,
+                auth=auth,
+                headers=CaseInsensitiveDict(headers) if headers else None,
+                config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
+                transport_kwargs=engine.transport_kwargs,
+                recorder=self.recorder,
+            )
             validate_response(
                 response=response,
                 case=case,
                 stateful_ctx=ctx,
-                check_ctx=self._check_ctx,
-                checks=config.execution.checks,
+                check_ctx=check_ctx,
+                checks=check_ctx.checks,
                 control=engine.control,
                 recorder=self.recorder,
                 additional_checks=additional_checks,
@@ -169,7 +171,7 @@ def execute_state_machine_loop(
             ctx.reset_scenario()
             super().teardown()
 
-    seed = config.execution.seed
+    seed = engine.config.seed
 
     while True:
         # This loop is running until no new failures are found in a single iteration
@@ -187,16 +189,13 @@ def execute_state_machine_loop(
             )
             break
         suite_status = Status.SUCCESS
-        if seed is not None:
-            InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
-            # Predictably change the seed to avoid re-running the same sequences if tests fail
-            # yet have reproducible results
-            seed += 1
-        else:
-            InstrumentedStateMachine = _InstrumentedStateMachine
+        InstrumentedStateMachine = hypothesis.seed(seed)(_InstrumentedStateMachine)
+        # Predictably change the seed to avoid re-running the same sequences if tests fail
+        # yet have reproducible results
+        seed += 1
         try:
             with catch_warnings(), ignore_hypothesis_output():  # type: ignore
-                InstrumentedStateMachine.run(settings=config.execution.hypothesis_settings)
+                InstrumentedStateMachine.run(settings=hypothesis_settings)
         except KeyboardInterrupt:
             # Raised in the state machine when the stop event is set or it is raised by the user's code
             # that is placed in the base class of the state machine.
@@ -230,7 +229,7 @@ def execute_state_machine_loop(
             if isinstance(exc, Unsatisfiable) and ctx.completed_scenarios > 0:
                 # Sometimes Hypothesis randomly gives up on generating some complex cases. However, if we know that
                 # values are possible to generate based on the previous observations, we retry the generation
-                if ctx.completed_scenarios >= config.execution.hypothesis_settings.max_examples:
+                if ctx.completed_scenarios >= hypothesis_settings.max_examples:
                     # Avoid infinite restarts
                     break
                 continue

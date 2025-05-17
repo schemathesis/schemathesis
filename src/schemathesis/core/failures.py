@@ -9,8 +9,9 @@ from enum import Enum, auto
 from json import JSONDecodeError
 from typing import Any, Callable
 
+from schemathesis.config import OutputConfig
 from schemathesis.core.compat import BaseExceptionGroup
-from schemathesis.core.output import OutputConfig, prepare_response_payload
+from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.transport import Response
 
 
@@ -123,11 +124,6 @@ class CustomFailure(Failure):
         return self.origin
 
 
-@dataclass
-class MaxResponseTimeConfig:
-    limit: float = 10.0
-
-
 class ResponseTimeExceeded(Failure):
     """Response took longer than expected."""
 
@@ -138,7 +134,7 @@ class ResponseTimeExceeded(Failure):
         *,
         operation: str,
         elapsed: float,
-        deadline: int,
+        deadline: float,
         message: str,
         title: str = "Response time limit exceeded",
         case_id: str | None = None,
@@ -244,6 +240,9 @@ class FailureGroup(BaseExceptionGroup):
     """Multiple distinct check failures."""
 
     exceptions: Sequence[Failure]
+
+    def __init__(self, exceptions: Sequence[Failure], message: str = "", /) -> None:
+        super().__init__(message, exceptions)
 
     def __new__(cls, failures: Sequence[Failure], message: str | None = None) -> FailureGroup:
         if message is None:

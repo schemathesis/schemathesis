@@ -53,7 +53,7 @@ See [Getting Started](getting-started.md) for installation options and your firs
     <p>Learn how to use Schemathesis from the command line</p>
   </div>
   <div class="card">
-    <h3><a href="using/python-integration">Python Integration</a></h3>
+    <h3><a href="using/pytest">Pytest Integration</a></h3>
     <p>Embed API testing directly in your Python test suites</p>
   </div>
 </div>
@@ -67,7 +67,7 @@ See [Getting Started](getting-started.md) for installation options and your firs
 
 * **[Using Schemathesis](using/cli.md)** — Practical guides for running tests with different interfaces
     * [Command-Line Interface](using/cli.md)
-    * [Python Integration](using/python-integration.md)
+    * [Python Integration](using/pytest.md)
     * [Continuous Integration](ci/overview.md)
     * [Configuration](using/configuration.md)
 
