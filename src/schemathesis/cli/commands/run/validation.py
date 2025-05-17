@@ -3,7 +3,6 @@ from __future__ import annotations
 import codecs
 import operator
 import pathlib
-import re
 from contextlib import contextmanager
 from functools import reduce
 from typing import Callable, Generator
@@ -169,15 +168,6 @@ def validate_headers(
     return headers
 
 
-def validate_regex(ctx: click.core.Context, param: click.core.Parameter, raw_value: tuple[str, ...]) -> tuple[str, ...]:
-    for value in raw_value:
-        try:
-            re.compile(value)
-        except (re.error, OverflowError, RuntimeError) as exc:
-            raise click.BadParameter(f"Invalid regex: {exc.args[0]}.")  # noqa: B904
-    return raw_value
-
-
 def validate_request_cert_key(
     ctx: click.core.Context, param: click.core.Parameter, raw_value: str | None
 ) -> str | None:
@@ -215,14 +205,6 @@ def convert_maximize(
 
     names: list[str] = reduce(operator.iadd, value, [])
     return TARGETS.get_by_names(names)
-
-
-def convert_http_methods(
-    ctx: click.core.Context, param: click.core.Parameter, value: list[str] | None
-) -> set[str] | None:
-    if value is None:
-        return value
-    return {item.lower() for item in value}
 
 
 def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:

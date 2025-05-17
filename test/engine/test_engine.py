@@ -963,7 +963,7 @@ def workers_num(request):
 
 @pytest.fixture
 def engine(workers_num, swagger_20):
-    swagger_20.config.set(workers=workers_num)
+    swagger_20.config.update(workers=workers_num)
     return from_schema(swagger_20)
 
 
@@ -1046,7 +1046,7 @@ def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
         components={"securitySchemes": {"basicAuth": {"type": "http", "scheme": "basic"}}},
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.generation.set(modes=[GenerationMode.NEGATIVE])
+    schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     schema.config.base_url = openapi3_base_url
     stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
 
@@ -1067,7 +1067,7 @@ def test_skip_non_negated_headers(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.generation.set(modes=[GenerationMode.NEGATIVE])
+    schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
     stream = EventStream(schema, max_examples=1).execute()
     # There should not be unsatisfiable
     stream.assert_no_errors()
@@ -1099,7 +1099,7 @@ def test_stateful_auth(real_app_schema):
 @pytest.mark.operations("get_user", "create_user", "update_user")
 def test_stateful_all_generation_modes(real_app_schema):
     mode = GenerationMode.NEGATIVE
-    real_app_schema.config.generation.set(modes=[mode])
+    real_app_schema.config.generation.update(modes=[mode])
     stream = EventStream(real_app_schema, phases=[PhaseName.STATEFUL_TESTING], **STATEFUL_KWARGS).execute()
     cases = list(stream.find(events.ScenarioFinished).recorder.cases.values())
     assert len(cases) > 0
@@ -1176,7 +1176,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
     )
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.base_url = openapi2_base_url
-    schema.config.generation.set(
+    schema.config.generation.update(
         with_security_parameters=False,
         exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),
     )

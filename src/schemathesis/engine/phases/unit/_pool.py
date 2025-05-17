@@ -18,7 +18,6 @@ class TaskProducer:
     """Produces test tasks for workers to execute."""
 
     def __init__(self, ctx: EngineContext) -> None:
-        # TODO: get back generation config
         self.operations = ctx.schema.get_all_operations()
         self.lock = threading.Lock()
 

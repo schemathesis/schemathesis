@@ -980,7 +980,7 @@ def testdir(testdir):
             return schema
 
         config = SchemathesisConfig()
-        config.output.sanitization.set(enabled={sanitize_output!r})
+        config.output.sanitization.update(enabled={sanitize_output!r})
 
         schema = schemathesis.openapi.from_dict(
             raw_schema, config=config

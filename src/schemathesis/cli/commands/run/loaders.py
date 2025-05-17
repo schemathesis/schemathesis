@@ -82,9 +82,8 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
         kwargs["verify"] = config.tls_verify
         if config.request_cert:
             kwargs["cert"] = config.request_cert
-        # TODO: Fix this check
-        # if config.projects.default.auth:
-        #     kwargs["auth"] = config.network.auth
+        if config.auth.basic is not None:
+            kwargs["auth"] = config.auth.basic
 
     return loader(location, config=config._parent, **kwargs)
 

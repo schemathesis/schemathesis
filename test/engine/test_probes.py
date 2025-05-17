@@ -35,12 +35,12 @@ DEFAULT_HEADERS = {
 )
 def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
     session = Session()
-    ctx.schema.config.set(base_url=openapi3_base_url)
+    ctx.schema.config.update(base_url=openapi3_base_url)
     if "auth" in kwargs:
         session.auth = kwargs["auth"]
-        ctx.schema.config.auth.basic = {"username": kwargs["auth"][0], "password": kwargs["auth"][1]}
+        ctx.schema.config.auth.basic = kwargs["auth"]
     else:
-        ctx.schema.config.set(**kwargs)
+        ctx.schema.config.update(**kwargs)
     results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(
@@ -54,13 +54,13 @@ def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
 
 
 def test_detect_null_byte_with_response(ctx, openapi3_base_url, response_factory):
-    ctx.schema.config.set(base_url=openapi3_base_url)
+    ctx.schema.config.update(base_url=openapi3_base_url)
     result = probes.run(ctx)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
 
 
 def test_detect_null_byte_error(ctx):
-    ctx.schema.config.set(base_url="http://127.0.0.1:1")
+    ctx.schema.config.update(base_url="http://127.0.0.1:1")
     results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(

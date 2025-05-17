@@ -82,7 +82,7 @@ class EngineContext:
         config = self.config
         session.verify = config.tls_verify
         if config.auth.basic is not None:
-            session.auth = (config.auth.basic["username"], config.auth.basic["password"])
+            session.auth = config.auth.basic
         if config.headers:
             session.headers.update(config.headers)
         if config.request_cert is not None:

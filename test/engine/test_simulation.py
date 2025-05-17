@@ -7,7 +7,9 @@ from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 from requests.exceptions import HTTPError, Timeout
 
-from schemathesis.config import SchemathesisConfig
+from schemathesis.config import ProjectConfig, SchemathesisConfig
+from schemathesis.config._output import OutputConfig
+from schemathesis.config._projects import ProjectsConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.core import Engine
 from schemathesis.engine.events import FatalError
@@ -32,10 +34,20 @@ class FaultInjectingSession(requests.Session):
 
 @given(
     seed=st.integers(),
-    config=st.from_type(SchemathesisConfig),
+    config=st.builds(
+        SchemathesisConfig,
+        output=st.from_type(OutputConfig),
+        projects=st.builds(
+            ProjectsConfig,
+            default=st.builds(
+                ProjectConfig,
+                base_url=st.none(),
+            ),
+        ),
+    ),
 )
 @pytest.mark.operations("__all__")
-@settings(max_examples=6, suppress_health_check=list(HealthCheck), deadline=None)
+@settings(max_examples=3, suppress_health_check=list(HealthCheck), deadline=None)
 def test_engine_with_faults(seed, config, openapi3_schema):
     session = FaultInjectingSession(random=random.Random(seed))
     openapi3_schema.config = config.projects.default

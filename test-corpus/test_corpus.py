@@ -137,8 +137,8 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
         pass
 
-    schema.config.phases.set(phases=["examples", "fuzzing"])
-    schema.config.generation.set(max_examples=1)
+    schema.config.phases.update(phases=["examples", "fuzzing"])
+    schema.config.generation.update(max_examples=1)
 
     for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):

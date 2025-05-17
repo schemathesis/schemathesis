@@ -5,7 +5,6 @@ from typing import Any, NoReturn
 
 import click
 
-from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.registries import Registry
 
 
@@ -84,16 +83,3 @@ class RegistryChoice(BaseCsvChoice):
         if not invalid_options and selected:
             return selected
         self.fail_on_invalid_options(invalid_options, selected)
-
-
-class OptionalInt(click.types.IntRange):
-    def convert(  # type: ignore
-        self, value: str, param: click.core.Parameter | None, ctx: click.core.Context | None
-    ) -> int | NotSet:
-        if value.lower() == "none":
-            return NOT_SET
-        try:
-            int(value)
-            return super().convert(value, param, ctx)
-        except ValueError:
-            self.fail(f"{value} is not a valid integer or None.", param, ctx)

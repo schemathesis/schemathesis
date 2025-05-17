@@ -11,7 +11,7 @@ from schemathesis.core.validation import is_latin_1_encodable
 
 @dataclass(repr=False)
 class AuthConfig(DiffBase):
-    basic: dict[str, str] | None
+    basic: tuple[str, str] | None
     bearer: str | None
     openapi: dict[str, dict[str, str]] | None
 
@@ -24,12 +24,15 @@ class AuthConfig(DiffBase):
         bearer: str | None = None,
         openapi: dict[str, dict[str, str]] | None = None,
     ) -> None:
-        self.basic = {key: resolve(value, value) for key, value in basic.items()} if basic else None
-        if self.basic:
-            if not is_latin_1_encodable(self.basic["username"]):
-                raise ConfigError("Username should be latin-1 encodable.")
-            if not is_latin_1_encodable(self.basic["password"]):
-                raise ConfigError("Password should be latin-1 encodable.")
+        if basic is not None:
+            assert "username" in basic
+            username = resolve(basic["username"], basic["username"])
+            assert "password" in basic
+            password = resolve(basic["password"], basic["password"])
+            _validate_basic(username, password)
+            self.basic = (username, password)
+        else:
+            self.basic = None
         self.bearer = resolve(bearer, bearer) if bearer else None
         self.openapi = (
             {
@@ -39,6 +42,11 @@ class AuthConfig(DiffBase):
             if openapi
             else None
         )
+
+    def update(self, *, basic: tuple[str, str] | None = None) -> None:
+        if basic is not None:
+            _validate_basic(*basic)
+            self.basic = basic
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AuthConfig:
@@ -51,3 +59,10 @@ class AuthConfig(DiffBase):
     @property
     def is_defined(self) -> bool:
         return self.basic is not None or self.bearer is not None or self.openapi is not None
+
+
+def _validate_basic(username: str, password: str) -> None:
+    if not is_latin_1_encodable(username):
+        raise ConfigError("Username should be latin-1 encodable.")
+    if not is_latin_1_encodable(password):
+        raise ConfigError("Password should be latin-1 encodable.")

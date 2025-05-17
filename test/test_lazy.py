@@ -295,7 +295,7 @@ def test_generation_modes(testdir):
 @pytest.fixture()
 def api_schema():
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.generation.set(modes=GenerationMode.all())
+    schema.config.generation.update(modes=GenerationMode.all())
     return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
@@ -407,7 +407,7 @@ def test_skip_negative_without_parameters(testdir):
 @pytest.fixture()
 def api_schema():
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.generation.set(modes=[schemathesis.GenerationMode.NEGATIVE])
+    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
     return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
@@ -527,7 +527,7 @@ def test_rate_limit(testdir, openapi3_schema_url):
 @pytest.fixture
 def api_schema():
     schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
-    schema.config.set(rate_limit="1/s")
+    schema.config.update(rate_limit="1/s")
     return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")

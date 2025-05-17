@@ -99,7 +99,7 @@ class SanitizationConfig(DiffBase):
             replacement=data.get("replacement", DEFAULT_REPLACEMENT),
         )
 
-    def set(self, *, enabled: bool | None = None) -> None:
+    def update(self, *, enabled: bool | None = None) -> None:
         if enabled is not None:
             self.enabled = enabled
 
@@ -142,7 +142,7 @@ class TruncationConfig(DiffBase):
             max_width=data.get("max-width", MAX_WIDTH),
         )
 
-    def set(self, *, enabled: bool | None = None) -> None:
+    def update(self, *, enabled: bool | None = None) -> None:
         if enabled is not None:
             self.enabled = enabled
 

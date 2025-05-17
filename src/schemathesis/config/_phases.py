@@ -142,7 +142,7 @@ class PhasesConfig(DiffBase):
             stateful=StatefulPhaseConfig.from_dict(data.get("stateful", {})),
         )
 
-    def set(self, *, phases: list[str]) -> None:
+    def update(self, *, phases: list[str]) -> None:
         self.examples.enabled = "examples" in phases
         self.coverage.enabled = "coverage" in phases
         self.fuzzing.enabled = "fuzzing" in phases

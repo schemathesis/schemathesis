@@ -22,7 +22,7 @@ def test_maximum_requests(request, loader, fixture, mocker):
     mocker.patch("pyrate_limiter.limiter.Limiter.delay_or_raise", side_effect=side_effect)
     url = request.getfixturevalue(fixture)
     schema = loader(url)
-    schema.config.set(rate_limit="5/h")
+    schema.config.update(rate_limit="5/h")
     counter = 0
 
     def run():

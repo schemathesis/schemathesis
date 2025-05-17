@@ -1528,7 +1528,7 @@ def test_negative_query_parameter(ctx):
         urls.append(request.url)
 
     config = ProjectConfig()
-    config.generation.set(modes=[GenerationMode.NEGATIVE])
+    config.generation.update(modes=[GenerationMode.NEGATIVE])
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1612,7 +1612,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
         assert f"-X {case.method}" in case.as_curl_command()
 
     config = ProjectConfig()
-    config.generation.set(modes=[GenerationMode.NEGATIVE])
+    config.generation.update(modes=[GenerationMode.NEGATIVE])
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1630,7 +1630,7 @@ def test_unspecified_http_methods(ctx, cli, openapi3_base_url, snapshot_cli):
     methods = set()
 
     config = ProjectConfig()
-    config.generation.set(modes=[GenerationMode.NEGATIVE])
+    config.generation.update(modes=[GenerationMode.NEGATIVE])
     config.phases.coverage.unexpected_methods = {"DELETE", "PUT"}
     test_func = create_test(
         operation=operation,
@@ -1709,7 +1709,7 @@ def test_urlencoded_payloads_are_valid(ctx):
         assert_requests_call(case)
 
     config = ProjectConfig()
-    config.generation.set(modes=GenerationMode.all())
+    config.generation.update(modes=GenerationMode.all())
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1749,7 +1749,7 @@ def test_no_missing_header_duplication(ctx):
         descriptions.append(case.meta.phase.data.description)
 
     config = ProjectConfig()
-    config.generation.set(modes=GenerationMode.all())
+    config.generation.update(modes=GenerationMode.all())
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1788,7 +1788,7 @@ def assert_coverage(schema, modes, expected, path=None):
         cases.append(output)
 
     config = ProjectConfig()
-    config.generation.set(modes=modes)
+    config.generation.update(modes=modes)
     test_func = create_test(
         operation=operation,
         test_func=test,

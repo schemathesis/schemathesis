@@ -237,7 +237,7 @@ class ChecksConfig(DiffBase):
         except AttributeError:
             return self._unknown.setdefault(name, SimpleCheckConfig())
 
-    def set(
+    def update(
         self,
         *,
         included_check_names: list[str] | None = None,

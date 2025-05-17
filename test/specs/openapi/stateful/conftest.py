@@ -506,20 +506,20 @@ def engine_factory(app_factory, app_runner, stop_event):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
         config = SchemathesisConfig()
-        config.set(max_failures=max_failures)
-        config.projects.override.checks.set(
+        config.update(max_failures=max_failures)
+        config.projects.override.checks.update(
             included_check_names=[func.__name__ for func in checks] if isinstance(checks, list) else None,
             max_response_time=max_response_time,
         )
         if max_steps is not None:
             config.projects.override.phases.stateful.max_steps = max_steps
-        config.projects.override.generation.set(
+        config.projects.override.generation.update(
             modes=generation_modes,
             unique_inputs=unique_inputs,
             max_examples=max_examples,
             maximize=maximize,
         )
-        config.projects.override.set(headers=headers)
+        config.projects.override.update(headers=headers)
         schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
 
         if hypothesis_settings is not None:

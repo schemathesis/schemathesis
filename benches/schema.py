@@ -191,8 +191,8 @@ def test_as_json_schema(operations):
 
 @pytest.mark.benchmark
 def test_events():
-    BBCI_SCHEMA.config.generation.set(max_examples=1)
-    BBCI_SCHEMA.config.phases.set(phases=["examples", "fuzzing"])
+    BBCI_SCHEMA.config.generation.update(max_examples=1)
+    BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
     engine = from_schema(BBCI_SCHEMA)
     for _ in engine.execute():
         pass

@@ -10,7 +10,6 @@ from schemathesis import contrib
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run import executor, validation
 from schemathesis.cli.commands.run.filters import with_filters
-from schemathesis.cli.commands.run.hypothesis import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
@@ -21,6 +20,7 @@ from schemathesis.cli.ext.options import (
     RegistryChoice,
 )
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
+from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
 from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationMode
 from schemathesis.generation.targets import TARGETS, TargetFunction
@@ -58,7 +58,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
         ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
         choices_repr=f"[auto, {MIN_WORKERS}-{MAX_WORKERS}]",
     ),
-    default="1",
+    default=str(DEFAULT_WORKERS),
     show_default=True,
     callback=validation.convert_workers,
     metavar="",
@@ -498,16 +498,16 @@ def run(
         contrib.openapi.fill_missing_examples.install()
 
     # Then override the global config from CLI options
-    config.set(
+    config.update(
         color=color,
         suppress_health_check=suppress_health_check,
         seed=generation_seed,
         wait_for_schema=wait_for_schema,
         max_failures=max_failures,
     )
-    config.output.sanitization.set(enabled=output_sanitize)
-    config.output.truncation.set(enabled=output_truncate)
-    config.reports.set(
+    config.output.sanitization.update(enabled=output_sanitize)
+    config.output.truncation.update(enabled=output_truncate)
+    config.reports.update(
         formats=report_formats,
         junit_path=report_junit_path.name if report_junit_path else None,
         vcr_path=report_vcr_path.name if report_vcr_path else None,
@@ -516,10 +516,10 @@ def run(
         preserve_bytes=report_preserve_bytes,
     )
     # Other CLI options work as an override for all defined projects
-    config.projects.override.set(
+    config.projects.override.update(
         base_url=base_url,
         headers=headers,
-        auth=auth,
+        basic_auth=auth,
         workers=workers,
         continue_on_failure=continue_on_failure,
         rate_limit=rate_limit,
@@ -555,13 +555,13 @@ def run(
         exclude_by=exclude_by,
         exclude_deprecated=exclude_deprecated,
     )
-    config.projects.override.phases.set(phases=phases)
-    config.projects.override.checks.set(
+    config.projects.override.phases.update(phases=phases)
+    config.projects.override.checks.update(
         included_check_names=included_check_names,
         excluded_check_names=excluded_check_names,
         max_response_time=max_response_time,
     )
-    config.projects.override.generation.set(
+    config.projects.override.generation.update(
         modes=generation_modes,
         max_examples=generation_max_examples,
         no_shrink=generation_no_shrink,
@@ -576,5 +576,10 @@ def run(
     )
 
     executor.execute(
-        location=location, filter_set=filter_set, config=config.projects.get_default(), args=ctx.args, params=ctx.params
+        location=location,
+        filter_set=filter_set,
+        # We don't the project yet, so pass the default config
+        config=config.projects.get_default(),
+        args=ctx.args,
+        params=ctx.params,
     )

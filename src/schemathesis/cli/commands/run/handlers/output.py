@@ -1062,7 +1062,7 @@ class OutputHandler(EventHandler):
 
         if (
             event.status == Status.SUCCESS
-            and GenerationMode.POSITIVE in self.config.generation.modes
+            and GenerationMode.POSITIVE in self.config.generation_for(operation=None, phase=event.phase.name).modes
             and all_positive_are_rejected(event.recorder)
             and statistic.should_warn_about_only_4xx()
         ):
@@ -1402,6 +1402,8 @@ class OutputHandler(EventHandler):
 
     def display_seed(self) -> None:
         click.echo(_style("Seed: ", bold=True), nl=False)
+        # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere
+        # If not everywhere, then the seed matter and should be displayed
         if self.config.seed is None or self.config.generation.deterministic:
             click.echo("not used in the deterministic mode")
         else:

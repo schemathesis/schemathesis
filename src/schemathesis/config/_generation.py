@@ -106,7 +106,7 @@ class GenerationConfig(DiffBase):
             exclude_header_characters=data.get("exclude-header-characters"),
         )
 
-    def set(
+    def update(
         self,
         *,
         modes: list[GenerationMode] | None = None,

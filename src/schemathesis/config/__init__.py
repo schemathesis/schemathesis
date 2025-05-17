@@ -42,8 +42,6 @@ __all__ = [
     "get_workers_count",
 ]
 
-_join = os.path.join
-
 
 @dataclass(repr=False)
 class SchemathesisConfig(DiffBase):
@@ -127,7 +125,7 @@ class SchemathesisConfig(DiffBase):
             return cls.from_path(config_file)
         return cls()
 
-    def set(
+    def update(
         self,
         *,
         color: bool | None = None,

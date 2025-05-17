@@ -17,7 +17,7 @@ from schemathesis.config._parameters import ParameterOverride, load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
-from schemathesis.core import hooks
+from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER, hooks
 from schemathesis.core.validation import validate_base_url
 
 if TYPE_CHECKING:
@@ -181,12 +181,12 @@ class ProjectConfig(DiffBase):
 
         return SchemathesisConfig.discover().projects.default
 
-    def set(
+    def update(
         self,
         *,
         base_url: str | None = None,
         headers: dict | None = None,
-        auth: tuple[str, str] | None = None,
+        basic_auth: tuple[str, str] | None = None,
         workers: int | Literal["auto"] = 1,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
@@ -205,8 +205,8 @@ class ProjectConfig(DiffBase):
             _headers.update(headers)
             self.headers = _headers
 
-        if auth is not None:
-            self.auth.basic = {"username": auth[0], "password": auth[1]}
+        if basic_auth is not None:
+            self.auth.update(basic=basic_auth)
 
         if isinstance(workers, int):
             self.workers = workers
@@ -242,14 +242,13 @@ class ProjectConfig(DiffBase):
         return parameters
 
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
-        auth = None
-        if self.auth.basic is not None:
-            auth = self.auth.basic["username"], self.auth.basic["password"]
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
             if config.auth.basic is not None:
-                auth = config.auth.basic["username"], config.auth.basic["password"]
-        return auth
+                return config.auth.basic
+        if self.auth.basic is not None:
+            return self.auth.basic
+        return None
 
     def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str] | None:
         headers = None
@@ -265,7 +264,7 @@ class ProjectConfig(DiffBase):
         self,
         *,
         operation: APIOperation | None = None,
-        phase: Literal["examples", "coverage", "fuzzing", "stateful"] | None = None,
+        phase: str | None = None,
     ) -> GenerationConfig:
         configs = []
         if operation is not None:
@@ -301,28 +300,63 @@ class ProjectConfig(DiffBase):
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
 
+    # def get_hypothesis_settings(self) -> hypothesis.settings:
+    #     # TODO: rework so it accepts optional operation / phase too
+    #     import hypothesis
+    #
+    #     # "database",
+    #     # "phases",
+    #     # "stateful_step_count",
+    #     # "suppress_health_check",
+    #     # "deadline",
+    #     kwargs: dict[str, Any] = {
+    #         "derandomize": self.generation.deterministic,
+    #         "deadline": None,
+    #     }
+    #     if self.generation.max_examples is not None:
+    #         kwargs["max_examples"] = self.generation.max_examples
+    #     # TODO: prepare
+    #     # suppress_health_check = self.run.suppress_health_check
+    #     # TODO: Prepare DB settings
+    #     # database = self.project.generation.database
+    #     # Prepare phases
+    #
+    #     return hypothesis.settings(**kwargs)
+
     def get_hypothesis_settings(self) -> hypothesis.settings:
-        # TODO: rework so it accepts optional operation / phase too
         import hypothesis
+        from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-        # "database",
-        # "phases",
-        # "stateful_step_count",
-        # "suppress_health_check",
-        # "deadline",
-        kwargs: dict[str, Any] = {
-            "derandomize": self.generation.deterministic,
-            "deadline": None,
-        }
-        if self.generation.max_examples is not None:
-            kwargs["max_examples"] = self.generation.max_examples
-        # TODO: prepare
-        # suppress_health_check = self.run.suppress_health_check
-        # TODO: Prepare DB settings
-        # database = self.project.generation.database
-        # Prepare phases
+        # TODO: create a hierarchy & build config
+        config = self.generation
+        kwargs: dict[str, Any] = {}
 
-        return hypothesis.settings(**kwargs)
+        if config.max_examples is not None:
+            kwargs["max_examples"] = config.max_examples
+        phases = set(hypothesis.Phase) - {hypothesis.Phase.explain}
+        if config.no_shrink:
+            phases.discard(hypothesis.Phase.shrink)
+        database = config.database
+        if database is not None:
+            if database.lower() == "none":
+                kwargs["database"] = None
+                phases.discard(hypothesis.Phase.reuse)
+            elif database == HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER:
+                kwargs["database"] = InMemoryExampleDatabase()
+            else:
+                kwargs["database"] = DirectoryBasedExampleDatabase(database)
+
+        return hypothesis.settings(
+            derandomize=config.deterministic,
+            print_blob=False,
+            deadline=None,
+            verbosity=hypothesis.Verbosity.quiet,
+            suppress_health_check=[check for item in self.suppress_health_check for check in item.as_hypothesis()],
+            phases=phases,
+            # NOTE: Ignoring any operation-specific config as stateful tests are not operation-specific
+            stateful_step_count=self.phases.stateful.max_steps,
+            **kwargs,
+        )
 
     def _get_parent(self) -> SchemathesisConfig:
         if self._parent is None:

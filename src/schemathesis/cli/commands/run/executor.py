@@ -49,11 +49,15 @@ MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a sch
 
 
 def into_event_stream(*, location: str, config: ProjectConfig, filter_set: FilterSet) -> EventGenerator:
+    # The whole engine idea is that it communicates with the outside via events, so handlers can react to them
+    # For this reason, even schema loading is done via a separate set of events.
     loading_started = LoadingStarted(location=location)
     yield loading_started
 
     try:
         schema = load_schema(location=location, config=config)
+        # Schemas don't (yet?) use configs for deciding what operations should be tested, so
+        # a separate FilterSet passed there. It combines both config file filters + CLI options
         schema.filter_set = filter_set
         if file_exists(location) and schema.config.base_url is None:
             raise click.UsageError(MISSING_BASE_URL_MESSAGE)
