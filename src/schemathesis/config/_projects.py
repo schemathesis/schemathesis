@@ -195,6 +195,7 @@ class ProjectConfig(DiffBase):
         request_cert: str | None = None,
         request_cert_key: str | None = None,
         proxy: str | None = None,
+        suppress_health_check: list[HealthCheck] | None = None,
     ) -> None:
         if base_url is not None:
             _validate_base_url(base_url)
@@ -233,6 +234,9 @@ class ProjectConfig(DiffBase):
 
         if proxy is not None:
             self.proxy = proxy
+
+        if suppress_health_check is not None:
+            self.suppress_health_check = suppress_health_check
 
     def parameters_for(self, *, operation: APIOperation | None = None) -> dict:
         parameters = {name: param.value for name, param in self.parameters.items()}
@@ -366,6 +370,11 @@ class ProjectConfig(DiffBase):
     @property
     def suppress_health_check(self) -> list[HealthCheck]:
         return self._get_parent().suppress_health_check
+
+    @suppress_health_check.setter
+    def suppress_health_check(self, value: list[HealthCheck]) -> None:
+        parent = self._get_parent()
+        parent.suppress_health_check = value
 
     @property
     def seed(self) -> int:

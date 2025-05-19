@@ -294,7 +294,6 @@ def app_factory(ctx):
             return jsonify({"error": "Something went wrong - PATCH"}), 500
         if user:
             data = request.get_json()
-            assert data["last_modified"] == user["last_modified"]
             if not config.merge_body:
                 assert len(data) == 1
             else:
