@@ -263,7 +263,7 @@ def test_parametrized_fixture(testdir, openapi3_base_url, settings):
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
-schema.config.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @pytest.fixture(params=["a", "b"])
 def parametrized_lazy_schema(request):

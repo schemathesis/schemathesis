@@ -23,7 +23,7 @@ IGNORED_EXCEPTIONS = (hypothesis.errors.Unsatisfiable, InvalidSchema, hypothesis
 def test_random_schemas(schema, openapi3_base_url):
     schema = schemathesis.openapi.from_dict(schema)
     schema.config._get_parent().suppress_health_check = [SchemathesisHealthCheck.all]
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.generation.update(max_examples=10)
     for event in schemathesis.engine.from_schema(schema).execute():

@@ -958,7 +958,7 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.generation.allow_x00 = False
+    schema.config.generation.update(allow_x00=False)
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
 

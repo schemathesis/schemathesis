@@ -66,7 +66,7 @@ def assert_schema_requests_num(app, number):
 def test_execute_base_url_not_found(openapi3_base_url, schema_url, app):
     # When base URL is pointing to an unknown location
     schema = schemathesis.openapi.from_url(schema_url)
-    schema.config.base_url = f"{openapi3_base_url}/404/"
+    schema.config.update(base_url=f"{openapi3_base_url}/404/")
     EventStream(schema).execute()
     # Then the engine should use this base
     # And they will not reach the application
@@ -185,7 +185,7 @@ def test_base_url(openapi3_base_url, schema_url, app, converter):
     base_url = converter(openapi3_base_url)
     # When `base_url` is specified explicitly with or without trailing slash
     schema = schemathesis.openapi.from_url(schema_url)
-    schema.config.base_url = base_url
+    schema.config.update(base_url=base_url)
     execute(schema)
 
     # Then each request should reach the app in both cases
@@ -470,7 +470,7 @@ def test_path_parameters_encoding(real_app_schema):
 @pytest.mark.operations("slow")
 def test_exceptions(schema_url):
     schema = schemathesis.openapi.from_url(schema_url)
-    schema.config.base_url = "http://127.0.0.1:1/"
+    schema.config.update(base_url="http://127.0.0.1:1/")
     stream = execute(schema)
     assert any(event.status == Status.ERROR for event in stream.find_all(events.ScenarioFinished))
 
@@ -530,7 +530,7 @@ def test_explicit_examples_from_response(ctx, openapi3_base_url):
         components={"schemas": {"Item": {"properties": {"id": {"type": "string"}}}}},
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     stream = EventStream(schema, max_examples=1, phases=[PhaseName.EXAMPLES]).execute()
     assert [case.value.path_parameters for case in stream.find(events.ScenarioFinished).recorder.cases.values()] == [
         {"itemId": "456789"},
@@ -791,7 +791,7 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
     stream.assert_errors()
@@ -806,7 +806,7 @@ def test_invalid_header_in_example(ctx, openapi3_base_url):
 def test_connection_error(ctx):
     schema = ctx.openapi.build_schema({"/success": {"post": {"responses": {"200": {"description": "OK"}}}}})
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = "http://127.0.0.1:1"
+    schema.config.update(base_url="http://127.0.0.1:1")
     stream = EventStream(schema, max_examples=1).execute()
     # And the tests are failing
     stream.assert_errors()
@@ -863,7 +863,7 @@ def test_hypothesis_errors_propagation(ctx, openapi3_base_url):
 
     max_examples = 10
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     stream = EventStream(
         schema,
         max_examples=max_examples,
@@ -902,7 +902,7 @@ def test_encoding_octet_stream(ctx, openapi3_base_url):
         }
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     stream = EventStream(
         schema,
         checks=[not_a_server_error],
@@ -1047,7 +1047,7 @@ def test_explicit_header_negative(ctx, parameters, expected, openapi3_base_url):
     )
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
     stream = EventStream(schema, headers={"Authorization": "TEST"}, max_examples=1).execute()
 
     # There should not be unsatisfiable
@@ -1175,7 +1175,7 @@ def test_generation_config_in_explicit_examples(ctx, openapi2_base_url):
         version="2.0",
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi2_base_url
+    schema.config.update(base_url=openapi2_base_url)
     schema.config.generation.update(
         with_security_parameters=False,
         exclude_header_characters="".join({chr(i) for i in range(256)} - {"a"}),

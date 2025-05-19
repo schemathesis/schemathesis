@@ -97,6 +97,10 @@ UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE = schemathesis.graphql.from_dict(UNIVERSE)
 UNIVERSE_SCHEMA_WITH_OPERATIONS_CACHE[UNIVERSE_OPERATION_KEY[0]][UNIVERSE_OPERATION_KEY[1]]
 
 
+BBCI_SCHEMA.config.generation.update(max_examples=1)
+BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
+
+
 @pytest.mark.benchmark
 @pytest.mark.parametrize(
     "raw_schema, key, loader",
@@ -191,8 +195,6 @@ def test_as_json_schema(operations):
 
 @pytest.mark.benchmark
 def test_events():
-    BBCI_SCHEMA.config.generation.update(max_examples=1)
-    BBCI_SCHEMA.config.phases.update(phases=["examples", "fuzzing"])
     engine = from_schema(BBCI_SCHEMA)
     for _ in engine.execute():
         pass

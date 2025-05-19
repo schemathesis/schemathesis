@@ -324,7 +324,7 @@ def test_valid_form_data(request, raw_schema):
     # When the request definition contains a schema, matching values of which cannot be encoded to multipart
     # straightforwardly
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.base_url = base_url
+    schema.config.update(base_url=base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=10)
@@ -359,7 +359,7 @@ def test_optional_form_data(ctx, openapi3_base_url):
     # Note, this test is similar to the one above, but has a simplified schema & conditions
     # It is done mostly due to performance reasons
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = openapi3_base_url
+    schema.config.update(base_url=openapi3_base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], max_examples=1)

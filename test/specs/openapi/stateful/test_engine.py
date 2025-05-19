@@ -520,7 +520,7 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app = app_factory(independent_500=True)
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = f"http://127.0.0.1:{root_app_port}/"
+    schema.config.update(base_url=f"http://127.0.0.1:{root_app_port}/")
     schema.config.generation.update(max_examples=75, database="none")
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),

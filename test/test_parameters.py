@@ -521,11 +521,11 @@ def api_schema(ctx, request, openapi_version):
     schema = schemathesis.openapi.from_dict(schema)
     if request.param == "aiohttp":
         base_url = request.getfixturevalue("base_url")
-        schema.config.base_url = base_url
+        schema.config.update(base_url=base_url)
         return schema
     app = request.getfixturevalue("flask_app")
     schema = schema.configure(app=app)
-    schema.config.base_url = "http://127.0.0.1/api"
+    schema.config.update(base_url="http://127.0.0.1/api")
     return schema
 
 

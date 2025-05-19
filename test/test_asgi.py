@@ -61,7 +61,7 @@ def test_null_byte(fastapi_app):
         return {"success": True}
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
-    schema.config.generation.allow_x00 = False
+    schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()
 
@@ -86,7 +86,7 @@ def test_null_byte_in_headers(fastapi_app):
         return {"success": True}
 
     schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
-    schema.config.generation.allow_x00 = False
+    schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()
 

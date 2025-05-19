@@ -23,7 +23,7 @@ def loose_schema(ctx):
         version="2.0",
     )
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.base_url = "http://127.0.0.1:1"
+    schema.config.update(base_url="http://127.0.0.1:1")
     return schema
 
 
@@ -91,7 +91,7 @@ def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
 def test_pytest_subtests_output(testdir, openapi3_base_url, app_schema):
     testdir.make_test(
         f"""
-schema.config.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()

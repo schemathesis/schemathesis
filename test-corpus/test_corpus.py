@@ -162,7 +162,7 @@ def _load_schema(corpus, filename, app_port=None):
     raw_schema = json_loads(raw_content.read())
     try:
         schema = schemathesis.openapi.from_dict(raw_schema)
-        schema.config.base_url = f"http://127.0.0.1:{app_port}/" if app_port is not None else None
+        schema.config.update(base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None)
         return schema
     except LoaderError as exc:
         assert_invalid_schema(exc)

@@ -94,7 +94,7 @@ def test_without_security_parameters(with_security_parameters):
         "security": [{"basic_auth": []}],
     }
     schema = schemathesis.openapi.from_dict(schema)
-    schema.config.generation.with_security_parameters = with_security_parameters
+    schema.config.generation.update(with_security_parameters=with_security_parameters)
 
     @given(case=schema["/test"]["GET"].as_strategy())
     @settings(max_examples=20, suppress_health_check=list(HealthCheck))

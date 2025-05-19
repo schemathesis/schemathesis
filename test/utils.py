@@ -11,7 +11,7 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.config._parameters import ParameterOverride
+from schemathesis.config import ParameterOverride
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
