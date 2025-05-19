@@ -162,13 +162,12 @@ def worker_task(
                     operation = result.ok()
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
                     try:
-                        # TODO: Get hypothesis / generation config specifically for this operation
                         test_function = create_test(
                             operation=operation,
                             test_func=test_func,
                             config=HypothesisTestConfig(
                                 modes=[mode],
-                                settings=ctx.config.get_hypothesis_settings(),
+                                settings=ctx.config.get_hypothesis_settings(operation=operation, phase="unit"),
                                 seed=ctx.config.seed,
                                 project=ctx.config,
                                 as_strategy_kwargs=as_strategy_kwargs,

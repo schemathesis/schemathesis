@@ -200,7 +200,7 @@ class OperationConfig(DiffBase):
     max_response_time: float | int | None
     wait_for_schema: float | int | None
     exclude_deprecated: bool | None
-    continue_on_failure: bool | None
+    continue_on_failure: bool
     tls_verify: bool | str | None
     rate_limit: Limiter | None
     request_timeout: float | int | None
@@ -246,7 +246,7 @@ class OperationConfig(DiffBase):
         max_response_time: float | int | None = None,
         wait_for_schema: float | int | None = None,
         exclude_deprecated: bool | None = None,
-        continue_on_failure: bool | None = None,
+        continue_on_failure: bool = False,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,
@@ -315,7 +315,7 @@ class OperationConfig(DiffBase):
             max_response_time=data.get("max-response-time"),
             wait_for_schema=data.get("wait-for-schema"),
             exclude_deprecated=data.get("exclude-deprecated"),
-            continue_on_failure=data.get("continue-on-failure"),
+            continue_on_failure=data.get("continue-on-failure", False),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             request_timeout=data.get("request-timeout"),

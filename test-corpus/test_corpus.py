@@ -10,6 +10,7 @@ from flask import Flask
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.config import HealthCheck
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -125,6 +126,8 @@ def app_port():
 def combined_check(ctx, response, case):
     case.as_curl_command()
     for check in CHECKS.get_all():
+        if check is combined_check:
+            continue
         try:
             check(ctx, response, case)
         except Failure:
@@ -138,6 +141,7 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
         pass
 
+    schema.config.update(suppress_health_check=list(HealthCheck))
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.generation.update(max_examples=1)
     schema.config.checks.update(included_check_names=[combined_check.__name__])

@@ -142,10 +142,14 @@ class JsonSchemaError(Failure):
         title: str = "Response violates schema",
         operation: str,
         exc: ValidationError,
-        config: OutputConfig,
+        config: OutputConfig | None = None,
     ) -> JsonSchemaError:
-        schema = textwrap.indent(truncate_json(exc.schema, config=config, max_lines=20), prefix="    ")
-        value = textwrap.indent(truncate_json(exc.instance, config=config, max_lines=20), prefix="    ")
+        schema = textwrap.indent(
+            truncate_json(exc.schema, config=config or OutputConfig(), max_lines=20), prefix="    "
+        )
+        value = textwrap.indent(
+            truncate_json(exc.instance, config=config or OutputConfig(), max_lines=20), prefix="    "
+        )
         schema_path = list(exc.absolute_schema_path)
         if len(schema_path) > 1:
             # Exclude the last segment, which is already in the schema
@@ -336,7 +340,7 @@ class IgnoredAuth(Failure):
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
 
-    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
+    __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -351,7 +355,7 @@ class AcceptedNegativeData(Failure):
         self.operation = operation
         self.message = message
         self.status_code = status_code
-        self.allowed_statuses = expected_statuses
+        self.expected_statuses = expected_statuses
         self.title = title
         self.case_id = case_id
         self.severity = Severity.MEDIUM

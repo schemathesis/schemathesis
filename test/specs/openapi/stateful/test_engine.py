@@ -549,7 +549,7 @@ def test_resource_availability(engine_factory):
     result = collect_result(engine)
     event = result.events[-1]
     if event.status != Status.SUCCESS:
-        pytest.fail(str(result.failures) + str(result.errors))
+        pytest.fail(str(result.events))
 
 
 def test_negative_tests(engine_factory):
@@ -561,7 +561,7 @@ def test_negative_tests(engine_factory):
     result = collect_result(engine)
     event = result.events[-1]
     if event.status != Status.FAILURE:
-        pytest.fail(str(result.failures) + str(result.errors))
+        pytest.fail(str(result.events))
 
 
 def test_unique_inputs(engine_factory):
@@ -591,7 +591,7 @@ def test_ignored_auth_valid(engine_factory):
     # Then no failures are reported
     event = result.events[-1]
     if event.status != Status.SUCCESS:
-        pytest.fail(str(event) + str(result.failures) + str(result.errors))
+        pytest.fail(str(result.events))
 
 
 def test_ignored_auth_invalid(engine_factory):

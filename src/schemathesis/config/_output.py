@@ -165,10 +165,7 @@ class OutputConfig(DiffBase):
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> OutputConfig:
-        sanitization_data = data.get("sanitization", {})
-        truncation_data = data.get("truncation", {})
-
         return cls(
-            sanitization=SanitizationConfig.from_dict(sanitization_data),
-            truncation=TruncationConfig.from_dict(truncation_data),
+            sanitization=SanitizationConfig.from_dict(data.get("sanitization", {})),
+            truncation=TruncationConfig.from_dict(data.get("truncation", {})),
         )

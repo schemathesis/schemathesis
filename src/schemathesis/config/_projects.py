@@ -52,7 +52,7 @@ class ProjectConfig(DiffBase):
     workers: int
     max_response_time: float | int | None
     exclude_deprecated: bool | None
-    continue_on_failure: bool | None
+    continue_on_failure: bool
     tls_verify: bool | str | None
     rate_limit: Limiter | None
     request_timeout: float | int | None
@@ -100,7 +100,7 @@ class ProjectConfig(DiffBase):
         proxy: str | None = None,
         max_response_time: float | int | None = None,
         exclude_deprecated: bool | None = None,
-        continue_on_failure: bool | None = None,
+        continue_on_failure: bool = False,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,
@@ -159,7 +159,7 @@ class ProjectConfig(DiffBase):
             proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
             exclude_deprecated=data.get("exclude-deprecated"),
-            continue_on_failure=data.get("continue-on-failure"),
+            continue_on_failure=data.get("continue-on-failure", False),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             request_timeout=data.get("request-timeout"),
@@ -288,7 +288,7 @@ class ProjectConfig(DiffBase):
         self,
         *,
         operation: APIOperation | None = None,
-        phase: Literal["examples", "coverage", "fuzzing", "stateful"] | None = None,
+        phase: str | None = None,
     ) -> ChecksConfig:
         configs = []
         if operation is not None:
@@ -304,7 +304,12 @@ class ProjectConfig(DiffBase):
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
 
-    def get_hypothesis_settings(self) -> hypothesis.settings:
+    def get_hypothesis_settings(
+        self,
+        *,
+        operation: APIOperation | None = None,
+        phase: str | None = None,
+    ) -> hypothesis.settings:
         import hypothesis
         from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 

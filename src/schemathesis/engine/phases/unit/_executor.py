@@ -198,7 +198,7 @@ def run_test(
             yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
-        and ctx.config.continue_on_failure is True
+        and ctx.config.continue_on_failure
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
@@ -309,7 +309,7 @@ def test_func(*, ctx: EngineContext, case: Case, check_ctx: CheckContext, record
         case=case,
         ctx=check_ctx,
         response=response,
-        continue_on_failure=ctx.config.continue_on_failure or False,
+        continue_on_failure=ctx.config.continue_on_failure,
         recorder=recorder,
     )
 
