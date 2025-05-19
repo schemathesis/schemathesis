@@ -30,7 +30,7 @@ DEFAULT_HEADERS = {
     "kwargs",
     [
         {"request_cert": str(HERE.parent / "cli" / "cert.pem")},
-        {"auth": ("test", "test")},
+        {"basic_auth": ("test", "test")},
     ],
 )
 def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
@@ -38,9 +38,7 @@ def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
     ctx.schema.config.update(base_url=openapi3_base_url)
     if "auth" in kwargs:
         session.auth = kwargs["auth"]
-        ctx.schema.config.auth.basic = kwargs["auth"]
-    else:
-        ctx.schema.config.update(**kwargs)
+    ctx.schema.config.update(**kwargs)
     results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(

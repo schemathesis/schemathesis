@@ -121,6 +121,7 @@ def app_port():
     return run_flask_app(app)
 
 
+@schemathesis.check
 def combined_check(ctx, response, case):
     case.as_curl_command()
     for check in CHECKS.get_all():
@@ -139,6 +140,7 @@ def test_default(corpus, filename, app_port):
 
     schema.config.phases.update(phases=["examples", "fuzzing"])
     schema.config.generation.update(max_examples=1)
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
 
     for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):

@@ -7,7 +7,13 @@ from random import Random
 
 import tomli
 
-from schemathesis.config._checks import CheckConfig, ChecksConfig
+from schemathesis.config._checks import (
+    CheckConfig,
+    ChecksConfig,
+    NotAServerErrorConfig,
+    PositiveDataAcceptanceConfig,
+    SimpleCheckConfig,
+)
 from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
@@ -33,6 +39,9 @@ __all__ = [
     "TruncationConfig",
     "ChecksConfig",
     "CheckConfig",
+    "NotAServerErrorConfig",
+    "PositiveDataAcceptanceConfig",
+    "SimpleCheckConfig",
     "PhaseConfig",
     "PhasesConfig",
     "CoveragePhaseConfig",

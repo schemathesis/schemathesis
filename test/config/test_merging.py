@@ -1,14 +1,11 @@
-from dataclasses import dataclass
-
 import pytest
 
-from schemathesis.config._checks import (
+from schemathesis.config import (
     ChecksConfig,
     NotAServerErrorConfig,
     PositiveDataAcceptanceConfig,
     SimpleCheckConfig,
 )
-from schemathesis.config._projects import ProjectConfig
 
 
 @pytest.mark.parametrize(
@@ -71,19 +68,3 @@ from schemathesis.config._projects import ProjectConfig
 )
 def test_checks_config_from_hierarchy(configs, expected):
     assert ChecksConfig.from_hierarchy(configs) == expected
-
-
-@dataclass
-class APIOperation:
-    path: str
-    method: str
-
-
-@pytest.fixture
-def basic_operation():
-    return APIOperation(path="/users", method="GET")
-
-
-@pytest.fixture
-def project_config():
-    return ProjectConfig.from_dict({"checks": {"not_a_server_error": {"enabled": True}}})
