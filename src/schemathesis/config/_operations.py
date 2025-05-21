@@ -197,7 +197,6 @@ class OperationConfig(DiffBase):
     base_url: str | None
     headers: dict | None
     proxy: str | None
-    wait_for_schema: float | int | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
     rate_limit: Limiter | None
@@ -216,7 +215,6 @@ class OperationConfig(DiffBase):
         "base_url",
         "headers",
         "proxy",
-        "wait_for_schema",
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
@@ -239,7 +237,6 @@ class OperationConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         proxy: str | None = None,
-        wait_for_schema: float | int | None = None,
         continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
@@ -257,7 +254,6 @@ class OperationConfig(DiffBase):
         self.base_url = base_url
         self.headers = headers
         self.proxy = proxy
-        self.wait_for_schema = wait_for_schema
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
@@ -304,7 +300,6 @@ class OperationConfig(DiffBase):
             if "headers" in data
             else None,
             proxy=resolve(data.get("proxy")),
-            wait_for_schema=data.get("wait-for-schema"),
             continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),

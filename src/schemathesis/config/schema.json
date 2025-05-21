@@ -522,10 +522,6 @@
         "proxy": {
           "type": "string"
         },
-        "wait-for-schema": {
-          "type": "number",
-          "minimum": 1
-        },
         "continue-on-failure": {
           "type": "boolean"
         },
