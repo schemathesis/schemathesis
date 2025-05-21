@@ -1,1 +1,1 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='GET /users/{user_id}']>}, _excludes=set()), parameters={'user_id': ParameterOverride(value='42')})])))
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='GET /users/{user_id}']>}, _excludes=set()), parameters={'user_id': '42'})])))

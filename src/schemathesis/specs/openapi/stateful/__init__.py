@@ -176,9 +176,12 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                 name = _normalize_name(f"RANDOM -> {target.label}")
                 config = schema.config.generation_for(operation=target, phase="stateful")
                 if len(config.modes) == 1:
-                    case_strategy = target.as_strategy(generation_mode=config.modes[0])
+                    case_strategy = target.as_strategy(generation_mode=config.modes[0], __is_stateful_phase=True)
                 else:
-                    _strategies = {method: target.as_strategy(generation_mode=method) for method in config.modes}
+                    _strategies = {
+                        method: target.as_strategy(generation_mode=method, __is_stateful_phase=True)
+                        for method in config.modes
+                    }
 
                     @st.composite  # type: ignore[misc]
                     def case_strategy_factory(
@@ -262,7 +265,9 @@ def into_step_input(
                 and not link.merge_body
             ):
                 kwargs["body"] = transition.request_body.value.ok()
-            cases = strategies.combine([target.as_strategy(generation_mode=mode, **kwargs) for mode in modes])
+            cases = strategies.combine(
+                [target.as_strategy(generation_mode=mode, __is_stateful_phase=True, **kwargs) for mode in modes]
+            )
             case = draw(cases)
             if (
                 transition.request_body is not None

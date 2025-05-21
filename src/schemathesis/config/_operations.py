@@ -11,7 +11,7 @@ from schemathesis.config._diff_base import DiffBase
 from schemathesis.config._env import resolve
 from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
-from schemathesis.config._parameters import ParameterOverride, load_parameters
+from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.core.errors import IncorrectUsage
@@ -205,7 +205,7 @@ class OperationConfig(DiffBase):
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
-    parameters: dict[str, ParameterOverride]
+    parameters: dict[str, Any]
     auth: AuthConfig
     checks: ChecksConfig
     phases: PhasesConfig
@@ -249,7 +249,7 @@ class OperationConfig(DiffBase):
         request_timeout: float | int | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
-        parameters: dict[str, ParameterOverride] | None = None,
+        parameters: dict[str, Any] | None = None,
         auth: AuthConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,

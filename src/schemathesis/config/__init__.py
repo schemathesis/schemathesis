@@ -19,7 +19,6 @@ from schemathesis.config._error import ConfigError
 from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._output import OutputConfig, SanitizationConfig, TruncationConfig
-from schemathesis.config._parameters import ParameterOverride
 from schemathesis.config._phases import CoveragePhaseConfig, PhaseConfig, PhasesConfig, StatefulPhaseConfig
 from schemathesis.config._projects import ProjectConfig, ProjectsConfig, get_workers_count
 from schemathesis.config._report import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat, ReportsConfig
@@ -32,7 +31,6 @@ __all__ = [
     "ReportsConfig",
     "ReportFormat",
     "DEFAULT_REPORT_DIRECTORY",
-    "ParameterOverride",
     "GenerationConfig",
     "OutputConfig",
     "SanitizationConfig",

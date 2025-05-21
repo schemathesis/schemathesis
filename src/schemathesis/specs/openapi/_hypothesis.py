@@ -60,6 +60,7 @@ def openapi_cases(
     body: Any = NOT_SET,
     media_type: str | None = None,
     phase: TestPhase = TestPhase.FUZZING,
+    __is_stateful_phase: bool = False,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -76,7 +77,8 @@ def openapi_cases(
     start = time.monotonic()
     strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
 
-    generation_config = operation.schema.config.generation_for(operation=operation)
+    phase_name = "stateful" if __is_stateful_phase else phase.value
+    generation_config = operation.schema.config.generation_for(operation=operation, phase=phase_name)
 
     context = HookContext(operation)
 

@@ -4,7 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
-from schemathesis.config import ParameterOverride, ProjectConfig
+from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import diff
@@ -67,13 +67,13 @@ def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override
     return output
 
 
-def _get_override_value(param: Parameter, parameters: dict[str, ParameterOverride]) -> Any:
+def _get_override_value(param: Parameter, parameters: dict[str, Any]) -> Any:
     key = param.name
     full_key = f"{param.location}.{param.name}"
     if key in parameters:
-        return parameters[key].value
+        return parameters[key]
     elif full_key in parameters:
-        return parameters[full_key].value
+        return parameters[full_key]
     return None
 
 

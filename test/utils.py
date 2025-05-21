@@ -11,7 +11,6 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.config import ParameterOverride
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
@@ -169,7 +168,7 @@ class EventStream:
         if parameters is not None:
             result = schema.config.parameters or {}
             for name, value in parameters.items():
-                result[name] = ParameterOverride.from_value(value)
+                result[name] = value
             schema.config.parameters = result
         self.schema = from_schema(schema)
 

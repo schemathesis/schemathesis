@@ -1,1 +1,1 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'api_version': ParameterOverride(value='v2'), 'limit': ParameterOverride(value=50), 'offset': ParameterOverride(value=0)})))
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(parameters={'api_version': 'v2', 'limit': 50, 'offset': 0})))

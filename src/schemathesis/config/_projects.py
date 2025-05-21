@@ -13,7 +13,7 @@ from schemathesis.config._generation import GenerationConfig
 from schemathesis.config._health_check import HealthCheck
 from schemathesis.config._operations import OperationConfig, OperationsConfig
 from schemathesis.config._output import OutputConfig
-from schemathesis.config._parameters import ParameterOverride, load_parameters
+from schemathesis.config._parameters import load_parameters
 from schemathesis.config._phases import PhasesConfig
 from schemathesis.config._rate_limit import build_limiter
 from schemathesis.config._report import ReportsConfig
@@ -57,7 +57,7 @@ class ProjectConfig(DiffBase):
     request_timeout: float | int | None
     request_cert: str | None
     request_cert_key: str | None
-    parameters: dict[str, ParameterOverride]
+    parameters: dict[str, Any]
     auth: AuthConfig
     checks: ChecksConfig
     phases: PhasesConfig
@@ -103,7 +103,7 @@ class ProjectConfig(DiffBase):
         request_timeout: float | int | None = None,
         request_cert: str | None = None,
         request_cert_key: str | None = None,
-        parameters: dict[str, ParameterOverride] | None = None,
+        parameters: dict[str, Any] | None = None,
         auth: AuthConfig | None = None,
         checks: ChecksConfig | None = None,
         phases: PhasesConfig | None = None,
