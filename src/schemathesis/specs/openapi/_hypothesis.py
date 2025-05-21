@@ -59,7 +59,7 @@ def openapi_cases(
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
-    phase: TestPhase = TestPhase.GENERATE,
+    phase: TestPhase = TestPhase.FUZZING,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -149,8 +149,8 @@ def openapi_cases(
             reject()
 
     _phase_data = {
-        TestPhase.EXPLICIT: ExplicitPhaseData(),
-        TestPhase.GENERATE: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExplicitPhaseData(),
+        TestPhase.FUZZING: GeneratePhaseData(),
     }[phase]
     phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
 

@@ -61,8 +61,6 @@ def execute_state_machine_loop(
 
     ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.generation.maximize))
 
-    transport_kwargs = engine.get_transport_kwargs()
-
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
 
@@ -73,7 +71,7 @@ def execute_state_machine_loop(
             event_queue.put(scenario_started)
 
         def get_call_kwargs(self, case: Case) -> dict[str, Any]:
-            return transport_kwargs
+            return engine.get_transport_kwargs(operation=case.operation)
 
         def _repr_step(self, rule: Rule, data: dict, result: StepOutput) -> str:
             return ""
@@ -138,7 +136,7 @@ def execute_state_machine_loop(
                 auth=auth,
                 headers=CaseInsensitiveDict(headers) if headers else None,
                 config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
-                transport_kwargs=engine.get_transport_kwargs(),
+                transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
                 recorder=self.recorder,
             )
             validate_response(

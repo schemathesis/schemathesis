@@ -68,7 +68,7 @@ def get_strategies_from_examples(
     # Add examples from parameter's schemas
     examples.extend(extract_from_schemas(operation))
     return [
-        openapi_cases(operation=operation, **{**parameters, **kwargs, "phase": TestPhase.EXPLICIT}).map(
+        openapi_cases(operation=operation, **{**parameters, **kwargs, "phase": TestPhase.EXAMPLES}).map(
             serialize_components
         )
         for parameters in produce_combinations(examples)

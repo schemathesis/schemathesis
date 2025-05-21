@@ -142,7 +142,9 @@ class Case:
             override=self._override,
             auth=None,
             headers=CaseInsensitiveDict(headers) if headers else None,
-            config=self.operation.schema.config.checks,
+            config=self.operation.schema.config.checks_config_for(
+                operation=self.operation, phase=self.meta.phase.name.value if self.meta is not None else None
+            ),
             transport_kwargs=transport_kwargs,
             recorder=None,
         )

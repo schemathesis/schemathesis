@@ -328,7 +328,7 @@ def graphql_cases(
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
-    phase: TestPhase = TestPhase.GENERATE,
+    phase: TestPhase = TestPhase.FUZZING,
 ) -> Any:
     start = time.monotonic()
     definition = cast(GraphQLOperationDefinition, operation.definition)
@@ -356,8 +356,8 @@ def graphql_cases(
     query_ = _generate_parameter("query", query, draw, operation, hook_context, hooks)
 
     _phase_data = {
-        TestPhase.EXPLICIT: ExplicitPhaseData(),
-        TestPhase.GENERATE: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExplicitPhaseData(),
+        TestPhase.FUZZING: GeneratePhaseData(),
     }[phase]
     phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
     instance = operation.Case(
