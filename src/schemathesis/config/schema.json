@@ -366,9 +366,6 @@
         },
         "unique-inputs": {
           "type": "boolean"
-        },
-        "fill-missing-examples": {
-          "type": "boolean"
         }
       }
     },

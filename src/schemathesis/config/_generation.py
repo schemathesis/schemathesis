@@ -27,7 +27,6 @@ class GenerationConfig(DiffBase):
     graphql_allow_null: bool
     database: str | None
     unique_inputs: bool
-    fill_missing_examples: bool
     exclude_header_characters: str | None
 
     __slots__ = (
@@ -42,7 +41,6 @@ class GenerationConfig(DiffBase):
         "graphql_allow_null",
         "database",
         "unique_inputs",
-        "fill_missing_examples",
         "exclude_header_characters",
     )
 
@@ -60,7 +58,6 @@ class GenerationConfig(DiffBase):
         graphql_allow_null: bool = True,
         database: str | None = None,
         unique_inputs: bool = False,
-        fill_missing_examples: bool = False,
         exclude_header_characters: str | None = None,
     ) -> None:
         from schemathesis.generation import GenerationMode
@@ -77,7 +74,6 @@ class GenerationConfig(DiffBase):
         self.graphql_allow_null = graphql_allow_null
         self.database = database
         self.unique_inputs = unique_inputs
-        self.fill_missing_examples = fill_missing_examples
         self.exclude_header_characters = exclude_header_characters
 
     @classmethod
@@ -102,7 +98,6 @@ class GenerationConfig(DiffBase):
             graphql_allow_null=data.get("graphql-allow-null", True),
             database=data.get("database"),
             unique_inputs=data.get("unique-inputs", False),
-            fill_missing_examples=data.get("fill-missing-examples", False),
             exclude_header_characters=data.get("exclude-header-characters"),
         )
 

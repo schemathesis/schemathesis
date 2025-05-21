@@ -852,16 +852,3 @@ The following settings control how Schemathesis generates test data for your API
     unique-inputs = true
     ```
 
-#### `generation.fill-missing-examples`
-
-!!! note ""
-
-    **Type:** `Boolean`  
-    **Default:** `false`  
-
-    Enable generation of random examples for API operations that do not have explicit examples in the OpenAPI schema.
-
-    ```toml
-    [generation]
-    fill-missing-examples = true
-    ```
