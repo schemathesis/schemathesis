@@ -549,7 +549,6 @@ class BaseOpenAPISchema(BaseSchema):
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
-        # TODO: What about phase?
         config = self.config.generation_for(operation=operation)
         if config.with_security_parameters:
             security_parameters = self.security.get_security_definitions_as_parameters(
