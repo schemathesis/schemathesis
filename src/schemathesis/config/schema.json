@@ -507,9 +507,6 @@
         "enabled": {
           "type": "boolean"
         },
-        "base-url": {
-          "type": "string"
-        },
         "auth": {
           "$ref": "#/$defs/AuthConfig"
         },

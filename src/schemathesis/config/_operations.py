@@ -194,7 +194,6 @@ class OperationsConfig(DiffBase):
 class OperationConfig(DiffBase):
     _filter_set: FilterSet
     enabled: bool
-    base_url: str | None
     headers: dict | None
     proxy: str | None
     continue_on_failure: bool | None
@@ -212,7 +211,6 @@ class OperationConfig(DiffBase):
     __slots__ = (
         "_filter_set",
         "enabled",
-        "base_url",
         "headers",
         "proxy",
         "continue_on_failure",
@@ -234,7 +232,6 @@ class OperationConfig(DiffBase):
         *,
         filter_set: FilterSet | None = None,
         enabled: bool = True,
-        base_url: str | None = None,
         headers: dict | None = None,
         proxy: str | None = None,
         continue_on_failure: bool | None = None,
@@ -251,7 +248,6 @@ class OperationConfig(DiffBase):
     ) -> None:
         self._filter_set = filter_set or FilterSet()
         self.enabled = enabled
-        self.base_url = base_url
         self.headers = headers
         self.proxy = proxy
         self.continue_on_failure = continue_on_failure
@@ -295,7 +291,6 @@ class OperationConfig(DiffBase):
         return cls(
             filter_set=filter_set,
             enabled=data.get("enabled", True),
-            base_url=resolve(data.get("base-url")),
             headers={resolve(key): resolve(value) for key, value in data.get("headers", {}).items()}
             if "headers" in data
             else None,

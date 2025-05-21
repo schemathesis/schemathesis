@@ -41,7 +41,7 @@ def test_configs(monkeypatch, path, snapshot_config):
 
 
 def test_project_key_config_sync():
-    ignored_in_operations_config = {"operations", "hooks", "workers"}
+    ignored_in_operations_config = {"operations", "hooks", "workers", "base_url"}
     for key in ProjectConfig.__slots__:
         if key.startswith("_"):
             continue
