@@ -90,6 +90,8 @@ def run_test(
     phase_name = phase.value.lower()
     assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
 
+    operation_config = ctx.config.operations.get_for_operation(operation)
+    continue_on_failure = operation_config.continue_on_failure or ctx.config.continue_on_failure or False
     generation = ctx.config.generation_for(operation=operation, phase=phase_name)
     override = overrides.for_operation(ctx.config, operation=operation)
     auth = ctx.config.auth_for(operation=operation)
@@ -114,6 +116,7 @@ def run_test(
                 recorder=recorder,
                 generation=generation,
                 transport_kwargs=transport_kwargs,
+                continue_on_failure=continue_on_failure,
             )
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
@@ -207,7 +210,7 @@ def run_test(
             yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
-        and ctx.config.continue_on_failure
+        and continue_on_failure
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
@@ -273,11 +276,12 @@ def cached_test_func(f: Callable) -> Callable:
         recorder: ScenarioRecorder,
         generation: GenerationConfig,
         transport_kwargs: dict[str, Any],
+        continue_on_failure: bool,
     ) -> None:
         try:
             if ctx.has_to_stop:
                 raise KeyboardInterrupt
-            if ctx.config.generation.unique_inputs:
+            if generation.unique_inputs:
                 cached = ctx.get_cached_outcome(case)
                 if isinstance(cached, BaseException):
                     raise cached
@@ -285,12 +289,12 @@ def cached_test_func(f: Callable) -> Callable:
                     return None
                 try:
                     f(
-                        ctx=ctx,
                         case=case,
                         check_ctx=check_ctx,
                         recorder=recorder,
                         generation=generation,
                         transport_kwargs=transport_kwargs,
+                        continue_on_failure=continue_on_failure,
                     )
                 except BaseException as exc:
                     ctx.cache_outcome(case, exc)
@@ -299,12 +303,12 @@ def cached_test_func(f: Callable) -> Callable:
                     ctx.cache_outcome(case, None)
             else:
                 f(
-                    ctx=ctx,
                     case=case,
                     check_ctx=check_ctx,
                     recorder=recorder,
                     generation=generation,
                     transport_kwargs=transport_kwargs,
+                    continue_on_failure=continue_on_failure,
                 )
         except (KeyboardInterrupt, Failure):
             raise
@@ -320,12 +324,12 @@ def cached_test_func(f: Callable) -> Callable:
 @cached_test_func
 def test_func(
     *,
-    ctx: EngineContext,
     case: Case,
     check_ctx: CheckContext,
     recorder: ScenarioRecorder,
     generation: GenerationConfig,
     transport_kwargs: dict[str, Any],
+    continue_on_failure: bool,
 ) -> None:
     recorder.record_case(parent_id=None, transition=None, case=case)
     try:
@@ -342,7 +346,7 @@ def test_func(
         case=case,
         ctx=check_ctx,
         response=response,
-        continue_on_failure=ctx.config.continue_on_failure,
+        continue_on_failure=continue_on_failure,
         recorder=recorder,
     )
 

@@ -51,7 +51,7 @@ class ProjectConfig(DiffBase):
     proxy: str | None
     workers: int
     max_response_time: float | int | None
-    continue_on_failure: bool
+    continue_on_failure: bool | None
     tls_verify: bool | str | None
     rate_limit: Limiter | None
     request_timeout: float | int | None
@@ -97,7 +97,7 @@ class ProjectConfig(DiffBase):
         workers: int | Literal["auto"] = DEFAULT_WORKERS,
         proxy: str | None = None,
         max_response_time: float | int | None = None,
-        continue_on_failure: bool = False,
+        continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,
@@ -154,7 +154,7 @@ class ProjectConfig(DiffBase):
             workers=data.get("workers", DEFAULT_WORKERS),
             proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
-            continue_on_failure=data.get("continue-on-failure", False),
+            continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
             request_timeout=data.get("request-timeout"),
