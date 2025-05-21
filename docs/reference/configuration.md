@@ -356,19 +356,6 @@ These settings can only be applied at the project level.
     wait-for-schema = 5.0
     ```
 
-#### `exclude-deprecated`
-
-!!! note ""
-
-    **Type:** `Boolean`  
-    **Default:** `false`  
-
-    Skip deprecated API operations.
-
-    ```toml
-    exclude-deprecated = true
-    ```
-
 #### `continue-on-failure`
 
 !!! note ""

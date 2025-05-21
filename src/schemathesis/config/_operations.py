@@ -199,7 +199,6 @@ class OperationConfig(DiffBase):
     proxy: str | None
     max_response_time: float | int | None
     wait_for_schema: float | int | None
-    exclude_deprecated: bool | None
     continue_on_failure: bool
     tls_verify: bool | str | None
     rate_limit: Limiter | None
@@ -220,7 +219,6 @@ class OperationConfig(DiffBase):
         "proxy",
         "max_response_time",
         "wait_for_schema",
-        "exclude_deprecated",
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
@@ -245,7 +243,6 @@ class OperationConfig(DiffBase):
         proxy: str | None = None,
         max_response_time: float | int | None = None,
         wait_for_schema: float | int | None = None,
-        exclude_deprecated: bool | None = None,
         continue_on_failure: bool = False,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
@@ -265,7 +262,6 @@ class OperationConfig(DiffBase):
         self.proxy = proxy
         self.max_response_time = max_response_time
         self.wait_for_schema = wait_for_schema
-        self.exclude_deprecated = exclude_deprecated
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
@@ -314,7 +310,6 @@ class OperationConfig(DiffBase):
             proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
             wait_for_schema=data.get("wait-for-schema"),
-            exclude_deprecated=data.get("exclude-deprecated"),
             continue_on_failure=data.get("continue-on-failure", False),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),

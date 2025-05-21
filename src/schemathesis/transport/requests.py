@@ -100,7 +100,8 @@ class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
 
         try:
             config = case.operation.schema.config
-            with ratelimit(config.rate_limit, config.base_url):
+            rate_limit = config.rate_limit_for(operation=case.operation)
+            with ratelimit(rate_limit, config.base_url):
                 response = session.request(**data)  # type: ignore
             return Response.from_requests(response, verify=verify)
         finally:

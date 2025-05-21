@@ -51,7 +51,6 @@ class ProjectConfig(DiffBase):
     proxy: str | None
     workers: int
     max_response_time: float | int | None
-    exclude_deprecated: bool | None
     continue_on_failure: bool
     tls_verify: bool | str | None
     rate_limit: Limiter | None
@@ -73,7 +72,6 @@ class ProjectConfig(DiffBase):
         "proxy",
         "workers",
         "max_response_time",
-        "exclude_deprecated",
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
@@ -99,7 +97,6 @@ class ProjectConfig(DiffBase):
         workers: int | Literal["auto"] = DEFAULT_WORKERS,
         proxy: str | None = None,
         max_response_time: float | int | None = None,
-        exclude_deprecated: bool | None = None,
         continue_on_failure: bool = False,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,
@@ -129,7 +126,6 @@ class ProjectConfig(DiffBase):
             self.workers = get_workers_count()
         self.proxy = proxy
         self.max_response_time = max_response_time
-        self.exclude_deprecated = exclude_deprecated
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
@@ -158,7 +154,6 @@ class ProjectConfig(DiffBase):
             workers=data.get("workers", DEFAULT_WORKERS),
             proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
-            exclude_deprecated=data.get("exclude-deprecated"),
             continue_on_failure=data.get("continue-on-failure", False),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
@@ -293,6 +288,15 @@ class ProjectConfig(DiffBase):
                 return config.proxy
         if self.proxy is not None:
             return self.proxy
+        return None
+
+    def rate_limit_for(self, *, operation: APIOperation | None = None) -> Limiter | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.rate_limit is not None:
+                return config.rate_limit
+        if self.rate_limit is not None:
+            return self.rate_limit
         return None
 
     def generation_for(

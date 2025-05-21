@@ -104,9 +104,6 @@
       "type": "number",
       "minimum": 1
     },
-    "exclude-deprecated": {
-      "type": "boolean"
-    },
     "continue-on-failure": {
       "type": "boolean"
     },
@@ -480,9 +477,6 @@
           "type": "number",
           "minimum": 1
         },
-        "exclude-deprecated": {
-          "type": "boolean"
-        },
         "continue-on-failure": {
           "type": "boolean"
         },
@@ -539,9 +533,6 @@
         "wait-for-schema": {
           "type": "number",
           "minimum": 1
-        },
-        "exclude-deprecated": {
-          "type": "boolean"
         },
         "continue-on-failure": {
           "type": "boolean"
