@@ -55,11 +55,12 @@ def execute_state_machine_loop(
     engine: EngineContext,
 ) -> None:
     """Execute the state machine testing loop."""
-    configures_hypothesis_settings = engine.config.get_hypothesis_settings()
-    kwargs = _get_hypothesis_settings_kwargs_override(configures_hypothesis_settings)
-    hypothesis_settings = hypothesis.settings(configures_hypothesis_settings, **kwargs)
+    configured_hypothesis_settings = engine.config.get_hypothesis_settings(phase="stateful")
+    kwargs = _get_hypothesis_settings_kwargs_override(configured_hypothesis_settings)
+    hypothesis_settings = hypothesis.settings(configured_hypothesis_settings, **kwargs)
+    generation = engine.config.generation_for(phase="stateful")
 
-    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.generation.maximize))
+    ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=generation.maximize))
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -92,7 +93,7 @@ def execute_state_machine_loop(
             if engine.has_to_stop:
                 raise KeyboardInterrupt
             try:
-                if engine.config.generation.unique_inputs:
+                if generation.unique_inputs:
                     cached = ctx.get_step_outcome(input.case)
                     if isinstance(cached, BaseException):
                         raise cached
@@ -101,13 +102,13 @@ def execute_state_machine_loop(
                 result = super().step(input)
                 ctx.step_succeeded()
             except FailureGroup as exc:
-                if engine.config.generation.unique_inputs:
+                if generation.unique_inputs:
                     for failure in exc.exceptions:
                         ctx.store_step_outcome(input.case, failure)
                 ctx.step_failed()
                 raise
             except Exception as exc:
-                if engine.config.generation.unique_inputs:
+                if generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
                 raise
@@ -115,11 +116,11 @@ def execute_state_machine_loop(
                 ctx.step_interrupted()
                 raise
             except BaseException as exc:
-                if engine.config.generation.unique_inputs:
+                if generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 raise exc
             else:
-                if engine.config.generation.unique_inputs:
+                if generation.unique_inputs:
                     ctx.store_step_outcome(input.case, None)
             return result
 

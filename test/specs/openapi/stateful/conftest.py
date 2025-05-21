@@ -524,7 +524,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         if hypothesis_settings is not None:
             current = schema.config.get_hypothesis_settings()
             new = hypothesis.settings(current, **hypothesis_settings)
-            schema.config.get_hypothesis_settings = lambda: new
+            schema.config.get_hypothesis_settings = lambda *_, **__: new
 
         if include is not None:
             schema = schema.include(**include)

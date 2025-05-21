@@ -80,8 +80,9 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
         if config.wait_for_schema is not None:
             kwargs["wait_for_schema"] = config.wait_for_schema
         kwargs["verify"] = config.tls_verify
-        if config.request_cert:
-            kwargs["cert"] = config.request_cert
+        request_cert = config.request_cert_for()
+        if request_cert:
+            kwargs["cert"] = request_cert
         auth = config.auth_for()
         if auth is not None:
             kwargs["auth"] = auth

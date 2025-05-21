@@ -338,14 +338,15 @@ def graphql_cases(
     }[definition.root_type]
     hook_context = HookContext(operation)
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
+    generation = operation.schema.config.generation_for(operation=operation, phase="fuzzing")
     strategy = strategy_factory(
         operation.schema.client_schema,  # type: ignore[attr-defined]
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
-        allow_x00=operation.schema.config.generation.allow_x00,
-        allow_null=operation.schema.config.generation.graphql_allow_null,
-        codec=operation.schema.config.generation.codec,
+        allow_x00=generation.allow_x00,
+        allow_null=generation.graphql_allow_null,
+        codec=generation.codec,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)

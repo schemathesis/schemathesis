@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
@@ -19,7 +18,7 @@ from jsonschema.exceptions import SchemaError
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
 from schemathesis.config import ProjectConfig
-from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types, string_to_boolean
+from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import prepare_urlencoded
@@ -74,8 +73,9 @@ def create_test(
         "auth_storage": auth_storage,
         **config.as_strategy_kwargs,
     }
+    generation = config.project.generation_for(operation=operation)
     strategy = strategies.combine(
-        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in config.project.generation.modes]
+        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes]
     )
 
     hypothesis_test = create_base_test(
@@ -127,11 +127,8 @@ def create_test(
     ):
         hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
 
-    disable_coverage = string_to_boolean(os.getenv("SCHEMATHESIS_DISABLE_COVERAGE", ""))
-
     if (
-        not disable_coverage
-        and HypothesisTestMode.COVERAGE in config.modes
+        HypothesisTestMode.COVERAGE in config.modes
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.COVERAGE)
         and not config.given_args
@@ -140,7 +137,7 @@ def create_test(
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
-            config.project.generation.modes,
+            generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
             config.project.phases.coverage.unexpected_methods,
