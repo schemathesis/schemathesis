@@ -352,8 +352,7 @@ class ProjectConfig(DiffBase):
         import hypothesis
         from hypothesis.database import DirectoryBasedExampleDatabase, InMemoryExampleDatabase
 
-        # TODO: create a hierarchy & build config
-        config = self.generation
+        config = self.generation_for(operation=operation, phase=phase)
         kwargs: dict[str, Any] = {}
 
         if config.max_examples is not None:
