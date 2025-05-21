@@ -197,7 +197,6 @@ class OperationConfig(DiffBase):
     base_url: str | None
     headers: dict | None
     proxy: str | None
-    max_response_time: float | int | None
     wait_for_schema: float | int | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
@@ -217,7 +216,6 @@ class OperationConfig(DiffBase):
         "base_url",
         "headers",
         "proxy",
-        "max_response_time",
         "wait_for_schema",
         "continue_on_failure",
         "tls_verify",
@@ -241,7 +239,6 @@ class OperationConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         proxy: str | None = None,
-        max_response_time: float | int | None = None,
         wait_for_schema: float | int | None = None,
         continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
@@ -260,7 +257,6 @@ class OperationConfig(DiffBase):
         self.base_url = base_url
         self.headers = headers
         self.proxy = proxy
-        self.max_response_time = max_response_time
         self.wait_for_schema = wait_for_schema
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
@@ -308,7 +304,6 @@ class OperationConfig(DiffBase):
             if "headers" in data
             else None,
             proxy=resolve(data.get("proxy")),
-            max_response_time=data.get("max-response-time"),
             wait_for_schema=data.get("wait-for-schema"),
             continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),

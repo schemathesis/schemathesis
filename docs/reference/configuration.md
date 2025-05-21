@@ -369,19 +369,6 @@ These settings can only be applied at the project level.
     continue-on-failure = true
     ```
 
-#### `max-response-time`
-
-!!! note ""
-
-    **Type:** `Float (>0)`  
-    **Default:** `null`  
-
-    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
-
-    ```toml
-    max-response-time = 2.0
-    ```
-
 ### Phases
 
 #### `phases.<phase>.enabled`
@@ -506,6 +493,20 @@ These settings can only be applied at the project level.
     ```toml
     [checks]
     positive_data_acceptance.expected-statuses = [200, 201, 202]
+    ```
+
+#### `checks.max_response_time`
+
+!!! note ""
+
+    **Type:** `Float (>0)`  
+    **Default:** `null`  
+
+    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
+
+    ```toml
+    [checks]
+    max_response_time = 2.0
     ```
 
 ### Network

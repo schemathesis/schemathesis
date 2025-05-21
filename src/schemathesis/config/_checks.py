@@ -76,8 +76,8 @@ class MaxResponseTimeConfig(DiffBase):
 
     __slots__ = ("enabled", "limit")
 
-    def __init__(self, *, enabled: bool = True, limit: float | None = None) -> None:
-        self.enabled = enabled
+    def __init__(self, *, limit: float | None = None) -> None:
+        self.enabled = limit is not None
         self.limit = limit
 
 
@@ -225,6 +225,7 @@ class ChecksConfig(DiffBase):
             ),
             ignored_auth=SimpleCheckConfig.from_dict(merge(data.get("ignored_auth", {}))),
             unsupported_method=SimpleCheckConfig.from_dict(merge(data.get("unsupported_method", {}))),
+            max_response_time=MaxResponseTimeConfig(limit=data.get("max_response_time")),
         )
 
     def get_by_name(self, *, name: str) -> CheckConfig | SimpleCheckConfig | MaxResponseTimeConfig:

@@ -93,10 +93,6 @@
     "proxy": {
       "type": "string"
     },
-    "max-response-time": {
-      "type": "number",
-      "minimum": 0
-    },
     "workers": {
       "type": "integer"
     },
@@ -204,6 +200,9 @@
         },
         "unsupported_method": {
           "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "max_response_time": {
+          "$ref": "#/$defs/MaxResponseTimeConfig"
         }
       }
     },
@@ -215,6 +214,10 @@
           "type": "boolean"
         }
       }
+    },
+    "MaxResponseTimeConfig": {
+      "type": "number",
+      "minimum": 0
     },
     "CheckConfig": {
       "type": "object",
@@ -463,10 +466,6 @@
         "proxy": {
           "type": "string"
         },
-        "max-response-time": {
-          "type": "number",
-          "minimum": 0
-        },
         "workers": {
           "type": "integer"
         },
@@ -522,10 +521,6 @@
         },
         "proxy": {
           "type": "string"
-        },
-        "max-response-time": {
-          "type": "number",
-          "minimum": 0
         },
         "wait-for-schema": {
           "type": "number",

@@ -134,13 +134,14 @@ def create_test(
         and not config.given_args
         and not config.given_kwargs
     ):
+        phases_config = config.project.phases_for(operation=operation)
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
             generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
-            config.project.phases.coverage.unexpected_methods,
+            phases_config.coverage.unexpected_methods,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)

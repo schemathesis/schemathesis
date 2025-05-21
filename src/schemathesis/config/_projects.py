@@ -50,7 +50,6 @@ class ProjectConfig(DiffBase):
     hooks: str | None
     proxy: str | None
     workers: int
-    max_response_time: float | int | None
     continue_on_failure: bool | None
     tls_verify: bool | str | None
     rate_limit: Limiter | None
@@ -71,7 +70,6 @@ class ProjectConfig(DiffBase):
         "hooks",
         "proxy",
         "workers",
-        "max_response_time",
         "continue_on_failure",
         "tls_verify",
         "rate_limit",
@@ -125,7 +123,6 @@ class ProjectConfig(DiffBase):
         else:
             self.workers = get_workers_count()
         self.proxy = proxy
-        self.max_response_time = max_response_time
         self.continue_on_failure = continue_on_failure
         self.tls_verify = tls_verify
         if rate_limit is not None:
@@ -153,7 +150,6 @@ class ProjectConfig(DiffBase):
             hooks_=resolve(data.get("hooks")),
             workers=data.get("workers", DEFAULT_WORKERS),
             proxy=resolve(data.get("proxy")),
-            max_response_time=data.get("max-response-time"),
             continue_on_failure=data.get("continue-on-failure", None),
             tls_verify=resolve(data.get("tls-verify")),
             rate_limit=resolve(data.get("rate-limit")),
@@ -341,7 +337,8 @@ class ProjectConfig(DiffBase):
                         configs.append(phase_config.checks)
                     configs.append(op.checks)
         if phase is not None:
-            phase_config = self.phases.get_by_name(name=phase)
+            phases = self.phases_for(operation=operation)
+            phase_config = phases.get_by_name(name=phase)
             configs.append(phase_config.checks)
         configs.append(self.checks)
         return ChecksConfig.from_hierarchy(configs)
