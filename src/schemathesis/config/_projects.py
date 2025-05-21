@@ -228,13 +228,6 @@ class ProjectConfig(DiffBase):
         if suppress_health_check is not None:
             self.suppress_health_check = suppress_health_check
 
-    def parameters_for(self, *, operation: APIOperation | None = None) -> dict:
-        parameters = {name: param.value for name, param in self.parameters.items()}
-        if operation is not None:
-            config = self.operations.get_for_operation(operation=operation)
-            parameters.update({name: param.value for name, param in config.parameters.items()})
-        return parameters
-
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
         """Get auth credentials, prioritizing operation-specific configs."""
         if operation is not None:

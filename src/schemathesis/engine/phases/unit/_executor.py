@@ -38,7 +38,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.generation import targets
+from schemathesis.generation import overrides, targets
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
@@ -89,11 +89,10 @@ def run_test(
     phase_name = phase.value.lower()
     assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
 
-    override = ctx.config.parameters_for(operation=operation)
+    override = overrides.for_operation(ctx.config, operation=operation)
     auth = ctx.config.auth_for(operation=operation)
     headers = ctx.config.headers_for(operation=operation)
     check_ctx = CheckContext(
-        # TODO:
         override=override,
         auth=auth,
         headers=CaseInsensitiveDict(headers) if headers else None,

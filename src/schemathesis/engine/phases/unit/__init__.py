@@ -160,7 +160,7 @@ def worker_task(
 
                 if isinstance(result, Ok):
                     operation = result.ok()
-                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation)
+                    as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
                     try:
                         test_function = create_test(
                             operation=operation,
@@ -191,9 +191,11 @@ def worker_task(
             events_queue.put(events.Interrupted(phase=phase))
 
 
-def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str, Any]:
+def get_strategy_kwargs(ctx: EngineContext, *, operation: APIOperation) -> dict[str, Any]:
     kwargs = {}
-    for location, entry in overrides.for_operation(ctx.config, operation).items():
+    override = overrides.for_operation(ctx.config, operation=operation)
+    for location in ("query", "headers", "cookies", "path_parameters"):
+        entry = getattr(override, location)
         if entry:
             kwargs[location] = entry
     headers = ctx.config.headers_for(operation=operation)

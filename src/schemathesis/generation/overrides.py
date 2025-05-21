@@ -42,18 +42,17 @@ class Override:
         )
 
 
-def for_operation(config: ProjectConfig, operation: APIOperation) -> dict[str, dict[str, str]]:
+def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override:
     operation_config = config.operations.get_for_operation(operation)
 
-    output = {}
+    output = Override(query={}, headers={}, cookies={}, path_parameters={})
     groups = [
-        ("query", operation.query),
-        ("headers", operation.headers),
-        ("cookies", operation.cookies),
-        ("path_parameters", operation.path_parameters),
+        (output.query, operation.query),
+        (output.headers, operation.headers),
+        (output.cookies, operation.cookies),
+        (output.path_parameters, operation.path_parameters),
     ]
-    for key, params in groups:
-        overrides = {}
+    for container, params in groups:
         for param in params:
             # Attempt to get the override from the operation-specific configuration.
             value = None
@@ -63,8 +62,7 @@ def for_operation(config: ProjectConfig, operation: APIOperation) -> dict[str, d
             if value is None:
                 value = _get_override_value(param, config.parameters)
             if value is not None:
-                overrides[param.name] = value
-        output[key] = overrides
+                container[param.name] = value
 
     return output
 

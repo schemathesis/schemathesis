@@ -77,7 +77,9 @@ def execute_state_machine_loop(
             return ""
 
         def before_call(self, case: Case) -> None:
-            for location, entry in overrides.for_operation(engine.config, case.operation).items():
+            override = overrides.for_operation(engine.config, operation=case.operation)
+            for location in ("query", "headers", "cookies", "path_parameters"):
+                entry = getattr(override, location)
                 if entry:
                     container = getattr(case, location) or {}
                     container.update(entry)
@@ -127,8 +129,7 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
-            # TODO: convert overrides to Override class
-            override = engine.config.parameters_for(operation=case.operation)
+            override = overrides.for_operation(engine.config, operation=case.operation)
             auth = engine.config.auth_for(operation=case.operation)
             headers = engine.config.headers_for(operation=case.operation)
             check_ctx = CheckContext(
