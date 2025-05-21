@@ -135,11 +135,12 @@ class SchemathesisCase(PyCollector):
                 else:
                     as_strategy_kwargs = {}
                 modes = []
-                if self.schema.config.phases.examples.enabled:
+                phases = self.schema.config.phases_for(operation=operation)
+                if phases.examples.enabled:
                     modes.append(HypothesisTestMode.EXAMPLES)
-                if self.schema.config.phases.fuzzing.enabled:
+                if phases.fuzzing.enabled:
                     modes.append(HypothesisTestMode.FUZZING)
-                if self.schema.config.phases.coverage.enabled:
+                if phases.coverage.enabled:
                     modes.append(HypothesisTestMode.COVERAGE)
 
                 funcobj = create_test(

@@ -160,6 +160,14 @@ def worker_task(
 
                 if isinstance(result, Ok):
                     operation = result.ok()
+                    phases = ctx.config.phases_for(operation=operation)
+                    # Skip tests if this phase is disabled
+                    if (
+                        (phase == PhaseName.EXAMPLES and not phases.examples.enabled)
+                        or (phase == PhaseName.FUZZING and not phases.fuzzing.enabled)
+                        or (phase == PhaseName.COVERAGE and not phases.coverage.enabled)
+                    ):
+                        continue
                     as_strategy_kwargs = get_strategy_kwargs(ctx, operation=operation)
                     try:
                         test_function = create_test(

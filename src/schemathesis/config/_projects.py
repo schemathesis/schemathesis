@@ -296,6 +296,15 @@ class ProjectConfig(DiffBase):
             return self.rate_limit
         return None
 
+    def phases_for(self, *, operation: APIOperation | None) -> PhasesConfig:
+        configs = []
+        if operation is not None:
+            for op in self.operations.operations:
+                if op._filter_set.applies_to(operation=operation):
+                    configs.append(op.phases)
+        configs.append(self.phases)
+        return PhasesConfig.from_hierarchy(configs)
+
     def generation_for(
         self,
         *,
@@ -311,7 +320,8 @@ class ProjectConfig(DiffBase):
                         configs.append(phase_config.generation)
                     configs.append(op.generation)
         if phase is not None:
-            phase_config = self.phases.get_by_name(name=phase)
+            phases = self.phases_for(operation=operation)
+            phase_config = phases.get_by_name(name=phase)
             configs.append(phase_config.generation)
         configs.append(self.generation)
         return GenerationConfig.from_hierarchy(configs)
