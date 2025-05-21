@@ -61,7 +61,7 @@ def execute_state_machine_loop(
 
     ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=engine.config.generation.maximize))
 
-    transport_kwargs = engine.transport_kwargs
+    transport_kwargs = engine.get_transport_kwargs()
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -138,7 +138,7 @@ def execute_state_machine_loop(
                 auth=auth,
                 headers=CaseInsensitiveDict(headers) if headers else None,
                 config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
-                transport_kwargs=engine.transport_kwargs,
+                transport_kwargs=engine.get_transport_kwargs(),
                 recorder=self.recorder,
             )
             validate_response(

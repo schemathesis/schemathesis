@@ -196,6 +196,7 @@ def get_strategy_kwargs(ctx: EngineContext, operation: APIOperation) -> dict[str
     for location, entry in overrides.for_operation(ctx.config, operation).items():
         if entry:
             kwargs[location] = entry
-    if ctx.config.headers:
-        kwargs["headers"] = {key: value for key, value in ctx.config.headers.items() if key.lower() != "user-agent"}
+    headers = ctx.config.headers_for(operation=operation)
+    if headers:
+        kwargs["headers"] = {key: value for key, value in headers.items() if key.lower() != "user-agent"}
     return kwargs

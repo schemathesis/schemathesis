@@ -176,7 +176,7 @@ class GroupedFailures:
 class ExecutionContext:
     """Storage for the current context of the execution."""
 
-    config: ProjectConfig = field(default_factory=ProjectConfig.discover)
+    config: ProjectConfig
     statistic: Statistic = field(default_factory=Statistic)
     exit_code: int = 0
     initialization_lines: list[str | Generator[str, None, None]] = field(default_factory=list)

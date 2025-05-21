@@ -98,7 +98,7 @@ def run_test(
         auth=auth,
         headers=CaseInsensitiveDict(headers) if headers else None,
         config=ctx.config.checks_config_for(operation=operation, phase=phase_name),
-        transport_kwargs=ctx.transport_kwargs,
+        transport_kwargs=ctx.get_transport_kwargs(operation=operation),
         recorder=recorder,
     )
 
@@ -296,7 +296,7 @@ def cached_test_func(f: Callable) -> Callable:
 def test_func(*, ctx: EngineContext, case: Case, check_ctx: CheckContext, recorder: ScenarioRecorder) -> None:
     recorder.record_case(parent_id=None, transition=None, case=case)
     try:
-        response = case.call(**ctx.transport_kwargs)
+        response = case.call(**ctx.get_transport_kwargs())
     except (requests.Timeout, requests.ConnectionError) as error:
         if isinstance(error.request, requests.Request):
             recorder.record_request(case_id=case.id, request=error.request.prepare())

@@ -100,7 +100,7 @@ class ApiOperationsCount:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
-    config: ProjectConfig = field(default_factory=ProjectConfig.discover)
+    config: ProjectConfig
     location: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
     app: Any = None

@@ -96,7 +96,7 @@ class ProjectConfig(DiffBase):
         base_url: str | None = None,
         headers: dict | None = None,
         hooks_: str | None = None,
-        workers: int | Literal["auto"] = 1,
+        workers: int | Literal["auto"] = DEFAULT_WORKERS,
         proxy: str | None = None,
         max_response_time: float | int | None = None,
         exclude_deprecated: bool | None = None,
@@ -155,7 +155,7 @@ class ProjectConfig(DiffBase):
             if "headers" in data
             else None,
             hooks_=resolve(data.get("hooks")),
-            workers=data.get("workers", 1),
+            workers=data.get("workers", DEFAULT_WORKERS),
             proxy=resolve(data.get("proxy")),
             max_response_time=data.get("max-response-time"),
             exclude_deprecated=data.get("exclude-deprecated"),
@@ -175,19 +175,13 @@ class ProjectConfig(DiffBase):
             ),
         )
 
-    @classmethod
-    def discover(cls) -> ProjectConfig:
-        from schemathesis.config import SchemathesisConfig
-
-        return SchemathesisConfig.discover().projects.default
-
     def update(
         self,
         *,
         base_url: str | None = None,
         headers: dict | None = None,
         basic_auth: tuple[str, str] | None = None,
-        workers: int | Literal["auto"] = 1,
+        workers: int | Literal["auto"] | None = None,
         continue_on_failure: bool | None = None,
         rate_limit: str | None = None,
         request_timeout: float | int | None = None,
@@ -209,10 +203,11 @@ class ProjectConfig(DiffBase):
         if basic_auth is not None:
             self.auth.update(basic=basic_auth)
 
-        if isinstance(workers, int):
-            self.workers = workers
-        else:
-            self.workers = get_workers_count()
+        if workers is not None:
+            if isinstance(workers, int):
+                self.workers = workers
+            else:
+                self.workers = get_workers_count()
 
         if continue_on_failure is not None:
             self.continue_on_failure = continue_on_failure
@@ -246,6 +241,7 @@ class ProjectConfig(DiffBase):
         return parameters
 
     def auth_for(self, *, operation: APIOperation | None = None) -> tuple[str, str] | None:
+        """Get auth credentials, prioritizing operation-specific configs."""
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
             if config.auth.basic is not None:
@@ -255,14 +251,49 @@ class ProjectConfig(DiffBase):
         return None
 
     def headers_for(self, *, operation: APIOperation | None = None) -> dict[str, str] | None:
-        headers = None
-        if self.headers is not None:
-            headers = self.headers
+        """Get explicitly configured headers."""
+        headers = self.headers.copy() if self.headers else {}
         if operation is not None:
             config = self.operations.get_for_operation(operation=operation)
             if config.headers is not None:
-                headers = config.headers
+                headers.update(config.headers)
         return headers
+
+    def request_timeout_for(self, *, operation: APIOperation | None = None) -> float | int | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.request_timeout is not None:
+                return config.request_timeout
+        if self.request_timeout is not None:
+            return self.request_timeout
+        return None
+
+    def tls_verify_for(self, *, operation: APIOperation | None = None) -> bool | str | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.tls_verify is not None:
+                return config.tls_verify
+        if self.tls_verify is not None:
+            return self.tls_verify
+        return None
+
+    def request_cert_for(self, *, operation: APIOperation | None = None) -> str | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.request_cert is not None:
+                return config.request_cert
+        if self.request_cert is not None:
+            return self.request_cert
+        return None
+
+    def proxy_for(self, *, operation: APIOperation | None = None) -> str | None:
+        if operation is not None:
+            config = self.operations.get_for_operation(operation=operation)
+            if config.proxy is not None:
+                return config.proxy
+        if self.proxy is not None:
+            return self.proxy
+        return None
 
     def generation_for(
         self,

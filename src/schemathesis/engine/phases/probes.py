@@ -130,12 +130,13 @@ def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     from urllib3.exceptions import InsecureRequestWarning
 
     try:
-        request = probe.prepare_request(ctx.session, Request(), ctx.schema)
+        session = ctx.get_session()
+        request = probe.prepare_request(session, Request(), ctx.schema)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = ctx.session.send(request, timeout=ctx.config.request_timeout or 2)
+            response = session.send(request, timeout=ctx.config.request_timeout or 2)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented

@@ -82,8 +82,9 @@ def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchem
         kwargs["verify"] = config.tls_verify
         if config.request_cert:
             kwargs["cert"] = config.request_cert
-        if config.auth.basic is not None:
-            kwargs["auth"] = config.auth.basic
+        auth = config.auth_for()
+        if auth is not None:
+            kwargs["auth"] = auth
 
     return loader(location, config=config._parent, **kwargs)
 
