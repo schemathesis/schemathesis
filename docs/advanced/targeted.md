@@ -22,7 +22,7 @@ This approach is particularly useful for detecting:
 
 !!! info "Custom Metrics"
 
-    See [Extending Metrics](../extending/metrics.md) for details on implementing custom metrics for targeted testing.
+    See [Extending Metrics](../guides/extending.md) for details on implementing custom metrics for targeted testing.
 
 ## Example Scenario
 

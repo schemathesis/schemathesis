@@ -3,35 +3,30 @@ repo_url: https://github.com/schemathesis/schemathesis
 
 nav:
   - Introduction: index.md
-  - Getting Started: getting-started.md
-  - Core Concepts: core-concepts.md
-  - Tutorials:
-      - Command-Line Interface: using/cli.md
-      - Pytest: using/pytest.md
-  - Configuration: using/configuration.md
-  - Continuous Integration:
-      - Overview: ci/overview.md
-      - GitHub Actions: ci/github-actions.md
-      - GitLab CI: ci/gitlab-ci.md
-  - Extending:
-      - Overview: extending/overview.md
-      - Checks: extending/checks.md
-      - Data Generation: extending/data-generation.md
-      - Authentication: extending/auth.md
-      - Hooks: extending/hooks.md
-      - Metrics: extending/metrics.md
-  - Open API:
-      - Examples in API Schemas: openapi/examples.md
+  - Quick Start Guide: quick-start.md
+  - Tutorial: tutorial.md
+  - How-To Guides:
+      - guides/index.md
+      - guides/cicd.md
+      - guides/extending.md
+  - Explanations:
+      - explanations/index.md
+      - explanations/workflow.md
+      - explanations/data-generation.md
+      - explanations/checks.md
+  - Configuration:
+      - configuration/file.md
+      - configuration/authentication.md
   - Advanced:
       - Targeted Testing: advanced/targeted.md
-  - Troubleshooting: troubleshooting.md
-  - Reference:
+  - API Reference:
       - Configuration Options: reference/configuration.md
       - CLI Options: reference/cli.md
       - Checks: reference/checks.md
       - Reporting: reference/reporting.md
       - Python API Reference: reference/python.md
   - External Resources: resources.md
+  - Troubleshooting: troubleshooting.md
   - FAQ: faq.md
 
 theme:
@@ -44,23 +39,26 @@ theme:
       toggle:
         icon: material/brightness-auto
         name: Switch to light mode
-
-    # Palette toggle for light mode
+    # Light mode
     - media: "(prefers-color-scheme: light)"
       scheme: default
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-7
+        icon: material/weather-night
         name: Switch to dark mode
-
-    # Palette toggle for dark mode
+    # Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
+      primary: custom
+      accent: custom
       toggle:
-        icon: material/brightness-4
-        name: Switch to system preference
+        icon: material/weather-sunny
+        name: Switch to light mode
   features:
     - navigation.footer
     - content.code.copy
+    - content.tabs.link
 
 extra:
   social:
@@ -79,10 +77,18 @@ markdown_extensions:
   - pymdownx.inlinehilite
   - pymdownx.snippets
   - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.blocks.caption
   - admonition
   - pymdownx.details
   - pymdownx.emoji:
       emoji_index: !!python/name:material.extensions.emoji.twemoji
       emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - attr_list
+  - md_in_html
+
+extra_css:
+  - stylesheets/extra.css
 
 copyright: Copyright &copy; 2020-2025 Dmitry Dygalo & Schemathesis.io

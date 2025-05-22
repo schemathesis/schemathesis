@@ -40,7 +40,7 @@ uvx schemathesis run https://example.schemathesis.io/openapi.json
 
 - **Basic understanding of OpenAPI specifications**: Familiarity with OpenAPI 3.x is recommended.
 
-If you're new to Schemathesis, consider reviewing the [Getting Started Guide](../getting-started.md) before proceeding.
+If you're new to Schemathesis, consider reviewing the [Quick Start Guide](../quick-start.md) before proceeding.
 
 ## First Test Run
 
@@ -319,7 +319,7 @@ basic = { username = "${USERNAME}", password = "${PASSWORD}" }
 
 ### Advanced Authentication
 
-For complex or multi-step authentication flows that require custom logic, please refer to the [Extensions Guide](../extending/auth.md).
+For complex or multi-step authentication flows that require custom logic, please refer to the [Extensions Guide](../guides/extending.md).
 
 
 !!! tip "Third-Party Authentication"
@@ -361,7 +361,7 @@ $ st run openapi.yaml --phases coverage
 
 !!! tip ""
 
-    For more information about test phases, including how they work and when to use them, see the [Test Phases](../core-concepts.md#test-phases) section.
+    For more information about test phases, including how they work and when to use them, see the [Test Phases](../explanations/workflow.md) section.
 
 ## Data Generation
 
@@ -620,4 +620,4 @@ Should you wish to go beyond the discussed CLI usage you can check the following
 
 - See the [CLI Reference](../reference/cli.md) for a complete list of all available command-line options
 
-- Check [Extension Mechanisms](../extending/overview.md) to implement custom checks, hooks, or data generators when standard functionality doesn't meet your requirements
+- Check [Extension Mechanisms](../guides/extending.md) to implement custom checks, hooks, or data generators when standard functionality doesn't meet your requirements
