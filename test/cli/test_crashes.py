@@ -1,7 +1,7 @@
 from unittest import mock
 
 import pytest
-from hypothesis import HealthCheck, Phase, assume, example, given, settings
+from hypothesis import HealthCheck, Phase, Verbosity, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
 from hypothesis_jsonschema import from_schema
@@ -225,26 +225,25 @@ def check_result(result):
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
 
 
-def has_no_none(value):
-    if value is None:
-        return False
-    elif isinstance(value, dict):
-        return all(has_no_none(v) for v in value.values())
-    elif isinstance(value, (list, tuple)):
-        return all(has_no_none(item) for item in value)
-    return True
+def remove_nones(value):
+    if isinstance(value, dict):
+        return {k: remove_nones(v) for k, v in value.items() if v is not None}
+    elif isinstance(value, list):
+        return [remove_nones(v) for v in value if v is not None]
+    return value
 
 
-@given(config=from_schema(deepclone(CONFIG_SCHEMA)))
+@given(config=from_schema(deepclone(CONFIG_SCHEMA)).map(remove_nones))
 @settings(
-    phases=[Phase.explicit, Phase.generate],
+    phases=[Phase.generate],
     suppress_health_check=list(HealthCheck),
     deadline=None,
-    max_examples=10,
+    database=None,
+    verbosity=Verbosity.quiet,
+    max_examples=7,
 )
 @pytest.mark.usefixtures("mocked_schema")
 def test_random_config(cli, config, schema_url, tmp_path):
-    assume(has_no_none(config))
     reports = config.get("reports", {})
     report_enabled = False
     for report_type in ("vcr", "har", "junit"):

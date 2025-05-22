@@ -1583,6 +1583,7 @@ def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_refer
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("payload")
+@pytest.mark.skipif(sys.version_info >= (3, 13), reason="Traceback is different")
 def test_unknown_schema_error(ctx, schema_url, cli, snapshot_cli):
     module = ctx.write_pymodule(
         r"""

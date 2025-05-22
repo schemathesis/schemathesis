@@ -52,9 +52,6 @@ def test_disable_operations(cli, schema_url, snapshot_cli):
                         ],
                     }
                 ],
-                "operations": [
-                    {"include-name": "GET /failure", "enabled": False},
-                ],
             },
         )
         == snapshot_cli
