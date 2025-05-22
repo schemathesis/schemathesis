@@ -26,6 +26,8 @@ class EngineContext:
     outcome_cache: dict[int, BaseException | None]
     start_time: float
 
+    __slots__ = ("schema", "control", "outcome_cache", "start_time", "_session", "_transport_kwargs_cache")
+
     def __init__(
         self,
         *,
@@ -38,6 +40,7 @@ class EngineContext:
         self.outcome_cache = {}
         self.start_time = time.monotonic()
         self._session = session
+        self._transport_kwargs_cache: dict[str | None, dict[str, Any]] = {}
 
     def _repr_pretty_(self, *args: Any, **kwargs: Any) -> None: ...
 
@@ -95,6 +98,10 @@ class EngineContext:
         return session
 
     def get_transport_kwargs(self, operation: APIOperation | None = None) -> dict[str, Any]:
+        key = operation.label if operation is not None else None
+        cached = self._transport_kwargs_cache.get(key)
+        if cached is not None:
+            return cached.copy()
         config = self.config
         kwargs: dict[str, Any] = {
             "session": self.get_session(operation=operation),
@@ -106,4 +113,5 @@ class EngineContext:
         proxy = config.proxy_for(operation=operation)
         if proxy is not None:
             kwargs["proxies"] = {"all": proxy}
+        self._transport_kwargs_cache[key] = kwargs
         return kwargs
