@@ -4,8 +4,9 @@ import textwrap
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
+from schemathesis.config import OutputConfig
 from schemathesis.core.failures import Failure, Severity
-from schemathesis.core.output import OutputConfig, truncate_json
+from schemathesis.core.output import truncate_json
 
 if TYPE_CHECKING:
     from jsonschema import ValidationError
@@ -141,11 +142,14 @@ class JsonSchemaError(Failure):
         title: str = "Response violates schema",
         operation: str,
         exc: ValidationError,
-        output_config: OutputConfig | None = None,
+        config: OutputConfig | None = None,
     ) -> JsonSchemaError:
-        output_config = OutputConfig.from_parent(output_config, max_lines=20)
-        schema = textwrap.indent(truncate_json(exc.schema, config=output_config), prefix="    ")
-        value = textwrap.indent(truncate_json(exc.instance, config=output_config), prefix="    ")
+        schema = textwrap.indent(
+            truncate_json(exc.schema, config=config or OutputConfig(), max_lines=20), prefix="    "
+        )
+        value = textwrap.indent(
+            truncate_json(exc.instance, config=config or OutputConfig(), max_lines=20), prefix="    "
+        )
         schema_path = list(exc.absolute_schema_path)
         if len(schema_path) > 1:
             # Exclude the last segment, which is already in the schema
@@ -336,7 +340,7 @@ class IgnoredAuth(Failure):
 class AcceptedNegativeData(Failure):
     """Response with negative data was accepted."""
 
-    __slots__ = ("operation", "message", "status_code", "allowed_statuses", "title", "case_id", "severity")
+    __slots__ = ("operation", "message", "status_code", "expected_statuses", "title", "case_id", "severity")
 
     def __init__(
         self,
@@ -344,14 +348,14 @@ class AcceptedNegativeData(Failure):
         operation: str,
         message: str,
         status_code: int,
-        allowed_statuses: list[str],
+        expected_statuses: list[str],
         title: str = "Accepted negative data",
         case_id: str | None = None,
     ) -> None:
         self.operation = operation
         self.message = message
         self.status_code = status_code
-        self.allowed_statuses = allowed_statuses
+        self.expected_statuses = expected_statuses
         self.title = title
         self.case_id = case_id
         self.severity = Severity.MEDIUM

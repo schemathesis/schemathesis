@@ -1,0 +1,4 @@
+Error in root section:
+  Type error:
+
+  - 'tls-verify' → Must be one of: boolean or string, but got list: [True, False]

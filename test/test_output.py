@@ -1,6 +1,7 @@
 import pytest
 
-from schemathesis.core.output import OutputConfig, prepare_response_payload, truncate_json
+from schemathesis.config import OutputConfig, TruncationConfig
+from schemathesis.core.output import prepare_response_payload, truncate_json
 
 SIMPLE_DICT = {
     "name": "John",
@@ -20,7 +21,7 @@ SIMPLE_DICT = {
 
 def test_truncate_simple_dict():
     assert (
-        truncate_json(SIMPLE_DICT)
+        truncate_json(SIMPLE_DICT, config=OutputConfig())
         == """{
     "name": "John",
     "age": 30,
@@ -37,7 +38,7 @@ def test_truncate_simple_dict():
 
 def test_no_dict_truncation():
     assert (
-        truncate_json(SIMPLE_DICT, config=OutputConfig(truncate=False))
+        truncate_json(SIMPLE_DICT, config=OutputConfig(truncation=TruncationConfig(enabled=False)))
         == """{
     "name": "John",
     "age": 30,
@@ -63,14 +64,14 @@ def test_no_dict_truncation():
     ],
 )
 def test_prepare_response_payload(payload, expected):
-    assert prepare_response_payload(payload) == expected
+    assert prepare_response_payload(payload, config=OutputConfig()) == expected
 
 
 def test_prepare_response_payload_truncated():
     value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ" * 30
-    assert prepare_response_payload(value).endswith(" // Output truncated...")
+    assert prepare_response_payload(value, config=OutputConfig()).endswith(" // Output truncated...")
 
 
 def test_prepare_response_payload_no_truncation():
     value = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    assert prepare_response_payload(value, config=OutputConfig(truncate=False)) == value
+    assert prepare_response_payload(value, config=OutputConfig(truncation=TruncationConfig(enabled=False))) == value

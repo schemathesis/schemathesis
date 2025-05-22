@@ -71,7 +71,7 @@ class Case:
 
     def as_curl_command(self, headers: Mapping[str, Any] | None = None, verify: bool = True) -> str:
         """Construct a curl command for a given case."""
-        request_data = prepare_request(self, headers, self.operation.schema.output_config.sanitize)
+        request_data = prepare_request(self, headers, config=self.operation.schema.config.output.sanitization)
         return curl.generate(
             method=str(request_data.method),
             url=str(request_data.url),
@@ -142,7 +142,9 @@ class Case:
             override=self._override,
             auth=None,
             headers=CaseInsensitiveDict(headers) if headers else None,
-            config={},
+            config=self.operation.schema.config.checks_config_for(
+                operation=self.operation, phase=self.meta.phase.name.value if self.meta is not None else None
+            ),
             transport_kwargs=transport_kwargs,
             recorder=None,
         )
@@ -163,7 +165,7 @@ class Case:
                 response=response,
                 failures=_failures,
                 curl=curl,
-                config=self.operation.schema.output_config,
+                config=self.operation.schema.config.output,
             )
             raise FailureGroup(_failures, message) from None
 

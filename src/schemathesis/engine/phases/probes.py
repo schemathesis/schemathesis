@@ -20,7 +20,6 @@ from schemathesis.engine import Status, events
 if TYPE_CHECKING:
     import requests
 
-    from schemathesis.engine.config import NetworkConfig
     from schemathesis.engine.context import EngineContext
     from schemathesis.engine.events import EventGenerator
     from schemathesis.engine.phases import Phase
@@ -36,7 +35,7 @@ class ProbePayload:
 
 def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     """Discover capabilities of the tested app."""
-    probes = run(ctx.schema, ctx.session, ctx.config.network)
+    probes = run(ctx)
     status = Status.SUCCESS
     payload: Result[ProbePayload, Exception] | None = None
     for result in probes:
@@ -44,7 +43,7 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
             from ...specs.openapi import formats
             from ...specs.openapi.formats import HEADER_FORMAT, header_values
 
-            formats.register(HEADER_FORMAT, header_values(blacklist_characters="\n\r\x00"))
+            formats.register(HEADER_FORMAT, header_values(exclude_characters="\n\r\x00"))
         if result.error is not None:
             status = Status.ERROR
             payload = Err(result.error)
@@ -54,9 +53,9 @@ def execute(ctx: EngineContext, phase: Phase) -> EventGenerator:
     yield events.PhaseFinished(phase=phase, status=status, payload=payload)
 
 
-def run(schema: BaseSchema, session: requests.Session, config: NetworkConfig) -> list[ProbeRun]:
+def run(ctx: EngineContext) -> list[ProbeRun]:
     """Run all probes against the given schema."""
-    return [send(probe(), session, schema, config) for probe in PROBES]
+    return [send(probe(), ctx) for probe in PROBES]
 
 
 HEADER_NAME = "X-Schemathesis-Probe"
@@ -124,19 +123,20 @@ class NullByteInHeader(Probe):
 PROBES = (NullByteInHeader,)
 
 
-def send(probe: Probe, session: requests.Session, schema: BaseSchema, config: NetworkConfig) -> ProbeRun:
+def send(probe: Probe, ctx: EngineContext) -> ProbeRun:
     """Send the probe to the application."""
     from requests import PreparedRequest, Request, RequestException
     from requests.exceptions import MissingSchema
     from urllib3.exceptions import InsecureRequestWarning
 
     try:
-        request = probe.prepare_request(session, Request(), schema)
+        session = ctx.get_session()
+        request = probe.prepare_request(session, Request(), ctx.schema)
         request.headers[HEADER_NAME] = probe.name
         request.headers["User-Agent"] = USER_AGENT
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", InsecureRequestWarning)
-            response = session.send(request, timeout=config.timeout or 2)
+            response = session.send(request, timeout=ctx.config.request_timeout or 2)
     except MissingSchema:
         # In-process ASGI/WSGI testing will have local URLs and requires extra handling
         # which is not currently implemented

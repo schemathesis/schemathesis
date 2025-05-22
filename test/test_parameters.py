@@ -518,11 +518,15 @@ def api_schema(ctx, request, openapi_version):
                 }
             }
         )
+    schema = schemathesis.openapi.from_dict(schema)
     if request.param == "aiohttp":
         base_url = request.getfixturevalue("base_url")
-        return schemathesis.openapi.from_dict(schema).configure(base_url=base_url)
+        schema.config.update(base_url=base_url)
+        return schema
     app = request.getfixturevalue("flask_app")
-    return schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1/api", app=app)
+    schema = schema.configure(app=app)
+    schema.config.update(base_url="http://127.0.0.1/api")
+    return schema
 
 
 @pytest.mark.hypothesis_nested

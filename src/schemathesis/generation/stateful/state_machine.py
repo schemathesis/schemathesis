@@ -10,6 +10,7 @@ from hypothesis.errors import InvalidDefinition
 from hypothesis.stateful import RuleBasedStateMachine
 
 from schemathesis.checks import CheckFunction
+from schemathesis.core import DEFAULT_STATEFUL_STEP_COUNT
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.result import Result
 from schemathesis.core.transport import Response
@@ -22,7 +23,6 @@ if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
 
-DEFAULT_STATEFUL_STEP_COUNT = 6
 DEFAULT_STATE_MACHINE_SETTINGS = hypothesis.settings(
     phases=[hypothesis.Phase.generate],
     deadline=None,

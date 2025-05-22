@@ -43,7 +43,7 @@ from schemathesis.generation.overrides import Override, OverrideMark, check_no_o
 from schemathesis.openapi.checks import JsonSchemaError, MissingContentType
 from schemathesis.specs.openapi.stateful import links
 
-from ...generation import GenerationConfig, GenerationMode
+from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher
 from ...schemas import APIOperation, APIOperationMap, ApiStatistic, BaseSchema, OperationDefinition
 from . import serialization
@@ -292,9 +292,7 @@ class BaseOpenAPISchema(BaseSchema):
         parameters = operation.get("parameters", ())
         return self.collect_parameters(itertools.chain(parameters, shared_parameters), operation)
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         """Iterate over all operations defined in the API.
 
         Each yielded item is either `Ok` or `Err`, depending on the presence of errors during schema processing.
@@ -352,9 +350,6 @@ class BaseOpenAPISchema(BaseSchema):
                                 entry,
                                 resolved,
                                 scope,
-                                with_security_parameters=generation_config.with_security_parameters
-                                if generation_config
-                                else None,
                             )
                             yield Ok(operation)
                         except SCHEMA_PARSING_ERRORS as exc:
@@ -381,7 +376,9 @@ class BaseOpenAPISchema(BaseSchema):
         try:
             self.validate()
         except jsonschema.ValidationError as exc:
-            raise InvalidSchema.from_jsonschema_error(exc, path=path, method=method) from None
+            raise InvalidSchema.from_jsonschema_error(
+                exc, path=path, method=method, config=self.config.output
+            ) from None
         raise InvalidSchema(SCHEMA_ERROR_MESSAGE, path=path, method=method) from error
 
     def validate(self) -> None:
@@ -417,7 +414,6 @@ class BaseOpenAPISchema(BaseSchema):
         raw: dict[str, Any],
         resolved: dict[str, Any],
         scope: str,
-        with_security_parameters: bool | None = None,
     ) -> APIOperation:
         """Create JSON schemas for the query, body, etc from Swagger parameters definitions."""
         __tracebackhide__ = True
@@ -432,12 +428,8 @@ class BaseOpenAPISchema(BaseSchema):
         )
         for parameter in parameters:
             operation.add_parameter(parameter)
-        with_security_parameters = (
-            with_security_parameters
-            if with_security_parameters is not None
-            else self.generation_config.with_security_parameters
-        )
-        if with_security_parameters:
+        config = self.config.generation_for(operation=operation)
+        if config.with_security_parameters:
             self.security.process_definitions(self.raw_schema, operation, self.resolver)
         self.dispatch_hook("before_init_operation", HookContext(operation=operation), operation)
         return operation
@@ -545,21 +537,20 @@ class BaseOpenAPISchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
             operation=operation,
-            auth_storage=auth_storage,
             hooks=hooks,
+            auth_storage=auth_storage,
             generation_mode=generation_mode,
-            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 
     def get_parameter_serializer(self, operation: APIOperation, location: str) -> Callable | None:
         definitions = [item.definition for item in operation.iter_parameters() if item.location == location]
-        if self.generation_config.with_security_parameters:
+        config = self.config.generation_for(operation=operation)
+        if config.with_security_parameters:
             security_parameters = self.security.get_security_definitions_as_parameters(
                 self.raw_schema, operation, self.resolver, location
             )
@@ -713,7 +704,7 @@ class BaseOpenAPISchema(BaseSchema):
                     JsonSchemaError.from_exception(
                         operation=operation.label,
                         exc=exc,
-                        output_config=operation.schema.output_config,
+                        config=operation.schema.config.output,
                     )
                 )
         _maybe_raise_one_or_more(failures)

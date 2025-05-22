@@ -22,9 +22,6 @@ from schemathesis.openapi.checks import (
     MalformedMediaType,
     MissingContentType,
     MissingHeaders,
-    MissingRequiredHeaderConfig,
-    NegativeDataRejectionConfig,
-    PositiveDataAcceptanceConfig,
     RejectedPositiveData,
     UndefinedContentType,
     UndefinedStatusCode,
@@ -185,7 +182,7 @@ def response_headers_conformance(ctx: CheckContext, response: Response, case: Ca
                             title="Response header does not conform to the schema",
                             operation=case.operation.label,
                             exc=exc,
-                            output_config=case.operation.schema.output_config,
+                            config=case.operation.schema.config.output,
                         )
                     )
     return _maybe_raise_one_or_more(errors)  # type: ignore[func-returns-value]
@@ -233,8 +230,8 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     ):
         return True
 
-    config = ctx.config.get(negative_data_rejection, NegativeDataRejectionConfig())
-    allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+    config = ctx.config.negative_data_rejection
+    allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
     if (
         case.meta.generation.mode.is_negative
@@ -243,9 +240,9 @@ def negative_data_rejection(ctx: CheckContext, response: Response, case: Case) -
     ):
         raise AcceptedNegativeData(
             operation=case.operation.label,
-            message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
+            message=f"Allowed statuses: {', '.join(config.expected_statuses)}",
             status_code=response.status_code,
-            allowed_statuses=config.allowed_statuses,
+            expected_statuses=config.expected_statuses,
         )
     return None
 
@@ -261,21 +258,21 @@ def positive_data_acceptance(ctx: CheckContext, response: Response, case: Case) 
     ):
         return True
 
-    config = ctx.config.get(positive_data_acceptance, PositiveDataAcceptanceConfig())
-    allowed_statuses = expand_status_codes(config.allowed_statuses or [])
+    config = ctx.config.positive_data_acceptance
+    allowed_statuses = expand_status_codes(config.expected_statuses or [])
 
     if case.meta.generation.mode.is_positive and response.status_code not in allowed_statuses:
         raise RejectedPositiveData(
             operation=case.operation.label,
-            message=f"Allowed statuses: {', '.join(config.allowed_statuses)}",
+            message=f"Allowed statuses: {', '.join(config.expected_statuses)}",
             status_code=response.status_code,
-            allowed_statuses=config.allowed_statuses,
+            allowed_statuses=config.expected_statuses,
         )
     return None
 
 
+@schemathesis.check
 def missing_required_header(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    # NOTE: This check is intentionally not registered with `@schemathesis.check` because it is experimental
     meta = case.meta
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or is_unexpected_http_status_case(case):
         return None
@@ -287,16 +284,17 @@ def missing_required_header(ctx: CheckContext, response: Response, case: Case) -
         and data.description.startswith("Missing ")
     ):
         if data.parameter.lower() == "authorization":
-            allowed_statuses = {401}
+            expected_statuses = {401}
         else:
-            config = ctx.config.get(missing_required_header, MissingRequiredHeaderConfig())
-            allowed_statuses = expand_status_codes(config.allowed_statuses or [])
-        if response.status_code not in allowed_statuses:
-            allowed = f"Allowed statuses: {', '.join(map(str, allowed_statuses))}"
+            config = ctx.config.missing_required_header
+            expected_statuses = expand_status_codes(config.expected_statuses or [])
+        if response.status_code not in expected_statuses:
+            allowed = f"Allowed statuses: {', '.join(map(str, expected_statuses))}"
             raise AssertionError(f"Unexpected response status for a missing header: {response.status_code}\n{allowed}")
     return None
 
 
+@schemathesis.check
 def unsupported_method(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     meta = case.meta
     if meta is None or not isinstance(meta.phase.data, CoveragePhaseData) or response.request.method == "OPTIONS":

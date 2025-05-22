@@ -18,6 +18,7 @@ import click
 import httpx
 import pytest
 import requests
+import tomli_w
 import yaml
 from click.testing import CliRunner, Result
 from hypothesis import settings
@@ -26,8 +27,7 @@ from urllib3 import HTTPResponse
 
 import schemathesis.cli
 from schemathesis.cli.commands.run.executor import CUSTOM_HANDLERS
-from schemathesis.cli.hooks import HOOKS_MODULE_ENV_VAR
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
+from schemathesis.core.hooks import HOOKS_MODULE_ENV_VAR
 from schemathesis.specs.openapi import media_types
 
 from .apps import _graphql as graphql
@@ -56,13 +56,11 @@ settings.register_profile("CI", max_examples=2000)
 
 @pytest.fixture(autouse=True)
 def reset_hooks():
-    GLOBAL_EXPERIMENTS.disable_all()
     CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
     media_types.unregister_all()
     yield
-    GLOBAL_EXPERIMENTS.disable_all()
     CUSTOM_HANDLERS.clear()
     schemathesis.hooks.unregister_all()
     schemathesis.auth.unregister()
@@ -347,6 +345,12 @@ class CliSnapshotConfig:
         package_root = "/package-root"
         site_packages = "/site-packages/"
         data = data.replace(str(PACKAGE_ROOT), package_root)
+        data = re.sub(
+            "❌  Failed to load configuration file from .*toml$",
+            "❌  Failed to load configuration file from config.toml",
+            data,
+            flags=re.MULTILINE,
+        )
         data = data.replace(str(SITE_PACKAGES), site_packages)
         data = re.sub(", line [0-9]+,", ", line XXX,", data)
         data = re.sub(r"Scenarios:.*\d+", r"Scenarios:    N", data)
@@ -555,7 +559,7 @@ def snapshot_cli(request, snapshot):
 
 
 @pytest.fixture
-def cli():
+def cli(tmp_path):
     """CLI runner helper.
 
     Provides in-process execution via `click.CliRunner`.
@@ -565,14 +569,21 @@ def cli():
     class Runner:
         @staticmethod
         def run(*args, **kwargs):
-            return cli_runner.invoke(schemathesis.cli.run, args, **kwargs)
+            return Runner.main("run", *args, **kwargs)
 
         @staticmethod
-        def main(*args, hooks=None, **kwargs):
+        def main(*args, config=None, hooks=None, **kwargs):
+            if config is not None:
+                path = tmp_path / "config.toml"
+                path.write_text(tomli_w.dumps(config), encoding="utf-8")
+                args = ["--config-file", str(path), *args]
             if hooks is not None:
                 env = kwargs.setdefault("env", {})
                 env[HOOKS_MODULE_ENV_VAR] = hooks
-            return cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
+            result = cli_runner.invoke(schemathesis.cli.schemathesis, args, **kwargs)
+            if result.exception and not isinstance(result.exception, SystemExit):
+                raise result.exception
+            return result
 
     return Runner()
 
@@ -956,8 +967,8 @@ def testdir(testdir):
         import pytest
         import schemathesis
         from schemathesis.core import NOT_SET
-        from schemathesis.core.output import OutputConfig
-        from schemathesis.generation import GenerationMode, GenerationConfig
+        from schemathesis.config import *
+        from schemathesis.generation import GenerationMode
         from test.utils import *
         from hypothesis import given, settings, HealthCheck, Phase, assume, strategies as st, seed
         raw_schema = {schema}
@@ -968,12 +979,11 @@ def testdir(testdir):
         def simple_schema():
             return schema
 
+        config = SchemathesisConfig()
+        config.output.sanitization.update(enabled={sanitize_output!r})
+
         schema = schemathesis.openapi.from_dict(
-            raw_schema
-        ).configure(
-            output=OutputConfig(
-                sanitize={sanitize_output!r}
-            )
+            raw_schema, config=config
         )
         """
         )

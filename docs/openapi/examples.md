@@ -124,18 +124,6 @@ $ st run --phases=examples https://example.schemathesis.io/openapi.json
 
 This restricts testing to the examples phase, skipping other testing phases like coverage, fuzzing, and stateful testing.
 
-### Handling Missing Examples
-
-For API operations that don't have any examples defined, you can use the `generation.fill-missing-examples` configuration option:
-
-```toml
-# schemathesis.toml
-[generation]
-fill-missing-examples = true
-```
-
-This generates one simple example per operation that lacks examples, ensuring all operations are tested in the examples phase.
-
 ### Multiple Examples Strategy
 
 Schemathesis uses a round-robin strategy to evenly distribute test cases across multiple examples:

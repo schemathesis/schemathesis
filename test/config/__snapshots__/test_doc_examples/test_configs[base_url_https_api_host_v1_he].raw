@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(base_url='https://http://example.schemathesis.io/v1', headers={'Authorization': 'Bearer secret'})))

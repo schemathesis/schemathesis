@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [label='POST /users']>}, _excludes=set()), checks=ChecksConfig(response_schema_conformance=SimpleCheckConfig(enabled=False), positive_data_acceptance=PositiveDataAcceptanceConfig(expected_statuses=['201'])))])))

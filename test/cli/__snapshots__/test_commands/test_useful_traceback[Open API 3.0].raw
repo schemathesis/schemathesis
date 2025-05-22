@@ -36,7 +36,7 @@ division by zero
 
     Traceback (most recent call last):
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in wrapped
-        f(ctx=ctx, case=case, recorder=recorder)
+        f(
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in test_func
         validate_response(
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in validate_response

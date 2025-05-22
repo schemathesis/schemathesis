@@ -60,7 +60,8 @@ def test_as_wsgi_kwargs(graphql_strategy):
 
 @pytest.mark.filterwarnings("ignore:.*method is good for exploring strategies.*")
 def test_custom_base_url(graphql_url):
-    schema = schemathesis.graphql.from_url(graphql_url).configure(base_url="http://0.0.0.0:1234/something")
+    schema = schemathesis.graphql.from_url(graphql_url)
+    schema.config.update(base_url="http://0.0.0.0:1234/something")
 
     # Then the base path is changed, in this case it is the only available path
     assert schema.base_path == "/something"

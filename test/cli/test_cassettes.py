@@ -43,6 +43,7 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
         f"--max-examples={hypothesis_max_examples}",
         f"--mode={mode}",
         "--seed=1",
+        "--checks=not_a_server_error",
         *args,
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -59,13 +60,13 @@ def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples,
     if mode == "positive":
         assert load_response_body(cassette, 0) == '{"success": true}'
     assert all("checks" in interaction for interaction in interactions)
-    assert len(interactions[0]["checks"]) == 2
+    assert len(interactions[0]["checks"]) == 1
     assert interactions[0]["checks"][0] == {
         "name": "not_a_server_error",
         "status": "SUCCESS",
         "message": None,
     }
-    assert len(interactions[1]["checks"]) == 2
+    assert len(interactions[1]["checks"]) == 1
     for interaction in interactions:
         if interaction["phase"]["name"] == "coverage":
             if interaction["generation"]["mode"] == "negative" and not interaction["phase"]["data"][
@@ -151,6 +152,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         f"--url={openapi3_base_url}",
         f"--max-examples={hypothesis_max_examples or 1}",
         f"--report-vcr-path={cassette_path}",
+        "--checks=not_a_server_error",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -272,6 +274,7 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         "--seed=1",
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
+        "--checks=not_a_server_error",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
@@ -298,27 +301,36 @@ def test_forbid_preserve_bytes_without_cassette_path(cli, schema_url, snapshot_c
     assert cli.run(schema_url, "--report-preserve-bytes") == snapshot_cli
 
 
+@pytest.mark.parametrize("in_config", [True, False])
 @pytest.mark.openapi_version("3.0")
-def test_report_dir(cli, schema_url, tmp_path):
+def test_report_dir(cli, schema_url, tmp_path, in_config):
     # When report directory is specified with a report format
     report_dir = tmp_path / "reports"
-    cli.run(
-        schema_url,
-        f"--report-dir={report_dir}",
-        "--report=junit",
+    args = [
         "--max-examples=1",
-    )
+    ]
+    kwargs = {}
+    if in_config:
+        kwargs["config"] = {"reports": {"junit": {"enabled": True}, "directory": str(report_dir)}}
+    else:
+        args = ["--report=junit", f"--report-dir={report_dir}", *args]
+    cli.run(schema_url, *args, **kwargs)
     # And the report should be created in the specified directory
     assert report_dir.exists()
     assert (report_dir / "junit.xml").exists()
 
     # When multiple report formats are specified
-    cli.run(
-        schema_url,
-        f"--report-dir={report_dir}",
-        "--report=vcr,har",
+    args = [
         "--max-examples=1",
-    )
+    ]
+    kwargs = {}
+    if in_config:
+        kwargs["config"] = {
+            "reports": {"vcr": {"enabled": True}, "har": {"enabled": True}, "directory": str(report_dir)}
+        }
+    else:
+        args = [f"--report-dir={report_dir}", "--report=vcr,har", *args]
+    cli.run(schema_url, *args, **kwargs)
     # Then all reports should be created in the specified directory
     assert (report_dir / "vcr.yaml").exists()
     assert (report_dir / "har.json").exists()

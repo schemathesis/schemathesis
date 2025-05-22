@@ -9,7 +9,6 @@ from schemathesis.core import SpecificationFeature
 from schemathesis.engine import Status, events, phases
 from schemathesis.schemas import BaseSchema
 
-from .config import EngineConfig
 from .context import EngineContext
 from .events import EventGenerator
 from .phases import Phase, PhaseName, PhaseSkipReason
@@ -18,15 +17,14 @@ from .phases import Phase, PhaseName, PhaseSkipReason
 @dataclass
 class Engine:
     schema: BaseSchema
-    config: EngineConfig
 
     def execute(self) -> EventStream:
         """Execute all test phases."""
         # Unregister auth if explicitly provided
-        if self.config.network.auth is not None:
+        if self.schema.config.auth.is_defined:
             unregister_auth()
 
-        ctx = EngineContext(schema=self.schema, stop_event=threading.Event(), config=self.config)
+        ctx = EngineContext(schema=self.schema, stop_event=threading.Event())
         plan = self._create_execution_plan()
         return EventStream(plan.execute(ctx), ctx.control.stop_event)
 
@@ -70,7 +68,11 @@ class Engine:
                 skip_reason=PhaseSkipReason.NOT_SUPPORTED,
             )
 
-        if phase_name not in self.config.execution.phases:
+        phase = phase_name.value.lower()
+        if (
+            phase in ("examples", "coverage", "fuzzing", "stateful")
+            and not self.schema.config.phases.get_by_name(name=phase).enabled
+        ):
             return Phase(
                 name=phase_name,
                 is_supported=True,

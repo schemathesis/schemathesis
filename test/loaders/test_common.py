@@ -35,7 +35,8 @@ def test_absolute_urls_for_apps(loader):
 def test_base_url_override(request, loader, url_fixture, base_url):
     url = request.getfixturevalue(url_fixture)
     # When the user overrides base_url
-    schema = loader(url).configure(base_url=base_url)
+    schema = loader(url)
+    schema.config.update(base_url=base_url)
     operation = next(schema.get_all_operations()).ok()
     # Then the overridden value should not have a trailing slash
     assert operation.base_url == "http://example.com"

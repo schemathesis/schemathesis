@@ -6,6 +6,7 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Callable, Dict, NoReturn, TypeVar, cast
 
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.loaders import load_from_url, prepare_request_kwargs, raise_for_status, require_relative_url
 from schemathesis.hooks import HookContext, dispatch
@@ -17,16 +18,16 @@ if TYPE_CHECKING:
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
 
-def from_asgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
+def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> GraphQLSchema:
     require_relative_url(path)
     kwargs.setdefault("json", {"query": get_introspection_query()})
     client = asgi.get_client(app)
     response = load_from_url(client.post, url=path, **kwargs)
     schema = extract_schema_from_response(response, lambda r: r.json())
-    return from_dict(schema=schema).configure(app=app, location=path)
+    return from_dict(schema=schema, config=config).configure(app=app, location=path)
 
 
-def from_wsgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
+def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> GraphQLSchema:
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     kwargs.setdefault("json", {"query": get_introspection_query()})
@@ -34,26 +35,30 @@ def from_wsgi(path: str, app: Any, **kwargs: Any) -> GraphQLSchema:
     response = client.post(path=path, **kwargs)
     raise_for_status(response)
     schema = extract_schema_from_response(response, lambda r: r.json)
-    return from_dict(schema=schema).configure(app=app, location=path)
+    return from_dict(schema=schema, config=config).configure(app=app, location=path)
 
 
-def from_url(url: str, *, wait_for_schema: float | None = None, **kwargs: Any) -> GraphQLSchema:
+def from_url(
+    url: str, *, config: SchemathesisConfig | None = None, wait_for_schema: float | None = None, **kwargs: Any
+) -> GraphQLSchema:
     """Load from URL."""
     import requests
 
     kwargs.setdefault("json", {"query": get_introspection_query()})
     response = load_from_url(requests.post, url=url, wait_for_schema=wait_for_schema, **kwargs)
     schema = extract_schema_from_response(response, lambda r: r.json())
-    return from_dict(schema).configure(location=url)
+    return from_dict(schema, config=config).configure(location=url)
 
 
-def from_path(path: PathLike | str, *, encoding: str = "utf-8") -> GraphQLSchema:
+def from_path(
+    path: PathLike | str, *, config: SchemathesisConfig | None = None, encoding: str = "utf-8"
+) -> GraphQLSchema:
     """Load from a filesystem path."""
     with open(path, encoding=encoding) as file:
-        return from_file(file=file).configure(location=Path(path).absolute().as_uri())
+        return from_file(file=file, config=config).configure(location=Path(path).absolute().as_uri())
 
 
-def from_file(file: IO[str] | str) -> GraphQLSchema:
+def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
     """Load from file-like object or string."""
     import graphql
 
@@ -78,10 +83,10 @@ def from_file(file: IO[str] | str) -> GraphQLSchema:
                 _on_invalid_schema(exc)
         except json.JSONDecodeError:
             _on_invalid_schema(exc, extras=[entry for entry in str(exc).splitlines() if entry])
-    return from_dict(schema)
+    return from_dict(schema, config=config)
 
 
-def from_dict(schema: dict[str, Any]) -> GraphQLSchema:
+def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = None) -> GraphQLSchema:
     """Base loader that others build upon."""
     from schemathesis.specs.graphql.schemas import GraphQLSchema
 
@@ -89,7 +94,11 @@ def from_dict(schema: dict[str, Any]) -> GraphQLSchema:
         schema = schema["data"]
     hook_context = HookContext()
     dispatch("before_load_schema", hook_context, schema)
-    instance = GraphQLSchema(schema)
+
+    if config is None:
+        config = SchemathesisConfig.discover()
+    project_config = config.projects.get(schema)
+    instance = GraphQLSchema(schema, config=project_config)
     dispatch("after_load_schema", hook_context, instance)
     return instance
 

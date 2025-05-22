@@ -1,0 +1,11 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Invalid status code(s): 600. Use valid 3-digit codes between 100 and 599, or wildcards (e.g., 2XX, 2X0, 20X), where X is a wildcard digit.

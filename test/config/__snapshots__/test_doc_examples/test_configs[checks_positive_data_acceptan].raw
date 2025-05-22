@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(checks=ChecksConfig(positive_data_acceptance=PositiveDataAcceptanceConfig(expected_statuses=['200', '201', '202'])))))

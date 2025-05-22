@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(phases=PhasesConfig(coverage=CoveragePhaseConfig(enabled=False), fuzzing=PhaseConfig(generation=GenerationConfig(max_examples=200)), stateful=StatefulPhaseConfig(generation=GenerationConfig(max_examples=30))))))

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
 from typing import Any, Callable
 
 import click
@@ -13,15 +12,13 @@ from schemathesis.cli.commands.run.handlers.base import EventHandler
 from schemathesis.cli.commands.run.handlers.cassettes import CassetteWriter
 from schemathesis.cli.commands.run.handlers.junitxml import JunitXMLHandler
 from schemathesis.cli.commands.run.handlers.output import OutputHandler
-from schemathesis.cli.commands.run.loaders import AutodetectConfig, load_schema
-from schemathesis.cli.commands.run.reports import ReportConfig, ReportFormat
+from schemathesis.cli.commands.run.loaders import load_schema
 from schemathesis.cli.ext.fs import open_file
+from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError
-from schemathesis.core.output import OutputConfig
+from schemathesis.core.fs import file_exists
 from schemathesis.engine import from_schema
-from schemathesis.engine.config import EngineConfig
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
-from schemathesis.filters import FilterSet
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 
@@ -35,41 +32,34 @@ def handler() -> Callable[[type], None]:
     return _wrapper
 
 
-@dataclass
-class RunConfig:
-    location: str
-    base_url: str | None
-    filter_set: FilterSet
-    engine: EngineConfig
-    wait_for_schema: float | None
-    rate_limit: str | None
-    output: OutputConfig
-    report: ReportConfig | None
-    args: list[str]
-    params: dict[str, Any]
+def execute(
+    *,
+    location: str,
+    config: ProjectConfig,
+    filter_set: dict[str, Any],
+    args: list[str],
+    params: dict[str, Any],
+) -> None:
+    event_stream = into_event_stream(location=location, config=config, filter_set=filter_set)
+    _execute(event_stream, config=config, args=args, params=params)
 
 
-def execute(config: RunConfig) -> None:
-    event_stream = into_event_stream(config)
-    _execute(event_stream, config)
+MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 
 
-def into_event_stream(config: RunConfig) -> EventGenerator:
-    loader_config = AutodetectConfig(
-        location=config.location,
-        network=config.engine.network,
-        wait_for_schema=config.wait_for_schema,
-        base_url=config.base_url,
-        rate_limit=config.rate_limit,
-        output=config.output,
-        generation=config.engine.execution.generation,
-    )
-    loading_started = LoadingStarted(location=config.location)
+def into_event_stream(*, location: str, config: ProjectConfig, filter_set: dict[str, Any]) -> EventGenerator:
+    # The whole engine idea is that it communicates with the outside via events, so handlers can react to them
+    # For this reason, even schema loading is done via a separate set of events.
+    loading_started = LoadingStarted(location=location)
     yield loading_started
 
     try:
-        schema = load_schema(loader_config)
-        schema.filter_set = config.filter_set
+        schema = load_schema(location=location, config=config)
+        # Schemas don't (yet?) use configs for deciding what operations should be tested, so
+        # a separate FilterSet passed there. It combines both config file filters + CLI options
+        schema.filter_set = schema.config.operations.create_filter_set(**filter_set)
+        if file_exists(location) and schema.config.base_url is None:
+            raise click.UsageError(MISSING_BASE_URL_MESSAGE)
     except KeyboardInterrupt:
         yield Interrupted(phase=None)
         return
@@ -78,64 +68,61 @@ def into_event_stream(config: RunConfig) -> EventGenerator:
         return
 
     yield LoadingFinished(
-        location=config.location,
+        location=location,
         start_time=loading_started.timestamp,
         base_url=schema.get_base_url(),
         specification=schema.specification,
         statistic=schema.statistic,
         schema=schema.raw_schema,
+        config=schema.config,
         base_path=schema.base_path,
     )
 
     try:
-        yield from from_schema(schema, config=config.engine).execute()
+        yield from from_schema(schema).execute()
     except Exception as exc:
         yield FatalError(exception=exc)
 
 
-def initialize_handlers(config: RunConfig) -> list[EventHandler]:
+def initialize_handlers(
+    *,
+    config: ProjectConfig,
+    args: list[str],
+    params: dict[str, Any],
+) -> list[EventHandler]:
     """Create event handlers based on run configuration."""
     handlers: list[EventHandler] = []
 
-    if config.report is not None:
-        if ReportFormat.JUNIT in config.report.formats:
-            path = config.report.get_path(ReportFormat.JUNIT)
+    if config.reports.junit.enabled:
+        path = config.reports.get_path(ReportFormat.JUNIT)
+        open_file(path)
+        handlers.append(JunitXMLHandler(path))
+    for format, report in (
+        (ReportFormat.VCR, config.reports.vcr),
+        (ReportFormat.HAR, config.reports.har),
+    ):
+        if report.enabled:
+            path = config.reports.get_path(format)
             open_file(path)
-            handlers.append(JunitXMLHandler(path))
-
-        for format in (ReportFormat.VCR, ReportFormat.HAR):
-            if format in config.report.formats:
-                path = config.report.get_path(format)
-                open_file(path)
-                handlers.append(
-                    CassetteWriter(
-                        format=format,
-                        path=path,
-                        sanitize_output=config.report.sanitize_output,
-                        preserve_bytes=config.report.preserve_bytes,
-                    )
-                )
+            handlers.append(CassetteWriter(format=format, path=path, config=config))
 
     for custom_handler in CUSTOM_HANDLERS:
-        handlers.append(custom_handler(*config.args, **config.params))
+        handlers.append(custom_handler(*args, **params))
 
-    handlers.append(
-        OutputHandler(
-            workers_num=config.engine.execution.workers_num,
-            seed=config.engine.execution.seed,
-            rate_limit=config.rate_limit,
-            wait_for_schema=config.wait_for_schema,
-            engine_config=config.engine,
-            report_config=config.report,
-        )
-    )
+    handlers.append(OutputHandler(config=config))
 
     return handlers
 
 
-def _execute(event_stream: EventGenerator, config: RunConfig) -> None:
-    handlers = initialize_handlers(config)
-    ctx = ExecutionContext(output_config=config.output, seed=config.engine.execution.seed)
+def _execute(
+    event_stream: EventGenerator,
+    *,
+    config: ProjectConfig,
+    args: list[str],
+    params: dict[str, Any],
+) -> None:
+    handlers = initialize_handlers(config=config, args=args, params=params)
+    ctx = ExecutionContext(config=config)
 
     def shutdown() -> None:
         for _handler in handlers:

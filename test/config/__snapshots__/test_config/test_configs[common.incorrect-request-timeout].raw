@@ -1,0 +1,4 @@
+Error in root section:
+  Type error:
+
+  - 'request-timeout' → Must be a number, but got str: not a number

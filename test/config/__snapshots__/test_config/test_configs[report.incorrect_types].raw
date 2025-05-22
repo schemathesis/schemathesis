@@ -1,0 +1,4 @@
+Error in [reports] section:
+  Type error:
+
+  - 'preserve-bytes' → Must be a boolean, but got str: yes

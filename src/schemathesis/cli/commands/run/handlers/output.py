@@ -13,21 +13,19 @@ import click
 from schemathesis.cli.commands.run.context import ExecutionContext, GroupedFailures
 from schemathesis.cli.commands.run.events import LoadingFinished, LoadingStarted
 from schemathesis.cli.commands.run.handlers.base import EventHandler
-from schemathesis.cli.commands.run.reports import ReportConfig, ReportFormat
 from schemathesis.cli.constants import ISSUE_TRACKER_URL
 from schemathesis.cli.core import get_terminal_width
+from schemathesis.config import ProjectConfig, ReportFormat
 from schemathesis.core.errors import LoaderError, LoaderErrorKind, format_exception, split_traceback
 from schemathesis.core.failures import MessageBlock, Severity, format_failures
 from schemathesis.core.output import prepare_response_payload
 from schemathesis.core.result import Err, Ok
 from schemathesis.core.version import SCHEMATHESIS_VERSION
 from schemathesis.engine import Status, events
-from schemathesis.engine.config import EngineConfig
 from schemathesis.engine.errors import EngineErrorInfo
 from schemathesis.engine.phases import PhaseName, PhaseSkipReason
 from schemathesis.engine.phases.probes import ProbeOutcome
 from schemathesis.engine.recorder import Interaction, ScenarioRecorder
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
 from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import ApiStatistic
 
@@ -100,7 +98,7 @@ def display_failures_for_single_test(ctx: ExecutionContext, label: str, checks: 
                 failures=group.failures,
                 curl=group.code_sample,
                 formatter=failure_formatter,
-                config=ctx.output_config,
+                config=ctx.config.output,
             )
         )
         click.echo()
@@ -770,12 +768,7 @@ def format_duration(duration_ms: int) -> str:
 
 @dataclass
 class OutputHandler(EventHandler):
-    workers_num: int
-    # Seed can be absent in the deterministic mode
-    seed: int | None
-    rate_limit: str | None
-    wait_for_schema: float | None
-    engine_config: EngineConfig
+    config: ProjectConfig
 
     loading_manager: LoadingProgressManager | None = None
     probing_manager: ProbingProgressManager | None = None
@@ -784,7 +777,6 @@ class OutputHandler(EventHandler):
 
     statistic: ApiStatistic | None = None
     skip_reasons: list[str] = field(default_factory=list)
-    report_config: ReportConfig | None = None
     warnings: WarningData = field(default_factory=WarningData)
     errors: set[events.NonFatalError] = field(default_factory=set)
     phases: dict[PhaseName, tuple[Status, PhaseSkipReason | None]] = field(
@@ -835,6 +827,8 @@ class OutputHandler(EventHandler):
         from rich.padding import Padding
         from rich.style import Style
         from rich.table import Table
+
+        self.config = event.config
 
         assert self.loading_manager is not None
         self.loading_manager.stop()
@@ -1068,7 +1062,7 @@ class OutputHandler(EventHandler):
 
         if (
             event.status == Status.SUCCESS
-            and GenerationMode.POSITIVE in self.engine_config.execution.generation.modes
+            and GenerationMode.POSITIVE in self.config.generation_for(operation=None, phase=event.phase.name).modes
             and all_positive_are_rejected(event.recorder)
             and statistic.should_warn_about_only_4xx()
         ):
@@ -1116,7 +1110,9 @@ class OutputHandler(EventHandler):
                     self.console.print(Padding(Text(extra), (0, 0, 0, 5)))
                 self.console.print()
 
-            if not (event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.wait_for_schema is not None):
+            if not (
+                event.exception.kind == LoaderErrorKind.CONNECTION_OTHER and self.config.wait_for_schema is not None
+            ):
                 suggestion = LOADER_ERROR_SUGGESTIONS.get(event.exception.kind)
                 if suggestion is not None:
                     click.echo(_style(f"{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
@@ -1134,7 +1130,7 @@ class OutputHandler(EventHandler):
         if not (
             isinstance(event.exception, LoaderError)
             and event.exception.kind == LoaderErrorKind.CONNECTION_OTHER
-            and self.wait_for_schema is not None
+            and self.config.wait_for_schema is not None
         ):
             click.echo(_style(f"\n{click.style('Tip:', bold=True, fg='green')} {suggestion}"))
 
@@ -1195,25 +1191,6 @@ class OutputHandler(EventHandler):
             click.echo(_style("Check base URL or adjust data generation settings", fg="yellow"))
             click.echo()
 
-    def display_experiments(self) -> None:
-        display_section_name("EXPERIMENTS")
-
-        click.echo()
-        for experiment in sorted(GLOBAL_EXPERIMENTS.enabled, key=lambda e: e.name):
-            click.echo(_style(f"🧪 {experiment.name}: ", bold=True), nl=False)
-            click.echo(_style(experiment.description))
-            click.echo(_style(f"   Feedback: {experiment.discussion_url}"))
-            click.echo()
-
-        click.echo(
-            _style(
-                "Your feedback is crucial for experimental features. "
-                "Please visit the provided URL(s) to share your thoughts.",
-                dim=True,
-            )
-        )
-        click.echo()
-
     def display_stateful_failures(self, ctx: ExecutionContext) -> None:
         display_section_name("Stateful tests")
 
@@ -1255,7 +1232,7 @@ class OutputHandler(EventHandler):
                     click.echo(f"\n{indent}<EMPTY>")
                 else:
                     try:
-                        payload = prepare_response_payload(response.text, config=ctx.output_config)
+                        payload = prepare_response_payload(response.text, config=ctx.config.output)
                         click.echo(textwrap.indent(f"\n{payload}", prefix=indent))
                     except UnicodeDecodeError:
                         click.echo(f"\n{indent}<BINARY>")
@@ -1410,24 +1387,27 @@ class OutputHandler(EventHandler):
         display_section_name(message, fg=color)
 
     def display_reports(self) -> None:
-        if self.report_config is not None:
-            reports = [
-                (format.value.upper(), self.report_config.get_path(format).name)
-                for format in ReportFormat
-                if format in self.report_config.formats
-            ]
-
+        reports = self.config.reports
+        if reports.vcr.enabled or reports.har.enabled or reports.junit.enabled:
             click.echo(_style("Reports:", bold=True))
-            for report_type, path in reports:
-                click.echo(_style(f"  - {report_type}: {path}"))
+            for format, report in (
+                (ReportFormat.JUNIT, reports.junit),
+                (ReportFormat.VCR, reports.vcr),
+                (ReportFormat.HAR, reports.har),
+            ):
+                if report.enabled:
+                    path = reports.get_path(format)
+                    click.echo(_style(f"  - {format.value.upper()}: {path}"))
             click.echo()
 
     def display_seed(self) -> None:
         click.echo(_style("Seed: ", bold=True), nl=False)
-        if self.seed is None:
+        # Deterministic mode can be applied to a subset of tests, but we only care if it is enabled everywhere
+        # If not everywhere, then the seed matter and should be displayed
+        if self.config.seed is None or self.config.generation.deterministic:
             click.echo("not used in the deterministic mode")
         else:
-            click.echo(str(self.seed))
+            click.echo(str(self.config.seed))
         click.echo()
 
     def _on_engine_finished(self, ctx: ExecutionContext, event: events.EngineFinished) -> None:
@@ -1450,8 +1430,6 @@ class OutputHandler(EventHandler):
         display_failures(ctx)
         if self.warnings.missing_auth or self.warnings.only_4xx_responses:
             self.display_warnings()
-        if GLOBAL_EXPERIMENTS.enabled:
-            self.display_experiments()
         if ctx.statistic.extraction_failures:
             self.display_stateful_failures(ctx)
         display_section_name("SUMMARY")

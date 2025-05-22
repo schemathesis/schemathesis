@@ -3,12 +3,12 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, Callable, Iterable, Iterator, Optional
 
+from schemathesis.config import ChecksConfig
 from schemathesis.core.failures import (
     CustomFailure,
     Failure,
     FailureGroup,
     MalformedJson,
-    MaxResponseTimeConfig,
     ResponseTimeExceeded,
     ServerError,
 )
@@ -23,7 +23,6 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 CheckFunction = Callable[["CheckContext", "Response", "Case"], Optional[bool]]
-ChecksConfig = dict[CheckFunction, Any]
 
 
 class CheckContext:
@@ -38,8 +37,9 @@ class CheckContext:
     config: ChecksConfig
     transport_kwargs: dict[str, Any] | None
     recorder: ScenarioRecorder | None
+    checks: list[CheckFunction]
 
-    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "recorder")
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs", "recorder", "checks")
 
     def __init__(
         self,
@@ -56,6 +56,13 @@ class CheckContext:
         self.config = config
         self.transport_kwargs = transport_kwargs
         self.recorder = recorder
+        self.checks = []
+        for check in CHECKS.get_all():
+            name = check.__name__
+            if self.config.get_by_name(name=name).enabled:
+                self.checks.append(check)
+        if self.config.max_response_time.enabled:
+            self.checks.append(max_response_time)
 
     def find_parent(self, *, case_id: str) -> Case | None:
         if self.recorder is not None:
@@ -102,15 +109,18 @@ def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> boo
     return None
 
 
+DEFAULT_MAX_RESPONSE_TIME = 10.0
+
+
 def max_response_time(ctx: CheckContext, response: Response, case: Case) -> bool | None:
-    config = ctx.config.get(max_response_time, MaxResponseTimeConfig())
+    limit = ctx.config.max_response_time.limit or DEFAULT_MAX_RESPONSE_TIME
     elapsed = response.elapsed
-    if elapsed > config.limit:
+    if elapsed > limit:
         raise ResponseTimeExceeded(
             operation=case.operation.label,
-            message=f"Actual: {elapsed:.2f}ms\nLimit: {config.limit * 1000:.2f}ms",
+            message=f"Actual: {elapsed:.2f}ms\nLimit: {limit * 1000:.2f}ms",
             elapsed=elapsed,
-            deadline=config.limit,
+            deadline=limit,
         )
     return None
 

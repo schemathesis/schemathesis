@@ -150,9 +150,8 @@ class FilterSet:
     def clone(self) -> FilterSet:
         return FilterSet(_includes=self._includes.copy(), _excludes=self._excludes.copy())
 
-    def apply_to(self, operations: list[APIOperation]) -> list[APIOperation]:
-        """Get a filtered list of the given operations that match the filters."""
-        return [operation for operation in operations if self.match(SimpleNamespace(operation=operation))]
+    def applies_to(self, operation: APIOperation) -> bool:
+        return self.match(SimpleNamespace(operation=operation))
 
     def match(self, ctx: HasAPIOperation) -> bool:
         """Determines whether the given operation should be included based on the defined filters.

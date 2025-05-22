@@ -5,7 +5,7 @@ from hypothesis import Phase, assume, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig, HeaderConfig
+from schemathesis.config import GenerationConfig
 from schemathesis.openapi.generation.filters import is_valid_header
 from schemathesis.specs.openapi import _hypothesis, formats
 from schemathesis.specs.openapi._hypothesis import make_positive_strategy
@@ -169,9 +169,7 @@ def test_configure_headers():
         "GET /users/",
         "header",
         None,
-        GenerationConfig(
-            headers=HeaderConfig(strategy=st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=67)))
-        ),
+        GenerationConfig(exclude_header_characters="".join({chr(i) for i in range(256)} - {"A", "B", "C"})),
     )
 
     @given(strategy)

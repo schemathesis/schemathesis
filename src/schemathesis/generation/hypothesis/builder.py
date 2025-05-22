@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import os
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
@@ -18,12 +17,13 @@ from jsonschema.exceptions import SchemaError
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
-from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types, string_to_boolean
+from schemathesis.config import ProjectConfig
+from schemathesis.core import NOT_SET, NotSet, SpecificationFeature, media_types
 from schemathesis.core.errors import InvalidSchema, SerializationNotPossible
 from schemathesis.core.marks import Mark
 from schemathesis.core.transport import prepare_urlencoded
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
-from schemathesis.generation import GenerationConfig, GenerationMode, coverage
+from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
 from schemathesis.generation.hypothesis.given import GivenInput
@@ -49,7 +49,7 @@ class HypothesisTestMode(str, Enum):
 
 @dataclass
 class HypothesisTestConfig:
-    generation: GenerationConfig
+    project: ProjectConfig
     modes: list[HypothesisTestMode]
     settings: hypothesis.settings | None = None
     seed: int | None = None
@@ -71,11 +71,11 @@ def create_test(
     strategy_kwargs = {
         "hooks": hook_dispatcher,
         "auth_storage": auth_storage,
-        "generation_config": config.generation,
         **config.as_strategy_kwargs,
     }
+    generation = config.project.generation_for(operation=operation)
     strategy = strategies.combine(
-        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in config.generation.modes]
+        [operation.as_strategy(generation_mode=mode, **strategy_kwargs) for mode in generation.modes]
     )
 
     hypothesis_test = create_base_test(
@@ -127,23 +127,21 @@ def create_test(
     ):
         hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
 
-    disable_coverage = string_to_boolean(os.getenv("SCHEMATHESIS_DISABLE_COVERAGE", ""))
-
     if (
-        not disable_coverage
-        and HypothesisTestMode.COVERAGE in config.modes
+        HypothesisTestMode.COVERAGE in config.modes
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.COVERAGE)
         and not config.given_args
         and not config.given_kwargs
     ):
+        phases_config = config.project.phases_for(operation=operation)
         hypothesis_test = add_coverage(
             hypothesis_test,
             operation,
-            config.generation.modes,
+            generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
-            config.generation.unexpected_methods,
+            phases_config.coverage.unexpected_methods,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)

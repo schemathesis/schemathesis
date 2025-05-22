@@ -1,0 +1,1 @@
+SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(operations=[OperationConfig(filter_set=FilterSet(_includes={<Filter: [operation_id='getUserById']>}, _excludes=set()), generation=GenerationConfig(max_examples=150))])))

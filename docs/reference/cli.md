@@ -50,7 +50,7 @@ $ st run [OPTIONS] SCHEMA
 !!! note ""
 
     **Type**: `Integer or "auto"`  
-    **Default**: `auto`  
+    **Default**: `1`  
     **Range**: `1-64` or `auto`  
 
     Specifies the number of concurrent workers for running unit test phases (examples, coverage, fuzzing). Use "auto" to automatically adjust based on available CPU cores.

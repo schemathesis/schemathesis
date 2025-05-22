@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import shutil
 
@@ -9,9 +11,9 @@ def get_terminal_width() -> int:
     return shutil.get_terminal_size((80, 24)).columns
 
 
-def ensure_color(ctx: click.Context, no_color: bool, force_color: bool) -> None:
-    if force_color:
+def ensure_color(ctx: click.Context, color: bool | None) -> None:
+    if color:
         ctx.color = True
-    elif no_color or "NO_COLOR" in os.environ:
+    elif color is False or "NO_COLOR" in os.environ:
         ctx.color = False
         os.environ["NO_COLOR"] = "1"

@@ -7,7 +7,6 @@ from hypothesis import HealthCheck, Phase, given, settings
 from pydantic import BaseModel
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
 
 
 @pytest.mark.hypothesis_nested
@@ -61,9 +60,8 @@ def test_null_byte(fastapi_app):
         assert "\x00" not in payload["name"]
         return {"success": True}
 
-    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app).configure(
-        generation=GenerationConfig(allow_x00=False)
-    )
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
+    schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()
 
@@ -87,9 +85,8 @@ def test_null_byte_in_headers(fastapi_app):
         assert "\x00" not in x_cookie
         return {"success": True}
 
-    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app).configure(
-        generation=GenerationConfig(allow_x00=False)
-    )
+    schema = schemathesis.openapi.from_asgi("/openapi.json", app=fastapi_app)
+    schema.config.generation.update(allow_x00=False)
 
     strategy = schema["/data"]["POST"].as_strategy()
 

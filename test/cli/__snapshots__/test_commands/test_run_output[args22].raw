@@ -1,7 +1,7 @@
 Exit code: 2
 ---
 Stdout:
-Usage: run [OPTIONS] SCHEMA
-Try 'run -h' for help.
+Usage: schemathesis run [OPTIONS] SCHEMA
+Try 'schemathesis run -h' for help.
 
 Error: Invalid value for '--set-query': Expected NAME=VALUE format, received key.

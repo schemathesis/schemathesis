@@ -76,11 +76,24 @@ class Context:
 
     @contextmanager
     def check(self, content: str):
+        with self.restore_checks():
+            yield self.write_pymodule(content)
+
+    @contextmanager
+    def restore_checks(self):
         names = set(CHECKS.get_all_names())
-        yield self.write_pymodule(content)
-        new_names = set(CHECKS.get_all_names()) - names
-        for name in new_names:
-            CHECKS.unregister(name)
+        try:
+            yield
+        finally:
+            new_names = set(CHECKS.get_all_names()) - names
+            for name in new_names:
+                CHECKS.unregister(name)
+
+
+@pytest.fixture
+def restore_checks(ctx):
+    with ctx.restore_checks():
+        yield
 
 
 @pytest.fixture

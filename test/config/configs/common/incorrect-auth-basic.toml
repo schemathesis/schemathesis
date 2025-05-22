@@ -1,0 +1,2 @@
+[auth]
+basic = { "username" = "user" }  # Missing required "password" field

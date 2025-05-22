@@ -6,8 +6,10 @@ Usage: schemathesis [OPTIONS] COMMAND [ARGS]...
   Property-based API testing for OpenAPI and GraphQL.
 
 Options:
-  --version   Show the version and exit.
-  -h, --help  Show this message and exit.
+  --config-file PATH  The path to `schemathesis.toml` file to use for
+                      configuration
+  --version           Show the version and exit.
+  -h, --help          Show this message and exit.
 
 Commands:
   run  Execute automated tests based on API specifications

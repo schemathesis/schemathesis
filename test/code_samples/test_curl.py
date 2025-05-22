@@ -22,14 +22,16 @@ def loose_schema(ctx):
         },
         version="2.0",
     )
-    return schemathesis.openapi.from_dict(schema).configure(base_url="http://127.0.0.1:1")
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.update(base_url="http://127.0.0.1:1")
+    return schema
 
 
 @pytest.mark.parametrize("headers", [None, {"X-Key": "42"}])
 @schema.parametrize()
 @settings(suppress_health_check=[HealthCheck.function_scoped_fixture], deadline=None)
 def test_as_curl_command(case: Case, headers, curl):
-    case.operation.schema.output_config.sanitize = False
+    case.operation.schema.config.output.sanitization.update(enabled=False)
     command = case.as_curl_command(headers)
     expected_headers = "" if not headers else " ".join(f" -H '{name}: {value}'" for name, value in headers.items())
     assert command == f"curl -X GET{expected_headers} http://localhost/users"
@@ -89,7 +91,7 @@ def test_cli_output_includes_insecure(cli, base_url, schema_url, curl):
 def test_pytest_subtests_output(testdir, openapi3_base_url, app_schema):
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 lazy_schema = schemathesis.pytest.from_fixture("simple_schema")
 
 @lazy_schema.parametrize()

@@ -2,6 +2,7 @@ import pytest
 
 import schemathesis
 from schemathesis.checks import CheckContext
+from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.failures import Failure
 from schemathesis.core.transport import Response
 from schemathesis.generation import GenerationMode
@@ -12,7 +13,6 @@ from schemathesis.generation.meta import (
     GenerationInfo,
     PhaseInfo,
 )
-from schemathesis.openapi.checks import PositiveDataAcceptanceConfig
 from schemathesis.specs.openapi.checks import (
     ResourcePath,
     _is_prefix_operation,
@@ -194,7 +194,7 @@ def test_negative_data_rejection_on_additional_properties(response_factory, samp
                 override=None,
                 auth=None,
                 headers=None,
-                config={},
+                config=ChecksConfig(),
                 transport_kwargs=None,
             ),
             response,
@@ -244,7 +244,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
             override=None,
             auth=None,
             headers=None,
-            config={},
+            config=ChecksConfig(),
             transport_kwargs=None,
         ),
         response,
@@ -254,7 +254,7 @@ def test_response_schema_conformance_with_unspecified_method(response_factory, s
 
 
 @pytest.mark.parametrize(
-    ("status_code", "allowed_statuses", "is_positive", "should_raise"),
+    ("status_code", "expected_statuses", "is_positive", "should_raise"),
     [
         (200, ["200", "400"], True, False),
         (400, ["200", "400"], True, False),
@@ -280,7 +280,7 @@ def test_positive_data_acceptance(
     response_factory,
     sample_schema,
     status_code,
-    allowed_statuses,
+    expected_statuses,
     is_positive,
     should_raise,
 ):
@@ -297,7 +297,7 @@ def test_positive_data_acceptance(
         override=None,
         auth=None,
         headers=None,
-        config={positive_data_acceptance: PositiveDataAcceptanceConfig(allowed_statuses=allowed_statuses)},
+        config=ChecksConfig.from_dict({"positive_data_acceptance": {"expected-statuses": expected_statuses}}),
         transport_kwargs=None,
     )
 
@@ -339,7 +339,8 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
             f"--url={openapi3_base_url}",
             "--phases=coverage",
             "--mode=negative",
-            f"--experimental-missing-required-header-allowed-statuses={expected_status}",
+            "--checks=missing_required_header",
+            config={"checks": {"missing_required_header": {"expected-statuses": [expected_status]}}},
         )
         == snapshot_cli
     )

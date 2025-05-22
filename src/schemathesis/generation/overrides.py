@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
+from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import IncorrectUsage
 from schemathesis.core.marks import Mark
 from schemathesis.core.transforms import diff
@@ -11,7 +12,7 @@ from schemathesis.generation.meta import ComponentKind
 
 if TYPE_CHECKING:
     from schemathesis.generation.case import Case
-    from schemathesis.schemas import APIOperation, ParameterSet
+    from schemathesis.schemas import APIOperation, Parameter, ParameterSet
 
 
 @dataclass
@@ -39,6 +40,41 @@ class Override:
                 for kind, stored in components.items()
             }
         )
+
+
+def for_operation(config: ProjectConfig, *, operation: APIOperation) -> Override:
+    operation_config = config.operations.get_for_operation(operation)
+
+    output = Override(query={}, headers={}, cookies={}, path_parameters={})
+    groups = [
+        (output.query, operation.query),
+        (output.headers, operation.headers),
+        (output.cookies, operation.cookies),
+        (output.path_parameters, operation.path_parameters),
+    ]
+    for container, params in groups:
+        for param in params:
+            # Attempt to get the override from the operation-specific configuration.
+            value = None
+            if operation_config:
+                value = _get_override_value(param, operation_config.parameters)
+            # Fallback to the global project configuration.
+            if value is None:
+                value = _get_override_value(param, config.parameters)
+            if value is not None:
+                container[param.name] = value
+
+    return output
+
+
+def _get_override_value(param: Parameter, parameters: dict[str, Any]) -> Any:
+    key = param.name
+    full_key = f"{param.location}.{param.name}"
+    if key in parameters:
+        return parameters[key]
+    elif full_key in parameters:
+        return parameters[full_key]
+    return None
 
 
 def _for_parameters(overridden: dict[str, str], defined: ParameterSet) -> dict[str, str]:

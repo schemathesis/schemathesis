@@ -14,16 +14,15 @@ from typing import (
     NoReturn,
     TypeVar,
 )
-from urllib.parse import quote, unquote, urljoin, urlparse, urlsplit, urlunsplit
+from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
 from schemathesis import transport
+from schemathesis.config import ProjectConfig
 from schemathesis.core import NOT_SET, NotSet
 from schemathesis.core.errors import IncorrectUsage, InvalidSchema
-from schemathesis.core.output import OutputConfig
-from schemathesis.core.rate_limit import build_limiter
 from schemathesis.core.result import Ok, Result
 from schemathesis.core.transport import Response
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import strategies
 from schemathesis.generation.hypothesis.given import GivenInput, given_proxy
@@ -42,7 +41,6 @@ from .hooks import GLOBAL_HOOK_DISPATCHER, HookContext, HookDispatcher, HookScop
 
 if TYPE_CHECKING:
     from hypothesis.strategies import SearchStrategy
-    from pyrate_limiter import Limiter
     from typing_extensions import Self
 
     from schemathesis.core import Specification
@@ -102,16 +100,13 @@ class ApiOperationsCount:
 @dataclass(eq=False)
 class BaseSchema(Mapping):
     raw_schema: dict[str, Any]
+    config: ProjectConfig
     location: str | None = None
-    base_url: str | None = None
     filter_set: FilterSet = field(default_factory=FilterSet)
     app: Any = None
     hooks: HookDispatcher = field(default_factory=lambda: HookDispatcher(scope=HookScope.SCHEMA))
     auth: AuthStorage = field(default_factory=AuthStorage)
     test_function: Callable | None = None
-    generation_config: GenerationConfig = field(default_factory=GenerationConfig)
-    output_config: OutputConfig = field(default_factory=OutputConfig)
-    rate_limiter: Limiter | None = None
 
     def __post_init__(self) -> None:
         self.hook = to_filterable_hook(self.hooks)  # type: ignore[method-assign]
@@ -227,8 +222,8 @@ class BaseSchema(Mapping):
         """Base path for the schema."""
         # if `base_url` is specified, then it should include base path
         # Example: http://127.0.0.1:8080/api
-        if self.base_url:
-            path = urlsplit(self.base_url).path
+        if self.config.base_url:
+            path = urlsplit(self.config.base_url).path
         else:
             path = self._get_base_path()
         if not path.endswith("/"):
@@ -244,7 +239,7 @@ class BaseSchema(Mapping):
         return urlunsplit(parts)
 
     def get_base_url(self) -> str:
-        base_url = self.base_url
+        base_url = self.config.base_url
         if base_url is not None:
             return base_url.rstrip("/")
         return self._build_base_url()
@@ -259,9 +254,7 @@ class BaseSchema(Mapping):
     def _measure_statistic(self) -> ApiStatistic:
         raise NotImplementedError
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         raise NotImplementedError
 
     def get_strategies_from_examples(self, operation: APIOperation, **kwargs: Any) -> list[SearchStrategy[Case]]:
@@ -317,15 +310,12 @@ class BaseSchema(Mapping):
 
         return self.__class__(
             self.raw_schema,
+            config=self.config,
             location=self.location,
-            base_url=self.base_url,
             app=self.app,
             hooks=self.hooks,
             auth=self.auth,
             test_function=_test_function,
-            generation_config=self.generation_config,
-            output_config=self.output_config,
-            rate_limiter=self.rate_limiter,
             filter_set=_filter_set,
         )
 
@@ -379,7 +369,6 @@ class BaseSchema(Mapping):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         raise NotImplementedError
@@ -408,7 +397,6 @@ class BaseSchema(Mapping):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all defined API operations."""
@@ -417,7 +405,6 @@ class BaseSchema(Mapping):
                 hooks=hooks,
                 auth_storage=auth_storage,
                 generation_mode=generation_mode,
-                generation_config=generation_config,
                 **kwargs,
             )
             for operation in self.get_all_operations()
@@ -428,46 +415,14 @@ class BaseSchema(Mapping):
     def configure(
         self,
         *,
-        base_url: str | None | NotSet = NOT_SET,
         location: str | None | NotSet = NOT_SET,
-        rate_limit: str | None | NotSet = NOT_SET,
-        generation: GenerationConfig | NotSet = NOT_SET,
-        output: OutputConfig | NotSet = NOT_SET,
         app: Any | NotSet = NOT_SET,
     ) -> Self:
-        if not isinstance(base_url, NotSet):
-            if base_url is not None:
-                validate_base_url(base_url)
-            self.base_url = base_url
         if not isinstance(location, NotSet):
             self.location = location
-        if not isinstance(rate_limit, NotSet):
-            if isinstance(rate_limit, str):
-                self.rate_limiter = build_limiter(rate_limit)
-            else:
-                self.rate_limiter = None
-        if not isinstance(generation, NotSet):
-            self.generation_config = generation
-        if not isinstance(output, NotSet):
-            self.output_config = output
         if not isinstance(app, NotSet):
             self.app = app
         return self
-
-
-INVALID_BASE_URL_MESSAGE = (
-    "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
-    "Make sure it is a properly formatted URL."
-)
-
-
-def validate_base_url(value: str) -> None:
-    try:
-        netloc = urlparse(value).netloc
-    except ValueError as exc:
-        raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
-    if value and not netloc:
-        raise ValueError(INVALID_BASE_URL_MESSAGE)
 
 
 @dataclass
@@ -489,7 +444,6 @@ class APIOperationMap(Mapping):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all API operations defined in this subset."""
@@ -498,7 +452,6 @@ class APIOperationMap(Mapping):
                 hooks=hooks,
                 auth_storage=auth_storage,
                 generation_mode=generation_mode,
-                generation_config=generation_config,
                 **kwargs,
             )
             for operation in self._data.values()
@@ -688,13 +641,10 @@ class APIOperation(Generic[P]):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
         """Turn this API operation into a Hypothesis strategy."""
-        strategy = self.schema.get_case_strategy(
-            self, hooks, auth_storage, generation_mode, generation_config=generation_config, **kwargs
-        )
+        strategy = self.schema.get_case_strategy(self, hooks, auth_storage, generation_mode, **kwargs)
 
         def _apply_hooks(dispatcher: HookDispatcher, _strategy: SearchStrategy[Case]) -> SearchStrategy[Case]:
             context = HookContext(self)
@@ -722,7 +672,6 @@ class APIOperation(Generic[P]):
 
     def get_strategies_from_examples(self, **kwargs: Any) -> list[SearchStrategy[Case]]:
         """Get examples from the API operation."""
-        kwargs.setdefault("generation_config", self.schema.generation_config)
         return self.schema.get_strategies_from_examples(self, **kwargs)
 
     def get_parameter_serializer(self, location: str) -> Callable | None:

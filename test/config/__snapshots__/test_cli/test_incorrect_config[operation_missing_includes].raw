@@ -1,0 +1,14 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Error in [operations.0] section:
+  At least one filter is required when defining [[operations]].
+
+Please specify at least one include or exclude filter property (e.g., include-path, exclude-tag, etc.).

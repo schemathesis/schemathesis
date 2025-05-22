@@ -12,7 +12,6 @@ from pytest_subtests import SubTests
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.result import Ok, Result
 from schemathesis.filters import FilterSet, FilterValue, MatcherFunc, RegexValue, is_deprecated
-from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis.builder import HypothesisTestConfig, HypothesisTestMode, create_test
 from schemathesis.generation.hypothesis.given import (
     GivenArgsMark,
@@ -38,7 +37,6 @@ def get_all_tests(
     *,
     schema: BaseSchema,
     test_func: Callable,
-    generation_config: GenerationConfig,
     modes: list[HypothesisTestMode],
     settings: hypothesis.settings | None = None,
     seed: int | None = None,
@@ -46,7 +44,7 @@ def get_all_tests(
     given_kwargs: dict[str, GivenInput] | None = None,
 ) -> Generator[Result[tuple[APIOperation, Callable], InvalidSchema], None, None]:
     """Generate all operations and Hypothesis tests for them."""
-    for result in schema.get_all_operations(generation_config=generation_config):
+    for result in schema.get_all_operations():
         if isinstance(result, Ok):
             operation = result.ok()
             if callable(as_strategy_kwargs):
@@ -60,7 +58,7 @@ def get_all_tests(
                     settings=settings,
                     modes=modes,
                     seed=seed,
-                    generation=generation_config,
+                    project=schema.config,
                     as_strategy_kwargs=_as_strategy_kwargs,
                     given_kwargs=given_kwargs or {},
                 ),
@@ -194,7 +192,6 @@ class LazySchema:
                         test_func=test_func,
                         settings=settings,
                         modes=list(HypothesisTestMode),
-                        generation_config=schema.generation_config,
                         as_strategy_kwargs=as_strategy_kwargs,
                         given_kwargs=given_kwargs,
                     )

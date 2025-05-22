@@ -21,7 +21,8 @@ def test_maximum_requests(request, loader, fixture, mocker):
     side_effect = BucketFullException(rate_item, Rate(5, 3600))
     mocker.patch("pyrate_limiter.limiter.Limiter.delay_or_raise", side_effect=side_effect)
     url = request.getfixturevalue(fixture)
-    schema = loader(url).configure(rate_limit="5/h")
+    schema = loader(url)
+    schema.config.update(rate_limit="5/h")
     counter = 0
 
     def run():

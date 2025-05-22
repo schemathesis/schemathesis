@@ -1,6 +1,46 @@
-# Schemathesis CLI
+# Schemathesis CLI Tutorial
 
-This guide demonstrates practical usage examples of the Schemathesis command-line interface, progressing from basic commands to advanced testing scenarios.
+This tutorial provides a comprehensive walkthrough of using the Schemathesis Command-Line Interface to perform a full testing cycle on the "Booking API." You'll learn how to:
+
+- Target specific API operations (e.g., payments)
+
+- Authenticate requests using an API token
+
+- Run tests and interpret failure reports
+
+- Reproduce issues with curl
+
+- Generate and share test reports
+
+- Apply code fixes and verify them with deterministic test runs
+
+- Increase test coverage to detect additional issues
+
+By the end of this tutorial, you'll have a clear understanding of how to integrate Schemathesis CLI into your API development workflow to identify and resolve issues effectively.
+
+!!! note
+
+    This tutorial focuses exclusively on the Schemathesis CLI. For guidance on integrating Schemathesis with `pytest`, refer to the [Pytest Tutorial](pytest.md) section.
+
+## Prerequisites
+
+Before proceeding, ensure you have the following:
+
+- **Schemathesis CLI**: You can run Schemathesis without installing it by using [uvx](https://docs.astral.sh/uv/guides/tools/), a fast Python package runner:
+
+```
+uvx schemathesis run https://example.schemathesis.io/openapi.json
+```
+
+- **Access to the Booking API example**: Located in the `examples/booking/` directory of the Schemathesis repository.
+
+- **API token**: Set the `BOOKING_API_TOKEN` environment variable with a valid token.
+
+- **Running instance of the Booking API**: Ensure the API server is running locally or accessible remotely.
+
+- **Basic understanding of OpenAPI specifications**: Familiarity with OpenAPI 3.x is recommended.
+
+If you're new to Schemathesis, consider reviewing the [Getting Started Guide](../getting-started.md) before proceeding.
 
 ## First Test Run
 
@@ -262,7 +302,7 @@ Schemathesis automatically encodes credentials in the `Authorization` header.
 
 ### Using Configuration Files
 
-Configuration files allow you to set default authentication or override it for specific API operations. This flexible approach supports all authentication types, including OpenAPI security schemes, which are automatically applied when required by the API.
+Configuration files allow you to set default authentication or override it for specific API operations.
 
 By default, Schemathesis automatically loads a `schemathesis.toml` file from the current directory or project root. To use a custom configuration file, specify its path with the `--config-file` option:
 
@@ -274,10 +314,7 @@ For more details, see the [Authentication Configuration Reference](../reference/
 
 ```toml
 [auth]
-bearer = "${TOKEN}"
-
-[auth.openapi]
-ApiKeyAuth = { value = "${API_KEY}" }
+basic = { username = "${USERNAME}", password = "${PASSWORD}" }
 ```
 
 ### Advanced Authentication

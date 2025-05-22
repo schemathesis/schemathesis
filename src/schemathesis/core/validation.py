@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlparse
 
 # Adapted from http.client._is_illegal_header_value
 INVALID_HEADER_RE = re.compile(r"\n(?![ \t])|\r(?![ \t\n])")
@@ -36,3 +37,18 @@ def contains_unicode_surrogate_pair(item: object) -> bool:
     if isinstance(item, list):
         return any(isinstance(item_, str) and bool(_contains_surrogate_pair(item_)) for item_ in item)
     return isinstance(item, str) and bool(_contains_surrogate_pair(item))
+
+
+INVALID_BASE_URL_MESSAGE = (
+    "The provided base URL is invalid. This URL serves as a prefix for all API endpoints you want to test. "
+    "Make sure it is a properly formatted URL."
+)
+
+
+def validate_base_url(value: str) -> None:
+    try:
+        netloc = urlparse(value).netloc
+    except ValueError as exc:
+        raise ValueError(INVALID_BASE_URL_MESSAGE) from exc
+    if value and not netloc:
+        raise ValueError(INVALID_BASE_URL_MESSAGE)

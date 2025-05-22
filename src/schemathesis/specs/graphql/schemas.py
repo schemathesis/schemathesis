@@ -28,7 +28,7 @@ from schemathesis import auths
 from schemathesis.core import NOT_SET, NotSet, Specification
 from schemathesis.core.errors import InvalidSchema, OperationNotFound
 from schemathesis.core.result import Ok, Result
-from schemathesis.generation import GenerationConfig, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.case import Case
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -139,8 +139,8 @@ class GraphQLSchema(BaseSchema):
 
     @property
     def base_path(self) -> str:
-        if self.base_url:
-            return urlsplit(self.base_url).path
+        if self.config.base_url:
+            return urlsplit(self.config.base_url).path
         return self._get_base_path()
 
     def _get_base_path(self) -> str:
@@ -171,9 +171,7 @@ class GraphQLSchema(BaseSchema):
                                 statistic.operations.selected += 1
         return statistic
 
-    def get_all_operations(
-        self, generation_config: GenerationConfig | None = None
-    ) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
+    def get_all_operations(self) -> Generator[Result[APIOperation, InvalidSchema], None, None]:
         schema = self.client_schema
         for root_type, operation_type in (
             (RootType.QUERY, schema.query_type),
@@ -226,7 +224,6 @@ class GraphQLSchema(BaseSchema):
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
         generation_mode: GenerationMode = GenerationMode.default(),
-        generation_config: GenerationConfig | None = None,
         **kwargs: Any,
     ) -> SearchStrategy:
         return graphql_cases(
@@ -234,7 +231,6 @@ class GraphQLSchema(BaseSchema):
             hooks=hooks,
             auth_storage=auth_storage,
             generation_mode=generation_mode,
-            generation_config=generation_config or self.generation_config,
             **kwargs,
         )
 
@@ -326,14 +322,13 @@ def graphql_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
-    phase: TestPhase = TestPhase.GENERATE,
+    phase: TestPhase = TestPhase.FUZZING,
 ) -> Any:
     start = time.monotonic()
     definition = cast(GraphQLOperationDefinition, operation.definition)
@@ -343,14 +338,15 @@ def graphql_cases(
     }[definition.root_type]
     hook_context = HookContext(operation)
     custom_scalars = {**get_extra_scalar_strategies(), **CUSTOM_SCALARS}
+    generation = operation.schema.config.generation_for(operation=operation, phase="fuzzing")
     strategy = strategy_factory(
         operation.schema.client_schema,  # type: ignore[attr-defined]
         fields=[definition.field_name],
         custom_scalars=custom_scalars,
         print_ast=_noop,  # type: ignore
-        allow_x00=generation_config.allow_x00,
-        allow_null=generation_config.graphql_allow_null,
-        codec=generation_config.codec,
+        allow_x00=generation.allow_x00,
+        allow_null=generation.graphql_allow_null,
+        codec=generation.codec,
     )
     strategy = apply_to_all_dispatchers(operation, hook_context, hooks, strategy, "body").map(graphql.print_ast)
     body = draw(strategy)
@@ -361,8 +357,8 @@ def graphql_cases(
     query_ = _generate_parameter("query", query, draw, operation, hook_context, hooks)
 
     _phase_data = {
-        TestPhase.EXPLICIT: ExplicitPhaseData(),
-        TestPhase.GENERATE: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExplicitPhaseData(),
+        TestPhase.FUZZING: GeneratePhaseData(),
     }[phase]
     phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
     instance = operation.Case(

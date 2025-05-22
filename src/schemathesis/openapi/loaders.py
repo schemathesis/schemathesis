@@ -7,6 +7,7 @@ from os import PathLike
 from pathlib import Path
 from typing import IO, TYPE_CHECKING, Any, Mapping
 
+from schemathesis.config import SchemathesisConfig
 from schemathesis.core import media_types
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
@@ -18,16 +19,16 @@ if TYPE_CHECKING:
     from schemathesis.specs.openapi.schemas import BaseOpenAPISchema
 
 
-def from_asgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
+def from_asgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> BaseOpenAPISchema:
     require_relative_url(path)
     client = asgi.get_client(app)
     response = load_from_url(client.get, url=path, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema).configure(app=app, location=path)
+    return from_dict(schema=schema, config=config).configure(app=app, location=path)
 
 
-def from_wsgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
+def from_wsgi(path: str, app: Any, *, config: SchemathesisConfig | None = None, **kwargs: Any) -> BaseOpenAPISchema:
     require_relative_url(path)
     prepare_request_kwargs(kwargs)
     client = wsgi.get_client(app)
@@ -35,28 +36,32 @@ def from_wsgi(path: str, app: Any, **kwargs: Any) -> BaseOpenAPISchema:
     raise_for_status(response)
     content_type = detect_content_type(headers=response.headers, path=path)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema).configure(app=app, location=path)
+    return from_dict(schema=schema, config=config).configure(app=app, location=path)
 
 
-def from_url(url: str, *, wait_for_schema: float | None = None, **kwargs: Any) -> BaseOpenAPISchema:
+def from_url(
+    url: str, *, config: SchemathesisConfig | None = None, wait_for_schema: float | None = None, **kwargs: Any
+) -> BaseOpenAPISchema:
     """Load from URL."""
     import requests
 
     response = load_from_url(requests.get, url=url, wait_for_schema=wait_for_schema, **kwargs)
     content_type = detect_content_type(headers=response.headers, path=url)
     schema = load_content(response.text, content_type)
-    return from_dict(schema=schema).configure(location=url)
+    return from_dict(schema=schema, config=config).configure(location=url)
 
 
-def from_path(path: PathLike | str, *, encoding: str = "utf-8") -> BaseOpenAPISchema:
+def from_path(
+    path: PathLike | str, *, config: SchemathesisConfig | None = None, encoding: str = "utf-8"
+) -> BaseOpenAPISchema:
     """Load from a filesystem path."""
     with open(path, encoding=encoding) as file:
         content_type = detect_content_type(headers=None, path=str(path))
         schema = load_content(file.read(), content_type)
-        return from_dict(schema=schema).configure(location=Path(path).absolute().as_uri())
+        return from_dict(schema=schema, config=config).configure(location=Path(path).absolute().as_uri())
 
 
-def from_file(file: IO[str] | str) -> BaseOpenAPISchema:
+def from_file(file: IO[str] | str, *, config: SchemathesisConfig | None = None) -> BaseOpenAPISchema:
     """Load from file-like object or string."""
     if isinstance(file, str):
         data = file
@@ -66,10 +71,10 @@ def from_file(file: IO[str] | str) -> BaseOpenAPISchema:
         schema = json.loads(data)
     except json.JSONDecodeError:
         schema = _load_yaml(data)
-    return from_dict(schema)
+    return from_dict(schema, config=config)
 
 
-def from_dict(schema: dict[str, Any]) -> BaseOpenAPISchema:
+def from_dict(schema: dict[str, Any], *, config: SchemathesisConfig | None = None) -> BaseOpenAPISchema:
     """Base loader that others build upon."""
     from schemathesis.specs.openapi.schemas import OpenApi30, SwaggerV20
 
@@ -78,8 +83,12 @@ def from_dict(schema: dict[str, Any]) -> BaseOpenAPISchema:
     hook_context = HookContext()
     dispatch("before_load_schema", hook_context, schema)
 
+    if config is None:
+        config = SchemathesisConfig.discover()
+    project_config = config.projects.get(schema)
+
     if "swagger" in schema:
-        instance = SwaggerV20(schema)
+        instance = SwaggerV20(raw_schema=schema, config=project_config)
     elif "openapi" in schema:
         version = schema["openapi"]
         if not OPENAPI_VERSION_RE.match(version):
@@ -87,7 +96,7 @@ def from_dict(schema: dict[str, Any]) -> BaseOpenAPISchema:
                 LoaderErrorKind.OPEN_API_UNSUPPORTED_VERSION,
                 f"The provided schema uses Open API {version}, which is currently not supported.",
             )
-        instance = OpenApi30(schema)
+        instance = OpenApi30(raw_schema=schema, config=project_config)
     else:
         raise LoaderError(
             LoaderErrorKind.OPEN_API_UNSPECIFIED_VERSION,
