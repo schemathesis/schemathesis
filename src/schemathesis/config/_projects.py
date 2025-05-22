@@ -94,7 +94,6 @@ class ProjectConfig(DiffBase):
         hooks_: str | None = None,
         workers: int | Literal["auto"] = DEFAULT_WORKERS,
         proxy: str | None = None,
-        max_response_time: float | int | None = None,
         continue_on_failure: bool | None = None,
         tls_verify: bool | str | None = None,
         rate_limit: str | None = None,

@@ -61,6 +61,10 @@ class OperationsConfig(DiffBase):
             return f"[{', '.join(DiffBase.__repr__(cfg) for cfg in self.operations)}]"
         return "[]"
 
+    @classmethod
+    def from_hierarchy(cls, configs: list[OperationsConfig]) -> OperationsConfig:  # type: ignore
+        return cls(operations=sum([config.operations for config in reversed(configs)], []))
+
     def get_for_operation(self, operation: APIOperation) -> OperationConfig:
         configs = [config for config in self.operations if config._filter_set.applies_to(operation)]
         return OperationConfig.from_hierarchy(configs)

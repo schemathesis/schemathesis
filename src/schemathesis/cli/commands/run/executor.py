@@ -19,7 +19,6 @@ from schemathesis.core.errors import LoaderError
 from schemathesis.core.fs import file_exists
 from schemathesis.engine import from_schema
 from schemathesis.engine.events import EventGenerator, FatalError, Interrupted
-from schemathesis.filters import FilterSet
 
 CUSTOM_HANDLERS: list[type[EventHandler]] = []
 
@@ -37,7 +36,7 @@ def execute(
     *,
     location: str,
     config: ProjectConfig,
-    filter_set: FilterSet,
+    filter_set: dict[str, Any],
     args: list[str],
     params: dict[str, Any],
 ) -> None:
@@ -48,7 +47,7 @@ def execute(
 MISSING_BASE_URL_MESSAGE = "The `--url` option is required when specifying a schema via a file."
 
 
-def into_event_stream(*, location: str, config: ProjectConfig, filter_set: FilterSet) -> EventGenerator:
+def into_event_stream(*, location: str, config: ProjectConfig, filter_set: dict[str, Any]) -> EventGenerator:
     # The whole engine idea is that it communicates with the outside via events, so handlers can react to them
     # For this reason, even schema loading is done via a separate set of events.
     loading_started = LoadingStarted(location=location)
@@ -58,7 +57,7 @@ def into_event_stream(*, location: str, config: ProjectConfig, filter_set: Filte
         schema = load_schema(location=location, config=config)
         # Schemas don't (yet?) use configs for deciding what operations should be tested, so
         # a separate FilterSet passed there. It combines both config file filters + CLI options
-        schema.filter_set = filter_set
+        schema.filter_set = schema.config.operations.create_filter_set(**filter_set)
         if file_exists(location) and schema.config.base_url is None:
             raise click.UsageError(MISSING_BASE_URL_MESSAGE)
     except KeyboardInterrupt:
