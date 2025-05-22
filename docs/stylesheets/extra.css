@@ -1,0 +1,41 @@
+:root > * {
+  /* Primary colors - forest green theme */
+  --md-primary-fg-color:        #2e7d32; /* Medium forest green */
+  --md-primary-fg-color--light: #81c784; /* Light green */
+  --md-primary-fg-color--dark:  #1b5e20; /* Dark forest green */
+
+  /* Accent colors - teal accents work well with green */
+  --md-accent-fg-color:                #00bfa5; /* Teal accent */
+  --md-accent-fg-color--transparent:   rgba(0, 191, 165, 0.1);
+  --md-accent-bg-color:                #ffffff;
+  --md-accent-bg-color--light:         rgba(255, 255, 255, 0.7);
+}
+
+.grid.cards > ul > li {
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.grid.cards > ul > li:nth-child(1) {
+  border-left-color: #2196F3;
+}
+
+.grid.cards > ul > li:nth-child(2) {
+  border-left-color: #4CAF50;
+}
+
+.grid.cards > ul > li:nth-child(3) {
+  border-left-color: #9C27B0;
+}
+
+.grid.cards > ul > li:nth-child(4) {
+  border-left-color: #FF9800;
+}
+
+.grid.cards > ul > li:hover {
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.md-header {
+  background: linear-gradient(90deg, #1b5e20 0%, #2e7d32 100%);
+}

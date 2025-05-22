@@ -8,6 +8,10 @@ Schemathesis automatically generates and runs API tests from your OpenAPI or Gra
   <i>Automatically finding specification violations and server errors</i>
 </p>
 
+<div align="center" markdown>
+[Get Your API tested in 5 Minutes :octicons-rocket-24:](quick-start.md){ .md-button .md-button--primary }
+</div>
+
 ## Why Schemathesis?
 
 - 📑 **Schema-Based Testing** - Transform API documentation into a comprehensive test suite
@@ -16,6 +20,7 @@ Schemathesis automatically generates and runs API tests from your OpenAPI or Gra
 - 🛡️ **Effective Coverage** - Find edge cases no manual testing could uncover
 - 🔬 **Research-Backed**: [Recognized](https://dl.acm.org/doi/10.1145/3617175) in [academic research](https://ieeexplore.ieee.org/document/9793781) as a state-of-the-art API testing tool
 
+---
 
 <div class="testimonial-highlight">
   <blockquote>
@@ -27,7 +32,6 @@ Schemathesis automatically generates and runs API tests from your OpenAPI or Gra
 ## Try It
 
 ```console
-# Quickest way to start:
 $ uvx schemathesis run http://example.schemathesis.io/openapi.json
 ```
 
@@ -35,53 +39,57 @@ $ uvx schemathesis run http://example.schemathesis.io/openapi.json
 
     For installing Schemathesis, we recommend using [uv](https://docs.astral.sh/uv/), a fast Python package installer and environment manager.
 
-See [Getting Started](getting-started.md) for installation options and your first test run.
-
-## Documentation
-
-<div class="grid">
-  <div class="card">
-    <h3><a href="getting-started">Getting Started</a></h3>
-    <p>Install Schemathesis and run your first API test in minutes</p>
-  </div>
-  <div class="card">
-    <h3><a href="core-concepts">Core Concepts</a></h3>
-    <p>Understand how Schemathesis generates and executes tests</p>
-  </div>
-  <div class="card">
-    <h3><a href="using/cli">CLI Guide</a></h3>
-    <p>Learn how to use Schemathesis from the command line</p>
-  </div>
-  <div class="card">
-    <h3><a href="using/pytest">Pytest Integration</a></h3>
-    <p>Embed API testing directly in your Python test suites</p>
-  </div>
-</div>
-
 ## Schema Support
 
 - **OpenAPI**: 2.0 (Swagger), 3.0, and 3.1
 - **GraphQL**: 2018 specification
 
+## Documentation
+
+<div class="grid cards" markdown>
+
+-   :material-book-open-page-variant:{ .lg .middle style="color: #2196F3" } __Tutorial__
+
+    ---
+
+    Introduction to Schemathesis:
+
+    - [:octicons-arrow-right-24: Quick Start Guide](quick-start.md)
+    - [:octicons-arrow-right-24: Tutorial for CLI & pytest](quick-start.md)
+
+-   :material-puzzle:{ .lg .middle style="color: #4CAF50" } __How-To Guides__
+
+    ---
+
+    Practical guides for using Schemathesis:
+
+     - [:octicons-arrow-right-24: CI / CD Integration](guides/cicd.md)
+     - [:octicons-arrow-right-24: Extending Schemathesis](guides/extending.md)
+     - [:octicons-arrow-right-24: More...](guides/index.md)
+
+-   :material-puzzle:{ .lg .middle style="color: #9C27B0" } __Explanations__
+
+    ---
+
+    Diving deep into how Schemathesis works:
+
+     - [:octicons-arrow-right-24: Testing Workflow](explanations/workflow.md)
+     - [:octicons-arrow-right-24: Data Generation](explanations/data-generation.md)
+     - [:octicons-arrow-right-24: Checks](explanations/checks.md)
+
+-   :material-file-document-outline:{ .lg .middle style="color: #FF9800" } __API Reference__
+
+    ---
+
+    Technical API reference:
+
+     - [:octicons-arrow-right-24: Command-Line Interface](reference/cli.md)
+     - [:octicons-arrow-right-24: Python API](reference/python.md)
+     - [:octicons-arrow-right-24: Configuration File](reference/configuration.md)
+
+</div>
+
 ## Learn More
-
-* **[Using Schemathesis](using/cli.md)** — Practical guides for running tests with different interfaces
-    * [Command-Line Interface](using/cli.md)
-    * [Python Integration](using/pytest.md)
-    * [Continuous Integration](ci/overview.md)
-    * [Configuration](using/configuration.md)
-
-* **[Extending Schemathesis](extending/overview.md)** — Customize and enhance testing capabilities
-    * [Custom Checks](extending/checks.md)
-    * [Data Generation](extending/data-generation.md)
-    * [Authentication](extending/auth.md)
-    * [Hooks](extending/hooks.md)
-
-* **[Reference](reference/configuration.md)** — Comprehensive documentation of all options and settings
-    * [Configuration Options](reference/configuration.md)
-    * [CLI Options](reference/cli.md)
-    * [Checks](reference/checks.md)
-    * [Reporting](reference/reporting.md)
 
 * **[Resources](resources.md)** — Community articles, videos, and tutorials
 

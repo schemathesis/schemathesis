@@ -205,7 +205,7 @@ That's it! Schemathesis will automatically generate test cases based on your sch
 
 ## Where to Go Next
 
-- [Core Concepts](core-concepts.md) - Understand how Schemathesis works
+- [Testing Workflow](explanations/workflow.md) - Understand how Schemathesis works
 - [Command-Line Interface](using/cli.md) - Learn all available CLI options
 - [Authentication](using/configuration.md#authentication) - Configure tests for protected APIs
-- [Continuous Integration](ci/overview.md) - Automate API testing in your CI pipeline
+- [Continuous Integration](guides/cicd.md) - Automate API testing in your CI pipeline
