@@ -334,8 +334,8 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Integer`  
-    **Default:** `Number of available CPUs`  
+    **Type:** `Integer or "auto"`  
+    **Default:** `1`  
 
     Specifies the number of concurrent workers for running unit test phases.
 
@@ -356,19 +356,6 @@ These settings can only be applied at the project level.
     wait-for-schema = 5.0
     ```
 
-#### `exclude-deprecated`
-
-!!! note ""
-
-    **Type:** `Boolean`  
-    **Default:** `false`  
-
-    Skip deprecated API operations.
-
-    ```toml
-    exclude-deprecated = true
-    ```
-
 #### `continue-on-failure`
 
 !!! note ""
@@ -380,19 +367,6 @@ These settings can only be applied at the project level.
 
     ```toml
     continue-on-failure = true
-    ```
-
-#### `max-response-time`
-
-!!! note ""
-
-    **Type:** `Float (>0)`  
-    **Default:** `null`  
-
-    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
-
-    ```toml
-    max-response-time = 2.0
     ```
 
 ### Phases
@@ -426,6 +400,20 @@ These settings can only be applied at the project level.
     unexpected-methods = ["PATCH"]
     ```
 
+#### `phases.stateful.max-steps`
+
+!!! note ""
+
+    **Type**: `Integer (≥2)`  
+    **Default**: `null`  
+
+    Specifies the maximum number of stateful steps (i.e., transitions between states) to perform in the **stateful** phase. When set, Schemathesis will stop exploring new state transitions once this limit is reached, even if additional valid transitions are available.  
+
+    ```toml
+    [phases.stateful]
+    max-steps = 50
+    ```
+
 #### `phases.<phase>.checks`
 
 !!! note "" 
@@ -456,50 +444,6 @@ These settings can only be applied at the project level.
     basic = { username = "${USERNAME}", password = "${PASSWORD}" }
     ```
 
-#### `auth.bearer`
-
-!!! note ""
-
-    **Type:** `String`  
-    **Default:** `null`  
-
-    Specifies a bearer token for authentication.
-
-    ```toml
-    [auth]
-    bearer = "${API_TOKEN}"
-    ```
-
-#### `auth.openapi`
-
-!!! note ""
-
-    **Type:** `Object`  
-    **Default:** `null`  
-
-    Defines authentication settings for OpenAPI security schemes. Each key in this object should match a security scheme defined in your OpenAPI specification. 
-
-    Schemathesis resolves authentication in order: 
-
-      - CLI options
-      - Operation-specific auth
-      - Global
-
-    ```toml
-    [auth.openapi]
-    # Basic HTTP authentication
-    BasicAuth = { username = "${USERNAME}", password = "${PASSWORD}" }
-
-    # Bearer token authentication
-    BearerAuth = { token = "${API_TOKEN}" }
-
-    # API Key authentication
-    ApiKeyAuth = { value = "${API_KEY}" }
-
-    # OAuth2 authentication
-    OAuth2 = { client_id = "${CLIENT_ID}", client_secret = "${CLIENT_SECRET}" }
-    ```
-
 ### Checks
 
 #### `checks.<check>.enabled`
@@ -521,6 +465,7 @@ These settings can only be applied at the project level.
       - `ensure_resource_availability`
       - `missing_required_header`
       - `ignored_auth`
+      - `unsupported_method`
 
     ```toml
     [checks]
@@ -531,7 +476,7 @@ These settings can only be applied at the project level.
 
 !!! note ""
 
-    **Type:** `Array[Integer]`  
+    **Type:** `Array[Integer | String]`  
     **Default:** `[200]`  
 
     Defines the HTTP status codes expected from the API for specific checks. Different checks may interpret this setting differently:
@@ -543,9 +488,25 @@ These settings can only be applied at the project level.
 
     This allows you to customize validation for APIs that use non-standard success or error codes.
 
+    Status codes can be specified as exact integers (e.g., `200`) or as wildcard strings using the `X` character to match any digit (e.g., `"2XX"` to match all 2xx codes, `"4XX"` for all client error responses).
+
     ```toml
     [checks]
     positive_data_acceptance.expected-statuses = [200, 201, 202]
+    ```
+
+#### `checks.max_response_time`
+
+!!! note ""
+
+    **Type:** `Float (>0)`  
+    **Default:** `null`  
+
+    Maximum allowed API response time in seconds. Responses exceeding this limit will be reported as failures.
+
+    ```toml
+    [checks]
+    max_response_time = 2.0
     ```
 
 ### Network
@@ -890,18 +851,4 @@ The following settings control how Schemathesis generates test data for your API
     ```toml
     [generation]
     unique-inputs = true
-    ```
-
-#### `generation.fill-missing-examples`
-
-!!! note ""
-
-    **Type:** `Boolean`  
-    **Default:** `false`  
-
-    Enable generation of random examples for API operations that do not have explicit examples in the OpenAPI schema.
-
-    ```toml
-    [generation]
-    fill-missing-examples = true
     ```

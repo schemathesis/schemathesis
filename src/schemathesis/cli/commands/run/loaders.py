@@ -7,41 +7,26 @@ supporting both GraphQL and OpenAPI specifications.
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Callable
 
 from schemathesis import graphql, openapi
-from schemathesis.core import NOT_SET, NotSet
+from schemathesis.config import ProjectConfig
 from schemathesis.core.errors import LoaderError, LoaderErrorKind
 from schemathesis.core.fs import file_exists
-from schemathesis.core.output import OutputConfig
-from schemathesis.generation import GenerationConfig
 
 if TYPE_CHECKING:
-    from schemathesis.engine.config import NetworkConfig
     from schemathesis.schemas import BaseSchema
 
-Loader = Callable[["AutodetectConfig"], "BaseSchema"]
+Loader = Callable[["ProjectConfig"], "BaseSchema"]
 
 
-@dataclass
-class AutodetectConfig:
-    location: str
-    network: NetworkConfig
-    wait_for_schema: float | None
-    base_url: str | None | NotSet = NOT_SET
-    rate_limit: str | None | NotSet = NOT_SET
-    generation: GenerationConfig | NotSet = NOT_SET
-    output: OutputConfig | NotSet = NOT_SET
-
-
-def load_schema(config: AutodetectConfig) -> BaseSchema:
+def load_schema(location: str, config: ProjectConfig) -> BaseSchema:
     """Load API schema automatically based on the provided configuration."""
-    if is_probably_graphql(config.location):
+    if is_probably_graphql(location):
         # Try GraphQL first, then fallback to Open API
-        return _try_load_schema(config, graphql, openapi)
+        return _try_load_schema(location, config, graphql, openapi)
     # Try Open API first, then fallback to GraphQL
-    return _try_load_schema(config, openapi, graphql)
+    return _try_load_schema(location, config, openapi, graphql)
 
 
 def should_try_more(exc: LoaderError) -> bool:
@@ -60,27 +45,25 @@ def should_try_more(exc: LoaderError) -> bool:
     )
 
 
-def detect_loader(schema_or_location: str | dict[str, Any], module: Any) -> Callable:
+def detect_loader(location: str, module: Any) -> Callable:
     """Detect API schema loader."""
-    if isinstance(schema_or_location, str):
-        if file_exists(schema_or_location):
-            return module.from_path  # type: ignore
-        return module.from_url  # type: ignore
-    raise NotImplementedError
+    if file_exists(location):
+        return module.from_path  # type: ignore
+    return module.from_url  # type: ignore
 
 
-def _try_load_schema(config: AutodetectConfig, first_module: Any, second_module: Any) -> BaseSchema:
+def _try_load_schema(location: str, config: ProjectConfig, first_module: Any, second_module: Any) -> BaseSchema:
     """Try to load schema with fallback option."""
     from urllib3.exceptions import InsecureRequestWarning
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", InsecureRequestWarning)
         try:
-            return _load_schema(config, first_module)
+            return _load_schema(location, config, first_module)
         except LoaderError as exc:
             if should_try_more(exc):
                 try:
-                    return _load_schema(config, second_module)
+                    return _load_schema(location, config, second_module)
                 except Exception as second_exc:
                     if is_specific_exception(second_exc):
                         raise second_exc
@@ -88,26 +71,23 @@ def _try_load_schema(config: AutodetectConfig, first_module: Any, second_module:
             raise exc
 
 
-def _load_schema(config: AutodetectConfig, module: Any) -> BaseSchema:
+def _load_schema(location: str, config: ProjectConfig, module: Any) -> BaseSchema:
     """Unified schema loader for both GraphQL and OpenAPI."""
-    loader = detect_loader(config.location, module)
+    loader = detect_loader(location, module)
 
     kwargs: dict = {}
     if loader is module.from_url:
         if config.wait_for_schema is not None:
             kwargs["wait_for_schema"] = config.wait_for_schema
-        kwargs["verify"] = config.network.tls_verify
-        if config.network.cert:
-            kwargs["cert"] = config.network.cert
-        if config.network.auth:
-            kwargs["auth"] = config.network.auth
+        kwargs["verify"] = config.tls_verify
+        request_cert = config.request_cert_for()
+        if request_cert:
+            kwargs["cert"] = request_cert
+        auth = config.auth_for()
+        if auth is not None:
+            kwargs["auth"] = auth
 
-    return loader(config.location, **kwargs).configure(
-        base_url=config.base_url,
-        rate_limit=config.rate_limit,
-        output=config.output,
-        generation=config.generation,
-    )
+    return loader(location, config=config._parent, **kwargs)
 
 
 def is_specific_exception(exc: Exception) -> bool:

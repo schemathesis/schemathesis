@@ -48,7 +48,7 @@ def test_custom_rule(testdir, openapi3_base_url):
         f"""
 from hypothesis.stateful import initialize, rule
 
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 class APIWorkflow(schema.as_state_machine()):
 
@@ -85,7 +85,7 @@ def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     # When we run test as a state machine
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
     max_examples=2000,
@@ -170,7 +170,7 @@ def test_step_override(testdir, app_schema, base_url):
     # When the user overrides the `step` method
     testdir.make_test(
         f"""
-schema.base_url = "{base_url}"
+schema.config.update(base_url="{base_url}")
 
 class APIWorkflow(schema.as_state_machine()):
 
@@ -200,7 +200,7 @@ def test_trimmed_output(testdir, app_schema, base_url):
     # When an issue is found
     testdir.make_test(
         f"""
-schema.base_url = "{base_url}"
+schema.config.update(base_url="{base_url}")
 
 TestStateful = schema.as_state_machine().TestCase
 """,
@@ -262,7 +262,8 @@ def test_custom_config_in_test_case(app_factory):
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("create_user", "get_user", "update_user")
 def test_passing_transport_kwargs(app_schema, openapi3_base_url, mocker):
-    schema = schemathesis.openapi.from_dict(app_schema).configure(base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(app_schema)
+    schema.config.update(base_url=openapi3_base_url)
 
     mocker.patch(
         "schemathesis.specs.openapi.checks._get_security_parameters",

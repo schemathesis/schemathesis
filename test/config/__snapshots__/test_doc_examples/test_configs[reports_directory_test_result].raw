@@ -1,0 +1,1 @@
+SchemathesisConfig(reports=ReportsConfig(directory=Path('test-results')))

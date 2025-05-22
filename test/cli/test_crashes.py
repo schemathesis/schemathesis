@@ -1,15 +1,17 @@
 from unittest import mock
 
 import pytest
-from hypothesis import HealthCheck, Phase, example, given, settings
+from hypothesis import HealthCheck, Phase, Verbosity, example, given, settings
 from hypothesis import strategies as st
 from hypothesis.provisional import urls
+from hypothesis_jsonschema import from_schema
 from requests import Response
 
 from schemathesis import GenerationMode
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run.handlers.output import DEFAULT_INTERNAL_ERROR_MESSAGE
-from schemathesis.experimental import GLOBAL_EXPERIMENTS
+from schemathesis.config._validator import CONFIG_SCHEMA
+from schemathesis.core.transforms import deepclone
 from schemathesis.generation.targets import TARGETS
 
 
@@ -82,9 +84,6 @@ def csv_strategy(enum, exclude=()):
             "generation-database": st.text(),
             "generation-max-examples": st.integers(min_value=1),
             "generation-seed": st.integers(),
-            "experimental": st.sampled_from(
-                [experiment.name.lower().replace(" ", "-") for experiment in GLOBAL_EXPERIMENTS.available]
-            ),
         },
     ).map(lambda params: [f"--{key}={value}" for key, value in params.items()]),
     flags=st.fixed_dictionaries(
@@ -221,5 +220,43 @@ def test_schema_validity(cli, schema, base_url):
 
 
 def check_result(result):
-    assert not (result.exception and not isinstance(result.exception, SystemExit)), result.stdout
+    if result.exception and not isinstance(result.exception, SystemExit):
+        raise result.exception
     assert DEFAULT_INTERNAL_ERROR_MESSAGE not in result.stdout, result.stdout
+
+
+def remove_nones(value):
+    if isinstance(value, dict):
+        return {k: remove_nones(v) for k, v in value.items() if v is not None}
+    elif isinstance(value, list):
+        return [remove_nones(v) for v in value if v is not None]
+    return value
+
+
+@given(config=from_schema(deepclone(CONFIG_SCHEMA)).map(remove_nones))
+@settings(
+    phases=[Phase.generate],
+    suppress_health_check=list(HealthCheck),
+    deadline=None,
+    database=None,
+    verbosity=Verbosity.quiet,
+    max_examples=7,
+)
+@pytest.mark.usefixtures("mocked_schema")
+def test_random_config(cli, config, schema_url, tmp_path):
+    reports = config.get("reports", {})
+    report_enabled = False
+    for report_type in ("vcr", "har", "junit"):
+        report = reports.get(report_type, {})
+        if "path" in report:
+            report["path"] = str(tmp_path / report["path"])
+            report_enabled = True
+        if report.get("enabled"):
+            report_enabled = True
+    # Add prefix to the 'directory' path if it exists
+    if "directory" in reports:
+        reports["directory"] = str(tmp_path / reports["directory"])
+    elif report_enabled:
+        reports["directory"] = str(tmp_path / "report")
+    result = cli.main("run", schema_url, "-n 1", "--phases=examples", config=config)
+    check_result(result)

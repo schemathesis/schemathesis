@@ -1,0 +1,11 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The configuration file content is not valid TOML
+
+Illegal character '\x00' (at line 3, column 13)

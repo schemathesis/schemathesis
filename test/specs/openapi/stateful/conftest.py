@@ -10,11 +10,9 @@ import pytest
 from flask import Flask, abort, jsonify, request
 
 import schemathesis
-from schemathesis.checks import CHECKS, ChecksConfig
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
+from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
-from schemathesis.generation import GenerationConfig
 
 
 @dataclass
@@ -296,7 +294,6 @@ def app_factory(ctx):
             return jsonify({"error": "Something went wrong - PATCH"}), 500
         if user:
             data = request.get_json()
-            assert data["last_modified"] == user["last_modified"]
             if not config.merge_body:
                 assert len(data) == 1
             else:
@@ -494,36 +491,45 @@ def engine_factory(app_factory, app_runner, stop_event):
         *,
         app_kwargs=None,
         hypothesis_settings=None,
+        max_examples=None,
+        max_steps=None,
+        maximize=None,
         checks=None,
-        checks_config=None,
-        targets=None,
-        network=None,
         max_failures=None,
-        unique_data=False,
-        configuration=None,
+        unique_inputs=False,
+        generation_modes=None,
         include=None,
+        headers=None,
+        max_response_time=None,
     ):
         app = app_factory(**(app_kwargs or {}))
         port = app_runner.run_flask_app(app)
-        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json").configure(
-            **(configuration or {})
+        config = SchemathesisConfig()
+        config.update(max_failures=max_failures)
+        config.projects.override.checks.update(
+            included_check_names=[func.__name__ for func in checks] if isinstance(checks, list) else None,
+            max_response_time=max_response_time,
         )
+        if max_steps is not None:
+            config.projects.override.phases.stateful.max_steps = max_steps
+        config.projects.override.generation.update(
+            modes=generation_modes,
+            unique_inputs=unique_inputs,
+            max_examples=max_examples,
+            maximize=maximize,
+        )
+        config.projects.override.update(headers=headers)
+        schema = schemathesis.openapi.from_url(f"http://127.0.0.1:{port}/openapi.json", config=config)
+
+        if hypothesis_settings is not None:
+            current = schema.config.get_hypothesis_settings()
+            new = hypothesis.settings(current, **hypothesis_settings)
+            schema.config.get_hypothesis_settings = lambda *_, **__: new
+
         if include is not None:
             schema = schema.include(**include)
-        config = EngineConfig(
-            execution=ExecutionConfig(
-                checks=checks or CHECKS.get_all(),
-                targets=targets or [],
-                generation=GenerationConfig(),
-                hypothesis_settings=hypothesis_settings or hypothesis.settings(max_examples=55, database=None),
-                unique_inputs=unique_data,
-                max_failures=max_failures,
-            ),
-            network=network or NetworkConfig(),
-            checks_config=checks_config or ChecksConfig(),
-        )
         return stateful.execute(
-            engine=EngineContext(schema=schema, stop_event=stop_event, config=config),
+            engine=EngineContext(schema=schema, stop_event=stop_event),
             phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
         )
 

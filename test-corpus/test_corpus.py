@@ -4,14 +4,13 @@ import threading
 from time import sleep
 from typing import NoReturn
 
-import hypothesis
 import pytest
 from aiohttp.test_utils import unused_port
 from flask import Flask
-from hypothesis import HealthCheck, Phase, Verbosity
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.config import HealthCheck
 from schemathesis.core.compat import RefResolutionError
 from schemathesis.core.errors import (
     RECURSIVE_REFERENCE_ERROR_MESSAGE,
@@ -24,8 +23,6 @@ from schemathesis.core.errors import (
 from schemathesis.core.failures import Failure
 from schemathesis.core.result import Ok
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import EngineConfig, ExecutionConfig
-from schemathesis.engine.phases import PhaseName
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis.builder import _iter_coverage_cases
 
@@ -125,9 +122,12 @@ def app_port():
     return run_flask_app(app)
 
 
+@schemathesis.check
 def combined_check(ctx, response, case):
     case.as_curl_command()
     for check in CHECKS.get_all():
+        if check is combined_check:
+            continue
         try:
             check(ctx, response, case)
         except Failure:
@@ -141,24 +141,12 @@ def test_default(corpus, filename, app_port):
     except (RefResolutionError, IncorrectUsage, LoaderError, InvalidSchema, InvalidStateMachine):
         pass
 
-    engine = from_schema(
-        schema,
-        config=EngineConfig(
-            execution=ExecutionConfig(
-                phases=[PhaseName.EXAMPLES, PhaseName.FUZZING],
-                checks=[combined_check],
-                hypothesis_settings=hypothesis.settings(
-                    deadline=None,
-                    database=None,
-                    max_examples=1,
-                    suppress_health_check=list(HealthCheck),
-                    phases=[Phase.explicit, Phase.generate],
-                    verbosity=Verbosity.quiet,
-                ),
-            )
-        ),
-    )
-    for event in engine.execute():
+    schema.config.update(suppress_health_check=list(HealthCheck))
+    schema.config.phases.update(phases=["examples", "fuzzing"])
+    schema.config.generation.update(max_examples=1)
+    schema.config.checks.update(included_check_names=[combined_check.__name__])
+
+    for event in from_schema(schema).execute():
         if isinstance(event, events.Interrupted):
             pytest.exit("Keyboard Interrupt")
         assert_event(filename, event)
@@ -179,9 +167,9 @@ def _load_schema(corpus, filename, app_port=None):
     raw_content = CORPUS_FILES[corpus].extractfile(filename)
     raw_schema = json_loads(raw_content.read())
     try:
-        return schemathesis.openapi.from_dict(raw_schema).configure(
-            base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None,
-        )
+        schema = schemathesis.openapi.from_dict(raw_schema)
+        schema.config.update(base_url=f"http://127.0.0.1:{app_port}/" if app_port is not None else None)
+        return schema
     except LoaderError as exc:
         assert_invalid_schema(exc)
 

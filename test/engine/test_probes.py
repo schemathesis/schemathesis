@@ -1,3 +1,4 @@
+import threading
 from pathlib import Path
 from unittest.mock import ANY
 
@@ -5,22 +6,13 @@ import pytest
 from requests import Session
 
 from schemathesis.core.transport import USER_AGENT
-from schemathesis.engine.config import NetworkConfig
+from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import probes
 
 
-@pytest.fixture
-def config_factory():
-    def inner(request_proxy=None, request_tls_verify=False, request_cert=None, auth=None, headers=None):
-        return NetworkConfig(
-            proxy=request_proxy,
-            tls_verify=request_tls_verify,
-            cert=request_cert,
-            auth=auth,
-            headers=headers,
-        )
-
-    return inner
+@pytest.fixture()
+def ctx(openapi_30):
+    return EngineContext(schema=openapi_30, stop_event=threading.Event())
 
 
 HERE = Path(__file__).absolute().parent
@@ -35,19 +27,19 @@ DEFAULT_HEADERS = {
 
 
 @pytest.mark.parametrize(
-    ("kwargs", "headers"),
+    "kwargs",
     [
-        ({"request_cert": str(HERE.parent / "cli" / "cert.pem")}, {}),
-        ({"auth": ("test", "test")}, {"Authorization": ["[Filtered]"]}),
+        {"request_cert": str(HERE.parent / "cli" / "cert.pem")},
+        {"basic_auth": ("test", "test")},
     ],
 )
-def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url, kwargs, headers):
-    config = config_factory(**kwargs)
-    openapi_30.base_url = openapi3_base_url
+def test_detect_null_byte_detected(ctx, openapi3_base_url, kwargs):
     session = Session()
+    ctx.schema.config.update(base_url=openapi3_base_url)
     if "auth" in kwargs:
         session.auth = kwargs["auth"]
-    results = probes.run(openapi_30, session, config)
+    ctx.schema.config.update(**kwargs)
+    results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -59,17 +51,15 @@ def test_detect_null_byte_detected(openapi_30, config_factory, openapi3_base_url
     ]
 
 
-def test_detect_null_byte_with_response(openapi_30, config_factory, openapi3_base_url, response_factory):
-    config = config_factory()
-    openapi_30.base_url = openapi3_base_url
-    result = probes.run(openapi_30, Session(), config)[0]
+def test_detect_null_byte_with_response(ctx, openapi3_base_url, response_factory):
+    ctx.schema.config.update(base_url=openapi3_base_url)
+    result = probes.run(ctx)[0]
     result.response = response_factory.requests(content=b'{"success": true}')
 
 
-def test_detect_null_byte_error(openapi_30, config_factory):
-    config = config_factory()
-    openapi_30.base_url = "http://127.0.0.1:1"
-    results = probes.run(openapi_30, Session(), config)
+def test_detect_null_byte_error(ctx):
+    ctx.schema.config.update(base_url="http://127.0.0.1:1")
+    results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),
@@ -81,9 +71,8 @@ def test_detect_null_byte_error(openapi_30, config_factory):
     ]
 
 
-def test_detect_null_byte_skipped(openapi_30, config_factory):
-    config = config_factory()
-    results = probes.run(openapi_30, Session(), config)
+def test_detect_null_byte_skipped(ctx):
+    results = probes.run(ctx)
     assert results == [
         probes.ProbeRun(
             probe=probes.NullByteInHeader(),

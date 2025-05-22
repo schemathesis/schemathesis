@@ -8,8 +8,8 @@ from uuid import uuid4
 import jsonschema
 from aiohttp import web
 
+from schemathesis.config._output import MAX_PAYLOAD_SIZE
 from schemathesis.core import media_types
-from schemathesis.core.output import MAX_PAYLOAD_SIZE
 
 try:
     from ..schema import PAYLOAD_VALIDATOR

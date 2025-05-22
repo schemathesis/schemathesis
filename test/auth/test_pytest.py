@@ -185,7 +185,7 @@ def test_requests_auth(testdir, app_schema, openapi3_base_url):
         f"""
 from requests.auth import HTTPBasicAuth
 
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 auth = HTTPBasicAuth("user", "pass")
 
 schema.auth.set_from_requests(auth).apply_to(method="GET", path="/success")
@@ -212,7 +212,7 @@ def test_conditional(testdir, app_schema, openapi3_base_url):
     # When the user sets up multiple auths applied to different API operations
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 TOKEN_1 = "ABC"
 

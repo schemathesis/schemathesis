@@ -263,7 +263,7 @@ def test_parametrized_fixture(testdir, openapi3_base_url, settings):
     # When the used pytest fixture is parametrized via `params`
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @pytest.fixture(params=["a", "b"])
 def parametrized_lazy_schema(request):
@@ -294,9 +294,9 @@ def test_generation_modes(testdir):
         """
 @pytest.fixture()
 def api_schema():
-    return schemathesis.openapi.from_dict(raw_schema).configure(
-        generation=GenerationConfig(modes=schemathesis.GenerationMode.all())
-    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.generation.update(modes=GenerationMode.all())
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
@@ -406,9 +406,9 @@ def test_skip_negative_without_parameters(testdir):
         """
 @pytest.fixture()
 def api_schema():
-    return schemathesis.openapi.from_dict(raw_schema).configure(
-        generation=GenerationConfig(modes=[schemathesis.GenerationMode.NEGATIVE])
-    )
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.generation.update(modes=[schemathesis.GenerationMode.NEGATIVE])
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
@@ -500,7 +500,9 @@ def test_output_sanitization(testdir, openapi3_schema_url, openapi3_base_url, va
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}').configure(output=OutputConfig(sanitize={value}))
+    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema.config.output.sanitization.enabled = {value}
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
@@ -524,13 +526,15 @@ def test_rate_limit(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}').configure(rate_limit="1/s")
+    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema.config.update(rate_limit="1/s")
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 
 @lazy_schema.parametrize()
 def test_(case):
-    limiter = case.operation.schema.rate_limiter
+    limiter = case.operation.schema.config.rate_limit
     assert limiter.bucket_factory.bucket.rates[0].limit == 1
     assert limiter.bucket_factory.bucket.rates[0].interval == 1000
 """,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, Mapping, cast
 from urllib.parse import quote, unquote, urljoin, urlsplit, urlunsplit
 
+from schemathesis.config import SanitizationConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER, NotSet
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.output.sanitization import sanitize_url, sanitize_value
@@ -81,19 +82,19 @@ def prepare_path(path: str, parameters: dict[str, Any] | None) -> str:
         raise InvalidSchema(f"Malformed path template: `{path}`\n\n  {exc}") from exc
 
 
-def prepare_request(case: Case, headers: Mapping[str, Any] | None, sanitize: bool) -> PreparedRequest:
+def prepare_request(case: Case, headers: Mapping[str, Any] | None, *, config: SanitizationConfig) -> PreparedRequest:
     import requests
 
     from schemathesis.transport.requests import REQUESTS_TRANSPORT
 
     base_url = normalize_base_url(case.operation.base_url)
     kwargs = REQUESTS_TRANSPORT.serialize_case(case, base_url=base_url, headers=headers)
-    if sanitize:
-        kwargs["url"] = sanitize_url(kwargs["url"])
-        sanitize_value(kwargs["headers"])
+    if config.enabled:
+        kwargs["url"] = sanitize_url(kwargs["url"], config=config)
+        sanitize_value(kwargs["headers"], config=config)
         if kwargs["cookies"]:
-            sanitize_value(kwargs["cookies"])
+            sanitize_value(kwargs["cookies"], config=config)
         if kwargs["params"]:
-            sanitize_value(kwargs["params"])
+            sanitize_value(kwargs["params"], config=config)
 
     return requests.Request(**kwargs).prepare()

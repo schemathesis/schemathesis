@@ -3,7 +3,7 @@ from __future__ import annotations
 import time
 import unittest
 import uuid
-from typing import TYPE_CHECKING, Callable, Iterable
+from typing import TYPE_CHECKING, Any, Callable
 from warnings import WarningMessage, catch_warnings
 
 import requests
@@ -11,8 +11,10 @@ from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
+from requests.structures import CaseInsensitiveDict
 
-from schemathesis.checks import CheckContext, CheckFunction, run_checks
+from schemathesis.checks import CheckContext, run_checks
+from schemathesis.config._generation import GenerationConfig
 from schemathesis.core.compat import BaseExceptionGroup
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import (
@@ -37,7 +39,7 @@ from schemathesis.engine.errors import (
 )
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
-from schemathesis.generation import targets
+from schemathesis.generation import overrides, targets
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis.builder import (
     InvalidHeadersExampleMark,
@@ -85,10 +87,37 @@ def run_test(
             is_final=False,
         )
 
+    phase_name = phase.value.lower()
+    assert phase_name in ("examples", "coverage", "fuzzing", "stateful")
+
+    operation_config = ctx.config.operations.get_for_operation(operation)
+    continue_on_failure = operation_config.continue_on_failure or ctx.config.continue_on_failure or False
+    generation = ctx.config.generation_for(operation=operation, phase=phase_name)
+    override = overrides.for_operation(ctx.config, operation=operation)
+    auth = ctx.config.auth_for(operation=operation)
+    headers = ctx.config.headers_for(operation=operation)
+    transport_kwargs = ctx.get_transport_kwargs(operation=operation)
+    check_ctx = CheckContext(
+        override=override,
+        auth=auth,
+        headers=CaseInsensitiveDict(headers) if headers else None,
+        config=ctx.config.checks_config_for(operation=operation, phase=phase_name),
+        transport_kwargs=transport_kwargs,
+        recorder=recorder,
+    )
+
     try:
         setup_hypothesis_database_key(test_function, operation)
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
-            test_function(ctx=ctx, errors=errors, recorder=recorder)
+            test_function(
+                ctx=ctx,
+                errors=errors,
+                check_ctx=check_ctx,
+                recorder=recorder,
+                generation=generation,
+                transport_kwargs=transport_kwargs,
+                continue_on_failure=continue_on_failure,
+            )
         # Test body was not executed at all - Hypothesis did not generate any tests, but there is no error
         status = Status.SUCCESS
     except (SkipTest, unittest.case.SkipTest) as exc:
@@ -147,6 +176,7 @@ def run_test(
                     exc,
                     path=operation.path,
                     method=operation.method,
+                    config=ctx.config.output,
                 )
             )
     except HypothesisRefResolutionError:
@@ -180,7 +210,7 @@ def run_test(
             yield non_fatal_error(exc)
     if (
         status == Status.SUCCESS
-        and ctx.config.execution.continue_on_failure
+        and continue_on_failure
         and any(check.status == Status.FAILURE for checks in recorder.checks.values() for check in checks)
     ):
         status = Status.FAILURE
@@ -237,25 +267,49 @@ def get_invalid_regular_expression_message(warnings: list[WarningMessage]) -> st
 
 
 def cached_test_func(f: Callable) -> Callable:
-    def wrapped(*, ctx: EngineContext, case: Case, errors: list[Exception], recorder: ScenarioRecorder) -> None:
+    def wrapped(
+        *,
+        ctx: EngineContext,
+        case: Case,
+        errors: list[Exception],
+        check_ctx: CheckContext,
+        recorder: ScenarioRecorder,
+        generation: GenerationConfig,
+        transport_kwargs: dict[str, Any],
+        continue_on_failure: bool,
+    ) -> None:
         try:
             if ctx.has_to_stop:
                 raise KeyboardInterrupt
-            if ctx.config.execution.unique_inputs:
+            if generation.unique_inputs:
                 cached = ctx.get_cached_outcome(case)
                 if isinstance(cached, BaseException):
                     raise cached
                 elif cached is None:
                     return None
                 try:
-                    f(ctx=ctx, case=case, recorder=recorder)
+                    f(
+                        case=case,
+                        check_ctx=check_ctx,
+                        recorder=recorder,
+                        generation=generation,
+                        transport_kwargs=transport_kwargs,
+                        continue_on_failure=continue_on_failure,
+                    )
                 except BaseException as exc:
                     ctx.cache_outcome(case, exc)
                     raise
                 else:
                     ctx.cache_outcome(case, None)
             else:
-                f(ctx=ctx, case=case, recorder=recorder)
+                f(
+                    case=case,
+                    check_ctx=check_ctx,
+                    recorder=recorder,
+                    generation=generation,
+                    transport_kwargs=transport_kwargs,
+                    continue_on_failure=continue_on_failure,
+                )
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
@@ -268,10 +322,18 @@ def cached_test_func(f: Callable) -> Callable:
 
 
 @cached_test_func
-def test_func(*, ctx: EngineContext, case: Case, recorder: ScenarioRecorder) -> None:
+def test_func(
+    *,
+    case: Case,
+    check_ctx: CheckContext,
+    recorder: ScenarioRecorder,
+    generation: GenerationConfig,
+    transport_kwargs: dict[str, Any],
+    continue_on_failure: bool,
+) -> None:
     recorder.record_case(parent_id=None, transition=None, case=case)
     try:
-        response = case.call(**ctx.transport_kwargs)
+        response = case.call(**transport_kwargs)
     except (requests.Timeout, requests.ConnectionError) as error:
         if isinstance(error.request, requests.Request):
             recorder.record_request(case_id=case.id, request=error.request.prepare())
@@ -279,13 +341,12 @@ def test_func(*, ctx: EngineContext, case: Case, recorder: ScenarioRecorder) -> 
             recorder.record_request(case_id=case.id, request=error.request)
         raise
     recorder.record_response(case_id=case.id, response=response)
-    targets.run(ctx.config.execution.targets, case=case, response=response)
+    targets.run(generation.maximize, case=case, response=response)
     validate_response(
         case=case,
-        ctx=ctx.get_check_context(recorder),
-        checks=ctx.config.execution.checks,
+        ctx=check_ctx,
         response=response,
-        continue_on_failure=ctx.config.execution.continue_on_failure,
+        continue_on_failure=continue_on_failure,
         recorder=recorder,
     )
 
@@ -294,7 +355,6 @@ def validate_response(
     *,
     case: Case,
     ctx: CheckContext,
-    checks: Iterable[CheckFunction],
     response: Response,
     continue_on_failure: bool,
     recorder: ScenarioRecorder,
@@ -318,7 +378,7 @@ def validate_response(
         case=case,
         response=response,
         ctx=ctx,
-        checks=checks,
+        checks=ctx.checks,
         on_failure=on_failure,
         on_success=on_success,
     )

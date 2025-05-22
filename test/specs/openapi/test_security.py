@@ -2,7 +2,6 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
 from schemathesis.specs.openapi.references import InliningResolver
 from schemathesis.specs.openapi.security import OpenAPISecurityProcessor
 
@@ -94,9 +93,8 @@ def test_without_security_parameters(with_security_parameters):
         },
         "security": [{"basic_auth": []}],
     }
-    schema = schemathesis.openapi.from_dict(schema).configure(
-        generation=GenerationConfig(with_security_parameters=with_security_parameters),
-    )
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.update(with_security_parameters=with_security_parameters)
 
     @given(case=schema["/test"]["GET"].as_strategy())
     @settings(max_examples=20, suppress_health_check=list(HealthCheck))

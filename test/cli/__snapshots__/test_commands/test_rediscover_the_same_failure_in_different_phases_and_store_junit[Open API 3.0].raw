@@ -79,7 +79,7 @@ Warnings:
   ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
-  N generated, N found N unique failures
+  N generated, N found N unique failures, N skipped
 
 Reports:
   - JUNIT: /tmp/test_rediscover_the_same_failu0/reports/junit.xml

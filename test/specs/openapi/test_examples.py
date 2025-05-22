@@ -10,7 +10,6 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
-from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import examples, strategies
 from schemathesis.specs.openapi.examples import (
     ParameterExample,
@@ -331,6 +330,7 @@ def test_examples_from_cli(ctx, app, cli, base_url, schema_with_examples):
         str(schema_path),
         f"--url={base_url}",
         "--phases=examples",
+        "--checks=not_a_server_error",
     )
 
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -420,9 +420,13 @@ def test_parameter_override(ctx, cli, openapi3_base_url, snapshot_cli, explicit_
             "--phases=examples",
             f"--url={openapi3_base_url}",
             "--checks=explicit_header",
-            "--set-header=anyKey=OVERRIDE",
-            "--set-query=id=OVERRIDE",
             hooks=explicit_header,
+            config={
+                "parameters": {
+                    "anyKey": "OVERRIDE",
+                    "id": "OVERRIDE",
+                }
+            },
         )
         == snapshot_cli
     )
@@ -953,7 +957,8 @@ def test_partial_examples_without_null_bytes_and_formats(ctx):
             }
         }
     )
-    schema = schemathesis.openapi.from_dict(schema).configure(generation=GenerationConfig(allow_x00=False))
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.update(allow_x00=False)
     operation = schema["/test/"]["POST"]
     strategy = operation.get_strategies_from_examples()[0]
 

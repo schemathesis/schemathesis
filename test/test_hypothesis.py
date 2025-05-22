@@ -6,8 +6,8 @@ from hypothesis import HealthCheck, assume, find, given, settings
 from hypothesis import strategies as st
 
 import schemathesis
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET
-from schemathesis.generation import GenerationConfig
 from schemathesis.generation.hypothesis import examples
 from schemathesis.generation.meta import CaseMetadata, GenerationInfo, PhaseInfo
 from schemathesis.generation.modes import GenerationMode
@@ -323,7 +323,8 @@ def test_valid_form_data(request, raw_schema):
         base_url = request.getfixturevalue("openapi3_base_url")
     # When the request definition contains a schema, matching values of which cannot be encoded to multipart
     # straightforwardly
-    schema = schemathesis.openapi.from_dict(raw_schema).configure(base_url=base_url)
+    schema = schemathesis.openapi.from_dict(raw_schema)
+    schema.config.update(base_url=base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow], max_examples=10)
@@ -357,7 +358,8 @@ def test_optional_form_data(ctx, openapi3_base_url):
     # When the multipart form is optional
     # Note, this test is similar to the one above, but has a simplified schema & conditions
     # It is done mostly due to performance reasons
-    schema = schemathesis.openapi.from_dict(schema).configure(base_url=openapi3_base_url)
+    schema = schemathesis.openapi.from_dict(schema)
+    schema.config.update(base_url=openapi3_base_url)
 
     @given(case=schema["/form"]["POST"].as_strategy())
     @settings(deadline=None, suppress_health_check=[HealthCheck.too_slow, HealthCheck.filter_too_much], max_examples=1)

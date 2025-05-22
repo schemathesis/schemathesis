@@ -1,0 +1,13 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+❌  Failed to load configuration file from config.toml
+
+The loaded configuration is incorrect
+
+Filter for 'name' contains an invalid regular expression: '[0-'
+
+  unterminated character set at position 0

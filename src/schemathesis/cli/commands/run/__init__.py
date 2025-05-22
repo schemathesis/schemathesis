@@ -1,52 +1,43 @@
 from __future__ import annotations
 
 from pathlib import Path
-from random import Random
-from typing import Any, Sequence
+from typing import Any, Callable
 
 import click
 from click.utils import LazyFile
 
-from schemathesis import contrib, experimental
+from schemathesis import contrib
 from schemathesis.checks import CHECKS
 from schemathesis.cli.commands.run import executor, validation
-from schemathesis.cli.commands.run.checks import CheckArguments
-from schemathesis.cli.commands.run.filters import FilterArguments, with_filters
-from schemathesis.cli.commands.run.hypothesis import (
-    HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER,
-    HealthCheck,
-    prepare_health_checks,
-    prepare_phases,
-    prepare_settings,
-)
-from schemathesis.cli.commands.run.reports import DEFAULT_REPORT_DIRECTORY, ReportConfig, ReportFormat
+from schemathesis.cli.commands.run.filters import with_filters
 from schemathesis.cli.constants import DEFAULT_WORKERS, MAX_WORKERS, MIN_WORKERS
 from schemathesis.cli.core import ensure_color
 from schemathesis.cli.ext.groups import group, grouped_option
 from schemathesis.cli.ext.options import (
     CsvChoice,
     CsvEnumChoice,
-    CsvListChoice,
     CustomHelpMessageChoice,
     RegistryChoice,
 )
-from schemathesis.core.output import OutputConfig
+from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
+from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
-from schemathesis.engine.phases import PhaseName
-from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationConfig, GenerationMode
-from schemathesis.generation.overrides import Override
-from schemathesis.generation.targets import TARGETS
+from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationMode
+from schemathesis.generation.targets import TARGETS, TargetFunction
 
 # NOTE: Need to explicitly import all registered checks
 from schemathesis.specs.openapi.checks import *  # noqa: F401, F403
 
 COLOR_OPTIONS_INVALID_USAGE_MESSAGE = "Can't use `--no-color` and `--force-color` simultaneously"
 
-DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
+DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
 
 
-@click.argument("schema", type=str)  # type: ignore[misc]
+@click.argument(  # type: ignore[misc]
+    "location",
+    type=str,
+    callback=validation.validate_schema_location,
+)
 @group("Options")
 @grouped_option(
     "--url",
@@ -61,7 +52,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 @grouped_option(
     "--workers",
     "-w",
-    "workers_num",
+    "workers",
     help="Number of concurrent workers for testing. Auto-adjusts if 'auto' is specified",
     type=CustomHelpMessageChoice(
         ["auto", *list(map(str, range(MIN_WORKERS, MAX_WORKERS + 1)))],
@@ -100,7 +91,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     multiple=True,
     help="Comma-separated list of checks to run against API responses",
     type=RegistryChoice(CHECKS, with_all=True),
-    default=("not_a_server_error",),
+    default=None,
     callback=validation.reduce_list,
     show_default=True,
     metavar="",
@@ -111,7 +102,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     multiple=True,
     help="Comma-separated list of checks to skip during testing",
     type=RegistryChoice(CHECKS, with_all=True),
-    default=(),
+    default=None,
     callback=validation.reduce_list,
     show_default=True,
     metavar="",
@@ -153,12 +144,14 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     "include_by",
     type=str,
     metavar="EXPR",
+    callback=validation.validate_filter_expression,
     help="Include using custom expression",
 )
 @grouped_option(
     "--exclude-by",
     "exclude_by",
     type=str,
+    callback=validation.validate_filter_expression,
     metavar="EXPR",
     help="Exclude using custom expression",
 )
@@ -246,6 +239,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
 )
 @grouped_option(
     "--report-dir",
+    "report_directory",
     help="Directory to store all report files",
     type=click.Path(file_okay=False, dir_okay=True),
     default=DEFAULT_REPORT_DIRECTORY,
@@ -295,53 +289,6 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     metavar="BOOLEAN",
     callback=validation.convert_boolean_string,
 )
-@group("Experimental options")
-@grouped_option(
-    "--experimental",
-    "experiments",
-    help="Enable experimental features",
-    type=click.Choice(sorted([experiment.label for experiment in experimental.GLOBAL_EXPERIMENTS.available])),
-    callback=validation.convert_experimental,
-    multiple=True,
-    metavar="FEATURES",
-)
-@grouped_option(
-    "--experimental-coverage-unexpected-methods",
-    "coverage_unexpected_methods",
-    help="HTTP methods to use when generating test cases with methods not specified in the API during the coverage phase.",
-    type=CsvChoice(["get", "put", "post", "delete", "options", "head", "patch", "trace"], case_sensitive=False),
-    callback=validation.convert_http_methods,
-    metavar="",
-    default=None,
-    envvar="SCHEMATHESIS_EXPERIMENTAL_COVERAGE_UNEXPECTED_METHODS",
-)
-@grouped_option(
-    "--experimental-missing-required-header-allowed-statuses",
-    "missing_required_header_allowed_statuses",
-    help="Comma-separated list of status codes expected for test cases with a missing required header",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_MISSING_REQUIRED_HEADER_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-positive-data-acceptance-allowed-statuses",
-    "positive_data_acceptance_allowed_statuses",
-    help="Comma-separated list of status codes considered as successful responses",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES",
-)
-@grouped_option(
-    "--experimental-negative-data-rejection-allowed-statuses",
-    "negative_data_rejection_allowed_statuses",
-    help="Comma-separated list of status codes expected for rejected negative data",
-    type=CsvListChoice(),
-    callback=validation.convert_status_codes,
-    metavar="",
-    envvar="SCHEMATHESIS_EXPERIMENTAL_NEGATIVE_DATA_REJECTION_ALLOWED_STATUSES",
-)
 @group("Data generation options")
 @grouped_option(
     "--mode",
@@ -378,7 +325,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     help="Enables deterministic mode, which eliminates random variation between tests",
     is_flag=True,
     is_eager=True,
-    default=None,
+    default=False,
     show_default=True,
 )
 @grouped_option(
@@ -404,7 +351,7 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     help="Guide input generation to values more likely to expose bugs via targeted property-based testing",
     type=RegistryChoice(TARGETS),
     default=None,
-    callback=validation.reduce_list,
+    callback=validation.convert_maximize,
     show_default=True,
     metavar="METRIC",
 )
@@ -452,98 +399,57 @@ DEFAULT_PHASES = ("examples", "coverage", "fuzzing", "stateful")
     show_default=True,
     metavar="BOOLEAN",
 )
-@group("Open API options")
-@grouped_option(
-    "--set-query",
-    "set_query",
-    help=r"OpenAPI: Override a specific query parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_query,
-)
-@grouped_option(
-    "--set-header",
-    "set_header",
-    help=r"OpenAPI: Override a specific header parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_header,
-)
-@grouped_option(
-    "--set-cookie",
-    "set_cookie",
-    help=r"OpenAPI: Override a specific cookie parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_cookie,
-)
-@grouped_option(
-    "--set-path",
-    "set_path",
-    help=r"OpenAPI: Override a specific path parameter by specifying 'parameter=value'",
-    multiple=True,
-    type=str,
-    callback=validation.validate_set_path,
-)
 @group("Global options")
 @grouped_option("--no-color", help="Disable ANSI color escape codes", type=bool, is_flag=True)
 @grouped_option("--force-color", help="Explicitly tells to enable ANSI color escape codes", type=bool, is_flag=True)
 @click.pass_context  # type: ignore[misc]
 def run(
     ctx: click.Context,
-    schema: str,
+    *,
+    location: str,
     auth: tuple[str, str] | None,
     headers: dict[str, str],
-    set_query: dict[str, str],
-    set_header: dict[str, str],
-    set_cookie: dict[str, str],
-    set_path: dict[str, str],
-    experiments: list,
-    coverage_unexpected_methods: set[str] | None,
-    missing_required_header_allowed_statuses: list[str],
-    positive_data_acceptance_allowed_statuses: list[str],
-    negative_data_rejection_allowed_statuses: list[str],
-    included_check_names: Sequence[str],
-    excluded_check_names: Sequence[str],
+    included_check_names: list[str] | None,
+    excluded_check_names: list[str] | None,
     max_response_time: float | None = None,
-    phases: Sequence[str] = DEFAULT_PHASES,
+    phases: list[str] = DEFAULT_PHASES,
     max_failures: int | None = None,
-    continue_on_failure: bool = False,
-    include_path: Sequence[str] = (),
-    include_path_regex: str | None = None,
-    include_method: Sequence[str] = (),
-    include_method_regex: str | None = None,
-    include_name: Sequence[str] = (),
-    include_name_regex: str | None = None,
-    include_tag: Sequence[str] = (),
-    include_tag_regex: str | None = None,
-    include_operation_id: Sequence[str] = (),
-    include_operation_id_regex: str | None = None,
-    exclude_path: Sequence[str] = (),
-    exclude_path_regex: str | None = None,
-    exclude_method: Sequence[str] = (),
-    exclude_method_regex: str | None = None,
-    exclude_name: Sequence[str] = (),
-    exclude_name_regex: str | None = None,
-    exclude_tag: Sequence[str] = (),
-    exclude_tag_regex: str | None = None,
-    exclude_operation_id: Sequence[str] = (),
-    exclude_operation_id_regex: str | None = None,
-    include_by: str | None = None,
-    exclude_by: str | None = None,
+    continue_on_failure: bool | None = None,
+    include_path: tuple[str, ...],
+    include_path_regex: str | None,
+    include_method: tuple[str, ...],
+    include_method_regex: str | None,
+    include_name: tuple[str, ...],
+    include_name_regex: str | None,
+    include_tag: tuple[str, ...],
+    include_tag_regex: str | None,
+    include_operation_id: tuple[str, ...],
+    include_operation_id_regex: str | None,
+    exclude_path: tuple[str, ...],
+    exclude_path_regex: str | None,
+    exclude_method: tuple[str, ...],
+    exclude_method_regex: str | None,
+    exclude_name: tuple[str, ...],
+    exclude_name_regex: str | None,
+    exclude_tag: tuple[str, ...],
+    exclude_tag_regex: str | None,
+    exclude_operation_id: tuple[str, ...],
+    exclude_operation_id_regex: str | None,
+    include_by: Callable | None = None,
+    exclude_by: Callable | None = None,
     exclude_deprecated: bool = False,
-    workers_num: int = DEFAULT_WORKERS,
-    base_url: str | None = None,
+    workers: int = DEFAULT_WORKERS,
+    base_url: str | None,
     wait_for_schema: float | None = None,
+    suppress_health_check: list[HealthCheck] | None,
     rate_limit: str | None = None,
-    suppress_health_check: list[HealthCheck] | None = None,
     request_timeout: int | None = None,
     request_tls_verify: bool = True,
     request_cert: str | None = None,
     request_cert_key: str | None = None,
     request_proxy: str | None = None,
-    report_formats: list[ReportFormat] | None = None,
-    report_dir: Path = DEFAULT_REPORT_DIRECTORY,
+    report_formats: list[ReportFormat] | None,
+    report_directory: Path | str = DEFAULT_REPORT_DIRECTORY,
     report_junit_path: LazyFile | None = None,
     report_vcr_path: LazyFile | None = None,
     report_har_path: LazyFile | None = None,
@@ -551,11 +457,11 @@ def run(
     output_sanitize: bool = True,
     output_truncate: bool = True,
     contrib_openapi_fill_missing_examples: bool = False,
-    generation_modes: tuple[GenerationMode, ...] = DEFAULT_GENERATOR_MODES,
+    generation_modes: list[GenerationMode] = DEFAULT_GENERATOR_MODES,
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
-    generation_maximize: Sequence[str] | None = None,
-    generation_deterministic: bool | None = None,
+    generation_maximize: list[TargetFunction] | None,
+    generation_deterministic: bool = False,
     generation_database: str | None = None,
     generation_unique_inputs: bool = False,
     generation_allow_x00: bool = True,
@@ -573,126 +479,107 @@ def run(
     """
     if no_color and force_color:
         raise click.UsageError(COLOR_OPTIONS_INVALID_USAGE_MESSAGE)
-    ensure_color(ctx, no_color, force_color)
 
-    validation.validate_schema(schema, base_url)
+    config: SchemathesisConfig = ctx.obj.config
 
-    _hypothesis_phases = prepare_phases(generation_no_shrink)
-    _hypothesis_suppress_health_check = prepare_health_checks(suppress_health_check)
+    # First, set the right color
+    color: bool | None
+    if force_color:
+        color = True
+    elif no_color:
+        color = False
+    else:
+        color = config.color
+    ensure_color(ctx, color)
 
-    for experiment in experiments:
-        experiment.enable()
+    validation.validate_auth_overlap(auth, headers)
+
     if contrib_openapi_fill_missing_examples:
         contrib.openapi.fill_missing_examples.install()
 
-    override = Override(query=set_query, headers=set_header, cookies=set_cookie, path_parameters=set_path)
-
-    validation.validate_auth_overlap(auth, headers, override)
-
-    filter_set = FilterArguments(
-        include_path=include_path,
-        include_method=include_method,
-        include_name=include_name,
-        include_tag=include_tag,
-        include_operation_id=include_operation_id,
-        include_path_regex=include_path_regex,
-        include_method_regex=include_method_regex,
-        include_name_regex=include_name_regex,
-        include_tag_regex=include_tag_regex,
-        include_operation_id_regex=include_operation_id_regex,
-        exclude_path=exclude_path,
-        exclude_method=exclude_method,
-        exclude_name=exclude_name,
-        exclude_tag=exclude_tag,
-        exclude_operation_id=exclude_operation_id,
-        exclude_path_regex=exclude_path_regex,
-        exclude_method_regex=exclude_method_regex,
-        exclude_name_regex=exclude_name_regex,
-        exclude_tag_regex=exclude_tag_regex,
-        exclude_operation_id_regex=exclude_operation_id_regex,
-        include_by=include_by,
-        exclude_by=exclude_by,
-        exclude_deprecated=exclude_deprecated,
-    ).into()
-
-    selected_checks, checks_config = CheckArguments(
+    # Then override the global config from CLI options
+    config.update(
+        color=color,
+        suppress_health_check=suppress_health_check,
+        seed=generation_seed,
+        wait_for_schema=wait_for_schema,
+        max_failures=max_failures,
+    )
+    config.output.sanitization.update(enabled=output_sanitize)
+    config.output.truncation.update(enabled=output_truncate)
+    config.reports.update(
+        formats=report_formats,
+        junit_path=report_junit_path.name if report_junit_path else None,
+        vcr_path=report_vcr_path.name if report_vcr_path else None,
+        har_path=report_har_path.name if report_har_path else None,
+        directory=Path(report_directory),
+        preserve_bytes=report_preserve_bytes,
+    )
+    # Other CLI options work as an override for all defined projects
+    config.projects.override.update(
+        base_url=base_url,
+        headers=headers if headers else None,
+        basic_auth=auth,
+        workers=workers,
+        continue_on_failure=continue_on_failure,
+        rate_limit=rate_limit,
+        request_timeout=request_timeout,
+        tls_verify=request_tls_verify,
+        request_cert=request_cert,
+        request_cert_key=request_cert_key,
+        proxy=request_proxy,
+    )
+    # These are filters for what API operations should be tested
+    filter_set = {
+        "include_path": include_path,
+        "include_method": include_method,
+        "include_name": include_name,
+        "include_tag": include_tag,
+        "include_operation_id": include_operation_id,
+        "include_path_regex": include_path_regex,
+        "include_method_regex": include_method_regex,
+        "include_name_regex": include_name_regex,
+        "include_tag_regex": include_tag_regex,
+        "include_operation_id_regex": include_operation_id_regex,
+        "exclude_path": exclude_path,
+        "exclude_method": exclude_method,
+        "exclude_name": exclude_name,
+        "exclude_tag": exclude_tag,
+        "exclude_operation_id": exclude_operation_id,
+        "exclude_path_regex": exclude_path_regex,
+        "exclude_method_regex": exclude_method_regex,
+        "exclude_name_regex": exclude_name_regex,
+        "exclude_tag_regex": exclude_tag_regex,
+        "exclude_operation_id_regex": exclude_operation_id_regex,
+        "include_by": include_by,
+        "exclude_by": exclude_by,
+        "exclude_deprecated": exclude_deprecated,
+    }
+    config.projects.override.phases.update(phases=phases)
+    config.projects.override.checks.update(
         included_check_names=included_check_names,
         excluded_check_names=excluded_check_names,
-        positive_data_acceptance_allowed_statuses=positive_data_acceptance_allowed_statuses,
-        missing_required_header_allowed_statuses=missing_required_header_allowed_statuses,
-        negative_data_rejection_allowed_statuses=negative_data_rejection_allowed_statuses,
         max_response_time=max_response_time,
-    ).into()
+    )
+    config.projects.override.generation.update(
+        modes=generation_modes,
+        max_examples=generation_max_examples,
+        no_shrink=generation_no_shrink,
+        maximize=generation_maximize,
+        deterministic=generation_deterministic,
+        database=generation_database,
+        unique_inputs=generation_unique_inputs,
+        allow_x00=generation_allow_x00,
+        graphql_allow_null=generation_graphql_allow_null,
+        with_security_parameters=generation_with_security_parameters,
+        codec=generation_codec,
+    )
 
-    report_config = None
-    if report_formats or report_junit_path or report_vcr_path or report_har_path:
-        report_config = ReportConfig(
-            formats=report_formats,
-            directory=Path(report_dir),
-            junit_path=report_junit_path if report_junit_path else None,
-            vcr_path=report_vcr_path if report_vcr_path else None,
-            har_path=report_har_path if report_har_path else None,
-            preserve_bytes=report_preserve_bytes,
-            sanitize_output=output_sanitize,
-        )
-
-    # Use the same seed for all tests unless `derandomize=True` is used
-    seed: int | None
-    if generation_seed is None and not generation_deterministic:
-        seed = Random().getrandbits(128)
-    else:
-        seed = generation_seed
-
-    phases_ = [PhaseName.PROBING] + [PhaseName.from_str(phase) for phase in phases]
-
-    config = executor.RunConfig(
-        location=schema,
-        base_url=base_url,
-        engine=EngineConfig(
-            execution=ExecutionConfig(
-                phases=phases_,
-                checks=selected_checks,
-                targets=TARGETS.get_by_names(generation_maximize or []),
-                hypothesis_settings=prepare_settings(
-                    database=generation_database,
-                    derandomize=generation_deterministic,
-                    max_examples=generation_max_examples,
-                    phases=_hypothesis_phases,
-                    suppress_health_check=_hypothesis_suppress_health_check,
-                ),
-                generation=GenerationConfig(
-                    modes=list(generation_modes),
-                    allow_x00=generation_allow_x00,
-                    graphql_allow_null=generation_graphql_allow_null,
-                    codec=generation_codec,
-                    with_security_parameters=generation_with_security_parameters,
-                    unexpected_methods=coverage_unexpected_methods,
-                ),
-                max_failures=max_failures,
-                continue_on_failure=continue_on_failure,
-                unique_inputs=generation_unique_inputs,
-                seed=seed,
-                workers_num=workers_num,
-            ),
-            network=NetworkConfig(
-                auth=auth,
-                headers=headers,
-                timeout=request_timeout,
-                tls_verify=request_tls_verify,
-                proxy=request_proxy,
-                cert=(request_cert, request_cert_key)
-                if request_cert is not None and request_cert_key is not None
-                else request_cert,
-            ),
-            override=override,
-            checks_config=checks_config,
-        ),
+    executor.execute(
+        location=location,
         filter_set=filter_set,
-        wait_for_schema=wait_for_schema,
-        rate_limit=rate_limit,
-        output=OutputConfig(sanitize=output_sanitize, truncate=output_truncate),
-        report=report_config,
+        # We don't the project yet, so pass the default config
+        config=config.projects.get_default(),
         args=ctx.args,
         params=ctx.params,
     )
-    executor.execute(config)

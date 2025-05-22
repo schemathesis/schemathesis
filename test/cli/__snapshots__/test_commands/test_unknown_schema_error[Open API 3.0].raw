@@ -36,9 +36,9 @@ Something bad happen
 
     Traceback (most recent call last):
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in wrapped
-        f(ctx=ctx, case=case, recorder=recorder)
+        f(
       File "/package-root/engine/phases/unit/_executor.py", line XXX, in test_func
-        targets.run(ctx.config.execution.targets, case=case, response=response)
+        targets.run(generation.maximize, case=case, response=response)
       File "/package-root/generation/targets.py", line XXX, in run
         value = target(context)
       File "/tmp/module.py", line XXX, in buggy

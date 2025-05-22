@@ -9,6 +9,7 @@ from hypothesis import given, settings
 import schemathesis
 from schemathesis import Case
 from schemathesis.checks import CheckContext, not_a_server_error
+from schemathesis.config._checks import ChecksConfig
 from schemathesis.core.errors import InvalidSchema
 from schemathesis.core.failures import Failure, FailureGroup
 from schemathesis.core.transport import Response
@@ -27,7 +28,7 @@ from schemathesis.specs.openapi.checks import (
 if TYPE_CHECKING:
     from schemathesis.schemas import BaseSchema
 
-CTX = CheckContext(override=None, auth=None, headers=None, config={}, transport_kwargs=None)
+CTX = CheckContext(override=None, auth=None, headers=None, config=ChecksConfig(), transport_kwargs=None)
 
 
 def make_case(schema: BaseSchema, definition: dict[str, Any]) -> Case:
@@ -630,7 +631,6 @@ def test_deduplication(ctx, response_factory):
         validate_response(
             case=case,
             ctx=CTX,
-            checks=(content_type_conformance, response_schema_conformance),
             recorder=recorder,
             response=response,
             continue_on_failure=False,

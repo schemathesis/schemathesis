@@ -162,22 +162,25 @@ def create_state_machine(schema: BaseOpenAPISchema) -> type[APIStateMachine]:
                         f"{link.source.label} -> {link.status_code} -> {link.name} -> {target.label}"
                     )
                     assert name not in rules, name
+                    config = schema.config.generation_for(operation=target, phase="stateful")
                     rules[name] = precondition(is_transition_allowed(bundle_name, link.source.label, target.label))(
                         transition(
                             name=name,
                             target=catch_all,
                             input=bundles[bundle_name].flatmap(
-                                into_step_input(target=target, link=link, modes=schema.generation_config.modes)
+                                into_step_input(target=target, link=link, modes=config.modes)
                             ),
                         )
                     )
             if target.label in roots.reliable or (not roots.reliable and target.label in roots.fallback):
                 name = _normalize_name(f"RANDOM -> {target.label}")
-                if len(schema.generation_config.modes) == 1:
-                    case_strategy = target.as_strategy(generation_mode=schema.generation_config.modes[0])
+                config = schema.config.generation_for(operation=target, phase="stateful")
+                if len(config.modes) == 1:
+                    case_strategy = target.as_strategy(generation_mode=config.modes[0], __is_stateful_phase=True)
                 else:
                     _strategies = {
-                        method: target.as_strategy(generation_mode=method) for method in schema.generation_config.modes
+                        method: target.as_strategy(generation_mode=method, __is_stateful_phase=True)
+                        for method in config.modes
                     }
 
                     @st.composite  # type: ignore[misc]
@@ -262,7 +265,9 @@ def into_step_input(
                 and not link.merge_body
             ):
                 kwargs["body"] = transition.request_body.value.ok()
-            cases = strategies.combine([target.as_strategy(generation_mode=mode, **kwargs) for mode in modes])
+            cases = strategies.combine(
+                [target.as_strategy(generation_mode=mode, __is_stateful_phase=True, **kwargs) for mode in modes]
+            )
             case = draw(cases)
             if (
                 transition.request_body is not None

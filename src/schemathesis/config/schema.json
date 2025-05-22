@@ -1,0 +1,837 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "color": {
+      "description": "Controls ANSI color output in the CLI. Schemathesis auto-detects color support by default. Set to true to force color output or false to disable it.",
+      "type": "boolean"
+    },
+    "suppress-health-check": {
+      "description": "Specifies a list of health checks to disable during test execution.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "data_too_large",
+          "filter_too_much",
+          "too_slow",
+          "large_base_example",
+          "all"
+        ]
+      }
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "max-failures": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "reports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "type": "string"
+        },
+        "preserve-bytes": {
+          "type": "boolean"
+        },
+        "junit": {
+          "$ref": "#/$defs/ReportConfig"
+        },
+        "har": {
+          "$ref": "#/$defs/ReportConfig"
+        },
+        "vcr": {
+          "$ref": "#/$defs/ReportConfig"
+        }
+      }
+    },
+    "output": {
+      "$ref": "#/$defs/OutputConfig"
+    },
+    "base-url": {
+      "type": "string"
+    },
+    "parameters": {
+      "type": "object"
+    },
+    "generation": {
+      "$ref": "#/$defs/GenerationConfig"
+    },
+    "checks": {
+      "$ref": "#/$defs/ChecksConfig"
+    },
+    "phases": {
+      "$ref": "#/$defs/PhasesConfig"
+    },
+    "auth": {
+      "$ref": "#/$defs/AuthConfig"
+    },
+    "operations": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OperationConfig"
+      }
+    },
+    "project": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ProjectConfig"
+      }
+    },
+    "headers": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "type": "object"
+    },
+    "hooks": {
+      "type": "string"
+    },
+    "proxy": {
+      "type": "string"
+    },
+    "workers": {
+      "type": "integer"
+    },
+    "wait-for-schema": {
+      "type": "number",
+      "minimum": 1
+    },
+    "continue-on-failure": {
+      "type": "boolean"
+    },
+    "tls-verify": {
+      "type": [
+        "boolean",
+        "string"
+      ]
+    },
+    "rate-limit": {
+      "type": "string"
+    },
+    "request-timeout": {
+      "type": "number",
+      "minimum": 0
+    },
+    "request-cert": {
+      "type": "string"
+    },
+    "request-cert-key": {
+      "type": "string"
+    }
+  },
+  "$defs": {
+    "ReportConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        }
+      }
+    },
+    "AuthConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "basic": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "type": "string"
+            },
+            "password": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "username",
+            "password"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "ChecksConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "not_a_server_error": {
+          "$ref": "#/$defs/CheckConfig"
+        },
+        "status_code_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "content_type_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "response_schema_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "response_headers_conformance": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "positive_data_acceptance": {
+          "$ref": "#/$defs/CheckConfig"
+        },
+        "negative_data_rejection": {
+          "$ref": "#/$defs/CheckConfig"
+        },
+        "use_after_free": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "ensure_resource_availability": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "missing_required_header": {
+          "$ref": "#/$defs/CheckConfig"
+        },
+        "ignored_auth": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "unsupported_method": {
+          "$ref": "#/$defs/SimpleCheckConfig"
+        },
+        "max_response_time": {
+          "$ref": "#/$defs/MaxResponseTimeConfig"
+        }
+      }
+    },
+    "SimpleCheckConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "MaxResponseTimeConfig": {
+      "type": "number",
+      "minimum": 0
+    },
+    "CheckConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "expected-statuses": {
+          "type": "array",
+          "items": {
+            "type": [
+              "integer",
+              "string"
+            ]
+          }
+        }
+      }
+    },
+    "PhasesConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "examples": {
+          "$ref": "#/$defs/PhaseConfig"
+        },
+        "coverage": {
+          "$ref": "#/$defs/CoveragePhaseConfig"
+        },
+        "fuzzing": {
+          "$ref": "#/$defs/PhaseConfig"
+        },
+        "stateful": {
+          "$ref": "#/$defs/StatefulPhaseConfig"
+        }
+      }
+    },
+    "PhaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        }
+      }
+    },
+    "StatefulPhaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "max-steps": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        }
+      }
+    },
+    "CoveragePhaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "unexpected-methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "(?i)(?:GET|PUT|POST|DELETE|OPTIONS|PATCH|TRACE)"
+          },
+          "uniqueItems": true
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        }
+      }
+    },
+    "GenerationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "positive",
+            "negative",
+            "all"
+          ]
+        },
+        "max-examples": {
+          "type": "integer"
+        },
+        "no-shrink": {
+          "type": "boolean"
+        },
+        "deterministic": {
+          "type": "boolean"
+        },
+        "allow-x00": {
+          "type": "boolean"
+        },
+        "codec": {
+          "type": "string"
+        },
+        "exclude-header-characters": {
+          "type": "string"
+        },
+        "maximize": {
+          "anyOf": [
+            {
+              "enum": [
+                "response_time"
+              ]
+            },
+            {
+              "type": "array",
+              "items": {
+                "enum": [
+                  "response_time"
+                ]
+              }
+            }
+          ]
+        },
+        "with-security-parameters": {
+          "type": "boolean"
+        },
+        "graphql-allow-null": {
+          "type": "boolean"
+        },
+        "database": {
+          "type": "string"
+        },
+        "unique-inputs": {
+          "type": "boolean"
+        }
+      }
+    },
+    "OutputConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sanitization": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "keys-to-sanitize": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sensitive-markers": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "replacement": {
+              "type": "string"
+            }
+          }
+        },
+        "truncation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "max-payload-size": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max-lines": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "max-width": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "ProjectConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "base-url": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        },
+        "phases": {
+          "$ref": "#/$defs/PhasesConfig"
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthConfig"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OperationConfig"
+          }
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "hooks": {
+          "type": "string"
+        },
+        "proxy": {
+          "type": "string"
+        },
+        "workers": {
+          "type": "integer"
+        },
+        "wait-for-schema": {
+          "type": "number",
+          "minimum": 1
+        },
+        "continue-on-failure": {
+          "type": "boolean"
+        },
+        "tls-verify": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "rate-limit": {
+          "type": "string"
+        },
+        "request-timeout": {
+          "type": "number",
+          "minimum": 0
+        },
+        "request-cert": {
+          "type": "string"
+        },
+        "request-cert-key": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ]
+    },
+    "OperationConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "auth": {
+          "$ref": "#/$defs/AuthConfig"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "proxy": {
+          "type": "string"
+        },
+        "continue-on-failure": {
+          "type": "boolean"
+        },
+        "tls-verify": {
+          "type": [
+            "boolean",
+            "string"
+          ]
+        },
+        "rate-limit": {
+          "type": "string"
+        },
+        "request-timeout": {
+          "type": "number",
+          "minimum": 0
+        },
+        "request-cert": {
+          "type": "string"
+        },
+        "request-cert-key": {
+          "type": "string"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        },
+        "phases": {
+          "$ref": "#/$defs/PhasesConfig"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "include-path": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "include-method": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "include-name": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "include-tag": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "include-operation-id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "include-by": {
+          "type": "string"
+        },
+        "include-path-regex": {
+          "type": "string"
+        },
+        "include-name-regex": {
+          "type": "string"
+        },
+        "include-method-regex": {
+          "type": "string"
+        },
+        "include-tag-regex": {
+          "type": "string"
+        },
+        "include-operation-id-regex": {
+          "type": "string"
+        },
+        "exclude-path": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "exclude-method": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "exclude-name": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "exclude-tag": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "exclude-operation-id": {
+          "oneOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          ]
+        },
+        "exclude-by": {
+          "type": "string"
+        },
+        "exclude-path-regex": {
+          "type": "string"
+        },
+        "exclude-method-regex": {
+          "type": "string"
+        },
+        "exclude-name-regex": {
+          "type": "string"
+        },
+        "exclude-tag-regex": {
+          "type": "string"
+        },
+        "exclude-operation-id-regex": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "object"
+        }
+      },
+      "anyOf": [
+        {
+          "required": [
+            "include-path"
+          ]
+        },
+        {
+          "required": [
+            "include-method"
+          ]
+        },
+        {
+          "required": [
+            "include-name"
+          ]
+        },
+        {
+          "required": [
+            "include-tag"
+          ]
+        },
+        {
+          "required": [
+            "include-operation-id"
+          ]
+        },
+        {
+          "required": [
+            "include-by"
+          ]
+        },
+        {
+          "required": [
+            "include-path-regex"
+          ]
+        },
+        {
+          "required": [
+            "include-method-regex"
+          ]
+        },
+        {
+          "required": [
+            "include-name-regex"
+          ]
+        },
+        {
+          "required": [
+            "include-tag-regex"
+          ]
+        },
+        {
+          "required": [
+            "include-operation-id-regex"
+          ]
+        },
+        {
+          "required": [
+            "exclude-path"
+          ]
+        },
+        {
+          "required": [
+            "exclude-method"
+          ]
+        },
+        {
+          "required": [
+            "exclude-name"
+          ]
+        },
+        {
+          "required": [
+            "exclude-tag"
+          ]
+        },
+        {
+          "required": [
+            "exclude-operation-id"
+          ]
+        },
+        {
+          "required": [
+            "exclude-by"
+          ]
+        },
+        {
+          "required": [
+            "exclude-path-regex"
+          ]
+        },
+        {
+          "required": [
+            "exclude-method-regex"
+          ]
+        },
+        {
+          "required": [
+            "exclude-name-regex"
+          ]
+        },
+        {
+          "required": [
+            "exclude-tag-regex"
+          ]
+        },
+        {
+          "required": [
+            "exclude-operation-id-regex"
+          ]
+        }
+      ]
+    }
+  }
+}

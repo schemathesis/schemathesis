@@ -23,6 +23,16 @@ class PhaseName(str, enum.Enum):
     def defaults(cls) -> list[PhaseName]:
         return [PhaseName.EXAMPLES, PhaseName.COVERAGE, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
 
+    @property
+    def name(self) -> str:
+        return {
+            PhaseName.PROBING: "probing",
+            PhaseName.EXAMPLES: "examples",
+            PhaseName.COVERAGE: "coverage",
+            PhaseName.FUZZING: "fuzzing",
+            PhaseName.STATEFUL_TESTING: "stateful",
+        }[self]
+
     @classmethod
     def from_str(cls, value: str) -> PhaseName:
         return {

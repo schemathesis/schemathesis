@@ -755,7 +755,7 @@ def test_(request, case):
 def test_long_response(testdir, app_schema, openapi3_base_url):
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.parametrize()
 @settings(max_examples=1)

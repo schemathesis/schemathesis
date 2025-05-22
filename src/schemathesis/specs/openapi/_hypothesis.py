@@ -11,6 +11,7 @@ from hypothesis import event, note, reject
 from hypothesis import strategies as st
 from hypothesis_jsonschema import from_schema
 
+from schemathesis.config import GenerationConfig
 from schemathesis.core import NOT_SET, NotSet, media_types
 from schemathesis.core.control import SkipTest
 from schemathesis.core.errors import SERIALIZERS_SUGGESTION_MESSAGE, SerializationNotPossible
@@ -30,7 +31,7 @@ from schemathesis.openapi.generation.filters import is_valid_header, is_valid_pa
 from schemathesis.schemas import APIOperation
 
 from ... import auths
-from ...generation import GenerationConfig, GenerationMode
+from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from .constants import LOCATION_TO_CONTAINER
 from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
@@ -52,14 +53,14 @@ def openapi_cases(
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
     generation_mode: GenerationMode = GenerationMode.default(),
-    generation_config: GenerationConfig,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
     query: NotSet | dict[str, Any] = NOT_SET,
     body: Any = NOT_SET,
     media_type: str | None = None,
-    phase: TestPhase = TestPhase.GENERATE,
+    phase: TestPhase = TestPhase.FUZZING,
+    __is_stateful_phase: bool = False,
 ) -> Any:
     """A strategy that creates `Case` instances.
 
@@ -75,6 +76,9 @@ def openapi_cases(
     """
     start = time.monotonic()
     strategy_factory = GENERATOR_MODE_TO_STRATEGY_FACTORY[generation_mode]
+
+    phase_name = "stateful" if __is_stateful_phase else phase.value
+    generation_config = operation.schema.config.generation_for(operation=operation, phase=phase_name)
 
     context = HookContext(operation)
 
@@ -147,8 +151,8 @@ def openapi_cases(
             reject()
 
     _phase_data = {
-        TestPhase.EXPLICIT: ExplicitPhaseData(),
-        TestPhase.GENERATE: GeneratePhaseData(),
+        TestPhase.EXAMPLES: ExplicitPhaseData(),
+        TestPhase.FUZZING: GeneratePhaseData(),
     }[phase]
     phase_data = cast(Union[ExplicitPhaseData, GeneratePhaseData], _phase_data)
 
@@ -407,10 +411,10 @@ def _build_custom_formats(
     custom_formats: dict[str, st.SearchStrategy] | None, generation_config: GenerationConfig
 ) -> dict[str, st.SearchStrategy]:
     custom_formats = {**get_default_format_strategies(), **STRING_FORMATS, **(custom_formats or {})}
-    if generation_config.headers.strategy is not None:
-        custom_formats[HEADER_FORMAT] = generation_config.headers.strategy
+    if generation_config.exclude_header_characters is not None:
+        custom_formats[HEADER_FORMAT] = header_values(exclude_characters=generation_config.exclude_header_characters)
     elif not generation_config.allow_x00:
-        custom_formats[HEADER_FORMAT] = header_values(blacklist_characters="\n\r\x00")
+        custom_formats[HEADER_FORMAT] = header_values(exclude_characters="\n\r\x00")
     return custom_formats
 
 

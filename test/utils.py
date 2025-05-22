@@ -4,7 +4,6 @@ import os
 from functools import lru_cache, wraps
 from typing import Any, Callable, TypeVar
 
-import hypothesis
 import pytest
 import requests
 import urllib3
@@ -12,16 +11,13 @@ from syrupy import SnapshotAssertion
 
 import schemathesis
 from schemathesis import Case
-from schemathesis.checks import not_a_server_error
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.errors import format_exception
 from schemathesis.core.transforms import deepclone
 from schemathesis.engine import Status, events, from_schema
-from schemathesis.engine.config import EngineConfig, ExecutionConfig, NetworkConfig
 from schemathesis.engine.events import EngineEvent, EngineFinished, NonFatalError, ScenarioFinished
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import Interaction
-from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
 from schemathesis.schemas import BaseSchema
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -135,30 +131,46 @@ E = TypeVar("E", bound=EngineEvent)
 
 
 class EventStream:
-    def __init__(self, schema, **options):
-        options.setdefault("checks", [not_a_server_error])
-        config = EngineConfig(
-            execution=ExecutionConfig(
-                phases=options.get(
-                    "phases", [PhaseName.PROBING, PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
-                ),
-                checks=options.get("checks", []),
-                targets=options.get("targets", []),
-                hypothesis_settings=options.get("hypothesis_settings")
-                or hypothesis.settings(deadline=DEFAULT_DEADLINE),
-                generation=schema.generation_config,
-                max_failures=options.get("max_failures"),
-                continue_on_failure=options.get("continue_on_failure", False),
-                unique_inputs=options.get("unique_data", False),
-                seed=options.get("seed"),
-                workers_num=options.get("workers_num", 1),
-            ),
-            network=options.get("network") or NetworkConfig(),
-            override=options.get("override"),
-            checks_config=options.get("checks_config", {}),
+    def __init__(
+        self,
+        schema,
+        *,
+        checks=None,
+        phases=None,
+        seed=None,
+        max_examples=None,
+        deterministic=None,
+        headers=None,
+        auth=None,
+        workers=1,
+        max_failures=None,
+        request_timeout=None,
+        tls_verify=None,
+        with_security_parameters=True,
+        parameters=None,
+        max_steps=None,
+    ):
+        schema.config.checks.update(
+            included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
         )
-
-        self.schema = from_schema(schema, config=config)
+        phases = phases or [PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
+        schema.config.phases.update(phases=[phase.value.lower() for phase in phases])
+        schema.config.generation.update(
+            max_examples=max_examples, deterministic=deterministic, with_security_parameters=with_security_parameters
+        )
+        schema.config.update(headers=headers, workers=workers, request_timeout=request_timeout, tls_verify=tls_verify)
+        if auth is not None:
+            schema.config.auth.update(basic=auth)
+        schema.config.seed = seed
+        schema.config.max_failures = max_failures
+        if max_steps is not None:
+            schema.config.phases.stateful.max_steps = max_steps
+        if parameters is not None:
+            result = schema.config.parameters or {}
+            for name, value in parameters.items():
+                result[name] = value
+            schema.config.parameters = result
+        self.schema = from_schema(schema)
 
     def execute(self) -> EventStream:
         self.events = list(self.schema.execute())

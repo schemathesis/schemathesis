@@ -9,9 +9,9 @@ from schemathesis.generation import GenerationMode
 class TestPhase(str, Enum):
     __test__ = False
 
-    EXPLICIT = "explicit"
+    EXAMPLES = "examples"
     COVERAGE = "coverage"
-    GENERATE = "generate"
+    FUZZING = "fuzzing"
 
 
 class ComponentKind(str, Enum):
@@ -81,7 +81,7 @@ class PhaseInfo:
 
     @classmethod
     def generate(cls) -> PhaseInfo:
-        return cls(name=TestPhase.GENERATE, data=GeneratePhaseData())
+        return cls(name=TestPhase.FUZZING, data=GeneratePhaseData())
 
 
 @dataclass

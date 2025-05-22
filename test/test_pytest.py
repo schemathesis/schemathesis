@@ -308,7 +308,7 @@ def test_failure_reproduction_message(testdir, openapi3_base_url):
     # When a test fails
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="failure").parametrize()
 def test(case):
@@ -343,7 +343,7 @@ def test_checks_as_a_list(testdir, openapi3_base_url):
     # When the user passes a list of checks instead of a tuple
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 def my_check(ctx, response, case):
     note("CHECKING!")
@@ -367,7 +367,7 @@ def test_excluded_checks(testdir, openapi3_base_url):
 from schemathesis.checks import not_a_server_error
 from schemathesis.specs.openapi.checks import status_code_conformance, positive_data_acceptance
 
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="failure").parametrize()
 def test(case):
@@ -392,7 +392,7 @@ def test_failing_custom_check(testdir, openapi3_base_url, body, expected):
     # When the user passes a custom check that fails
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 def my_check(ctx, response, case):
     {body}
@@ -430,11 +430,8 @@ def test_skip_negative_without_parameters(testdir):
     # When an endpoint has no parameters to negate
     testdir.make_test(
         """
-schema = schemathesis.openapi.from_dict(
-    raw_schema
-).configure(
-    generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
-)
+schema = schemathesis.openapi.from_dict(raw_schema)
+schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
 @schema.parametrize()
 def test_(case):
@@ -454,9 +451,8 @@ def test_skip_impossible_to_negate(testdir):
         """
 schema = schemathesis.openapi.from_dict(
     raw_schema
-).configure(
-    generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
 ).include(method="POST")
+schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -493,9 +489,8 @@ def test_do_not_skip_partially_negated(testdir):
         """
 schema = schemathesis.openapi.from_dict(
     raw_schema
-).configure(
-    generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
 ).include(method="POST")
+schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -533,9 +528,8 @@ def test_path_parameters_allow_partial_negation(testdir, location):
         """
 schema = schemathesis.openapi.from_dict(
     raw_schema
-).configure(
-    generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
 ).include(method="GET", path_regex="/pets/{key}/")
+schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -568,12 +562,11 @@ def test_many_path_parameters_allow_partial_negation(testdir):
         """
 schema = schemathesis.openapi.from_dict(
     raw_schema
-).configure(
-    generation=GenerationConfig(modes=[GenerationMode.NEGATIVE])
 ).include(
     method="GET",
     path_regex="/pets/{key}/{value}/",
 )
+schema.config.generation.update(modes=[GenerationMode.NEGATIVE])
 
 @schema.parametrize()
 @settings(max_examples=1)
@@ -604,7 +597,7 @@ def test_(request, case):
 def test_trimmed_output(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.parametrize()
 def test_a(case):
@@ -644,8 +637,7 @@ def test_output_sanitization(testdir, openapi3_base_url, value):
     auth = "secret-auth"
     testdir.make_test(
         f"""
-
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="failure").parametrize()
 def test(case):
@@ -664,11 +656,12 @@ def test(case):
     assert expected in result.stdout.str()
 
 
-@pytest.mark.xfail(reason="There is no way to disable the coverage phase via Python API")
 def test_unsatisfiable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.phases.coverage.enabled = False
+schema.config.phases.fuzzing.enabled = False
 
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])
@@ -687,6 +680,18 @@ def test(case):
                             "schema": {"type": "integer", "minimum": 5, "maximum": 4},
                         }
                     ],
+                    "requestBody": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "foo": {"type": "string", "example": "foo example string"},
+                                    },
+                                },
+                            }
+                        }
+                    },
                     "responses": {"200": {"description": "OK"}},
                 }
             }
@@ -720,8 +725,7 @@ def test(case):
 def test_invalid_regex_example(testdir, openapi3_base_url, phases, expected):
     testdir.make_test(
         f"""
-
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[{phases}])
@@ -770,7 +774,7 @@ def test(case):
 def test_invalid_header_in_example(testdir, openapi3_base_url, phases):
     testdir.make_test(
         f"""
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[{phases}])
@@ -803,8 +807,7 @@ def test(case):
 def test_non_serializable_example(testdir, openapi3_base_url):
     testdir.make_test(
         f"""
-
-schema.base_url = "{openapi3_base_url}"
+schema.config.update(base_url="{openapi3_base_url}")
 
 @schema.include(path_regex="success").parametrize()
 @settings(phases=[Phase.explicit])

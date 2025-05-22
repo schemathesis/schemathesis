@@ -115,7 +115,11 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
             "--mode=all",
             "--phases=coverage",
             "--continue-on-failure",
-            "--experimental-negative-data-rejection-allowed-statuses=400,401,403,404,422,428,5xx",
+            config={
+                "checks": {
+                    "negative_data_rejection": {"expected-statuses": ["400", "401", "403", "404", "422", "428", "5xx"]}
+                }
+            },
         )
         == snapshot_cli
     )
@@ -138,46 +142,36 @@ def schema(ctx):
 
 
 @pytest.mark.parametrize(
-    "args",
+    "expected_statuses",
     [
-        [],  # Default case
-        ["--experimental-positive-data-acceptance-allowed-statuses=404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=405"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=2xx,404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,404"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=2xx"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=4xx"],
+        None,  # Default case
+        ["404"],
+        ["405"],
+        ["2xx", "404"],
+        ["200"],
+        ["200", "404"],
+        ["2xx"],
+        ["4xx"],
         # Invalid status code
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,600"],
+        ["200", "600"],
         # Invalid wildcard
-        ["--experimental-positive-data-acceptance-allowed-statuses=xxx"],
-        ["--experimental-positive-data-acceptance-allowed-statuses=200,201,400,401"],
+        ["xxx"],
+        ["200", 201, 400, 401],
     ],
 )
-def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, args):
+def test_positive_data_acceptance(ctx, cli, snapshot_cli, schema, openapi3_base_url, expected_statuses):
     schema_path = ctx.makefile(schema)
+    kwargs = {}
+    if expected_statuses is not None:
+        kwargs["config"] = {"checks": {"positive_data_acceptance": {"expected-statuses": expected_statuses}}}
+
     assert (
         cli.run(
             str(schema_path),
             f"--url={openapi3_base_url}",
             "--max-examples=5",
-            "--experimental=positive-data-acceptance",
-            *args,
-        )
-        == snapshot_cli
-    )
-
-
-def test_positive_data_acceptance_with_env_vars(ctx, cli, snapshot_cli, schema, openapi3_base_url, monkeypatch):
-    schema_path = ctx.makefile(schema)
-    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE", "true")
-    monkeypatch.setenv("SCHEMATHESIS_EXPERIMENTAL_POSITIVE_DATA_ACCEPTANCE_ALLOWED_STATUSES", "403")
-    assert (
-        cli.run(
-            str(schema_path),
-            f"--url={openapi3_base_url}",
-            "--max-examples=5",
+            "--checks=positive_data_acceptance",
+            **kwargs,
         )
         == snapshot_cli
     )
