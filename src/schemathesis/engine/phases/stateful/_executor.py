@@ -3,6 +3,7 @@ from __future__ import annotations
 import queue
 import time
 import unittest
+from dataclasses import dataclass
 from typing import Any
 from warnings import catch_warnings
 
@@ -48,6 +49,17 @@ def _get_hypothesis_settings_kwargs_override(settings: hypothesis.settings) -> d
     return kwargs
 
 
+@dataclass
+class CachedCheckContextData:
+    override: Any
+    auth: Any
+    headers: Any
+    config: Any
+    transport_kwargs: Any
+
+    __slots__ = ("override", "auth", "headers", "config", "transport_kwargs")
+
+
 def execute_state_machine_loop(
     *,
     state_machine: type[APIStateMachine],
@@ -61,6 +73,9 @@ def execute_state_machine_loop(
     generation = engine.config.generation_for(phase="stateful")
 
     ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=generation.maximize))
+
+    # Caches for validate_response to avoid repeated config lookups per operation
+    _check_context_cache: dict[str, CachedCheckContextData] = {}
 
     class _InstrumentedStateMachine(state_machine):  # type: ignore[valid-type,misc]
         """State machine with additional hooks for emitting events."""
@@ -130,15 +145,26 @@ def execute_state_machine_loop(
             self.recorder.record_response(case_id=case.id, response=response)
             ctx.collect_metric(case, response)
             ctx.current_response = response
-            override = overrides.for_operation(engine.config, operation=case.operation)
-            auth = engine.config.auth_for(operation=case.operation)
-            headers = engine.config.headers_for(operation=case.operation)
+
+            label = case.operation.label
+            cached = _check_context_cache.get(label)
+            if cached is None:
+                headers = engine.config.headers_for(operation=case.operation)
+                cached = CachedCheckContextData(
+                    override=overrides.for_operation(engine.config, operation=case.operation),
+                    auth=engine.config.auth_for(operation=case.operation),
+                    headers=CaseInsensitiveDict(headers) if headers else None,
+                    config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
+                    transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
+                )
+                _check_context_cache[label] = cached
+
             check_ctx = CheckContext(
-                override=override,
-                auth=auth,
-                headers=CaseInsensitiveDict(headers) if headers else None,
-                config=engine.config.checks_config_for(operation=case.operation, phase="stateful"),
-                transport_kwargs=engine.get_transport_kwargs(operation=case.operation),
+                override=cached.override,
+                auth=cached.auth,
+                headers=cached.headers,
+                config=cached.config,
+                transport_kwargs=cached.transport_kwargs,
                 recorder=self.recorder,
             )
             validate_response(
