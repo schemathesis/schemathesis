@@ -20,7 +20,7 @@ jobs:
           # Python 3.12 for flamegraph support
           python-version: "3.12"
 
-      - uses: hynek/setup-cached-uv@v2
+      - uses: astral-sh/setup-uv@v6
 
       - name: Run benchmarks
         uses: CodSpeedHQ/action@v3

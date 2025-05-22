@@ -21,7 +21,7 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: hynek/setup-cached-uv@v2
+      - uses: astral-sh/setup-uv@v6
 
       - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_default
 
@@ -38,6 +38,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - uses: hynek/setup-cached-uv@v2
+      - uses: astral-sh/setup-uv@v6
 
       - run: uvx --from=".[tests]" pytest test-corpus -n auto -k test_coverage_phase
