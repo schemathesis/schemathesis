@@ -1,0 +1,12 @@
+services:
+  booking-api:
+    build: .
+    ports:
+      - "8080:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
