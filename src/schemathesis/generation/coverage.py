@@ -716,23 +716,28 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     examples = schema.get("examples")
     default = schema.get("default")
 
+    seen = set()
+
     if example or examples or default:
         if example:
+            seen.add(example)
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
+                seen.add(example)
                 yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
         ):
+            seen.add(default)
             yield PositiveValue(default, description="Default value")
     elif not minimum and not maximum:
         # Default positive value
-        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid number")
-
-    seen = set()
+        value = ctx.generate_from_schema(schema)
+        seen.add(value)
+        yield PositiveValue(value, description="Valid number")
 
     if minimum is not None:
         # Exactly the minimum
@@ -740,8 +745,9 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             smallest = closest_multiple_greater_than(minimum, multiple_of)
         else:
             smallest = minimum
-        seen.add(smallest)
-        yield PositiveValue(smallest, description="Minimum value")
+        if smallest not in seen:
+            seen.add(smallest)
+            yield PositiveValue(smallest, description="Minimum value")
 
         # One more than minimum if possible
         if multiple_of is not None:
