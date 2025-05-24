@@ -38,6 +38,7 @@ workers = 4
 - Coverage Phase: Avoid duplicate negative test cases for objects in some scenarios.
 - Coverage Phase: Internal error caused by generating invalid header values.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
+- Support for Hypothesis `>6.131.14`.
 
 ### :wrench: Changed
 
