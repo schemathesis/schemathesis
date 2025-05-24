@@ -36,6 +36,7 @@ workers = 4
 - Coverage Phase: Generate default values if examples are incorrect or inappropriate for their location.
 - Coverage Phase: Avoid duplicate positive test cases for string & numeric values in some scenarios.
 - Coverage Phase: Avoid duplicate negative test cases for objects in some scenarios.
+- Coverage Phase: Internal error caused by generating invalid header values.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 
 ### :wrench: Changed
