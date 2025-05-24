@@ -35,6 +35,11 @@ workers = 4
 - Coverage Phase: Skip empty string examples for path parameters.
 - Coverage Phase: Generate default values if examples are incorrect or inappropriate for their location.
 - Coverage Phase: Avoid duplicate test cases for string values in some scenarios.
+- Do not trigger `positive_data_acceptance` on 5xx responses.
+
+### :wrench: Changed
+
+- **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
 
 ## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
 
@@ -43,10 +48,6 @@ workers = 4
 - Generate negative test cases for large nested arrays during the coverage phase.
 - Generate strings larger than 10000 characters during the coverage phase.
 - Internal error on building a JUnit report if the same failures appear multiple times across multiple test phases. [#2814](https://github.com/schemathesis/schemathesis/issues/2814)
-
-### :wrench: Changed
-
-- **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
 
 ## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
 

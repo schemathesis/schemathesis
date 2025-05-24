@@ -34,10 +34,6 @@ __________________________________ GET /flaky __________________________________
 
 - Server error
 
-- Rejected positive data
-
-    Allowed statuses: 2xx, 401, 403, 404
-
 - Undocumented HTTP status code
 
     Received: 500
@@ -66,7 +62,6 @@ Test Phases:
 
 Failures:
   ❌ Server error: 1
-  ❌ Rejected positive data: 1
   ❌ Undocumented HTTP status code: 1
 
 Test cases:
@@ -74,4 +69,4 @@ Test cases:
 
 Seed: 42
 
-============================= 3 failures in 1.00s ==============================
+============================= 2 failures in 1.00s ==============================
