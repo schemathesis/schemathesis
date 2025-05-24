@@ -410,6 +410,10 @@ def _iter_coverage_cases(
     responses = find_in_responses(operation)
     # NOTE: The HEAD method is excluded
     unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
+
+    seen_negative = set()
+    seen_positive = set()
+
     for parameter in operation.iter_parameters():
         location = parameter.location
         name = parameter.name
@@ -487,6 +491,7 @@ def _iter_coverage_cases(
                     break
     elif GenerationMode.POSITIVE in generation_modes:
         data = template.unmodified()
+        seen_positive.add(coverage._to_hashable_key(data.kwargs))
         yield operation.Case(
             **data.kwargs,
             meta=CaseMetadata(
@@ -498,8 +503,6 @@ def _iter_coverage_cases(
                 phase=PhaseInfo.coverage(description="Default positive test case"),
             ),
         )
-
-    seen_negative = set()
 
     for (location, name), gen in generators.items():
         iterator = iter(gen)
@@ -513,6 +516,12 @@ def _iter_coverage_cases(
 
             if value.generation_mode == GenerationMode.NEGATIVE:
                 seen_negative.add(coverage._to_hashable_key(data.kwargs))
+            elif (
+                value.generation_mode == GenerationMode.POSITIVE
+                and coverage._to_hashable_key(data.kwargs) in seen_positive
+            ):
+                # Was already generated before
+                continue
 
             yield operation.Case(
                 **data.kwargs,

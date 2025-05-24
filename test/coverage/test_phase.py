@@ -1160,17 +1160,17 @@ def test_incorrect_headers_with_loose_schema(ctx):
     assert_coverage(
         schema,
         [GenerationMode.POSITIVE],
-        [
-            {
-                "headers": {"authorization": ANY},
-            },
-            {
-                "headers": {"authorization": "null"},
-            },
-            {
-                "headers": {"authorization": ""},
-            },
-        ],
+        (
+            [
+                {"headers": {"authorization": ANY}},
+                {"headers": {"authorization": "null"}},
+                {"headers": {"authorization": ""}},
+            ],
+            [
+                {"headers": {"authorization": "null"}},
+                {"headers": {"authorization": ""}},
+            ],
+        ),
     )
 
 
