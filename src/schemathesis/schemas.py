@@ -591,6 +591,9 @@ class APIOperation(Generic[P]):
         if self.label is None:
             self.label = f"{self.method.upper()} {self.path}"  # type: ignore
 
+    def __deepcopy__(self, memo: dict) -> APIOperation[P]:
+        return self
+
     @property
     def full_path(self) -> str:
         return self.schema.get_full_path(self.path)

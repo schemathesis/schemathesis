@@ -245,7 +245,7 @@ def execute_state_machine_loop(
                 ctx.mark_as_seen_in_run(failure)
             continue
         except Flaky:
-            suite_status = Status.FAILURE
+            # Ignore flakiness
             if engine.has_reached_the_failure_limit:
                 break  # type: ignore[unreachable]
             # Mark all failures in this suite as seen to prevent them being re-discovered
