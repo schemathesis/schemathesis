@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from jsonschema import RefResolutionError
+    from jsonschema import RefResolutionError, RefResolver
 
 try:
     BaseExceptionGroup = BaseExceptionGroup  # type: ignore
@@ -11,15 +12,21 @@ except NameError:
     from exceptiongroup import BaseExceptionGroup  # type: ignore
 
 
-def __getattr__(name: str) -> type[RefResolutionError] | type[BaseExceptionGroup]:
-    if name == "RefResolutionError":
-        # Import it just once to keep just a single warning
-        from jsonschema import RefResolutionError
+def __getattr__(name: str) -> type[RefResolutionError] | type[RefResolver] | type[BaseExceptionGroup]:
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", DeprecationWarning)
+        if name == "RefResolutionError":
+            # `jsonschema` is pinned, this warning is not useful for the end user
+            from jsonschema import RefResolutionError
 
-        return RefResolutionError
-    if name == "BaseExceptionGroup":
-        return BaseExceptionGroup
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+            return RefResolutionError
+        if name == "RefResolver":
+            from jsonschema import RefResolver
+
+            return RefResolver
+        if name == "BaseExceptionGroup":
+            return BaseExceptionGroup
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 __all__ = ["BaseExceptionGroup", "RefResolutionError"]

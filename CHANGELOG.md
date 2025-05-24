@@ -44,6 +44,10 @@ workers = 4
 - Generate strings larger than 10000 characters during the coverage phase.
 - Internal error on building a JUnit report if the same failures appear multiple times across multiple test phases. [#2814](https://github.com/schemathesis/schemathesis/issues/2814)
 
+### :wrench: Changed
+
+- **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
+
 ## [4.0.0-alpha.9](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.8...v4.0.0-alpha.9) - 2025-05-06
 
 ### :wrench: Changed
