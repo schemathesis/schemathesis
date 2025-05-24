@@ -4,12 +4,12 @@
 
 ### :rocket: Added
 
-Introducing a new configuration file, `schemathesis.toml`, replacing CLI options as the primary source for settings.
+Introducing a new configuration file, `schemathesis.toml`, for persistent Schemathesis configuration management.
 
 This file enables fine-grained control over per-API operation settings as well as multi-project configurations.
 Global settings are defined at the top level, while operation-specific and project-specific configurations can be set under dedicated sections.
 
-CLI options now only override the configuration file.
+CLI options override configuration file settings when specified.
 
 Example:
 
@@ -28,6 +28,13 @@ title = "Payment Processing API"
 base-url = "https://payments.example.com"
 workers = 4
 ```
+
+### :bug: Fixed
+
+- Coverage Phase: Do not generate empty path parameters.
+- Coverage Phase: Skip empty string examples for path parameters.
+- Coverage Phase: Generate default values if examples are incorrect or inappropriate for their location.
+- Coverage Phase: Avoid duplicate test cases for string values in some scenarios.
 
 ## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
 

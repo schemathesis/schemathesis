@@ -1045,6 +1045,58 @@ def test_required_and_optional_headers(ctx):
     )
 
 
+def test_path_parameter_string_non_empty(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [{"path_parameters": {"name": "0"}}],
+    )
+
+
+@pytest.mark.parametrize("extra", [{}, {"pattern": "[0-9]{1}", "minLength": 1}])
+def test_path_parameter_invalid_example(ctx, extra):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "name",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "string", **extra},
+                            "example": "/",
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [{"path_parameters": {"name": "0"}}],
+    )
+
+
 def test_path_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
@@ -1109,7 +1161,7 @@ def test_incorrect_headers(ctx):
     assert_coverage(
         schema,
         [GenerationMode.POSITIVE],
-        [{}],
+        [{"headers": {"X-API-Key-1": ""}}],
     )
 
 

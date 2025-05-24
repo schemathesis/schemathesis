@@ -22,6 +22,7 @@ from schemathesis.core.transforms import deepclone
 from schemathesis.core.validation import has_invalid_characters, is_latin_1_encodable
 from schemathesis.generation import GenerationMode
 from schemathesis.generation.hypothesis import examples
+from schemathesis.openapi.generation.filters import is_invalid_path_parameter
 
 from ..specs.openapi.converter import update_pattern_in_schema
 from ..specs.openapi.formats import STRING_FORMATS, get_default_format_strategies
@@ -152,6 +153,8 @@ class CoverageContext:
     def is_valid_for_location(self, value: Any) -> bool:
         if self.location in ("header", "cookie") and isinstance(value, str):
             return not value or (is_latin_1_encodable(value) and not has_invalid_characters("", value))
+        elif self.location == "path":
+            return not is_invalid_path_parameter(value)
         return True
 
     def generate_from(self, strategy: st.SearchStrategy) -> Any:
@@ -584,6 +587,15 @@ def _get_template_schema(schema: dict, ty: str) -> dict:
     return {**schema, "type": ty}
 
 
+def _ensure_valid_path_parameter_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    # Path parameters should have at least 1 character length and don't contain any characters with special treatment
+    # on the transport level.
+    # The implementation below sneaks into `not` to avoid clashing with existing `pattern` keyword
+    not_ = schema.get("not", {}).copy()
+    not_["pattern"] = r"[/{}]"
+    return {**schema, "minLength": 1, "not": not_}
+
+
 def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Boundary and near boundary values
@@ -591,67 +603,93 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     if min_length == 0:
         min_length = None
     max_length = schema.get("maxLength")
+    if ctx.location == "path":
+        schema = _ensure_valid_path_parameter_schema(schema)
+
     example = schema.get("example")
     examples = schema.get("examples")
     default = schema.get("default")
+
+    # Two-layer check to avoid potentially expensive data generation using schema constraints as a key
+    seen_values: set = set()
+    seen_constraints: set[tuple] = set()
+
     if example or examples or default:
+        has_valid_example = False
         if example and ctx.is_valid_for_location(example):
+            seen_values.add(example)
+            has_valid_example = True
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                if ctx.is_valid_for_location(example):
+                if ctx.is_valid_for_location(example) and example not in seen_values:
+                    seen_values.add(example)
+                    has_valid_example = True
                     yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and ctx.is_valid_for_location(default)
+            and default not in seen_values
         ):
+            seen_values.add(default)
+            has_valid_example = True
             yield PositiveValue(default, description="Default value")
-    elif not min_length and not max_length:
-        # Default positive value
-        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
-    elif "pattern" in schema:
-        yield PositiveValue(ctx.generate_from_schema(schema), description="Valid string")
-
-    seen = set()
+        if not has_valid_example:
+            if not min_length and not max_length or "pattern" in schema:
+                value = ctx.generate_from_schema(schema)
+                seen_values.add(value)
+                seen_constraints.add((min_length, max_length))
+                yield PositiveValue(value, description="Valid string")
+    elif not min_length and not max_length or "pattern" in schema:
+        value = ctx.generate_from_schema(schema)
+        seen_values.add(value)
+        seen_constraints.add((min_length, max_length))
+        yield PositiveValue(value, description="Valid string")
 
     if min_length is not None and min_length < INTERNAL_BUFFER_SIZE:
         # Exactly the minimum length
-        yield PositiveValue(
-            ctx.generate_from_schema({**schema, "maxLength": min_length}), description="Minimum length string"
-        )
-        seen.add(min_length)
+        key = (min_length, min_length)
+        if key not in seen_constraints:
+            seen_constraints.add(key)
+            value = ctx.generate_from_schema({**schema, "maxLength": min_length})
+            if value not in seen_values:
+                seen_values.add(value)
+                yield PositiveValue(value, description="Minimum length string")
 
         # One character more than minimum if possible
         larger = min_length + 1
-        if larger < INTERNAL_BUFFER_SIZE and larger not in seen and (not max_length or larger <= max_length):
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger}),
-                description="Near-boundary length string",
-            )
-            seen.add(larger)
+        key = (larger, larger)
+        if larger < INTERNAL_BUFFER_SIZE and key not in seen_constraints and (not max_length or larger <= max_length):
+            seen_constraints.add(key)
+            value = ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
+            if value not in seen_values:
+                seen_values.add(value)
+                yield PositiveValue(value, description="Near-boundary length string")
 
     if max_length is not None:
         # Exactly the maximum length
-        if max_length < INTERNAL_BUFFER_SIZE and max_length not in seen:
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minLength": max_length}), description="Maximum length string"
-            )
-            seen.add(max_length)
+        key = (max_length, max_length)
+        if max_length < INTERNAL_BUFFER_SIZE and key not in seen_constraints:
+            seen_constraints.add(key)
+            value = ctx.generate_from_schema({**schema, "minLength": max_length})
+            if value not in seen_values:
+                seen_values.add(value)
+                yield PositiveValue(value, description="Maximum length string")
 
         # One character less than maximum if possible
         smaller = max_length - 1
+        key = (smaller, smaller)
         if (
             smaller < INTERNAL_BUFFER_SIZE
-            and smaller not in seen
+            and key not in seen_constraints
             and (smaller > 0 and (min_length is None or smaller >= min_length))
         ):
-            yield PositiveValue(
-                ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller}),
-                description="Near-boundary length string",
-            )
-            seen.add(smaller)
+            seen_constraints.add(key)
+            value = ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
+            if value not in seen_values:
+                yield PositiveValue(value, description="Near-boundary length string")
 
 
 def closest_multiple_greater_than(y: int, x: int) -> int:
