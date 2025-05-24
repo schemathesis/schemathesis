@@ -1139,6 +1139,41 @@ def test_path_parameter(ctx):
     )
 
 
+def test_incorrect_headers_with_loose_schema(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "authorization",
+                            "in": "header",
+                            "required": False,
+                            "schema": {"anyOf": [{"type": "string"}, {"type": "null"}], "title": "Authorization"},
+                        }
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [
+            {
+                "headers": {"authorization": ANY},
+            },
+            {
+                "headers": {"authorization": "null"},
+            },
+            {
+                "headers": {"authorization": ""},
+            },
+        ],
+    )
+
+
 def test_incorrect_headers(ctx):
     schema = ctx.openapi.build_schema(
         {
