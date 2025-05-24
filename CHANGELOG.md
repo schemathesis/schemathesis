@@ -34,7 +34,7 @@ workers = 4
 - Coverage Phase: Do not generate empty path parameters.
 - Coverage Phase: Skip empty string examples for path parameters.
 - Coverage Phase: Generate default values if examples are incorrect or inappropriate for their location.
-- Coverage Phase: Avoid duplicate test cases for string values in some scenarios.
+- Coverage Phase: Avoid duplicate test cases for string & numeric values in some scenarios.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 
 ### :wrench: Changed
