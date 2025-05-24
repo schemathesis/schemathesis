@@ -1226,29 +1226,6 @@ def test_optional_parameter_without_type(ctx):
             },
             {
                 "query": {
-                    "query": {},
-                },
-            },
-            {
-                "query": {
-                    "query": [
-                        "null",
-                        "null",
-                    ],
-                },
-            },
-            {
-                "query": {
-                    "query": "null",
-                },
-            },
-            {
-                "query": {
-                    "query": "false",
-                },
-            },
-            {
-                "query": {
                     "query": "0",
                 },
             },

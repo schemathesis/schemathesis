@@ -14,6 +14,7 @@ from hypothesis import strategies as st
 from hypothesis._settings import all_settings
 from hypothesis.errors import Unsatisfiable
 from jsonschema.exceptions import SchemaError
+from requests.models import CaseInsensitiveDict
 
 from schemathesis import auths
 from schemathesis.auths import AuthStorage, AuthStorageMark
@@ -498,6 +499,8 @@ def _iter_coverage_cases(
             ),
         )
 
+    seen_negative = set()
+
     for (location, name), gen in generators.items():
         iterator = iter(gen)
         while True:
@@ -507,6 +510,9 @@ def _iter_coverage_cases(
                 data = template.with_parameter(location=location, name=name, value=value)
             except StopIteration:
                 break
+
+            if value.generation_mode == GenerationMode.NEGATIVE:
+                seen_negative.add(coverage._to_hashable_key(data.kwargs))
 
             yield operation.Case(
                 **data.kwargs,
@@ -687,6 +693,10 @@ def _iter_coverage_cases(
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 for case in _yield_negative(subschema, location, container_name):
+                    key = _hash_key_for_case(case)
+                    if key in seen_negative:
+                        continue
+                    seen_negative.add(key)
                     assert case.meta is not None
                     assert isinstance(case.meta.phase.data, CoveragePhaseData)
                     # Already generated in one of the blocks above
@@ -734,6 +744,19 @@ def _iter_coverage_cases(
                             GenerationMode.POSITIVE,
                             Instant(),
                         )
+
+
+def _hash_key_for_case(case: Case) -> tuple[type, str | dict]:
+    from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
+
+    kwargs = {}
+    for container_name in LOCATION_TO_CONTAINER.values():
+        value = getattr(case, container_name)
+        if isinstance(value, CaseInsensitiveDict):
+            kwargs[container_name] = dict(value)
+        elif value and value is not NOT_SET:
+            kwargs[container_name] = value
+    return coverage._to_hashable_key(kwargs)
 
 
 def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
