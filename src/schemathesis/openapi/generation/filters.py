@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from typing import Any
 
 from schemathesis.core import NOT_SET
 from schemathesis.core.validation import contains_unicode_surrogate_pair, has_invalid_characters, is_latin_1_encodable
@@ -21,14 +22,15 @@ def is_valid_path(parameters: dict[str, object]) -> bool:
     In this case one variable in the path template will be empty, which will lead to 404 in most of the cases.
     Because of it this case doesn't bring much value and might lead to false positives results of Schemathesis runs.
     """
-    return not any(
-        (
-            value in ("/", "")
-            or contains_unicode_surrogate_pair(value)
-            or isinstance(value, str)
-            and ("/" in value or "}" in value or "{" in value)
-        )
-        for value in parameters.values()
+    return not any(is_invalid_path_parameter(value) for value in parameters.values())
+
+
+def is_invalid_path_parameter(value: Any) -> bool:
+    return (
+        value in ("/", "")
+        or contains_unicode_surrogate_pair(value)
+        or isinstance(value, str)
+        and ("/" in value or "}" in value or "{" in value)
     )
 
 
