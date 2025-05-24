@@ -596,6 +596,13 @@ def _ensure_valid_path_parameter_schema(schema: dict[str, Any]) -> dict[str, Any
     return {**schema, "minLength": 1, "not": not_}
 
 
+def _ensure_valid_headers_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    # Reject any character that is not A-Z, a-z, or 0-9 for simplicity
+    not_ = schema.get("not", {}).copy()
+    not_["pattern"] = r"[^A-Za-z0-9]"
+    return {**schema, "not": not_}
+
+
 def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedValue, None, None]:
     """Generate positive string values."""
     # Boundary and near boundary values
@@ -605,6 +612,9 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     max_length = schema.get("maxLength")
     if ctx.location == "path":
         schema = _ensure_valid_path_parameter_schema(schema)
+    elif ctx.location in ("header", "cookie") and not ("format" in schema and schema["format"] in FORMAT_STRATEGIES):
+        # Don't apply it for known formats - they will insure the correct format during generation
+        schema = _ensure_valid_headers_schema(schema)
 
     example = schema.get("example")
     examples = schema.get("examples")
