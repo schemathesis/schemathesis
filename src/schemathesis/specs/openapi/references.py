@@ -5,10 +5,9 @@ from functools import lru_cache
 from typing import Any, Callable, Dict, Union, overload
 from urllib.request import urlopen
 
-import jsonschema
 import requests
 
-from schemathesis.core.compat import RefResolutionError
+from schemathesis.core.compat import RefResolutionError, RefResolver
 from schemathesis.core.deserialization import deserialize_yaml
 from schemathesis.core.transforms import deepclone
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
@@ -48,7 +47,7 @@ def load_remote_uri(uri: str) -> Any:
 JSONType = Union[None, bool, float, str, list, Dict[str, Any]]
 
 
-class InliningResolver(jsonschema.RefResolver):
+class InliningResolver(RefResolver):
     """Inlines resolved schemas."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:

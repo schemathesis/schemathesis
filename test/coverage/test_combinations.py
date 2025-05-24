@@ -1081,6 +1081,7 @@ def test_negative_combinators(nctx, schema, expected):
         "^[-._\\p{L}\\p{N}]+$",
     ],
 )
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_unsupported_patterns(nctx, pattern):
     covered = cover_schema(nctx, {"type": "string", "pattern": pattern})
     assert covered == [0, False, None, [None, None], {}]
