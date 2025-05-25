@@ -6,6 +6,7 @@ supporting both GraphQL and OpenAPI specifications.
 
 from __future__ import annotations
 
+import os
 import warnings
 from typing import TYPE_CHECKING, Any, Callable
 
@@ -61,6 +62,9 @@ def _try_load_schema(location: str, config: ProjectConfig, first_module: Any, se
         try:
             return _load_schema(location, config, first_module)
         except LoaderError as exc:
+            # If this was the OpenAPI loader on an explicit OpenAPI file, don't fallback
+            if first_module is openapi and is_openapi_file(location):
+                raise exc
             if should_try_more(exc):
                 try:
                     return _load_schema(location, config, second_module)
@@ -100,10 +104,11 @@ def is_specific_exception(exc: Exception) -> bool:
     )
 
 
-def is_probably_graphql(schema_or_location: str | dict[str, Any]) -> bool:
+def is_probably_graphql(location: str) -> bool:
     """Detect whether it is likely that the given location is a GraphQL endpoint."""
-    if isinstance(schema_or_location, str):
-        return schema_or_location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
-    return "__schema" in schema_or_location or (
-        "data" in schema_or_location and "__schema" in schema_or_location["data"]
-    )
+    return location.endswith(("/graphql", "/graphql/", ".graphql", ".gql"))
+
+
+def is_openapi_file(location: str) -> bool:
+    name = os.path.basename(location).lower()
+    return any(name == f"{base}{ext}" for base in ("openapi", "swagger") for ext in (".json", ".yaml", ".yml"))

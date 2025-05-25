@@ -70,9 +70,9 @@ Each method accepts the following arguments:
 Each argument is either a single string or a list of strings. Note that all conditions within the same method call are combined with the logical AND operator.
 Additionally, if you pass a list of strings, it means that the operation should match at least one of the provided values.
 
-Every argument is accompanied with its version with the ``_regex`` suffix that enables regular expression matching for the specified criteria. 
-For example, ``include(path_regex="^/users")`` matches any path starting with ``/users``. 
-Without this suffix (e.g., ``include(path="/users")``), the option performs an exact match. 
+Every argument is accompanied with its version with the ``_regex`` suffix that enables regular expression matching for the specified criteria.
+For example, ``include(path_regex="^/users")`` matches any path starting with ``/users``.
+Without this suffix (e.g., ``include(path="/users")``), the option performs an exact match.
 Use regex for flexible pattern matching and the non-regex version for precise, literal matching.
 
 Additionally, you can exclude deprecated operations with:
@@ -81,8 +81,8 @@ Additionally, you can exclude deprecated operations with:
 
 .. note::
 
-   The ``name`` property in Schemathesis refers to the full operation name. 
-   For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``). 
+   The ``name`` property in Schemathesis refers to the full operation name.
+   For Open API, it is formatted as ``HTTP_METHOD PATH`` (e.g., ``GET /users``).
    For GraphQL, it follows the pattern ``OperationType.field`` (e.g., ``Query.getBookings`` or ``Mutation.updateOrder``).
 
 You also can filter API operations by a custom function:
@@ -453,16 +453,16 @@ This trick allows the test to cover three different situations where the input t
 
 Using custom Hypothesis strategies allows you to expand the testing surface significantly.
 
-Note that tests that use custom Hypothesis examples won't work if your schema contains explicit examples. 
+Note that tests that use custom Hypothesis examples won't work if your schema contains explicit examples.
 They are incompatible because Schemathesis only builds the ``case`` argument from the examples and does not know
 what values to provide for other arguments you define for your test function.
 
 Be aware of a key limitation when integrating Schemathesis with Hypothesis and pytest for testing.
-Schemathesis is unable to simultaneously support custom Hypothesis strategies and explicit examples defined in your API schema. 
-This limitation arises because Schemathesis generates ``hypothesis.example`` instances from schema-defined examples, but it 
+Schemathesis is unable to simultaneously support custom Hypothesis strategies and explicit examples defined in your API schema.
+This limitation arises because Schemathesis generates ``hypothesis.example`` instances from schema-defined examples, but it
 doesn't have the capability to infer or assign appropriate values for additional custom arguments in your test functions.
-To effectively manage this, you should consider structuring your tests differently. 
-For tests involving custom Hypothesis strategies, you need to exclude ``Phase.explicit`` to avoid conflicts. 
+To effectively manage this, you should consider structuring your tests differently.
+For tests involving custom Hypothesis strategies, you need to exclude ``Phase.explicit`` to avoid conflicts.
 
 .. code-block:: python
 
@@ -476,7 +476,7 @@ For tests involving custom Hypothesis strategies, you need to exclude ``Phase.ex
     def test_api(data, case, user):
         ...
 
-In contrast, if you intend to test schema-provided explicit examples, create a separate test function without the ``schema.given`` decorator. 
+In contrast, if you intend to test schema-provided explicit examples, create a separate test function without the ``schema.given`` decorator.
 This approach ensures that both types of tests can be executed, albeit in separate contexts.
 
 .. code-block:: python

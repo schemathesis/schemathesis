@@ -41,4 +41,3 @@ repos:
     rev: v0.11.11
     hooks:
       - id: ruff
-
