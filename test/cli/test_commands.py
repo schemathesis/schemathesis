@@ -13,7 +13,6 @@ import trustme
 import urllib3.exceptions
 import yaml
 from _pytest.main import ExitCode
-from aiohttp.test_utils import unused_port
 
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi import unregister_string_format
@@ -1205,9 +1204,8 @@ def test_wait_for_schema(cli, schema_path, app_factory, app_runner):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    port = unused_port()
+    port = app_runner.run_flask_app(app)
     schema_url = f"http://127.0.0.1:{port}/{schema_path}"
-    app_runner.run_flask_app(app, port=port)
     result = cli.run(schema_url, "--wait-for-schema=1", "--max-examples=1")
     assert result.exit_code == ExitCode.OK, result.stdout
 
@@ -1222,9 +1220,8 @@ def test_wait_for_schema_not_enough(cli, snapshot_cli, app_runner):
         return original_run(*args, **kwargs)
 
     app.run = run_with_delay
-    port = unused_port()
+    port = app_runner.run_flask_app(app)
     schema_url = f"http://127.0.0.1:{port}/schema.yaml"
-    app_runner.run_flask_app(app, port=port)
 
     assert cli.run(schema_url, "--wait-for-schema=1", "--max-examples=1") == snapshot_cli
 

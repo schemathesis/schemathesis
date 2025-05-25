@@ -9,6 +9,7 @@ Welcome! Thank you for considering contributing to Schemathesis. Your feedback a
 - Python 3.9 or higher
 - `pre-commit`
 - `tox`
+- `curl` (required by some integration tests; install via your OS package manager, e.g., `apt install curl` or `brew install curl`)
 
 ```bash
 uv pip install pre-commit tox
