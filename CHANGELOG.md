@@ -37,6 +37,7 @@ workers = 4
     - Avoid duplicate positive test cases for string & numeric values in some scenarios.
     - Avoid duplicate negative test cases for objects in some scenarios.
     - Internal error caused by generating invalid header values.
+    - Internal error on `maxItems` & unsupported `pattern` combination.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 - Support for Hypothesis `>6.131.14`.
 

@@ -487,7 +487,7 @@ def cover_schema_iter(
 
                         # Extend the array to be of length value + 1 by repeating its own elements
                         diff = value + 1 - len(array_value)
-                        if diff > 0:
+                        if diff > 0 and array_value:
                             array_value += (
                                 array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
                             )
