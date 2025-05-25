@@ -28,6 +28,12 @@ base-url = "https://payments.example.com"
 workers = 4
 ```
 
+You can also use environment variable substitution for string values:
+
+```toml
+headers = { Authorization = "Bearer ${API_TOKEN}" }
+```
+
 - Stabilized `positive_data_acceptance` and `missing_required_header` checks.
 
 ### :bug: Fixed
