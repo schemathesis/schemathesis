@@ -1,4 +1,4 @@
-Exit code: 0
+Exit code: 2
 ---
 Stdout:
 Usage: schemathesis [OPTIONS] COMMAND [ARGS]...

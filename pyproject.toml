@@ -32,7 +32,7 @@ classifiers = [
 ]
 dependencies = [
   "backoff>=2.1.2,<3.0",
-  "click>=8.0,<8.2",
+  "click>=8.0,<9",
   "colorama>=0.4,<1.0",
   "harfile>=0.3.0,<1.0",
   "httpx>=0.22.0,<1.0",
