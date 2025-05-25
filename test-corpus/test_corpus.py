@@ -1,11 +1,8 @@
 import pathlib
 import sys
-import threading
-from time import sleep
 from typing import NoReturn
 
 import pytest
-from aiohttp.test_utils import unused_port
 from flask import Flask
 
 import schemathesis
@@ -30,6 +27,7 @@ CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
 sys.path.append(str(CURRENT_DIR.parent))
 
 from corpus.tools import json_loads, read_corpus_file  # noqa: E402
+from test.fixtures import app_runner  # noqa: E402
 
 CORPUS_FILE_NAMES = (
     "swagger-2.0",
@@ -40,16 +38,6 @@ CORPUS_FILES = {name: read_corpus_file(name) for name in CORPUS_FILE_NAMES}
 
 
 app = Flask("test_app")
-
-
-def run_flask_app(app: Flask, port: int | None = None, timeout: float = 0.05) -> int:
-    if port is None:
-        port = unused_port()
-    server_thread = threading.Thread(target=app.run, kwargs={"port": port})
-    server_thread.daemon = True
-    server_thread.start()
-    sleep(timeout)
-    return port
 
 
 @app.route("/")
@@ -119,7 +107,7 @@ KNOWN_ISSUES = {
 
 @pytest.fixture(scope="session")
 def app_port():
-    return run_flask_app(app)
+    return app_runner.run(app.run)
 
 
 @schemathesis.check
