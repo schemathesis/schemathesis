@@ -476,7 +476,7 @@ def _iter_coverage_cases(
                         meta=CaseMetadata(
                             generation=GenerationInfo(
                                 time=instant.elapsed,
-                                mode=value.generation_mode,
+                                mode=next_value.generation_mode,
                             ),
                             components=data.components,
                             phase=PhaseInfo.coverage(
