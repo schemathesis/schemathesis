@@ -222,4 +222,5 @@ def test_permission_denied(cli, tmp_path, schema_url, path):
     xml_path = dir_path / path
     result = cli.run(schema_url, f"--report-junit-path={xml_path}")
     assert result.exit_code == ExitCode.INTERRUPTED, result.stdout
-    assert "Permission denied" in result.stdout
+    # Depends on the Click version (Python 3.9 tests have an older one)
+    assert "Permission denied" in result.stdout or "Permission denied" in result.stderr
