@@ -46,6 +46,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
     - Avoid duplicate negative test cases for objects in some scenarios.
     - Internal error caused by generating invalid header values.
     - Internal error on `maxItems` & unsupported `pattern` combination.
+    - Incorrect generation mode in generated test cases which caused false positive in `positive_data_acceptance`.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 - Support for Hypothesis `>6.131.14`.
 - Internal error on CTRL-C when running API probes.
