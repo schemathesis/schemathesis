@@ -9,8 +9,8 @@ Usage & Configuration
 How many tests does Schemathesis execute for an API operation?
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The total number of tests Schemathesis executes is influenced by the API schema's complexity, user-defined settings like ``--hypothesis-max-examples`` for the maximum tests generated, and the test generation phases (``explicit``, ``generate``, ``reuse``, and ``shrink``). 
-The process is designed to optimize coverage within a reasonable test budget rather than aiming for exhaustive coverage. 
+The total number of tests Schemathesis executes is influenced by the API schema's complexity, user-defined settings like ``--hypothesis-max-examples`` for the maximum tests generated, and the test generation phases (``explicit``, ``generate``, ``reuse``, and ``shrink``).
+The process is designed to optimize coverage within a reasonable test budget rather than aiming for exhaustive coverage.
 For detailed insights and customization options, refer to our :ref:`data generation docs <data-generation-overview>`.
 
 What parts of the application is Schemathesis targeting during its tests?

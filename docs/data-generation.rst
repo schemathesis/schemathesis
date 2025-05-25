@@ -42,7 +42,7 @@ Additionally, you can control the upper limit of generated test cases (only for 
     # Raise the upper cap for generated test cases per operation
     --hypothesis-max-examples=1000
 
-The generation process is inherently randomized and is designed for efficient testing, favoring speed and maintaining reasonable coverage over exhaustive testing. 
+The generation process is inherently randomized and is designed for efficient testing, favoring speed and maintaining reasonable coverage over exhaustive testing.
 It also means that Schemathesis does not guarantee the full coverage of all possible variants, but will do its best to generate a diverse set of test cases with minimal duplication.
 
 The number of generated tests is affected by the schema's complexity and the distinctness of possible test cases.
@@ -82,7 +82,7 @@ This phase may reduce the total number of generated test cases as Schemathesis m
 Generating random test cases
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-The generation process is governed by the ``--data-generation-method`` CLI option, and creates valid (``positive``) or guaranteed invalid (``negative``) test cases based on the schema. 
+The generation process is governed by the ``--data-generation-method`` CLI option, and creates valid (``positive``) or guaranteed invalid (``negative``) test cases based on the schema.
 If negative testing is inapplicable (e.g., when any input is accepted), the tests are skipped.
 
 Example:
