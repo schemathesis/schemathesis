@@ -411,8 +411,8 @@ def _iter_coverage_cases(
     # NOTE: The HEAD method is excluded
     unexpected_methods = unexpected_methods or {"get", "put", "post", "delete", "options", "patch", "trace"}
 
-    seen_negative = set()
-    seen_positive = set()
+    seen_negative = coverage.HashSet()
+    seen_positive = coverage.HashSet()
 
     for parameter in operation.iter_parameters():
         location = parameter.location
@@ -491,7 +491,7 @@ def _iter_coverage_cases(
                     break
     elif GenerationMode.POSITIVE in generation_modes:
         data = template.unmodified()
-        seen_positive.add(coverage._to_hashable_key(data.kwargs))
+        seen_positive.insert(data.kwargs)
         yield operation.Case(
             **data.kwargs,
             meta=CaseMetadata(
@@ -515,11 +515,8 @@ def _iter_coverage_cases(
                 break
 
             if value.generation_mode == GenerationMode.NEGATIVE:
-                seen_negative.add(coverage._to_hashable_key(data.kwargs))
-            elif (
-                value.generation_mode == GenerationMode.POSITIVE
-                and coverage._to_hashable_key(data.kwargs) in seen_positive
-            ):
+                seen_negative.insert(data.kwargs)
+            elif value.generation_mode == GenerationMode.POSITIVE and not seen_positive.insert(data.kwargs):
                 # Was already generated before
                 continue
 
@@ -702,10 +699,9 @@ def _iter_coverage_cases(
             if GenerationMode.NEGATIVE in generation_modes:
                 subschema = _combination_schema(only_required, required, parameter_set)
                 for case in _yield_negative(subschema, location, container_name):
-                    key = _hash_key_for_case(case)
-                    if key in seen_negative:
+                    kwargs = _case_to_kwargs(case)
+                    if not seen_negative.insert(kwargs):
                         continue
-                    seen_negative.add(key)
                     assert case.meta is not None
                     assert isinstance(case.meta.phase.data, CoveragePhaseData)
                     # Already generated in one of the blocks above
@@ -755,7 +751,7 @@ def _iter_coverage_cases(
                         )
 
 
-def _hash_key_for_case(case: Case) -> tuple[type, str | dict]:
+def _case_to_kwargs(case: Case) -> dict:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
 
     kwargs = {}
@@ -765,7 +761,7 @@ def _hash_key_for_case(case: Case) -> tuple[type, str | dict]:
             kwargs[container_name] = dict(value)
         elif value and value is not NOT_SET:
             kwargs[container_name] = value
-    return coverage._to_hashable_key(kwargs)
+    return kwargs
 
 
 def find_invalid_headers(headers: Mapping) -> Generator[tuple[str, str], None, None]:
