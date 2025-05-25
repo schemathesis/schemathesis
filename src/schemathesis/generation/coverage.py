@@ -255,6 +255,24 @@ def _to_hashable_key(value: T, _encode: Callable = _encode) -> tuple[type, str |
     return (type(value), value)
 
 
+class HashSet:
+    """Helper to track already generated values."""
+
+    __slots__ = ("_data",)
+
+    def __init__(self) -> None:
+        self._data: set[tuple] = set()
+
+    def insert(self, value: Any) -> bool:
+        key = _to_hashable_key(value)
+        before = len(self._data)
+        self._data.add(key)
+        return len(self._data) > before
+
+    def clear(self) -> None:
+        self._data.clear()
+
+
 def _cover_positive_for_type(
     ctx: CoverageContext, schema: dict, ty: str | None
 ) -> Generator[GeneratedValue, None, None]:
@@ -328,10 +346,10 @@ def _ignore_unfixable(
 
 
 def cover_schema_iter(
-    ctx: CoverageContext, schema: dict | bool, seen: set[Any | tuple[type, str]] | None = None
+    ctx: CoverageContext, schema: dict | bool, seen: HashSet | None = None
 ) -> Generator[GeneratedValue, None, None]:
     if seen is None:
-        seen = set()
+        seen = HashSet()
     if isinstance(schema, bool):
         types = ["null", "boolean", "string", "number", "array", "object"]
         schema = {}
@@ -354,12 +372,9 @@ def cover_schema_iter(
                     yield from _negative_enum(ctx, value, seen)
                 elif key == "const":
                     for value_ in _negative_enum(ctx, [value], seen):
-                        k = _to_hashable_key(value_.value)
-                        if k not in seen:
-                            yield value_
-                            seen.add(k)
+                        yield value_
                 elif key == "type":
-                    yield from _negative_type(ctx, seen, value)
+                    yield from _negative_type(ctx, value, seen)
                 elif key == "properties":
                     template = template or ctx.generate_from_schema(_get_template_schema(schema, "object"))
                     yield from _negative_properties(ctx, template, value)
@@ -376,37 +391,30 @@ def cover_schema_iter(
                     yield from _negative_format(ctx, schema, value)
                 elif key == "maximum":
                     next = value + 1
-                    if next not in seen:
+                    if seen.insert(next):
                         yield NegativeValue(next, description="Value greater than maximum", location=ctx.current_path)
-                        seen.add(next)
                 elif key == "minimum":
                     next = value - 1
-                    if next not in seen:
+                    if seen.insert(next):
                         yield NegativeValue(next, description="Value smaller than minimum", location=ctx.current_path)
-                        seen.add(next)
-                elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and value not in seen:
+                elif key == "exclusiveMaximum" or key == "exclusiveMinimum" and seen.insert(value):
                     verb = "greater" if key == "exclusiveMaximum" else "smaller"
                     limit = "maximum" if key == "exclusiveMaximum" else "minimum"
                     yield NegativeValue(value, description=f"Value {verb} than {limit}", location=ctx.current_path)
-                    seen.add(value)
                 elif key == "multipleOf":
                     for value_ in _negative_multiple_of(ctx, schema, value):
-                        k = _to_hashable_key(value_.value)
-                        if k not in seen:
+                        if seen.insert(value_.value):
                             yield value_
-                            seen.add(k)
                 elif key == "minLength" and 0 < value < INTERNAL_BUFFER_SIZE:
                     if value == 1:
                         # In this case, the only possible negative string is an empty one
                         # The `pattern` value may require an non-empty one and the generation will fail
                         # However, it is fine to violate `pattern` here as it is negative string generation anyway
                         value = ""
-                        k = _to_hashable_key(value)
-                        if k not in seen:
+                        if seen.insert(value):
                             yield NegativeValue(
                                 value, description="String smaller than minLength", location=ctx.current_path
                             )
-                            seen.add(k)
                     else:
                         with suppress(InvalidArgument):
                             min_length = max_length = value - 1
@@ -423,12 +431,10 @@ def cover_schema_iter(
                                     value = ctx.generate_from_schema(new_schema)
                             else:
                                 value = ctx.generate_from_schema(new_schema)
-                            k = _to_hashable_key(value)
-                            if k not in seen:
+                            if seen.insert(value):
                                 yield NegativeValue(
                                     value, description="String smaller than minLength", location=ctx.current_path
                                 )
-                                seen.add(k)
                 elif key == "maxLength" and value < INTERNAL_BUFFER_SIZE:
                     try:
                         min_length = max_length = value + 1
@@ -450,12 +456,10 @@ def cover_schema_iter(
                                     value = ctx.generate_from_schema(new_schema)
                         else:
                             value = ctx.generate_from_schema(new_schema)
-                        k = _to_hashable_key(value)
-                        if k not in seen:
+                        if seen.insert(value):
                             yield NegativeValue(
                                 value, description="String larger than maxLength", location=ctx.current_path
                             )
-                            seen.add(k)
                     except (InvalidArgument, Unsatisfiable):
                         pass
                 elif key == "uniqueItems" and value:
@@ -491,27 +495,23 @@ def cover_schema_iter(
                             array_value += (
                                 array_value * (diff // len(array_value)) + array_value[: diff % len(array_value)]
                             )
-                        k = _to_hashable_key(array_value)
-                        if k not in seen:
+                        if seen.insert(array_value):
                             yield NegativeValue(
                                 array_value,
                                 description="Array with more items than allowed by maxItems",
                                 location=ctx.current_path,
                             )
-                            seen.add(k)
                     else:
                         try:
                             # Force the array to have one more item than allowed
                             new_schema = {**schema, "minItems": value + 1, "maxItems": value + 1, "type": "array"}
                             array_value = ctx.generate_from_schema(new_schema)
-                            k = _to_hashable_key(array_value)
-                            if k not in seen:
+                            if seen.insert(array_value):
                                 yield NegativeValue(
                                     array_value,
                                     description="Array with more items than allowed by maxItems",
                                     location=ctx.current_path,
                                 )
-                                seen.add(k)
                         except (InvalidArgument, Unsatisfiable):
                             pass
                 elif key == "minItems" and isinstance(value, int) and value > 0:
@@ -519,14 +519,12 @@ def cover_schema_iter(
                         # Force the array to have one less item than the minimum
                         new_schema = {**schema, "minItems": value - 1, "maxItems": value - 1, "type": "array"}
                         array_value = ctx.generate_from_schema(new_schema)
-                        k = _to_hashable_key(array_value)
-                        if k not in seen:
+                        if seen.insert(array_value):
                             yield NegativeValue(
                                 array_value,
                                 description="Array with fewer items than allowed by minItems",
                                 location=ctx.current_path,
                             )
-                            seen.add(k)
                     except (InvalidArgument, Unsatisfiable):
                         pass
                 elif (
@@ -621,43 +619,37 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     default = schema.get("default")
 
     # Two-layer check to avoid potentially expensive data generation using schema constraints as a key
-    seen_values: set = set()
+    seen_values = HashSet()
     seen_constraints: set[tuple] = set()
 
     if example or examples or default:
         has_valid_example = False
-        if example and ctx.is_valid_for_location(example):
-            seen_values.add(_to_hashable_key(example))
+        if example and ctx.is_valid_for_location(example) and seen_values.insert(example):
             has_valid_example = True
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                if ctx.is_valid_for_location(example):
-                    key = _to_hashable_key(example)
-                    if key not in seen_values:
-                        seen_values.add(key)
-                        has_valid_example = True
-                        yield PositiveValue(example, description="Example value")
+                if ctx.is_valid_for_location(example) and seen_values.insert(example):
+                    has_valid_example = True
+                    yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
             and ctx.is_valid_for_location(default)
+            and seen_values.insert(default)
         ):
-            key = _to_hashable_key(default)
-            if key not in seen_values:
-                seen_values.add(key)
-                has_valid_example = True
-                yield PositiveValue(default, description="Default value")
+            has_valid_example = True
+            yield PositiveValue(default, description="Default value")
         if not has_valid_example:
             if not min_length and not max_length or "pattern" in schema:
                 value = ctx.generate_from_schema(schema)
-                seen_values.add(_to_hashable_key(value))
+                seen_values.insert(value)
                 seen_constraints.add((min_length, max_length))
                 yield PositiveValue(value, description="Valid string")
     elif not min_length and not max_length or "pattern" in schema:
         value = ctx.generate_from_schema(schema)
-        seen_values.add(_to_hashable_key(value))
+        seen_values.insert(value)
         seen_constraints.add((min_length, max_length))
         yield PositiveValue(value, description="Valid string")
 
@@ -667,9 +659,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         if key not in seen_constraints:
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "maxLength": min_length})
-            key = _to_hashable_key(value)
-            if key not in seen_values:
-                seen_values.add(key)
+            if seen_values.insert(value):
                 yield PositiveValue(value, description="Minimum length string")
 
         # One character more than minimum if possible
@@ -678,9 +668,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         if larger < INTERNAL_BUFFER_SIZE and key not in seen_constraints and (not max_length or larger <= max_length):
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": larger, "maxLength": larger})
-            key = _to_hashable_key(value)
-            if key not in seen_values:
-                seen_values.add(key)
+            if seen_values.insert(value):
                 yield PositiveValue(value, description="Near-boundary length string")
 
     if max_length is not None:
@@ -689,9 +677,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         if max_length < INTERNAL_BUFFER_SIZE and key not in seen_constraints:
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": max_length})
-            key = _to_hashable_key(value)
-            if key not in seen_values:
-                seen_values.add(key)
+            if seen_values.insert(value):
                 yield PositiveValue(value, description="Maximum length string")
 
         # One character less than maximum if possible
@@ -704,8 +690,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         ):
             seen_constraints.add(key)
             value = ctx.generate_from_schema({**schema, "minLength": smaller, "maxLength": smaller})
-            key = _to_hashable_key(value)
-            if key not in seen_values:
+            if seen_values.insert(value):
                 yield PositiveValue(value, description="Near-boundary length string")
 
 
@@ -733,34 +718,26 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
     examples = schema.get("examples")
     default = schema.get("default")
 
-    seen = set()
+    seen = HashSet()
 
     if example or examples or default:
-        if example:
-            seen.add(_to_hashable_key(example))
+        if example and seen.insert(example):
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                key = _to_hashable_key(example)
-                if key not in seen:
-                    seen.add(key)
+                if seen.insert(example):
                     yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and seen.insert(default)
         ):
-            key = _to_hashable_key(default)
-            if key not in seen:
-                seen.add(key)
-                yield PositiveValue(default, description="Default value")
+            yield PositiveValue(default, description="Default value")
     elif not minimum and not maximum:
-        # Default positive value
         value = ctx.generate_from_schema(schema)
-        key = _to_hashable_key(value)
-        if key not in seen:
-            seen.add(key)
-            yield PositiveValue(value, description="Valid number")
+        seen.insert(value)
+        yield PositiveValue(value, description="Valid number")
 
     if minimum is not None:
         # Exactly the minimum
@@ -768,9 +745,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             smallest = closest_multiple_greater_than(minimum, multiple_of)
         else:
             smallest = minimum
-        key = _to_hashable_key(smallest)
-        if key not in seen:
-            seen.add(key)
+        if seen.insert(smallest):
             yield PositiveValue(smallest, description="Minimum value")
 
         # One more than minimum if possible
@@ -778,9 +753,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             larger = smallest + multiple_of
         else:
             larger = minimum + 1
-        key = _to_hashable_key(larger)
-        if key not in seen and (not maximum or larger <= maximum):
-            seen.add(key)
+        if (not maximum or larger <= maximum) and seen.insert(larger):
             yield PositiveValue(larger, description="Near-boundary number")
 
     if maximum is not None:
@@ -789,9 +762,7 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             largest = maximum - (maximum % multiple_of)
         else:
             largest = maximum
-        key = _to_hashable_key(largest)
-        if key not in seen:
-            seen.add(key)
+        if seen.insert(largest):
             yield PositiveValue(largest, description="Maximum value")
 
         # One less than maximum if possible
@@ -799,58 +770,53 @@ def _positive_number(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
             smaller = largest - multiple_of
         else:
             smaller = maximum - 1
-        key = _to_hashable_key(smaller)
-        if key not in seen and (smaller > 0 and (minimum is None or smaller >= minimum)):
-            seen.add(key)
+        if (smaller > 0 and (minimum is None or smaller >= minimum)) and seen.insert(smaller):
             yield PositiveValue(smaller, description="Near-boundary number")
 
 
 def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Generator[GeneratedValue, None, None]:
-    seen = set()
     example = schema.get("example")
     examples = schema.get("examples")
     default = schema.get("default")
 
+    seen = HashSet()
+    seen_constraints: set[tuple] = set()
+
     if example or examples or default:
-        if example:
-            seen.add(_to_hashable_key(example))
+        if example and seen.insert(example):
             yield PositiveValue(example, description="Example value")
         if examples:
             for example in examples:
-                seen.add(_to_hashable_key(example))
-                yield PositiveValue(example, description="Example value")
+                if seen.insert(example):
+                    yield PositiveValue(example, description="Example value")
         if (
             default
             and not (example is not None and default == example)
             and not (examples is not None and any(default == ex for ex in examples))
+            and seen.insert(default)
         ):
-            seen.add(_to_hashable_key(default))
             yield PositiveValue(default, description="Default value")
-    else:
+    elif seen.insert(template):
         yield PositiveValue(template, description="Valid array")
-    seen.add(_to_hashable_key(template))
 
     # Boundary and near-boundary sizes
     min_items = schema.get("minItems")
     max_items = schema.get("maxItems")
     if min_items is not None:
         # Do not generate an array with `minItems` length, because it is already covered by `template`
-
         # One item more than minimum if possible
         larger = min_items + 1
-        if larger not in seen and (max_items is None or larger <= max_items):
+        if (max_items is None or larger <= max_items) and larger not in seen_constraints:
+            seen_constraints.add(larger)
             value = ctx.generate_from_schema({**schema, "minItems": larger, "maxItems": larger})
-            key = _to_hashable_key(value)
-            if key not in seen:
-                seen.add(key)
+            if seen.insert(value):
                 yield PositiveValue(value, description="Near-boundary items array")
 
     if max_items is not None:
-        if max_items < INTERNAL_BUFFER_SIZE and max_items not in seen:
+        if max_items < INTERNAL_BUFFER_SIZE and max_items not in seen_constraints:
+            seen_constraints.add(max_items)
             value = ctx.generate_from_schema({**schema, "minItems": max_items})
-            key = _to_hashable_key(value)
-            if key not in seen:
-                seen.add(key)
+            if seen.insert(value):
                 yield PositiveValue(value, description="Maximum items array")
 
         # One item smaller than maximum if possible
@@ -858,13 +824,11 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         if (
             smaller < INTERNAL_BUFFER_SIZE
             and smaller > 0
-            and smaller not in seen
             and (min_items is None or smaller >= min_items)
+            and smaller not in seen_constraints
         ):
             value = ctx.generate_from_schema({**schema, "minItems": smaller, "maxItems": smaller})
-            key = _to_hashable_key(value)
-            if key not in seen:
-                seen.add(key)
+            if seen.insert(value):
                 yield PositiveValue(value, description="Near-boundary items array")
 
     if "items" in schema and "enum" in schema["items"] and isinstance(schema["items"]["enum"], list) and max_items != 0:
@@ -872,9 +836,7 @@ def _positive_array(ctx: CoverageContext, schema: dict, template: list) -> Gener
         length = min_items or 1
         for variant in schema["items"]["enum"]:
             value = [variant] * length
-            key = _to_hashable_key(value)
-            if key not in seen:
-                seen.add(key)
+            if seen.insert(value):
                 yield PositiveValue(value, description="Enum value from available for items array")
     elif min_items is None and max_items is None and "items" in schema and isinstance(schema["items"], dict):
         # Otherwise only an empty array is generated
@@ -921,16 +883,14 @@ def _positive_object(ctx: CoverageContext, schema: dict, template: dict) -> Gene
     if set(properties) != required:
         only_required = {k: v for k, v in template.items() if k in required}
         yield PositiveValue(only_required, description="Object with only required properties")
-    seen = set()
+    seen = HashSet()
     for name, sub_schema in properties.items():
-        seen.add(_to_hashable_key(template.get(name)))
+        seen.insert(template.get(name))
         for new in cover_schema_iter(ctx, sub_schema):
-            key = _to_hashable_key(new.value)
-            if key not in seen:
+            if seen.insert(new.value):
                 yield PositiveValue(
                     {**template, name: new.value}, description=f"Object with valid '{name}' value: {new.description}"
                 )
-                seen.add(key)
         seen.clear()
 
 
@@ -939,14 +899,11 @@ def select_combinations(optional: list[str]) -> Iterator[tuple[str, ...]]:
         yield next(combinations(optional, size))
 
 
-def _negative_enum(
-    ctx: CoverageContext, value: list, seen: set[Any | tuple[type, str]]
-) -> Generator[GeneratedValue, None, None]:
+def _negative_enum(ctx: CoverageContext, value: list, seen: HashSet) -> Generator[GeneratedValue, None, None]:
     def is_not_in_value(x: Any) -> bool:
         if x in value or not ctx.is_valid_for_location(x):
             return False
-        _hashed = _to_hashable_key(x)
-        return _hashed not in seen
+        return seen.insert(x)
 
     strategy = (
         st.text(alphabet=st.characters(min_codepoint=65, max_codepoint=122, categories=["L"]), min_size=3)
@@ -954,10 +911,11 @@ def _negative_enum(
         | st.booleans()
         | NUMERIC_STRATEGY
     ).filter(is_not_in_value)
-    value = ctx.generate_from(strategy)
-    yield NegativeValue(value, description="Invalid enum value", location=ctx.current_path)
-    hashed = _to_hashable_key(value)
-    seen.add(hashed)
+    yield NegativeValue(
+        ctx.generate_from(strategy),
+        description="Invalid enum value",
+        location=ctx.current_path,
+    )
 
 
 def _negative_properties(
@@ -1086,7 +1044,11 @@ def _is_non_integer_float(x: float) -> bool:
     return x != int(x)
 
 
-def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Generator[GeneratedValue, None, None]:
+def _negative_type(
+    ctx: CoverageContext,
+    ty: str | list[str],
+    seen: HashSet,
+) -> Generator[GeneratedValue, None, None]:
     if isinstance(ty, str):
         types = [ty]
     else:
@@ -1098,11 +1060,8 @@ def _negative_type(ctx: CoverageContext, seen: set, ty: str | list[str]) -> Gene
         strategies["number"] = FLOAT_STRATEGY.filter(_is_non_integer_float)
     for strategy in strategies.values():
         value = ctx.generate_from(strategy)
-        hashed = _to_hashable_key(value)
-        if hashed in seen:
-            continue
-        yield NegativeValue(value, description="Incorrect type", location=ctx.current_path)
-        seen.add(hashed)
+        if seen.insert(value):
+            yield NegativeValue(value, description="Incorrect type", location=ctx.current_path)
 
 
 def push_examples_to_properties(schema: dict[str, Any]) -> None:
