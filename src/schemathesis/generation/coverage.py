@@ -676,7 +676,7 @@ def _positive_string(ctx: CoverageContext, schema: dict) -> Generator[GeneratedV
         key = (max_length, max_length)
         if max_length < INTERNAL_BUFFER_SIZE and key not in seen_constraints:
             seen_constraints.add(key)
-            value = ctx.generate_from_schema({**schema, "minLength": max_length})
+            value = ctx.generate_from_schema({**schema, "minLength": max_length, "maxLength": max_length})
             if seen_values.insert(value):
                 yield PositiveValue(value, description="Maximum length string")
 
