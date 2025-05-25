@@ -19,6 +19,7 @@ if hasattr(sre, "POSSESSIVE_REPEAT"):
 else:
     REPEATS = (sre.MIN_REPEAT, sre.MAX_REPEAT)
 LITERAL = sre.LITERAL
+NOT_LITERAL = sre.NOT_LITERAL
 IN = sre.IN
 MAXREPEAT = sre_parse.MAXREPEAT
 
@@ -114,8 +115,20 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
 
     pattern_parts = parsed[1:-1]
 
+    # Calculate total fixed length and per-repetition lengths
+    fixed_length = 0
+    quantifier_bounds = []
+    repetition_lengths = []
+
+    for op, value in pattern_parts:
+        if op in (LITERAL, NOT_LITERAL):
+            fixed_length += 1
+        elif op in REPEATS:
+            min_repeat, max_repeat, subpattern = value
+            quantifier_bounds.append((min_repeat, max_repeat))
+            repetition_lengths.append(_calculate_min_repetition_length(subpattern))
+
     # Adjust length constraints by subtracting fixed literals length
-    fixed_length = sum(1 for op, _ in pattern_parts if op == LITERAL)
     if min_length is not None:
         min_length -= fixed_length
         if min_length < 0:
@@ -125,13 +138,10 @@ def _handle_anchored_pattern(parsed: list, pattern: str, min_length: int | None,
         if max_length < 0:
             return pattern
 
-    # Extract only min/max bounds from quantified parts
-    quantifier_bounds = [value[:2] for op, value in pattern_parts if op in REPEATS]
-
     if not quantifier_bounds:
         return pattern
 
-    length_distribution = _distribute_length_constraints(quantifier_bounds, min_length, max_length)
+    length_distribution = _distribute_length_constraints(quantifier_bounds, repetition_lengths, min_length, max_length)
     if not length_distribution:
         return pattern
 
@@ -212,7 +222,7 @@ def _find_quantified_end(pattern: str, start: int) -> int:
 
 
 def _distribute_length_constraints(
-    bounds: list[tuple[int, int]], min_length: int | None, max_length: int | None
+    bounds: list[tuple[int, int]], repetition_lengths: list[int], min_length: int | None, max_length: int | None
 ) -> list[tuple[int, int]] | None:
     """Distribute length constraints among quantified pattern parts."""
     # Handle exact length case with dynamic programming
@@ -228,18 +238,22 @@ def _distribute_length_constraints(
             if pos == len(bounds):
                 return [()] if remaining == 0 else None
 
-            max_len: int
-            min_len, max_len = bounds[pos]
-            if max_len == MAXREPEAT:
-                max_len = remaining + 1
-            else:
-                max_len += 1
+            max_repeat: int
+            min_repeat, max_repeat = bounds[pos]
+            repeat_length = repetition_lengths[pos]
+
+            if max_repeat == MAXREPEAT:
+                max_repeat = remaining // repeat_length + 1 if repeat_length > 0 else remaining + 1
 
             # Try each possible length for current quantifier
-            for length in range(min_len, max_len):
-                rest = find_valid_combination(pos + 1, remaining - length)
+            for repeat_count in range(min_repeat, max_repeat + 1):
+                used_length = repeat_count * repeat_length
+                if used_length > remaining:
+                    break
+
+                rest = find_valid_combination(pos + 1, remaining - used_length)
                 if rest is not None:
-                    dp[(pos, remaining)] = [(length,) + r for r in rest]
+                    dp[(pos, remaining)] = [(repeat_count,) + r for r in rest]
                     return dp[(pos, remaining)]
 
             dp[(pos, remaining)] = None
@@ -280,6 +294,22 @@ def _distribute_length_constraints(
     return result
 
 
+def _calculate_min_repetition_length(subpattern: list) -> int:
+    """Calculate minimum length contribution per repetition of a quantified group."""
+    total = 0
+    for op, value in subpattern:
+        if op in [LITERAL, NOT_LITERAL, IN, sre.ANY]:
+            total += 1
+        elif op == sre.SUBPATTERN:
+            _, _, _, inner_pattern = value
+            total += _calculate_min_repetition_length(inner_pattern)
+        elif op in REPEATS:
+            min_repeat, _, inner_pattern = value
+            inner_min = _calculate_min_repetition_length(inner_pattern)
+            total += min_repeat * inner_min
+    return total
+
+
 def _get_anchor_length(node_type: int) -> int:
     """Determine the length of the anchor based on its type."""
     if node_type in {sre.AT_BEGINNING_STRING, sre.AT_END_STRING, sre.AT_BOUNDARY, sre.AT_NON_BOUNDARY}:
@@ -293,7 +323,7 @@ def _update_quantifier(
     """Update the quantifier based on the operation type and given constraints."""
     if op in REPEATS and value is not None:
         return _handle_repeat_quantifier(value, pattern, min_length, max_length)
-    if op in (LITERAL, IN) and max_length != 0:
+    if op in (LITERAL, NOT_LITERAL, IN) and max_length != 0:
         return _handle_literal_or_in_quantifier(pattern, min_length, max_length)
     if op == sre.ANY and value is None:
         # Equivalent to `.` which is in turn is the same as `.{1}`
