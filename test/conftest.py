@@ -537,14 +537,16 @@ def snapshot_cli(request, snapshot):
             include: PropertyFilter | None = None,
             matcher: PropertyMatcher | None = None,
         ) -> str:
-            stdout = None
+            stdout = ""
             if isinstance(data, Result):
                 exit_code = data.exit_code
                 if data.stdout_bytes:
                     stdout = data.stdout
+                if data.stderr_bytes:
+                    stdout += data.stderr
             else:
                 exit_code = data.ret
-                stdout = data.stdout.str()
+                stdout = data.stdout.str() + data.stderr.str()
             serialized = f"Exit code: {exit_code}"
             if stdout:
                 serialized += f"\n---\nStdout:\n{stdout}"

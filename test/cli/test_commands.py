@@ -21,21 +21,28 @@ from test.apps._graphql._flask import create_app as create_graphql_app
 from test.apps.openapi._flask import create_app as create_openapi_app
 from test.utils import HERE, SIMPLE_PATH, flaky
 
+skip_py39 = pytest.mark.skipif(
+    sys.version_info < (3, 10), reason="Older version of Click that treats exit codes differently"
+)
 
+
+@skip_py39
 def test_commands_help(cli, snapshot_cli):
     assert cli.main() == snapshot_cli
 
 
+@skip_py39
 def test_run_subprocess(testdir):
     # To verify that CLI entry point is installed properly
     result = testdir.run("schemathesis")
-    assert result.ret == ExitCode.OK
+    assert result.ret == ExitCode.INTERRUPTED
 
 
 @pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@skip_py39
 def test_run_as_module(testdir):
     result = testdir.run("python", "-m", "schemathesis.cli")
-    assert result.ret == ExitCode.OK
+    assert result.ret == ExitCode.INTERRUPTED
 
 
 @pytest.mark.parametrize(
