@@ -82,3 +82,8 @@ def test_detect_null_byte_skipped(ctx):
             error=None,
         )
     ]
+
+
+def test_ctrl_c(cli, mocker, openapi3_schema_url, snapshot_cli):
+    mocker.patch("schemathesis.engine.phases.probes.send", side_effect=KeyboardInterrupt)
+    assert cli.run(openapi3_schema_url) == snapshot_cli

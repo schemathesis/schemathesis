@@ -1091,6 +1091,7 @@ class OutputHandler(EventHandler):
             )
             self.console.print(message)
             self.console.print()
+            self.probing_manager = None
 
     def _on_fatal_error(self, ctx: ExecutionContext, event: events.FatalError) -> None:
         from rich.padding import Padding

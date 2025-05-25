@@ -48,6 +48,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
     - Internal error on `maxItems` & unsupported `pattern` combination.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 - Support for Hypothesis `>6.131.14`.
+- Internal error on CTRL-C when running API probes.
 
 ### :wrench: Changed
 
