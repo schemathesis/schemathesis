@@ -28,6 +28,8 @@ base-url = "https://payments.example.com"
 workers = 4
 ```
 
+- Stabilized `positive_data_acceptance` and `missing_required_header` checks.
+
 ### :bug: Fixed
 
 - **Coverage Phase**: 
@@ -43,7 +45,57 @@ workers = 4
 
 ### :wrench: Changed
 
+- Enable all available checks by default.
 - **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
+
+### :fire: Removed
+
+- `--experimental` CLI option. All experimental features have been stabilized.
+- `--experimental-coverage-unexpected-methods` CLI option. Use `[phases.coverage]` configuration table instead:
+
+```toml
+[phases.coverage]
+unexpected-methods = ["PATCH"]
+```
+
+- `--experimental-missing-required-header-allowed-statuses` CLI option. Use `[checks.missing_required_header]` configuration table instead:
+
+```toml
+[checks.missing_required_header]
+expected-statuses = [200, 201, 202]
+```
+
+- `--experimental-positive-data-acceptance-allowed-statuses` CLI option. Use `[checks.positive_data_acceptance]` configuration table instead:
+
+```toml
+[checks.positive_data_acceptance]
+expected-statuses = [200, 201, 202]
+```
+
+- `--experimental-negative-data-rejection-allowed-statuses` CLI option. Use `[checks.negative_data_rejection]` configuration table instead:
+
+```toml
+[checks.negative_data_rejection]
+expected-statuses = [200, 201, 202]
+```
+
+- `--set-{header,cookie,path,query}` CLI options. Use parameter overrides in the configuration file instead:
+
+```toml
+# Global parameters
+[parameters]
+api_version = "v2"
+
+# Operation-specific parameters
+[[operations]]
+include-name = "GET /users/"
+parameters = { limit = 50, offset = 0 }
+
+[[operations]]
+include-name = "GET /users/{user_id}/"
+# Disambiguate parameters with the same name
+parameters = { "path.user_id" = 42, "query.user_id" = 100 }
+```
 
 ## [4.0.0-alpha.10](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.9...v4.0.0-alpha.10) - 2025-05-07
 
