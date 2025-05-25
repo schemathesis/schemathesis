@@ -1469,6 +1469,55 @@ def test_less_than_min_items(ctx):
     )
 
 
+@pytest.mark.filterwarnings("ignore::UserWarning")
+def test_min_items_with_unsupported_pattern(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "requestBody": {
+                        "required": True,
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "pattern": "[\\p{L}]+",
+                                    },
+                                    "maxItems": 50,
+                                },
+                            }
+                        },
+                    },
+                    "responses": {"default": {"description": "OK"}},
+                }
+            }
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.NEGATIVE],
+        [
+            {
+                "body": [],
+            },
+            {
+                "body": {},
+            },
+            {
+                "body": "",
+            },
+            {},
+            {
+                "body": False,
+            },
+            {
+                "body": 0,
+            },
+        ],
+    )
+
+
 def test_query_parameters_with_nested_enum(ctx):
     schema = ctx.openapi.build_schema(
         {
