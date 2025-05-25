@@ -1893,6 +1893,16 @@ def assert_coverage(schema, modes, expected, path=None):
         assert_requests_call(case)
         if len(modes) == 1:
             assert case.meta.generation.mode == modes[0]
+        else:
+            mode = case.meta.generation.mode
+            if mode == GenerationMode.POSITIVE:
+                # If the main mode is positive, then all components should have the positive mode
+                for component, info in case.meta.components.items():
+                    assert info.mode == mode, f"{component.value} should have {mode.value} mode"
+            if mode == GenerationMode.NEGATIVE:
+                # If the main mode is negative, then at least one component should be negative
+                assert any(info.mode == mode for info in case.meta.components.values())
+
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
             value = getattr(case, container)
