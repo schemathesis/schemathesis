@@ -1604,6 +1604,52 @@ def test_query_parameters_with_nested_enum(ctx):
     )
 
 
+def test_query_parameters_dont_exceed_max_length(ctx):
+    schema = ctx.openapi.build_schema(
+        {
+            "/foo": {
+                "post": {
+                    "parameters": [
+                        {
+                            "name": "foo",
+                            "in": "query",
+                            "required": False,
+                            "schema": {
+                                "type": "string",
+                                "pattern": "^bar\\.spam\\.[^,]+(?:,bar\\.spam\\.[^,]+)*$",
+                                "minLength": 1,
+                                "maxLength": 60,
+                            },
+                        },
+                    ],
+                    "responses": {"default": {"description": "OK"}},
+                }
+            },
+        }
+    )
+    assert_coverage(
+        schema,
+        [GenerationMode.POSITIVE],
+        [
+            {
+                "query": {
+                    "foo": "bar.spam.000000,bar.spam.0,bar.spam.0,bar.spam.0,bar.spam.0",
+                },
+            },
+            {
+                "query": {
+                    "foo": "bar.spam.0000000,bar.spam.0,bar.spam.0,bar.spam.0,bar.spam.0",
+                },
+            },
+            {
+                "query": {
+                    "foo": "bar.spam.0",
+                },
+            },
+        ],
+    )
+
+
 def test_negative_query_parameter(ctx):
     schema = ctx.openapi.build_schema(
         {
@@ -1886,15 +1932,16 @@ def assert_coverage(schema, modes, expected, path=None):
     operation = schema[path[0]][path[1]] if path else schema["/foo"]["post"]
 
     def test(case):
-        if case.meta.phase.name != TestPhase.COVERAGE:
+        meta = case.meta
+        if meta.phase.name != TestPhase.COVERAGE:
             return
-        if case.meta.phase.data.description.startswith("Unspecified"):
+        if meta.phase.data.description.startswith("Unspecified"):
             return
         assert_requests_call(case)
         if len(modes) == 1:
-            assert case.meta.generation.mode == modes[0]
+            assert meta.generation.mode == modes[0]
         else:
-            mode = case.meta.generation.mode
+            mode = meta.generation.mode
             if mode == GenerationMode.POSITIVE:
                 # If the main mode is positive, then all components should have the positive mode
                 for component, info in case.meta.components.items():
@@ -1902,6 +1949,14 @@ def assert_coverage(schema, modes, expected, path=None):
             if mode == GenerationMode.NEGATIVE:
                 # If the main mode is negative, then at least one component should be negative
                 assert any(info.mode == mode for info in case.meta.components.values())
+
+        if meta.phase.data.description == "Maximum length string":
+            location = meta.phase.data.parameter_location
+            name = meta.phase.data.parameter
+            container = getattr(case, location)
+            value = container[name]
+            parameter = getattr(operation, location).get(name)
+            assert len(value) == parameter.definition["schema"]["maxLength"]
 
         output = {}
         for container in LOCATION_TO_CONTAINER.values():
