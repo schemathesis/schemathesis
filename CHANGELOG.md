@@ -4,10 +4,9 @@
 
 ### :rocket: Added
 
-Introducing a new configuration file, `schemathesis.toml`, for persistent Schemathesis configuration management.
+Introducing `schemathesis.toml` as a configuration file for Schemathesis.
 
-This file enables fine-grained control over per-API operation settings as well as multi-project configurations.
-Global settings are defined at the top level, while operation-specific and project-specific configurations can be set under dedicated sections.
+It provides fine-grained control over individual API operations and supports multi-project configurations. Global settings go at the top level, with dedicated sections for operations and projects.
 
 CLI options override configuration file settings when specified.
 
@@ -31,12 +30,13 @@ workers = 4
 
 ### :bug: Fixed
 
-- Coverage Phase: Do not generate empty path parameters.
-- Coverage Phase: Skip empty string examples for path parameters.
-- Coverage Phase: Generate default values if examples are incorrect or inappropriate for their location.
-- Coverage Phase: Avoid duplicate positive test cases for string & numeric values in some scenarios.
-- Coverage Phase: Avoid duplicate negative test cases for objects in some scenarios.
-- Coverage Phase: Internal error caused by generating invalid header values.
+- **Coverage Phase**: 
+    - Do not generate empty path parameters.
+    - Skip empty string examples for path parameters.
+    - Generate default values if examples are incorrect or inappropriate for their location.
+    - Avoid duplicate positive test cases for string & numeric values in some scenarios.
+    - Avoid duplicate negative test cases for objects in some scenarios.
+    - Internal error caused by generating invalid header values.
 - Do not trigger `positive_data_acceptance` on 5xx responses.
 - Support for Hypothesis `>6.131.14`.
 
