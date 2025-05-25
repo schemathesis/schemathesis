@@ -387,7 +387,7 @@ def _stringify_value(val: Any, container_name: str) -> Any:
             # Having a list here ensures there will be multiple query parameters wit the same name
             return [_stringify_value(item, container_name) for item in val]
         # use comma-separated values style for arrays
-        return ",".join(_stringify_value(sub, container_name) for sub in val)
+        return ",".join(str(_stringify_value(sub, container_name)) for sub in val)
     if isinstance(val, dict):
         return {key: _stringify_value(sub, container_name) for key, sub in val.items()}
     return val
