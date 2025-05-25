@@ -52,6 +52,7 @@ headers = { Authorization = "Bearer ${API_TOKEN}" }
 ### :wrench: Changed
 
 - Enable all available checks by default.
+- Do not fallback to GraphQL loading if schema location ends with `openapi.json` and similar filenames. [#2757](https://github.com/schemathesis/schemathesis/issues/2757) 
 - **INTERNAL**: Ignore deprecation warnings from `jsonschema`.
 
 ### :fire: Removed

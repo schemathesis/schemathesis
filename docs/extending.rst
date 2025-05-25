@@ -1,8 +1,8 @@
 Extending Schemathesis
 ======================
 
-Schemathesis provides various extension mechanisms to adapt its default behavior to your specific testing needs. 
-This might involve customizing data generation, modifying requests, or introducing new validation checks. 
+Schemathesis provides various extension mechanisms to adapt its default behavior to your specific testing needs.
+This might involve customizing data generation, modifying requests, or introducing new validation checks.
 In this section, we explore different ways to leverage these mechanisms to adjust Schemathesis to your API testing requirements.
 
 Hooks
@@ -10,7 +10,7 @@ Hooks
 
 Need to customize the data used in your tests?
 
-Hooks in Schemathesis allow you to influence the generation of test data, enabling you to create more relevant and targeted tests. 
+Hooks in Schemathesis allow you to influence the generation of test data, enabling you to create more relevant and targeted tests.
 They can be used to limit the test input to certain criteria, modify the generated values, or establish relationships between different pieces of generated data.
 
 .. code:: python
@@ -23,7 +23,7 @@ They can be used to limit the test input to certain criteria, modify the generat
         # Simple filtering to avoid a specific query parameter value
         return query["key"] != "42"
 
-Hooks are identified and applied based on their function name, utilized through a decorator, like ``@schemathesis.hook``. 
+Hooks are identified and applied based on their function name, utilized through a decorator, like ``@schemathesis.hook``.
 The function name, such as ``filter_query``, indicates it's a hook to filter query parameters.
 
 .. note::
@@ -53,16 +53,16 @@ When dealing with multiple hooks that serve similar purposes, especially across 
         return query["key"] != "43"
 
 
-In the code snippet above, the function names ``avoid_42`` and ``avoid_43`` don't directly indicate their role as hooks. 
+In the code snippet above, the function names ``avoid_42`` and ``avoid_43`` don't directly indicate their role as hooks.
 However, by providing "filter_query" as an argument in the ``@schemathesis.hook`` decorator, both functions will serve as ``filter_query`` hooks, ensuring the right application while maintaining unique function names.
 
 Many Schemathesis hooks accept a ``context`` argument, an instance of the ``HookContext`` class.
 This context provides optional information about the API operation currently being tested, accessible via ``context.operation``.
 This can be useful for conditional logic within your hooks.
 
-Hooks are applied at different scopes: global, schema-specific, and test-specific. 
+Hooks are applied at different scopes: global, schema-specific, and test-specific.
 They execute in the order they are defined, with globally defined hooks executing first, followed by schema-specific hooks, and finally test-specific hooks.
- 
+
 **Note**: hooks in different scopes do not override each other but are applied sequentially.
 
 .. code:: python
@@ -94,7 +94,7 @@ They execute in the order they are defined, with globally defined hooks executin
 
 .. tip::
 
-    Be mindful of the sequence in which hooks are applied. The order can significantly impact the generated test data and subsequent API calls during testing. 
+    Be mindful of the sequence in which hooks are applied. The order can significantly impact the generated test data and subsequent API calls during testing.
     Always validate the test data and requests to ensure that hooks are applied in the intended order and manner.
 
 .. _enabling-extensions:
@@ -104,7 +104,7 @@ Enabling Extensions
 
 For Schemathesis to utilize your custom hooks or other extensions, they need to be properly enabled.
 
-For **CLI** usage, extensions should be placed in a separate Python module. 
+For **CLI** usage, extensions should be placed in a separate Python module.
 Then, Schemathesis should be informed about this module via the ``SCHEMATHESIS_HOOKS`` environment variable:
 
 .. code:: bash
@@ -120,17 +120,17 @@ Also, depending on your setup, you might need to run this command with a custom 
     export SCHEMATHESIS_HOOKS=myproject.tests.hooks
     st run https://example.com/api/swagger.json
 
-In the example above, the module is located at ``myproject/tests/hooks.py`` and the environment variable contains 
+In the example above, the module is located at ``myproject/tests/hooks.py`` and the environment variable contains
 a path that could be used as an import in Python.
 
 If you run Schemathesis in Docker, make sure you mount a volume to the ``/app`` directory, so Schemathesis can find it within the container.
 
 .. code:: bash
 
-    docker run -v $(pwd):/app -e SCHEMATHESIS_HOOKS=hooks --network=host 
+    docker run -v $(pwd):/app -e SCHEMATHESIS_HOOKS=hooks --network=host
         schemathesis/schemathesis:stable run http://127.0.0.1:8081/schema.yaml
 
-In this example, the hooks file is called ``hooks.py`` and is located in the current directory. 
+In this example, the hooks file is called ``hooks.py`` and is located in the current directory.
 The current directory is mounted to the ``/app`` directory in the container.
 
 .. note::
@@ -142,7 +142,7 @@ If you're using Schemathesis in Python tests, ensure to define your hooks in the
 Filtering Data
 ~~~~~~~~~~~~~~
 
-Use ``filter`` hooks to exclude certain data values, creating tests that focus on more interesting or relevant inputs. 
+Use ``filter`` hooks to exclude certain data values, creating tests that focus on more interesting or relevant inputs.
 For instance, to avoid testing with data that is known to be invalid or uninteresting:
 
 .. code:: python
@@ -370,7 +370,7 @@ This example demonstrates how to add a custom CLI option and an event handler th
                     f"Counter: {self.counter}",
                 )
 
-The ``--custom-counter`` CLI option sets the initial value for the ``EventCounter`` handler. 
+The ``--custom-counter`` CLI option sets the initial value for the ``EventCounter`` handler.
 The handler increments the counter for each event and adds a summary line with the final count when the test run finishes.
 
 ``before_process_path``
@@ -547,7 +547,7 @@ For WSGI integration, the keywords are different. See the documentation for ``we
 Checks
 ------
 
-Checks in Schemathesis allow you to validate responses from your API, ensuring they adhere to both general and application-specific expectations. 
+Checks in Schemathesis allow you to validate responses from your API, ensuring they adhere to both general and application-specific expectations.
 They can be particularly useful for checking behaviors that are specific to your application and go beyond the built-in checks provided by Schemathesis.
 
 Define a check as a function taking three parameters: ``ctx``, ``response`` and ``case``, and register it using the ``@schemathesis.check`` decorator.
@@ -588,7 +588,7 @@ To signify a check failure, raise an ``AssertionError``. If the assertion fails,
 Generating strings for custom Open API formats
 ----------------------------------------------
 
-In Open API, you may define custom string formats using the ``format`` keyword, specifying the expected format of a string property value. 
+In Open API, you may define custom string formats using the ``format`` keyword, specifying the expected format of a string property value.
 Schemathesis allows you to manage the generation of values for these custom formats by registering Hypothesis strategies.
 
 While Schemathesis supports all built-in Open API formats out of the box, creating strategies for custom string formats enhances the precision of your generated test data.
@@ -625,7 +625,7 @@ Adjusting header generation
 
 By default, Schemathesis generates headers based on the schema definition falling back to the set of characters defined in `RFC 7230 <https://datatracker.ietf.org/doc/html/rfc7230#section-3.2>`_, but you can adjust this behavior to suit your needs.
 
-To customize header generation, you can extend the ``GenerationConfig`` class and modify its ``headers`` attribute. 
+To customize header generation, you can extend the ``GenerationConfig`` class and modify its ``headers`` attribute.
 The ``headers`` attribute accepts a ``HeaderConfig`` object, which allows you to specify a custom Hypothesis strategy for generating header values.
 
 Here's an example of how you can adjust header generation:
@@ -642,7 +642,7 @@ Here's an example of how you can adjust header generation:
             headers=HeaderConfig(
                 strategy=st.text(
                     alphabet=st.characters(
-                        min_codepoint=1, 
+                        min_codepoint=1,
                         max_codepoint=127,
                     ).map(str.strip)
                 )
