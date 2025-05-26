@@ -4,6 +4,7 @@ from flask import Flask, jsonify, request
 
 import schemathesis
 from schemathesis.checks import CHECKS
+from schemathesis.checks import not_a_server_error as default_not_a_server_error
 
 
 @pytest.fixture
@@ -187,3 +188,29 @@ def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
         )
         == snapshot_cli
     )
+
+
+@pytest.fixture
+def custom_not_a_server_error():
+    calls = []
+
+    @schemathesis.check
+    def not_a_server_error(ctx, response, case):
+        calls.append("CALLED")
+
+    yield calls
+
+    CHECKS.unregister(not_a_server_error.__name__)
+    CHECKS.register(default_not_a_server_error)
+
+
+def test_override_not_a_server_error(cli, custom_not_a_server_error, openapi3_schema_url, snapshot_cli):
+    assert (
+        cli.run(
+            openapi3_schema_url,
+            "--max-examples=5",
+            "--checks=not_a_server_error",
+        )
+        == snapshot_cli
+    )
+    assert len(custom_not_a_server_error) > 0
