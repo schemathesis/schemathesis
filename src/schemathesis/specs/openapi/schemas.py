@@ -120,7 +120,8 @@ class BaseOpenAPISchema(BaseSchema):
         if map is not None:
             return map
         path_item = self.raw_schema.get("paths", {})[path]
-        scope, path_item = self._resolve_path_item(path_item)
+        with in_scope(self.resolver, self.location or ""):
+            scope, path_item = self._resolve_path_item(path_item)
         self.dispatch_hook("before_process_path", HookContext(), path, path_item)
         map = APIOperationMap(self, {})
         map._data = MethodMap(map, scope, path, CaseInsensitiveDict(path_item))
