@@ -5,6 +5,7 @@ nav:
   - Introduction: index.md
   - Quick Start Guide: quick-start.md
   - Tutorial: tutorial.md
+  - Configuration: configuration.md
   - How-To Guides:
       - guides/index.md
       - guides/cicd.md
@@ -14,9 +15,6 @@ nav:
       - explanations/workflow.md
       - explanations/data-generation.md
       - explanations/checks.md
-  - Configuration:
-      - configuration/file.md
-      - configuration/authentication.md
   - Advanced:
       - Targeted Testing: advanced/targeted.md
   - API Reference:

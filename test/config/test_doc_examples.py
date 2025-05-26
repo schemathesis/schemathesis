@@ -16,7 +16,7 @@ def extract_examples(path: str) -> list:
     return pattern.findall(markdown)
 
 
-ALL_CONFIGS = extract_examples("reference/configuration.md") + extract_examples("using/configuration.md")
+ALL_CONFIGS = extract_examples("reference/configuration.md") + extract_examples("guides/configuration.md")
 DEFAULT_CONFIG = SchemathesisConfig()
 
 
