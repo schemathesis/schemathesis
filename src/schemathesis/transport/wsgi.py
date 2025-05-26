@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import werkzeug
 
 
-class WSGITransport(BaseTransport[werkzeug.Client]):
+class WSGITransport(BaseTransport["werkzeug.Client"]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         headers = kwargs.get("headers")
         params = kwargs.get("params")

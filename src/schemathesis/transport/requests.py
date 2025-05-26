@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-class RequestsTransport(BaseTransport[requests.Session]):
+class RequestsTransport(BaseTransport["requests.Session"]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         base_url = kwargs.get("base_url")
         headers = kwargs.get("headers")
