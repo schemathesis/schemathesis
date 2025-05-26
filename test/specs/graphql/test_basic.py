@@ -7,7 +7,7 @@ from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
 from schemathesis.checks import CheckContext, not_a_server_error
-from schemathesis.config._checks import ChecksConfig
+from schemathesis.config import ChecksConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
