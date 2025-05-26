@@ -121,17 +121,21 @@ def _execute(
     args: list[str],
     params: dict[str, Any],
 ) -> None:
-    handlers = initialize_handlers(config=config, args=args, params=params)
-    ctx = ExecutionContext(config=config)
+    handlers: list[EventHandler] = []
+    ctx: ExecutionContext | None = None
 
     def shutdown() -> None:
-        for _handler in handlers:
-            _handler.shutdown(ctx)
-
-    for handler in handlers:
-        handler.start(ctx)
+        if ctx is not None:
+            for _handler in handlers:
+                _handler.shutdown(ctx)
 
     try:
+        handlers = initialize_handlers(config=config, args=args, params=params)
+        ctx = ExecutionContext(config=config)
+
+        for handler in handlers:
+            handler.start(ctx)
+
         for event in event_stream:
             ctx.on_event(event)
             for handler in handlers:
