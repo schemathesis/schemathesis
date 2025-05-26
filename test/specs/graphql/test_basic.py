@@ -6,7 +6,8 @@ import strawberry
 from hypothesis import HealthCheck, Phase, find, given, settings
 
 import schemathesis
-from schemathesis.checks import not_a_server_error
+from schemathesis.checks import CheckContext, not_a_server_error
+from schemathesis.config._checks import ChecksConfig
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
 from schemathesis.core.errors import LoaderError
 from schemathesis.core.failures import Failure, FailureGroup
@@ -88,7 +89,17 @@ def test_response_validation(graphql_schema, response_factory, kwargs, expected)
     response = response_factory.requests(status_code=200, **kwargs)
     case = graphql_schema["Query"]["getBooks"].Case(body="Q")
     with pytest.raises(Failure, match=expected):
-        not_a_server_error(None, response, case)
+        not_a_server_error(
+            CheckContext(
+                override=None,
+                auth=None,
+                headers=None,
+                config=ChecksConfig(),
+                transport_kwargs=None,
+            ),
+            response,
+            case,
+        )
 
 
 def test_client_error(graphql_schema):
