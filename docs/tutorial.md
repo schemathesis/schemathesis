@@ -222,4 +222,3 @@ uvx schemathesis --config-file path/to/config.toml run http://...
 
 - **[CLI Reference](reference/cli.md)** - All available CLI options
 - **[Configuration Reference](reference/configuration.md)** - Complete configuration reference
-
