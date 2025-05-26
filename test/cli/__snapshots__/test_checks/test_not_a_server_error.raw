@@ -28,14 +28,6 @@ Schemathesis dev
 
      ✅ 2 passed
 
-=================================== WARNINGS ===================================
-
-Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
-
-  - GET /failure
-
-Tip: Check base URL or adjust data generation settings
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -48,9 +40,6 @@ Test Phases:
   ✅ Coverage
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
-
-Warnings:
-  ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
   N generated, N passed
