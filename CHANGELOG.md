@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.11...HEAD) - TBD
 
+### :bug: Fixed
+
+- **Coverage phase**: Incorrect reference resolution scope during test generation
+
 ## [4.0.0-alpha.11](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.10...v4.0.0-alpha.11) - 2025-05-26
 
 ### :rocket: Added
