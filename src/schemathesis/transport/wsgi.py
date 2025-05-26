@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     import werkzeug
 
 
-class WSGITransport(BaseTransport["Case", Response, "werkzeug.Client"]):
+class WSGITransport(BaseTransport[werkzeug.Client]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         headers = kwargs.get("headers")
         params = kwargs.get("params")
@@ -119,24 +119,24 @@ WSGI_TRANSPORT = WSGITransport()
 
 
 @WSGI_TRANSPORT.serializer("application/json", "text/json")
-def json_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def json_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return serialize_json(value)
 
 
 @WSGI_TRANSPORT.serializer(
     "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
 )
-def yaml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def yaml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return serialize_yaml(value)
 
 
 @WSGI_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
-def multipart_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return {"data": value}
 
 
 @WSGI_TRANSPORT.serializer("application/xml", "text/xml")
-def xml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def xml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     media_type = ctx.case.media_type
 
     assert media_type is not None
@@ -148,17 +148,17 @@ def xml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any
 
 
 @WSGI_TRANSPORT.serializer("application/x-www-form-urlencoded")
-def urlencoded_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def urlencoded_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return {"data": value}
 
 
 @WSGI_TRANSPORT.serializer("text/plain")
-def text_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def text_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": str(value)}
 
 
 @WSGI_TRANSPORT.serializer("application/octet-stream")
-def binary_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def binary_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return {"data": serialize_binary(value)}
