@@ -94,11 +94,14 @@ check = CHECKS.register
 @check
 def not_a_server_error(ctx: CheckContext, response: Response, case: Case) -> bool | None:
     """A check to verify that the response is not a server-side error."""
-    from .specs.graphql.schemas import GraphQLSchema
-    from .specs.graphql.validation import validate_graphql_response
+    from schemathesis.specs.graphql.schemas import GraphQLSchema
+    from schemathesis.specs.graphql.validation import validate_graphql_response
+    from schemathesis.specs.openapi.utils import expand_status_codes
+
+    expected_statuses = expand_status_codes(ctx.config.not_a_server_error.expected_statuses or [])
 
     status_code = response.status_code
-    if status_code >= 500:
+    if status_code not in expected_statuses:
         raise ServerError(operation=case.operation.label, status_code=status_code)
     if isinstance(case.operation.schema, GraphQLSchema):
         try:

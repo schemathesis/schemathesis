@@ -2,6 +2,10 @@
 
 ## [Unreleased](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.11...HEAD) - TBD
 
+### :rocket: Added
+
+- A way to configure status codes for the `not_a_server_error` check. [#2539](https://github.com/schemathesis/schemathesis/issues/2539) 
+
 ### :bug: Fixed
 
 - **Coverage phase**: Incorrect reference resolution scope during test generation
