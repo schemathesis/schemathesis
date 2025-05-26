@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from inspect import iscoroutinefunction
-from typing import Any, Callable, Generic, Iterator, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Generic, Iterator, TypeVar
 
 from schemathesis.core import media_types
 from schemathesis.core.errors import SerializationNotPossible
+
+if TYPE_CHECKING:
+    from schemathesis.core.transport import Response
+    from schemathesis.generation.case import Case
 
 
 def get(app: Any) -> BaseTransport:
@@ -23,41 +27,39 @@ def get(app: Any) -> BaseTransport:
     return WSGI_TRANSPORT
 
 
-C = TypeVar("C", contravariant=True)
-R = TypeVar("R", covariant=True)
 S = TypeVar("S", contravariant=True)
 
 
 @dataclass
-class SerializationContext(Generic[C]):
+class SerializationContext:
     """Generic context for serialization process."""
 
-    case: C
+    case: Case
 
     __slots__ = ("case",)
 
 
-Serializer = Callable[[SerializationContext[C], Any], Any]
+Serializer = Callable[[SerializationContext, Any], Any]
 
 
-class BaseTransport(Generic[C, R, S]):
+class BaseTransport(Generic[S]):
     """Base implementation with serializer registration."""
 
     def __init__(self) -> None:
-        self._serializers: dict[str, Serializer[C]] = {}
+        self._serializers: dict[str, Serializer] = {}
 
-    def serialize_case(self, case: C, **kwargs: Any) -> dict[str, Any]:
+    def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         """Prepare the case for sending."""
         raise NotImplementedError
 
-    def send(self, case: C, *, session: S | None = None, **kwargs: Any) -> R:
+    def send(self, case: Case, *, session: S | None = None, **kwargs: Any) -> Response:
         """Send the case using this transport."""
         raise NotImplementedError
 
-    def serializer(self, *media_types: str) -> Callable[[Serializer[C]], Serializer[C]]:
+    def serializer(self, *media_types: str) -> Callable[[Serializer], Serializer]:
         """Register a serializer for given media types."""
 
-        def decorator(func: Serializer[C]) -> Serializer[C]:
+        def decorator(func: Serializer) -> Serializer:
             for media_type in media_types:
                 self._serializers[media_type] = func
             return func
@@ -71,10 +73,10 @@ class BaseTransport(Generic[C, R, S]):
     def _copy_serializers_from(self, transport: BaseTransport) -> None:
         self._serializers.update(transport._serializers)
 
-    def get_first_matching_media_type(self, media_type: str) -> tuple[str, Serializer[C]] | None:
+    def get_first_matching_media_type(self, media_type: str) -> tuple[str, Serializer] | None:
         return next(self.get_matching_media_types(media_type), None)
 
-    def get_matching_media_types(self, media_type: str) -> Iterator[tuple[str, Serializer[C]]]:
+    def get_matching_media_types(self, media_type: str) -> Iterator[tuple[str, Serializer]]:
         """Get all registered media types matching the given media type."""
         if media_type == "*/*":
             # Shortcut to avoid comparing all values
@@ -96,7 +98,7 @@ class BaseTransport(Generic[C, R, S]):
                     if main in ("*", target_main) and sub in ("*", target_sub):
                         yield registered_media_type, serializer
 
-    def _get_serializer(self, input_media_type: str) -> Serializer[C]:
+    def _get_serializer(self, input_media_type: str) -> Serializer:
         pair = self.get_first_matching_media_type(input_media_type)
         if pair is None:
             # This media type is set manually. Otherwise, it should have been rejected during the data generation

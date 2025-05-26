@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from schemathesis.generation.case import Case
 
 
-class RequestsTransport(BaseTransport["Case", Response, "requests.Session"]):
+class RequestsTransport(BaseTransport[requests.Session]):
     def serialize_case(self, case: Case, **kwargs: Any) -> dict[str, Any]:
         base_url = kwargs.get("base_url")
         headers = kwargs.get("headers")
@@ -135,14 +135,14 @@ REQUESTS_TRANSPORT = RequestsTransport()
 
 
 @REQUESTS_TRANSPORT.serializer("application/json", "text/json")
-def json_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def json_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return serialize_json(value)
 
 
 @REQUESTS_TRANSPORT.serializer(
     "text/yaml", "text/x-yaml", "text/vnd.yaml", "text/yml", "application/yaml", "application/x-yaml"
 )
-def yaml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def yaml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return serialize_yaml(value)
 
 
@@ -188,7 +188,7 @@ def _encode_multipart(value: Any, boundary: str) -> bytes:
 
 
 @REQUESTS_TRANSPORT.serializer("multipart/form-data", "multipart/mixed")
-def multipart_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def multipart_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     if isinstance(value, dict):
@@ -204,7 +204,7 @@ def multipart_serializer(ctx: SerializationContext[Case], value: Any) -> dict[st
 
 
 @REQUESTS_TRANSPORT.serializer("application/xml", "text/xml")
-def xml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def xml_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     media_type = ctx.case.media_type
 
     assert media_type is not None
@@ -216,17 +216,17 @@ def xml_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any
 
 
 @REQUESTS_TRANSPORT.serializer("application/x-www-form-urlencoded")
-def urlencoded_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def urlencoded_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return {"data": value}
 
 
 @REQUESTS_TRANSPORT.serializer("text/plain")
-def text_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def text_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     if isinstance(value, bytes):
         return {"data": value}
     return {"data": str(value).encode("utf8")}
 
 
 @REQUESTS_TRANSPORT.serializer("application/octet-stream")
-def binary_serializer(ctx: SerializationContext[Case], value: Any) -> dict[str, Any]:
+def binary_serializer(ctx: SerializationContext, value: Any) -> dict[str, Any]:
     return {"data": serialize_binary(value)}
