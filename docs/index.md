@@ -100,4 +100,3 @@ Easy integration:
 * **[Troubleshooting](troubleshooting.md)** — Solve common issues
 
 * **[Resources](resources.md)** — Community articles, videos, and tutorials
-

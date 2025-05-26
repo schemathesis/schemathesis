@@ -82,4 +82,3 @@ Run the demo command above, then try it on your own API. Schemathesis will immed
 
 - **[CLI Reference](reference/cli.md)** - All available CLI options
 - **[Configuration Reference](reference/configuration.md)** - Complete configuration reference
-
