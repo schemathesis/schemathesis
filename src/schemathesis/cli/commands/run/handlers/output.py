@@ -1499,8 +1499,8 @@ class StatusCodeStatistic:
         """Check if an operation should be warned about (only 4xx responses, excluding auth)."""
         if self.total == 0:
             return False
-        # Don't duplicate auth warnings
-        if set(self.counts.keys()) <= {401, 403}:
+        # Don't duplicate auth warnings & skip only 500
+        if set(self.counts.keys()) <= {401, 403, 500}:
             return False
         # At this point we know we only have 4xx responses
         return True

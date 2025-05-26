@@ -9,6 +9,7 @@
 ### :bug: Fixed
 
 - **Coverage phase**: Incorrect reference resolution scope during test generation
+- Do not show the `operation returned only 4xx responses during unit tests` warning if the API operation only returned HTTP 500 responses.
 
 ## [4.0.0-alpha.11](https://github.com/schemathesis/schemathesis/compare/v4.0.0-alpha.10...v4.0.0-alpha.11) - 2025-05-26
 
