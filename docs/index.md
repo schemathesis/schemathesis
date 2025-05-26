@@ -1,87 +1,93 @@
 # Schemathesis
 
-Schemathesis automatically generates and runs API tests from your OpenAPI or GraphQL schema to find bugs and spec violations.
+> **Catch API bugs before your users do.** 
+
+Schemathesis automatically generates thousands of test cases from your OpenAPI or GraphQL schema and finds the edge cases that break your API.
 
 <p align="center">
   <img src="https://raw.githubusercontent.com/schemathesis/schemathesis/master/img/demo.gif" alt="Schemathesis automatically finding a server error"/>
   <br>
-  <i>Automatically finding specification violations and server errors</i>
+  <i>Finding a server error that manual testing missed</i>
 </p>
 
 <div align="center" markdown>
-[Get Your API tested in 5 Minutes :octicons-rocket-24:](quick-start.md){ .md-button .md-button--primary }
+[Find Bugs in Your API in 5 Minutes :octicons-rocket-24:](quick-start.md){ .md-button .md-button--primary }
 </div>
 
-## Why Schemathesis?
-
-- 📑 **Schema-Based Testing** - Transform API documentation into a comprehensive test suite
-- 🚀 **Zero Configuration** - Begin testing immediately with a valid OpenAPI or GraphQL schema
-- ⚙️ **CI-Ready** - Integrate API testing into existing pipelines without complex configuration
-- 🛡️ **Effective Coverage** - Find edge cases no manual testing could uncover
-- 🔬 **Research-Backed**: [Recognized](https://dl.acm.org/doi/10.1145/3617175) in [academic research](https://ieeexplore.ieee.org/document/9793781) as a state-of-the-art API testing tool
-
----
-
-<div class="testimonial-highlight">
-  <blockquote>
-    "The tool is amazing as it can test negative scenarios instead of me and much faster!"
-  </blockquote>
-  <cite>— Luděk Nový, JetBrains</cite>
-</div>
-
-## Try It
+## Try it now
 
 ```console
-$ uvx schemathesis run http://example.schemathesis.io/openapi.json
+uvx schemathesis run https://example.schemathesis.io/openapi.json
 ```
 
-!!! tip ""
+This command will immediately find real bugs in a demo API and show you exactly how to reproduce them.
 
-    For installing Schemathesis, we recommend using [uv](https://docs.astral.sh/uv/), a fast Python package installer and environment manager.
+**Bugs that cause real problems**:
 
-## Schema Support
+- Registration forms that crash on legitimate international names
+- Shopping carts accepting negative quantities or invalid product IDs
+- User profiles returning incomplete data that breaks mobile apps
+- APIs that fail silently instead of showing proper error messages
 
-- **OpenAPI**: 2.0 (Swagger), 3.0, and 3.1
-- **GraphQL**: 2018 specification
+## Why developers choose Schemathesis
+
+Immediate results:
+
+ - **🎯 Find 5-15 real bugs** in a typical API within the first test run
+
+ - **⏱️ 2-minute setup** - Just point it at your OpenAPI schema
+
+ - **🔄 Zero maintenance** - Automatically tests new endpoints as you add them
+
+Easy integration:
+
+ - **🔌 Works with existing tools** - Integrates with pytest and CI/CD
+
+ - **📑 Uses your existing docs** - Reads OpenAPI/GraphQL schemas you already have
+
+!!! quote "Developer feedback"
+    "The tool is amazing as it can test negative scenarios instead of me and much faster!" 
+    
+    *— Luděk Nový, JetBrains*
 
 ## Documentation
 
 <div class="grid cards" markdown>
 
--   :material-book-open-page-variant:{ .lg .middle style="color: #2196F3" } __Tutorial__
+-   :material-book-open-page-variant:{ .lg .middle style="color: #2196F3" } __New to Schemathesis?__
 
     ---
 
-    Introduction to Schemathesis:
+    Get started in minutes:
 
-    - [:octicons-arrow-right-24: Quick Start Guide](quick-start.md)
-    - [:octicons-arrow-right-24: Tutorial for CLI & pytest](quick-start.md)
+    - [:octicons-arrow-right-24: Quick Start - 5 minute demo](quick-start.md)
+    - [:octicons-arrow-right-24: Tutorial - 20 minute walkthrough](tutorial.md)
 
 -   :material-puzzle:{ .lg .middle style="color: #4CAF50" } __How-To Guides__
 
     ---
 
-    Practical guides for using Schemathesis:
+    Production setup guides:
 
-     - [:octicons-arrow-right-24: CI / CD Integration](guides/cicd.md)
+     - [:octicons-arrow-right-24: CI/CD Integration](guides/cicd.md)
      - [:octicons-arrow-right-24: Extending Schemathesis](guides/extending.md)
      - [:octicons-arrow-right-24: More...](guides/index.md)
 
--   :material-puzzle:{ .lg .middle style="color: #9C27B0" } __Explanations__
+-   :material-puzzle:{ .lg .middle style="color: #9C27B0" } __Want to understand how it works?__
 
     ---
 
-    Diving deep into how Schemathesis works:
+    Deep dive into concepts:
 
-     - [:octicons-arrow-right-24: Testing Workflow](explanations/workflow.md)
+     - [:octicons-arrow-right-24: Testing Approach](explanations/workflow.md)
      - [:octicons-arrow-right-24: Data Generation](explanations/data-generation.md)
      - [:octicons-arrow-right-24: Checks](explanations/checks.md)
 
--   :material-file-document-outline:{ .lg .middle style="color: #FF9800" } __API Reference__
+-   :material-file-document-outline:{ .lg .middle style="color: #FF9800" } __Need technical details?__
 
     ---
 
-    Technical API reference:
+    Complete reference:
 
      - [:octicons-arrow-right-24: Command-Line Interface](reference/cli.md)
      - [:octicons-arrow-right-24: Python API](reference/python.md)
@@ -89,8 +95,9 @@ $ uvx schemathesis run http://example.schemathesis.io/openapi.json
 
 </div>
 
-## Learn More
+## Need help?
+
+* **[Troubleshooting](troubleshooting.md)** — Solve common issues
 
 * **[Resources](resources.md)** — Community articles, videos, and tutorials
 
-* **[Troubleshooting](troubleshooting.md)** — Solve common issues

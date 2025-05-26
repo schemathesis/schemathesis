@@ -58,7 +58,7 @@ $ st --config-file my-config.toml run http://api-host:port/openapi.json
 
 !!! info "Configuration Reference"
 
-    See the [Configuration Guide](../using/configuration.md) for usage instructions and the [Configuration Reference](../reference/configuration.md) for all available options.
+    See the [Configuration Guide](../configuration.md) for usage instructions and the [Configuration Reference](../reference/configuration.md) for all available options.
 
 ## Exit Codes
 
@@ -72,7 +72,7 @@ Schemathesis returns these exit codes that you should handle in your CI job:
 
 For detailed setup instructions on specific CI platforms:
 
-- [GitHub Actions](./github-actions.md)
-- [GitLab CI](./gitlab-ci.md)
+- [GitHub Actions](github-actions.md)
+- [GitLab CI](gitlab-ci.md)
 
 Each platform guide includes concrete examples, authentication patterns, and troubleshooting advice specific to that environment.

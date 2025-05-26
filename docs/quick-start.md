@@ -1,211 +1,85 @@
-# Getting Started with Schemathesis
+# Quick Start Guide
 
-Schemathesis automatically generates and runs API tests from your OpenAPI or GraphQL schema to find bugs and spec violations.
+**Estimated time: 5 minutes**
 
-## What is Schemathesis?
+Schemathesis automatically finds bugs in your APIs by generating thousands of test cases from your OpenAPI or GraphQL schema. It catches edge cases that manual testing typically misses.
 
-Schemathesis is a property-based testing tool that:
+!!! question "What makes this different?"
+    Instead of writing individual tests, Schemathesis reads your API schema and generates hundreds of test cases automatically - like having a tireless QA engineer testing every possible input combination.
 
-- Uses your API schema to generate test cases automatically
-- Validates responses against schema definitions
-- Finds edge cases and bugs without manual test writing
-- Works with OpenAPI (Swagger) and GraphQL schemas
+**Core benefits:**
 
-## Installation
+- 🔍 **Discovers edge cases** that break your API with unexpected input
+- ⚡ **Zero test maintenance** - adapts as your schema evolves  
+- 🛡️ **Prevents regressions** by testing API contracts
+- 📊 **Validates specification compliance** between implementation and documentation
 
-### Using uv (recommended)
+## Try the demo
 
-[uv](https://docs.astral.sh/uv/) is a fast Python package installer and environment manager:
+Test a sample API using [uv](https://docs.astral.sh/uv/){target=_blank}:
 
-```console
-$ uv pip install schemathesis
+```bash
+uvx schemathesis run https://example.schemathesis.io/openapi.json
 ```
 
-### Run without installing
-
-[uvx](https://docs.astral.sh/uvx/) (part of the uv ecosystem) lets you run Schemathesis directly without installation:
-
-```console
-$ uvx schemathesis run https://example.schemathesis.io/openapi.json
-```
-
-### Using Docker
-
-```console
-$ docker pull schemathesis/schemathesis:stable
-$ docker run schemathesis/schemathesis:stable --version
-```
-
-Verify your installation:
-
-```console
-$ schemathesis --version
-# or using the shorter command alias
-$ st --version
-Schemathesis 4.0.0
-```
-
-## Testing a Sample API
-
-Let's run a basic test against an example API:
-
-```console
-$ st run https://example.schemathesis.io/openapi.json
-```
-
-This single command:
-
-- Loads the API schema
-- Generates test cases based on schema definitions
-- Sends requests to test endpoints
-- Validates responses with various checks
-
-You should see output similar to this:
+Schemathesis will automatically discover real bugs in this demo API and show you exactly how to reproduce them with `curl` commands:
 
 ```
-Schemathesis 4.0.0
-━━━━━━━━━━━━━━━━
+_____________________ POST /improper-input-type-handling _____________________
 
- ✅  Loaded specification from https://schemathesis.io/openapi.json (in 0.32s)
+- Server error
 
-     Base URL:         http://127.0.0.1/api
-     Specification:    Open API 3.0.2
-     Operations:       1 selected / 1 total
+[500] Internal Server Error:
 
- ✅  API capabilities:
-
-     Supports NULL byte in headers:    ✘
-
- ⏭   Examples (in 0.00s)
-
-     ⏭  1 skipped
-
- ❌  Coverage (in 0.00s)
-
-     ❌ 1 failed
-
- ❌  Fuzzing (in 0.00s)
-
-     ❌ 1 failed
-
-=================================== FAILURES ===================================
-_________________________________ GET /success _________________________________
-1. Test Case ID: <PLACEHOLDER>
-
-- Response violates schema
-
-    {} is not of type 'integer'
-
-    Schema:
-
-        {
-            "type": "integer"
-        }
-
-    Value:
-
-        {}
-
-- Missing Content-Type header
-
-    The following media types are documented in the schema:
-    - `application/json`
-
-[200] OK:
-
-    `{}`
+    `{"success":false,"error":"invalid literal for int() with base 10: '\\n'"}`
 
 Reproduce with:
 
-    curl -X GET http://127.0.0.1/api/success
-
-=================================== SUMMARY ====================================
-
-API Operations:
-  Selected: 1/1
-  Tested: 1
-
-Test Phases:
-  ✅ API probing
-  ⏭  Examples
-  ❌ Coverage
-  ❌ Fuzzing
-  ⏭  Stateful (not applicable)
-
-Failures:
-  ❌ Response violates schema: 1
-  ❌ Missing Content-Type header: 1
-
-Test cases:
-  N generated, N found N unique failures
-
-Seed: 42
-
-============================= 2 failures in 1.00s ==============================
+    curl -X POST -H 'Content-Type: application/json' \
+      -d '{"number": "\n\udbcd." }' 
+      https://example.schemathesis.io/improper-input-type-handling
 ```
 
-## Understanding Test Results
+## Test your own API
 
-In this test:
+=== "With authentication"
+    ```bash
+    uvx schemathesis run https://your-api.com/openapi.json \
+      --header 'Authorization: Bearer your-token'
+    ```
 
-1. Schemathesis found that the API endpoint's response didn't match what was defined in the schema
-2. The endpoint was supposed to return an integer, but returned an empty object (`{}`) instead
-3. The response was also missing a required Content-Type header
+=== "Local development"
+    ```bash
+    uvx schemathesis run ./openapi.yaml --url http://localhost:8000
+    ```
 
-For each issue found, Schemathesis provides:
+=== "pytest integration"
+    ```python
+    import schemathesis
+    
+    schema = schemathesis.openapi.from_url("https://your-api.com/openapi.json")
+    
+    @schema.parametrize()
+    def test_api(case):
+        # Automatically calls your API and validates the response
+        case.call_and_validate()
+    ```
 
-- An explanation of what went wrong
-- The expected vs. actual values
-- A curl command to help you reproduce the issue
+Run the demo command above, then try it on your own API. Schemathesis will immediately show you issues you didn't know existed.
 
-## Common Issues and Troubleshooting
+!!! example "What bugs does it find?"
+    - APIs crashing on Unicode characters or special inputs
+    - Endpoints accepting invalid data they should reject  
+    - Response formats not matching documentation
+    - Authentication and validation bypasses
 
-Schemathesis identifies these common categories of API problems:
+## What's next?
 
-### API Contract Violations
+!!! tip "Ready to dive deeper?"
+    **[Complete Tutorial](tutorial.md)** - 15-20 minute hands-on workflow with a realistic booking API
 
-- **Schema violations**: Response bodies that don't match the defined schema
-- **Status code issues**: Unexpected or undocumented HTTP status codes
-- **Header problems**: Missing or incorrect response headers
+**Reference guides:**
 
-### Implementation Flaws
+- **[CLI Reference](reference/cli.md)** - All available CLI options
+- **[Configuration Reference](reference/configuration.md)** - Complete configuration reference
 
-- **Server errors**: 5xx responses indicating server-side problems
-- **Data validation issues**: APIs accepting invalid data or rejecting valid data
-- **Security concerns**: Potential authentication bypasses
-
-### Stateful Behavior Issues
-
-- **Resource state problems**: Resources inaccessible after creation or accessible after deletion
-
-When you encounter these issues:
-
-1. Use the provided curl command to reproduce and verify the problem
-2. Check your API implementation against the schema definition
-3. Determine if the issue is in the schema (incorrect definition) or the API (incorrect implementation)
-4. For schema issues, update your schema definition
-5. For API issues, modify your implementation to comply with the schema
-
-## Testing Your Own API
-
-To test your own API:
-
-1. Make sure your API is running
-2. Run Schemathesis against your schema:
-
-```console
-# If your API serves its own schema
-$ st run https://your-api.com/openapi.json
-
-# If you have a local schema file
-$ st run ./openapi.yaml --url https://your-api.com
-```
-
-That's it! Schemathesis will automatically generate test cases based on your schema and identify any server errors or compliance issues.
-
-## Where to Go Next
-
-- [Testing Workflow](explanations/workflow.md) - Understand how Schemathesis works
-- [Command-Line Interface](using/cli.md) - Learn all available CLI options
-- [Authentication](using/configuration.md#authentication) - Configure tests for protected APIs
-- [Continuous Integration](guides/cicd.md) - Automate API testing in your CI pipeline
