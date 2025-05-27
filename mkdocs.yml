@@ -9,6 +9,7 @@ nav:
   - How-To Guides:
       - guides/index.md
       - guides/cicd.md
+      - guides/graphql-custom-scalars.md
       - guides/extending.md
   - Explanations:
       - explanations/index.md
