@@ -79,7 +79,6 @@ Easy integration:
 
     Deep dive into concepts:
 
-     - [:octicons-arrow-right-24: Testing Approach](explanations/workflow.md)
      - [:octicons-arrow-right-24: Data Generation](explanations/data-generation.md)
      - [:octicons-arrow-right-24: Checks](explanations/checks.md)
 

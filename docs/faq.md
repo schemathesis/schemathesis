@@ -2,11 +2,11 @@
 
 ## What kind of data does Schemathesis generate?
 
-Schemathesis generates three types of test data:
+Schemathesis generates:
 
-- **Explicit examples** directly from your API schema (when available)
-- **Valid data** that conforms to your API schema's constraints
-- **Invalid data** that deliberately violates schema constraints (when using negative testing modes, currently limited to OpenAPI tests)
+- **Schema examples** - Direct from your API documentation
+- **Valid test data** - Follows your schema constraints  
+- **Invalid test data** - Deliberately breaks constraints to test validation
 
 For OpenAPI schemas, the data generation covers all JSON Schema data types and their combinations, with varying complexity and edge cases. For GraphQL, Schemathesis generates valid queries based on the schema structure.
 
@@ -38,7 +38,7 @@ Schemathesis identifies problems in three main categories:
 Schemathesis can be run in two primary ways:
 
 - **As a CLI tool**: Ideal for testing APIs built in any programming language. The CLI offers the most complete feature set, including all test phases, comprehensive reporting, and stateful testing. This is the recommended approach for most users.
-- **As a Python library**: Useful for Python applications where you want to integrate with existing pytest test suites. While the Python API has some limitations compared to the CLI due to pytest constraints, it offers more opportunities for customization and extension.
+- **As a Python library**: Useful for Python applications where you want to integrate with existing pytest test suites. The Python library has fewer features than the CLI.
 
 Choose the CLI approach for the most comprehensive testing capabilities and language-agnostic testing. Use the Python library when you need direct programmatic control or tight integration with your Python testing infrastructure.
 
@@ -56,20 +56,20 @@ Starting with an imperfect schema is fine - Schemathesis can help you refine it 
 
 ## How long does it usually take for Schemathesis to test an API?
 
-Testing duration depends on several factors:
+**Usually 1-5 minutes**. Duration depends on several factors:
 
 - **API complexity**: More endpoints and parameters mean more tests
 - **Test configuration**: Settings like `--max-examples` directly affect the number of tests generated
 - **Response time**: Slower APIs take longer to test
 - **Schema complexity**: Complex schemas may require more tests to achieve good coverage
 
-In practice, testing typically takes from a few seconds to a few minutes for most APIs. Very large or complex APIs might take longer, especially with high `--max-examples` settings or when using stateful testing.
+Testing typically takes 30 seconds for small APIs (10 endpoints) to 5 minutes for large APIs (100+ endpoints). Very large or complex APIs might take longer, especially with high `--max-examples` settings or when using stateful testing.
 
 You can control testing duration by adjusting the `--max-examples` parameter and by enabling parallel testing with the `--workers` option.
 
 ## How is Schemathesis different from other API testing tools?
 
-Schemathesis differs from other API testing tools in several key ways:
+Schemathesis differs from other API testing tools in several ways:
 
 - **Property-based testing**: Tests API properties (like "all responses should match their schema") rather than specific input-output pairs, automatically exploring the input space to find violations.
 
@@ -81,9 +81,9 @@ Schemathesis differs from other API testing tools in several key ways:
 
 Compared to tools like Dredd, Schemathesis focuses more on finding unexpected edge cases through property-based testing rather than verifying documented examples.
 
-## What are the known limitations of Schemathesis?
+## What are the limitations of Schemathesis?
 
-Schemathesis has the following known limitations:
+Schemathesis has the following limitations:
 
 ### Schema Processing Limitations
 

@@ -13,8 +13,6 @@ nav:
       - guides/auth.md
       - guides/extending.md
   - Explanations:
-      - explanations/index.md
-      - explanations/workflow.md
       - explanations/data-generation.md
       - explanations/checks.md
   - Advanced:
