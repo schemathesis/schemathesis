@@ -130,6 +130,7 @@ def test_schema_not_available(cli, workers, snapshot_cli):
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("success")
+@pytest.mark.snapshot_suffix(platform.python_implementation().lower())
 def test_empty_schema_file(testdir, cli, snapshot_cli):
     # When the schema file is empty
     filename = testdir.makefile(".json", schema="")
@@ -990,6 +991,7 @@ def test_response_schema_conformance_deduplication(cli, schema_url, snapshot_cli
 
 @pytest.mark.openapi_version("3.0")
 @pytest.mark.operations("malformed_json")
+@pytest.mark.snapshot_suffix(platform.python_implementation().lower())
 def test_malformed_json_deduplication(cli, schema_url, snapshot_cli):
     # See GH-1518
     # When responses are not JSON as expected and their content differ each time
