@@ -117,6 +117,7 @@ def pytest_generate_tests(metafunc):
 def pytest_configure(config):
     config.addinivalue_line("markers", "operations(*names): Add only specified API operations to the test application.")
     config.addinivalue_line("markers", "snapshot(**kwargs): Configure snapshot tests.")
+    config.addinivalue_line("markers", "snapshot_suffix(suffix): Append a suffix to the snapshot file name.")
     config.addinivalue_line("markers", "hypothesis_nested: Mark tests with nested Hypothesis tests.")
     config.addinivalue_line(
         "markers",
@@ -538,6 +539,7 @@ EXAMPLE_UUID = "e32ab85ed4634c38a320eb0b22460da9"
 @pytest.fixture
 def snapshot_cli(request, snapshot):
     config = CliSnapshotConfig.from_request(request)
+    snapshot_suffix = request.node.get_closest_marker("snapshot_suffix")
 
     class CliSnapshotExtension(SingleFileSnapshotExtension):
         _write_mode = WriteMode.TEXT
@@ -564,6 +566,14 @@ def snapshot_cli(request, snapshot):
             if stdout:
                 serialized += f"\n---\nStdout:\n{stdout}"
             return config.serialize(serialized).replace("\r\n", "\n").replace("\r", "\n")
+
+        @classmethod
+        def get_snapshot_name(cls, *, test_location, index=0) -> str:
+            base_name = super().get_snapshot_name(test_location=test_location, index=index)
+            if snapshot_suffix is not None:
+                suffix = str(snapshot_suffix.args[0])
+                return f"{base_name}.{suffix}"
+            return base_name
 
     class SnapshotAssertion(snapshot.__class__):
         def rebuild(self):

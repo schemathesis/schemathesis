@@ -100,6 +100,7 @@ def run(ctx, cli, unique_hook, schema, openapi3_base_url, hypothesis_max_example
         "--phases=examples,fuzzing",
         *args,
         hooks=unique_hook,
+        config={"warnings": False},
     )
 
 

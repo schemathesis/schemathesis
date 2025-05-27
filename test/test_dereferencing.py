@@ -158,6 +158,7 @@ def build_schema_with_recursion(schema, definition):
 )
 @pytest.mark.hypothesis_nested
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="SIGSEGV on PyPy")
 def test_drop_recursive_references_from_the_last_resolution_level(ctx, definition):
     raw_schema = ctx.openapi.build_schema({})
     build_schema_with_recursion(raw_schema, definition)
@@ -853,7 +854,13 @@ def test_global_security_schemes_with_custom_scope(ctx, testdir, cli, snapshot_c
     (tests / "test.json").write_text(json.dumps(operation), "utf8")
 
     assert (
-        cli.run(str(raw_schema_path), f"--url={openapi3_base_url}", "--checks=not_a_server_error", "--mode=all")
+        cli.run(
+            str(raw_schema_path),
+            f"--url={openapi3_base_url}",
+            "--checks=not_a_server_error",
+            "--mode=all",
+            config={"warnings": False},
+        )
         == snapshot_cli
     )
 

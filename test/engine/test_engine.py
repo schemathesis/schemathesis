@@ -29,6 +29,8 @@ from test.utils import EventStream
 if TYPE_CHECKING:
     from aiohttp import web
 
+IS_PYPY = platform.python_implementation() == "PyPy"
+
 
 def execute(schema, **options) -> EventStream:
     return EventStream(schema, **options).execute()
@@ -433,7 +435,11 @@ def test_response_conformance_malformed_json(real_app_schema):
 
     check = list(stream.find_all(events.ScenarioFinished)[-1].recorder.checks.values())[-1][-1]
     assert check.failure_info.failure.title == "JSON deserialization error"
-    assert check.failure_info.failure.validation_message == "Expecting property name enclosed in double quotes"
+    if IS_PYPY:
+        expected = "Key name must be string at char"
+    else:
+        expected = "Expecting property name enclosed in double quotes"
+    assert check.failure_info.failure.validation_message == expected
     assert check.failure_info.failure.position == 1
 
 
@@ -1010,11 +1016,17 @@ def test_finish(event_stream):
     assert next(event_stream, None) is None
 
 
+if IS_PYPY:
+    REPLACEMENT_ERROR = "out of range: index 0 but only 0 arguments"
+else:
+    REPLACEMENT_ERROR = "Replacement index 0 out of range for positional args tuple"
+
+
 @pytest.mark.parametrize(
     ("path", "expected"),
     [
         ("/foo}/", "Single '}' encountered in format string"),
-        ("/{.format}/", "Replacement index 0 out of range for positional args tuple"),
+        ("/{.format}/", REPLACEMENT_ERROR),
     ],
 )
 def test_malformed_path_template(ctx, path, expected):

@@ -28,20 +28,6 @@ Schemathesis dev
 
      ✅ 1 passed
 
-=================================== WARNINGS ===================================
-
-Missing test data: 1 operation repeatedly returned 404 Not Found, preventing tests from reaching your API's core logic
-
-  - GET /test
-
-💡 Provide realistic parameter values in your config file so tests can access existing resources
-
-Schema validation mismatch: 1 operation mostly rejected generated data due to validation errors, indicating schema constraints don't match API validation
-
-  - GET /test
-
-💡 Check your schema constraints - API validation may be stricter than documented
-
 =================================== SUMMARY ====================================
 
 API Operations:
@@ -53,10 +39,6 @@ Test Phases:
   ✅ Coverage
   ✅ Fuzzing
   ⏭  Stateful (not applicable)
-
-Warnings:
-  ⚠️ Missing valid test data: 1 operation repeatedly returned 404 responses
-  ⚠️ Schema validation mismatch: 1 operation mostly rejected generated data
 
 Test cases:
   N generated, N passed

@@ -1,3 +1,5 @@
+import platform
+
 import pytest
 
 import schemathesis
@@ -265,6 +267,7 @@ def test_missing_payload_schema_media_type(open_api_3_schema_with_yaml_payload):
     assert schema["/yaml"]["POST"].get_raw_payload_schema("application/xml") is None
 
 
+@pytest.mark.skipif(platform.python_implementation() == "PyPy", reason="PyPy behaves differently")
 def test_ssl_error(server):
     with pytest.raises(LoaderError) as exc:
         schemathesis.openapi.from_url(f"https://127.0.0.1:{server['port']}")

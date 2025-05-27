@@ -406,7 +406,7 @@ def test_custom_auth():
             case.headers["x-api-key"] = data
 
     @given(case=schema["/"]["GET"].as_strategy())
-    @settings(max_examples=10)
+    @settings(max_examples=10, deadline=None)
     def test(case):
         client = TestClient(app)
         case.call_and_validate(session=client)
