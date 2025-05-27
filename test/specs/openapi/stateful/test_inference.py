@@ -756,7 +756,7 @@ def test_inference_disabled_via_config(cli, app_runner, snapshot_cli, user_api_a
             "-c response_schema_conformance",
             f"http://127.0.0.1:{port}/openapi.json",
             "--phases=fuzzing,stateful",
-            config={"phases": {"stateful": {"inference": {"algorithms": []}}}},
+            config={"phases": {"stateful": {"inference": {"algorithms": []}}}, "warnings": False},
         )
         == snapshot_cli
     )
