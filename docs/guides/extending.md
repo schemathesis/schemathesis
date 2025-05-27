@@ -13,6 +13,8 @@ Extend Schemathesis when the default behavior doesn't match your API requirement
 
 ## Quick Start: Your First Hook
 
+**Problem:** Your API requires existing user IDs, but Schemathesis generates random values that cause 404 errors.
+
 Replace random generated data with realistic values that work with your test environment:
 
 ```python
@@ -65,7 +67,7 @@ filter_* → map_* → flatmap_* → Final test case
 
 ### Filtering unwanted data
 
-Exclude data that causes known issues or isn't relevant for your API:
+**Problem:** Skip test cases that cause known issues or aren't relevant for your API.
 
 ```python
 @schemathesis.hook
@@ -74,10 +76,11 @@ def filter_query(context, query):
     return query and query.get("user_id") != "admin"
 ```
 
+**Result:** Tests with `user_id=admin` are skipped, avoiding permission errors in your test environment.
 
 ### Using real database values
 
-Test with actual data from your database:
+**Problem:** Your API validates IDs against a database, but Schemathesis generates random values that don't exist.
 
 ```python
 @schemathesis.hook
@@ -89,9 +92,11 @@ def map_path_parameters(context, path_parameters):
     return path_parameters
 ```
 
+**Result:** `GET /products/product_1` instead of `GET /products/random_abc123`, eliminating 404 errors.
+
 ### Generating dependent data
 
-Create relationships between different parts of the request:
+**Problem:** Create relationships between different parts of the request when fields must match.
 
 ```python
 from hypothesis import strategies as st
@@ -105,6 +110,8 @@ def flatmap_body(context, body):
         return st.just(body).map(lambda b: {**b, "email": f"user@{domain}"})
     return st.just(body)
 ```
+
+**Result:** Generates `{"email": "user@acme.com", "organization": "acme"}` instead of mismatched combinations.
 
 ## Custom Validation Checks
 
@@ -180,6 +187,9 @@ def map_headers(context, headers):
 export SCHEMATHESIS_HOOKS=hooks
 schemathesis run http://localhost:8000/openapi.json
 ```
+
+!!! warning "Common issue"
+    Use `SCHEMATHESIS_HOOKS=hooks` (not `hooks.py`). The file must be in your current directory or Python path.
 
 ### For pytest integration
 
