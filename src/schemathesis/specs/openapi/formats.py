@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import platform
 import string
 from base64 import b64encode
 from functools import lru_cache
@@ -11,7 +12,15 @@ if TYPE_CHECKING:
     from hypothesis import strategies as st
 
 
+IS_PYPY = platform.python_implementation() == "PyPy"
 STRING_FORMATS: dict[str, st.SearchStrategy] = {}
+# For some reason PyPy can't send header values with codepoints > 128, while CPython can
+if IS_PYPY:
+    MAX_HEADER_CODEPOINT = 128
+    DEFAULT_HEADER_EXCLUDE_CHARACTERS = "\n\r\x1f\x1e\x1d\x1c"
+else:
+    MAX_HEADER_CODEPOINT = 255
+    DEFAULT_HEADER_EXCLUDE_CHARACTERS = "\n\r"
 
 
 def register_string_format(name: str, strategy: st.SearchStrategy) -> None:
@@ -65,11 +74,15 @@ def unregister_string_format(name: str) -> None:
         raise ValueError(f"Unknown Open API format: {name}") from exc
 
 
-def header_values(codec: str | None = None, exclude_characters: str = "\n\r") -> st.SearchStrategy[str]:
+def header_values(
+    codec: str | None = None, exclude_characters: str = DEFAULT_HEADER_EXCLUDE_CHARACTERS
+) -> st.SearchStrategy[str]:
     from hypothesis import strategies as st
 
     return st.text(
-        alphabet=st.characters(min_codepoint=0, max_codepoint=255, codec=codec, exclude_characters=exclude_characters)
+        alphabet=st.characters(
+            min_codepoint=0, max_codepoint=MAX_HEADER_CODEPOINT, codec=codec, exclude_characters=exclude_characters
+        )
         # Header values with leading non-visible chars can't be sent with `requests`
     ).map(str.lstrip)
 

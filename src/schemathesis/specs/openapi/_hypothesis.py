@@ -36,7 +36,13 @@ from ... import auths
 from ...generation import GenerationMode
 from ...hooks import HookContext, HookDispatcher, apply_to_all_dispatchers
 from .constants import LOCATION_TO_CONTAINER
-from .formats import HEADER_FORMAT, STRING_FORMATS, get_default_format_strategies, header_values
+from .formats import (
+    DEFAULT_HEADER_EXCLUDE_CHARACTERS,
+    HEADER_FORMAT,
+    STRING_FORMATS,
+    get_default_format_strategies,
+    header_values,
+)
 from .media_types import MEDIA_TYPES
 from .negative import negative_schema
 from .negative.utils import can_negate
@@ -416,7 +422,7 @@ def _build_custom_formats(generation_config: GenerationConfig) -> dict[str, st.S
         if not generation_config.allow_x00:
             header_values_kwargs["exclude_characters"] += "\x00"
     elif not generation_config.allow_x00:
-        header_values_kwargs["exclude_characters"] = "\n\r\x00"
+        header_values_kwargs["exclude_characters"] = DEFAULT_HEADER_EXCLUDE_CHARACTERS + "\x00"
     if generation_config.codec is not None:
         header_values_kwargs["codec"] = generation_config.codec
     if header_values_kwargs:
