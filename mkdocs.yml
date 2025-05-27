@@ -10,6 +10,7 @@ nav:
       - guides/index.md
       - guides/cicd.md
       - guides/graphql-custom-scalars.md
+      - guides/auth.md
       - guides/extending.md
   - Explanations:
       - explanations/index.md
@@ -22,6 +23,7 @@ nav:
       - Configuration Options: reference/configuration.md
       - CLI Options: reference/cli.md
       - Checks: reference/checks.md
+      - Hooks: reference/hooks.md
       - Reporting: reference/reporting.md
       - Python API Reference: reference/python.md
   - External Resources: resources.md
