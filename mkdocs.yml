@@ -12,6 +12,8 @@ nav:
       - guides/graphql-custom-scalars.md
       - guides/auth.md
       - guides/extending.md
+      - guides/extending-cli.md
+      - guides/custom-media-types.md
   - Explanations:
       - explanations/data-generation.md
       - explanations/checks.md
