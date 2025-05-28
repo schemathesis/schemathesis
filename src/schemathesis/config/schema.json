@@ -242,7 +242,7 @@
       "additionalProperties": false,
       "properties": {
         "examples": {
-          "$ref": "#/$defs/PhaseConfig"
+          "$ref": "#/$defs/ExamplesPhaseConfig"
         },
         "coverage": {
           "$ref": "#/$defs/CoveragePhaseConfig"
@@ -260,6 +260,24 @@
       "additionalProperties": false,
       "properties": {
         "enabled": {
+          "type": "boolean"
+        },
+        "generation": {
+          "$ref": "#/$defs/GenerationConfig"
+        },
+        "checks": {
+          "$ref": "#/$defs/ChecksConfig"
+        }
+      }
+    },
+    "ExamplesPhaseConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fill-missing": {
           "type": "boolean"
         },
         "generation": {

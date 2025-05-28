@@ -40,6 +40,38 @@ class PhaseConfig(DiffBase):
 
 
 @dataclass(repr=False)
+class ExamplesPhaseConfig(DiffBase):
+    enabled: bool
+    fill_missing: bool
+    generation: GenerationConfig
+    checks: ChecksConfig
+
+    __slots__ = ("enabled", "fill_missing", "generation", "checks")
+
+    def __init__(
+        self,
+        *,
+        enabled: bool = True,
+        fill_missing: bool = False,
+        generation: GenerationConfig | None = None,
+        checks: ChecksConfig | None = None,
+    ) -> None:
+        self.enabled = enabled
+        self.fill_missing = fill_missing
+        self.generation = generation or GenerationConfig()
+        self.checks = checks or ChecksConfig()
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> ExamplesPhaseConfig:
+        return cls(
+            enabled=data.get("enabled", True),
+            fill_missing=data.get("fill-missing", False),
+            generation=GenerationConfig.from_dict(data.get("generation", {})),
+            checks=ChecksConfig.from_dict(data.get("checks", {})),
+        )
+
+
+@dataclass(repr=False)
 class CoveragePhaseConfig(DiffBase):
     enabled: bool
     generation: GenerationConfig
@@ -107,7 +139,7 @@ class StatefulPhaseConfig(DiffBase):
 
 @dataclass(repr=False)
 class PhasesConfig(DiffBase):
-    examples: PhaseConfig
+    examples: ExamplesPhaseConfig
     coverage: CoveragePhaseConfig
     fuzzing: PhaseConfig
     stateful: StatefulPhaseConfig
@@ -117,12 +149,12 @@ class PhasesConfig(DiffBase):
     def __init__(
         self,
         *,
-        examples: PhaseConfig | None = None,
+        examples: ExamplesPhaseConfig | None = None,
         coverage: CoveragePhaseConfig | None = None,
         fuzzing: PhaseConfig | None = None,
         stateful: StatefulPhaseConfig | None = None,
     ) -> None:
-        self.examples = examples or PhaseConfig()
+        self.examples = examples or ExamplesPhaseConfig()
         self.coverage = coverage or CoveragePhaseConfig()
         self.fuzzing = fuzzing or PhaseConfig()
         self.stateful = stateful or StatefulPhaseConfig()
@@ -138,7 +170,7 @@ class PhasesConfig(DiffBase):
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> PhasesConfig:
         return cls(
-            examples=PhaseConfig.from_dict(data.get("examples", {})),
+            examples=ExamplesPhaseConfig.from_dict(data.get("examples", {})),
             coverage=CoveragePhaseConfig.from_dict(data.get("coverage", {})),
             fuzzing=PhaseConfig.from_dict(data.get("fuzzing", {})),
             stateful=StatefulPhaseConfig.from_dict(data.get("stateful", {})),
