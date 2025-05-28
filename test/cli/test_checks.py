@@ -183,6 +183,7 @@ def test_not_a_server_error(cli, snapshot_cli, openapi3_schema_url):
             openapi3_schema_url,
             "--max-examples=5",
             "--checks=not_a_server_error",
+            "--mode=positive",
             config={"checks": {"not_a_server_error": {"expected-statuses": ["2xx", "4xx", "500"]}}},
         )
         == snapshot_cli

@@ -628,6 +628,9 @@ def _set_auth_for_case(case: Case, parameter: SecurityParameter) -> None:
     ):
         if parameter["in"] == location:
             container = getattr(case, attr_name, {})
+            # Could happen in the negative testing mode
+            if not isinstance(container, dict):
+                container = {}
             container[name] = "SCHEMATHESIS-INVALID-VALUE"
             setattr(case, attr_name, container)
 

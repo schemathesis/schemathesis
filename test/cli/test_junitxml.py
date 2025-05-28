@@ -36,6 +36,7 @@ def test_junitxml_file(cli, schema_url, hypothesis_max_examples, tmp_path, path,
         "--seed=1",
         "--checks=all",
         "--exclude-checks=positive_data_acceptance",
+        "--mode=positive",
     ]
     kwargs = {}
     if in_config:

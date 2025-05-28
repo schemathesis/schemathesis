@@ -168,7 +168,7 @@ def after_call(context, case, response):
     )
     # Then CLI should run successfully
     # And the auth should be used
-    assert cli.main("run", schema_url, "--checks=not_a_server_error", hooks=module) == snapshot_cli
+    assert cli.main("run", schema_url, "--checks=not_a_server_error", "--mode=positive", hooks=module) == snapshot_cli
 
 
 @pytest.fixture

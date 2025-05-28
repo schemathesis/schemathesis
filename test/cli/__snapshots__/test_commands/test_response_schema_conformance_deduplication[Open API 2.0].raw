@@ -73,7 +73,7 @@ Failures:
   ❌ Response violates schema: 1
 
 Test cases:
-  2 generated, 1 found 1 unique failures
+  8 generated, 1 found 1 unique failures, 6 skipped
 
 Seed: 42
 

@@ -87,6 +87,7 @@ def test_store_timeout(cli, schema_url, cassette_path, format):
         "--max-examples=1",
         "--request-timeout=0.001",
         "--seed=1",
+        "--mode=positive",
     )
     assert result.exit_code == ExitCode.TESTS_FAILED, result.stdout
     if format == "vcr":
@@ -153,6 +154,7 @@ def test_bad_yaml_headers(ctx, cli, cassette_path, hypothesis_max_examples, open
         f"--max-examples={hypothesis_max_examples or 1}",
         f"--report-vcr-path={cassette_path}",
         "--checks=not_a_server_error",
+        "--mode=positive",
     )
     # Then the test run should be successful
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -176,7 +178,7 @@ def test_run_subprocess(testdir, cassette_path, hypothesis_max_examples, schema_
     )
     assert result == snapshot_cli
     cassette = load_cassette(cassette_path)
-    assert len(cassette["http_interactions"]) == 2
+    assert len(cassette["http_interactions"]) == 8
     command = f"st run --report-vcr-path={cassette_path} --max-examples={hypothesis_max_examples or 2} {schema_url}"
     assert cassette["command"] == command
 
@@ -275,6 +277,7 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
         f"-H Authorization: {auth}",
         f"--output-sanitize={value}",
         "--checks=not_a_server_error",
+        "--mode=positive",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
     cassette = load_cassette(cassette_path)
@@ -284,8 +287,8 @@ def test_output_sanitization(cli, openapi2_schema_url, hypothesis_max_examples, 
     else:
         expected = ANY
     interactions = cassette["http_interactions"]
-    assert all(entry["request"]["headers"]["X-Token"] == [expected] for entry in interactions)
-    assert all(entry["request"]["headers"]["Authorization"] == [expected] for entry in interactions)
+    assert all(entry["request"]["headers"].get("X-Token") == [expected] for entry in interactions)
+    assert all(entry["request"]["headers"].get("Authorization") == [expected] for entry in interactions)
     # The app can reject requests, so the error won't contain this header
     assert all(
         entry["response"]["headers"]["X-Token"] == [expected]

@@ -154,7 +154,7 @@ def test_certificates(cli, schema_url, mocker):
         result = cli.run(schema_url, f"--request-cert={cert_path}")
         assert result.exit_code == ExitCode.OK, result.stdout
         # Then both schema & test network calls should use this cert
-        assert len(request.call_args_list) == 3
+        assert len(request.call_args_list) == 9
         assert request.call_args_list[0][1]["cert"] == request.call_args_list[1][1]["cert"] == str(cert_path)
 
 
@@ -190,6 +190,7 @@ def test_cli_binary_body(cli, schema_url, hypothesis_max_examples):
     result = cli.run(
         schema_url,
         "--suppress-health-check=filter_too_much",
+        "--mode=positive",
         f"--max-examples={hypothesis_max_examples or 1}",
     )
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -265,7 +266,7 @@ def test_unsatisfiable(cli, schema_url, workers, snapshot_cli):
     # For example if it contains contradiction in the parameters' definition - requires to be integer AND string at the
     # same time
     # And more clear error message is displayed instead of Hypothesis one
-    assert cli.run(schema_url, f"--workers={workers}") == snapshot_cli
+    assert cli.run(schema_url, "--mode=positive", f"--workers={workers}") == snapshot_cli
 
 
 @pytest.mark.operations("invalid")
@@ -274,7 +275,7 @@ def test_invalid_operation(cli, schema_url, workers, snapshot_cli):
     # When the app's schema contains errors
     # For example if its type is "int" but should be "integer"
     # And schema validation is disabled
-    assert cli.run(schema_url, f"--workers={workers}", "--phases=fuzzing") == snapshot_cli
+    assert cli.run(schema_url, f"--workers={workers}", "--phases=fuzzing", "--mode=positive") == snapshot_cli
 
 
 @pytest.mark.operations("teapot")
@@ -298,7 +299,12 @@ def test_headers_conformance_valid(cli, schema_url):
 @pytest.mark.operations("multiple_failures")
 def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
     assert (
-        cli.run(schema_url, "--generation-deterministic", "-c not_a_server_error,positive_data_acceptance")
+        cli.run(
+            schema_url,
+            "--generation-deterministic",
+            "-c not_a_server_error,positive_data_acceptance",
+            "--mode=positive",
+        )
         == snapshot_cli
     )
 
@@ -307,7 +313,7 @@ def test_multiple_failures_single_check(cli, schema_url, snapshot_cli):
 @pytest.mark.openapi_version("3.0")
 def test_continue_on_failure(cli, schema_url):
     result = cli.run(schema_url, "--continue-on-failure")
-    assert "101 generated" in result.stdout
+    assert "115 generated" in result.stdout
 
 
 @pytest.mark.operations("multiple_failures")
@@ -319,6 +325,7 @@ def test_multiple_failures_different_check(cli, schema_url, snapshot_cli):
             "status_code_conformance",
             "-c",
             "not_a_server_error",
+            "--mode=positive",
             "--generation-deterministic",
         )
         == snapshot_cli
@@ -330,7 +337,9 @@ def test_connection_error(cli, schema_url, workers, snapshot_cli):
     # When the given base_url is unreachable
     # Then the whole Schemathesis run should fail
     # And the proper error messages should be displayed for each operation
-    assert cli.run(schema_url, "--url=http://127.0.0.1:1/api", f"--workers={workers}") == snapshot_cli
+    assert (
+        cli.run(schema_url, "--url=http://127.0.0.1:1/api", f"--workers={workers}", "--mode=positive") == snapshot_cli
+    )
 
 
 @pytest.mark.openapi_version("3.0")
@@ -393,7 +402,12 @@ def digits_format(ctx):
 def test_hooks_valid(cli, schema_url, app, digits_format):
     # When a hook is passed to the CLI call
     result = cli.main(
-        "run", "--suppress-health-check=filter_too_much", "--phases=fuzzing", schema_url, hooks=digits_format
+        "run",
+        "--suppress-health-check=filter_too_much",
+        "--phases=fuzzing",
+        "--mode=positive",
+        schema_url,
+        hooks=digits_format,
     )
     # Then CLI should run successfully
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -451,7 +465,7 @@ def test_register_check(new_check, cli, schema_url, snapshot_cli):
     # And it contains registering a new check, which always fails for the testing purposes
     # Then CLI run should fail
     # And a message from the new check should be displayed
-    assert cli.main("run", "-c", "new_check", schema_url, hooks=new_check) == snapshot_cli
+    assert cli.main("run", "-c", "new_check", "--mode=positive", schema_url, hooks=new_check) == snapshot_cli
 
 
 @pytest.mark.parametrize("workers", [1, 2])
@@ -471,7 +485,7 @@ def test_keyboard_interrupt(cli, schema_url, base_url, mocker, swagger_20, worke
         return original(*args, **kwargs)
 
     mocker.patch("schemathesis.Case.call", wraps=mocked)
-    result = cli.run(schema_url, f"--workers={workers}")
+    result = cli.run(schema_url, f"--workers={workers}", "--mode=positive")
     if workers == 1:
         assert result == snapshot_cli
     else:
@@ -574,7 +588,7 @@ def test_no_useless_traceback(ctx, cli, snapshot_cli, openapi3_base_url):
             }
         }
     )
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
 
 
 def test_invalid_yaml(testdir, cli, simple_openapi, snapshot_cli, openapi3_base_url):
@@ -660,6 +674,7 @@ def test_multipart_upload(ctx, tmp_path, hypothesis_max_examples, openapi3_base_
         "--generation-deterministic",
         f"--report-vcr-path={cassette_path}",
         "-c not_a_server_error",
+        "--mode=positive",
     )
     # Then it should be correctly sent to the server
     assert result.exit_code == ExitCode.OK, result.stdout
@@ -738,7 +753,7 @@ def test_nested_binary_in_yaml(ctx, openapi3_base_url, cli, snapshot_cli):
 @pytest.mark.operations("form")
 def test_urlencoded_form(cli, schema_url):
     # When the API operation accepts application/x-www-form-urlencoded
-    result = cli.run(schema_url)
+    result = cli.run(schema_url, "--mode=positive")
     # Then Schemathesis should generate appropriate payload
     assert result.exit_code == ExitCode.OK, result.stdout
 
@@ -809,7 +824,7 @@ def test_filter_case_sensitivity(cli, schema_url, snapshot_cli):
 @pytest.mark.operations("upload_file", "custom_format")
 @pytest.mark.openapi_version("3.0")
 def test_filter_by(cli, schema_url, snapshot_cli, value):
-    assert cli.run(schema_url, "--max-examples=1", value) == snapshot_cli
+    assert cli.run(schema_url, "--mode=positive", "--max-examples=1", value) == snapshot_cli
 
 
 @pytest.mark.operations("success")
@@ -841,7 +856,9 @@ paths:
         '200':
           description: OK"""
     schema_file = testdir.makefile(".yaml", schema=schema)
-    result = cli.run(str(schema_file), f"--url={base_url}", "--phases=fuzzing", "--checks=not_a_server_error")
+    result = cli.run(
+        str(schema_file), f"--url={base_url}", "--phases=fuzzing", "--checks=not_a_server_error", "--mode=positive"
+    )
     assert "Invalid `pattern` value: expected a string" in result.stdout
 
 
@@ -944,7 +961,13 @@ def test_unsupported_regex(ctx, cli, snapshot_cli, openapi3_base_url):
     # Then if it is possible it should generate at least something
     # And if it is not then there should be an error with a descriptive error message
     assert (
-        cli.run(str(schema_path), "--max-examples=1", f"--url={openapi3_base_url}", "-c not_a_server_error")
+        cli.run(
+            str(schema_path),
+            "--max-examples=1",
+            f"--url={openapi3_base_url}",
+            "-c not_a_server_error",
+            "--mode=positive",
+        )
         == snapshot_cli
     )
 
@@ -967,7 +990,9 @@ def test_explicit_headers_in_output_on_errors(cli, schema_url, snapshot_cli):
     # And custom headers were passed explicitly
     auth = "Basic J3Rlc3Q6d3Jvbmcn"
     # Then the code sample should have the overridden value
-    assert cli.run(schema_url, "--output-sanitize=false", f"-H Authorization: {auth}") == snapshot_cli
+    assert (
+        cli.run(schema_url, "--output-sanitize=false", f"-H Authorization: {auth}", "--mode=positive") == snapshot_cli
+    )
 
 
 @pytest.mark.operations("cp866")
@@ -1121,7 +1146,7 @@ def test_skipped_on_no_explicit_examples(cli, openapi3_schema_url, snapshot_cli)
 def test_warning_on_unauthorized(cli, openapi3_schema_url, snapshot_cli):
     # When endpoint returns only 401
     # Then the output should contain a warning about it
-    assert cli.run(openapi3_schema_url, "-c not_a_server_error") == snapshot_cli
+    assert cli.run(openapi3_schema_url, "-c not_a_server_error", "--mode=positive") == snapshot_cli
 
 
 @pytest.mark.operations("always_incorrect")
@@ -1293,7 +1318,7 @@ def test_multiple_failures_in_single_check(ctx, mocker, response_factory, cli, o
     )
     response = response_factory.requests(content_type=None, status_code=200)
     mocker.patch("requests.Session.request", return_value=response)
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=all") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--checks=all", "--mode=positive") == snapshot_cli
 
 
 @flaky(max_runs=5, min_passes=1)
@@ -1487,6 +1512,8 @@ def custom_strings(ctx):
         """
 @schemathesis.check
 def custom_strings(ctx, response, case):
+    if not isinstance(case.body, str):
+        return
     try:
         case.body.encode("ascii")
     except Exception as exc:
@@ -1551,7 +1578,7 @@ def no_null_bytes(ctx):
         r"""
 @schemathesis.check
 def no_null_bytes(ctx, response, case):
-    assert "\x00" not in case.headers["X-KEY"]
+    assert "\x00" not in case.headers.get("X-KEY", {})
 """
     ) as module:
         yield module
@@ -1585,7 +1612,7 @@ def test_null_byte_in_header_probe(ctx, cli, snapshot_cli, openapi3_base_url, no
 @pytest.mark.skipif(platform.system() == "Windows", reason="Fails on Windows due to recursion")
 def test_recursive_reference_error_message(ctx, cli, schema_with_recursive_references, openapi3_base_url, snapshot_cli):
     schema_path = ctx.makefile(schema_with_recursive_references)
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
@@ -1683,6 +1710,7 @@ def always_fails(ctx, response, case):
                 f"--report-dir={report_dir}",
                 f"--report-junit-path={report_dir}/junit.xml",
                 "--report=junit",
+                "--mode=positive",
                 hooks=module,
             )
             == snapshot_cli

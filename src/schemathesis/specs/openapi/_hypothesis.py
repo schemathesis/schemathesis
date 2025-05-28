@@ -52,7 +52,7 @@ def openapi_cases(
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
-    generation_mode: GenerationMode = GenerationMode.default(),
+    generation_mode: GenerationMode = GenerationMode.POSITIVE,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,

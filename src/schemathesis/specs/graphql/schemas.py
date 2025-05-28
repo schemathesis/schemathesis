@@ -223,7 +223,7 @@ class GraphQLSchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         return graphql_cases(
@@ -321,7 +321,7 @@ def graphql_cases(
     operation: APIOperation,
     hooks: HookDispatcher | None = None,
     auth_storage: auths.AuthStorage | None = None,
-    generation_mode: GenerationMode = GenerationMode.default(),
+    generation_mode: GenerationMode = GenerationMode.POSITIVE,
     path_parameters: NotSet | dict[str, Any] = NOT_SET,
     headers: NotSet | dict[str, Any] = NOT_SET,
     cookies: NotSet | dict[str, Any] = NOT_SET,
