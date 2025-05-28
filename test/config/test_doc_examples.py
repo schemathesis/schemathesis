@@ -2,17 +2,20 @@ import re
 from pathlib import Path
 
 import pytest
+import yaml
 
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.errors import HookError
 
-DOCS_DIR = Path(__file__).parent.parent.parent / "docs"
+ROOT_DIR = Path(__file__).parent.parent.parent
+DOCS_DIR = ROOT_DIR / "docs"
+README_FILE = ROOT_DIR / "README.md"
 
 
-def extract_examples(path: str) -> list:
-    with open(DOCS_DIR / path) as fd:
+def extract_examples(path: str, format: str = "toml") -> list:
+    with open(DOCS_DIR / path, encoding="utf-8") as fd:
         markdown = fd.read()
-    pattern = re.compile(r"```toml(.*?)```", re.DOTALL)
+    pattern = re.compile(rf"```{format}(.*?)```", re.DOTALL)
     return pattern.findall(markdown)
 
 
@@ -46,3 +49,27 @@ def test_configs(monkeypatch, config, snapshot_config):
         assert config == snapshot_config
     except HookError as exc:
         assert str(exc) == snapshot_config
+
+
+def collect_all_yaml_snippets() -> list[tuple[str, str]]:
+    snippets = []
+
+    for block in extract_examples(str(README_FILE), format="yaml"):
+        snippets.append((str(README_FILE), block))
+
+    for md_file in DOCS_DIR.rglob("*.md"):
+        for block in extract_examples(str(md_file), format="yaml"):
+            snippets.append((str(md_file.relative_to(ROOT_DIR)), block))
+
+    return snippets
+
+
+YAML_SNIPPETS = collect_all_yaml_snippets()
+
+
+@pytest.mark.parametrize(["filename", "snippet"], YAML_SNIPPETS)
+def test_yaml_snippets_are_valid(filename: str, snippet: str):
+    try:
+        yaml.safe_load(snippet)
+    except yaml.YAMLError as exc:
+        pytest.fail(f"Invalid YAML in {filename}:\n{exc}")
