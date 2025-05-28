@@ -27,6 +27,7 @@ from schemathesis.core.validation import has_invalid_characters, is_latin_1_enco
 from schemathesis.generation import GenerationMode, coverage
 from schemathesis.generation.case import Case
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE, examples, setup, strategies
+from schemathesis.generation.hypothesis.examples import add_single_example
 from schemathesis.generation.hypothesis.given import GivenInput
 from schemathesis.generation.meta import (
     CaseMetadata,
@@ -126,7 +127,14 @@ def create_test(
         and Phase.explicit in settings.phases
         and specification.supports_feature(SpecificationFeature.EXAMPLES)
     ):
-        hypothesis_test = add_examples(hypothesis_test, operation, hook_dispatcher=hook_dispatcher, **strategy_kwargs)
+        phases_config = config.project.phases_for(operation=operation)
+        hypothesis_test = add_examples(
+            hypothesis_test,
+            operation,
+            fill_missing=phases_config.examples.fill_missing,
+            hook_dispatcher=hook_dispatcher,
+            **strategy_kwargs,
+        )
 
     if (
         HypothesisTestMode.COVERAGE in config.modes
@@ -188,7 +196,11 @@ def make_async_test(test: Callable) -> Callable:
 
 
 def add_examples(
-    test: Callable, operation: APIOperation, hook_dispatcher: HookDispatcher | None = None, **kwargs: Any
+    test: Callable,
+    operation: APIOperation,
+    fill_missing: bool,
+    hook_dispatcher: HookDispatcher | None = None,
+    **kwargs: Any,
 ) -> Callable:
     """Add examples to the Hypothesis test, if they are specified in the schema."""
     from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
@@ -211,6 +223,10 @@ def add_examples(
             NonSerializableMark.set(test, exc)
         if isinstance(exc, SchemaError):
             InvalidRegexMark.set(test, exc)
+
+    if fill_missing and not result:
+        strategy = operation.as_strategy()
+        add_single_example(strategy, result)
 
     context = HookContext(operation)  # context should be passed here instead
     GLOBAL_HOOK_DISPATCHER.dispatch("before_add_examples", context, result)

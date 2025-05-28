@@ -385,6 +385,20 @@ These settings can only be applied at the project level.
     enabled = false
     ```
 
+#### `phases.examples.fill-missing`
+
+!!! note "" 
+
+    **Type**: `Boolean`  
+    **Default**: `false`  
+
+    Enable generation of random examples for API operations that do not have explicit examples.
+
+    ```toml
+    [phases.examples]
+    fill-missing = true
+    ```
+
 #### `phases.coverage.unexpected-methods`
 
 !!! note "" 
