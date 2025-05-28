@@ -317,7 +317,7 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
     cli.run(schema_url, *args, **kwargs)
     # And the report should be created in the specified directory
     assert report_dir.exists()
-    assert (report_dir / "junit.xml").exists()
+    assert list(report_dir.glob("*.xml"))
 
     # When multiple report formats are specified
     args = [
@@ -332,8 +332,8 @@ def test_report_dir(cli, schema_url, tmp_path, in_config):
         args = [f"--report-dir={report_dir}", "--report=vcr,har", *args]
     cli.run(schema_url, *args, **kwargs)
     # Then all reports should be created in the specified directory
-    assert (report_dir / "vcr.yaml").exists()
-    assert (report_dir / "har.json").exists()
+    assert list(report_dir.glob("*.yaml"))
+    assert list(report_dir.glob("*.json"))
 
 
 @given(text=st.text())

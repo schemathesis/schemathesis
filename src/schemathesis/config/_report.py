@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -55,8 +56,9 @@ class ReportsConfig(DiffBase):
     junit: ReportConfig
     vcr: ReportConfig
     har: ReportConfig
+    _timestamp: str
 
-    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har")
+    __slots__ = ("directory", "preserve_bytes", "junit", "vcr", "har", "_timestamp")
 
     def __init__(
         self,
@@ -72,6 +74,7 @@ class ReportsConfig(DiffBase):
         self.junit = junit or ReportConfig()
         self.vcr = vcr or ReportConfig()
         self.har = har or ReportConfig()
+        self._timestamp = datetime.datetime.now().strftime("%Y%m%dT%H%M%SZ")
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> ReportsConfig:
@@ -113,4 +116,5 @@ class ReportsConfig(DiffBase):
         report: ReportConfig = getattr(self, format.value)
         if report.path is not None:
             return report.path
-        return self.directory / f"{format.value}.{format.extension}"
+
+        return self.directory / f"{format.value}-{self._timestamp}.{format.extension}"
