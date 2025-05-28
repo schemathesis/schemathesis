@@ -252,6 +252,108 @@ def before_call(context, case):
     case.query["test_mode"] = "true"
 ```
 
+## Advanced: Schema Modification Patterns
+
+**Problem:** You want faster tests by only generating required fields, skipping optional parameters that don't affect core functionality.
+
+```python
+@schemathesis.hook
+def before_init_operation(context, operation):
+    """Remove optional properties to focus tests on required fields only"""
+    for parameter in operation.iter_parameters():
+        schema = parameter.definition.get("schema", {})
+        remove_optional_properties(schema)
+    
+    for alternative in operation.body:
+        schema = alternative.definition.get("schema", {})
+        remove_optional_properties(schema)
+
+def remove_optional_properties(schema):
+    """Recursively remove non-required properties from schema"""
+    if not isinstance(schema, dict):
+        return
+    
+    required = schema.get("required", [])
+    properties = schema.get("properties", {})
+    
+    # Remove optional properties
+    for name in list(properties.keys()):
+        if name not in required:
+            del properties[name]
+    
+    # Recurse into remaining properties
+    for prop_schema in properties.values():
+        remove_optional_properties(prop_schema)
+```
+
+**When to use:** When you want to focus on core functionality testing and reduce test execution time.
+
+**Trade-offs:** Faster tests but reduced coverage of optional parameter combinations.
+
+## GraphQL Hooks
+
+GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. The `body` parameter contains the GraphQL query structure that you can modify.
+
+### Modifying GraphQL queries
+
+```python
+@schemathesis.hook
+def map_body(context, body):
+    """Change field names in the GraphQL query"""
+    # Access the first node in the GraphQL query
+    node = body.definitions[0].selection_set.selections[0]
+    
+    # Change the field name
+    node.name.value = "addedViaHook"
+    
+    return body
+```
+
+### Adding query variables
+
+Use `map_query` to provide variables:
+
+```python
+@schemathesis.hook
+def map_query(context, query):
+    """Add query parameters to GraphQL requests"""
+    return {"q": "42"}
+```
+
+Note that `query` is always `None` for GraphQL requests since Schemathesis doesn't generate query parameters for GraphQL.
+
+### Filtering GraphQL queries
+
+```python
+@schemathesis.hook
+def filter_body(context, body):
+    """Skip queries with specific field names"""
+    node = body.definitions[0].selection_set.selections[0]
+    return node.name.value != "excludeThisField"
+```
+
+### Generating dependent data
+
+```python
+from hypothesis import strategies as st
+
+@schemathesis.hook
+def flatmap_body(context, body):
+    """Generate dependent fields based on query content"""
+    node = body.definitions[0].selection_set.selections[0]
+    if node.name.value == "someField":
+        return st.just(body).map(lambda b: modify_body(b, "someDependentField"))
+    return st.just(body)
+
+def modify_body(body, new_field_name):
+    # Create and add a new field to the query
+    new_field = ...  # Create a new field node
+    new_field.name.value = new_field_name
+    
+    body.definitions[0].selection_set.selections.append(new_field)
+    return body
+```
+
 ## What's Next
 
 - **[Authentication Guide](../guides/auth.md)** - Configure API authentication
