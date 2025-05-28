@@ -1681,6 +1681,7 @@ def always_fails(ctx, response, case):
                 "always_fails",
                 "--max-examples=1",
                 f"--report-dir={report_dir}",
+                f"--report-junit-path={report_dir}/junit.xml",
                 "--report=junit",
                 hooks=module,
             )
