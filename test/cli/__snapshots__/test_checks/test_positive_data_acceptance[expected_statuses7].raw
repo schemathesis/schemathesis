@@ -53,7 +53,7 @@ Warnings:
   ⚠️ Schemathesis configuration: 1 operation returned only 4xx responses during unit tests
 
 Test cases:
-  N generated, N passed
+  N generated, N passed, N skipped
 
 Seed: 42
 

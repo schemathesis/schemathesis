@@ -368,7 +368,7 @@ class BaseSchema(Mapping):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         raise NotImplementedError
@@ -396,7 +396,7 @@ class BaseSchema(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all defined API operations."""
@@ -443,7 +443,7 @@ class APIOperationMap(Mapping):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         """Build a strategy for generating test cases for all API operations defined in this subset."""
@@ -643,7 +643,7 @@ class APIOperation(Generic[P]):
         self,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy[Case]:
         """Turn this API operation into a Hypothesis strategy."""

@@ -77,4 +77,4 @@ def test_explicit_example_with_custom_media_type(ctx, cli, snapshot_cli, openapi
     )
     schemathesis.openapi.media_type("text/csv", st.sampled_from([b"a,b,c\n2,3,4"]))
 
-    assert cli.run(str(schema_path), f"--url={openapi3_base_url}") == snapshot_cli
+    assert cli.run(str(schema_path), f"--url={openapi3_base_url}", "--mode=positive") == snapshot_cli

@@ -10,9 +10,6 @@ __all__ = [
 ]
 
 
-DEFAULT_GENERATOR_MODES = [GenerationMode.default()]
-
-
 CASE_ID_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 BASE = len(CASE_ID_ALPHABET)
 # Separate `Random` as Hypothesis might interfere with the default one

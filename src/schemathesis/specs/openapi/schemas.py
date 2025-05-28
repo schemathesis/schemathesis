@@ -537,7 +537,7 @@ class BaseOpenAPISchema(BaseSchema):
         operation: APIOperation,
         hooks: HookDispatcher | None = None,
         auth_storage: AuthStorage | None = None,
-        generation_mode: GenerationMode = GenerationMode.default(),
+        generation_mode: GenerationMode = GenerationMode.POSITIVE,
         **kwargs: Any,
     ) -> SearchStrategy:
         return openapi_cases(
