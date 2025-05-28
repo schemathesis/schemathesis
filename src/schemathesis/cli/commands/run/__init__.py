@@ -21,7 +21,7 @@ from schemathesis.cli.ext.options import (
 from schemathesis.config import DEFAULT_REPORT_DIRECTORY, HealthCheck, ReportFormat, SchemathesisConfig
 from schemathesis.core import HYPOTHESIS_IN_MEMORY_DATABASE_IDENTIFIER
 from schemathesis.core.transport import DEFAULT_RESPONSE_TIMEOUT
-from schemathesis.generation import DEFAULT_GENERATOR_MODES, GenerationMode
+from schemathesis.generation import GenerationMode
 from schemathesis.generation.targets import TARGETS, TargetFunction
 
 # NOTE: Need to explicitly import all registered checks
@@ -295,7 +295,7 @@ DEFAULT_PHASES = ["examples", "coverage", "fuzzing", "stateful"]
     "generation_modes",
     help="Test data generation mode",
     type=click.Choice([item.value for item in GenerationMode] + ["all"]),
-    default=GenerationMode.default().value,
+    default="all",
     callback=validation.convert_generation_mode,
     show_default=True,
     metavar="",
@@ -446,7 +446,7 @@ def run(
     report_preserve_bytes: bool = False,
     output_sanitize: bool = True,
     output_truncate: bool = True,
-    generation_modes: list[GenerationMode] = DEFAULT_GENERATOR_MODES,
+    generation_modes: list[GenerationMode] = GenerationMode.all(),
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
     generation_maximize: list[TargetFunction] | None,

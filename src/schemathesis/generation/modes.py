@@ -12,10 +12,6 @@ class GenerationMode(str, Enum):
     NEGATIVE = "negative"
 
     @classmethod
-    def default(cls) -> GenerationMode:
-        return cls.POSITIVE
-
-    @classmethod
     def all(cls) -> list[GenerationMode]:
         return list(GenerationMode)
 

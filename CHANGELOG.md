@@ -10,9 +10,11 @@
 
 - **Coverage phase**: Incorrect reference resolution scope during test generation
 - Do not show the `operation returned only 4xx responses during unit tests` warning if the API operation only returned HTTP 500 responses.
+- Internal error inside `ignored_auth` in negative testing mode.
 
 ### :wrench: Changed
 
+- Run positive and negative tests by default.
 - Add timestamps to report filenames to avoid rewriting exiting report in subsequent runs.
 
 ### :fire: Removed

@@ -20,6 +20,7 @@ def test_default(cli, schema_url, snapshot_cli, workers):
             "--max-examples=80",
             "-c not_a_server_error",
             f"--workers={workers}",
+            "--mode=positive",
         )
         == snapshot_cli
     )
@@ -245,6 +246,7 @@ def test_non_json_response(app_factory, app_runner, cli, snapshot_cli, content):
             "-n 80",
             "--generation-database=none",
             "-c not_a_server_error",
+            "--mode=positive",
         )
         == snapshot_cli
     )

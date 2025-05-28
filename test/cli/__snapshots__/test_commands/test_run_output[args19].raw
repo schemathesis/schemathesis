@@ -103,7 +103,7 @@ Output options:
                                 [default: true]
 
 Data generation options:
-  -m, --mode                      Test data generation mode  [default: positive]
+  -m, --mode                      Test data generation mode  [default: all]
                                   [possible values: positive, negative, all]
   -n, --max-examples INTEGER RANGE
                                   Maximum number of test cases per API operation
