@@ -74,21 +74,24 @@ class ExamplesPhaseConfig(DiffBase):
 @dataclass(repr=False)
 class CoveragePhaseConfig(DiffBase):
     enabled: bool
+    generate_duplicate_query_parameters: bool
     generation: GenerationConfig
     checks: ChecksConfig
     unexpected_methods: set[str]
 
-    __slots__ = ("enabled", "generation", "checks", "unexpected_methods")
+    __slots__ = ("enabled", "generate_duplicate_query_parameters", "generation", "checks", "unexpected_methods")
 
     def __init__(
         self,
         *,
         enabled: bool = True,
+        generate_duplicate_query_parameters: bool = False,
         generation: GenerationConfig | None = None,
         checks: ChecksConfig | None = None,
         unexpected_methods: set[str] | None = None,
     ) -> None:
         self.enabled = enabled
+        self.generate_duplicate_query_parameters = generate_duplicate_query_parameters
         self.unexpected_methods = unexpected_methods or DEFAULT_UNEXPECTED_METHODS
         self.generation = generation or GenerationConfig()
         self.checks = checks or ChecksConfig()
@@ -97,6 +100,7 @@ class CoveragePhaseConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> CoveragePhaseConfig:
         return cls(
             enabled=data.get("enabled", True),
+            generate_duplicate_query_parameters=data.get("generate-duplicate-query-parameters", False),
             unexpected_methods={method.lower() for method in data.get("unexpected-methods", [])}
             if "unexpected-methods" in data
             else None,

@@ -34,7 +34,7 @@ _________________________________ GET /success _________________________________
 
 Reproduce with:
 
-    curl -X GET 'http://127.0.0.1/api/success?page_num=1&page_num=1'
+    curl -X GET 'http://127.0.0.1/api/success?page_num=1000'
 
 =================================== SUMMARY ====================================
 
@@ -53,7 +53,7 @@ Failures:
   ❌ Accepted negative data: 1
 
 Test cases:
-  N generated, N found N unique failures
+  N generated, N found N unique failures, N skipped
 
 Seed: 42
 

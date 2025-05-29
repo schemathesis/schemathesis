@@ -150,7 +150,8 @@ def create_test(
             generation.modes,
             auth_storage,
             config.as_strategy_kwargs,
-            phases_config.coverage.unexpected_methods,
+            generate_duplicate_query_parameters=phases_config.coverage.generate_duplicate_query_parameters,
+            unexpected_methods=phases_config.coverage.unexpected_methods,
         )
 
     setattr(hypothesis_test, SETTINGS_ATTRIBUTE_NAME, settings)
@@ -262,6 +263,7 @@ def add_coverage(
     generation_modes: list[GenerationMode],
     auth_storage: AuthStorage | None,
     as_strategy_kwargs: dict[str, Any],
+    generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str] | None = None,
 ) -> Callable:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -275,7 +277,9 @@ def add_coverage(
         for container in LOCATION_TO_CONTAINER.values()
         if container in as_strategy_kwargs
     }
-    for case in _iter_coverage_cases(operation, generation_modes, unexpected_methods):
+    for case in _iter_coverage_cases(
+        operation, generation_modes, generate_duplicate_query_parameters, unexpected_methods
+    ):
         if case.media_type and operation.schema.transport.get_first_matching_media_type(case.media_type) is None:
             continue
         adjust_urlencoded_payload(case)
@@ -412,6 +416,7 @@ def _stringify_value(val: Any, container_name: str) -> Any:
 def _iter_coverage_cases(
     operation: APIOperation,
     generation_modes: list[GenerationMode],
+    generate_duplicate_query_parameters: bool,
     unexpected_methods: set[str] | None = None,
 ) -> Generator[Case, None, None]:
     from schemathesis.specs.openapi.constants import LOCATION_TO_CONTAINER
@@ -565,7 +570,7 @@ def _iter_coverage_cases(
                 ),
             )
         # Generate duplicate query parameters
-        if operation.query:
+        if generate_duplicate_query_parameters and operation.query:
             container = template["query"]
             for parameter in operation.query:
                 instant = Instant()

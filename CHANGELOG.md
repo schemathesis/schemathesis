@@ -16,6 +16,7 @@
 
 - Run positive and negative tests by default.
 - Add timestamps to report filenames to avoid rewriting exiting report in subsequent runs.
+- Coverage phase no longer emits duplicate query parameter names by default. The `phases.coverage.generate-duplicate-query-parameters` config option allows for controlling this behavior.
 
 ### :fire: Removed
 
