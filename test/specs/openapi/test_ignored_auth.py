@@ -451,8 +451,10 @@ def test_auth_via_setitem(testdir, location):
 {app}
 from hypothesis import settings
 import schemathesis
+from schemathesis import GenerationMode
 
 schema = schemathesis.openapi.from_asgi("/openapi.json", app)
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 @schema.parametrize()
 @settings(max_examples=3)
@@ -473,7 +475,7 @@ def test_replace(case):
 @schema.override({container}={{"api_key": "42"}})
 def test_override(case):
     case.call_and_validate()
-"""
+""",
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=3)

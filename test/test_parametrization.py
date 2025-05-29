@@ -2,6 +2,7 @@ import pytest
 from hypothesis import HealthCheck, Phase, assume, given, settings
 
 import schemathesis
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.schemas import PayloadAlternatives
 
 from .utils import assert_requests_call, integer
@@ -16,7 +17,8 @@ def test_(request, case):
     request.config.HYPOTHESIS_CASES += 1
     assert case.operation.path == "/users"
     assert case.method == "GET"
-"""
+""",
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # And schema doesn't contain any parameters
     # And schema contains only 1 API operation
@@ -44,6 +46,7 @@ def test_(request, param, case):
                 "post": {"responses": {"200": {"description": "OK"}}},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
@@ -76,6 +79,7 @@ class TestAPI:
                 "post": {"responses": {"200": {"description": "OK"}}},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then they should work as regular tests
     result = testdir.runpytest("-v", "-s")
@@ -102,6 +106,7 @@ def test_(request, case):
     assert case.method in ("GET", "POST")
 """,
         paths={"/users": {"get": parameters, "post": parameters}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
@@ -137,6 +142,7 @@ def test_(request, case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -180,6 +186,7 @@ def test(request, case):
                 "example": {"name": "John"},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     # Then this example should be used in tests
@@ -241,6 +248,7 @@ def test(request, case):
     assert case.query == {"id": "test"}
 """,
         schema=schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
 
     result = testdir.runpytest("-v", "-s")
@@ -281,6 +289,7 @@ def test(request, case):
                 }
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
 
     result = testdir.runpytest("-v", "-s")
@@ -325,6 +334,7 @@ def test(request, case):
                 }
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
 
     result = testdir.runpytest("-v", "-s")
@@ -372,6 +382,7 @@ def test(request, case):
                 }
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
 
     result = testdir.runpytest("-v", "-s")
@@ -417,6 +428,7 @@ def test(request, case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     # Then these examples should be used combined in tests
@@ -444,7 +456,7 @@ def test_b(request, case):
     # Then only relevant tests should be selected for running
     result.assert_outcomes(passed=2)
     # "/users" path is excluded in the first test function
-    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 4"])
+    result.stdout.re_match_lines([".* 1 deselected / 2 selected", r".*\[POST /pets\]", r"Hypothesis calls: 16"])
 
 
 @pytest.mark.parametrize(
@@ -469,7 +481,7 @@ def test_(request, case):
     result = testdir.runpytest("-s")
     # Then it should be correctly processed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 2"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 8"])
 
 
 def test_invalid_schema(testdir):
@@ -517,7 +529,7 @@ def test_(request, case):
     result = testdir.runpytest()
     # Then test should be executed
     result.assert_outcomes(passed=1)
-    result.stdout.re_match_lines([r"Hypothesis calls: 3$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 20$"])
 
 
 def test_exception_during_test(testdir):

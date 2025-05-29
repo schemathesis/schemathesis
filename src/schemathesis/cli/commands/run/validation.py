@@ -209,7 +209,7 @@ def convert_maximize(
 
 def convert_generation_mode(ctx: click.core.Context, param: click.core.Parameter, value: str) -> list[GenerationMode]:
     if value == "all":
-        return GenerationMode.all()
+        return list(GenerationMode)
     return [GenerationMode(value)]
 
 

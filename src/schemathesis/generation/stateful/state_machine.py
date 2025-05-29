@@ -196,6 +196,7 @@ class APIStateMachine(RuleBasedStateMachine):
         """Run state machine as a test."""
         from . import run_state_machine_as_test
 
+        __tracebackhide__ = True
         return run_state_machine_as_test(cls, settings=settings)
 
     def setup(self) -> None:

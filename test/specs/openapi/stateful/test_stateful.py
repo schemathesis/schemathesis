@@ -5,6 +5,7 @@ from hypothesis.errors import InvalidDefinition
 import schemathesis
 from schemathesis.core.errors import NoLinksFound
 from schemathesis.core.failures import FailureGroup
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.generation.stateful.state_machine import DEFAULT_STATE_MACHINE_SETTINGS, StepOutput
 from schemathesis.specs.openapi.stateful import make_response_filter, match_status_code
 
@@ -86,6 +87,7 @@ def test_hidden_failure(testdir, app_schema, openapi3_base_url):
     testdir.make_test(
         f"""
 schema.config.update(base_url="{openapi3_base_url}")
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 TestStateful = schema.as_state_machine().TestCase
 TestStateful.settings = settings(
     max_examples=2000,
@@ -142,6 +144,7 @@ def test_hidden_failure_app(request, factory_name, open_api_3):
     else:
         schema = schemathesis.openapi.from_wsgi("/schema.yaml", app=app)
 
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     state_machine = schema.as_state_machine()
 
     with pytest.raises(FailureGroup) as exc:
@@ -238,6 +241,7 @@ def test_settings_error(app_schema):
 def test_dynamic_body(merge_body, app_factory):
     app = app_factory(merge_body=merge_body)
     schema = schemathesis.openapi.from_wsgi("/openapi.json", app=app)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     state_machine = schema.as_state_machine()
 
     state_machine.run(

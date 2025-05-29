@@ -1,1 +1,0 @@
-SchemathesisConfig(projects=ProjectsConfig(default=ProjectConfig(generation=GenerationConfig(modes=[<GenerationMode.POSITIVE: 'positive'>, <GenerationMode.NEGATIVE: 'negative'>]))))

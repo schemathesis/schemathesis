@@ -7,6 +7,7 @@ from hypothesis import given, settings
 
 import schemathesis
 from schemathesis.core import SCHEMATHESIS_TEST_CASE_HEADER
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi.serialization import (
     comma_delimited_object,
     conversion,
@@ -179,6 +180,7 @@ def test_(request, case):
     assert case.{attribute} in {expected!r}
     """,
         schema=raw_schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v")
     result.assert_outcomes(passed=1)

@@ -13,6 +13,7 @@ import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.phases import Phase, PhaseName, stateful
+from schemathesis.generation.modes import GenerationMode
 
 
 @dataclass
@@ -513,7 +514,7 @@ def engine_factory(app_factory, app_runner, stop_event):
         if max_steps is not None:
             config.projects.override.phases.stateful.max_steps = max_steps
         config.projects.override.generation.update(
-            modes=generation_modes,
+            modes=generation_modes or [GenerationMode.POSITIVE],
             unique_inputs=unique_inputs,
             max_examples=max_examples,
             maximize=maximize,

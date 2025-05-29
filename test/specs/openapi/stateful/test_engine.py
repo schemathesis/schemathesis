@@ -269,9 +269,7 @@ def test_failure_hidden_behind_another_failure(engine_factory):
 
 
 def test_multiple_conformance_issues(engine_factory):
-    engine = engine_factory(
-        app_kwargs={"multiple_conformance_issues": True},
-    )
+    engine = engine_factory(app_kwargs={"multiple_conformance_issues": True})
     result = collect_result(engine)
     assert len(result.failures) == 2
     assert {check.failure_info.failure.title for check in result.failures} == {
@@ -521,7 +519,7 @@ def test_external_link(ctx, app_factory, app_runner):
     root_app_port = app_runner.run_flask_app(root_app)
     schema = schemathesis.openapi.from_dict(schema)
     schema.config.update(base_url=f"http://127.0.0.1:{root_app_port}/")
-    schema.config.generation.update(max_examples=75, database="none")
+    schema.config.generation.update(max_examples=75, database="none", modes=[GenerationMode.POSITIVE])
     engine = stateful.execute(
         engine=EngineContext(schema=schema, stop_event=threading.Event()),
         phase=Phase(name=PhaseName.STATEFUL_TESTING, is_supported=True, is_enabled=True),
@@ -556,7 +554,7 @@ def test_negative_tests(engine_factory):
     engine = engine_factory(
         app_kwargs={"independent_500": True},
         max_examples=50,
-        generation_modes=GenerationMode.all(),
+        generation_modes=list(GenerationMode),
     )
     result = collect_result(engine)
     event = result.events[-1]

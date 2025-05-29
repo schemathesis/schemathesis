@@ -142,7 +142,7 @@ def test_default(corpus, filename, app_port):
 
 def test_coverage_phase(corpus, filename):
     schema = _load_schema(corpus, filename)
-    modes = GenerationMode.all()
+    modes = list(GenerationMode)
     for operation in schema.get_all_operations():
         if isinstance(operation, Ok):
             for _ in _iter_coverage_cases(operation.ok(), modes):

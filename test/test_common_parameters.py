@@ -1,4 +1,5 @@
 import schemathesis
+from schemathesis.generation.modes import GenerationMode
 
 from .utils import integer
 
@@ -29,6 +30,7 @@ def test_(request, case):
                 },
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used for all specified methods
@@ -79,6 +81,7 @@ def test_b(request, case):
         },
         definitions={"SimpleIntRef": {"type": "integer"}},
         parameters={"Param": {"in": "query", "name": "key", "required": True, "type": "integer"}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all generated tests
@@ -159,6 +162,7 @@ def test_b(request, case):
                 "post": {"responses": {"200": {"description": "OK"}}},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     # Then this parameter should be used in all test functions
