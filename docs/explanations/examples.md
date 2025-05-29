@@ -1,13 +1,11 @@
 # Examples in API Schemas
 
-Schema examples in OpenAPI are predefined sample values for request parameters and bodies. They serve as concrete test cases to validate that the API handles typical inputs correctly.
+Examples are sample values defined in your OpenAPI schema for request parameters and bodies.
 
-Schemathesis supports these distinct testing paradigms:
+Schemathesis supports:
 
 - **Example-based testing**: Uses fixed input values from your schema to produce predictable, repeatable tests.
 - **Property-based testing**: Generates a diverse range of inputs dynamically to expose unexpected edge cases.
-
-Use schema examples to verify critical business logic, ensure backward compatibility, and achieve deterministic test reproduction. In contrast, property-based testing is ideal for discovering unexpected edge cases and performance issues.
 
 ## Defining Examples in OpenAPI
 
@@ -21,18 +19,6 @@ schema:
     name:
       type: string
       example: "John Doe"
-```
-
-```yaml
-# Multiple examples using the 'examples' keyword (OpenAPI 3.0+)
-schema:
-  type: object
-  properties:
-    name:
-      type: string
-      examples:
-        - "John Doe"
-        - "Jane Smith"
 ```
 
 ```yaml
@@ -66,10 +52,9 @@ content:
     examples:
       user:
         summary: "A typical user"
+        # Schemathesis will load and cache external examples during testing.
         externalValue: 'http://example.com/examples/user.json'
 ```
-
-Schemathesis will load and cache external examples during testing.
 
 !!! tip "OpenAPI 2.0 Support"
 
@@ -148,7 +133,7 @@ Schemathesis will generate test cases using each age value:
 
 ## Differences with Dredd
 
-Unlike [Dredd](https://dredd.org/en/latest/), which depends exclusively on schema examples for generating test cases, Schemathesis employs a hybrid approach. It treats predefined examples as fixed test inputs while also dynamically generating additional inputs to explore the broader input space. This allows for both deterministic validation of documented scenarios and exploration of potential edge cases. Furthermore, Schemathesis supports test case reduction and stateful testing to isolate minimal failing inputs and validate complex operation sequences.
+Unlike [Dredd](https://dredd.org/en/latest/), which only uses schema examples, Schemathesis uses both predefined examples and generated data. Schemathesis also includes test case reduction and stateful testing.
 
 !!! tip "Feedback"
 
