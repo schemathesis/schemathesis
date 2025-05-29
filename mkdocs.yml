@@ -15,11 +15,11 @@ nav:
       - guides/extending-cli.md
       - guides/custom-media-types.md
       - guides/custom-serializers.md
+      - Targeted Testing: guides/targeted.md
   - Explanations:
       - explanations/data-generation.md
+      - explanations/examples.md
       - explanations/checks.md
-  - Advanced:
-      - Targeted Testing: advanced/targeted.md
   - API Reference:
       - Configuration Options: reference/configuration.md
       - CLI Options: reference/cli.md
