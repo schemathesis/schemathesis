@@ -61,7 +61,6 @@ class CounterHandler(cli.EventHandler):
         self.output_file = params["counter_output"]
         self.verbose = params["counter_verbose"]
 
-        # Initialize counters
         self.total_events = self.initial_value
         self.test_cases = 0
         self.failures = 0
@@ -91,7 +90,6 @@ class CounterHandler(cli.EventHandler):
             self._generate_summary(ctx)
 
     def _generate_summary(self, context):
-        """Generate the final summary."""
         context.add_summary_line("")
         context.add_summary_line("Counter Summary:")
         context.add_summary_line(f"  Total events: {self.total_events}")
@@ -106,7 +104,6 @@ class CounterHandler(cli.EventHandler):
             )
 
     def _write_output_file(self):
-        """Write results to the specified output file."""
         with open(self.output_file, "w") as f:
             f.write("Counter Results\n")
             f.write(f"Total events: {self.total_events}\n")
@@ -123,7 +120,6 @@ class CounterHandler(cli.EventHandler):
 ## Using the extension
 
 ```bash
-# Set the module containing your CLI extensions
 export SCHEMATHESIS_HOOKS=cli_extensions
 
 # Use the custom options

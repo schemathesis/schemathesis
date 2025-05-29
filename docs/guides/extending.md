@@ -35,8 +35,6 @@ export SCHEMATHESIS_HOOKS=hooks
 schemathesis run http://localhost:8000/openapi.json
 ```
 
-**Result:** Instead of generating random user IDs that might not exist in your test database, this hook ensures tests use a known test user.
-
 ## Hook Types and Naming
 
 **Data generation hooks** use a naming pattern: `<operation>_<part>` where the operation determines what the hook does and the part determines which request data it affects.
@@ -72,11 +70,8 @@ filter_* → map_* → flatmap_* → Final test case
 ```python
 @schemathesis.hook
 def filter_query(context, query):
-    """Skip tests with admin user to avoid permission issues"""
     return query and query.get("user_id") != "admin"
 ```
-
-**Result:** Tests with `user_id=admin` are skipped, avoiding permission errors in your test environment.
 
 ### Using real database values
 
@@ -85,14 +80,10 @@ def filter_query(context, query):
 ```python
 @schemathesis.hook
 def map_path_parameters(context, path_parameters):
-    """Use real product IDs from the database"""
     if path_parameters and "product_id" in path_parameters:
-        # In practice, query your test database
         path_parameters["product_id"] = "product_1"
     return path_parameters
 ```
-
-**Result:** `GET /products/product_1` instead of `GET /products/random_abc123`, eliminating 404 errors.
 
 ### Generating dependent data
 
@@ -103,15 +94,12 @@ from hypothesis import strategies as st
 
 @schemathesis.hook
 def flatmap_body(context, body):
-    """Ensure email domain matches organization"""
     if body and "email" in body and "organization" in body:
         org = body["organization"]
         domain = f"{org.lower()}.com"
         return st.just(body).map(lambda b: {**b, "email": f"user@{domain}"})
     return st.just(body)
 ```
-
-**Result:** Generates `{"email": "user@acme.com", "organization": "acme"}` instead of mismatched combinations.
 
 ## Custom Validation Checks
 
@@ -166,12 +154,10 @@ user_phone:
 
 ## Setting Up Extensions
 
-### For CLI usage
-
-Create a hooks file and reference it with an environment variable:
+Define your hooks:
 
 ```python
-# hooks.py
+# hooks.py (for CLI) or conftest.py (for pytest)
 import schemathesis
 
 @schemathesis.hook
@@ -182,8 +168,9 @@ def map_headers(context, headers):
     return headers
 ```
 
+### For CLI usage
+
 ```bash
-# Run with hooks
 export SCHEMATHESIS_HOOKS=hooks
 schemathesis run http://localhost:8000/openapi.json
 ```
@@ -193,19 +180,9 @@ schemathesis run http://localhost:8000/openapi.json
 
 ### For pytest integration
 
-Define hooks in your conftest.py to make them available to all tests:
+Put hooks in conftest.py to make them available to all tests:
 
 ```python
-# conftest.py
-import schemathesis
-
-@schemathesis.hook
-def map_headers(context, headers):
-    if headers is None:
-        headers = {}
-    headers["X-Test-Mode"] = "true"
-    return headers
-
 # test_api.py
 schema = schemathesis.openapi.from_url("http://localhost:8000/openapi.json")
 
@@ -300,7 +277,6 @@ GraphQL hooks work with `graphql.DocumentNode` objects instead of JSON data. The
 @schemathesis.hook
 def map_body(context, body):
     """Change field names in the GraphQL query"""
-    # Access the first node in the GraphQL query
     node = body.definitions[0].selection_set.selections[0]
     
     # Change the field name

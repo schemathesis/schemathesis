@@ -4,10 +4,6 @@
 
 This tutorial walks you through a complete API testing workflow with Schemathesis using a booking API. You'll see how property-based testing automatically finds bugs that manual testing typically misses.
 
-!!! info "What you'll accomplish"
-
-    By the end, you'll catch API bugs automatically and integrate Schemathesis into your development workflow.
-
 If you're new to Schemathesis, check the [Quick Start Guide](quick-start.md) first.
 
 ## Prerequisites
@@ -31,7 +27,7 @@ curl --version  # optional
 
 ## API under test
 
-We'll test an example booking API that handles hotel reservations - creating bookings and retrieving guest information. This is a sample API designed to demonstrate common validation scenarios.
+We'll test a booking API that handles hotel reservations - creating bookings and retrieving guest information.
 
 The API lives in the [Schemathesis repository](https://github.com/schemathesis/schemathesis/tree/master/examples/booking):
 
@@ -50,7 +46,7 @@ docker compose up -d
 
 ## First Test Run
 
-Schemathesis automatically tests all API operations with various test types to find edge cases:
+Run Schemathesis against the API:
 
 ```bash
 uvx schemathesis run http://127.0.0.1:8080/openapi.json \
@@ -138,8 +134,6 @@ uvx schemathesis run http://127.0.0.1:8080/openapi.json \
   --include-operation-id create_booking_bookings_post
 ```
 
-!!! success "Expected result"
-    You should see no failures for the `POST /bookings` operation. The 500 error is now prevented.
 !!! info "Operation ID explained"
     FastAPI generates operation IDs automatically. You can find them in the OpenAPI schema or API docs.
 
@@ -211,12 +205,6 @@ uvx schemathesis --config-file path/to/config.toml run http://...
     CLI options override config file settings, so you can still adjust settings temporarily.
 
 ## What's next?
-
-!!! success "You've learned the core workflow!"
-    - ✅ Find bugs automatically with property-based testing
-    - ✅ Focus testing during development 
-    - ✅ Export results to share with others
-    - ✅ Maintain consistent configuration
 
 **Continue learning:**
 

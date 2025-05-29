@@ -4,9 +4,6 @@
 
 Schemathesis automatically finds bugs in your APIs by generating thousands of test cases from your OpenAPI or GraphQL schema. It catches edge cases that manual testing typically misses.
 
-!!! question "What makes this different?"
-    Instead of writing individual tests, Schemathesis reads your API schema and generates hundreds of test cases automatically - like having a tireless QA engineer testing every possible input combination.
-
 **Core benefits:**
 
 - 🔍 **Discovers edge cases** that break your API with unexpected input
@@ -22,7 +19,7 @@ Test a sample API using [uv](https://docs.astral.sh/uv/){target=_blank}:
 uvx schemathesis run https://example.schemathesis.io/openapi.json
 ```
 
-Schemathesis will automatically discover real bugs in this demo API and show you exactly how to reproduce them with `curl` commands:
+Example output:
 
 ```
 _____________________ POST /improper-input-type-handling _____________________
@@ -64,14 +61,6 @@ Reproduce with:
         # Automatically calls your API and validates the response
         case.call_and_validate()
     ```
-
-Run the demo command above, then try it on your own API. Schemathesis will immediately show you issues you didn't know existed.
-
-!!! example "What bugs does it find?"
-    - APIs crashing on Unicode characters or special inputs
-    - Endpoints accepting invalid data they should reject  
-    - Response formats not matching documentation
-    - Authentication and validation bypasses
 
 ## What's next?
 

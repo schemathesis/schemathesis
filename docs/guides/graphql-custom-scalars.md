@@ -89,16 +89,8 @@ schemathesis.graphql.scalar(
 
 Use these `schemathesis.graphql.nodes` factories to wrap your generated values:
 
-- `String(value)` - String values like `"hello"`
-- `Int(value)` - Integer values like `42`
-- `Float(value)` - Float values like `3.14`
-- `Boolean(value)` - Boolean values `true`/`false`
-- `Enum(value)` - Enum values like `ACTIVE`
-- `Null` - The `null` value
-
-For complex types:
-- `List(values)` - Arrays like `[1, 2, 3]`
-- `Object(fields)` - Objects (requires special handling, see advanced section)
+- `String(value)`, `Int(value)`, `Float(value)`, `Boolean(value)`, `Enum(value)`, `Null`
+- `List(values)`, `Object(fields)` - For complex types (see advanced section)
 
 ## Advanced: JSON scalars
 

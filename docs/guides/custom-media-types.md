@@ -20,7 +20,6 @@ Register a strategy that generates valid PDF headers:
 from hypothesis import strategies as st
 import schemathesis
 
-# Generate minimal valid PDF content
 pdf_strategy = st.sampled_from([
     b"%PDF-1.4\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\nxref\n0 3\n0000000000 65535 f \ntrailer\n<<\n/Size 3\n/Root 1 0 R\n>>\nstartxref\n9\n%%EOF",
     b"%PDF-1.5\n%\xe2\xe3\xcf\xd3\n1 0 obj\n<<\n/Type /Catalog\n/Pages 2 0 R\n>>\nendobj\nxref\n0 3\n0000000000 65535 f \ntrailer\n<<\n/Size 3\n/Root 1 0 R\n>>\nstartxref\n9\n%%EOF"
@@ -45,7 +44,6 @@ schemathesis run http://localhost:8000/openapi.json
 ### Image files
 
 ```python
-# Generate simple image formats
 image_strategy = st.sampled_from([
     # Minimal PNG
     b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\tpHYs\x00\x00\x0b\x13\x00\x00\x0b\x13\x01\x00\x9a\x9c\x18\x00\x00\x00\nIDAT\x08\x1dc\xf8\x00\x00\x00\x01\x00\x01\x00\x00\x00\x00IEND\xaeB`\x82',
@@ -75,8 +73,6 @@ schemathesis.openapi.media_type("application/zip", zip_strategy)
 
 ## Media Type Aliases
 
-Handle multiple content-type variations for the same format:
-
 ```python
 # Register PDF strategy with common aliases
 schemathesis.openapi.media_type(
@@ -85,15 +81,10 @@ schemathesis.openapi.media_type(
     aliases=["application/x-pdf", "application/acrobat"]
 )
 
-# All these content types will use the same strategy:
-# - application/pdf
-# - application/x-pdf  
-# - application/acrobat
+# Handles application/pdf, application/x-pdf, and application/acrobat
 ```
 
 ## Dynamic Content Generation
-
-Generate content that varies:
 
 ```python
 from hypothesis import strategies as st
