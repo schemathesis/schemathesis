@@ -62,8 +62,7 @@ class GenerationConfig(DiffBase):
     ) -> None:
         from schemathesis.generation import GenerationMode
 
-        # TODO: Switch to `all` by default.
-        self.modes = modes or [GenerationMode.POSITIVE]
+        self.modes = modes or list(GenerationMode)
         self.max_examples = max_examples
         self.no_shrink = no_shrink
         self.deterministic = deterministic
@@ -80,7 +79,7 @@ class GenerationConfig(DiffBase):
     def from_dict(cls, data: dict[str, Any]) -> GenerationConfig:
         mode_raw = data.get("mode")
         if mode_raw == "all":
-            modes = GenerationMode.all()
+            modes = list(GenerationMode)
         elif mode_raw is not None:
             modes = [GenerationMode(mode_raw)]
         else:

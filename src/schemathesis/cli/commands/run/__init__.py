@@ -446,7 +446,7 @@ def run(
     report_preserve_bytes: bool = False,
     output_sanitize: bool = True,
     output_truncate: bool = True,
-    generation_modes: list[GenerationMode] = GenerationMode.all(),
+    generation_modes: list[GenerationMode],
     generation_seed: int | None = None,
     generation_max_examples: int | None = None,
     generation_maximize: list[TargetFunction] | None,

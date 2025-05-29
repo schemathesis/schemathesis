@@ -311,7 +311,8 @@ def test_(case):
     request.prepare("GET", "http://127.0.0.1")
     response.request = request
     assert case.validate_response(Response.from_requests(response, True)) is None
-"""
+""",
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("--tb=long", "-sv")
     result.assert_outcomes(passed=1)
@@ -407,7 +408,7 @@ def test_method_suggestion(swagger_20):
         swagger_20["/users"]["PUT"]
 
 
-@pytest.mark.parametrize("mode", GenerationMode.all())
+@pytest.mark.parametrize("mode", list(GenerationMode))
 @pytest.mark.hypothesis_nested
 def test_generation_mode_is_available(ctx, mode):
     # When a new case is generated

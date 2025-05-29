@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.generation.modes import GenerationMode
+
 
 def test_default(testdir):
     # When LazySchema is used
@@ -62,6 +64,7 @@ def test_(request, case):
                 }
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-rf")
     # Then one test should be marked as failed (passed - /users, failed /)
@@ -99,7 +102,7 @@ def test_(request, case, another):
     # Then the generated test should use these fixtures
     result.assert_outcomes(passed=1)
     result.stdout.re_match_lines([r"test_with_fixtures.py::test_ PASSED", r".*1 passed"])
-    result.stdout.re_match_lines([r"Hypothesis calls: 2$"])
+    result.stdout.re_match_lines([r"Hypothesis calls: 8$"])
 
 
 def test_with_parametrize_filters(testdir):
@@ -142,6 +145,7 @@ def test_d(request, case):
             "/third": {"put": {"operationId": "updateThird", "responses": {"200": {"description": "OK"}}}},
         },
         tags=[{"name": "foo"}, {"name": "bar"}],
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
@@ -171,6 +175,7 @@ def test_a(request, case):
     assert case.method == "POST"
 """,
         paths={"/pets": {"post": {"responses": {"200": {"description": "OK"}}}}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v")
     # Then the filters should be applied to the generated tests
@@ -295,7 +300,7 @@ def test_generation_modes(testdir):
 @pytest.fixture()
 def api_schema():
     schema = schemathesis.openapi.from_dict(raw_schema)
-    schema.config.generation.update(modes=GenerationMode.all())
+    schema.config.generation.update(modes=list(GenerationMode))
     return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
@@ -447,7 +452,9 @@ def test_multiple_failures(testdir, openapi3_schema_url):
         f"""
 @pytest.fixture
 def api_schema():
-    return schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema = schemathesis.openapi.from_url('{openapi3_schema_url}')
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+    return schema
 
 lazy_schema = schemathesis.pytest.from_fixture("api_schema")
 

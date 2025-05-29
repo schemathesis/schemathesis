@@ -959,11 +959,17 @@ def testdir(testdir):
         content,
         pytest_plugins=("aiohttp.pytest_plugin",),
         sanitize_output=True,
+        generation_modes=None,
         schema=None,
         schema_name="simple_swagger.yaml",
         **kwargs,
     ):
         schema = schema or make_schema(schema_name=schema_name, **kwargs)
+        modes = (
+            "[" + ", ".join([f"GenerationMode.{m.value.upper()}" for m in generation_modes]) + "]"
+            if generation_modes
+            else None
+        )
         preparation = dedent(
             f"""
         import pytest
@@ -987,6 +993,9 @@ def testdir(testdir):
         schema = schemathesis.openapi.from_dict(
             raw_schema, config=config
         )
+
+        if {modes} is not None:
+            schema.config.generation.update(modes={modes})
         """
         )
         module = testdir.makepyfile(preparation, content)

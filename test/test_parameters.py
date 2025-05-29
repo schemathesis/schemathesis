@@ -6,6 +6,7 @@ from hypothesis.errors import NoSuchExample
 
 import schemathesis
 from schemathesis.core.errors import InvalidSchema
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.specs.openapi._hypothesis import get_default_format_strategies, is_valid_header
 
 from .utils import as_param
@@ -29,6 +30,7 @@ def test_(case):
         """,
         schema_name=schema_name,
         **as_param({"name": "X-Header", "in": "header", "required": True, **kwargs}),
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it in its `headers` attribute
     testdir.run_and_assert(passed=1)
@@ -47,6 +49,7 @@ def test_(case):
         """,
         schema_name="simple_openapi.yaml",
         **as_param({"name": "token", "in": "cookie", "required": True, "schema": {"type": type_}}),
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it in its `cookies` attribute
     testdir.run_and_assert(passed=1)
@@ -70,6 +73,7 @@ def test_(case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)
@@ -94,6 +98,7 @@ def test_(case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it its `path_parameters` attribute
     testdir.run_and_assert(passed=1)
@@ -122,6 +127,7 @@ def test_(case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain them its `path_parameters` attribute
     testdir.run_and_assert(passed=1)
@@ -145,6 +151,7 @@ def test_(case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain it in its `body` attribute
     testdir.run_and_assert(passed=1)
@@ -195,6 +202,7 @@ def test_(case):
     assert_requests_call(case)
         """,
         schema=schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain API key in a proper place
     testdir.run_and_assert(passed=1)
@@ -220,6 +228,7 @@ def test_(case):
     assert_requests_call(case)
         """,
         schema=cookie_schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain API key in a proper place
     testdir.run_and_assert(passed=1)
@@ -314,6 +323,7 @@ def test_(case):
     assert_requests_call(case)
         """,
         schema=basic_auth_schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated data should contain a valid "Authorization" header
     testdir.run_and_assert(passed=1)
@@ -335,6 +345,7 @@ def test_(case):
     assert_requests_call(case)
         """,
         schema=simple_openapi,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the generated test case should contain a valid "Authorization" header
     testdir.run_and_assert("-s", passed=1)
@@ -444,6 +455,7 @@ def test_(case):
                 }
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then the payload should be serialized as json
     testdir.run_and_assert(passed=1)

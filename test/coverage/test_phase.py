@@ -1869,7 +1869,7 @@ def test_urlencoded_payloads_are_valid(ctx):
         assert_requests_call(case)
 
     config = ProjectConfig()
-    config.generation.update(modes=GenerationMode.all())
+    config.generation.update(modes=list(GenerationMode))
     test_func = create_test(
         operation=operation,
         test_func=test,
@@ -1909,7 +1909,7 @@ def test_no_missing_header_duplication(ctx):
         descriptions.append(case.meta.phase.data.description)
 
     config = ProjectConfig()
-    config.generation.update(modes=GenerationMode.all())
+    config.generation.update(modes=list(GenerationMode))
     test_func = create_test(
         operation=operation,
         test_func=test,

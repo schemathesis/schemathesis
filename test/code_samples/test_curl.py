@@ -3,10 +3,12 @@ from hypothesis import HealthCheck, given, settings
 
 import schemathesis
 from schemathesis import Case
+from schemathesis.generation.modes import GenerationMode
 from test.apps.openapi._fastapi import create_app
 from test.apps.openapi._fastapi.app import app
 
 schema = schemathesis.openapi.from_dict(app.openapi())
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
 
 
 @pytest.fixture

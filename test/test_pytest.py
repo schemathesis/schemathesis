@@ -4,6 +4,7 @@ import pytest
 
 from schemathesis.core.errors import RECURSIVE_REFERENCE_ERROR_MESSAGE
 from schemathesis.generation.hypothesis import DEFAULT_DEADLINE
+from schemathesis.generation.modes import GenerationMode
 
 
 def test_pytest_parametrize_fixture(testdir):
@@ -33,6 +34,7 @@ def test_(request, param, case):
                 "post": {"responses": {"200": {"description": "OK"}}},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
@@ -97,6 +99,7 @@ class TestAPI:
                 "post": {"responses": {"200": {"description": "OK"}}},
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # And there are multiple method/path combinations
     result = testdir.runpytest("-v", "-s")
@@ -332,6 +335,7 @@ def test_skip_operations_with_recursive_references(testdir, schema_with_recursiv
 def test(case):
     pass""",
         schema=schema_with_recursive_references,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-rs")
     # Then this test should be skipped with a proper error message
@@ -761,6 +765,7 @@ def test(case):
             }
         },
         schema_name="simple_openapi.yaml",
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest()
     result.assert_outcomes(failed=1)

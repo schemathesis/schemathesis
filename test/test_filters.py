@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.generation.modes import GenerationMode
+
 from .utils import integer
 
 
@@ -17,6 +19,7 @@ def test_(request, case):
     assert case.method == "GET"
 """,
         paths={"/foo": {"get": parameters}, "/bar": {"post": parameters}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=2)
@@ -46,6 +49,7 @@ def test_(request, case):
             "/bar": {"get": {**parameters, "tags": ["bar", "baz"]}},
         },
         tags=[{"name": "foo"}, {"name": "bar"}, {"name": "baz"}],
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -73,6 +77,7 @@ def test_(request, case):
                 "get": {"parameters": [], "responses": {"200": {"description": "OK"}}},
             },
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -95,6 +100,7 @@ def test_(request, case):
             "/bar": {"get": {**parameters, "operationId": "bar_get"}},
         },
         schema_name="simple_openapi.yaml",
+        generation_modes=[GenerationMode.POSITIVE],
     )
 
     result = testdir.runpytest("-v", "-s")

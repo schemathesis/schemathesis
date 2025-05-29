@@ -608,6 +608,7 @@ def test_max_failures(real_app_schema):
 def test_skip_operations_with_recursive_references(schema_with_recursive_references):
     # When the test schema contains recursive references
     schema = schemathesis.openapi.from_dict(schema_with_recursive_references)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema).execute()
     # Then it causes an error with a proper error message
     stream.assert_after_execution_status(Status.ERROR)
@@ -656,6 +657,7 @@ def test_unsatisfiable_example(ctx, phases, expected, total_errors):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema, max_examples=1, phases=phases).execute()
     # And the tests are failing because of the unsatisfiable schema
     stream.assert_errors()
@@ -762,6 +764,7 @@ def test_invalid_regex_example(ctx, phases, expected):
     )
     # Then the testing process should not raise an internal error
     schema = schemathesis.openapi.from_dict(schema)
+    schema.config.generation.update(modes=[GenerationMode.POSITIVE])
     stream = EventStream(schema, phases=phases, max_examples=1).execute()
     # And the tests are failing because of the invalid regex error
     stream.assert_errors()

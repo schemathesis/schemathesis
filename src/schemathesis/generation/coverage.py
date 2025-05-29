@@ -121,7 +121,7 @@ class CoverageContext:
         path: list[str | int] | None = None,
     ) -> None:
         self.location = location
-        self.generation_modes = generation_modes if generation_modes is not None else GenerationMode.all()
+        self.generation_modes = generation_modes if generation_modes is not None else list(GenerationMode)
         self.path = path or []
 
     @contextmanager

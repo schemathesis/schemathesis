@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.generation.modes import GenerationMode
+
 from .utils import as_param
 
 
@@ -29,6 +31,7 @@ def test_(request, case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)
@@ -46,6 +49,7 @@ def test_(request, case):
     assert case.method == "GET"
 """,
         **as_param({"in": "query", "name": "key", "required": False, "type": "string"}),
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)

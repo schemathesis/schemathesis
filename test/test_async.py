@@ -1,5 +1,7 @@
 import pytest
 
+from schemathesis.generation.modes import GenerationMode
+
 from .utils import integer
 
 ALL_PLUGINS = {"aiohttp.pytest_plugin": "", "asyncio": "@pytest.mark.asyncio", "trio": "@pytest.mark.trio"}
@@ -38,6 +40,7 @@ async def test_(request, case):
         await trio.sleep(0)
 """,
         pytest_plugins=[plugin],
+        generation_modes=[GenerationMode.POSITIVE],
     )
     args = build_pytest_args(plugin)
     result = testdir.runpytest(*args)
@@ -61,6 +64,7 @@ async def test_(request, case):
 """,
         pytest_plugins=[plugin],
         paths={"/users": {"get": parameters, "post": parameters}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     args = build_pytest_args(plugin)
     result = testdir.runpytest(*args)
@@ -103,7 +107,8 @@ async def test_(request, aiohttp_client, app, case):
     assert len(app["saved_requests"]) <= 3
     assert app["saved_requests"][0].method == "GET"
     assert app["saved_requests"][0].path == "/users"
-"""
+""",
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest("-v", "-s")
     result.assert_outcomes(passed=1)

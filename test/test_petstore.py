@@ -1,11 +1,14 @@
 import pytest
 from hypothesis import settings
 
+from schemathesis.generation.modes import GenerationMode
+
 
 @pytest.fixture(params=["petstore_v2.yaml", "petstore_v3.yaml"])
 def testdir(request, testdir):
     def make_petstore_test(*args, **kwargs):
         kwargs["schema_name"] = request.param
+        kwargs["generation_modes"] = [GenerationMode.POSITIVE]
         testdir.make_test(*args, **kwargs)
 
     testdir.make_petstore_test = make_petstore_test
@@ -113,6 +116,8 @@ def test_(request, case):
 def test_delete_pet(testdir):
     testdir.make_petstore_test(
         """
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
 @schema.include(method="DELETE", path_regex="/pet/{petId}$").parametrize()
 @settings(max_examples=5, deadline=None)
 def test_(request, case):
@@ -129,6 +134,8 @@ def test_(request, case):
 def test_get_inventory(testdir):
     testdir.make_petstore_test(
         """
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
 @schema.include(path_regex="/store/inventory$").parametrize()
 @settings(max_examples=5, deadline=None)
 def test_(request, case):

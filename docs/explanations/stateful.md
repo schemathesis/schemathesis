@@ -76,4 +76,3 @@ paths:
 - Create resource → Get resource → Update resource → Delete resource
 - Create user → Create user's orders → Get order details
 - Create parent → Create children → Get parent with children
-
