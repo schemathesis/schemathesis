@@ -229,6 +229,7 @@ def test_missing_body_parameter(app_factory, app_runner, cli, snapshot_cli):
             "--phases=stateful",
             "-n 30",
             "-c not_a_server_error",
+            "--mode=positive",
         )
         == snapshot_cli
     )

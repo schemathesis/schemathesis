@@ -9,6 +9,7 @@ from jsonschema.validators import Draft4Validator
 
 import schemathesis
 from schemathesis.core.errors import LoaderError
+from schemathesis.generation.modes import GenerationMode
 
 from .utils import as_param, get_schema, integer
 
@@ -312,6 +313,7 @@ def test_(request, case):
             }
         },
         definitions={"SimpleIntRef": {"type": "integer"}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -355,6 +357,7 @@ def test_(request, case):
             },
             "SimpleIntRef": {"type": "integer"},
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -394,6 +397,7 @@ def test_(request, case):
             }
         },
         definitions={"SimpleIntRef": {"type": "integer"}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -439,6 +443,7 @@ def test_(request, case):
             "A": {"type": "object", "required": ["a"], "properties": {"a": {"type": "integer"}}},
             "B": {"type": "object", "required": ["b"], "properties": {"b": {"type": "string"}}},
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -471,6 +476,7 @@ def test_(request, case):
     assert case.method == "GET"
 """,
         schema=schema,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -508,6 +514,7 @@ def test_(request, case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-vv", "-s")
@@ -544,6 +551,7 @@ def test_(request, case):
             }
         },
         definitions={"NullableIntRef": {"type": "integer", "x-nullable": True}},
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -574,6 +582,7 @@ def test_(request, case):
                 }
             }
         },
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")
@@ -594,6 +603,7 @@ def test_(request, case):
         assert case.query["id"] == "null"
 """,
         **as_param(integer(name="id", required=True, enum=[1, 2], **{"x-nullable": True})),
+        generation_modes=[GenerationMode.POSITIVE],
     )
     # Then it should be correctly resolved and used in the generated case
     result = testdir.runpytest("-v", "-s")

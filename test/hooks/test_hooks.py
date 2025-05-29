@@ -6,6 +6,7 @@ from hypothesis import strategies as st
 
 import schemathesis
 from schemathesis.core.transport import USER_AGENT
+from schemathesis.generation.modes import GenerationMode
 from schemathesis.hooks import HookDispatcher, HookDispatcherMark, HookScope
 from schemathesis.pytest.plugin import SchemaHandleMark
 from test.utils import assert_requests_call, flaky
@@ -189,6 +190,7 @@ def test(case):
     assert int(case.query["id"]) % 2 == 0
     """,
         schema=simple_openapi,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)
@@ -428,6 +430,7 @@ def test_a(case):
         assert case.query == {"id": 42}
     """,
         schema=simple_openapi,
+        generation_modes=[GenerationMode.POSITIVE],
     )
     result = testdir.runpytest()
     result.assert_outcomes(passed=1)

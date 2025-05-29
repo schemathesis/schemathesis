@@ -17,4 +17,6 @@ def run_state_machine_as_test(
     """
     from hypothesis.stateful import run_state_machine_as_test as _run_state_machine_as_test
 
+    __tracebackhide__ = True
+
     return _run_state_machine_as_test(state_machine_factory, settings=settings, _min_steps=2)

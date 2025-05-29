@@ -11,10 +11,6 @@ class GenerationMode(str, Enum):
     # Doesn't fit the API schema
     NEGATIVE = "negative"
 
-    @classmethod
-    def all(cls) -> list[GenerationMode]:
-        return list(GenerationMode)
-
     @property
     def is_positive(self) -> bool:
         return self == GenerationMode.POSITIVE

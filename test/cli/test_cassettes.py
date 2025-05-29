@@ -32,7 +32,7 @@ def load_response_body(cassette, idx):
     return body["string"]
 
 
-@pytest.mark.parametrize("mode", [m.value for m in GenerationMode.all()] + ["all"])
+@pytest.mark.parametrize("mode", [m.value for m in list(GenerationMode)] + ["all"])
 @pytest.mark.parametrize("args", [(), ("--report-preserve-bytes",)], ids=("plain", "base64"))
 @pytest.mark.operations("success", "upload_file")
 def test_store_cassette(cli, schema_url, cassette_path, hypothesis_max_examples, args, mode):
