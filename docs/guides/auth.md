@@ -193,6 +193,20 @@ class AdminAuth:
 
 **Available filters:** `path`, `method`, `name`, `tag`, `operation_id` (add `_regex` for regex matching)
 
+## Advanced: Third-Party Authentication
+
+For specialized authentication protocols not covered by custom auth classes, use third-party `requests.auth` implementations:
+
+```python
+# ntlm_auth.py
+import schemathesis
+from requests_ntlm import HttpNtlmAuth
+
+# Use existing requests auth implementation
+schemathesis.auth.set_from_requests(
+    HttpNtlmAuth("domain\\username", "password")
+)
+```
 ## Setup
 
 Custom authentication classes use the same setup as other extensions:
