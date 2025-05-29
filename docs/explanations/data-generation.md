@@ -25,18 +25,11 @@ This layered approach means Schemathesis inherits Hypothesis's powerful features
 
 ## Testing Phases
 
-!!! info "How phases work together"
-    These phases run independently — each generates its own test cases based on whether conditions are met. You can control which phases run with `--phases=examples,coverage,fuzzing,stateful`.
-
 Schemathesis generates test cases through multiple independent phases, each targeting different aspects of API testing.
 
 ### Examples Phase
 
-**When it runs:** When your schema contains `example` or `examples` fields
-
-**What it produces:** Test cases using those examples, with generated data filling any missing parameters
-
-**Why it matters:** Tests real-world data patterns from your documentation instead of purely random values
+Uses `example` and `examples` from your schema, filling missing parameters with generated data.
 
 **Example:**
 ```yaml
@@ -52,11 +45,7 @@ parameters:
 
 ### Coverage Phase
 
-**When it runs:** Always (for schemas with defined constraints)
-
-**What it produces:** Boundary values, all enum/const values, property combinations, and constraint violations
-
-**Why it matters:** Catches edge cases that random testing might miss through systematic exploration
+Generates boundary values, enum combinations, and constraint violations systematically.
 
 **Example:**
 ```yaml
@@ -67,11 +56,7 @@ parameters:
 
 ### Fuzzing Phase
 
-**When it runs:** Always
-
-**What it produces:** Random, diverse data within your schema constraints
-
-**Why it matters:** Discovers unexpected edge cases through Hypothesis's property-based testing approach
+Generates random, diverse data within schema constraints using Hypothesis strategies.
 
 **Example:**
 ```yaml
@@ -83,11 +68,7 @@ parameters:
 
 ### Stateful Phase
 
-**When it runs:** When your OpenAPI schema defines links between operations
-
-**What it produces:** Sequences of API calls where response data feeds into subsequent requests
-
-**Why it matters:** Finds issues that only appear when operations are combined in specific orders
+Runs when OpenAPI schemas define links between operations. Creates sequences where response data feeds into subsequent requests.
 
 **Example:**
 ```yaml
@@ -128,12 +109,6 @@ schemathesis run --mode=negative https://api.example.com/openapi.json
 ## Serialization Process
 
 The final step transforms generated Python objects into actual HTTP requests based on your API's media types.
-
-**How it works:**
-
-1. Schemathesis generates Python data structures (dicts, lists, strings, etc.)
-2. Based on the operation's `Content-Type`, it serializes the data appropriately
-3. The serialized data becomes the HTTP request body
 
 **Media type support:**
 
