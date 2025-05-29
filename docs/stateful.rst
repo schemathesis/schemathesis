@@ -2,82 +2,6 @@
 Stateful testing
 ****************
 
-By default, Schemathesis takes all operations from your API and tests them separately by passing random input data and validating responses.
-It works great when you need to quickly verify that your operations properly validate input and respond in conformance with the API schema.
-
-With stateful testing, Schemathesis combines multiple API calls into a single test scenario and tries to find call sequences that fail.
-
-Stateful tests in Schemathesis rely on Open API links to function, as they are designed to target stateful transitions between API endpoints.
-Unlike stateless tests, which verify individual endpoints in isolation, stateful tests require these links to sequence API calls logically.
-Ensure your schema includes Open API links to leverage stateful testing effectively.
-
-Why is it useful?
------------------
-
-This approach allows your tests to reach deeper into your application logic and cover scenarios that are impossible to cover with independent tests.
-You may compare Schemathesis's stateful and non-stateful testing the same way you would compare integration and unit tests.
-Stateful testing checks how multiple API operations work in combination.
-
-It solves the problem when your application produces a high number of "404 Not Found" responses during testing due to randomness in the input data.
-
-**NOTE**. The number of received "404 Not Found" responses depends on the number of connections between different operations defined in the schema.
-The more connections you have, the deeper tests can reach.
-
-How to specify connections?
----------------------------
-
-To specify how different operations depend on each other, we use a special syntax from the Open API specification - `Open API links <https://swagger.io/docs/specification/links/>`_.
-It describes how the output from one operation can be used as input for other operations.
-To define such connections, you need to extend your API schema with the ``links`` keyword:
-
-.. code-block::
-   :emphasize-lines: 16-20
-
-    paths:
-      /users:
-        post:
-          summary: Creates a user and returns the user ID
-          operationId: createUser
-          requestBody:
-            required: true
-            description: User object
-            content:
-              application/json:
-                schema:
-                  $ref: '#/components/schemas/User'
-          responses:
-            '201':
-              ...
-              links:
-                GetUserByUserId:
-                  operationId: getUser  # The target operation
-                  parameters:
-                    userId: '$response.body#/id'
-      /users/{userId}:
-        get:
-          summary: Gets a user by ID
-          operationId: getUser
-          parameters:
-            - in: path
-              name: userId
-              required: true
-              schema:
-                type: integer
-                format: int64
-
-In this schema, you define that the ``id`` value returned by the ``POST /users`` call can be used as a path parameter in the ``GET /users/{userId}`` call.
-
-Schemathesis will use this connection during ``GET /users/{userId}`` parameters generation - everything that is not defined by links will be generated randomly.
-
-If you don't want to modify your schema source, :func:`add_link <schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link>`
-allows you to define links between a pair of operations programmatically.
-
-For CLI, you can use the :ref:`after_load_schema <after-load-schema-hook>` hook to attach links before tests.
-
-.. automethod:: schemathesis.specs.openapi.schemas.BaseOpenAPISchema.add_link(source, target, status_code, parameters=None, request_body=None) -> None
-
-With some `minor limitations <#open-api-links-limitations>`_, Schemathesis fully supports Open API links, including the `runtime expressions <https://swagger.io/docs/specification/links/#runtime-expressions>`_ syntax.
-
 Minimal example
 ---------------
 
@@ -100,10 +24,6 @@ Besides loading an API schema, the example above contains two basic components:
 Stateful tests work seamlessly with WSGI / ASGI applications - the state machine will automatically pick up the right way to make an API call.
 
 The implementation is based on Hypothesis's `Rule-based state machines <https://hypothesis.readthedocs.io/en/latest/stateful.html>`_, and you can apply its features if you want to extend the default behavior.
-
-.. note::
-
-   Schemathesis's stateful testing uses `Swarm testing <https://www.cs.utah.edu/~regehr/papers/swarm12.pdf>`_ (via Hypothesis), which makes defect discovery much more effective.
 
 Lazy schema loading
 -------------------
