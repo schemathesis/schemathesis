@@ -18,6 +18,7 @@ nav:
       - Targeted Testing: guides/targeted.md
   - Explanations:
       - explanations/data-generation.md
+      - explanations/stateful.md
       - explanations/examples.md
       - explanations/checks.md
   - API Reference:
