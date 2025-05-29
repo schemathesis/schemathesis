@@ -399,6 +399,21 @@ These settings can only be applied at the project level.
     fill-missing = true
     ```
 
+#### `phases.coverage.generate-duplicate-query-parameters`
+
+!!! note "" 
+
+    **Type**: `Boolean`  
+    **Default**: `false`  
+
+    When enabled, the coverage phase will emit duplicate query parameters in test requests.
+    For example: `GET /items?page_num=1&page_num=2`
+
+    ```toml
+    [phases.coverage]
+    generate-duplicate-query-parameters = true
+    ```
+
 #### `phases.coverage.unexpected-methods`
 
 !!! note "" 

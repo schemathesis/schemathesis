@@ -314,6 +314,9 @@
         "enabled": {
           "type": "boolean"
         },
+        "generate-duplicate-query-parameters": {
+          "type": "boolean"
+        },
         "unexpected-methods": {
           "type": "array",
           "items": {
