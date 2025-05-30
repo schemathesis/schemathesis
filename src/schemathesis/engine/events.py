@@ -200,10 +200,18 @@ class NonFatalError(EngineEvent):
 
     __slots__ = ("id", "timestamp", "info", "value", "phase", "label", "related_to_operation")
 
-    def __init__(self, *, error: Exception, phase: PhaseName, label: str, related_to_operation: bool) -> None:
+    def __init__(
+        self,
+        *,
+        error: Exception,
+        phase: PhaseName,
+        label: str,
+        related_to_operation: bool,
+        code_sample: str | None = None,
+    ) -> None:
         self.id = uuid.uuid4()
         self.timestamp = time.time()
-        self.info = EngineErrorInfo(error=error)
+        self.info = EngineErrorInfo(error=error, code_sample=code_sample)
         self.value = error
         self.phase = phase
         self.label = label

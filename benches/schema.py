@@ -1,11 +1,14 @@
 import pathlib
 import sys
+from unittest.mock import patch
 
 import pytest
+import requests
 
 import schemathesis
 from schemathesis.config import SchemathesisConfig
 from schemathesis.core.transforms import deepclone
+from schemathesis.core.transport import Response
 from schemathesis.engine import from_schema
 
 CURRENT_DIR = pathlib.Path(__file__).parent.absolute()
@@ -38,6 +41,16 @@ EVETECH = load_from_corpus("evetech.net/0.8.6.json", CORPUS_SWAGGER_20)
 OSISOFT = load_from_corpus("osisoft.com/1.11.1.5383.json", CORPUS_SWAGGER_20)
 ML_WEBSERVICES = load_from_corpus("azure.com/machinelearning-webservices/2017-01-01.json", CORPUS_SWAGGER_20)
 AZURE_NETWORK = load_from_corpus("azure.com/network/2016-03-30.json", CORPUS_SWAGGER_20)
+
+RESPONSE = Response(
+    status_code=200,
+    headers={},
+    content=b"",
+    request=requests.Request(method="GET", url="http://127.0.0.1/test").prepare(),
+    elapsed=0.1,
+    verify=False,
+)
+patch("schemathesis.Case.call", return_value=RESPONSE).start()
 
 
 @pytest.mark.benchmark

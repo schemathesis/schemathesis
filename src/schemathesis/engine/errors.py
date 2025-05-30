@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import enum
 import re
+from dataclasses import dataclass
 from functools import cached_property
 from typing import TYPE_CHECKING, Callable, Iterator, Sequence, cast
 
@@ -24,6 +25,8 @@ from schemathesis.core.errors import (
 
 if TYPE_CHECKING:
     import hypothesis.errors
+    import requests
+    from requests.exceptions import ChunkedEncodingError
 
 __all__ = ["EngineErrorInfo", "DeadlineExceeded", "UnsupportedRecursiveReference", "UnexpectedError"]
 
@@ -61,8 +64,9 @@ class EngineErrorInfo:
     It serves as a caching wrapper around exceptions to avoid repeated computations.
     """
 
-    def __init__(self, error: Exception) -> None:
+    def __init__(self, error: Exception, code_sample: str | None = None) -> None:
         self._error = error
+        self._code_sample = code_sample
 
     def __str__(self) -> str:
         return self._error_repr
@@ -211,6 +215,9 @@ class EngineErrorInfo:
         if extras:
             message.append("")  # Empty line before extras
             message.extend(f"{indent}{extra}" for extra in extras)
+
+        if self._code_sample is not None:
+            message.append(f"\nReproduce with: \n\n    {self._code_sample}")
 
         # Suggestion
         suggestion = get_runtime_error_suggestion(self._kind, bold=bold)
@@ -409,3 +416,49 @@ def clear_hypothesis_notes(exc: Exception) -> None:
     notes = getattr(exc, "__notes__", [])
     if any("while generating" in note for note in notes):
         notes.clear()
+
+
+def is_unrecoverable_network_error(exc: Exception) -> bool:
+    from http.client import RemoteDisconnected
+
+    from urllib3.exceptions import ProtocolError
+
+    def has_connection_reset(inner: BaseException) -> bool:
+        exc_str = str(inner)
+        if any(pattern in exc_str for pattern in ["Connection reset by peer", "[Errno 104]", "ECONNRESET"]):
+            return True
+
+        if inner.__context__ is not None:
+            return has_connection_reset(inner.__context__)
+
+        return False
+
+    if isinstance(exc.__context__, ProtocolError):
+        if len(exc.__context__.args) == 2 and isinstance(exc.__context__.args[1], RemoteDisconnected):
+            return True
+        if len(exc.__context__.args) == 1 and exc.__context__.args[0] == "Response ended prematurely":
+            return True
+
+    return has_connection_reset(exc)
+
+
+@dataclass()
+class UnrecoverableNetworkError:
+    error: requests.ConnectionError | ChunkedEncodingError
+    code_sample: str
+
+    __slots__ = ("error", "code_sample")
+
+    def __init__(self, error: requests.ConnectionError | ChunkedEncodingError, code_sample: str) -> None:
+        self.error = error
+        self.code_sample = code_sample
+
+
+@dataclass
+class TestingState:
+    unrecoverable_network_error: UnrecoverableNetworkError | None
+
+    __slots__ = ("unrecoverable_network_error",)
+
+    def __init__(self) -> None:
+        self.unrecoverable_network_error = None

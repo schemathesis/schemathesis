@@ -33,7 +33,7 @@ Network Error
 Connection failed
 
     Failed to establish a new connection: [Error NUM] Connection refused
-__________________________________ POST /test __________________________________
+
 Serialization not possible
 
 Schemathesis can't serialize data to any of the defined media types: application/zip
