@@ -19,6 +19,7 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.control import ExecutionControl
+from schemathesis.engine.errors import clear_hypothesis_notes
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -259,6 +260,7 @@ def execute_state_machine_loop(
                     # Avoid infinite restarts
                     break
                 continue
+            clear_hypothesis_notes(exc)
             # Any other exception is an inner error and the test run should be stopped
             suite_status = Status.ERROR
             event_queue.put(
