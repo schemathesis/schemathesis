@@ -882,3 +882,58 @@ def test(case):
     result = testdir.runpytest()
     result.assert_outcomes(errors=1)
     assert "`test` has already been decorated with `override`" in result.stdout.str()
+
+
+def test_csv_response_validation_direct(testdir, openapi3_base_url):
+    testdir.make_test(
+        f"""
+import requests
+from schemathesis.core.transport import Response
+from schemathesis.specs.openapi.checks import response_schema_conformance
+
+schema.config.update(base_url="{openapi3_base_url}")
+schema.config.generation.update(modes=[GenerationMode.POSITIVE])
+
+@schema.include(name="GET /success").parametrize()
+def test_csv_validation(case):
+    request = requests.Request('GET', "http://127.0.0.1/api/success").prepare()
+
+    response = Response(
+        status_code=200,
+        headers={{}},
+        content=b"name,age\\nJohn,25",
+        request=request,
+        elapsed=0.1,
+        verify=False
+    )
+    case.validate_response(response, checks=(response_schema_conformance,))
+""",
+        paths={
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "format",
+                            "in": "query",
+                            "schema": {"type": "string", "enum": ["json", "csv"]},
+                            "required": True,
+                        }
+                    ],
+                    "responses": {
+                        "default": {
+                            "description": "Data response",
+                            "content": {"application/json": {"schema": {"type": "object"}}},
+                        }
+                    },
+                }
+            }
+        },
+        schema_name="simple_openapi.yaml",
+    )
+    result = testdir.runpytest("-s")
+    result.assert_outcomes(failed=1)
+    result.stdout.re_match_lines(
+        [
+            r".*/api/success\?format=csv.*",
+        ]
+    )

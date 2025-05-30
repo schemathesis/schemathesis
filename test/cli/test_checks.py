@@ -111,7 +111,6 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
     assert (
         cli.run(
             f"http://127.0.0.1:{port}/openapi.json",
-            "-call",
             "--mode=all",
             "--phases=coverage",
             "--continue-on-failure",
@@ -120,6 +119,62 @@ def test_negative_data_rejection_displays_all_cases(app_runner, cli, snapshot_cl
                     "negative_data_rejection": {"expected-statuses": ["400", "401", "403", "404", "422", "428", "5xx"]}
                 }
             },
+        )
+        == snapshot_cli
+    )
+
+
+def test_format_parameter_csv_response(app_runner, cli, snapshot_cli):
+    raw_schema = {
+        "openapi": "3.0.0",
+        "paths": {
+            "/data": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "format",
+                            "in": "query",
+                            "schema": {
+                                "type": "string",
+                                "enum": ["json", "csv"],
+                            },
+                        }
+                    ],
+                    "responses": {
+                        "200": {
+                            "description": "Data response",
+                            "content": {
+                                "application/json": {"schema": {"type": "object"}},
+                            },
+                        }
+                    },
+                }
+            }
+        },
+    }
+    app = Flask(__name__)
+
+    @app.route("/openapi.json")
+    def schema():
+        return jsonify(raw_schema)
+
+    @app.route("/data", methods=["GET"])
+    def data_endpoint():
+        format_param = request.args.get("format", "json")
+
+        if format_param == "csv":
+            return "name,age\nJohn,25", 200, {"Content-Type": ""}
+        return jsonify({"name": "John", "age": 25})
+
+    port = app_runner.run_flask_app(app)
+
+    assert (
+        cli.run(
+            f"http://127.0.0.1:{port}/openapi.json",
+            "-c response_schema_conformance",
+            "--mode=positive",
+            "--phases=fuzzing",
+            "--continue-on-failure",
         )
         == snapshot_cli
     )

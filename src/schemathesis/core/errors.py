@@ -441,7 +441,7 @@ def split_traceback(traceback: str) -> list[str]:
 
 
 def format_exception(
-    error: Exception,
+    error: BaseException,
     *,
     with_traceback: bool = False,
     skip_frames: int = 0,
