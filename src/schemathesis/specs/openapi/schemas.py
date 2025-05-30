@@ -659,6 +659,7 @@ class BaseOpenAPISchema(BaseSchema):
         return jsonschema.Draft4Validator
 
     def validate_response(self, operation: APIOperation, response: Response) -> bool | None:
+        __tracebackhide__ = True
         responses = {str(key): value for key, value in operation.definition.raw.get("responses", {}).items()}
         status_code = str(response.status_code)
         if status_code in responses:

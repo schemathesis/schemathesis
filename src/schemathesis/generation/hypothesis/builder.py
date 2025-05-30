@@ -9,7 +9,7 @@ from time import perf_counter
 from typing import Any, Callable, Generator, Mapping
 
 import hypothesis
-from hypothesis import Phase
+from hypothesis import Phase, Verbosity
 from hypothesis import strategies as st
 from hypothesis._settings import all_settings
 from hypothesis.errors import Unsatisfiable
@@ -96,6 +96,9 @@ def create_test(
 
     if settings.deadline == default.deadline:
         settings = hypothesis.settings(settings, deadline=DEFAULT_DEADLINE)
+
+    if settings.verbosity == default.verbosity:
+        settings = hypothesis.settings(settings, verbosity=Verbosity.quiet)
 
     if config.settings is not None:
         # Merge the user-provided settings with the current ones

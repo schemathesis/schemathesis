@@ -167,6 +167,7 @@ class Case:
                 curl=curl,
                 config=self.operation.schema.config.output,
             )
+            message += "\n\n"
             raise FailureGroup(_failures, message) from None
 
     def call_and_validate(

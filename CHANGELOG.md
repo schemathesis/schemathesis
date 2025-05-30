@@ -19,7 +19,8 @@
 - Run positive and negative tests by default.
 - Add timestamps to report filenames to avoid rewriting exiting report in subsequent runs.
 - Coverage phase no longer emits duplicate query parameter names by default. The `phases.coverage.generate-duplicate-query-parameters` config option allows for controlling this behavior.
-- Report cURL commands for some network-level errors (connection resets, server crashes). [#2709](https://github.com/schemathesis/schemathesis/issues/2709) 
+- Report cURL commands for some network-level errors (connection resets, server crashes). [#2709](https://github.com/schemathesis/schemathesis/issues/2709)
+- Cleanup pytest output. [#2714](https://github.com/schemathesis/schemathesis/issues/2714)
 
 ### :fire: Removed
 
