@@ -149,6 +149,7 @@ class EventStream:
         with_security_parameters=True,
         parameters=None,
         max_steps=None,
+        modes=None,
     ):
         schema.config.checks.update(
             included_check_names=[c.__name__ for c in checks] if checks else ["not_a_server_error"],
@@ -156,7 +157,10 @@ class EventStream:
         phases = phases or [PhaseName.EXAMPLES, PhaseName.FUZZING, PhaseName.STATEFUL_TESTING]
         schema.config.phases.update(phases=[phase.value.lower() for phase in phases])
         schema.config.generation.update(
-            max_examples=max_examples, deterministic=deterministic, with_security_parameters=with_security_parameters
+            max_examples=max_examples,
+            deterministic=deterministic,
+            with_security_parameters=with_security_parameters,
+            modes=modes,
         )
         schema.config.update(headers=headers, workers=workers, request_timeout=request_timeout, tls_verify=tls_verify)
         if auth is not None:
