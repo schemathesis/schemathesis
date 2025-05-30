@@ -58,6 +58,7 @@ def test_max_failures(cli, schema_url, snapshot_cli):
             "--generation-database=none",
             "-c not_a_server_error",
             "--phases=fuzzing,stateful",
+            "--mode=positive",
         )
         == snapshot_cli
     )

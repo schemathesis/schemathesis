@@ -1,0 +1,62 @@
+Exit code: 1
+---
+Stdout:
+Schemathesis dev
+━━━━━━━━━━━━━━━━
+
+
+ ✅  Loaded specification from http://127.0.0.1/openapi.json (in 0.00s)
+
+     Base URL:         http://127.0.0.1/
+     Specification:    Open API 3.0.0
+     Operations:       2 selected / 2 total
+
+
+ ✅  API capabilities:
+
+     Supports NULL byte in headers:    ✓
+
+ 🚫  Stateful (in 0.00s)
+
+     Scenarios:    N
+     API Links:    N covered / 1 selected / 1 total
+
+     🚫 1 error
+
+==================================== ERRORS ====================================
+________________________________ Stateful tests ________________________________
+Network Error
+
+Connection failed
+
+    Connection aborted. Remote end closed connection without response
+
+Reproduce with:
+
+    curl -X GET --insecure http://127.0.0.1/users/123
+
+Need more help?
+    Join our Discord server: https://discord.gg/R9ASRAmHnA
+=================================== SUMMARY ====================================
+
+API Operations:
+  Selected: 2/2
+  Tested: 1
+  Skipped: 1
+
+Test Phases:
+  ✅ API probing
+  ⏭  Examples (disabled)
+  ⏭  Coverage (disabled)
+  ⏭  Fuzzing (disabled)
+  🚫 Stateful
+
+Errors:
+  🚫 Network Error: 1
+
+Test cases:
+  N generated, N passed, N skipped
+
+Seed: 42
+
+=============================== 1 error in 1.00s ===============================

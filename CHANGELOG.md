@@ -12,12 +12,14 @@
 - Do not show the `operation returned only 4xx responses during unit tests` warning if the API operation only returned HTTP 500 responses.
 - Internal error inside `ignored_auth` in negative testing mode.
 - Do not show additional Hypothesis notes on errors during CLI execution.
+- Internal error on `ChunkedEncodingError`.
 
 ### :wrench: Changed
 
 - Run positive and negative tests by default.
 - Add timestamps to report filenames to avoid rewriting exiting report in subsequent runs.
 - Coverage phase no longer emits duplicate query parameter names by default. The `phases.coverage.generate-duplicate-query-parameters` config option allows for controlling this behavior.
+- Report cURL commands for some network-level errors (connection resets, server crashes). [#2709](https://github.com/schemathesis/schemathesis/issues/2709) 
 
 ### :fire: Removed
 

@@ -11,6 +11,7 @@ from hypothesis.errors import InvalidArgument
 from hypothesis_jsonschema._canonicalise import HypothesisRefResolutionError
 from jsonschema.exceptions import SchemaError as JsonSchemaError
 from jsonschema.exceptions import ValidationError
+from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, run_checks
@@ -33,10 +34,13 @@ from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.errors import (
     DeadlineExceeded,
+    TestingState,
     UnexpectedError,
+    UnrecoverableNetworkError,
     UnsupportedRecursiveReference,
     clear_hypothesis_notes,
     deduplicate_errors,
+    is_unrecoverable_network_error,
 )
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -71,9 +75,12 @@ def run_test(
     skip_reason = None
     test_start_time = time.monotonic()
     recorder = ScenarioRecorder(label=operation.label)
+    state = TestingState()
 
-    def non_fatal_error(error: Exception) -> events.NonFatalError:
-        return events.NonFatalError(error=error, phase=phase, label=operation.label, related_to_operation=True)
+    def non_fatal_error(error: Exception, code_sample: str | None = None) -> events.NonFatalError:
+        return events.NonFatalError(
+            error=error, phase=phase, label=operation.label, related_to_operation=True, code_sample=code_sample
+        )
 
     def scenario_finished(status: Status) -> events.ScenarioFinished:
         return events.ScenarioFinished(
@@ -112,6 +119,7 @@ def run_test(
         with catch_warnings(record=True) as warnings, ignore_hypothesis_output():
             test_function(
                 ctx=ctx,
+                state=state,
                 errors=errors,
                 check_ctx=check_ctx,
                 recorder=recorder,
@@ -209,7 +217,10 @@ def run_test(
                 )
             )
         else:
-            yield non_fatal_error(exc)
+            code_sample: str | None = None
+            if state.unrecoverable_network_error is not None and state.unrecoverable_network_error.error is exc:
+                code_sample = state.unrecoverable_network_error.code_sample
+            yield non_fatal_error(exc, code_sample=code_sample)
     if (
         status == Status.SUCCESS
         and continue_on_failure
@@ -272,6 +283,7 @@ def cached_test_func(f: Callable) -> Callable:
     def wrapped(
         *,
         ctx: EngineContext,
+        state: TestingState,
         case: Case,
         errors: list[Exception],
         check_ctx: CheckContext,
@@ -315,6 +327,21 @@ def cached_test_func(f: Callable) -> Callable:
         except (KeyboardInterrupt, Failure):
             raise
         except Exception as exc:
+            if isinstance(exc, (requests.ConnectionError, ChunkedEncodingError)) and is_unrecoverable_network_error(
+                exc
+            ):
+                # Server likely has crashed and does not accept any connections at all
+                # Don't report these error - only the original crash should be reported
+                if exc.request is not None:
+                    headers = {key: value[0] for key, value in exc.request.headers.items()}
+                else:
+                    headers = {**dict(case.headers or {}), **transport_kwargs.get("headers", {})}
+                verify = transport_kwargs.get("verify", True)
+                state.unrecoverable_network_error = UnrecoverableNetworkError(
+                    error=exc,
+                    code_sample=case.as_curl_command(headers=headers, verify=verify),
+                )
+                raise
             errors.append(exc)
             raise UnexpectedError from None
 
@@ -336,7 +363,7 @@ def test_func(
     recorder.record_case(parent_id=None, transition=None, case=case)
     try:
         response = case.call(**transport_kwargs)
-    except (requests.Timeout, requests.ConnectionError) as error:
+    except (requests.Timeout, requests.ConnectionError, ChunkedEncodingError) as error:
         if isinstance(error.request, requests.Request):
             recorder.record_request(case_id=case.id, request=error.request.prepare())
         elif isinstance(error.request, requests.PreparedRequest):
