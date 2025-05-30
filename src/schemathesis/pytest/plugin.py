@@ -21,7 +21,9 @@ from schemathesis.core.errors import (
     InvalidRegexPattern,
     InvalidSchema,
     SerializationNotPossible,
+    format_exception,
 )
+from schemathesis.core.failures import FailureGroup
 from schemathesis.core.marks import Mark
 from schemathesis.core.result import Ok, Result
 from schemathesis.generation.hypothesis.given import (
@@ -245,6 +247,26 @@ def pytest_pycollect_makeitem(collector: nodes.Collector, name: str, obj: Any) -
         outcome.force_result(SchemathesisCase.from_parent(collector, test_function=obj, name=name, schema=schema))
     except Exception:
         outcome.get_result()
+
+
+@pytest.hookimpl(tryfirst=True)  # type: ignore[misc]
+def pytest_exception_interact(node: Function, call: pytest.CallInfo, report: pytest.TestReport) -> None:
+    if call.excinfo and call.excinfo.type is FailureGroup:
+        tb_entries = list(call.excinfo.traceback)
+        total_frames = len(tb_entries)
+
+        # Keep internal Schemathesis frames + one extra one from the caller
+        keep_from_index = 0
+        for i in range(total_frames - 1, -1, -1):
+            entry = tb_entries[i]
+
+            if "validate_response" in str(entry):
+                keep_from_index = max(0, i - 1)
+                break
+
+        skip_frames = keep_from_index
+
+        report.longrepr = "".join(format_exception(call.excinfo.value, with_traceback=True, skip_frames=skip_frames))
 
 
 @hookimpl(wrapper=True)
