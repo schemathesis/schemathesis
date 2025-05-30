@@ -13,6 +13,7 @@
 - Internal error inside `ignored_auth` in negative testing mode.
 - Do not show additional Hypothesis notes on errors during CLI execution.
 - Internal error on `ChunkedEncodingError`.
+- False positive `missing_required_header` if the header name is one of the ones added by default like `Accept`.
 
 ### :wrench: Changed
 

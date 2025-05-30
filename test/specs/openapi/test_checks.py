@@ -1,4 +1,5 @@
 import pytest
+import yaml
 
 import schemathesis
 from schemathesis.checks import CheckContext
@@ -344,6 +345,67 @@ def test_missing_required_header(ctx, cli, openapi3_base_url, snapshot_cli, path
         )
         == snapshot_cli
     )
+
+
+@pytest.mark.operations("success")
+def test_missing_required_accept_header(ctx, cli, openapi3_base_url, tmp_path):
+    cassette_path = tmp_path / "missing_accept_header.yaml"
+
+    schema_path = ctx.openapi.write_schema(
+        {
+            "/success": {
+                "get": {
+                    "parameters": [
+                        {
+                            "name": "Accept",
+                            "in": "header",
+                            "required": True,
+                            "schema": {"type": "string", "enum": ["application/json"]},
+                        },
+                    ],
+                    "responses": {"200": {"description": "OK"}},
+                }
+            }
+        }
+    )
+
+    cli.run(
+        str(schema_path),
+        f"--url={openapi3_base_url}",
+        f"--report-vcr-path={cassette_path}",
+        "--phases=coverage",
+        "--mode=negative",
+        "--checks=missing_required_header",
+        "--max-examples=1",
+    )
+
+    # Load and verify the cassette
+    with cassette_path.open(encoding="utf-8") as fd:
+        cassette = yaml.safe_load(fd)
+    interactions = cassette["http_interactions"]
+
+    missing_header_interaction = None
+    for interaction in interactions:
+        if (
+            interaction["phase"]["name"] == "coverage"
+            and interaction["generation"]["mode"] == "negative"
+            and interaction["phase"]["data"]["description"] == "Missing `Accept` at header"
+        ):
+            missing_header_interaction = interaction
+            break
+
+    assert missing_header_interaction is not None, "Should find missing required header test case"
+    phase_data = missing_header_interaction["phase"]["data"]
+    assert phase_data["parameter"] == "Accept"
+    assert phase_data["parameter_location"] == "header"
+
+    request_headers = missing_header_interaction["request"]["headers"]
+    assert "Accept" not in request_headers, f"Accept header should be missing, but found: {request_headers}"
+
+    checks = missing_header_interaction["checks"]
+    missing_header_check = next((c for c in checks if c["name"] == "missing_required_header"), None)
+    assert missing_header_check is not None
+    assert missing_header_check["status"] == "FAILURE"
 
 
 @pytest.mark.parametrize("path, method", [("/success", "get"), ("/basic", "post")])

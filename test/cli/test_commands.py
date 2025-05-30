@@ -980,7 +980,7 @@ def test_auth_override_on_protected_operation(cli, schema_url, extra, snapshot_c
     # And the auth is overridden (directly or via headers)
     # And there is an error during testing
     # Then the code sample representation in the output should have the overridden value
-    assert cli.run(schema_url, "--output-sanitize=false", extra) == snapshot_cli
+    assert cli.run(schema_url, "--output-sanitize=false", "--phases=fuzzing", extra) == snapshot_cli
 
 
 @pytest.mark.openapi_version("3.0")
