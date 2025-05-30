@@ -403,7 +403,10 @@ def get_request_error_extras(exc: RequestException) -> list[str]:
             return [reason.strip()]
         return [" ".join(map(_clean_inner_request_message, inner.args))]
     if isinstance(exc, ChunkedEncodingError):
-        return [str(exc.args[0].args[1])]
+        args = exc.args[0].args
+        if len(args) == 1:
+            return [str(args[0])]
+        return [str(args[1])]
     return []
 
 

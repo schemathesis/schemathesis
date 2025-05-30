@@ -1715,3 +1715,193 @@ def always_fails(ctx, response, case):
             )
             == snapshot_cli
         )
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+def test_app_crash(subprocess_runner, cli, snapshot_cli):
+    app = """
+import os
+from flask import Flask, jsonify
+import ctypes
+
+app = Flask(__name__)
+
+raw_schema = {
+    "openapi": "3.0.0",
+    "info": {"title": "Crash Test", "version": "1.0.0"},
+    "paths": {"/crash": {"get": {"responses": {"200": {"description": "Won't return"}}}}},
+}
+
+@app.route("/openapi.json")
+def openapi():
+    return jsonify(raw_schema)
+
+@app.get("/crash")
+def crash():
+    ctypes.string_at(0)  # Segfault
+
+if __name__ == "__main__":
+    port = int(os.environ["PORT"])
+    app.run(host="127.0.0.1", port=port, debug=False)
+"""
+
+    port = subprocess_runner.run_app(app)
+
+    assert cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--tls-verify=false") == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+def test_partial_response(subprocess_runner, cli, snapshot_cli):
+    app = """
+import os
+import sys
+from flask import Flask, jsonify, Response
+import time
+
+app = Flask(__name__)
+
+raw_schema = {
+    "openapi": "3.0.0",
+    "info": {"title": "Partial Response Test", "version": "1.0.0"},
+    "paths": {"/crash": {"get": {"responses": {"200": {"description": "Won't return"}}}}},
+}
+
+@app.route("/openapi.json")
+def openapi():
+    return jsonify(raw_schema)
+
+@app.get("/crash")
+def crash():
+    def generate():
+        yield '{"partial":'
+        sys.stdout.flush()
+        # Force connection reset while client expects more data
+        os._exit(1)
+
+    return Response(generate(), mimetype='application/json')
+
+if __name__ == "__main__":
+    port = int(os.environ["PORT"])
+    app.run(host="127.0.0.1", port=port, debug=False)
+"""
+
+    port = subprocess_runner.run_app(app)
+
+    assert cli.main("run", f"http://127.0.0.1:{port}/openapi.json", "--tls-verify=false") == snapshot_cli
+
+
+@pytest.mark.skipif(platform.system() == "Windows", reason="Requires extra setup on Windows")
+@pytest.mark.snapshot(replace_phase_statistic=True)
+def test_stateful_crash(subprocess_runner, cli, snapshot_cli):
+    app = """
+import os
+from flask import Flask, jsonify, request
+import ctypes
+
+app = Flask(__name__)
+
+raw_schema = {
+    "openapi": "3.0.0",
+    "info": {"title": "Stateful Crash Test", "version": "1.0.0"},
+    "paths": {
+        "/users": {
+            "post": {
+                "summary": "Create user",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {"name": {"type": "string"}},
+                                "required": ["name"]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "User created",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {"id": {"type": "integer"}},
+                                    "required": ["id"]
+                                }
+                            }
+                        },
+                        "links": {
+                            "GetUserById": {
+                                "operationId": "getUserById",
+                                "parameters": {"id": "$response.body#/id"}
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "operationId": "getUserById",
+                "summary": "Get user by ID",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"}
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User details",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {"type": "integer"},
+                                        "name": {"type": "string"}
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@app.route("/openapi.json")
+def openapi():
+    return jsonify(raw_schema)
+
+@app.route("/users", methods=["POST"])
+def create_user():
+    return jsonify({"id": 123}), 201
+
+@app.route("/users/<int:user_id>", methods=["GET"])
+def get_user(user_id):
+    # Crash during stateful testing when following the link
+    ctypes.string_at(0)  # Segfault
+
+if __name__ == "__main__":
+    port = int(os.environ["PORT"])
+    app.run(host="127.0.0.1", port=port, debug=False)
+"""
+
+    port = subprocess_runner.run_app(app)
+
+    assert (
+        cli.main(
+            "run",
+            f"http://127.0.0.1:{port}/openapi.json",
+            "--phases=stateful",
+            "--tls-verify=false",
+            "-c not_a_server_error",
+            "--max-examples=1",
+            "--mode=positive",
+        )
+        == snapshot_cli
+    )

@@ -4,6 +4,7 @@ import os
 import textwrap
 import time
 from dataclasses import dataclass, field
+from itertools import groupby
 from json.decoder import JSONDecodeError
 from types import GeneratorType
 from typing import TYPE_CHECKING, Any, Generator, Iterable
@@ -1419,9 +1420,13 @@ class OutputHandler(EventHandler):
         if self.errors:
             display_section_name("ERRORS")
             errors = sorted(self.errors, key=lambda r: (r.phase.value, r.label, r.info.title))
-            for error in errors:
-                display_section_name(error.label, "_", fg="red")
-                click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+            for label, group_errors in groupby(errors, key=lambda r: r.label):
+                display_section_name(label, "_", fg="red")
+                _errors = list(group_errors)
+                for idx, error in enumerate(_errors, 1):
+                    click.echo(error.info.format(bold=lambda x: click.style(x, bold=True)))
+                    if idx < len(_errors):
+                        click.echo()
             click.echo(
                 _style(
                     f"\nNeed more help?\n    Join our Discord server: {DISCORD_LINK}",

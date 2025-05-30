@@ -8,9 +8,11 @@ from typing import Any
 from warnings import catch_warnings
 
 import hypothesis
+import requests
 from hypothesis.control import current_build_context
 from hypothesis.errors import Flaky, Unsatisfiable
 from hypothesis.stateful import Rule
+from requests.exceptions import ChunkedEncodingError
 from requests.structures import CaseInsensitiveDict
 
 from schemathesis.checks import CheckContext, CheckFunction, run_checks
@@ -19,7 +21,12 @@ from schemathesis.core.transport import Response
 from schemathesis.engine import Status, events
 from schemathesis.engine.context import EngineContext
 from schemathesis.engine.control import ExecutionControl
-from schemathesis.engine.errors import clear_hypothesis_notes
+from schemathesis.engine.errors import (
+    TestingState,
+    UnrecoverableNetworkError,
+    clear_hypothesis_notes,
+    is_unrecoverable_network_error,
+)
 from schemathesis.engine.phases import PhaseName
 from schemathesis.engine.phases.stateful.context import StatefulContext
 from schemathesis.engine.recorder import ScenarioRecorder
@@ -74,6 +81,7 @@ def execute_state_machine_loop(
     generation = engine.config.generation_for(phase="stateful")
 
     ctx = StatefulContext(metric_collector=TargetMetricCollector(targets=generation.maximize))
+    state = TestingState()
 
     # Caches for validate_response to avoid repeated config lookups per operation
     _check_context_cache: dict[str, CachedCheckContextData] = {}
@@ -124,6 +132,20 @@ def execute_state_machine_loop(
                 ctx.step_failed()
                 raise
             except Exception as exc:
+                if isinstance(exc, (requests.ConnectionError, ChunkedEncodingError)) and is_unrecoverable_network_error(
+                    exc
+                ):
+                    transport_kwargs = engine.get_transport_kwargs(operation=input.case.operation)
+                    if exc.request is not None:
+                        headers = {key: value[0] for key, value in exc.request.headers.items()}
+                    else:
+                        headers = {**dict(input.case.headers or {}), **transport_kwargs.get("headers", {})}
+                    verify = transport_kwargs.get("verify", True)
+                    state.unrecoverable_network_error = UnrecoverableNetworkError(
+                        error=exc,
+                        code_sample=input.case.as_curl_command(headers=headers, verify=verify),
+                    )
+
                 if generation.unique_inputs:
                     ctx.store_step_outcome(input.case, exc)
                 ctx.step_errored()
@@ -263,9 +285,17 @@ def execute_state_machine_loop(
             clear_hypothesis_notes(exc)
             # Any other exception is an inner error and the test run should be stopped
             suite_status = Status.ERROR
+            code_sample: str | None = None
+            if state.unrecoverable_network_error is not None:
+                exc = state.unrecoverable_network_error.error
+                code_sample = state.unrecoverable_network_error.code_sample
             event_queue.put(
                 events.NonFatalError(
-                    error=exc, phase=PhaseName.STATEFUL_TESTING, label="Stateful tests", related_to_operation=False
+                    error=exc,
+                    phase=PhaseName.STATEFUL_TESTING,
+                    label="Stateful tests",
+                    related_to_operation=False,
+                    code_sample=code_sample,
                 )
             )
             break
