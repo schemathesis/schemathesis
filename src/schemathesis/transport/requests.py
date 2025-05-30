@@ -92,6 +92,7 @@ class RequestsTransport(BaseTransport["requests.Session"]):
         if session is None:
             validate_vanilla_requests_kwargs(data)
             session = requests.Session()
+            session.headers = {}
             close_session = True
         else:
             close_session = False

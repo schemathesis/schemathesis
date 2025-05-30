@@ -16,6 +16,7 @@ from schemathesis.core.transport import USER_AGENT, Response
 from schemathesis.generation import GenerationMode
 from schemathesis.schemas import APIOperation
 from schemathesis.specs.openapi.checks import content_type_conformance, response_schema_conformance
+from schemathesis.transport.prepare import get_default_headers
 
 
 @pytest.fixture
@@ -124,7 +125,7 @@ def test_as_transport_kwargs(override, server, base_url, swagger_20, converter):
         operation.base_url = base_url
         data = case.as_transport_kwargs()
     assert data == {
-        "headers": {"User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
+        "headers": {**get_default_headers(), "User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
         "method": "GET",
         "params": None,
         "cookies": {"TOKEN": "secret"},
@@ -170,7 +171,7 @@ def test_as_transport_kwargs_override_user_agent(server, openapi2_base_url, swag
     data = case.as_transport_kwargs(headers={"X-Key": "foo"})
     expected[SCHEMATHESIS_TEST_CASE_HEADER] = ANY
     assert data == {
-        "headers": expected,
+        "headers": {**get_default_headers(), **expected},
         "method": "GET",
         "params": None,
         "cookies": None,
@@ -207,7 +208,12 @@ def test_as_transport_kwargs_override_content_type(ctx, header):
         "data": b"<html></html>",
         "params": None,
         "cookies": None,
-        "headers": {header: "text/html", "User-Agent": USER_AGENT, SCHEMATHESIS_TEST_CASE_HEADER: ANY},
+        "headers": {
+            **get_default_headers(),
+            header: "text/html",
+            "User-Agent": USER_AGENT,
+            SCHEMATHESIS_TEST_CASE_HEADER: ANY,
+        },
         "url": "/data",
     }
 

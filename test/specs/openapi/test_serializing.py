@@ -22,6 +22,7 @@ from schemathesis.specs.openapi.serialization import (
     matrix_object,
     matrix_primitive,
 )
+from schemathesis.transport.prepare import get_default_headers
 from test.utils import assert_requests_call
 
 PRIMITIVE_SCHEMA = {"type": "integer", "enum": [1]}
@@ -583,6 +584,6 @@ def test_unusual_form_schema(ctx, type_name):
         # And it should be case-insensitive
         headers = case.as_transport_kwargs(headers={"content-type": "text/plain"})["headers"]
         assert headers["content-type"] == "text/plain"
-        assert list(headers) == ["content-type", "User-Agent", SCHEMATHESIS_TEST_CASE_HEADER]
+        assert list(headers) == [*list(get_default_headers()), SCHEMATHESIS_TEST_CASE_HEADER, "content-type"]
 
     test()
